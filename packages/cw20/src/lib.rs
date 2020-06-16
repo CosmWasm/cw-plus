@@ -1,4 +1,5 @@
 pub mod msg;
+pub mod query;
 
 #[cfg(test)]
 mod tests {

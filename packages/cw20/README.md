@@ -27,6 +27,9 @@ any actions on the recipient if it is a contract.
 address of a contract that implements the `Receiver` interface. The `msg`
 will be passed to the recipient contract, along with the amount. 
 
+`Burn{amount}` - Remove `amount` tokens from the balance of `env.sender`
+and reduce `total_supply` by the same amount.
+
 ### Queries
 
 `Balance{address}` - Returns the balance of the given address.
@@ -75,6 +78,17 @@ and if there was a valid, un-expired pre-approval for the `env.sender`,
 then we move `amount` tokens from `owner` to `recipient` and deduct it
 from the available allowance.
 
+`SendFrom{owner, contract, amount, msg}` - `SendFrom` is to `Send`, what
+`TransferFrom` is to `Transfer`. This allows a pre-approved account to
+not just transfer the tokens, but to send them to another contract
+to trigger a given action. `SendFrom` will set the `Receive{sender}`
+to be the `owner` account (the account the money is coming from)
+rather than `env.sender` (the account that triggered the transfer).
+
+`BurnFrom{owner, amount}` - This works like `TransferFrom`, but burns 
+the tokens instead of transfering them. This will reduce the owner's 
+balance, `total_supply` and the caller's allowance.
+
 TODO: IncreaseApproval/DecreaseApproval to store delta's rather than absolute values??
 
 ### Queries
@@ -100,17 +114,3 @@ add them to the balance of `recipient`.
 
 `Minter{}` - Returns who and how much can be minted. Return type is
 `MinterResponse {minter, cap}`. Cap may be unset.
-
-## Burnable
-
-This allows users to burn tokens, reducing the total supply
-
-### Messages
-
-`Burn{amount}` - Remove `amount` tokens from the balance of `env.sender`
-and reduce `total_supply` by the same amount.
-
-`BurnFrom{owner, amount}` - If "Allowances" is also implemented, this
-works like `TransferFrom`, but burns the tokens instead of transfering
-them. This will reduce the owner's balance, `total_supply` and the
-caller's allowance.
