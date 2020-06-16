@@ -8,7 +8,6 @@ debug-assertions = false
 codegen-units = 1
 incremental = false
 overflow-checks = true
-panic = 'abort'
 
 [profile.release]
 rpath = false
