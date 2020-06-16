@@ -2,7 +2,7 @@ pub mod contract;
 pub mod msg;
 pub mod state;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "entrypoint"))]
 mod wasm {
     use super::contract;
     use cosmwasm_std::{

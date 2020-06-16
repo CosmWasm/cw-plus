@@ -8,7 +8,10 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["cranelift"]
+default = ["cranelift", "entrypoint"]
+# entrypoint means to expose init, handle, query extern "C" functions
+# disable this (default-features = false) if importing code for use in another contract
+entrypoint = []
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
