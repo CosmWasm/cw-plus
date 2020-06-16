@@ -23,7 +23,8 @@ use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance, query};
 use cw20_base::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
 
 // This line will test the output of cargo wasm
-static WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/release/cw20_base.wasm");
+static WASM: &[u8] =
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/cw20_base.wasm");
 // You can uncomment this line instead to test productionified build from rust-optimizer
 // static WASM: &[u8] = include_bytes!("../contract.wasm");
 

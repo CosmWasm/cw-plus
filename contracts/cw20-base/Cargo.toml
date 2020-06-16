@@ -15,17 +15,6 @@ exclude = [
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-opt-level = 3
-debug = false
-rpath = false
-lto = true
-debug-assertions = false
-codegen-units = 1
-panic = 'abort'
-incremental = false
-overflow-checks = true
-
 [features]
 default = ["cranelift"]
 # for quicker tests, cargo test --lib
@@ -35,12 +24,12 @@ cranelift = ["cosmwasm-vm/default-cranelift"]
 singlepass = ["cosmwasm-vm/default-singlepass"]
 
 [dependencies]
-cosmwasm-std = { version = "0.8.0" }
-cosmwasm-storage = { version = "0.8.0" }
+cosmwasm-std = { version = "0.8.1" }
+cosmwasm-storage = { version = "0.8.1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
 
 [dev-dependencies]
-cosmwasm-vm = { version = "0.8.0", default-features = false }
-cosmwasm-schema = { version = "0.8.0" }
+cosmwasm-vm = { version = "0.8.1", default-features = false }
+cosmwasm-schema = { version = "0.8.1" }
