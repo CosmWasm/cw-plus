@@ -1,71 +1,114 @@
-use cosmwasm_std::{to_binary, HumanAddr, Querier, StdResult, WasmQuery};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-use crate::{AllowanceResponse, Cw20QueryMsg, MetaResponse, MinterResponse};
+use cosmwasm_std::{
+    to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, Querier, StdResult, Uint128, WasmMsg,
+    WasmQuery,
+};
 
-/// ensure_cw20 checks that the contract satisfies the basic Cw20 query interface,
-/// so we assume it is a valid contract. This can be used as a sanity check in init
-/// when setting a token contract address.
+use crate::{
+    AllowanceResponse, BalanceResponse, Cw20HandleMsg, Cw20QueryMsg, MetaResponse, MinterResponse,
+};
+
+/// Cw20Contract is a wrapper around HumanAddr that provides a lot of helpers
+/// for working with this.
 ///
-/// This returns the token symbol if it is a valid contract.
-pub fn ensure_cw20<Q: Querier>(querier: &Q, contract_addr: HumanAddr) -> StdResult<String> {
-    let msg = Cw20QueryMsg::Meta {};
-    let query = WasmQuery::Smart {
-        contract_addr,
-        msg: to_binary(&msg)?,
+/// If you wish to persist this, convert to Cw20CanonicalContract via .canonical()
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Cw20Contract(pub HumanAddr);
+
+impl Cw20Contract {
+    pub fn addr(&self) -> HumanAddr {
+        self.0.clone()
     }
-    .into();
-    let res: MetaResponse = querier.query(&query)?;
-    Ok(res.symbol)
+
+    /// Convert this address to a form fit for storage
+    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw20CanonicalContract> {
+        let canon = api.canonical_address(&self.0)?;
+        Ok(Cw20CanonicalContract(canon))
+    }
+
+    pub fn call<T: Into<Cw20HandleMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
+        let msg = to_binary(&msg.into())?;
+        Ok(WasmMsg::Execute {
+            contract_addr: self.addr(),
+            msg,
+            send: vec![],
+        }
+        .into())
+    }
+
+    /// Get token balance for the given address
+    pub fn balance<Q: Querier>(&self, querier: &Q, address: HumanAddr) -> StdResult<Uint128> {
+        let msg = Cw20QueryMsg::Balance { address };
+        let query = WasmQuery::Smart {
+            contract_addr: self.addr(),
+            msg: to_binary(&msg)?,
+        }
+        .into();
+        let res: BalanceResponse = querier.query(&query)?;
+        Ok(res.balance)
+    }
+
+    /// Get metadata from the contract. This is a good check that the address
+    /// is a valid Cw20 contract.
+    pub fn meta<Q: Querier>(&self, querier: &Q) -> StdResult<MetaResponse> {
+        let msg = Cw20QueryMsg::Meta {};
+        let query = WasmQuery::Smart {
+            contract_addr: self.addr(),
+            msg: to_binary(&msg)?,
+        }
+        .into();
+        querier.query(&query)
+    }
+
+    /// Get allowance of spender to use owner's account
+    pub fn allowance<Q: Querier>(
+        &self,
+        querier: &Q,
+        owner: HumanAddr,
+        spender: HumanAddr,
+    ) -> StdResult<AllowanceResponse> {
+        let msg = Cw20QueryMsg::Allowance { owner, spender };
+        let query = WasmQuery::Smart {
+            contract_addr: self.addr(),
+            msg: to_binary(&msg)?,
+        }
+        .into();
+        querier.query(&query)
+    }
+
+    /// Find info on who can mint, and how much
+    pub fn minter<Q: Querier>(&self, querier: &Q) -> StdResult<MinterResponse> {
+        let msg = Cw20QueryMsg::Minter {};
+        let query = WasmQuery::Smart {
+            contract_addr: self.addr(),
+            msg: to_binary(&msg)?,
+        }
+        .into();
+        querier.query(&query)
+    }
+
+    /// returns true if the contract supports the allowance extension
+    pub fn has_allowance<Q: Querier>(&self, querier: &Q) -> bool {
+        self.allowance(querier, self.addr(), self.addr()).is_ok()
+    }
+
+    /// returns true if the contract supports the mintable extension
+    pub fn is_mintable<Q: Querier>(&self, querier: &Q) -> bool {
+        self.minter(querier).is_ok()
+    }
 }
 
-/// ensure_cw20_allowance checks that the contract satisfies the basic Cw20 query interface
-/// as well as the allowance extension. This can be used as a sanity check in init
-/// when setting a token contract address.
-///
-/// This returns the token symbol if it is a valid contract.
-pub fn ensure_cw20_allowance<Q: Querier>(
-    querier: &Q,
-    contract_addr: HumanAddr,
-) -> StdResult<String> {
-    // first ensure this is a valid erc20 contract
-    let ticker = ensure_cw20(querier, contract_addr.clone())?;
+/// This is a respresentation of Cw20Contract for storage.
+/// Don't use it directly, just translate to the Cw20Contract when needed.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Cw20CanonicalContract(pub CanonicalAddr);
 
-    // we use the contract_addr here as we just want to ensure we have a valid HumanAddr, don't care what allowance
-    let msg = Cw20QueryMsg::Allowance {
-        owner: contract_addr.clone(),
-        spender: contract_addr.clone(),
-    };
-    let query = WasmQuery::Smart {
-        contract_addr,
-        msg: to_binary(&msg)?,
+impl Cw20CanonicalContract {
+    /// Convert this address to a form fit for usage in messages and queries
+    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw20Contract> {
+        let human = api.human_address(&self.0)?;
+        Ok(Cw20Contract(human))
     }
-    .into();
-    // ensure we get a properly formatted AllowanceResponse, we don't care about the content
-    let _: AllowanceResponse = querier.query(&query)?;
-
-    Ok(ticker)
-}
-
-/// ensure_cw20_mintable checks that the contract satisfies the basic Cw20 query interface
-/// as well as the mintable extension. This can be used as a sanity check in init
-/// when setting a token contract address.
-///
-/// This returns the token symbol if it is a valid contract.
-pub fn ensure_cw20_mintable<Q: Querier>(
-    querier: &Q,
-    contract_addr: HumanAddr,
-) -> StdResult<String> {
-    // first ensure this is a valid erc20 contract
-    let ticker = ensure_cw20(querier, contract_addr.clone())?;
-
-    let msg = Cw20QueryMsg::Minter {};
-    let query = WasmQuery::Smart {
-        contract_addr,
-        msg: to_binary(&msg)?,
-    }
-    .into();
-    // ensure we get a properly formatted AllowanceResponse, we don't care about the content
-    let _: MinterResponse = querier.query(&query)?;
-
-    Ok(ticker)
 }

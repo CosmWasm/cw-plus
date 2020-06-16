@@ -2,7 +2,7 @@ mod helpers;
 mod msg;
 mod query;
 
-pub use crate::helpers::{ensure_cw20, ensure_cw20_allowance, ensure_cw20_mintable};
+pub use crate::helpers::{Cw20CanonicalContract, Cw20Contract};
 pub use crate::msg::Cw20HandleMsg;
 pub use crate::query::{
     AllowanceResponse, BalanceResponse, Cw20QueryMsg, MetaResponse, MinterResponse,
