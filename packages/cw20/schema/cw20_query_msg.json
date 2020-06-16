@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "QueryMsg",
+  "title": "Cw20QueryMsg",
   "anyOf": [
     {
       "description": "Returns the current balance of the given address, 0 if unset. Return type: BalanceResponse.",
