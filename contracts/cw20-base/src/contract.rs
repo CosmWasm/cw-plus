@@ -1,24 +1,45 @@
 use cosmwasm_std::{
-    to_binary, unauthorized, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier,
-    StdResult, Storage,
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    StdResult, Storage, Uint128,
 };
 
-use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
+use crate::state::{balances, balances_read, meta, meta_read, Meta};
+use cw20::{BalanceResponse, Cw20ReceiveMsg};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State {
-        count: msg.count,
-        owner: env.message.sender,
+    // check valid meta-data
+    msg.validate()?;
+    // create initial accounts
+    let total_supply = create_accounts(deps, &msg.initial_balances)?;
+
+    // store metadata
+    let data = Meta {
+        name: msg.name,
+        symbol: msg.symbol,
+        decimals: msg.decimals,
+        total_supply,
     };
-
-    config(&mut deps.storage).save(&state)?;
-
+    meta(&mut deps.storage).save(&data)?;
     Ok(InitResponse::default())
+}
+
+pub fn create_accounts<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    accounts: &[InitialBalance],
+) -> StdResult<Uint128> {
+    let mut total_supply = Uint128::zero();
+    let mut store = balances(&mut deps.storage);
+    for row in accounts {
+        let raw_address = deps.api.canonical_address(&row.address)?;
+        store.save(raw_address.as_slice(), &row.amount)?;
+        total_supply += row.amount;
+    }
+    Ok(total_supply)
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -27,36 +48,117 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps, env),
-        HandleMsg::Reset { count } => try_reset(deps, env, count),
+        HandleMsg::Transfer { recipient, amount } => try_transfer(deps, env, recipient, amount),
+        HandleMsg::Burn { amount } => try_burn(deps, env, amount),
+        HandleMsg::Send {
+            contract,
+            amount,
+            msg,
+        } => try_send(deps, env, contract, amount, msg),
     }
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _env: Env,
-) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    Ok(HandleResponse::default())
-}
-
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
+pub fn try_transfer<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    count: i32,
+    recipient: HumanAddr,
+    amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        if env.message.sender != state.owner {
-            return Err(unauthorized());
-        }
-        state.count = count;
-        Ok(state)
+    let rcpt_raw = deps.api.canonical_address(&recipient)?;
+    let sender_raw = env.message.sender;
+
+    let mut accounts = balances(&mut deps.storage);
+    accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
+        balance.unwrap_or_default() - amount
     })?;
-    Ok(HandleResponse::default())
+    accounts.update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
+        Ok(balance.unwrap_or_default() + amount)
+    })?;
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "transfer"),
+            log("from", deps.api.human_address(&sender_raw)?),
+            log("to", recipient),
+            log("amount", amount),
+        ],
+        data: None,
+    };
+    Ok(res)
+}
+
+pub fn try_burn<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    amount: Uint128,
+) -> StdResult<HandleResponse> {
+    let sender_raw = env.message.sender;
+
+    // lower balance
+    let mut accounts = balances(&mut deps.storage);
+    accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
+        balance.unwrap_or_default() - amount
+    })?;
+    // reduce total_supply
+    meta(&mut deps.storage).update(|mut meta| {
+        meta.total_supply = (meta.total_supply - amount)?;
+        Ok(meta)
+    })?;
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "burn"),
+            log("from", deps.api.human_address(&sender_raw)?),
+            log("amount", amount),
+        ],
+        data: None,
+    };
+    Ok(res)
+}
+
+pub fn try_send<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    contract: HumanAddr,
+    amount: Uint128,
+    msg: Option<Binary>,
+) -> StdResult<HandleResponse> {
+    let rcpt_raw = deps.api.canonical_address(&contract)?;
+    let sender_raw = env.message.sender;
+
+    // move the tokens to the contract
+    let mut accounts = balances(&mut deps.storage);
+    accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
+        balance.unwrap_or_default() - amount
+    })?;
+    accounts.update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
+        Ok(balance.unwrap_or_default() + amount)
+    })?;
+
+    let sender = deps.api.human_address(&sender_raw)?;
+    let logs = vec![
+        log("action", "send"),
+        log("from", &sender),
+        log("to", &contract),
+        log("amount", amount),
+    ];
+
+    // create a send message
+    let msg = Cw20ReceiveMsg {
+        sender,
+        amount,
+        msg,
+    }
+    .into_cosmos_msg(contract)?;
+
+    let res = HandleResponse {
+        messages: vec![msg],
+        log: logs,
+        data: None,
+    };
+    Ok(res)
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -64,14 +166,25 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => query_count(deps),
+        QueryMsg::Balance { address } => query_balance(deps, address),
+        QueryMsg::Meta {} => query_meta(deps),
     }
 }
 
-fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Binary> {
-    let state = config_read(&deps.storage).load()?;
-    let resp = CountResponse { count: state.count };
+fn query_balance<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    address: HumanAddr,
+) -> StdResult<Binary> {
+    let addr_raw = deps.api.canonical_address(&address)?;
+    let balance = balances_read(&deps.storage).load(addr_raw.as_slice())?;
+    let resp = BalanceResponse { balance };
     to_binary(&resp)
+}
+
+fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Binary> {
+    let meta = meta_read(&deps.storage).load()?;
+    // we return this just as we store it
+    to_binary(&meta)
 }
 
 #[cfg(test)]

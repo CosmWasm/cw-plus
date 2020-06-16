@@ -7,9 +7,9 @@ use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, Uint128, 
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Cw20ReceiveMsg {
-    sender: HumanAddr,
-    amount: Uint128,
-    msg: Option<Binary>,
+    pub sender: HumanAddr,
+    pub amount: Uint128,
+    pub msg: Option<Binary>,
 }
 
 impl Cw20ReceiveMsg {
