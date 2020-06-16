@@ -3,7 +3,9 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cw20::{AllowanceResponse, BalanceResponse, Cw20HandleMsg, MetaResponse, MinterResponse, Cw20QueryMsg};
+use cw20::{
+    AllowanceResponse, BalanceResponse, Cw20HandleMsg, Cw20QueryMsg, MetaResponse, MinterResponse,
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
