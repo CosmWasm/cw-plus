@@ -5,7 +5,7 @@ use cosmwasm_std::{HumanAddr, Uint128};
 
 use crate::msg::Expiration;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
@@ -27,12 +27,12 @@ pub enum Cw20QueryMsg {
     Minter {},
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct BalanceResponse {
     pub balance: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MetaResponse {
     pub name: String,
     pub symbol: String,
@@ -40,13 +40,13 @@ pub struct MetaResponse {
     pub total_supply: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AllowanceResponse {
     pub allowance: Uint128,
     pub expires: Option<Expiration>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterResponse {
     pub minter: HumanAddr,
     /// cap is how many more tokens can be issued by the minter
