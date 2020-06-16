@@ -20,7 +20,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - restore_cache:
           keys:
-            - cargocache-cw20-base-rust:1.44.0-{{ checksum "Cargo.lock" }}
+            - cargocache-cw20-base-rust:1.44.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
@@ -50,7 +50,7 @@ jobs:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-cw20-base-rust:1.44.0-{{ checksum "Cargo.lock" }}
+          key: cargocache-cw20-base-rust:1.44.0-{{ checksum "~/project/Cargo.lock" }}
 
   package_cw20:
     docker:
@@ -64,7 +64,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version; rustup target list --installed
       - restore_cache:
           keys:
-            - cargocache-v2-cw20:1.44.0-{{ checksum "Cargo.lock" }}
+            - cargocache-v2-cw20:1.44.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown && rustup target list --installed
@@ -73,13 +73,12 @@ jobs:
           command: cargo build --locked
       - run:
           name: Build library for wasm target
-          command: cargo wasm --locked
+          command: cargo wasm-debug --locked
       - run:
           name: Run unit tests
           command: cargo test --locked
       - run:
           name: Build and run schema generator
-          working_directory: ~/project/packages/std
           command: cargo schema --locked
       - run:
           name: Ensure schemas are up-to-date
@@ -94,7 +93,7 @@ jobs:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-v2-cw20:1.44.0-{{ checksum "Cargo.lock" }}
+          key: cargocache-v2-cw20:1.44.0-{{ checksum "~/project/Cargo.lock" }}
 
   lint:
     docker:
