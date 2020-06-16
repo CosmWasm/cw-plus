@@ -5,6 +5,7 @@ workflows:
     jobs:
       - contract_cw20_base
       - package_cw20
+      - lint
 
 jobs:
   contract_cw20_base:
@@ -24,9 +25,6 @@ jobs:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
       - run:
-          name: Add components to Rust toolchain
-          command: rustup component add rustfmt clippy
-      - run:
           name: Unit Tests
           env: RUST_BACKTRACE=1
           command: cargo unit-test --locked
@@ -36,12 +34,6 @@ jobs:
       - run:
           name: Integration Tests
           command: cargo integration-test --locked  -- --test-threads=2
-      - run:
-          name: Check formatting
-          command: cargo fmt -- --check
-      - run:
-          name: Lint
-          command: cargo clippy -- -D warnings
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
@@ -103,3 +95,34 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-v2-cw20:1.44.0-{{ checksum "Cargo.lock" }}
+
+  lint:
+    docker:
+      - image: rust:1.44.0
+    steps:
+      - checkout
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
+      - restore_cache:
+          keys:
+            - cargocache-v2-lint-rust:1.44.0-{{ checksum "Cargo.lock" }}
+      - run:
+          name: Add rustfmt component
+          command: rustup component add rustfmt
+      - run:
+          name: Add clippy component
+          command: rustup component add clippy
+      - run:
+          name: Check formatting of workspace
+          command: cargo fmt -- --check
+      - run:
+          name: Clippy linting on workspace
+          command: cargo clippy -- -D warnings
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target/debug/.fingerprint
+            - target/debug/build
+            - target/debug/deps
+          key: cargocache-v2-lint-rust:1.44.0-{{ checksum "Cargo.lock" }}
