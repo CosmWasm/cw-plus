@@ -176,7 +176,9 @@ fn query_balance<S: Storage, A: Api, Q: Querier>(
     address: HumanAddr,
 ) -> StdResult<Binary> {
     let addr_raw = deps.api.canonical_address(&address)?;
-    let balance = balances_read(&deps.storage).load(addr_raw.as_slice())?;
+    let balance = balances_read(&deps.storage)
+        .may_load(addr_raw.as_slice())?
+        .unwrap_or_default();
     let resp = BalanceResponse { balance };
     to_binary(&resp)
 }
@@ -191,7 +193,7 @@ fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, WasmMsg};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -310,6 +312,42 @@ mod tests {
         );
         assert_eq!(get_balance(&deps, &addr1), amount1);
         assert_eq!(get_balance(&deps, &addr2), amount2);
+    }
+
+    #[test]
+    fn queries_work() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+        let addr1 = HumanAddr::from("addr0001");
+        let amount1 = Uint128::from(12340000u128);
+
+        let expected = do_init(&mut deps, &addr1, amount1);
+
+        // check meta query
+        let data = query(&deps, QueryMsg::Meta {}).unwrap();
+        let loaded: Meta = from_binary(&data).unwrap();
+        assert_eq!(expected, loaded);
+
+        // check balance query (full)
+        let data = query(
+            &deps,
+            QueryMsg::Balance {
+                address: addr1.clone(),
+            },
+        )
+        .unwrap();
+        let loaded: BalanceResponse = from_binary(&data).unwrap();
+        assert_eq!(loaded.balance, amount1);
+
+        // check balance query (empty)
+        let data = query(
+            &deps,
+            QueryMsg::Balance {
+                address: HumanAddr::from("addr0002"),
+            },
+        )
+        .unwrap();
+        let loaded: BalanceResponse = from_binary(&data).unwrap();
+        assert_eq!(loaded.balance, Uint128::zero());
     }
 
     #[test]
