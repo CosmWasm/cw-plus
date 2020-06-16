@@ -191,7 +191,7 @@ fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
+    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -207,6 +207,38 @@ mod tests {
 
     fn get_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> Meta {
         meta_read(&deps.storage).load().unwrap()
+    }
+
+    // this will set up the init for other tests
+    fn do_init<S: Storage, A: Api, Q: Querier>(
+        deps: &mut Extern<S, A, Q>,
+        addr: &HumanAddr,
+        amount: Uint128,
+    ) -> Meta {
+        let init_msg = InitMsg {
+            name: "Auto Gen".to_string(),
+            symbol: "AUTO".to_string(),
+            decimals: 3,
+            initial_balances: vec![InitialBalance {
+                address: addr.into(),
+                amount,
+            }],
+        };
+        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let res = init(deps, env, init_msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        let meta = get_meta(&deps);
+        assert_eq!(
+            meta,
+            Meta {
+                name: "Auto Gen".to_string(),
+                symbol: "AUTO".to_string(),
+                decimals: 3,
+                total_supply: amount,
+            }
+        );
+        meta
     }
 
     #[test]
@@ -241,50 +273,184 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn increment() {
-    //     let mut deps = mock_dependencies(20, &coins(2, "token"));
-    //
-    //     let msg = InitMsg { count: 17 };
-    //     let env = mock_env(&deps.api, "creator", &coins(2, "token"));
-    //     let _res = init(&mut deps, env, msg).unwrap();
-    //
-    //     // beneficiary can release it
-    //     let env = mock_env(&deps.api, "anyone", &coins(2, "token"));
-    //     let msg = HandleMsg::Increment {};
-    //     let _res = handle(&mut deps, env, msg).unwrap();
-    //
-    //     // should increase counter by 1
-    //     let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-    //     let value: CountResponse = from_binary(&res).unwrap();
-    //     assert_eq!(18, value.count);
-    // }
-    //
-    // #[test]
-    // fn reset() {
-    //     let mut deps = mock_dependencies(20, &coins(2, "token"));
-    //
-    //     let msg = InitMsg { count: 17 };
-    //     let env = mock_env(&deps.api, "creator", &coins(2, "token"));
-    //     let _res = init(&mut deps, env, msg).unwrap();
-    //
-    //     // beneficiary can release it
-    //     let unauth_env = mock_env(&deps.api, "anyone", &coins(2, "token"));
-    //     let msg = HandleMsg::Reset { count: 5 };
-    //     let res = handle(&mut deps, unauth_env, msg);
-    //     match res {
-    //         Err(StdError::Unauthorized { .. }) => {}
-    //         _ => panic!("Must return unauthorized error"),
-    //     }
-    //
-    //     // only the original creator can reset the counter
-    //     let auth_env = mock_env(&deps.api, "creator", &coins(2, "token"));
-    //     let msg = HandleMsg::Reset { count: 5 };
-    //     let _res = handle(&mut deps, auth_env, msg).unwrap();
-    //
-    //     // should now be 5
-    //     let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-    //     let value: CountResponse = from_binary(&res).unwrap();
-    //     assert_eq!(5, value.count);
-    // }
+    #[test]
+    fn init_multiple_accounts() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let amount1 = Uint128::from(11223344u128);
+        let addr1 = HumanAddr::from("addr0001");
+        let amount2 = Uint128::from(7890987u128);
+        let addr2 = HumanAddr::from("addr0002");
+        let init_msg = InitMsg {
+            name: "Bash Shell".to_string(),
+            symbol: "BASH".to_string(),
+            decimals: 6,
+            initial_balances: vec![
+                InitialBalance {
+                    address: addr1.clone(),
+                    amount: amount1,
+                },
+                InitialBalance {
+                    address: addr2.clone(),
+                    amount: amount2,
+                },
+            ],
+        };
+        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let res = init(&mut deps, env, init_msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        assert_eq!(
+            get_meta(&deps),
+            Meta {
+                name: "Bash Shell".to_string(),
+                symbol: "BASH".to_string(),
+                decimals: 6,
+                total_supply: amount1 + amount2,
+            }
+        );
+        assert_eq!(get_balance(&deps, &addr1), amount1);
+        assert_eq!(get_balance(&deps, &addr2), amount2);
+    }
+
+    #[test]
+    fn transfer() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+        let addr1 = HumanAddr::from("addr0001");
+        let addr2 = HumanAddr::from("addr0002");
+        let amount1 = Uint128::from(12340000u128);
+        let transfer = Uint128::from(76543u128);
+        let too_much = Uint128::from(12340321u128);
+
+        do_init(&mut deps, &addr1, amount1);
+
+        // cannot send more than we have
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: too_much,
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // cannot send from empty account
+        let env = mock_env(&deps.api, addr2.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr1.clone(),
+            amount: transfer,
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // valid transfer
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: transfer,
+        };
+        let res = handle(&mut deps, env, msg).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
+        let remainder = (amount1 - transfer).unwrap();
+        assert_eq!(get_balance(&deps, &addr1), remainder);
+        assert_eq!(get_balance(&deps, &addr2), transfer);
+        assert_eq!(get_meta(&deps).total_supply, amount1);
+    }
+
+    #[test]
+    fn burn() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+        let addr1 = HumanAddr::from("addr0001");
+        let amount1 = Uint128::from(12340000u128);
+        let burn = Uint128::from(76543u128);
+        let too_much = Uint128::from(12340321u128);
+
+        do_init(&mut deps, &addr1, amount1);
+
+        // cannot burn more than we have
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Burn { amount: too_much };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+        assert_eq!(get_meta(&deps).total_supply, amount1);
+
+        // valid burn reduces total supply
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Burn { amount: burn };
+        let res = handle(&mut deps, env, msg).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
+        let remainder = (amount1 - burn).unwrap();
+        assert_eq!(get_balance(&deps, &addr1), remainder);
+        assert_eq!(get_meta(&deps).total_supply, remainder);
+    }
+
+    #[test]
+    fn send() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+        let addr1 = HumanAddr::from("addr0001");
+        let contract = HumanAddr::from("addr0002");
+        let amount1 = Uint128::from(12340000u128);
+        let transfer = Uint128::from(76543u128);
+        let too_much = Uint128::from(12340321u128);
+        let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
+
+        do_init(&mut deps, &addr1, amount1);
+
+        // cannot send more than we have
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Send {
+            contract: contract.clone(),
+            amount: too_much,
+            msg: Some(send_msg.clone()),
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // valid transfer
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Send {
+            contract: contract.clone(),
+            amount: transfer,
+            msg: Some(send_msg.clone()),
+        };
+        let res = handle(&mut deps, env, msg).unwrap();
+        assert_eq!(res.messages.len(), 1);
+
+        // ensure proper send message sent
+        // this is the message we want delivered to the other side
+        let binary_msg = Cw20ReceiveMsg {
+            sender: addr1.clone(),
+            amount: transfer,
+            msg: Some(send_msg),
+        }
+        .into_binary()
+        .unwrap();
+        // and this is how it must be wrapped for the vm to process it
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: contract.clone(),
+                msg: binary_msg,
+                send: vec![],
+            })
+        );
+
+        // ensure balance is properly transfered
+        let remainder = (amount1 - transfer).unwrap();
+        assert_eq!(get_balance(&deps, &addr1), remainder);
+        assert_eq!(get_balance(&deps, &contract), transfer);
+        assert_eq!(get_meta(&deps).total_supply, amount1);
+    }
 }
