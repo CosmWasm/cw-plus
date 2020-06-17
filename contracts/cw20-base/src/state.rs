@@ -1,21 +1,28 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_std::{ReadonlyStorage, Storage, Uint128};
+use cosmwasm_storage::{
+    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
+    Singleton,
+};
 
-use cosmwasm_std::{CanonicalAddr, Storage};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+pub use cw20::MetaResponse as Meta;
 
-pub static CONFIG_KEY: &[u8] = b"config";
+const META_KEY: &[u8] = b"meta";
+const PREFIX_BALANCE: &[u8] = b"balance";
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    pub count: i32,
-    pub owner: CanonicalAddr,
+// meta is the token definition as well as the total_supply
+pub fn meta<S: Storage>(storage: &mut S) -> Singleton<S, Meta> {
+    singleton(storage, META_KEY)
 }
 
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
-    singleton(storage, CONFIG_KEY)
+pub fn meta_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Meta> {
+    singleton_read(storage, META_KEY)
 }
 
-pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
-    singleton_read(storage, CONFIG_KEY)
+/// balances are state of the erc20 tokens
+pub fn balances<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
+    bucket(PREFIX_BALANCE, storage)
+}
+
+pub fn balances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
+    bucket_read(PREFIX_BALANCE, storage)
 }

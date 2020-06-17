@@ -30,10 +30,7 @@ jobs:
           command: cargo unit-test --locked
       - run:
           name: Build Wasm
-          command: cargo wasm --locked
-      - run:
-          name: Integration Tests
-          command: cargo integration-test --locked  -- --test-threads=2
+          command: cargo wasm-debug --locked
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
