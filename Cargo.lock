@@ -98,6 +98,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20-bonding"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw20",
+ "cw20-base",
+ "schemars",
+ "serde",
+ "snafu",
+]
+
+[[package]]
 name = "cw20-escrow"
 version = "0.1.0"
 dependencies = [
