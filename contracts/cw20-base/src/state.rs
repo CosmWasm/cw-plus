@@ -1,10 +1,20 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use cosmwasm_std::{ReadonlyStorage, Storage, Uint128};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
 };
 
-pub use cw20::MetaResponse as Meta;
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct Meta {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub total_supply: Uint128,
+}
 
 const META_KEY: &[u8] = b"meta";
 const PREFIX_BALANCE: &[u8] = b"balance";
