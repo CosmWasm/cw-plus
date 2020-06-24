@@ -1,4 +1,4 @@
-use cosmwasm_std::{generic_err, Binary, HumanAddr, StdResult, Uint128};
+use cosmwasm_std::{Binary, HumanAddr, StdError, StdResult, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -20,17 +20,17 @@ impl InitMsg {
     pub fn validate(&self) -> StdResult<()> {
         // Check name, symbol, decimals
         if !is_valid_name(&self.name) {
-            return Err(generic_err(
+            return Err(StdError::generic_err(
                 "Name is not in the expected format (3-30 UTF-8 bytes)",
             ));
         }
         if !is_valid_symbol(&self.symbol) {
-            return Err(generic_err(
+            return Err(StdError::generic_err(
                 "Ticker symbol is not in expected format [A-Z]{3,6}",
             ));
         }
         if self.decimals > 18 {
-            return Err(generic_err("Decimals must not exceed 18"));
+            return Err(StdError::generic_err("Decimals must not exceed 18"));
         }
         Ok(())
     }
