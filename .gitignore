@@ -14,3 +14,7 @@ target/
 
 # Auto-gen
 .cargo-ok
+
+# Build artifacts
+*.wasm
+hash.txt

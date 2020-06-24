@@ -21,10 +21,15 @@ You can run unit tests on this via:
 
 Once you are happy with the content, you can compile it to wasm via:
 
-`cargo wasm` (local, quick build)
+```
+RUSTFLAGS='-C link-arg=-s' cargo wasm
+cp ../../target/wasm32-unknown-unknown/release/cw20_base.wasm .
+ls -l cw20_base.wasm
+sha256sum cw20_base.wasm
+```
 
 Or for a production-ready (compressed) build, run the following from the
-repository root:
+repository root (not currently working with this monorepo...)
 
 ```
 docker run --rm -v "$(pwd)":/code \
@@ -33,3 +38,11 @@ docker run --rm -v "$(pwd)":/code \
   cosmwasm/rust-optimizer:0.8.0 ./contracts/cw20-base
 mv contract.wasm cw20_base.wasm
 ```
+
+## Importing this contract
+
+You can also import much of the logic of this contract to build another
+ERC20-contract, such as a bonding curve, overiding or extending what you
+need.
+
+**TODO**
