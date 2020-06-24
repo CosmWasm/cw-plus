@@ -2,7 +2,7 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
     StdResult, Storage, Uint128,
 };
-use cw20::{BalanceResponse, Cw20ReceiveMsg};
+use cw20::{BalanceResponse, Cw20ReceiveMsg, MetaResponse};
 
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
 use crate::state::{balances, balances_read, meta, meta_read, Meta};
@@ -182,8 +182,15 @@ fn query_balance<S: Storage, A: Api, Q: Querier>(
     Ok(BalanceResponse { balance })
 }
 
-fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Meta> {
-    meta_read(&deps.storage).load()
+fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<MetaResponse> {
+    let meta = meta_read(&deps.storage).load()?;
+    let res = MetaResponse {
+        name: meta.name,
+        symbol: meta.symbol,
+        decimals: meta.decimals,
+        total_supply: meta.total_supply,
+    };
+    Ok(res)
 }
 
 #[cfg(test)]
@@ -206,7 +213,7 @@ mod tests {
         deps: &mut Extern<S, A, Q>,
         addr: &HumanAddr,
         amount: Uint128,
-    ) -> Meta {
+    ) -> MetaResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -223,7 +230,7 @@ mod tests {
         let meta = query_meta(&deps).unwrap();
         assert_eq!(
             meta,
-            Meta {
+            MetaResponse {
                 name: "Auto Gen".to_string(),
                 symbol: "AUTO".to_string(),
                 decimals: 3,
@@ -252,17 +259,14 @@ mod tests {
 
         assert_eq!(
             query_meta(&deps).unwrap(),
-            Meta {
+            MetaResponse {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
                 total_supply: amount,
             }
         );
-        assert_eq!(
-            get_balance(&deps, "addr0000"),
-            11223344u128.into()
-        );
+        assert_eq!(get_balance(&deps, "addr0000"), 11223344u128.into());
     }
 
     #[test]
@@ -293,7 +297,7 @@ mod tests {
 
         assert_eq!(
             query_meta(&deps).unwrap(),
-            Meta {
+            MetaResponse {
                 name: "Bash Shell".to_string(),
                 symbol: "BASH".to_string(),
                 decimals: 6,
@@ -313,8 +317,7 @@ mod tests {
         let expected = do_init(&mut deps, &addr1, amount1);
 
         // check meta query
-        let data = query(&deps, QueryMsg::Meta {}).unwrap();
-        let loaded: Meta = from_binary(&data).unwrap();
+        let loaded = query_meta(&deps).unwrap();
         assert_eq!(expected, loaded);
 
         // check balance query (full)
