@@ -32,7 +32,38 @@ Read more about [bonding curve math here](https://yos.io/2018/11/10/bonding-curv
 
 ### Math
 
-**TODO**
+Given a price curve `f(x)` = price of the `x`th token, we want to figure out
+how to buy into and sell from the bonding curve. In fact we can look at
+the total supply issued. let `F(x)` be the integral of `f(x)`. We have issued
+`x` tokens for `F(x)` sent to the contract. Or, in reverse, if we send
+`x` tokens to the contract, it will mint `F^-1(x)` tokens.
+
+From this we can create some formulas. Assume we currently have issued `S`
+tokens in exchange for `N = F(S)` input tokens. If someone sends us `x` tokens,
+how much will we issue?
+
+`F^-1(N+x) - F^-1(N)` = `F^-1(N+x) - S`
+
+And if we sell `x` tokens, how much we will get out:
+
+`F(S) - F(S-x)` = `N - F(S-x)`
+
+Just one calculation each side. To be safe, make sure to round down and 
+always check against `F(S)` when using `F^-1(S)` to estimate how much
+should be issued. This will also safely give us how many tokens to return.
+
+There is build in support for safely [raising i128 to an integer power](https://doc.rust-lang.org/std/primitive.i128.html#method.checked_pow).
+There is also a crate to [provide nth-root of for all integers](https://docs.rs/num-integer/0.1.43/num_integer/trait.Roots.html).
+With these two, we can handle most math except for logs/exponents. 
+
+Compare this to [writing it all in solidity](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/7b7ff729b82ea73ea168e495d9c94cb901ae95ce/contracts/math/Power.sol)
+
+Examples:
+
+Constant: `f(x) = k` and `F(x) = kx` and `F^-1(x) = x/k`
+
+Linear: `f(x) = x` and `F(x) = x^2/2` and `F^-1(x) = (2x)^(0.5)`
+
 
 ## Running this contract
 
