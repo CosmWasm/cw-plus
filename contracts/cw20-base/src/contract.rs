@@ -166,27 +166,24 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Balance { address } => query_balance(deps, address),
-        QueryMsg::Meta {} => query_meta(deps),
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        QueryMsg::Meta {} => to_binary(&query_meta(deps)?),
     }
 }
 
 fn query_balance<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     address: HumanAddr,
-) -> StdResult<Binary> {
+) -> StdResult<BalanceResponse> {
     let addr_raw = deps.api.canonical_address(&address)?;
     let balance = balances_read(&deps.storage)
         .may_load(addr_raw.as_slice())?
         .unwrap_or_default();
-    let resp = BalanceResponse { balance };
-    to_binary(&resp)
+    Ok(BalanceResponse { balance })
 }
 
-fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Binary> {
-    let meta = meta_read(&deps.storage).load()?;
-    // we return this just as we store it
-    to_binary(&meta)
+fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<Meta> {
+    meta_read(&deps.storage).load()
 }
 
 #[cfg(test)]
@@ -197,18 +194,11 @@ mod tests {
 
     const CANONICAL_LENGTH: usize = 20;
 
-    fn get_balance<S: Storage, A: Api, Q: Querier>(
+    fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
         deps: &Extern<S, A, Q>,
-        address: &HumanAddr,
+        address: T,
     ) -> Uint128 {
-        let addr_raw = deps.api.canonical_address(address).unwrap();
-        balances_read(&deps.storage)
-            .load(addr_raw.as_slice())
-            .unwrap()
-    }
-
-    fn get_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> Meta {
-        meta_read(&deps.storage).load().unwrap()
+        query_balance(&deps, address.into()).unwrap().balance
     }
 
     // this will set up the init for other tests
@@ -230,7 +220,7 @@ mod tests {
         let res = init(deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let meta = get_meta(&deps);
+        let meta = query_meta(&deps).unwrap();
         assert_eq!(
             meta,
             Meta {
@@ -261,7 +251,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            get_meta(&deps),
+            query_meta(&deps).unwrap(),
             Meta {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -270,7 +260,7 @@ mod tests {
             }
         );
         assert_eq!(
-            get_balance(&deps, &HumanAddr("addr0000".to_string())),
+            get_balance(&deps, "addr0000"),
             11223344u128.into()
         );
     }
@@ -302,7 +292,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            get_meta(&deps),
+            query_meta(&deps).unwrap(),
             Meta {
                 name: "Bash Shell".to_string(),
                 symbol: "BASH".to_string(),
@@ -397,7 +387,7 @@ mod tests {
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
         assert_eq!(get_balance(&deps, &addr2), transfer);
-        assert_eq!(get_meta(&deps).total_supply, amount1);
+        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
     }
 
     #[test]
@@ -418,7 +408,7 @@ mod tests {
             StdError::Underflow { .. } => {}
             e => panic!("Unexpected error: {}", e),
         }
-        assert_eq!(get_meta(&deps).total_supply, amount1);
+        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
 
         // valid burn reduces total supply
         let env = mock_env(&deps.api, addr1.clone(), &[]);
@@ -428,7 +418,7 @@ mod tests {
 
         let remainder = (amount1 - burn).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
-        assert_eq!(get_meta(&deps).total_supply, remainder);
+        assert_eq!(query_meta(&deps).unwrap().total_supply, remainder);
     }
 
     #[test]
@@ -489,6 +479,6 @@ mod tests {
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
         assert_eq!(get_balance(&deps, &contract), transfer);
-        assert_eq!(get_meta(&deps).total_supply, amount1);
+        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
     }
 }
