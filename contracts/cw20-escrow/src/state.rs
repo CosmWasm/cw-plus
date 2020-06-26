@@ -2,12 +2,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    CanonicalAddr, Coin, Order, ReadonlyStorage, StdError, StdResult, Storage, Uint128,
+    CanonicalAddr, Coin, Env, Order, ReadonlyStorage, StdError, StdResult, Storage, Uint128,
 };
-use cosmwasm_storage::{
-    bucket, bucket_read, prefixed_read, singleton, singleton_read, Bucket, ReadonlyBucket,
-    ReadonlySingleton, Singleton,
-};
+use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Escrow {
@@ -36,7 +33,25 @@ pub struct Cw20Coin {
     pub amount: Uint128,
 }
 
-const PREFIX_ESCROW: &[u8] = b"escrow";
+impl Escrow {
+    pub fn is_expired(&self, env: &Env) -> bool {
+        if let Some(end_height) = self.end_height {
+            if env.block.height > end_height {
+                return true;
+            }
+        }
+
+        if let Some(end_time) = self.end_time {
+            if env.block.time > end_time {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+pub const PREFIX_ESCROW: &[u8] = b"escrow";
 
 pub fn escrows<S: Storage>(storage: &mut S) -> Bucket<S, Escrow> {
     bucket(PREFIX_ESCROW, storage)
@@ -50,10 +65,10 @@ pub fn escrows_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Escrow
 pub fn all_escrow_ids<S: ReadonlyStorage>(storage: &S) -> StdResult<Vec<String>> {
     prefixed_read(PREFIX_ESCROW, storage)
         .range(None, None, Order::Ascending)
-        .map(|(k, v)| {
+        .map(|(k, _)| {
             String::from_utf8(k).map_err(|_| StdError::invalid_utf8("parsing escrow key"))
         })
-        .collect();
+        .collect()
 }
 
 #[cfg(test)]
@@ -61,6 +76,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::Binary;
 
     #[test]
     fn no_escrow_ids() {
@@ -71,9 +87,9 @@ mod tests {
 
     fn dummy_escrow() -> Escrow {
         Escrow {
-            arbiter: CanonicalAddr(Binary::from(b"arb")),
-            recipient: CanonicalAddr(Binary::from(b"recip")),
-            source: CanonicalAddr(Binary::from(b"source")),
+            arbiter: CanonicalAddr(Binary(b"arb".to_vec())),
+            recipient: CanonicalAddr(Binary(b"recip".to_vec())),
+            source: CanonicalAddr(Binary(b"source".to_vec())),
             ..Escrow::default()
         }
     }
@@ -81,9 +97,15 @@ mod tests {
     #[test]
     fn all_escrow_ids_in_order() {
         let mut storage = MockStorage::new();
-        escrows(&mut storage).save("lazy".as_bytes(), &dummy_escrow());
-        escrows(&mut storage).save("assign".as_bytes(), &dummy_escrow());
-        escrows(&mut storage).save("zen".as_bytes(), &dummy_escrow());
+        escrows(&mut storage)
+            .save("lazy".as_bytes(), &dummy_escrow())
+            .unwrap();
+        escrows(&mut storage)
+            .save("assign".as_bytes(), &dummy_escrow())
+            .unwrap();
+        escrows(&mut storage)
+            .save("zen".as_bytes(), &dummy_escrow())
+            .unwrap();
 
         let ids = all_escrow_ids(&storage).unwrap();
         assert_eq!(3, ids.len());

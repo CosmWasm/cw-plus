@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HandleMsg",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "create"
+      ],
+      "properties": {
+        "create": {
+          "$ref": "#/definitions/CreateMsg"
+        }
+      }
+    },
+    {
+      "description": "Approve sends all tokens to the recipient. Only the arbiter can do this",
+      "type": "object",
+      "required": [
+        "approve"
+      ],
+      "properties": {
+        "approve": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "description": "id is a human-readable name for the escrow from create",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Refund returns all remaining tokens to the original sender, The arbiter can do this any time, or anyone can do this after a timeout",
+      "type": "object",
+      "required": [
+        "refund"
+      ],
+      "properties": {
+        "refund": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "description": "id is a human-readable name for the escrow from create",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "CreateMsg": {
+      "type": "object",
+      "required": [
+        "arbiter",
+        "id",
+        "recipient"
+      ],
+      "properties": {
+        "arbiter": {
+          "description": "arbiter can decide to approve or refund the escrow",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        },
+        "end_height": {
+          "description": "When end height set and block height exceeds this value, the escrow is expired. Once an escrow is expired, it can be returned to the original funder (via \"refund\").",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "end_time": {
+          "description": "When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and block time exceeds this value, the escrow is expired. Once an escrow is expired, it can be returned to the original funder (via \"refund\").",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "id": {
+          "description": "id is a human-readable name for the escrow to use later 3-20 bytes of utf-8 text",
+          "type": "string"
+        },
+        "recipient": {
+          "description": "if approved, funds go to the recipient",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
+}

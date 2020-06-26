@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ListResponse",
+  "type": "object",
+  "required": [
+    "escrows"
+  ],
+  "properties": {
+    "escrows": {
+      "description": "list all registered ids",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
