@@ -130,7 +130,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
 }
 
 fn send_native_tokens(from: &HumanAddr, to: &HumanAddr, amount: Vec<Coin>) -> Vec<CosmosMsg> {
-    if amount.len() == 0 {
+    if amount.is_empty() {
         vec![]
     } else {
         vec![BankMsg::Send {
