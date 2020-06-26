@@ -1,11 +1,12 @@
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
+    from_binary, log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
-use cw20::Cw20HandleMsg;
+use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::msg::{
     CreateMsg, Cw20CoinHuman, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
+    ReceiveMsg,
 };
 use crate::state::{all_escrow_ids, escrows, escrows_read, Cw20Coin, Escrow, PREFIX_ESCROW};
 use cosmwasm_storage::prefixed;
@@ -29,6 +30,27 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::Approve { id } => try_approve(deps, env, id),
         HandleMsg::TopUp { id } => try_top_up(deps, env, id),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
+        HandleMsg::Receive(msg) => try_receive(deps, env, msg),
+    }
+}
+
+pub fn try_receive<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    wrapper: Cw20ReceiveMsg,
+) -> StdResult<HandleResponse> {
+    let msg: ReceiveMsg = match wrapper.msg {
+        Some(bin) => from_binary(&bin),
+        None => Err(StdError::parse_err("ReceiveMsg", "no data")),
+    }?;
+    // TODO: assert the sending token address is valid (contract not external account)
+    let token = Cw20Coin {
+        address: env.message.sender,
+        amount: wrapper.amount,
+    };
+    match msg {
+        ReceiveMsg::Create(create) => try_cw20_create(deps, wrapper.sender, token, create),
+        ReceiveMsg::TopUp { id } => try_cw20_top_up(deps, wrapper.sender, token, id),
     }
 }
 
@@ -65,6 +87,34 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
+pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    sender: HumanAddr,
+    token: Cw20Coin,
+    msg: CreateMsg,
+) -> StdResult<HandleResponse> {
+    let escrow = Escrow {
+        arbiter: deps.api.canonical_address(&msg.arbiter)?,
+        recipient: deps.api.canonical_address(&msg.recipient)?,
+        source: deps.api.canonical_address(&sender)?,
+        end_height: msg.end_height,
+        end_time: msg.end_time,
+        // there are native coins sent with the message
+        native_balance: vec![],
+        cw20_balance: vec![token],
+    };
+
+    // try to store it, fail if the id was already in use
+    escrows(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
+        None => Ok(escrow),
+        Some(_) => Err(StdError::generic_err("escrow id already in use")),
+    })?;
+
+    let mut res = HandleResponse::default();
+    res.log = vec![log("action", "create"), log("id", msg.id)];
+    Ok(res)
+}
+
 pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -75,6 +125,27 @@ pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
 
     // combine these two
     add_tokens(&mut escrow.native_balance, env.message.sent_funds);
+    // and save
+    escrows(&mut deps.storage).save(id.as_bytes(), &escrow)?;
+
+    let mut res = HandleResponse::default();
+    res.log = vec![log("action", "top_up"), log("id", id)];
+    Ok(res)
+}
+
+pub fn try_cw20_top_up<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    _sender: HumanAddr,
+    token: Cw20Coin,
+    id: String,
+) -> StdResult<HandleResponse> {
+    // this fails is no escrow there
+    let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
+
+    // combine these two
+    add_cw20_token(&mut escrow.cw20_balance, token);
+    // and save
+    escrows(&mut deps.storage).save(id.as_bytes(), &escrow)?;
 
     let mut res = HandleResponse::default();
     res.log = vec![log("action", "top_up"), log("id", id)];
@@ -94,6 +165,20 @@ fn add_tokens(store: &mut Vec<Coin>, add: Vec<Coin>) {
             Some(idx) => store[idx].amount += token.amount,
             None => store.push(token),
         }
+    }
+}
+
+fn add_cw20_token(store: &mut Vec<Cw20Coin>, token: Cw20Coin) {
+    let index = store.iter().enumerate().find_map(|(i, exist)| {
+        if exist.address == token.address {
+            Some(i)
+        } else {
+            None
+        }
+    });
+    match index {
+        Some(idx) => store[idx].amount += token.amount,
+        None => store.push(token),
     }
 }
 

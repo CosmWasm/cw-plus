@@ -1,4 +1,5 @@
 use cosmwasm_std::{Coin, HumanAddr, Uint128};
+use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,18 @@ pub enum HandleMsg {
     /// The arbiter can do this any time, or anyone can do this after a timeout
     Refund {
         /// id is a human-readable name for the escrow from create
+        id: String,
+    },
+    /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
+    Receive(Cw20ReceiveMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiveMsg {
+    Create(CreateMsg),
+    /// Adds all sent native tokens to the contract
+    TopUp {
         id: String,
     },
 }
