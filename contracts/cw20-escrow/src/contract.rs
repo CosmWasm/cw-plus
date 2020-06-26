@@ -27,6 +27,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::Create(msg) => try_create(deps, env, msg),
         HandleMsg::Approve { id } => try_approve(deps, env, id),
+        HandleMsg::TopUp { id } => try_top_up(deps, env, id),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
     }
 }
@@ -62,6 +63,38 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     let mut res = HandleResponse::default();
     res.log = vec![log("action", "create"), log("id", msg.id)];
     Ok(res)
+}
+
+pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    id: String,
+) -> StdResult<HandleResponse> {
+    // this fails is no escrow there
+    let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
+
+    // combine these two
+    add_tokens(&mut escrow.native_balance, env.message.sent_funds);
+
+    let mut res = HandleResponse::default();
+    res.log = vec![log("action", "top_up"), log("id", id)];
+    Ok(res)
+}
+
+fn add_tokens(store: &mut Vec<Coin>, add: Vec<Coin>) {
+    for token in add {
+        let index = store.iter().enumerate().find_map(|(i, exist)| {
+            if exist.denom == token.denom {
+                Some(i)
+            } else {
+                None
+            }
+        });
+        match index {
+            Some(idx) => store[idx].amount += token.amount,
+            None => store.push(token),
+        }
+    }
 }
 
 pub fn try_approve<S: Storage, A: Api, Q: Querier>(

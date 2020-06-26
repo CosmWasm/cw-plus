@@ -9,6 +9,10 @@ pub struct InitMsg {}
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     Create(CreateMsg),
+    /// Adds all sent native tokens to the contract
+    TopUp {
+        id: String,
+    },
     /// Approve sends all tokens to the recipient.
     /// Only the arbiter can do this
     Approve {
