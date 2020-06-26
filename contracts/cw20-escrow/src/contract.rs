@@ -329,81 +329,65 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
     })
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-//     use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, WasmMsg};
-//
-//     const CANONICAL_LENGTH: usize = 20;
-//
-//     fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
-//         deps: &Extern<S, A, Q>,
-//         address: T,
-//     ) -> Uint128 {
-//         query_balance(&deps, address.into()).unwrap().balance
-//     }
-//
-//     // this will set up the init for other tests
-//     fn do_init<S: Storage, A: Api, Q: Querier>(
-//         deps: &mut Extern<S, A, Q>,
-//         addr: &HumanAddr,
-//         amount: Uint128,
-//     ) -> MetaResponse {
-//         let init_msg = InitMsg {
-//             name: "Auto Gen".to_string(),
-//             symbol: "AUTO".to_string(),
-//             decimals: 3,
-//             initial_balances: vec![InitialBalance {
-//                 address: addr.into(),
-//                 amount,
-//             }],
-//         };
-//         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
-//         let res = init(deps, env, init_msg).unwrap();
-//         assert_eq!(0, res.messages.len());
-//
-//         let meta = query_meta(&deps).unwrap();
-//         assert_eq!(
-//             meta,
-//             MetaResponse {
-//                 name: "Auto Gen".to_string(),
-//                 symbol: "AUTO".to_string(),
-//                 decimals: 3,
-//                 total_supply: amount,
-//             }
-//         );
-//         meta
-//     }
-//
-//     #[test]
-//     fn proper_initialization() {
-//         let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-//         let amount = Uint128::from(11223344u128);
-//         let init_msg = InitMsg {
-//             name: "Cash Token".to_string(),
-//             symbol: "CASH".to_string(),
-//             decimals: 9,
-//             initial_balances: vec![InitialBalance {
-//                 address: HumanAddr("addr0000".to_string()),
-//                 amount,
-//             }],
-//         };
-//         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
-//         let res = init(&mut deps, env, init_msg).unwrap();
-//         assert_eq!(0, res.messages.len());
-//
-//         assert_eq!(
-//             query_meta(&deps).unwrap(),
-//             MetaResponse {
-//                 name: "Cash Token".to_string(),
-//                 symbol: "CASH".to_string(),
-//                 decimals: 9,
-//                 total_supply: amount,
-//             }
-//         );
-//         assert_eq!(get_balance(&deps, "addr0000"), 11223344u128.into());
-//     }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::{coins, CosmosMsg, StdError};
+
+    const CANONICAL_LENGTH: usize = 20;
+
+    #[test]
+    fn happy_path_native() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        // init an empty contract
+        let init_msg = InitMsg {};
+        let env = mock_env(&deps.api, &HumanAddr::from("anyone"), &[]);
+        let res = init(&mut deps, env, init_msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // create an escrow
+        let create = CreateMsg {
+            id: "foobar".to_string(),
+            arbiter: HumanAddr::from("arbitrate"),
+            recipient: HumanAddr::from("recd"),
+            end_time: None,
+            end_height: None,
+        };
+        let sender = HumanAddr::from("source");
+        let balance = coins(100, "tokens");
+        let env = mock_env(&deps.api, &sender, &balance);
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "create"), res.log[0]);
+
+        // approve it
+        let id = create.id.clone();
+        let env = mock_env(&deps.api, &create.arbiter, &[]);
+        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+        assert_eq!(1, res.messages.len());
+        assert_eq!(log("action", "approve"), res.log[0]);
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                to_address: create.recipient,
+                amount: balance,
+            })
+        );
+
+        // second attempt fails (not found)
+        let id = create.id.clone();
+        let env = mock_env(&deps.api, &create.arbiter, &[]);
+        let res = handle(&mut deps, env, HandleMsg::Approve { id });
+        match res.unwrap_err() {
+            StdError::NotFound { .. } => {}
+            e => panic!("Expected NotFound, got {}", e),
+        }
+    }
+}
+
 //
 //     #[test]
 //     fn init_multiple_accounts() {
