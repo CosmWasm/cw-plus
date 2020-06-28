@@ -332,6 +332,7 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::msg::HandleMsg::TopUp;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
 
@@ -496,279 +497,115 @@ mod tests {
             ]
         );
     }
-}
-// #[test]
-// fn top_up_mixed_tokens() {
-//     let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-//
-//     // init an empty contract
-//     let init_msg = InitMsg {};
-//     let env = mock_env(&deps.api, &HumanAddr::from("anyone"), &[]);
-//     let res = init(&mut deps, env, init_msg).unwrap();
-//     assert_eq!(0, res.messages.len());
-//
-//     // create an escrow
-//     let create = CreateMsg {
-//         id: "foobar".to_string(),
-//         arbiter: HumanAddr::from("arbitrate"),
-//         recipient: HumanAddr::from("recd"),
-//         end_time: None,
-//         end_height: None,
-//     };
-//     let receive = Cw20ReceiveMsg {
-//         sender: HumanAddr::from("source"),
-//         amount: Uint128(100),
-//         msg: Some(to_binary(&HandleMsg::Create(create.clone())).unwrap()),
-//     };
-//     let token_contract = HumanAddr::from("my-cw20-token");
-//     let env = mock_env(&deps.api, &token_contract, &[]);
-//     let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
-//     assert_eq!(0, res.messages.len());
-//     assert_eq!(log("action", "create"), res.log[0]);
-//
-//     // approve it
-//     let id = create.id.clone();
-//     let env = mock_env(&deps.api, &create.arbiter, &[]);
-//     let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
-//     assert_eq!(1, res.messages.len());
-//     assert_eq!(log("action", "approve"), res.log[0]);
-//     let send_msg = Cw20HandleMsg::Transfer {
-//         recipient: create.recipient,
-//         amount: receive.amount,
-//     };
-//     assert_eq!(
-//         res.messages[0],
-//         CosmosMsg::Wasm(WasmMsg::Execute {
-//             contract_addr: token_contract,
-//             msg: to_binary(&send_msg).unwrap(),
-//             send: vec![]
-//         })
-//     );
-//
-//     // second attempt fails (not found)
-//     let id = create.id.clone();
-//     let env = mock_env(&deps.api, &create.arbiter, &[]);
-//     let res = handle(&mut deps, env, HandleMsg::Approve { id });
-//     match res.unwrap_err() {
-//         StdError::NotFound { .. } => {}
-//         e => panic!("Expected NotFound, got {}", e),
-//     }
-// }
 
-//
-//     #[test]
-//     fn init_multiple_accounts() {
-//         let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-//         let amount1 = Uint128::from(11223344u128);
-//         let addr1 = HumanAddr::from("addr0001");
-//         let amount2 = Uint128::from(7890987u128);
-//         let addr2 = HumanAddr::from("addr0002");
-//         let init_msg = InitMsg {
-//             name: "Bash Shell".to_string(),
-//             symbol: "BASH".to_string(),
-//             decimals: 6,
-//             initial_balances: vec![
-//                 InitialBalance {
-//                     address: addr1.clone(),
-//                     amount: amount1,
-//                 },
-//                 InitialBalance {
-//                     address: addr2.clone(),
-//                     amount: amount2,
-//                 },
-//             ],
-//         };
-//         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
-//         let res = init(&mut deps, env, init_msg).unwrap();
-//         assert_eq!(0, res.messages.len());
-//
-//         assert_eq!(
-//             query_meta(&deps).unwrap(),
-//             MetaResponse {
-//                 name: "Bash Shell".to_string(),
-//                 symbol: "BASH".to_string(),
-//                 decimals: 6,
-//                 total_supply: amount1 + amount2,
-//             }
-//         );
-//         assert_eq!(get_balance(&deps, &addr1), amount1);
-//         assert_eq!(get_balance(&deps, &addr2), amount2);
-//     }
-//
-//     #[test]
-//     fn queries_work() {
-//         let mut deps = mock_dependencies(20, &coins(2, "token"));
-//         let addr1 = HumanAddr::from("addr0001");
-//         let amount1 = Uint128::from(12340000u128);
-//
-//         let expected = do_init(&mut deps, &addr1, amount1);
-//
-//         // check meta query
-//         let loaded = query_meta(&deps).unwrap();
-//         assert_eq!(expected, loaded);
-//
-//         // check balance query (full)
-//         let data = query(
-//             &deps,
-//             QueryMsg::Balance {
-//                 address: addr1.clone(),
-//             },
-//         )
-//         .unwrap();
-//         let loaded: BalanceResponse = from_binary(&data).unwrap();
-//         assert_eq!(loaded.balance, amount1);
-//
-//         // check balance query (empty)
-//         let data = query(
-//             &deps,
-//             QueryMsg::Balance {
-//                 address: HumanAddr::from("addr0002"),
-//             },
-//         )
-//         .unwrap();
-//         let loaded: BalanceResponse = from_binary(&data).unwrap();
-//         assert_eq!(loaded.balance, Uint128::zero());
-//     }
-//
-//     #[test]
-//     fn transfer() {
-//         let mut deps = mock_dependencies(20, &coins(2, "token"));
-//         let addr1 = HumanAddr::from("addr0001");
-//         let addr2 = HumanAddr::from("addr0002");
-//         let amount1 = Uint128::from(12340000u128);
-//         let transfer = Uint128::from(76543u128);
-//         let too_much = Uint128::from(12340321u128);
-//
-//         do_init(&mut deps, &addr1, amount1);
-//
-//         // cannot send more than we have
-//         let env = mock_env(&deps.api, addr1.clone(), &[]);
-//         let msg = HandleMsg::Transfer {
-//             recipient: addr2.clone(),
-//             amount: too_much,
-//         };
-//         let res = handle(&mut deps, env, msg);
-//         match res.unwrap_err() {
-//             StdError::Underflow { .. } => {}
-//             e => panic!("Unexpected error: {}", e),
-//         }
-//
-//         // cannot send from empty account
-//         let env = mock_env(&deps.api, addr2.clone(), &[]);
-//         let msg = HandleMsg::Transfer {
-//             recipient: addr1.clone(),
-//             amount: transfer,
-//         };
-//         let res = handle(&mut deps, env, msg);
-//         match res.unwrap_err() {
-//             StdError::Underflow { .. } => {}
-//             e => panic!("Unexpected error: {}", e),
-//         }
-//
-//         // valid transfer
-//         let env = mock_env(&deps.api, addr1.clone(), &[]);
-//         let msg = HandleMsg::Transfer {
-//             recipient: addr2.clone(),
-//             amount: transfer,
-//         };
-//         let res = handle(&mut deps, env, msg).unwrap();
-//         assert_eq!(res.messages.len(), 0);
-//
-//         let remainder = (amount1 - transfer).unwrap();
-//         assert_eq!(get_balance(&deps, &addr1), remainder);
-//         assert_eq!(get_balance(&deps, &addr2), transfer);
-//         assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
-//     }
-//
-//     #[test]
-//     fn burn() {
-//         let mut deps = mock_dependencies(20, &coins(2, "token"));
-//         let addr1 = HumanAddr::from("addr0001");
-//         let amount1 = Uint128::from(12340000u128);
-//         let burn = Uint128::from(76543u128);
-//         let too_much = Uint128::from(12340321u128);
-//
-//         do_init(&mut deps, &addr1, amount1);
-//
-//         // cannot burn more than we have
-//         let env = mock_env(&deps.api, addr1.clone(), &[]);
-//         let msg = HandleMsg::Burn { amount: too_much };
-//         let res = handle(&mut deps, env, msg);
-//         match res.unwrap_err() {
-//             StdError::Underflow { .. } => {}
-//             e => panic!("Unexpected error: {}", e),
-//         }
-//         assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
-//
-//         // valid burn reduces total supply
-//         let env = mock_env(&deps.api, addr1.clone(), &[]);
-//         let msg = HandleMsg::Burn { amount: burn };
-//         let res = handle(&mut deps, env, msg).unwrap();
-//         assert_eq!(res.messages.len(), 0);
-//
-//         let remainder = (amount1 - burn).unwrap();
-//         assert_eq!(get_balance(&deps, &addr1), remainder);
-//         assert_eq!(query_meta(&deps).unwrap().total_supply, remainder);
-//     }
-//
-//     #[test]
-//     fn send() {
-//         let mut deps = mock_dependencies(20, &coins(2, "token"));
-//         let addr1 = HumanAddr::from("addr0001");
-//         let contract = HumanAddr::from("addr0002");
-//         let amount1 = Uint128::from(12340000u128);
-//         let transfer = Uint128::from(76543u128);
-//         let too_much = Uint128::from(12340321u128);
-//         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
-//
-//         do_init(&mut deps, &addr1, amount1);
-//
-//         // cannot send more than we have
-//         let env = mock_env(&deps.api, addr1.clone(), &[]);
-//         let msg = HandleMsg::Send {
-//             contract: contract.clone(),
-//             amount: too_much,
-//             msg: Some(send_msg.clone()),
-//         };
-//         let res = handle(&mut deps, env, msg);
-//         match res.unwrap_err() {
-//             StdError::Underflow { .. } => {}
-//             e => panic!("Unexpected error: {}", e),
-//         }
-//
-//         // valid transfer
-//         let env = mock_env(&deps.api, addr1.clone(), &[]);
-//         let msg = HandleMsg::Send {
-//             contract: contract.clone(),
-//             amount: transfer,
-//             msg: Some(send_msg.clone()),
-//         };
-//         let res = handle(&mut deps, env, msg).unwrap();
-//         assert_eq!(res.messages.len(), 1);
-//
-//         // ensure proper send message sent
-//         // this is the message we want delivered to the other side
-//         let binary_msg = Cw20ReceiveMsg {
-//             sender: addr1.clone(),
-//             amount: transfer,
-//             msg: Some(send_msg),
-//         }
-//         .into_binary()
-//         .unwrap();
-//         // and this is how it must be wrapped for the vm to process it
-//         assert_eq!(
-//             res.messages[0],
-//             CosmosMsg::Wasm(WasmMsg::Execute {
-//                 contract_addr: contract.clone(),
-//                 msg: binary_msg,
-//                 send: vec![],
-//             })
-//         );
-//
-//         // ensure balance is properly transfered
-//         let remainder = (amount1 - transfer).unwrap();
-//         assert_eq!(get_balance(&deps, &addr1), remainder);
-//         assert_eq!(get_balance(&deps, &contract), transfer);
-//         assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
-//     }
-// }
+    #[test]
+    fn top_up_mixed_tokens() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        // init an empty contract
+        let init_msg = InitMsg {};
+        let env = mock_env(&deps.api, &HumanAddr::from("anyone"), &[]);
+        let res = init(&mut deps, env, init_msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // create an escrow with 2 native tokens
+        let create = CreateMsg {
+            id: "foobar".to_string(),
+            arbiter: HumanAddr::from("arbitrate"),
+            recipient: HumanAddr::from("recd"),
+            end_time: None,
+            end_height: None,
+        };
+        let sender = HumanAddr::from("source");
+        let balance = vec![coin(100, "fee"), coin(200, "stake")];
+        let env = mock_env(&deps.api, &sender, &balance);
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "create"), res.log[0]);
+
+        // top it up with 2 more native tokens
+        let extra_native = vec![coin(250, "random"), coin(300, "stake")];
+        let env = mock_env(&deps.api, &sender, &extra_native);
+        let top_up = HandleMsg::TopUp {
+            id: create.id.clone(),
+        };
+        let res = handle(&mut deps, env, top_up).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "top_up"), res.log[0]);
+
+        // top up with one foreign token
+        let bar_token = HumanAddr::from("bar_token");
+        let base = TopUp {
+            id: create.id.clone(),
+        };
+        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
+            sender: HumanAddr::from("random"),
+            amount: Uint128(7890),
+            msg: Some(to_binary(&base).unwrap()),
+        });
+        let env = mock_env(&deps.api, &bar_token, &[]);
+        let res = handle(&mut deps, env, top_up).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "top_up"), res.log[0]);
+
+        // top up with second foreign token
+        let foo_token = HumanAddr::from("foo_token");
+        let base = TopUp {
+            id: create.id.clone(),
+        };
+        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
+            sender: HumanAddr::from("random"),
+            amount: Uint128(888),
+            msg: Some(to_binary(&base).unwrap()),
+        });
+        let env = mock_env(&deps.api, &foo_token, &[]);
+        let res = handle(&mut deps, env, top_up).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "top_up"), res.log[0]);
+
+        // approve it
+        let id = create.id.clone();
+        let env = mock_env(&deps.api, &create.arbiter, &[]);
+        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+        assert_eq!(log("action", "approve"), res.log[0]);
+        assert_eq!(3, res.messages.len());
+
+        // first message releases all native coins
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                to_address: create.recipient.clone(),
+                amount: vec![coin(100, "fee"), coin(500, "stake"), coin(250, "random")],
+            })
+        );
+
+        // second one release bar cw20 token
+        let send_msg = Cw20HandleMsg::Transfer {
+            recipient: create.recipient.clone(),
+            amount: Uint128(7890),
+        };
+        assert_eq!(
+            res.messages[1],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: bar_token,
+                msg: to_binary(&send_msg).unwrap(),
+                send: vec![]
+            })
+        );
+
+        // third one release foo cw20 token
+        let send_msg = Cw20HandleMsg::Transfer {
+            recipient: create.recipient.clone(),
+            amount: Uint128(888),
+        };
+        assert_eq!(
+            res.messages[2],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: foo_token,
+                msg: to_binary(&send_msg).unwrap(),
+                send: vec![]
+            })
+        );
+    }
+}
