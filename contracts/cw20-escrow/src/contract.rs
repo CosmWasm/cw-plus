@@ -152,36 +152,6 @@ pub fn try_cw20_top_up<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-fn add_tokens(store: &mut Vec<Coin>, add: Vec<Coin>) {
-    for token in add {
-        let index = store.iter().enumerate().find_map(|(i, exist)| {
-            if exist.denom == token.denom {
-                Some(i)
-            } else {
-                None
-            }
-        });
-        match index {
-            Some(idx) => store[idx].amount += token.amount,
-            None => store.push(token),
-        }
-    }
-}
-
-fn add_cw20_token(store: &mut Vec<Cw20Coin>, token: Cw20Coin) {
-    let index = store.iter().enumerate().find_map(|(i, exist)| {
-        if exist.address == token.address {
-            Some(i)
-        } else {
-            None
-        }
-    });
-    match index {
-        Some(idx) => store[idx].amount += token.amount,
-        None => store.push(token),
-    }
-}
-
 pub fn try_approve<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -282,6 +252,36 @@ fn send_cw20_tokens<A: Api>(
         .collect()
 }
 
+fn add_tokens(store: &mut Vec<Coin>, add: Vec<Coin>) {
+    for token in add {
+        let index = store.iter().enumerate().find_map(|(i, exist)| {
+            if exist.denom == token.denom {
+                Some(i)
+            } else {
+                None
+            }
+        });
+        match index {
+            Some(idx) => store[idx].amount += token.amount,
+            None => store.push(token),
+        }
+    }
+}
+
+fn add_cw20_token(store: &mut Vec<Cw20Coin>, token: Cw20Coin) {
+    let index = store.iter().enumerate().find_map(|(i, exist)| {
+        if exist.address == token.address {
+            Some(i)
+        } else {
+            None
+        }
+    });
+    match index {
+        Some(idx) => store[idx].amount += token.amount,
+        None => store.push(token),
+    }
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
@@ -333,7 +333,7 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, CosmosMsg, StdError, Uint128};
+    use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -444,7 +444,116 @@ mod tests {
             e => panic!("Expected NotFound, got {}", e),
         }
     }
+
+    #[test]
+    fn add_tokens_proper() {
+        let mut tokens = vec![];
+        add_tokens(&mut tokens, vec![coin(123, "atom"), coin(789, "eth")]);
+        add_tokens(&mut tokens, vec![coin(456, "atom"), coin(12, "btc")]);
+        assert_eq!(
+            tokens,
+            vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
+        );
+    }
+
+    #[test]
+    fn add_cw_tokens_proper() {
+        let mut tokens = vec![];
+        let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
+        let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
+        add_cw20_token(
+            &mut tokens,
+            Cw20Coin {
+                address: foo_token.clone(),
+                amount: Uint128(12345),
+            },
+        );
+        add_cw20_token(
+            &mut tokens,
+            Cw20Coin {
+                address: bar_token.clone(),
+                amount: Uint128(777),
+            },
+        );
+        add_cw20_token(
+            &mut tokens,
+            Cw20Coin {
+                address: foo_token.clone(),
+                amount: Uint128(23400),
+            },
+        );
+        assert_eq!(
+            tokens,
+            vec![
+                Cw20Coin {
+                    address: foo_token,
+                    amount: Uint128(35745)
+                },
+                Cw20Coin {
+                    address: bar_token,
+                    amount: Uint128(777)
+                }
+            ]
+        );
+    }
 }
+// #[test]
+// fn top_up_mixed_tokens() {
+//     let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+//
+//     // init an empty contract
+//     let init_msg = InitMsg {};
+//     let env = mock_env(&deps.api, &HumanAddr::from("anyone"), &[]);
+//     let res = init(&mut deps, env, init_msg).unwrap();
+//     assert_eq!(0, res.messages.len());
+//
+//     // create an escrow
+//     let create = CreateMsg {
+//         id: "foobar".to_string(),
+//         arbiter: HumanAddr::from("arbitrate"),
+//         recipient: HumanAddr::from("recd"),
+//         end_time: None,
+//         end_height: None,
+//     };
+//     let receive = Cw20ReceiveMsg {
+//         sender: HumanAddr::from("source"),
+//         amount: Uint128(100),
+//         msg: Some(to_binary(&HandleMsg::Create(create.clone())).unwrap()),
+//     };
+//     let token_contract = HumanAddr::from("my-cw20-token");
+//     let env = mock_env(&deps.api, &token_contract, &[]);
+//     let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
+//     assert_eq!(0, res.messages.len());
+//     assert_eq!(log("action", "create"), res.log[0]);
+//
+//     // approve it
+//     let id = create.id.clone();
+//     let env = mock_env(&deps.api, &create.arbiter, &[]);
+//     let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+//     assert_eq!(1, res.messages.len());
+//     assert_eq!(log("action", "approve"), res.log[0]);
+//     let send_msg = Cw20HandleMsg::Transfer {
+//         recipient: create.recipient,
+//         amount: receive.amount,
+//     };
+//     assert_eq!(
+//         res.messages[0],
+//         CosmosMsg::Wasm(WasmMsg::Execute {
+//             contract_addr: token_contract,
+//             msg: to_binary(&send_msg).unwrap(),
+//             send: vec![]
+//         })
+//     );
+//
+//     // second attempt fails (not found)
+//     let id = create.id.clone();
+//     let env = mock_env(&deps.api, &create.arbiter, &[]);
+//     let res = handle(&mut deps, env, HandleMsg::Approve { id });
+//     match res.unwrap_err() {
+//         StdError::NotFound { .. } => {}
+//         e => panic!("Expected NotFound, got {}", e),
+//     }
+// }
 
 //
 //     #[test]
