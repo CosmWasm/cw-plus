@@ -63,18 +63,18 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Transfer { recipient, amount } => try_transfer(deps, env, recipient, amount),
-        HandleMsg::Burn { amount } => try_burn(deps, env, amount),
+        HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, recipient, amount),
+        HandleMsg::Burn { amount } => handle_burn(deps, env, amount),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => try_send(deps, env, contract, amount, msg),
-        HandleMsg::Mint { recipient, amount } => try_mint(deps, env, recipient, amount),
+        } => handle_send(deps, env, contract, amount, msg),
+        HandleMsg::Mint { recipient, amount } => handle_mint(deps, env, recipient, amount),
     }
 }
 
-pub fn try_transfer<S: Storage, A: Api, Q: Querier>(
+pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     recipient: HumanAddr,
@@ -104,7 +104,7 @@ pub fn try_transfer<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn try_burn<S: Storage, A: Api, Q: Querier>(
+pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     amount: Uint128,
@@ -134,7 +134,7 @@ pub fn try_burn<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn try_mint<S: Storage, A: Api, Q: Querier>(
+pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     recipient: HumanAddr,
@@ -172,7 +172,7 @@ pub fn try_mint<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn try_send<S: Storage, A: Api, Q: Querier>(
+pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     contract: HumanAddr,
