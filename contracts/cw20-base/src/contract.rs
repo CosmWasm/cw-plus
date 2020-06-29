@@ -278,10 +278,39 @@ mod tests {
     }
 
     // this will set up the init for other tests
+    fn do_init_with_minter<S: Storage, A: Api, Q: Querier>(
+        deps: &mut Extern<S, A, Q>,
+        addr: &HumanAddr,
+        amount: Uint128,
+        minter: &HumanAddr,
+        cap: Option<Uint128>,
+    ) -> MetaResponse {
+        _do_init(
+            deps,
+            addr,
+            amount,
+            Some(MinterResponse {
+                minter: minter.into(),
+                cap,
+            }),
+        )
+    }
+
+    // this will set up the init for other tests
     fn do_init<S: Storage, A: Api, Q: Querier>(
         deps: &mut Extern<S, A, Q>,
         addr: &HumanAddr,
         amount: Uint128,
+    ) -> MetaResponse {
+        _do_init(deps, addr, amount, None)
+    }
+
+    // this will set up the init for other tests
+    fn _do_init<S: Storage, A: Api, Q: Querier>(
+        deps: &mut Extern<S, A, Q>,
+        addr: &HumanAddr,
+        amount: Uint128,
+        mint: Option<MinterResponse>,
     ) -> MetaResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
@@ -291,7 +320,7 @@ mod tests {
                 address: addr.into(),
                 amount,
             }],
-            mint: None,
+            mint: mint.clone(),
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(deps, env, init_msg).unwrap();
@@ -307,6 +336,8 @@ mod tests {
                 total_supply: amount,
             }
         );
+        assert_eq!(get_balance(&deps, addr), amount);
+        assert_eq!(query_minter(&deps).unwrap(), mint,);
         meta
     }
 
@@ -337,11 +368,11 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(&deps, "addr0000"), 11223344u128.into());
+        assert_eq!(get_balance(&deps, "addr0000"), Uint128(11223344));
     }
 
     #[test]
-    fn mintable_works() {
+    fn init_mintable() {
         let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
@@ -372,7 +403,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(&deps, "addr0000"), 11223344u128.into());
+        assert_eq!(get_balance(&deps, "addr0000"), Uint128(11223344));
         assert_eq!(
             query_minter(&deps).unwrap(),
             Some(MinterResponse {
@@ -380,6 +411,44 @@ mod tests {
                 cap: Some(limit)
             }),
         );
+    }
+
+    #[test]
+    fn init_mintable_over_cap() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let amount = Uint128(11223344);
+        let minter = HumanAddr::from("asmodat");
+        let limit = Uint128(11223300);
+        let init_msg = InitMsg {
+            name: "Cash Token".to_string(),
+            symbol: "CASH".to_string(),
+            decimals: 9,
+            initial_balances: vec![InitialBalance {
+                address: HumanAddr("addr0000".to_string()),
+                amount,
+            }],
+            mint: Some(MinterResponse {
+                minter: minter.clone(),
+                cap: Some(limit),
+            }),
+        };
+        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let res = init(&mut deps, env, init_msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Initial supply greater than cap"),
+            e => panic!("Unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn can_mint_by_minter() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        let genesis = HumanAddr::from("genesis");
+        let amount = Uint128(11223344);
+        let minter = HumanAddr::from("asmodat");
+        let limit = Uint128(511223344);
+        do_init_with_minter(&mut deps, &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
         let winner = HumanAddr::from("lucky");
@@ -392,25 +461,15 @@ mod tests {
         let env = mock_env(&deps.api, &minter, &[]);
         let res = handle(&mut deps, env, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
-
-        assert_eq!(get_balance(&deps, "addr0000"), Uint128(11223344));
+        assert_eq!(get_balance(&deps, &genesis), amount);
         assert_eq!(get_balance(&deps, &winner), prize);
 
-        // no one else can mint
-        let env = mock_env(&deps.api, "someone else", &[]);
-        let res = handle(&mut deps, env, msg);
-        match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
-            e => panic!("expected unauthorized error, got {}", e),
-        }
-
+        // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
-        let too_much = Uint128(333_222_222);
         let msg = HandleMsg::Mint {
             recipient: winner.clone(),
-            amount: too_much,
+            amount: Uint128(333_222_222),
         };
-
         let env = mock_env(&deps.api, &minter, &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
@@ -418,6 +477,46 @@ mod tests {
                 assert_eq!(msg, "Minting cannot exceed the cap".to_string())
             }
             e => panic!("Unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn others_cannot_mint() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        do_init_with_minter(
+            &mut deps,
+            &HumanAddr::from("genesis"),
+            Uint128(1234),
+            &HumanAddr::from("minter"),
+            None,
+        );
+
+        let msg = HandleMsg::Mint {
+            recipient: HumanAddr::from("lucky"),
+            amount: Uint128(222),
+        };
+        let env = mock_env(&deps.api, &HumanAddr::from("anyone else"), &[]);
+        let res = handle(&mut deps, env, msg.clone());
+        match res.unwrap_err() {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("expected unauthorized error, got {}", e),
+        }
+    }
+
+    #[test]
+    fn no_one_mints_if_minter_unset() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        do_init(&mut deps, &HumanAddr::from("genesis"), Uint128(1234));
+
+        let msg = HandleMsg::Mint {
+            recipient: HumanAddr::from("lucky"),
+            amount: Uint128(222),
+        };
+        let env = mock_env(&deps.api, &HumanAddr::from("genesis"), &[]);
+        let res = handle(&mut deps, env, msg.clone());
+        match res.unwrap_err() {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("expected unauthorized error, got {}", e),
         }
     }
 
