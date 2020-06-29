@@ -14,8 +14,20 @@ pub struct Meta {
     pub symbol: String,
     pub decimals: u8,
     pub total_supply: Uint128,
-    pub minter: Option<CanonicalAddr>,
+    pub mint: Option<MinterData>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct MinterData {
+    pub minter: CanonicalAddr,
+    /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
+}
+
+impl Meta {
+    pub fn get_cap(&self) -> Option<Uint128> {
+        self.mint.as_ref().and_then(|v| v.cap)
+    }
 }
 
 const META_KEY: &[u8] = b"meta";

@@ -1,4 +1,5 @@
 use cosmwasm_std::{Binary, HumanAddr, StdError, StdResult, Uint128};
+use cw20::MinterResponse;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,11 +15,14 @@ pub struct InitMsg {
     pub symbol: String,
     pub decimals: u8,
     pub initial_balances: Vec<InitialBalance>,
-    pub minter: Option<HumanAddr>,
-    pub cap: Option<Uint128>,
+    pub mint: Option<MinterResponse>,
 }
 
 impl InitMsg {
+    pub fn get_cap(&self) -> Option<Uint128> {
+        self.mint.as_ref().and_then(|v| v.cap)
+    }
+
     pub fn validate(&self) -> StdResult<()> {
         // Check name, symbol, decimals
         if !is_valid_name(&self.name) {

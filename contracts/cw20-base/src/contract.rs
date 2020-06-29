@@ -5,7 +5,7 @@ use cosmwasm_std::{
 use cw20::{BalanceResponse, Cw20ReceiveMsg, MetaResponse, MinterResponse};
 
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
-use crate::state::{balances, balances_read, meta, meta_read, Meta};
+use crate::state::{balances, balances_read, meta, meta_read, Meta, MinterData};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -17,15 +17,19 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     // create initial accounts
     let total_supply = create_accounts(deps, &msg.initial_balances)?;
 
-    let minter = match &msg.minter {
-        Some(human) => Some(deps.api.canonical_address(human)?),
-        None => None,
-    };
-    if let Some(limit) = msg.cap {
+    if let Some(limit) = msg.get_cap() {
         if total_supply > limit {
             return Err(StdError::generic_err("Initial supply greater than cap"));
         }
     }
+
+    let mint = match msg.mint {
+        Some(m) => Some(MinterData {
+            minter: deps.api.canonical_address(&m.minter)?,
+            cap: m.cap,
+        }),
+        None => None,
+    };
 
     // store metadata
     let data = Meta {
@@ -33,8 +37,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply,
-        minter,
-        cap: msg.cap,
+        mint,
     };
     meta(&mut deps.storage).save(&data)?;
     Ok(InitResponse::default())
@@ -138,13 +141,13 @@ pub fn try_mint<S: Storage, A: Api, Q: Querier>(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let mut config = meta_read(&deps.storage).load()?;
-    if config.minter.is_none() || config.minter.as_ref().unwrap() != &env.message.sender {
+    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != env.message.sender {
         return Err(StdError::unauthorized());
     }
 
     // update supply and enforce cap
     config.total_supply += amount;
-    if let Some(limit) = config.cap {
+    if let Some(limit) = config.get_cap() {
         if config.total_supply > limit {
             return Err(StdError::generic_err("Minting cannot exceed the cap"));
         }
@@ -247,17 +250,16 @@ fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 
 fn query_minter<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-) -> StdResult<MinterResponse> {
+) -> StdResult<Option<MinterResponse>> {
     let meta = meta_read(&deps.storage).load()?;
-    let minter = match meta.minter {
-        Some(m) => Some(deps.api.human_address(&m)?),
+    let minter = match meta.mint {
+        Some(m) => Some(MinterResponse {
+            minter: deps.api.human_address(&m.minter)?,
+            cap: m.cap,
+        }),
         None => None,
     };
-    let res = MinterResponse {
-        minter,
-        cap: meta.cap,
-    };
-    Ok(res)
+    Ok(minter)
 }
 
 #[cfg(test)]
@@ -289,8 +291,7 @@ mod tests {
                 address: addr.into(),
                 amount,
             }],
-            minter: None,
-            cap: None,
+            mint: None,
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(deps, env, init_msg).unwrap();
@@ -321,8 +322,7 @@ mod tests {
                 address: HumanAddr("addr0000".to_string()),
                 amount,
             }],
-            minter: None,
-            cap: None,
+            mint: None,
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
@@ -354,8 +354,10 @@ mod tests {
                 address: HumanAddr("addr0000".to_string()),
                 amount,
             }],
-            minter: Some(minter.clone()),
-            cap: Some(limit),
+            mint: Some(MinterResponse {
+                minter: minter.clone(),
+                cap: Some(limit),
+            }),
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
@@ -373,10 +375,10 @@ mod tests {
         assert_eq!(get_balance(&deps, "addr0000"), 11223344u128.into());
         assert_eq!(
             query_minter(&deps).unwrap(),
-            MinterResponse {
-                minter: Some(minter.clone()),
+            Some(MinterResponse {
+                minter: minter.clone(),
                 cap: Some(limit)
-            }
+            }),
         );
 
         // minter can mint coins to some winner
@@ -440,8 +442,7 @@ mod tests {
                     amount: amount2,
                 },
             ],
-            minter: None,
-            cap: None,
+            mint: None,
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();

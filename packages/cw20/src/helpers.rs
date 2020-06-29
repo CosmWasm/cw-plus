@@ -79,7 +79,7 @@ impl Cw20Contract {
     }
 
     /// Find info on who can mint, and how much
-    pub fn minter<Q: Querier>(&self, querier: &Q) -> StdResult<MinterResponse> {
+    pub fn minter<Q: Querier>(&self, querier: &Q) -> StdResult<Option<MinterResponse>> {
         let msg = Cw20QueryMsg::Minter {};
         let query = WasmQuery::Smart {
             contract_addr: self.addr(),

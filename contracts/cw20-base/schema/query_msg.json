@@ -33,6 +33,18 @@
           "type": "object"
         }
       }
+    },
+    {
+      "description": "Only with \"mintable\" extension. Returns who can mint and how much. Return type: MinterResponse.",
+      "type": "object",
+      "required": [
+        "minter"
+      ],
+      "properties": {
+        "minter": {
+          "type": "object"
+        }
+      }
     }
   ],
   "definitions": {
