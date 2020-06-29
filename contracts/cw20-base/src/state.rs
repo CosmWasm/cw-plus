@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage, Uint128};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
@@ -14,6 +14,8 @@ pub struct Meta {
     pub symbol: String,
     pub decimals: u8,
     pub total_supply: Uint128,
+    pub minter: Option<CanonicalAddr>,
+    pub cap: Option<Uint128>,
 }
 
 const META_KEY: &[u8] = b"meta";

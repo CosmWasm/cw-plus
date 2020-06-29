@@ -48,7 +48,7 @@ pub struct AllowanceResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterResponse {
-    pub minter: HumanAddr,
+    pub minter: Option<HumanAddr>,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
 }

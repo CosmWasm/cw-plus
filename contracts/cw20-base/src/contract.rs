@@ -1,8 +1,8 @@
 use cosmwasm_std::{
     log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdResult, Storage, Uint128,
+    StdError, StdResult, Storage, Uint128,
 };
-use cw20::{BalanceResponse, Cw20ReceiveMsg, MetaResponse};
+use cw20::{BalanceResponse, Cw20ReceiveMsg, MetaResponse, MinterResponse};
 
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
 use crate::state::{balances, balances_read, meta, meta_read, Meta};
@@ -17,12 +17,24 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     // create initial accounts
     let total_supply = create_accounts(deps, &msg.initial_balances)?;
 
+    let minter = match &msg.minter {
+        Some(human) => Some(deps.api.canonical_address(human)?),
+        None => None,
+    };
+    if let Some(limit) = msg.cap {
+        if total_supply > limit {
+            return Err(StdError::generic_err("Initial supply greater than cap"));
+        }
+    }
+
     // store metadata
     let data = Meta {
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply,
+        minter,
+        cap: msg.cap,
     };
     meta(&mut deps.storage).save(&data)?;
     Ok(InitResponse::default())
@@ -55,6 +67,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             msg,
         } => try_send(deps, env, contract, amount, msg),
+        HandleMsg::Mint { recipient, amount } => try_mint(deps, env, recipient, amount),
     }
 }
 
@@ -118,6 +131,44 @@ pub fn try_burn<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
+pub fn try_mint<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    recipient: HumanAddr,
+    amount: Uint128,
+) -> StdResult<HandleResponse> {
+    let mut config = meta_read(&deps.storage).load()?;
+    if config.minter.is_none() || config.minter.as_ref().unwrap() != &env.message.sender {
+        return Err(StdError::unauthorized());
+    }
+
+    // update supply and enforce cap
+    config.total_supply += amount;
+    if let Some(limit) = config.cap {
+        if config.total_supply > limit {
+            return Err(StdError::generic_err("Minting cannot exceed the cap"));
+        }
+    }
+    meta(&mut deps.storage).save(&config)?;
+
+    // add amount to recipient balance
+    let rcpt_raw = deps.api.canonical_address(&recipient)?;
+    balances(&mut deps.storage).update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
+        Ok(balance.unwrap_or_default() + amount)
+    })?;
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "mint"),
+            log("to", recipient),
+            log("amount", amount),
+        ],
+        data: None,
+    };
+    Ok(res)
+}
+
 pub fn try_send<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -168,6 +219,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
         QueryMsg::Meta {} => to_binary(&query_meta(deps)?),
+        QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
     }
 }
 
@@ -189,6 +241,21 @@ fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
         symbol: meta.symbol,
         decimals: meta.decimals,
         total_supply: meta.total_supply,
+    };
+    Ok(res)
+}
+
+fn query_minter<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<MinterResponse> {
+    let meta = meta_read(&deps.storage).load()?;
+    let minter = match meta.minter {
+        Some(m) => Some(deps.api.human_address(&m)?),
+        None => None,
+    };
+    let res = MinterResponse {
+        minter,
+        cap: meta.cap,
     };
     Ok(res)
 }
@@ -222,6 +289,8 @@ mod tests {
                 address: addr.into(),
                 amount,
             }],
+            minter: None,
+            cap: None,
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(deps, env, init_msg).unwrap();
@@ -252,6 +321,8 @@ mod tests {
                 address: HumanAddr("addr0000".to_string()),
                 amount,
             }],
+            minter: None,
+            cap: None,
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
@@ -290,6 +361,8 @@ mod tests {
                     amount: amount2,
                 },
             ],
+            minter: None,
+            cap: None,
         };
         let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();

@@ -14,6 +14,8 @@ pub struct InitMsg {
     pub symbol: String,
     pub decimals: u8,
     pub initial_balances: Vec<InitialBalance>,
+    pub minter: Option<HumanAddr>,
+    pub cap: Option<Uint128>,
 }
 
 impl InitMsg {
@@ -74,6 +76,12 @@ pub enum HandleMsg {
         amount: Uint128,
         msg: Option<Binary>,
     },
+    /// Only with the "mintable" extension. If authorized, creates amount new tokens
+    /// and adds to the recipient balance.
+    Mint {
+        recipient: HumanAddr,
+        amount: Uint128,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -85,4 +93,8 @@ pub enum QueryMsg {
     /// Returns metadata on the contract - name, decimals, supply, etc.
     /// Return type: MetaResponse.
     Meta {},
+    /// Only with "mintable" extension.
+    /// Returns who can mint and how much.
+    /// Return type: MinterResponse.
+    Minter {},
 }
