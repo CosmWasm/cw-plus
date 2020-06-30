@@ -1,4 +1,5 @@
 use cosmwasm_std::{Binary, HumanAddr, StdError, StdResult, Uint128};
+use cw20::MinterResponse;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -14,9 +15,14 @@ pub struct InitMsg {
     pub symbol: String,
     pub decimals: u8,
     pub initial_balances: Vec<InitialBalance>,
+    pub mint: Option<MinterResponse>,
 }
 
 impl InitMsg {
+    pub fn get_cap(&self) -> Option<Uint128> {
+        self.mint.as_ref().and_then(|v| v.cap)
+    }
+
     pub fn validate(&self) -> StdResult<()> {
         // Check name, symbol, decimals
         if !is_valid_name(&self.name) {
@@ -74,6 +80,12 @@ pub enum HandleMsg {
         amount: Uint128,
         msg: Option<Binary>,
     },
+    /// Only with the "mintable" extension. If authorized, creates amount new tokens
+    /// and adds to the recipient balance.
+    Mint {
+        recipient: HumanAddr,
+        amount: Uint128,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -85,4 +97,8 @@ pub enum QueryMsg {
     /// Returns metadata on the contract - name, decimals, supply, etc.
     /// Return type: MetaResponse.
     Meta {},
+    /// Only with "mintable" extension.
+    /// Returns who can mint and how much.
+    /// Return type: MinterResponse.
+    Minter {},
 }
