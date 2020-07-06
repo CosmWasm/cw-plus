@@ -8,7 +8,8 @@ use cw20::{
 
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
 use crate::state::{
-    allowances, allowances_read, balances, balances_read, meta, meta_read, Meta, MinterData,
+    allowance_remove, allowances, allowances_read, balances, balances_read, meta, meta_read, Meta,
+    MinterData,
 };
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
@@ -253,8 +254,8 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier>(
 
     allowances(&mut deps.storage, owner_raw).update(spender_raw.as_slice(), |allow| {
         let mut val = allow.unwrap_or_default();
-        if expires.is_some() {
-            val.expires = expires.unwrap();
+        if let Some(exp) = expires {
+            val.expires = exp;
         }
         val.allowance += amount;
         Ok(val)
@@ -283,18 +284,19 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier>(
     let spender_raw = deps.api.canonical_address(&spender)?;
     let owner_raw = &env.message.sender;
 
-    // TODO: make sure we delete if below 0, not just update
-    allowances(&mut deps.storage, owner_raw).update(spender_raw.as_slice(), |allow| {
-        let mut val = allow.unwrap_or_default();
-        if expires.is_some() {
-            val.expires = expires.unwrap();
+    // load value and delete if it hits 0, or update otherwise
+    let mut bucket = allowances(&mut deps.storage, owner_raw);
+    let mut allowance = bucket.load(spender_raw.as_slice())?;
+    if amount < allowance.allowance {
+        // update the new amount
+        allowance.allowance = (allowance.allowance - amount)?;
+        if let Some(exp) = expires {
+            allowance.expires = exp;
         }
-        // this will saturate at 0 if amount is greater than current allowance
-        // TODO: expose this on Uint128 for cleaner syntax
-        let remain = val.allowance.0.saturating_sub(amount.0);
-        val.allowance = Uint128(remain);
-        Ok(val)
-    })?;
+        bucket.save(spender_raw.as_slice(), &allowance)?;
+    } else {
+        allowance_remove(&mut deps.storage, owner_raw, &spender_raw);
+    }
 
     let res = HandleResponse {
         messages: vec![],
