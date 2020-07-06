@@ -43,7 +43,7 @@ pub struct MetaResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AllowanceResponse {
     pub allowance: Uint128,
-    pub expires: Option<Expiration>,
+    pub expires: Expiration,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

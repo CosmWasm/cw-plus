@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, HumanAddr, Uint128};
+use cosmwasm_std::{Binary, BlockInfo, HumanAddr, Uint128};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -20,9 +20,18 @@ pub enum Cw20HandleMsg {
         amount: Uint128,
         msg: Option<Binary>,
     },
-    /// Only with "approval" extension. Allows spender to access up to amount tokens
-    /// from the owner's (env.sender) account, with an optional expiration.
-    Approve {
+    /// Only with "approval" extension. Allows spender to access an additional amount tokens
+    /// from the owner's (env.sender) account. If expires is Some(), overwrites current allowance
+    /// expiration with this one.
+    IncreaseAllowance {
+        spender: HumanAddr,
+        amount: Uint128,
+        expires: Option<Expiration>,
+    },
+    /// Only with "approval" extension. Lowers the spender's access of tokens
+    /// from the owner's (env.sender) account by amount. If expires is Some(), overwrites current
+    /// allowance expiration with this one.
+    DecreaseAllowance {
         spender: HumanAddr,
         amount: Uint128,
         expires: Option<Expiration>,
@@ -59,4 +68,23 @@ pub enum Expiration {
     AtHeight { height: u64 },
     /// AtTime will expire when `env.block.time` >= time
     AtTime { time: u64 },
+    /// Never will never expire. Used to distinguish None from Some(Expiration::Never)
+    Never {},
+}
+
+/// The default (empty value) is to never expire
+impl Default for Expiration {
+    fn default() -> Self {
+        Expiration::Never {}
+    }
+}
+
+impl Expiration {
+    pub fn is_expired(&self, block: &BlockInfo) -> bool {
+        match self {
+            Expiration::AtHeight { height } => block.height >= *height,
+            Expiration::AtTime { time } => block.time >= *time,
+            Expiration::Never {} => false,
+        }
+    }
 }

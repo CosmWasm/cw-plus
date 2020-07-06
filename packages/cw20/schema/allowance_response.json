@@ -3,21 +3,15 @@
   "title": "AllowanceResponse",
   "type": "object",
   "required": [
-    "allowance"
+    "allowance",
+    "expires"
   ],
   "properties": {
     "allowance": {
       "$ref": "#/definitions/Uint128"
     },
     "expires": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Expiration"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/definitions/Expiration"
     }
   },
   "definitions": {
@@ -64,6 +58,18 @@
                   "minimum": 0.0
                 }
               }
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to distinguish None from Some(Expiration::Never)",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
             }
           }
         }
