@@ -25,6 +25,8 @@ pub struct Escrow {
     pub native_balance: Vec<Coin>,
     /// Balance in cw20 tokens
     pub cw20_balance: Vec<Cw20Coin>,
+    /// All possible contracts that we accept tokens from
+    pub cw20_whitelist: Vec<CanonicalAddr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

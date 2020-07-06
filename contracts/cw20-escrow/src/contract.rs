@@ -74,6 +74,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         // there are native coins sent with the message
         native_balance: env.message.sent_funds,
         cw20_balance: vec![],
+        cw20_whitelist: msg.canonical_whitelist(&deps.api)?,
     };
 
     // try to store it, fail if the id was already in use
@@ -93,6 +94,12 @@ pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
     token: Cw20Coin,
     msg: CreateMsg,
 ) -> StdResult<HandleResponse> {
+    let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
+    // make sure the token sent is on the whitelist by default
+    if !cw20_whitelist.iter().any(|t| t == &token.address) {
+        cw20_whitelist.push(token.address.clone())
+    }
+
     let escrow = Escrow {
         arbiter: deps.api.canonical_address(&msg.arbiter)?,
         recipient: deps.api.canonical_address(&msg.recipient)?,
@@ -102,6 +109,7 @@ pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
         // there are native coins sent with the message
         native_balance: vec![],
         cw20_balance: vec![token],
+        cw20_whitelist,
     };
 
     // try to store it, fail if the id was already in use
@@ -355,6 +363,7 @@ mod tests {
             recipient: HumanAddr::from("recd"),
             end_time: None,
             end_height: None,
+            cw20_whitelist: None,
         };
         let sender = HumanAddr::from("source");
         let balance = coins(100, "tokens");
@@ -405,6 +414,7 @@ mod tests {
             recipient: HumanAddr::from("recd"),
             end_time: None,
             end_height: None,
+            cw20_whitelist: None,
         };
         let receive = Cw20ReceiveMsg {
             sender: HumanAddr::from("source"),
@@ -515,6 +525,7 @@ mod tests {
             recipient: HumanAddr::from("recd"),
             end_time: None,
             end_height: None,
+            cw20_whitelist: None,
         };
         let sender = HumanAddr::from("source");
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
