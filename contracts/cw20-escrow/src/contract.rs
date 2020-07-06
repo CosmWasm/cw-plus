@@ -150,6 +150,13 @@ pub fn try_cw20_top_up<S: Storage, A: Api, Q: Querier>(
     // this fails is no escrow there
     let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
+    // ensure the token is on the whitelist
+    if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
+        return Err(StdError::generic_err(
+            "Only accepts tokens on the cw20_whitelist",
+        ));
+    }
+
     // combine these two
     add_cw20_token(&mut escrow.cw20_balance, token);
     // and save
@@ -518,6 +525,9 @@ mod tests {
         let res = init(&mut deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
+        // only accept these tokens
+        let whitelist = vec![HumanAddr::from("bar_token"), HumanAddr::from("foo_token")];
+
         // create an escrow with 2 native tokens
         let create = CreateMsg {
             id: "foobar".to_string(),
@@ -525,7 +535,7 @@ mod tests {
             recipient: HumanAddr::from("recd"),
             end_time: None,
             end_height: None,
-            cw20_whitelist: None,
+            cw20_whitelist: Some(whitelist),
         };
         let sender = HumanAddr::from("source");
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
@@ -558,6 +568,26 @@ mod tests {
         let res = handle(&mut deps, env, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(log("action", "top_up"), res.log[0]);
+
+        // top with a foreign token not on the whitelist
+        // top up with one foreign token
+        let baz_token = HumanAddr::from("baz_token");
+        let base = TopUp {
+            id: create.id.clone(),
+        };
+        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
+            sender: HumanAddr::from("random"),
+            amount: Uint128(7890),
+            msg: Some(to_binary(&base).unwrap()),
+        });
+        let env = mock_env(&deps.api, &baz_token, &[]);
+        let res = handle(&mut deps, env, top_up);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(msg, "Only accepts tokens on the cw20_whitelist")
+            }
+            e => panic!("Unexpected error: {}", e),
+        }
 
         // top up with second foreign token
         let foo_token = HumanAddr::from("foo_token");
