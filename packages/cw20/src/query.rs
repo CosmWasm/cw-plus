@@ -40,7 +40,7 @@ pub struct MetaResponse {
     pub total_supply: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AllowanceResponse {
     pub allowance: Uint128,
     pub expires: Expiration,
