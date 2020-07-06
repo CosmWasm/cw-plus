@@ -5,6 +5,7 @@
   "required": [
     "arbiter",
     "cw20_balance",
+    "cw20_whitelist",
     "id",
     "native_balance",
     "recipient",
@@ -24,6 +25,13 @@
       "type": "array",
       "items": {
         "$ref": "#/definitions/Cw20CoinHuman"
+      }
+    },
+    "cw20_whitelist": {
+      "description": "Whitelisted cw20 tokens",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/HumanAddr"
       }
     },
     "end_height": {

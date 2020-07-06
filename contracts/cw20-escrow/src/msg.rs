@@ -116,6 +116,8 @@ pub struct DetailsResponse {
     pub native_balance: Vec<Coin>,
     /// Balance in cw20 tokens
     pub cw20_balance: Vec<Cw20CoinHuman>,
+    /// Whitelisted cw20 tokens
+    pub cw20_whitelist: Vec<HumanAddr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

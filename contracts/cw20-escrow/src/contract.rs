@@ -313,6 +313,8 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<DetailsResponse> {
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
+    let cw20_whitelist = escrow.human_whitelist(&deps.api)?;
+
     // transform tokens
     let cw20_balance: StdResult<Vec<_>> = escrow
         .cw20_balance
@@ -334,6 +336,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
         end_time: escrow.end_time,
         native_balance: escrow.native_balance,
         cw20_balance: cw20_balance?,
+        cw20_whitelist,
     };
     Ok(details)
 }
@@ -369,7 +372,7 @@ mod tests {
             arbiter: HumanAddr::from("arbitrate"),
             recipient: HumanAddr::from("recd"),
             end_time: None,
-            end_height: None,
+            end_height: Some(123456),
             cw20_whitelist: None,
         };
         let sender = HumanAddr::from("source");
@@ -378,6 +381,23 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(log("action", "create"), res.log[0]);
+
+        // ensure the details is what we expect
+        let details = query_details(&deps, "foobar".to_string()).unwrap();
+        assert_eq!(
+            details,
+            DetailsResponse {
+                id: "foobar".to_string(),
+                arbiter: HumanAddr::from("arbitrate"),
+                recipient: HumanAddr::from("recd"),
+                source: HumanAddr::from("source"),
+                end_height: Some(123456),
+                end_time: None,
+                native_balance: balance.clone(),
+                cw20_balance: vec![],
+                cw20_whitelist: vec![],
+            }
+        );
 
         // approve it
         let id = create.id.clone();
@@ -421,7 +441,7 @@ mod tests {
             recipient: HumanAddr::from("recd"),
             end_time: None,
             end_height: None,
-            cw20_whitelist: None,
+            cw20_whitelist: Some(vec![HumanAddr::from("other-token")]),
         };
         let receive = Cw20ReceiveMsg {
             sender: HumanAddr::from("source"),
@@ -433,6 +453,29 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(log("action", "create"), res.log[0]);
+
+        // ensure the whitelist is what we expect
+        let details = query_details(&deps, "foobar".to_string()).unwrap();
+        assert_eq!(
+            details,
+            DetailsResponse {
+                id: "foobar".to_string(),
+                arbiter: HumanAddr::from("arbitrate"),
+                recipient: HumanAddr::from("recd"),
+                source: HumanAddr::from("source"),
+                end_height: None,
+                end_time: None,
+                native_balance: vec![],
+                cw20_balance: vec![Cw20CoinHuman {
+                    address: HumanAddr::from("my-cw20-token"),
+                    amount: Uint128(100)
+                }],
+                cw20_whitelist: vec![
+                    HumanAddr::from("other-token"),
+                    HumanAddr::from("my-cw20-token")
+                ],
+            }
+        );
 
         // approve it
         let id = create.id.clone();
