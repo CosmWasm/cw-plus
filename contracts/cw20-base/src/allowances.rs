@@ -221,17 +221,18 @@ pub fn handle_send_from<S: Storage, A: Api, Q: Querier>(
         Ok(balance.unwrap_or_default() + amount)
     })?;
 
+    let spender = deps.api.human_address(&spender_raw)?;
     let logs = vec![
         log("action", "send_from"),
         log("from", &owner),
         log("to", &contract),
-        log("by", deps.api.human_address(&spender_raw)?),
+        log("by", &spender),
         log("amount", amount),
     ];
 
     // create a send message
     let msg = Cw20ReceiveMsg {
-        sender: owner,
+        sender: spender,
         amount,
         msg,
     }
@@ -263,7 +264,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, StdError};
+    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
     use cw20::MetaResponse;
 
     use crate::contract::{handle, init, query_balance, query_meta};
@@ -557,11 +558,214 @@ mod tests {
             recipient: rcpt.clone(),
             amount: Uint128(33443),
         };
-
         let env = mock_env(&deps.api, spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
             StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // let us increase limit, but set the expiration (default env height is 12_345)
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: Uint128(1000),
+            expires: Some(Expiration::AtHeight {
+                height: env.block.height,
+            }),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // we should now get the expiration error
+        let msg = HandleMsg::TransferFrom {
+            owner: owner.clone(),
+            recipient: rcpt.clone(),
+            amount: Uint128(33443),
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(msg, "Allowance is expired"),
+            e => panic!("Unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn burn_from_respects_limits() {
+        let mut deps = mock_dependencies(20, &[]);
+        let owner = HumanAddr::from("addr0001");
+        let spender = HumanAddr::from("addr0002");
+
+        let start = Uint128(999999);
+        do_init(&mut deps, &owner, start);
+
+        // provide an allowance
+        let allow1 = Uint128(77777);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow1,
+            expires: None,
+        };
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // valid burn of part of the allowance
+        let transfer = Uint128(44444);
+        let msg = HandleMsg::BurnFrom {
+            owner: owner.clone(),
+            amount: transfer,
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(res.log[0], log("action", "burn_from"));
+
+        // make sure money burnt
+        assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
+
+        // ensure it looks good
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        let expect = AllowanceResponse {
+            allowance: (allow1 - transfer).unwrap(),
+            expires: Expiration::Never {},
+        };
+        assert_eq!(expect, allowance);
+
+        // cannot burn more than the allowance
+        let msg = HandleMsg::BurnFrom {
+            owner: owner.clone(),
+            amount: Uint128(33443),
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // let us increase limit, but set the expiration (default env height is 12_345)
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: Uint128(1000),
+            expires: Some(Expiration::AtHeight {
+                height: env.block.height,
+            }),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // we should now get the expiration error
+        let msg = HandleMsg::BurnFrom {
+            owner: owner.clone(),
+            amount: Uint128(33443),
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(msg, "Allowance is expired"),
+            e => panic!("Unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn send_from_respects_limits() {
+        let mut deps = mock_dependencies(20, &[]);
+        let owner = HumanAddr::from("addr0001");
+        let spender = HumanAddr::from("addr0002");
+        let contract = HumanAddr::from("cool-dex");
+        let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
+
+        let start = Uint128(999999);
+        do_init(&mut deps, &owner, start);
+
+        // provide an allowance
+        let allow1 = Uint128(77777);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow1,
+            expires: None,
+        };
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // valid send of part of the allowance
+        let transfer = Uint128(44444);
+        let msg = HandleMsg::SendFrom {
+            owner: owner.clone(),
+            amount: transfer,
+            contract: contract.clone(),
+            msg: Some(send_msg.clone()),
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(res.log[0], log("action", "send_from"));
+        assert_eq!(1, res.messages.len());
+
+        // we record this as sent by the one who requested, not the one who was paying
+        // TODO: is this what we want??? or the owner???
+        let binary_msg = Cw20ReceiveMsg {
+            sender: spender.clone(),
+            amount: transfer,
+            msg: Some(send_msg.clone()),
+        }
+        .into_binary()
+        .unwrap();
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: contract.clone(),
+                msg: binary_msg,
+                send: vec![],
+            })
+        );
+
+        // make sure money sent
+        assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
+        assert_eq!(get_balance(&deps, &contract), transfer);
+
+        // ensure it looks good
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        let expect = AllowanceResponse {
+            allowance: (allow1 - transfer).unwrap(),
+            expires: Expiration::Never {},
+        };
+        assert_eq!(expect, allowance);
+
+        // cannot send more than the allowance
+        let msg = HandleMsg::SendFrom {
+            owner: owner.clone(),
+            amount: Uint128(33443),
+            contract: contract.clone(),
+            msg: Some(send_msg.clone()),
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // let us increase limit, but set the expiration to current block (expired)
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: Uint128(1000),
+            expires: Some(Expiration::AtHeight {
+                height: env.block.height,
+            }),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // we should now get the expiration error
+        let msg = HandleMsg::SendFrom {
+            owner: owner.clone(),
+            amount: Uint128(33443),
+            contract: contract.clone(),
+            msg: Some(send_msg.clone()),
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(msg, "Allowance is expired"),
             e => panic!("Unexpected error: {}", e),
         }
     }
