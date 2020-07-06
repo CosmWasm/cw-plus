@@ -16,6 +16,10 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier>(
     let spender_raw = deps.api.canonical_address(&spender)?;
     let owner_raw = &env.message.sender;
 
+    if &spender_raw == owner_raw {
+        return Err(StdError::generic_err("Cannot set allowance to own account"));
+    }
+
     allowances(&mut deps.storage, owner_raw).update(spender_raw.as_slice(), |allow| {
         let mut val = allow.unwrap_or_default();
         if let Some(exp) = expires {
@@ -47,6 +51,10 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let spender_raw = deps.api.canonical_address(&spender)?;
     let owner_raw = &env.message.sender;
+
+    if &spender_raw == owner_raw {
+        return Err(StdError::generic_err("Cannot set allowance to own account"));
+    }
 
     // load value and delete if it hits 0, or update otherwise
     let mut bucket = allowances(&mut deps.storage, owner_raw);
@@ -464,55 +472,97 @@ mod tests {
     }
 
     #[test]
-    fn no_self_allowance() {}
+    fn no_self_allowance() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let owner = HumanAddr::from("addr0001");
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        do_init(&mut deps, &owner, Uint128(12340000));
+
+        // self-allowance
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: owner.clone(),
+            amount: Uint128(7777),
+            expires: None,
+        };
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(msg, "Cannot set allowance to own account")
+            }
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // decrease self-allowance
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: owner.clone(),
+            amount: Uint128(7777),
+            expires: None,
+        };
+        let res = handle(&mut deps, env.clone(), msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(msg, "Cannot set allowance to own account")
+            }
+            e => panic!("Unexpected error: {}", e),
+        }
+    }
 
     #[test]
-    fn transfer() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-        let addr1 = HumanAddr::from("addr0001");
-        let addr2 = HumanAddr::from("addr0002");
-        let amount1 = Uint128::from(12340000u128);
-        let transfer = Uint128::from(76543u128);
-        let too_much = Uint128::from(12340321u128);
+    fn transfer_from_respects_limits() {
+        let mut deps = mock_dependencies(20, &[]);
+        let owner = HumanAddr::from("addr0001");
+        let spender = HumanAddr::from("addr0002");
+        let rcpt = HumanAddr::from("addr0003");
 
-        do_init(&mut deps, &addr1, amount1);
+        let start = Uint128(999999);
+        do_init(&mut deps, &owner, start);
 
-        // cannot send more than we have
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
-        let msg = HandleMsg::Transfer {
-            recipient: addr2.clone(),
-            amount: too_much,
+        // provide an allowance
+        let allow1 = Uint128(77777);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow1,
+            expires: None,
         };
-        let res = handle(&mut deps, env, msg);
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // valid transfer of part of the allowance
+        let transfer = Uint128(44444);
+        let msg = HandleMsg::TransferFrom {
+            owner: owner.clone(),
+            recipient: rcpt.clone(),
+            amount: transfer,
+        };
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg).unwrap();
+        assert_eq!(res.log[0], log("action", "transfer_from"));
+
+        // make sure money arrived
+        assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
+        assert_eq!(get_balance(&deps, &rcpt), transfer);
+
+        // ensure it looks good
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        let expect = AllowanceResponse {
+            allowance: (allow1 - transfer).unwrap(),
+            expires: Expiration::Never {},
+        };
+        assert_eq!(expect, allowance);
+
+        // cannot send more than the allowance
+        let msg = HandleMsg::TransferFrom {
+            owner: owner.clone(),
+            recipient: rcpt.clone(),
+            amount: Uint128(33443),
+        };
+
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
             StdError::Underflow { .. } => {}
             e => panic!("Unexpected error: {}", e),
         }
-
-        // cannot send from empty account
-        let env = mock_env(&deps.api, addr2.clone(), &[]);
-        let msg = HandleMsg::Transfer {
-            recipient: addr1.clone(),
-            amount: transfer,
-        };
-        let res = handle(&mut deps, env, msg);
-        match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
-            e => panic!("Unexpected error: {}", e),
-        }
-
-        // valid transfer
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
-        let msg = HandleMsg::Transfer {
-            recipient: addr2.clone(),
-            amount: transfer,
-        };
-        let res = handle(&mut deps, env, msg).unwrap();
-        assert_eq!(res.messages.len(), 0);
-
-        let remainder = (amount1 - transfer).unwrap();
-        assert_eq!(get_balance(&deps, &addr1), remainder);
-        assert_eq!(get_balance(&deps, &addr2), transfer);
-        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
     }
 }
