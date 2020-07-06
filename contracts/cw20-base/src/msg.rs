@@ -1,5 +1,5 @@
 use cosmwasm_std::{Binary, HumanAddr, StdError, StdResult, Uint128};
-use cw20::MinterResponse;
+use cw20::{Expiration, MinterResponse};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -86,6 +86,39 @@ pub enum HandleMsg {
         recipient: HumanAddr,
         amount: Uint128,
     },
+    /// Only with "approval" extension. Allows spender to access an additional amount tokens
+    /// from the owner's (env.sender) account. If expires is Some(), overwrites current allowance
+    /// expiration with this one.
+    IncreaseAllowance {
+        spender: HumanAddr,
+        amount: Uint128,
+        expires: Option<Expiration>,
+    },
+    /// Only with "approval" extension. Lowers the spender's access of tokens
+    /// from the owner's (env.sender) account by amount. If expires is Some(), overwrites current
+    /// allowance expiration with this one.
+    DecreaseAllowance {
+        spender: HumanAddr,
+        amount: Uint128,
+        expires: Option<Expiration>,
+    },
+    /// Only with "approval" extension. Transfers amount tokens from owner -> recipient
+    /// if `env.sender` has sufficient pre-approval.
+    TransferFrom {
+        owner: HumanAddr,
+        recipient: HumanAddr,
+        amount: Uint128,
+    },
+    /// Only with "approval" extension. Sends amount tokens from owner -> contract
+    /// if `env.sender` has sufficient pre-approval.
+    SendFrom {
+        owner: HumanAddr,
+        contract: HumanAddr,
+        amount: Uint128,
+        msg: Option<Binary>,
+    },
+    /// Only with "approval" extension. Destroys tokens forever
+    BurnFrom { owner: HumanAddr, amount: Uint128 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -101,4 +134,11 @@ pub enum QueryMsg {
     /// Returns who can mint and how much.
     /// Return type: MinterResponse.
     Minter {},
+    /// Only with "allowance" extension.
+    /// Returns how much spender can use from owner account, 0 if unset.
+    /// Return type: AllowanceResponse.
+    Allowance {
+        owner: HumanAddr,
+        spender: HumanAddr,
+    },
 }
