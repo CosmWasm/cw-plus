@@ -249,3 +249,270 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
         .unwrap_or_default();
     Ok(allowance)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+    use cosmwasm_std::{coins, StdError};
+    use cw20::MetaResponse;
+
+    use crate::contract::{handle, init, query_balance, query_meta};
+    use crate::msg::{HandleMsg, InitMsg, InitialBalance};
+
+    fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
+        deps: &Extern<S, A, Q>,
+        address: T,
+    ) -> Uint128 {
+        query_balance(&deps, address.into()).unwrap().balance
+    }
+
+    // this will set up the init for other tests
+    fn do_init<S: Storage, A: Api, Q: Querier>(
+        deps: &mut Extern<S, A, Q>,
+        addr: &HumanAddr,
+        amount: Uint128,
+    ) -> MetaResponse {
+        let init_msg = InitMsg {
+            name: "Auto Gen".to_string(),
+            symbol: "AUTO".to_string(),
+            decimals: 3,
+            initial_balances: vec![InitialBalance {
+                address: addr.into(),
+                amount,
+            }],
+            mint: None,
+        };
+        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        init(deps, env, init_msg).unwrap();
+        query_meta(&deps).unwrap()
+    }
+
+    #[test]
+    fn increase_decrease_allowances() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let owner = HumanAddr::from("addr0001");
+        let spender = HumanAddr::from("addr0002");
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        do_init(&mut deps, &owner, Uint128(12340000));
+
+        // no allowance to start
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        assert_eq!(allowance, AllowanceResponse::default());
+
+        // set allowance with height expiration
+        let allow1 = Uint128(7777);
+        let expires = Expiration::AtHeight { height: 5432 };
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow1,
+            expires: Some(expires.clone()),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // ensure it looks good
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            AllowanceResponse {
+                allowance: allow1,
+                expires: expires.clone()
+            }
+        );
+
+        // decrease it a bit with no expire set - stays the same
+        let lower = Uint128(4444);
+        let allow2 = (allow1 - lower).unwrap();
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender.clone(),
+            amount: lower,
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            AllowanceResponse {
+                allowance: allow2,
+                expires: expires.clone()
+            }
+        );
+
+        // increase it some more and override the expires
+        let raise = Uint128(87654);
+        let allow3 = allow2 + raise;
+        let new_expire = Expiration::AtTime { time: 8888888888 };
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: raise,
+            expires: Some(new_expire.clone()),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            AllowanceResponse {
+                allowance: allow3,
+                expires: new_expire.clone()
+            }
+        );
+
+        // decrease it below 0
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender.clone(),
+            amount: Uint128(99988647623876347),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+        let allowance = query_allowance(&deps, owner.clone(), spender.clone()).unwrap();
+        assert_eq!(allowance, AllowanceResponse::default());
+    }
+
+    #[test]
+    fn allowances_independent() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let owner = HumanAddr::from("addr0001");
+        let spender = HumanAddr::from("addr0002");
+        let spender2 = HumanAddr::from("addr0003");
+        let env = mock_env(&deps.api, owner.clone(), &[]);
+        do_init(&mut deps, &owner, Uint128(12340000));
+
+        // no allowance to start
+        assert_eq!(
+            query_allowance(&deps, owner.clone(), spender.clone()).unwrap(),
+            AllowanceResponse::default()
+        );
+        assert_eq!(
+            query_allowance(&deps, owner.clone(), spender2.clone()).unwrap(),
+            AllowanceResponse::default()
+        );
+        assert_eq!(
+            query_allowance(&deps, spender.clone(), spender2.clone()).unwrap(),
+            AllowanceResponse::default()
+        );
+
+        // set allowance with height expiration
+        let allow1 = Uint128(7777);
+        let expires = Expiration::AtHeight { height: 5432 };
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow1,
+            expires: Some(expires.clone()),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // set other allowance with no expiration
+        let allow2 = Uint128(87654);
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender2.clone(),
+            amount: allow2,
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // check they are proper
+        let expect_one = AllowanceResponse {
+            allowance: allow1,
+            expires,
+        };
+        let expect_two = AllowanceResponse {
+            allowance: allow2,
+            expires: Expiration::Never {},
+        };
+        assert_eq!(
+            query_allowance(&deps, owner.clone(), spender.clone()).unwrap(),
+            expect_one.clone()
+        );
+        assert_eq!(
+            query_allowance(&deps, owner.clone(), spender2.clone()).unwrap(),
+            expect_two.clone()
+        );
+        assert_eq!(
+            query_allowance(&deps, spender.clone(), spender2.clone()).unwrap(),
+            AllowanceResponse::default()
+        );
+
+        // also allow spender -> spender2 with no interference
+        let env = mock_env(&deps.api, spender.clone(), &[]);
+        let allow3 = Uint128(1821);
+        let expires3 = Expiration::AtTime { time: 3767626296 };
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender2.clone(),
+            amount: allow3,
+            expires: Some(expires3.clone()),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+        let expect_three = AllowanceResponse {
+            allowance: allow3,
+            expires: expires3,
+        };
+        assert_eq!(
+            query_allowance(&deps, owner.clone(), spender.clone()).unwrap(),
+            expect_one.clone()
+        );
+        assert_eq!(
+            query_allowance(&deps, owner.clone(), spender2.clone()).unwrap(),
+            expect_two.clone()
+        );
+        assert_eq!(
+            query_allowance(&deps, spender.clone(), spender2.clone()).unwrap(),
+            expect_three.clone()
+        );
+    }
+
+    #[test]
+    fn no_self_allowance() {}
+
+    #[test]
+    fn transfer() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+        let addr1 = HumanAddr::from("addr0001");
+        let addr2 = HumanAddr::from("addr0002");
+        let amount1 = Uint128::from(12340000u128);
+        let transfer = Uint128::from(76543u128);
+        let too_much = Uint128::from(12340321u128);
+
+        do_init(&mut deps, &addr1, amount1);
+
+        // cannot send more than we have
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: too_much,
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // cannot send from empty account
+        let env = mock_env(&deps.api, addr2.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr1.clone(),
+            amount: transfer,
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // valid transfer
+        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: transfer,
+        };
+        let res = handle(&mut deps, env, msg).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
+        let remainder = (amount1 - transfer).unwrap();
+        assert_eq!(get_balance(&deps, &addr1), remainder);
+        assert_eq!(get_balance(&deps, &addr2), transfer);
+        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
+    }
+}

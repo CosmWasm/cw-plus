@@ -255,7 +255,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn query_balance<S: Storage, A: Api, Q: Querier>(
+pub fn query_balance<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     address: HumanAddr,
 ) -> StdResult<BalanceResponse> {
@@ -266,7 +266,9 @@ fn query_balance<S: Storage, A: Api, Q: Querier>(
     Ok(BalanceResponse { balance })
 }
 
-fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<MetaResponse> {
+pub fn query_meta<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<MetaResponse> {
     let meta = meta_read(&deps.storage).load()?;
     let res = MetaResponse {
         name: meta.name,
@@ -277,7 +279,7 @@ fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
     Ok(res)
 }
 
-fn query_minter<S: Storage, A: Api, Q: Querier>(
+pub fn query_minter<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<Option<MinterResponse>> {
     let meta = meta_read(&deps.storage).load()?;
