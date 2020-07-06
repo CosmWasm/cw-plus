@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, HumanAddr, Uint128};
+use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult, Uint128};
 use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -56,6 +56,19 @@ pub struct CreateMsg {
     /// block time exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_time: Option<u64>,
+    /// Besides any possible tokens sent with the CreateMsg, this is a list of all cw20 token addresses
+    /// that are accepted by the escrow during a top-up. This is required to avoid a DoS attack by topping-up
+    /// with an invalid cw20 contract. See https://github.com/CosmWasm/cosmwasm-plus/issues/19
+    pub cw20_whitelist: Option<Vec<HumanAddr>>,
+}
+
+impl CreateMsg {
+    pub fn canonical_whitelist<A: Api>(&self, api: &A) -> StdResult<Vec<CanonicalAddr>> {
+        match self.cw20_whitelist.as_ref() {
+            Some(v) => v.iter().map(|h| api.canonical_address(h)).collect(),
+            None => Ok(vec![]),
+        }
+    }
 }
 
 pub fn is_valid_name(name: &str) -> bool {
@@ -103,6 +116,8 @@ pub struct DetailsResponse {
     pub native_balance: Vec<Coin>,
     /// Balance in cw20 tokens
     pub cw20_balance: Vec<Cw20CoinHuman>,
+    /// Whitelisted cw20 tokens
+    pub cw20_whitelist: Vec<HumanAddr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

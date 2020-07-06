@@ -109,6 +109,16 @@
             }
           ]
         },
+        "cw20_whitelist": {
+          "description": "Besides any possible tokens sent with the CreateMsg, this is a list of all cw20 token addresses that are accepted by the escrow during a top-up. This is required to avoid a DoS attack by topping-up with an invalid cw20 contract. See https://github.com/CosmWasm/cosmwasm-plus/issues/19",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/HumanAddr"
+          }
+        },
         "end_height": {
           "description": "When end height set and block height exceeds this value, the escrow is expired. Once an escrow is expired, it can be returned to the original funder (via \"refund\").",
           "type": [

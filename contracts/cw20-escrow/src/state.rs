@@ -2,7 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    CanonicalAddr, Coin, Env, Order, ReadonlyStorage, StdError, StdResult, Storage, Uint128,
+    Api, CanonicalAddr, Coin, Env, HumanAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Uint128,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
@@ -25,6 +26,8 @@ pub struct Escrow {
     pub native_balance: Vec<Coin>,
     /// Balance in cw20 tokens
     pub cw20_balance: Vec<Cw20Coin>,
+    /// All possible contracts that we accept tokens from
+    pub cw20_whitelist: Vec<CanonicalAddr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -48,6 +51,13 @@ impl Escrow {
         }
 
         false
+    }
+
+    pub fn human_whitelist<A: Api>(&self, api: &A) -> StdResult<Vec<HumanAddr>> {
+        self.cw20_whitelist
+            .iter()
+            .map(|h| api.human_address(h))
+            .collect()
     }
 }
 
