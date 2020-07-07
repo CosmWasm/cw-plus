@@ -100,9 +100,10 @@ from the available allowance.
 `SendFrom{owner, contract, amount, msg}` - `SendFrom` is to `Send`, what
 `TransferFrom` is to `Transfer`. This allows a pre-approved account to
 not just transfer the tokens, but to send them to another contract
-to trigger a given action. `SendFrom` will set the `Receive{sender}`
-to be the `owner` account (the account the money is coming from)
-rather than `env.sender` (the account that triggered the transfer).
+to trigger a given action. **Note** `SendFrom` will set the `Receive{sender}`
+to be the `env.sender` (the account that triggered the transfer)
+rather than the `owner` account (the account the money is coming from).
+This is an open question whether we should switch this?
 
 `BurnFrom{owner, amount}` - This works like `TransferFrom`, but burns 
 the tokens instead of transfering them. This will reduce the owner's 
