@@ -3,6 +3,8 @@ name = "cw20-base"
 version = "0.1.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
+description = "Basic implementation of a CosmWasm-20 compliant token"
+license = "AGPL-3.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
