@@ -1,4 +1,4 @@
-# CW20 Spec
+# CW20 Spec: Fungible Tokens
 
 CW20 is a specification for fungible tokens based on CosmWasm.
 The name and design is loosely based on Ethereum's ERC20 standard,
