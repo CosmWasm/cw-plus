@@ -42,8 +42,8 @@ mod tests {
     #[test]
     fn is_admin() {
         let api = MockApi::new(20);
-        let admins: Vec<_> = ["bob", "paul", "john"]
-            .iter()
+        let admins: Vec<_> = vec!["bob", "paul", "john"]
+            .into_iter()
             .map(|name| api.canonical_address(&HumanAddr::from(name)).unwrap())
             .collect();
         let config = Config {
