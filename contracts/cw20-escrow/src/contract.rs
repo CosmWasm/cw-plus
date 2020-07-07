@@ -43,7 +43,6 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
         Some(bin) => from_binary(&bin),
         None => Err(StdError::parse_err("ReceiveMsg", "no data")),
     }?;
-    // TODO: assert the sending token address is valid (contract not external account)
     let token = Cw20Coin {
         address: env.message.sender,
         amount: wrapper.amount,
