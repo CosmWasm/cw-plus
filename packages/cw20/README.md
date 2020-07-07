@@ -66,12 +66,31 @@ is still a nice use-case, and you can see how the Cosmos SDK wants to add
 payment allowances to native tokens. This is mainly designed to provide
 access to other public-key-based accounts.
 
+There was an issue with race conditions in the original ERC20 approval spec.
+If you had an approval of 50 and I then want to reduce it to 20, I submit a
+Tx to set the allowance to 20. If you see that and immediately submit a tx
+using the entire 50, you then get access to the other 20. Not only did you quickly
+spend the 50 before I could reduce it, you get another 20 for free.
+
+The solution discussed in the Ethereum community was an `IncreaseAllowance`
+and `DecreaseAllowance` operator (instead of `Approve`). To originally set
+an approval, use `IncreaseAllowance`, which works fine with no previous allowance.
+`DecreaseAllowance` is meant to be robust, that is if you decrease by more than
+the current allowance (eg. the user spent some in the middle), it will just round 
+down to 0 and not make any underflow error.
+
 ### Messages
 
-`Approve{spender, amount, expires}` - Sets an allowance such that `spender`
-may access up to `amount` tokens from the `env.sender` account. This may
-optionally come with an `Expiration` time, which if set limits when the
-approval can be used (by time or height).
+`IncreaseAllowance{spender, amount, expires}` - Set or increase the allowance 
+such that `spender` may access up to `amount + current_allowance` tokens 
+from the `env.sender` account. This may optionally come with an `Expiration`
+time, which if set limits when the approval can be used (by time or height).
+
+`DecreaseAllowance{spender, amount, expires}` - Decrease or clear the allowance 
+such that `spender` may access up to `current_allowance - amount` tokens 
+from the `env.sender` account. This may optionally come with an `Expiration`
+time, which if set limits when the approval can be used (by time or height).
+If `amount >= current_allowance`, this will clear the allowance (delete it).
 
 `TransferFrom{owner, recipient, amount}` - This makes use of an allowance
 and if there was a valid, un-expired pre-approval for the `env.sender`, 
@@ -81,15 +100,14 @@ from the available allowance.
 `SendFrom{owner, contract, amount, msg}` - `SendFrom` is to `Send`, what
 `TransferFrom` is to `Transfer`. This allows a pre-approved account to
 not just transfer the tokens, but to send them to another contract
-to trigger a given action. `SendFrom` will set the `Receive{sender}`
-to be the `owner` account (the account the money is coming from)
-rather than `env.sender` (the account that triggered the transfer).
+to trigger a given action. **Note** `SendFrom` will set the `Receive{sender}`
+to be the `env.sender` (the account that triggered the transfer)
+rather than the `owner` account (the account the money is coming from).
+This is an open question whether we should switch this?
 
 `BurnFrom{owner, amount}` - This works like `TransferFrom`, but burns 
 the tokens instead of transfering them. This will reduce the owner's 
 balance, `total_supply` and the caller's allowance.
-
-TODO: IncreaseApproval/DecreaseApproval to store delta's rather than absolute values??
 
 ### Queries
 

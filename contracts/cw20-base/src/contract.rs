@@ -4,6 +4,10 @@ use cosmwasm_std::{
 };
 use cw20::{BalanceResponse, Cw20ReceiveMsg, MetaResponse, MinterResponse};
 
+use crate::allowances::{
+    handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
+    handle_transfer_from, query_allowance,
+};
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
 use crate::state::{balances, balances_read, meta, meta_read, Meta, MinterData};
 
@@ -71,6 +75,28 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             msg,
         } => handle_send(deps, env, contract, amount, msg),
         HandleMsg::Mint { recipient, amount } => handle_mint(deps, env, recipient, amount),
+        HandleMsg::IncreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        HandleMsg::DecreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        HandleMsg::TransferFrom {
+            owner,
+            recipient,
+            amount,
+        } => handle_transfer_from(deps, env, owner, recipient, amount),
+        HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, owner, amount),
+        HandleMsg::SendFrom {
+            owner,
+            contract,
+            amount,
+            msg,
+        } => handle_send_from(deps, env, owner, contract, amount, msg),
     }
 }
 
@@ -223,10 +249,13 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
         QueryMsg::Meta {} => to_binary(&query_meta(deps)?),
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
+        QueryMsg::Allowance { owner, spender } => {
+            to_binary(&query_allowance(deps, owner, spender)?)
+        }
     }
 }
 
-fn query_balance<S: Storage, A: Api, Q: Querier>(
+pub fn query_balance<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     address: HumanAddr,
 ) -> StdResult<BalanceResponse> {
@@ -237,7 +266,9 @@ fn query_balance<S: Storage, A: Api, Q: Querier>(
     Ok(BalanceResponse { balance })
 }
 
-fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<MetaResponse> {
+pub fn query_meta<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<MetaResponse> {
     let meta = meta_read(&deps.storage).load()?;
     let res = MetaResponse {
         name: meta.name,
@@ -248,7 +279,7 @@ fn query_meta<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
     Ok(res)
 }
 
-fn query_minter<S: Storage, A: Api, Q: Querier>(
+pub fn query_minter<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<Option<MinterResponse>> {
     let meta = meta_read(&deps.storage).load()?;

@@ -4,7 +4,7 @@ mod query;
 mod receiver;
 
 pub use crate::helpers::{Cw20CanonicalContract, Cw20Contract};
-pub use crate::msg::Cw20HandleMsg;
+pub use crate::msg::{Cw20HandleMsg, Expiration};
 pub use crate::query::{
     AllowanceResponse, BalanceResponse, Cw20QueryMsg, MetaResponse, MinterResponse,
 };
