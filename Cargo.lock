@@ -85,7 +85,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw1-multisig"
+name = "cw1-whitelist"
 version = "0.1.0"
 dependencies = [
  "cosmwasm-schema",
