@@ -3,7 +3,7 @@ workflows:
   version: 2
   test:
     jobs:
-      - contract_cw1_multisig
+      - contract_cw1_whitelist
       - contract_cw20_base
       - contract_cw20_escrow
       - package_cw1
@@ -11,10 +11,10 @@ workflows:
       - lint
 
 jobs:
-  contract_cw1_multisig:
+  contract_cw1_whitelist:
     docker:
       - image: rust:1.44.0
-    working_directory: ~/project/contracts/cw1-multisig
+    working_directory: ~/project/contracts/cw1-whitelist
     steps:
       - checkout:
           path: ~/project
@@ -23,7 +23,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - restore_cache:
           keys:
-            - cargocache-cw1-multisig-rust:1.44.0-{{ checksum "~/project/Cargo.lock" }}
+            - cargocache-cw1-whitelist-rust:1.44.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
@@ -50,7 +50,7 @@ jobs:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-cw1-multisig-rust:1.44.0-{{ checksum "~/project/Cargo.lock" }}
+          key: cargocache-cw1-whitelist-rust:1.44.0-{{ checksum "~/project/Cargo.lock" }}
 
   contract_cw20_base:
     docker:
