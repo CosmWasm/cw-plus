@@ -56,7 +56,7 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = config_read(&deps.storage).load()?;
-    if !cfg.is_admin(&env.message.sender) {
+    if !cfg.is_admin(&deps.api.canonical_address(&env.message.sender)?) {
         Err(StdError::unauthorized())
     } else {
         let mut res = HandleResponse::default();
@@ -71,7 +71,7 @@ pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
     env: Env,
 ) -> StdResult<HandleResponse> {
     let mut cfg = config_read(&deps.storage).load()?;
-    if !cfg.can_modify(&env.message.sender) {
+    if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
         Err(StdError::unauthorized())
     } else {
         cfg.mutable = false;
@@ -89,7 +89,7 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     admins: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
     let mut cfg = config_read(&deps.storage).load()?;
-    if !cfg.can_modify(&env.message.sender) {
+    if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
         Err(StdError::unauthorized())
     } else {
         cfg.admins = map_canonical(&deps.api, &admins)?;
@@ -143,7 +143,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone(), carl.clone()],
             mutable: true,
         };
-        let env = mock_env(&deps.api, &anyone, &[]);
+        let env = mock_env(&anyone, &[]);
         init(&mut deps, env, init_msg).unwrap();
 
         // ensure expected config
@@ -157,7 +157,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![anyone.clone()],
         };
-        let env = mock_env(&deps.api, &anyone, &[]);
+        let env = mock_env(&anyone, &[]);
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
@@ -168,7 +168,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![alice.clone(), bob.clone()],
         };
-        let env = mock_env(&deps.api, &alice, &[]);
+        let env = mock_env(&alice, &[]);
         handle(&mut deps, env, msg).unwrap();
 
         // ensure expected config
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(query_config(&deps).unwrap(), expected);
 
         // carl cannot freeze it
-        let env = mock_env(&deps.api, &carl, &[]);
+        let env = mock_env(&carl, &[]);
         let res = handle(&mut deps, env, HandleMsg::Freeze {});
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
@@ -187,7 +187,7 @@ mod tests {
         }
 
         // but bob can
-        let env = mock_env(&deps.api, &bob, &[]);
+        let env = mock_env(&bob, &[]);
         handle(&mut deps, env, HandleMsg::Freeze {}).unwrap();
         let expected = ConfigResponse {
             admins: vec![alice.clone(), bob.clone()],
@@ -199,7 +199,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![alice.clone()],
         };
-        let env = mock_env(&deps.api, &alice, &[]);
+        let env = mock_env(&alice, &[]);
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
@@ -220,7 +220,7 @@ mod tests {
             admins: vec![alice.clone(), carl.clone()],
             mutable: false,
         };
-        let env = mock_env(&deps.api, &bob, &[]);
+        let env = mock_env(&bob, &[]);
         init(&mut deps, env, init_msg).unwrap();
 
         let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
@@ -243,7 +243,7 @@ mod tests {
         let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
-        let env = mock_env(&deps.api, &bob, &[]);
+        let env = mock_env(&bob, &[]);
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
@@ -251,7 +251,7 @@ mod tests {
         }
 
         // but carl can
-        let env = mock_env(&deps.api, &carl, &[]);
+        let env = mock_env(&carl, &[]);
         let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.log, vec![log("action", "execute")]);
