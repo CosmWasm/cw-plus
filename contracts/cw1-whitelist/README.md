@@ -25,7 +25,7 @@ a chain-specific message.
 
 ## Running this contract
 
-You will need Rust 1.41+ with `wasm32-unknown-unknown` target installed.
+You will need Rust 1.44.1+ with `wasm32-unknown-unknown` target installed.
 
 You can run unit tests on this via: 
 
@@ -35,9 +35,9 @@ Once you are happy with the content, you can compile it to wasm via:
 
 ```
 RUSTFLAGS='-C link-arg=-s' cargo wasm
-cp ../../target/wasm32-unknown-unknown/release/cw20_escrow.wasm .
-ls -l cw20_escrow.wasm
-sha256sum cw20_escrow.wasm
+cp ../../target/wasm32-unknown-unknown/release/cw1_whitelist.wasm .
+ls -l cw1_whitelist.wasm
+sha256sum cw1_whitelist.wasm
 ```
 
 Or for a production-ready (compressed) build, run the following from the
@@ -47,6 +47,6 @@ repository root (not currently working with this monorepo...)
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.8.0 ./contracts/cw20-base
-mv contract.wasm cw20_escrow.wasm
+  cosmwasm/rust-optimizer:0.9.0 ./contracts/cw1-base
+mv contract.wasm cw1_whitelist.wasm
 ```

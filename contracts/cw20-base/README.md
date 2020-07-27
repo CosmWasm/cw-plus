@@ -13,7 +13,7 @@ Implements:
 
 ## Running this contract
 
-You will need Rust 1.41+ with `wasm32-unknown-unknown` target installed.
+You will need Rust 1.44.1+ with `wasm32-unknown-unknown` target installed.
 
 You can run unit tests on this via: 
 
@@ -35,7 +35,7 @@ repository root (not currently working with this monorepo...)
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.8.0 ./contracts/cw20-base
+  cosmwasm/rust-optimizer:0.9.0 ./contracts/cw20-base
 mv contract.wasm cw20_base.wasm
 ```
 

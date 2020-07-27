@@ -107,7 +107,7 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
-    let sender_raw = env.message.sender;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
     let mut accounts = balances(&mut deps.storage);
     accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
@@ -135,7 +135,7 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
     env: Env,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    let sender_raw = env.message.sender;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
     // lower balance
     let mut accounts = balances(&mut deps.storage);
@@ -167,7 +167,10 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
     let mut config = meta_read(&deps.storage).load()?;
-    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != env.message.sender {
+    if config.mint.is_none()
+        || config.mint.as_ref().unwrap().minter
+            != deps.api.canonical_address(&env.message.sender)?
+    {
         return Err(StdError::unauthorized());
     }
 
@@ -206,7 +209,7 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
     let rcpt_raw = deps.api.canonical_address(&contract)?;
-    let sender_raw = env.message.sender;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
     // move the tokens to the contract
     let mut accounts = balances(&mut deps.storage);
@@ -353,7 +356,7 @@ mod tests {
             }],
             mint: mint.clone(),
         };
-        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let env = mock_env(&HumanAddr("creator".to_string()), &[]);
         let res = init(deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -386,7 +389,7 @@ mod tests {
             }],
             mint: None,
         };
-        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let env = mock_env(&HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -421,7 +424,7 @@ mod tests {
                 cap: Some(limit),
             }),
         };
-        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let env = mock_env(&HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -463,7 +466,7 @@ mod tests {
                 cap: Some(limit),
             }),
         };
-        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let env = mock_env(&HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg);
         match res.unwrap_err() {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Initial supply greater than cap"),
@@ -489,7 +492,7 @@ mod tests {
             amount: prize,
         };
 
-        let env = mock_env(&deps.api, &minter, &[]);
+        let env = mock_env(&minter, &[]);
         let res = handle(&mut deps, env, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(get_balance(&deps, &genesis), amount);
@@ -501,7 +504,7 @@ mod tests {
             recipient: winner.clone(),
             amount: Uint128(333_222_222),
         };
-        let env = mock_env(&deps.api, &minter, &[]);
+        let env = mock_env(&minter, &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
             StdError::GenericErr { msg, .. } => {
@@ -526,7 +529,7 @@ mod tests {
             recipient: HumanAddr::from("lucky"),
             amount: Uint128(222),
         };
-        let env = mock_env(&deps.api, &HumanAddr::from("anyone else"), &[]);
+        let env = mock_env(&HumanAddr::from("anyone else"), &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
@@ -543,7 +546,7 @@ mod tests {
             recipient: HumanAddr::from("lucky"),
             amount: Uint128(222),
         };
-        let env = mock_env(&deps.api, &HumanAddr::from("genesis"), &[]);
+        let env = mock_env(&HumanAddr::from("genesis"), &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
@@ -574,7 +577,7 @@ mod tests {
             ],
             mint: None,
         };
-        let env = mock_env(&deps.api, &HumanAddr("creator".to_string()), &[]);
+        let env = mock_env(&HumanAddr("creator".to_string()), &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -638,7 +641,7 @@ mod tests {
         do_init(&mut deps, &addr1, amount1);
 
         // cannot send more than we have
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Transfer {
             recipient: addr2.clone(),
             amount: too_much,
@@ -650,7 +653,7 @@ mod tests {
         }
 
         // cannot send from empty account
-        let env = mock_env(&deps.api, addr2.clone(), &[]);
+        let env = mock_env(addr2.clone(), &[]);
         let msg = HandleMsg::Transfer {
             recipient: addr1.clone(),
             amount: transfer,
@@ -662,7 +665,7 @@ mod tests {
         }
 
         // valid transfer
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Transfer {
             recipient: addr2.clone(),
             amount: transfer,
@@ -687,7 +690,7 @@ mod tests {
         do_init(&mut deps, &addr1, amount1);
 
         // cannot burn more than we have
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Burn { amount: too_much };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
@@ -697,7 +700,7 @@ mod tests {
         assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
 
         // valid burn reduces total supply
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Burn { amount: burn };
         let res = handle(&mut deps, env, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
@@ -720,7 +723,7 @@ mod tests {
         do_init(&mut deps, &addr1, amount1);
 
         // cannot send more than we have
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Send {
             contract: contract.clone(),
             amount: too_much,
@@ -733,7 +736,7 @@ mod tests {
         }
 
         // valid transfer
-        let env = mock_env(&deps.api, addr1.clone(), &[]);
+        let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Send {
             contract: contract.clone(),
             amount: transfer,
