@@ -2,14 +2,15 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, InitResponse,
-    Querier, StdResult, Storage,
+    log, to_binary, Api, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdResult, Storage,
 };
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_config},
     msg::InitMsg,
     state::config_read,
 };
+use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
@@ -71,6 +72,50 @@ where
     }
 }
 
+pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    spender: HumanAddr,
+    amount: Coin,
+    expires: Option<Expiration>,
+) -> StdResult<HandleResponse<T>>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    // placeholder to remove warnings
+    let _ = (deps, env, spender, amount, expires);
+
+    // TODO
+    // look at cw20_base::contract::IncreaseAllowance
+    // if nothing present, we set this, and expires=None => Expiration::Never
+    // if something present, we add to the balance. expires=None => leave expiration at previous state, expires=Some(x) => set expires to new value x
+    panic!("unimplemented")
+}
+
+pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier, T>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    spender: HumanAddr,
+    amount: Coin,
+    expires: Option<Expiration>,
+) -> StdResult<HandleResponse<T>>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    // placeholder to remove warnings
+    let _ = (deps, env, spender, amount, expires);
+
+    // TODO
+    // look at cw20_base::contract::DecreaseAllowance
+    // if something present, we subtract from the balance. underflow is okay, removes that denom
+    // (eg. if allowance was [5 ETH, 2 BTC] and I decrease by 4 BTC, new allowance is [5 ETH].
+    // if final balance has no denoms, remove the allowance entry.
+    //
+    // as with handle_increase_allowance,
+    // expires=None => leave expiration at previous state, expires=Some(x) => set expires to new value x
+    panic!("unimplemented")
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
@@ -79,6 +124,18 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
     }
+}
+
+// if the subkey has no allowance, return an empty struct (not an error)
+pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    spender: HumanAddr,
+) -> StdResult<Allowance> {
+    let subkey = deps.api.canonical_address(&spender)?;
+    let allow = allowances_read(&deps.storage)
+        .may_load(subkey.as_slice())?
+        .unwrap_or_default();
+    Ok(allow)
 }
 
 #[cfg(test)]

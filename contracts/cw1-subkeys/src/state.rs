@@ -7,7 +7,7 @@ use cw20::Expiration;
 
 use crate::balance::Balance;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Allowance {
     balance: Balance,
     expires: Expiration,

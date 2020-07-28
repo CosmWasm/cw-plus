@@ -41,12 +41,7 @@ pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
     /// Returns cw1-whitelist::ConfigResponse
     Config {},
-    /// Returns the current allowance for the given subkey (how much it can spend)
+    /// Get the current allowance for the given subkey (how much it can spend)
+    /// Returns crate::state::Allowance
     Allowance { spender: HumanAddr },
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct AllowanceResponse {
-    pub allowance: Vec<Coin>,
-    pub expires: Expiration,
 }
