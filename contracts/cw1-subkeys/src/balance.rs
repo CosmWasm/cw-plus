@@ -129,8 +129,7 @@ impl ops::Sub<Coin> for Balance {
 #[cfg(test)]
 mod test {
     use super::*;
-    use cosmwasm_std::{from_slice, to_vec};
-    use std::convert::TryInto;
+    use cosmwasm_std::coin;
 
     #[test]
     fn balance_has_works() {

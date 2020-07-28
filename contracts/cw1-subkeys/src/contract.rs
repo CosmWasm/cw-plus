@@ -146,132 +146,38 @@ mod tests {
 
     const CANONICAL_LENGTH: usize = 20;
 
+    // you probably want some `setup_test_case` function that inits a contract with 2 admins
+    // and 2 subkeys with some allowances. these keys can be constants strings here,
+    // used like `HumanAddr::from(admin1)` and then all tests can just run against that
+
     #[test]
-    fn init_and_modify_config() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-
-        let alice = HumanAddr::from("alice");
-        let bob = HumanAddr::from("bob");
-        let carl = HumanAddr::from("carl");
-
-        let anyone = HumanAddr::from("anyone");
-
-        // init the contract
-        let init_msg = InitMsg {
-            admins: vec![alice.clone(), bob.clone(), carl.clone()],
-            mutable: true,
-        };
-        let env = mock_env(&deps.api, &anyone, &[]);
-        init(&mut deps, env, init_msg).unwrap();
-
-        // ensure expected config
-        let expected = ConfigResponse {
-            admins: vec![alice.clone(), bob.clone(), carl.clone()],
-            mutable: true,
-        };
-        assert_eq!(query_config(&deps).unwrap(), expected);
-
-        // anyone cannot modify the contract
-        let msg = HandleMsg::UpdateAdmins {
-            admins: vec![anyone.clone()],
-        };
-        let env = mock_env(&deps.api, &anyone, &[]);
-        let res = handle(&mut deps, env, msg);
-        match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // but alice can kick out carl
-        let msg = HandleMsg::UpdateAdmins {
-            admins: vec![alice.clone(), bob.clone()],
-        };
-        let env = mock_env(&deps.api, &alice, &[]);
-        handle(&mut deps, env, msg).unwrap();
-
-        // ensure expected config
-        let expected = ConfigResponse {
-            admins: vec![alice.clone(), bob.clone()],
-            mutable: true,
-        };
-        assert_eq!(query_config(&deps).unwrap(), expected);
-
-        // carl cannot freeze it
-        let env = mock_env(&deps.api, &carl, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Freeze {});
-        match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // but bob can
-        let env = mock_env(&deps.api, &bob, &[]);
-        handle(&mut deps, env, HandleMsg::Freeze {}).unwrap();
-        let expected = ConfigResponse {
-            admins: vec![alice.clone(), bob.clone()],
-            mutable: false,
-        };
-        assert_eq!(query_config(&deps).unwrap(), expected);
-
-        // and now alice cannot change it again
-        let msg = HandleMsg::UpdateAdmins {
-            admins: vec![alice.clone()],
-        };
-        let env = mock_env(&deps.api, &alice, &[]);
-        let res = handle(&mut deps, env, msg);
-        match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+    fn query_allowances() {
+        // TODO
+        // check the allowances work for accounts with balances and accounts with none
     }
 
     #[test]
-    fn execute_messages_has_proper_permissions() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+    fn update_admins_and_query() {
+        // TODO
+        // insure imported logic is wired up properly
+    }
 
-        let alice = HumanAddr::from("alice");
-        let bob = HumanAddr::from("bob");
-        let carl = HumanAddr::from("carl");
+    #[test]
+    fn increase_allowances() {
+        // TODO
+        // add to existing account (expires = None) => don't change Expiration (previous should be different than Never)
+        // add to existing account (expires = Some)
+        // add to new account (expires = None) => default Expiration::Never
+        // add to new account (expires = Some)
+    }
 
-        // init the contract
-        let init_msg = InitMsg {
-            admins: vec![alice.clone(), carl.clone()],
-            mutable: false,
-        };
-        let env = mock_env(&deps.api, &bob, &[]);
-        init(&mut deps, env, init_msg).unwrap();
-
-        let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
-        let msgs = vec![
-            BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
-                to_address: bob.clone(),
-                amount: coins(10000, "DAI"),
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr: HumanAddr::from("some contract"),
-                msg: to_binary(&freeze).unwrap(),
-                send: vec![],
-            }
-            .into(),
-        ];
-
-        // make some nice message
-        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
-
-        // bob cannot execute them
-        let env = mock_env(&deps.api, &bob, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone());
-        match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // but carl can
-        let env = mock_env(&deps.api, &carl, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
-        assert_eq!(res.messages, msgs);
-        assert_eq!(res.log, vec![log("action", "execute")]);
+    #[test]
+    fn decrease_allowances() {
+        // TODO
+        // subtract to existing account (has none of that denom)
+        // subtract to existing account (brings denom to 0, other denoms left)
+        // subtract to existing account (brings denom to > 0)
+        // subtract to existing account (brings denom to 0, no other denoms left => should delete Allowance)
+        // subtract from empty account (should error)
     }
 }
