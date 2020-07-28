@@ -2,35 +2,24 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, InitResponse,
+    Querier, StdResult, Storage,
+};
+use cw1_whitelist::{
+    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_config},
+    msg::InitMsg,
+    state::config_read,
 };
 
-use crate::msg::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, Config};
+use crate::msg::{HandleMsg, QueryMsg};
+use crate::state::{allowances, allowances_read, Allowance};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let cfg = Config {
-        admins: map_canonical(&deps.api, &msg.admins)?,
-        mutable: msg.mutable,
-    };
-    config(&mut deps.storage).save(&cfg)?;
-    Ok(InitResponse::default())
-}
-
-fn map_canonical<A: Api>(api: &A, admins: &[HumanAddr]) -> StdResult<Vec<CanonicalAddr>> {
-    admins
-        .iter()
-        .map(|addr| api.canonical_address(addr))
-        .collect()
-}
-
-fn map_human<A: Api>(api: &A, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr>> {
-    admins.iter().map(|addr| api.human_address(addr)).collect()
+    whitelist_init(deps, env, msg)
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -44,6 +33,16 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::Execute { msgs } => handle_execute(deps, env, msgs),
         HandleMsg::Freeze {} => handle_freeze(deps, env),
         HandleMsg::UpdateAdmins { admins } => handle_update_admins(deps, env, admins),
+        HandleMsg::IncreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        HandleMsg::DecreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_decrease_allowance(deps, env, spender, amount, expires),
     }
 }
 
@@ -56,48 +55,19 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = config_read(&deps.storage).load()?;
-    if !cfg.is_admin(&env.message.sender) {
-        Err(StdError::unauthorized())
-    } else {
+    // this is the admin behavior (same as cw1-whitelist)
+    if cfg.is_admin(&deps.api.canonical_address(&env.message.sender)?) {
         let mut res = HandleResponse::default();
         res.messages = msgs;
         res.log = vec![log("action", "execute")];
         Ok(res)
-    }
-}
-
-pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-) -> StdResult<HandleResponse> {
-    let mut cfg = config_read(&deps.storage).load()?;
-    if !cfg.can_modify(&env.message.sender) {
-        Err(StdError::unauthorized())
     } else {
-        cfg.mutable = false;
-        config(&mut deps.storage).save(&cfg)?;
-
-        let mut res = HandleResponse::default();
-        res.log = vec![log("action", "freeze")];
-        Ok(res)
-    }
-}
-
-pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    admins: Vec<HumanAddr>,
-) -> StdResult<HandleResponse> {
-    let mut cfg = config_read(&deps.storage).load()?;
-    if !cfg.can_modify(&env.message.sender) {
-        Err(StdError::unauthorized())
-    } else {
-        cfg.admins = map_canonical(&deps.api, &admins)?;
-        config(&mut deps.storage).save(&cfg)?;
-
-        let mut res = HandleResponse::default();
-        res.log = vec![log("action", "update_admins")];
-        Ok(res)
+        // TODO
+        // for each message, check if the message is a BankMsg::Send and the if the subkey has sufficient allowance.
+        // if so, reduce the allowance and resend this message
+        //
+        // Note, you may want to use the cosmwasm_std::Context object to build the response
+        panic!("unimplemented")
     }
 }
 
@@ -107,17 +77,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
     }
-}
-
-fn query_config<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<ConfigResponse> {
-    let cfg = config_read(&deps.storage).load()?;
-    Ok(ConfigResponse {
-        admins: map_human(&deps.api, &cfg.admins)?,
-        mutable: cfg.mutable,
-    })
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+pub mod balance;
 pub mod contract;
 pub mod msg;
 pub mod state;
