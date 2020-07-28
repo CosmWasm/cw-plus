@@ -3,7 +3,7 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Shows all admins and whether or not it is mutable",
+      "description": "Shows all admins and whether or not it is mutable Returns cw1-whitelist::ConfigResponse",
       "type": "object",
       "required": [
         "config"
@@ -13,6 +13,31 @@
           "type": "object"
         }
       }
+    },
+    {
+      "description": "Get the current allowance for the given subkey (how much it can spend) Returns crate::state::Allowance",
+      "type": "object",
+      "required": [
+        "allowance"
+      ],
+      "properties": {
+        "allowance": {
+          "type": "object",
+          "required": [
+            "spender"
+          ],
+          "properties": {
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }
