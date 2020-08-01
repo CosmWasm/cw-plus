@@ -6,15 +6,15 @@ which have full control of the account. However, you can then grant
 a number of accounts allowances to send native tokens from this account.
 
 This was proposed in Summer 2019 for the Cosmos Hub and resembles the
-functionality of ERC20 (allowances and transfer from). 
+functionality of ERC20 (allowances and transfer from).
 
 ## Details
 
-Basically, any admin can add an allowance for a `(spender, denom)` pair 
-(similar to cw20 `IncreaseAllowance` / `DecreaseAllowance`). Any non-admin 
-account can try to execute a `CosmosMsg::Bank(BankMsg::Send{})` from this 
-contract and if they have the required allowances, there allowance will be 
-reduced and the send message relayed. If they don't have sufficient authorization, 
+Basically, any admin can add an allowance for a `(spender, denom)` pair
+(similar to cw20 `IncreaseAllowance` / `DecreaseAllowance`). Any non-admin
+account can try to execute a `CosmosMsg::Bank(BankMsg::Send{})` from this
+contract and if they have the required allowances, their allowance will be
+reduced and the send message relayed. If they don't have sufficient authorization,
 or if they try to proxy any other message type, then the attempt will be rejected.
 
 ### Messages
@@ -46,7 +46,7 @@ It also adds one more query type:
 enum QueryMsg {
     Allowance {
         spender: HumanAddr,
-    } 
+    }
 }
 
 pub struct AllowanceResponse {
@@ -57,9 +57,9 @@ pub struct AllowanceResponse {
 
 ## Running this contract
 
-You will need Rust 1.41.1+ with `wasm32-unknown-unknown` target installed.
+You will need Rust 1.44.1+ with `wasm32-unknown-unknown` target installed.
 
-You can run unit tests on this via: 
+You can run unit tests on this via:
 
 `cargo test`
 
@@ -79,6 +79,6 @@ repository root (not currently working with this monorepo...)
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.8.0 ./contracts/cw1-subkeys
+  cosmwasm/rust-optimizer:0.9.0 ./contracts/cw1-subkeys
 mv contract.wasm cw1_subkeys.wasm
 ```
