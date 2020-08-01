@@ -9,19 +9,19 @@ use crate::balance::Balance;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Allowance {
-    balance: Balance,
-    expires: Expiration,
+    pub balance: Balance,
+    pub expires: Expiration,
 }
 
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";
 
 /// returns a bucket with all allowances (query by subkey)
-pub fn allowances<'a, S: Storage>(storage: &'a mut S) -> Bucket<'a, S, Allowance> {
+pub fn allowances<S: Storage>(storage: &mut S) -> Bucket<S, Allowance> {
     bucket(PREFIX_ALLOWANCE, storage)
 }
 
 /// returns a bucket with all allowances (query by subkey)
 /// (read-only version for queries)
-pub fn allowances_read<'a, S: ReadonlyStorage>(storage: &'a S) -> ReadonlyBucket<'a, S, Allowance> {
+pub fn allowances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Allowance> {
     bucket_read(PREFIX_ALLOWANCE, storage)
 }

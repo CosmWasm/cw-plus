@@ -3,7 +3,7 @@ use std::fmt;
 
 use cosmwasm_std::{
     log, to_binary, Api, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdResult, Storage,
+    InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_config},
@@ -14,6 +14,7 @@ use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
+use std::ops::AddAssign;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -82,14 +83,38 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    // placeholder to remove warnings
-    let _ = (deps, env, spender, amount, expires);
+    let cfg = config_read(&deps.storage).load()?;
+    let spender_raw = &deps.api.canonical_address(&spender)?;
+    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
-    // TODO
-    // look at cw20_base::contract::IncreaseAllowance
-    // if nothing present, we set this, and expires=None => Expiration::Never
-    // if something present, we add to the balance. expires=None => leave expiration at previous state, expires=Some(x) => set expires to new value x
-    panic!("unimplemented")
+    if !cfg.is_admin(&owner_raw) {
+        return Err(StdError::unauthorized());
+    }
+    if spender_raw == owner_raw {
+        return Err(StdError::generic_err("Cannot set allowance to own account"));
+    }
+
+    allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
+        let mut allowance = allow.unwrap_or_default();
+        if let Some(exp) = expires {
+            allowance.expires = exp;
+        }
+        allowance.balance.add_assign(amount.clone());
+        Ok(allowance)
+    })?;
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "increase_allowance"),
+            log("owner", env.message.sender),
+            log("spender", spender),
+            log("denomination", amount.denom),
+            log("amount", amount.amount),
+        ],
+        data: None,
+    };
+    Ok(res)
 }
 
 pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier, T>(
