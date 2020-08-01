@@ -222,9 +222,9 @@ mod test {
         let no_btc = (balance.clone() - coin(555, "BTC")).unwrap();
         assert_eq!(no_btc, Balance(vec![coin(12345, "ETH")]));
 
-        // subtract more than we have
+        // subtract more than we have is tolerated
         let underflow = balance.clone() - coin(666, "BTC");
-        assert!(underflow.is_err());
+        assert!(underflow.is_ok());
 
         // subtract non-existent denom
         let missing = balance.clone() - coin(1, "ATOM");
