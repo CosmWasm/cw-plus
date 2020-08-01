@@ -110,29 +110,17 @@ impl ops::Add<Balance> for Balance {
     }
 }
 
-impl ops::SubAssign<Coin> for Balance {
-    fn sub_assign(&mut self, other: Coin) {
-        // Warning: fails silently if no tokens
-        if let Some((i, c)) = self.find(&other.denom) {
-            if c.amount <= other.amount {
-                self.0.remove(i);
-            } else {
-                self.0[i].amount = (c.amount - other.amount).unwrap();
-            }
-        }
-    }
-}
-
 impl ops::Sub<Coin> for Balance {
     type Output = StdResult<Self>;
 
     fn sub(mut self, other: Coin) -> StdResult<Self> {
         match self.find(&other.denom) {
             Some((i, c)) => {
-                if c.amount <= other.amount {
+                let remainder = (c.amount - other.amount)?;
+                if remainder.u128() == 0 {
                     self.0.remove(i);
                 } else {
-                    self.0[i].amount = (c.amount - other.amount).unwrap();
+                    self.0[i].amount = remainder;
                 }
             }
             // error if no tokens
