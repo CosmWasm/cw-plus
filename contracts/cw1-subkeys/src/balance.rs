@@ -63,6 +63,10 @@ impl Balance {
     fn insert_pos(&self, denom: &str) -> Option<usize> {
         self.0.iter().position(|c| c.denom.as_str() >= denom)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl ops::AddAssign<Coin> for Balance {

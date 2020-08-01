@@ -14,7 +14,7 @@ use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
-use std::ops::AddAssign;
+use std::ops::{AddAssign, Sub};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -127,18 +127,47 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    // placeholder to remove warnings
-    let _ = (deps, env, spender, amount, expires);
+    let cfg = config_read(&deps.storage).load()?;
+    let spender_raw = &deps.api.canonical_address(&spender)?;
+    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
-    // TODO
-    // look at cw20_base::contract::DecreaseAllowance
-    // if something present, we subtract from the balance. underflow is okay, removes that denom
-    // (eg. if allowance was [5 ETH, 2 BTC] and I decrease by 4 BTC, new allowance is [5 ETH].
-    // if final balance has no denoms, remove the allowance entry.
-    //
-    // as with handle_increase_allowance,
-    // expires=None => leave expiration at previous state, expires=Some(x) => set expires to new value x
-    panic!("unimplemented")
+    if !cfg.is_admin(&owner_raw) {
+        return Err(StdError::unauthorized());
+    }
+    if spender_raw == owner_raw {
+        return Err(StdError::generic_err("Cannot set allowance to own account"));
+    }
+
+    let allowance = allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
+        if allow.is_none() {
+            // Fail fast
+            return Err(StdError::generic_err("No allowance for this account"));
+        }
+        let mut allowance = allow.unwrap();
+
+        if let Some(exp) = expires {
+            allowance.expires = exp;
+        }
+
+        allowance.balance = allowance.balance.sub(amount.clone())?; // Fails if no tokens
+        Ok(allowance)
+    })?;
+    if allowance.balance.is_empty() {
+        allowances(&mut deps.storage).remove(spender_raw.as_slice());
+    }
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "decrease_allowance"),
+            log("owner", deps.api.human_address(owner_raw)?),
+            log("spender", spender),
+            log("denomination", amount.denom),
+            log("amount", amount.amount),
+        ],
+        data: None,
+    };
+    Ok(res)
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
