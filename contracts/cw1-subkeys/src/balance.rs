@@ -67,6 +67,22 @@ impl Balance {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    /// similar to `Balance.sub`, but doesn't fail when minuend less than subtrahend
+    pub fn sub_saturating(mut self, other: Coin) -> StdResult<Self> {
+        match self.find(&other.denom) {
+            Some((i, c)) => {
+                if c.amount <= other.amount {
+                    self.0.remove(i);
+                } else {
+                    self.0[i].amount = (self.0[i].amount - other.amount)?;
+                }
+            }
+            // error if no tokens
+            None => return Err(StdError::underflow(0, other.amount.u128())),
+        };
+        Ok(self)
+    }
 }
 
 impl ops::AddAssign<Coin> for Balance {
@@ -213,6 +229,31 @@ mod test {
         // subtract more than we have
         let underflow = balance.clone() - coin(666, "BTC");
         assert!(underflow.is_err());
+
+        // subtract non-existent denom
+        let missing = balance.clone() - coin(1, "ATOM");
+        assert!(missing.is_err());
+    }
+
+    #[test]
+    fn balance_subtract_saturating_works() {
+        let balance = Balance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
+
+        // subtract less than we have
+        let less_eth = balance.clone().sub_saturating(coin(2345, "ETH")).unwrap();
+        assert_eq!(
+            less_eth,
+            Balance(vec![coin(555, "BTC"), coin(10000, "ETH")])
+        );
+
+        // subtract all of one coin (and remove with 0 amount)
+        let no_btc = balance.clone().sub_saturating(coin(555, "BTC")).unwrap();
+        assert_eq!(no_btc, Balance(vec![coin(12345, "ETH")]));
+
+        // subtract more than we have
+        let saturating = balance.clone().sub_saturating(coin(666, "BTC"));
+        assert!(saturating.is_ok());
+        assert_eq!(saturating.unwrap(), Balance(vec![coin(12345, "ETH")]));
 
         // subtract non-existent denom
         let missing = balance.clone() - coin(1, "ATOM");

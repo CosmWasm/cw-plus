@@ -14,7 +14,7 @@ use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
-use std::ops::{AddAssign, Sub};
+use std::ops::AddAssign;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -145,7 +145,7 @@ where
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
-        allowance.balance = allowance.balance.sub(amount.clone())?; // Fails if no tokens
+        allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Fails if no tokens
         Ok(allowance)
     })?;
     if allowance.balance.is_empty() {
