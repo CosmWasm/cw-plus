@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse,
+    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_config},
@@ -14,7 +14,7 @@ use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
-use std::ops::AddAssign;
+use std::ops::{AddAssign, Sub};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -57,19 +57,46 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = config_read(&deps.storage).load()?;
+    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
-    if cfg.is_admin(&deps.api.canonical_address(&env.message.sender)?) {
+    if cfg.is_admin(owner_raw) {
         let mut res = HandleResponse::default();
         res.messages = msgs;
-        res.log = vec![log("action", "execute")];
+        res.log = vec![log("action", "execute"), log("owner", env.message.sender)];
         Ok(res)
     } else {
-        // TODO
-        // for each message, check if the message is a BankMsg::Send and the if the subkey has sufficient allowance.
-        // if so, reduce the allowance and resend this message
-        //
-        // Note, you may want to use the cosmwasm_std::Context object to build the response
-        panic!("unimplemented")
+        let mut allowances = allowances(&mut deps.storage);
+        let allow = allowances.may_load(owner_raw.as_slice())?;
+        let mut allowance =
+            allow.ok_or_else(|| StdError::generic_err("No allowance for this account"))?;
+        for msg in &msgs {
+            match msg {
+                CosmosMsg::Bank(BankMsg::Send {
+                    from_address: _,
+                    to_address: _,
+                    amount,
+                }) => {
+                    // FIXME?: Can from_address be different from env.message.sender? (guess so)
+                    // FIXME?: Can from_address and to_address be the same? (i.e. fancy sender)
+                    // Decrease allowance
+                    for coin in amount {
+                        allowance.balance = allowance.balance.sub(coin.clone())?;
+                        // Fails if not enough tokens
+                    }
+                    allowances.save(owner_raw.as_slice(), &allowance)?;
+                }
+                _ => {
+                    return Err(StdError::generic_err("Message type rejected"));
+                }
+            }
+        }
+        // Relay messages
+        let res = HandleResponse {
+            messages: msgs,
+            log: vec![log("action", "execute"), log("owner", env.message.sender)],
+            data: None,
+        };
+        Ok(res)
     }
 }
 
