@@ -139,16 +139,12 @@ where
     }
 
     let allowance = allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
-        if allow.is_none() {
-            // Fail fast
-            return Err(StdError::generic_err("No allowance for this account"));
-        }
-        let mut allowance = allow.unwrap();
-
+        // Fail fast
+        let mut allowance =
+            allow.ok_or_else(|| StdError::generic_err("No allowance for this account"))?;
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
-
         allowance.balance = allowance.balance.sub(amount.clone())?; // Fails if no tokens
         Ok(allowance)
     })?;
