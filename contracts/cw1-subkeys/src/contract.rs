@@ -68,7 +68,7 @@ where
         let mut allowances = allowances(&mut deps.storage);
         let allow = allowances.may_load(owner_raw.as_slice())?;
         let mut allowance =
-            allow.ok_or_else(|| StdError::generic_err("No allowance for this account"))?;
+            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
         for msg in &msgs {
             match msg {
                 CosmosMsg::Bank(BankMsg::Send {
@@ -76,8 +76,6 @@ where
                     to_address: _,
                     amount,
                 }) => {
-                    // FIXME?: Can from_address be different from env.message.sender? (guess so)
-                    // FIXME?: Can from_address and to_address be the same? (i.e. fancy sender)
                     // Decrease allowance
                     for coin in amount {
                         allowance.balance = allowance.balance.sub(coin.clone())?;
@@ -168,7 +166,7 @@ where
     let allowance = allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
         // Fail fast
         let mut allowance =
-            allow.ok_or_else(|| StdError::generic_err("No allowance for this account"))?;
+            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
