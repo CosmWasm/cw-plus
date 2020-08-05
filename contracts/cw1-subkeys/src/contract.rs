@@ -170,7 +170,7 @@ where
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
-        allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Fails if no tokens
+        allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
         Ok(allowance)
     })?;
     if allowance.balance.is_empty() {
