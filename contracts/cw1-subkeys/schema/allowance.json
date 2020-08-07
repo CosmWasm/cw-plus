@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Allowance",
+  "type": "object",
+  "required": [
+    "balance",
+    "expires"
+  ],
+  "properties": {
+    "balance": {
+      "$ref": "#/definitions/Balance"
+    },
+    "expires": {
+      "$ref": "#/definitions/Expiration"
+    }
+  },
+  "definitions": {
+    "Balance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Coin"
+      }
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "Expiration": {
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "object",
+              "required": [
+                "height"
+              ],
+              "properties": {
+                "height": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "object",
+              "required": [
+                "time"
+              ],
+              "properties": {
+                "time": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to distinguish None from Some(Expiration::Never)",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

@@ -110,7 +110,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn query_config<S: Storage, A: Api, Q: Querier>(
+pub fn query_config<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<ConfigResponse> {
     let cfg = config_read(&deps.storage).load()?;
