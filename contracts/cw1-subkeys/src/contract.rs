@@ -216,14 +216,38 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, BankMsg, StdError, WasmMsg};
+    use crate::balance::Balance;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+    use cosmwasm_std::{coin, coins};
 
-    const CANONICAL_LENGTH: usize = 20;
+    // this will set up the init for other tests
+    fn setup_test_case<S: Storage, A: Api, Q: Querier>(
+        mut deps: &mut Extern<S, A, Q>,
+        env: &Env,
+        admins: &Vec<HumanAddr>,
+        spenders: &Vec<HumanAddr>,
+        allowances: &Vec<Coin>,
+        expirations: &Vec<Expiration>,
+    ) {
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: false,
+        };
+        init(deps, env.clone(), init_msg).unwrap();
 
-    // you probably want some `setup_test_case` function that inits a contract with 2 admins
-    // and 2 subkeys with some allowances. these keys can be constants strings here,
-    // used like `HumanAddr::from(admin1)` and then all tests can just run against that
+        // Add subkeys with initial allowances
+        for (spender, expiration) in spenders.iter().zip(expirations) {
+            for amount in allowances {
+                let msg = HandleMsg::IncreaseAllowance {
+                    spender: spender.clone(),
+                    amount: amount.clone(),
+                    expires: Some(expiration.clone()),
+                };
+                handle(&mut deps, env.clone(), msg).unwrap();
+            }
+        }
+    }
 
     #[test]
     fn query_allowances() {
@@ -239,11 +263,115 @@ mod tests {
 
     #[test]
     fn increase_allowances() {
-        // TODO
-        // add to existing account (expires = None) => don't change Expiration (previous should be different than Never)
-        // add to existing account (expires = Some)
-        // add to new account (expires = None) => default Expiration::Never
-        // add to new account (expires = Some)
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+        let spender4 = HumanAddr::from("spender0004");
+        let spenders = vec![spender1.clone(), spender2.clone()];
+
+        // Same allowances for all spenders, for simplicity
+        let denom1 = "token1";
+        let denom2 = "token2";
+        let amount1 = 1111;
+        let amount2 = 2222;
+        let allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
+
+        let expires_height = Expiration::AtHeight { height: 5432 };
+        let expires_never = Expiration::Never {};
+        let expires_time = Expiration::AtTime { time: 1234567890};
+        // Initially set first spender allowance with height expiration, the second with no expiration
+        let expirations = vec![expires_height.clone(), expires_never.clone()];
+
+        let allow1 = &allowances[0];
+        let allow2 = &allowances[1];
+
+        let env = mock_env(owner, &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &spenders,
+            &allowances,
+            &expirations,
+        );
+
+        // Add to spender1 account (expires = None) => don't change Expiration
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender1.clone(),
+            amount: allow1.clone(),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
+                expires: expires_height.clone()
+            }
+        );
+
+        // Add to spender2 account (expires = Some)
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender2.clone(),
+            amount: allow1.clone(),
+            expires: Some(expires_height.clone()),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
+                expires: expires_height.clone()
+            }
+        );
+
+        // Add to spender3 (new account) (expires = None) => default Expiration::Never
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender3.clone(),
+            amount: allow1.clone(),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender3.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow1.clone()]),
+                expires: expires_never.clone()
+            }
+        );
+
+        // Add to spender4 (new account) (expires = Some)
+        let msg = HandleMsg::IncreaseAllowance {
+            spender: spender4.clone(),
+            amount: allow2.clone(),
+            expires: Some(expires_time.clone()),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender4.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow2.clone()]),
+                expires: expires_time,
+            }
+        );
+
     }
 
     #[test]
