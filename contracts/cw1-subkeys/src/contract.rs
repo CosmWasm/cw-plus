@@ -375,11 +375,124 @@ mod tests {
 
     #[test]
     fn decrease_allowances() {
-        // TODO
-        // subtract to existing account (has none of that denom)
-        // subtract to existing account (brings denom to 0, other denoms left)
-        // subtract to existing account (brings denom to > 0)
-        // subtract to existing account (brings denom to 0, no other denoms left => should delete Allowance)
-        // subtract from empty account (should error)
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spenders = vec![spender1.clone(), spender2.clone()];
+
+        // Same allowances for all spenders, for simplicity
+        let denom1 = "token1";
+        let denom2 = "token2";
+        let denom3 = "token3";
+        let amount1 = 1111;
+        let amount2 = 2222;
+        let amount3 = 3333;
+        let allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
+
+        let expires_height = Expiration::AtHeight { height: 5432 };
+        let expires_never = Expiration::Never {};
+        // Initially set first spender allowance with height expiration, the second with no expiration
+        let expirations = vec![expires_height.clone(), expires_never.clone()];
+
+        let allow1 = &allowances[0];
+        let allow2 = &allowances[1];
+        let allow3 = coin(amount3, denom3);
+
+        let env = mock_env(owner, &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &spenders,
+            &allowances,
+            &expirations,
+        );
+
+        // Subtract from spender1 (existing) account (has none of that denom)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender1.clone(),
+            amount: allow3.clone(),
+            expires: None,
+        };
+        let res = handle(&mut deps, env.clone(), msg);
+
+        // Verify
+        assert!(res.is_err());
+
+        // Verify everything stays the same for that spender
+        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow1.clone(), allow2.clone()]),
+                expires: expires_height.clone()
+            }
+        );
+
+        // Subtract from spender2 (existing) account (brings denom to 0, other denoms left)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender2.clone(),
+            amount: allow2.clone(),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow1.clone()]),
+                expires: expires_never.clone()
+            }
+        );
+
+        // Subtract from spender1 (existing) account (brings denom to > 0)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender1.clone(),
+            amount: coin(amount1 / 2, denom1),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![
+                    coin(amount1 / 2 + (amount1 & 1), denom1),
+                    allow2.clone()
+                ]),
+                expires: expires_height.clone()
+            }
+        );
+
+        // Subtract from spender2 (existing) account (brings denom to 0, no other denoms left => should delete Allowance)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender2.clone(),
+            amount: allow1.clone(),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
+        assert_eq!(allowance, Allowance::default());
+
+        // Subtract from spender2 (empty) account (should error)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender2.clone(),
+            amount: allow1.clone(),
+            expires: None,
+        };
+        let res = handle(&mut deps, env.clone(), msg);
+
+        // Verify
+        assert!(res.is_err());
     }
 }
