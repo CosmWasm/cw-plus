@@ -283,7 +283,7 @@ mod tests {
 
         let expires_height = Expiration::AtHeight { height: 5432 };
         let expires_never = Expiration::Never {};
-        let expires_time = Expiration::AtTime { time: 1234567890};
+        let expires_time = Expiration::AtTime { time: 1234567890 };
         // Initially set first spender allowance with height expiration, the second with no expiration
         let expirations = vec![expires_height.clone(), expires_never.clone()];
 
@@ -371,7 +371,6 @@ mod tests {
                 expires: expires_time,
             }
         );
-
     }
 
     #[test]
