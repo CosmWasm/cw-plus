@@ -272,32 +272,35 @@ mod tests {
         let spender2 = HumanAddr::from("spender0002");
         let spender3 = HumanAddr::from("spender0003");
         let spender4 = HumanAddr::from("spender0004");
-        let spenders = vec![spender1.clone(), spender2.clone()];
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
 
         // Same allowances for all spenders, for simplicity
         let denom1 = "token1";
         let denom2 = "token2";
+        let denom3 = "token3";
         let amount1 = 1111;
         let amount2 = 2222;
-        let allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
+        let amount3 = 3333;
+
+        let allow1 = coin(amount1, denom1);
+        let allow2 = coin(amount2, denom2);
+        let allow3 = coin(amount3, denom3);
+        let initial_allowances = vec![allow1.clone(), allow2.clone()];
 
         let expires_height = Expiration::AtHeight { height: 5432 };
         let expires_never = Expiration::Never {};
         let expires_time = Expiration::AtTime { time: 1234567890 };
         // Initially set first spender allowance with height expiration, the second with no expiration
-        let expirations = vec![expires_height.clone(), expires_never.clone()];
-
-        let allow1 = &allowances[0];
-        let allow2 = &allowances[1];
+        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
             &mut deps,
             &env,
             &admins,
-            &spenders,
-            &allowances,
-            &expirations,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
         );
 
         // Add to spender1 account (expires = None) => don't change Expiration
@@ -321,7 +324,7 @@ mod tests {
         // Add to spender2 account (expires = Some)
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender2.clone(),
-            amount: allow1.clone(),
+            amount: allow3.clone(),
             expires: Some(expires_height.clone()),
         };
         handle(&mut deps, env.clone(), msg).unwrap();
@@ -331,7 +334,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
+                balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
                 expires: expires_height.clone()
             }
         );
@@ -382,7 +385,7 @@ mod tests {
 
         let spender1 = HumanAddr::from("spender0001");
         let spender2 = HumanAddr::from("spender0002");
-        let spenders = vec![spender1.clone(), spender2.clone()];
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
 
         // Same allowances for all spenders, for simplicity
         let denom1 = "token1";
@@ -391,25 +394,26 @@ mod tests {
         let amount1 = 1111;
         let amount2 = 2222;
         let amount3 = 3333;
-        let allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
+
+        let allow1 = coin(amount1, denom1);
+        let allow2 = coin(amount2, denom2);
+        let allow3 = coin(amount3, denom3);
+
+        let initial_allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
 
         let expires_height = Expiration::AtHeight { height: 5432 };
         let expires_never = Expiration::Never {};
         // Initially set first spender allowance with height expiration, the second with no expiration
-        let expirations = vec![expires_height.clone(), expires_never.clone()];
-
-        let allow1 = &allowances[0];
-        let allow2 = &allowances[1];
-        let allow3 = coin(amount3, denom3);
+        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
             &mut deps,
             &env,
             &admins,
-            &spenders,
-            &allowances,
-            &expirations,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
         );
 
         // Subtract from spender1 (existing) account (has none of that denom)
@@ -422,7 +426,6 @@ mod tests {
 
         // Verify
         assert!(res.is_err());
-
         // Verify everything stays the same for that spender
         let allowance = query_allowance(&deps, spender1.clone()).unwrap();
         assert_eq!(
@@ -494,5 +497,23 @@ mod tests {
 
         // Verify
         assert!(res.is_err());
+
+        // Subtract from spender1 (existing) account (underflows denom => should delete denom)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender1.clone(),
+            amount: coin(amount1 * 10, denom1),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow2]),
+                expires: expires_height.clone()
+            }
+        );
     }
 }
