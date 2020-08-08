@@ -219,6 +219,7 @@ mod tests {
     use crate::balance::Balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coin, coins};
+    use cw1_whitelist::msg::ConfigResponse;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -232,7 +233,7 @@ mod tests {
         // Init a contract with admins
         let init_msg = InitMsg {
             admins: admins.clone(),
-            mutable: false,
+            mutable: true,
         };
         init(deps, env.clone(), init_msg).unwrap();
 
@@ -306,8 +307,87 @@ mod tests {
 
     #[test]
     fn update_admins_and_query() {
-        // TODO
-        // insure imported logic is wired up properly
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admin2 = HumanAddr::from("admin0002");
+        let admin3 = HumanAddr::from("admin0003");
+        let initial_admins = vec![owner.clone(), admin2];
+
+        let env = mock_env(owner.clone(), &[]);
+        setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![]);
+
+        // Verify
+        let config = query_config(&deps).unwrap();
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: initial_admins.clone(),
+                mutable: true,
+            }
+        );
+
+        // Add a third (new) admin
+        let msg = HandleMsg::UpdateAdmins {
+            admins: [&config.admins[..], &[admin3.clone()]].concat(),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let config = query_config(&deps).unwrap();
+        println!("config: {:#?}", config);
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: [&initial_admins[..], &[admin3.clone()]].concat(),
+                mutable: true,
+            }
+        );
+
+        // Set admin3 as the only admin
+        let msg = HandleMsg::UpdateAdmins {
+            admins: vec![admin3.clone()],
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify admin3 is now the sole admin
+        let config = query_config(&deps).unwrap();
+        println!("config: {:#?}", config);
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: vec![admin3.clone()],
+                mutable: true,
+            }
+        );
+
+        // Try to add owner back
+        let msg = HandleMsg::UpdateAdmins {
+            admins: vec![admin3.clone(), owner.clone()],
+        };
+        let res = handle(&mut deps, env.clone(), msg);
+
+        // Verify it fails (admin3 is now the owner)
+        assert!(res.is_err());
+
+        // Connect as admin3
+        let env = mock_env(admin3.clone(), &[]);
+        // Add owner back
+        let msg = HandleMsg::UpdateAdmins {
+            admins: vec![admin3.clone(), owner.clone()],
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let config = query_config(&deps).unwrap();
+        println!("config: {:#?}", config);
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: vec![admin3, owner],
+                mutable: true,
+            }
+        );
     }
 
     #[test]
