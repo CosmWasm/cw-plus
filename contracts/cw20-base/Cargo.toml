@@ -10,17 +10,9 @@ license = "AGPL-3.0"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-#default = ["cranelift", "entrypoint"]
-default = ["entrypoint"]
-# entrypoint means to expose init, handle, query extern "C" functions
-# disable this (default-features = false) if importing code for use in another contract
-entrypoint = []
-# for quicker tests, cargo test --lib
-# for more explicit tests, cargo test --features=backtraces
 backtraces = ["cosmwasm-std/backtraces"]
-#backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
-#cranelift = ["cosmwasm-vm/default-cranelift"]
-#singlepass = ["cosmwasm-vm/default-singlepass"]
+# use library feature to disable all init/handle/query exports
+library = []
 
 [dependencies]
 cw20 = { path = "../../packages/cw20", version = "0.1.0" }
