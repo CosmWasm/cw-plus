@@ -312,7 +312,7 @@ mod tests {
         let owner = HumanAddr::from("admin0001");
         let admin2 = HumanAddr::from("admin0002");
         let admin3 = HumanAddr::from("admin0003");
-        let initial_admins = vec![owner.clone(), admin2];
+        let initial_admins = vec![owner.clone(), admin2.clone()];
 
         let env = mock_env(owner.clone(), &[]);
         setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![]);
@@ -328,8 +328,9 @@ mod tests {
         );
 
         // Add a third (new) admin
+        let new_admins = vec![owner.clone(), admin2.clone(), admin3.clone()];
         let msg = HandleMsg::UpdateAdmins {
-            admins: [&config.admins[..], &[admin3.clone()]].concat(),
+            admins: new_admins.clone(),
         };
         handle(&mut deps, env.clone(), msg).unwrap();
 
@@ -339,7 +340,7 @@ mod tests {
         assert_eq!(
             config,
             ConfigResponse {
-                admins: [&initial_admins[..], &[admin3.clone()]].concat(),
+                admins: new_admins,
                 mutable: true,
             }
         );
