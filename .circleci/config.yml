@@ -34,7 +34,7 @@ jobs:
           command: cargo unit-test --locked
       - run:
           name: Build Wasm
-          command: cargo wasm-debug --locked
+          command: cargo wasm --locked
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
@@ -75,7 +75,7 @@ jobs:
           command: cargo unit-test --locked
       - run:
           name: Build Wasm
-          command: cargo wasm-debug --locked
+          command: cargo wasm --locked
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
@@ -116,7 +116,7 @@ jobs:
           command: cargo unit-test --locked
       - run:
           name: Build Wasm
-          command: cargo wasm-debug --locked
+          command: cargo wasm --locked
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
@@ -157,7 +157,7 @@ jobs:
           command: cargo unit-test --locked
       - run:
           name: Build Wasm
-          command: cargo wasm-debug --locked
+          command: cargo wasm --locked
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
@@ -197,7 +197,7 @@ jobs:
           command: cargo build --locked
       - run:
           name: Build library for wasm target
-          command: cargo wasm-debug --locked
+          command: cargo wasm --locked
       - run:
           name: Run unit tests
           command: cargo test --locked
@@ -240,7 +240,7 @@ jobs:
           command: cargo build --locked
       - run:
           name: Build library for wasm target
-          command: cargo wasm-debug --locked
+          command: cargo wasm --locked
       - run:
           name: Run unit tests
           command: cargo test --locked
