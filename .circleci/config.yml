@@ -364,9 +364,12 @@ jobs:
           command: |
             docker run --volumes-from with_code cosmwasm/rust-optimizer:0.10.0
       - run:
-          name: Show checksums
-          working_directory: artifacts
-          command: ls -l && cat checksums.txt
+          name: Show data
+          command: |
+            ls -l
+            echo "*****"
+            ls -l artifacts
+            cat artifacts/checksums.txt
 #      - run:
 #          name: Publish artifacts on GitHub
 #          command: |
