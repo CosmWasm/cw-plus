@@ -700,7 +700,7 @@ mod tests {
         assert_eq!(res.messages, msgs);
         assert_eq!(
             res.log,
-            vec![log("action", "execute"), log("owner", spender1)]
+            vec![log("action", "execute"), log("owner", spender1.clone())]
         );
 
         // And then cannot (not enough funds anymore)
@@ -714,6 +714,28 @@ mod tests {
         let env = mock_env(&owner.clone(), &[]);
         let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
+        assert_eq!(
+            res.log,
+            vec![log("action", "execute"), log("owner", owner.clone())]
+        );
+
+        // For admins, even other message types are allowed
+        let other_msgs = vec![CosmosMsg::Custom(Empty {})];
+        let handle_msg = HandleMsg::Execute {
+            msgs: other_msgs.clone(),
+        };
+
+        let env = mock_env(&owner, &[]);
+        let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
+        assert_eq!(res.messages, other_msgs);
         assert_eq!(res.log, vec![log("action", "execute"), log("owner", owner)]);
+
+        // But not for mere mortals
+        let env = mock_env(&spender1, &[]);
+        let res = handle(&mut deps, env, handle_msg.clone());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Message type rejected"),
+            e => panic!("unexpected error: {}", e),
+        }
     }
 }
