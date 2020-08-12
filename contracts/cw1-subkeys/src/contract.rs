@@ -217,7 +217,7 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
     use crate::balance::Balance;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins};
     use cw1_whitelist::msg::ConfigResponse;
 
@@ -645,5 +645,73 @@ mod tests {
                 expires: expires_height.clone()
             }
         );
+    }
+
+    #[test]
+    fn execute_checks() {
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let initial_spenders = vec![spender1.clone()];
+
+        let denom1 = "token1";
+        let amount1 = 1111;
+        let allow1 = coin(amount1, denom1);
+        let initial_allowances = vec![allow1];
+
+        let expires_never = Expiration::Never {};
+        let initial_expirations = vec![expires_never.clone()];
+
+        let env = mock_env(owner.clone(), &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        // Create Send message
+        let msgs = vec![
+            BankMsg::Send {
+                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                to_address: spender2.clone(),
+                amount: coins(1000, "token1"),
+            }.into(),
+        ];
+
+        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
+
+        // spender2 cannot spend funds (no initial allowance)
+        let env = mock_env(&spender2, &[]);
+        let res = handle(&mut deps, env, handle_msg.clone());
+        match res.unwrap_err() {
+            StdError::NotFound { .. } => {},
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // But spender1 can (he has enough funds)
+        let env = mock_env(&spender1, &[]);
+        let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
+        assert_eq!(res.messages, msgs);
+        assert_eq!(res.log, vec![log("action", "execute"), log("owner", spender1)]);
+
+        // And then cannot (not enough funds anymore)
+        let res = handle(&mut deps, env, handle_msg.clone());
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {},
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Owner / admins can do anything (at the contract level)
+        let env = mock_env(&owner.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
+        assert_eq!(res.messages, msgs);
+        assert_eq!(res.log, vec![log("action", "execute"), log("owner", owner)]);
     }
 }
