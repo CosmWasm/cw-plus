@@ -1,6 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use cosmwasm_std::{
+    HumanAddr, Querier, QueryRequest, ReadonlyStorage, StdResult, Storage, WasmQuery,
+};
+use cosmwasm_storage::{to_length_prefixed, ReadonlySingleton, Singleton};
+
+pub const PREFIX_INFO: &[u8] = b"contract_info";
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ContractVersion {
     /// contract is the crate name of the implementing contract, eg. `crate:cw20-base`
@@ -16,6 +23,25 @@ pub struct ContractVersion {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ContractInfo {
     versions: Vec<ContractVersion>,
+}
+
+pub fn get_contract_info<S: ReadonlyStorage>(storage: &S) -> StdResult<ContractInfo> {
+    ReadonlySingleton::new(storage, PREFIX_INFO).load()
+}
+
+pub fn set_contract_info<S: Storage>(storage: &mut S, info: &ContractInfo) -> StdResult<()> {
+    Singleton::new(storage, PREFIX_INFO).save(info)
+}
+
+pub fn query_contract_info<Q: Querier, T: Into<HumanAddr>>(
+    querier: &Q,
+    contract_addr: T,
+) -> StdResult<ContractInfo> {
+    let req = QueryRequest::Wasm(WasmQuery::Raw {
+        contract_addr: contract_addr.into(),
+        key: to_length_prefixed(PREFIX_INFO).into(),
+    });
+    querier.query(&req)
 }
 
 #[cfg(test)]
