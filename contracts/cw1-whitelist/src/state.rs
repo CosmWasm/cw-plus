@@ -5,12 +5,12 @@ use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
-pub struct Config {
+pub struct AdminList {
     pub admins: Vec<CanonicalAddr>,
     pub mutable: bool,
 }
 
-impl Config {
+impl AdminList {
     /// returns true if the address is a registered admin
     pub fn is_admin(&self, addr: &CanonicalAddr) -> bool {
         self.admins.iter().any(|a| a == addr)
@@ -22,15 +22,15 @@ impl Config {
     }
 }
 
-pub const CONFIG_KEY: &[u8] = b"config";
+pub const ADMIN_LIST_KEY: &[u8] = b"admin_list";
 
 // config is all config information
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, Config> {
-    singleton(storage, CONFIG_KEY)
+pub fn admin_list<S: Storage>(storage: &mut S) -> Singleton<S, AdminList> {
+    singleton(storage, ADMIN_LIST_KEY)
 }
 
-pub fn config_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Config> {
-    singleton_read(storage, CONFIG_KEY)
+pub fn admin_list_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, AdminList> {
+    singleton_read(storage, ADMIN_LIST_KEY)
 }
 
 #[cfg(test)]
@@ -46,7 +46,7 @@ mod tests {
             .into_iter()
             .map(|name| api.canonical_address(&HumanAddr::from(name)).unwrap())
             .collect();
-        let config = Config {
+        let config = AdminList {
             admins: admins.clone(),
             mutable: false,
         };
@@ -64,7 +64,7 @@ mod tests {
         let bob = api.canonical_address(&HumanAddr::from("bob")).unwrap();
 
         // admin can modify mutable contract
-        let config = Config {
+        let config = AdminList {
             admins: vec![bob.clone()],
             mutable: true,
         };
@@ -72,7 +72,7 @@ mod tests {
         assert!(config.can_modify(&bob));
 
         // no one can modify an immutable contract
-        let config = Config {
+        let config = AdminList {
             admins: vec![alice.clone()],
             mutable: false,
         };

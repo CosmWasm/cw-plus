@@ -6,19 +6,19 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 
-use crate::msg::{ConfigResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, Config};
+use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::state::{admin_list, admin_list_read, AdminList};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let cfg = Config {
+    let cfg = AdminList {
         admins: map_canonical(&deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
-    config(&mut deps.storage).save(&cfg)?;
+    admin_list(&mut deps.storage).save(&cfg)?;
     Ok(InitResponse::default())
 }
 
@@ -55,7 +55,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = config_read(&deps.storage).load()?;
+    let cfg = admin_list_read(&deps.storage).load()?;
     if !cfg.is_admin(&deps.api.canonical_address(&env.message.sender)?) {
         Err(StdError::unauthorized())
     } else {
@@ -70,12 +70,12 @@ pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> StdResult<HandleResponse> {
-    let mut cfg = config_read(&deps.storage).load()?;
+    let mut cfg = admin_list_read(&deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
         Err(StdError::unauthorized())
     } else {
         cfg.mutable = false;
-        config(&mut deps.storage).save(&cfg)?;
+        admin_list(&mut deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
         res.log = vec![log("action", "freeze")];
@@ -88,12 +88,12 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     env: Env,
     admins: Vec<HumanAddr>,
 ) -> StdResult<HandleResponse> {
-    let mut cfg = config_read(&deps.storage).load()?;
+    let mut cfg = admin_list_read(&deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
         Err(StdError::unauthorized())
     } else {
         cfg.admins = map_canonical(&deps.api, &admins)?;
-        config(&mut deps.storage).save(&cfg)?;
+        admin_list(&mut deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
         res.log = vec![log("action", "update_admins")];
@@ -106,15 +106,15 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::AdminList {} => to_binary(&query_config(deps)?),
     }
 }
 
 pub fn query_config<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-) -> StdResult<ConfigResponse> {
-    let cfg = config_read(&deps.storage).load()?;
-    Ok(ConfigResponse {
+) -> StdResult<AdminListResponse> {
+    let cfg = admin_list_read(&deps.storage).load()?;
+    Ok(AdminListResponse {
         admins: map_human(&deps.api, &cfg.admins)?,
         mutable: cfg.mutable,
     })
@@ -147,7 +147,7 @@ mod tests {
         init(&mut deps, env, init_msg).unwrap();
 
         // ensure expected config
-        let expected = ConfigResponse {
+        let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone(), carl.clone()],
             mutable: true,
         };
@@ -172,7 +172,7 @@ mod tests {
         handle(&mut deps, env, msg).unwrap();
 
         // ensure expected config
-        let expected = ConfigResponse {
+        let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: true,
         };
@@ -189,7 +189,7 @@ mod tests {
         // but bob can
         let env = mock_env(&bob, &[]);
         handle(&mut deps, env, HandleMsg::Freeze {}).unwrap();
-        let expected = ConfigResponse {
+        let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
         };

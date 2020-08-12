@@ -31,11 +31,11 @@ where
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
-    Config {},
+    AdminList {},
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ConfigResponse {
+pub struct AdminListResponse {
     pub admins: Vec<HumanAddr>,
     pub mutable: bool,
 }
