@@ -677,13 +677,12 @@ mod tests {
         );
 
         // Create Send message
-        let msgs = vec![
-            BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
-                to_address: spender2.clone(),
-                amount: coins(1000, "token1"),
-            }.into(),
-        ];
+        let msgs = vec![BankMsg::Send {
+            from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+            to_address: spender2.clone(),
+            amount: coins(1000, "token1"),
+        }
+        .into()];
 
         let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
 
@@ -691,7 +690,7 @@ mod tests {
         let env = mock_env(&spender2, &[]);
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            StdError::NotFound { .. } => {},
+            StdError::NotFound { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -699,12 +698,15 @@ mod tests {
         let env = mock_env(&spender1, &[]);
         let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
-        assert_eq!(res.log, vec![log("action", "execute"), log("owner", spender1)]);
+        assert_eq!(
+            res.log,
+            vec![log("action", "execute"), log("owner", spender1)]
+        );
 
         // And then cannot (not enough funds anymore)
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {},
+            StdError::Underflow { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
