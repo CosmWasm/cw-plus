@@ -361,6 +361,7 @@ jobs:
           command: |
             docker run --volumes-from with_code cosmwasm/rust-optimizer:0.10.0
             docker cp with_code:/code/artifacts ./artifacts
+            mv artifacts/contracts.txt artifacts/checksums.txt
       - run:
           name: Show data
           command: |
