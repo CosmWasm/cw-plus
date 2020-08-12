@@ -217,8 +217,9 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
     use crate::balance::Balance;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins};
+    use cw1_whitelist::msg::ConfigResponse;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -232,7 +233,7 @@ mod tests {
         // Init a contract with admins
         let init_msg = InitMsg {
             admins: admins.clone(),
-            mutable: false,
+            mutable: true,
         };
         init(deps, env.clone(), init_msg).unwrap();
 
@@ -251,14 +252,143 @@ mod tests {
 
     #[test]
     fn query_allowances() {
-        // TODO
-        // check the allowances work for accounts with balances and accounts with none
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
+
+        // Same allowances for all spenders, for simplicity
+        let denom1 = "token1";
+        let amount1 = 1111;
+
+        let allow1 = coin(amount1, denom1);
+        let initial_allowances = vec![allow1.clone()];
+
+        let expires_never = Expiration::Never {};
+        let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+
+        let env = mock_env(owner, &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        // Check allowances work for accounts with balances
+        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow1.clone()]),
+                expires: expires_never.clone()
+            }
+        );
+        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow1.clone()]),
+                expires: expires_never.clone()
+            }
+        );
+
+        // Check allowances work for accounts with no balance
+        let allowance = query_allowance(&deps, spender3.clone()).unwrap();
+        assert_eq!(allowance, Allowance::default(),);
     }
 
     #[test]
     fn update_admins_and_query() {
-        // TODO
-        // insure imported logic is wired up properly
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admin2 = HumanAddr::from("admin0002");
+        let admin3 = HumanAddr::from("admin0003");
+        let initial_admins = vec![owner.clone(), admin2.clone()];
+
+        let env = mock_env(owner.clone(), &[]);
+        setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![]);
+
+        // Verify
+        let config = query_config(&deps).unwrap();
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: initial_admins.clone(),
+                mutable: true,
+            }
+        );
+
+        // Add a third (new) admin
+        let new_admins = vec![owner.clone(), admin2.clone(), admin3.clone()];
+        let msg = HandleMsg::UpdateAdmins {
+            admins: new_admins.clone(),
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let config = query_config(&deps).unwrap();
+        println!("config: {:#?}", config);
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: new_admins,
+                mutable: true,
+            }
+        );
+
+        // Set admin3 as the only admin
+        let msg = HandleMsg::UpdateAdmins {
+            admins: vec![admin3.clone()],
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify admin3 is now the sole admin
+        let config = query_config(&deps).unwrap();
+        println!("config: {:#?}", config);
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: vec![admin3.clone()],
+                mutable: true,
+            }
+        );
+
+        // Try to add owner back
+        let msg = HandleMsg::UpdateAdmins {
+            admins: vec![admin3.clone(), owner.clone()],
+        };
+        let res = handle(&mut deps, env.clone(), msg);
+
+        // Verify it fails (admin3 is now the owner)
+        assert!(res.is_err());
+
+        // Connect as admin3
+        let env = mock_env(admin3.clone(), &[]);
+        // Add owner back
+        let msg = HandleMsg::UpdateAdmins {
+            admins: vec![admin3.clone(), owner.clone()],
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let config = query_config(&deps).unwrap();
+        println!("config: {:#?}", config);
+        assert_eq!(
+            config,
+            ConfigResponse {
+                admins: vec![admin3, owner],
+                mutable: true,
+            }
+        );
     }
 
     #[test]
@@ -272,32 +402,35 @@ mod tests {
         let spender2 = HumanAddr::from("spender0002");
         let spender3 = HumanAddr::from("spender0003");
         let spender4 = HumanAddr::from("spender0004");
-        let spenders = vec![spender1.clone(), spender2.clone()];
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
 
         // Same allowances for all spenders, for simplicity
         let denom1 = "token1";
         let denom2 = "token2";
+        let denom3 = "token3";
         let amount1 = 1111;
         let amount2 = 2222;
-        let allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
+        let amount3 = 3333;
+
+        let allow1 = coin(amount1, denom1);
+        let allow2 = coin(amount2, denom2);
+        let allow3 = coin(amount3, denom3);
+        let initial_allowances = vec![allow1.clone(), allow2.clone()];
 
         let expires_height = Expiration::AtHeight { height: 5432 };
         let expires_never = Expiration::Never {};
         let expires_time = Expiration::AtTime { time: 1234567890 };
         // Initially set first spender allowance with height expiration, the second with no expiration
-        let expirations = vec![expires_height.clone(), expires_never.clone()];
-
-        let allow1 = &allowances[0];
-        let allow2 = &allowances[1];
+        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
             &mut deps,
             &env,
             &admins,
-            &spenders,
-            &allowances,
-            &expirations,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
         );
 
         // Add to spender1 account (expires = None) => don't change Expiration
@@ -321,7 +454,7 @@ mod tests {
         // Add to spender2 account (expires = Some)
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender2.clone(),
-            amount: allow1.clone(),
+            amount: allow3.clone(),
             expires: Some(expires_height.clone()),
         };
         handle(&mut deps, env.clone(), msg).unwrap();
@@ -331,7 +464,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
+                balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
                 expires: expires_height.clone()
             }
         );
@@ -382,7 +515,7 @@ mod tests {
 
         let spender1 = HumanAddr::from("spender0001");
         let spender2 = HumanAddr::from("spender0002");
-        let spenders = vec![spender1.clone(), spender2.clone()];
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
 
         // Same allowances for all spenders, for simplicity
         let denom1 = "token1";
@@ -391,25 +524,26 @@ mod tests {
         let amount1 = 1111;
         let amount2 = 2222;
         let amount3 = 3333;
-        let allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
+
+        let allow1 = coin(amount1, denom1);
+        let allow2 = coin(amount2, denom2);
+        let allow3 = coin(amount3, denom3);
+
+        let initial_allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
 
         let expires_height = Expiration::AtHeight { height: 5432 };
         let expires_never = Expiration::Never {};
         // Initially set first spender allowance with height expiration, the second with no expiration
-        let expirations = vec![expires_height.clone(), expires_never.clone()];
-
-        let allow1 = &allowances[0];
-        let allow2 = &allowances[1];
-        let allow3 = coin(amount3, denom3);
+        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
             &mut deps,
             &env,
             &admins,
-            &spenders,
-            &allowances,
-            &expirations,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
         );
 
         // Subtract from spender1 (existing) account (has none of that denom)
@@ -422,7 +556,6 @@ mod tests {
 
         // Verify
         assert!(res.is_err());
-
         // Verify everything stays the same for that spender
         let allowance = query_allowance(&deps, spender1.clone()).unwrap();
         assert_eq!(
@@ -494,5 +627,115 @@ mod tests {
 
         // Verify
         assert!(res.is_err());
+
+        // Subtract from spender1 (existing) account (underflows denom => should delete denom)
+        let msg = HandleMsg::DecreaseAllowance {
+            spender: spender1.clone(),
+            amount: coin(amount1 * 10, denom1),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), msg).unwrap();
+
+        // Verify
+        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            Allowance {
+                balance: Balance(vec![allow2]),
+                expires: expires_height.clone()
+            }
+        );
+    }
+
+    #[test]
+    fn execute_checks() {
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let initial_spenders = vec![spender1.clone()];
+
+        let denom1 = "token1";
+        let amount1 = 1111;
+        let allow1 = coin(amount1, denom1);
+        let initial_allowances = vec![allow1];
+
+        let expires_never = Expiration::Never {};
+        let initial_expirations = vec![expires_never.clone()];
+
+        let env = mock_env(owner.clone(), &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        // Create Send message
+        let msgs = vec![BankMsg::Send {
+            from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+            to_address: spender2.clone(),
+            amount: coins(1000, "token1"),
+        }
+        .into()];
+
+        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
+
+        // spender2 cannot spend funds (no initial allowance)
+        let env = mock_env(&spender2, &[]);
+        let res = handle(&mut deps, env, handle_msg.clone());
+        match res.unwrap_err() {
+            StdError::NotFound { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // But spender1 can (he has enough funds)
+        let env = mock_env(&spender1, &[]);
+        let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
+        assert_eq!(res.messages, msgs);
+        assert_eq!(
+            res.log,
+            vec![log("action", "execute"), log("owner", spender1.clone())]
+        );
+
+        // And then cannot (not enough funds anymore)
+        let res = handle(&mut deps, env, handle_msg.clone());
+        match res.unwrap_err() {
+            StdError::Underflow { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Owner / admins can do anything (at the contract level)
+        let env = mock_env(&owner.clone(), &[]);
+        let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
+        assert_eq!(res.messages, msgs);
+        assert_eq!(
+            res.log,
+            vec![log("action", "execute"), log("owner", owner.clone())]
+        );
+
+        // For admins, even other message types are allowed
+        let other_msgs = vec![CosmosMsg::Custom(Empty {})];
+        let handle_msg = HandleMsg::Execute {
+            msgs: other_msgs.clone(),
+        };
+
+        let env = mock_env(&owner, &[]);
+        let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
+        assert_eq!(res.messages, other_msgs);
+        assert_eq!(res.log, vec![log("action", "execute"), log("owner", owner)]);
+
+        // But not for mere mortals
+        let env = mock_env(&spender1, &[]);
+        let res = handle(&mut deps, env, handle_msg.clone());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Message type rejected"),
+            e => panic!("unexpected error: {}", e),
+        }
     }
 }
