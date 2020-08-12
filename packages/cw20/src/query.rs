@@ -12,8 +12,8 @@ pub enum Cw20QueryMsg {
     /// Return type: BalanceResponse.
     Balance { address: HumanAddr },
     /// Returns metadata on the contract - name, decimals, supply, etc.
-    /// Return type: MetaResponse.
-    Meta {},
+    /// Return type: TokenInfoResponse.
+    TokenInfo {},
     /// Only with "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
     /// Return type: AllowanceResponse.
@@ -33,7 +33,7 @@ pub struct BalanceResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct MetaResponse {
+pub struct TokenInfoResponse {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,

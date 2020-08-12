@@ -7,7 +7,8 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    AllowanceResponse, BalanceResponse, Cw20HandleMsg, Cw20QueryMsg, MetaResponse, MinterResponse,
+    AllowanceResponse, BalanceResponse, Cw20HandleMsg, Cw20QueryMsg, MinterResponse,
+    TokenInfoResponse,
 };
 
 /// Cw20Contract is a wrapper around HumanAddr that provides a lot of helpers
@@ -52,8 +53,8 @@ impl Cw20Contract {
 
     /// Get metadata from the contract. This is a good check that the address
     /// is a valid Cw20 contract.
-    pub fn meta<Q: Querier>(&self, querier: &Q) -> StdResult<MetaResponse> {
-        let msg = Cw20QueryMsg::Meta {};
+    pub fn meta<Q: Querier>(&self, querier: &Q) -> StdResult<TokenInfoResponse> {
+        let msg = Cw20QueryMsg::TokenInfo {};
         let query = WasmQuery::Smart {
             contract_addr: self.addr(),
             msg: to_binary(&msg)?,

@@ -2,21 +2,21 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
     StdError, StdResult, Storage, Uint128,
 };
-use cw20::{BalanceResponse, Cw20ReceiveMsg, MetaResponse, MinterResponse};
+use cw20::{BalanceResponse, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
     handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
     handle_transfer_from, query_allowance,
 };
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
-use crate::state::{balances, balances_read, meta, meta_read, Meta, MinterData};
+use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    // check valid meta-data
+    // check valid token info
     msg.validate()?;
     // create initial accounts
     let total_supply = create_accounts(deps, &msg.initial_balances)?;
@@ -35,15 +35,15 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         None => None,
     };
 
-    // store metadata
-    let data = Meta {
+    // store token info
+    let data = TokenInfo {
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply,
         mint,
     };
-    meta(&mut deps.storage).save(&data)?;
+    token_info(&mut deps.storage).save(&data)?;
     Ok(InitResponse::default())
 }
 
@@ -143,9 +143,9 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    meta(&mut deps.storage).update(|mut meta| {
-        meta.total_supply = (meta.total_supply - amount)?;
-        Ok(meta)
+    token_info(&mut deps.storage).update(|mut info| {
+        info.total_supply = (info.total_supply - amount)?;
+        Ok(info)
     })?;
 
     let res = HandleResponse {
@@ -166,7 +166,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     recipient: HumanAddr,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
-    let mut config = meta_read(&deps.storage).load()?;
+    let mut config = token_info_read(&deps.storage).load()?;
     if config.mint.is_none()
         || config.mint.as_ref().unwrap().minter
             != deps.api.canonical_address(&env.message.sender)?
@@ -181,7 +181,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
             return Err(StdError::generic_err("Minting cannot exceed the cap"));
         }
     }
-    meta(&mut deps.storage).save(&config)?;
+    token_info(&mut deps.storage).save(&config)?;
 
     // add amount to recipient balance
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
@@ -250,7 +250,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
-        QueryMsg::Meta {} => to_binary(&query_meta(deps)?),
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
         QueryMsg::Allowance { owner, spender } => {
             to_binary(&query_allowance(deps, owner, spender)?)
@@ -269,15 +269,15 @@ pub fn query_balance<S: Storage, A: Api, Q: Querier>(
     Ok(BalanceResponse { balance })
 }
 
-pub fn query_meta<S: Storage, A: Api, Q: Querier>(
+pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-) -> StdResult<MetaResponse> {
-    let meta = meta_read(&deps.storage).load()?;
-    let res = MetaResponse {
-        name: meta.name,
-        symbol: meta.symbol,
-        decimals: meta.decimals,
-        total_supply: meta.total_supply,
+) -> StdResult<TokenInfoResponse> {
+    let info = token_info_read(&deps.storage).load()?;
+    let res = TokenInfoResponse {
+        name: info.name,
+        symbol: info.symbol,
+        decimals: info.decimals,
+        total_supply: info.total_supply,
     };
     Ok(res)
 }
@@ -285,7 +285,7 @@ pub fn query_meta<S: Storage, A: Api, Q: Querier>(
 pub fn query_minter<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<Option<MinterResponse>> {
-    let meta = meta_read(&deps.storage).load()?;
+    let meta = token_info_read(&deps.storage).load()?;
     let minter = match meta.mint {
         Some(m) => Some(MinterResponse {
             minter: deps.api.human_address(&m.minter)?,
@@ -318,7 +318,7 @@ mod tests {
         amount: Uint128,
         minter: &HumanAddr,
         cap: Option<Uint128>,
-    ) -> MetaResponse {
+    ) -> TokenInfoResponse {
         _do_init(
             deps,
             addr,
@@ -335,7 +335,7 @@ mod tests {
         deps: &mut Extern<S, A, Q>,
         addr: &HumanAddr,
         amount: Uint128,
-    ) -> MetaResponse {
+    ) -> TokenInfoResponse {
         _do_init(deps, addr, amount, None)
     }
 
@@ -345,7 +345,7 @@ mod tests {
         addr: &HumanAddr,
         amount: Uint128,
         mint: Option<MinterResponse>,
-    ) -> MetaResponse {
+    ) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -360,10 +360,10 @@ mod tests {
         let res = init(deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let meta = query_meta(&deps).unwrap();
+        let meta = query_token_info(&deps).unwrap();
         assert_eq!(
             meta,
-            MetaResponse {
+            TokenInfoResponse {
                 name: "Auto Gen".to_string(),
                 symbol: "AUTO".to_string(),
                 decimals: 3,
@@ -394,8 +394,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            query_meta(&deps).unwrap(),
-            MetaResponse {
+            query_token_info(&deps).unwrap(),
+            TokenInfoResponse {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
@@ -429,8 +429,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            query_meta(&deps).unwrap(),
-            MetaResponse {
+            query_token_info(&deps).unwrap(),
+            TokenInfoResponse {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
@@ -582,8 +582,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            query_meta(&deps).unwrap(),
-            MetaResponse {
+            query_token_info(&deps).unwrap(),
+            TokenInfoResponse {
                 name: "Bash Shell".to_string(),
                 symbol: "BASH".to_string(),
                 decimals: 6,
@@ -603,7 +603,7 @@ mod tests {
         let expected = do_init(&mut deps, &addr1, amount1);
 
         // check meta query
-        let loaded = query_meta(&deps).unwrap();
+        let loaded = query_token_info(&deps).unwrap();
         assert_eq!(expected, loaded);
 
         // check balance query (full)
@@ -676,7 +676,7 @@ mod tests {
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
         assert_eq!(get_balance(&deps, &addr2), transfer);
-        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
+        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
     }
 
     #[test]
@@ -697,7 +697,7 @@ mod tests {
             StdError::Underflow { .. } => {}
             e => panic!("Unexpected error: {}", e),
         }
-        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
+        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
 
         // valid burn reduces total supply
         let env = mock_env(addr1.clone(), &[]);
@@ -707,7 +707,7 @@ mod tests {
 
         let remainder = (amount1 - burn).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
-        assert_eq!(query_meta(&deps).unwrap().total_supply, remainder);
+        assert_eq!(query_token_info(&deps).unwrap().total_supply, remainder);
     }
 
     #[test]
@@ -768,6 +768,6 @@ mod tests {
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
         assert_eq!(get_balance(&deps, &contract), transfer);
-        assert_eq!(query_meta(&deps).unwrap().total_supply, amount1);
+        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
     }
 }
