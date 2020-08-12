@@ -11,6 +11,8 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all init/handle/query exports
+library = []
 
 [dependencies]
 cw20 = { path = "../../packages/cw20", version = "0.1.0" }
