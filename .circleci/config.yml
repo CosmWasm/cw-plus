@@ -360,25 +360,20 @@ jobs:
       - run:
           name: Build development contracts
           command: |
-            for contract_dir in ./contracts/*/; do
-              name=$(basename $contract_dir)
-              echo "Building $name ..."
-              docker run --volumes-from with_code cosmwasm/rust-optimizer:0.9.0 ./contracts/$name
-              docker cp with_code:/code/contracts/$name/contract.wasm ./artifacts/$name.wasm
-            done
+            docker run --volumes-from with_code cosmwasm/rust-optimizer:0.10.0
       - run:
-          name: Create checksums
+          name: Show checksums
           working_directory: artifacts
-          command: sha256sum *.wasm > checksums.txt && cat checksums.txt
-      - run:
-          name: Publish artifacts on GitHub
-          command: |
-            TAG="$CIRCLE_TAG"
-            TITLE="$TAG"
-            BODY="Attached there are some build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
-            ghr -t "$GITHUB_TOKEN" \
-              -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
-              -c "$CIRCLE_SHA1" \
-              -n "$TITLE" -b "$BODY" \
-              -delete \
-              "$TAG" ./artifacts/
+          command: ls -l && cat checksums.txt
+#      - run:
+#          name: Publish artifacts on GitHub
+#          command: |
+#            TAG="$CIRCLE_TAG"
+#            TITLE="$TAG"
+#            BODY="Attached there are some build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
+#            ghr -t "$GITHUB_TOKEN" \
+#              -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
+#              -c "$CIRCLE_SHA1" \
+#              -n "$TITLE" -b "$BODY" \
+#              -delete \
+#              "$TAG" ./artifacts/
