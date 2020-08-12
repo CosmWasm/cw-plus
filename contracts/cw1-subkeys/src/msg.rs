@@ -39,8 +39,8 @@ where
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
-    /// Returns cw1-whitelist::ConfigResponse
-    Config {},
+    /// Returns cw1-whitelist::AdminListResponse
+    AdminList {},
     /// Get the current allowance for the given subkey (how much it can spend)
     /// Returns crate::state::Allowance
     Allowance { spender: HumanAddr },

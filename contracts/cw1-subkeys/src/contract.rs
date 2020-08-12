@@ -6,7 +6,7 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw1_whitelist::{
-    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_config},
+    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
     state::admin_list_read,
 };
@@ -196,7 +196,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
     }
 }
@@ -318,7 +318,7 @@ mod tests {
         setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![]);
 
         // Verify
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         assert_eq!(
             config,
             AdminListResponse {
@@ -335,7 +335,7 @@ mod tests {
         handle(&mut deps, env.clone(), msg).unwrap();
 
         // Verify
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         println!("config: {:#?}", config);
         assert_eq!(
             config,
@@ -352,7 +352,7 @@ mod tests {
         handle(&mut deps, env.clone(), msg).unwrap();
 
         // Verify admin3 is now the sole admin
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         println!("config: {:#?}", config);
         assert_eq!(
             config,
@@ -380,7 +380,7 @@ mod tests {
         handle(&mut deps, env.clone(), msg).unwrap();
 
         // Verify
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         println!("config: {:#?}", config);
         assert_eq!(
             config,

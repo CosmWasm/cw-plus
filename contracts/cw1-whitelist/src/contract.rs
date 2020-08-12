@@ -106,11 +106,11 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::AdminList {} => to_binary(&query_config(deps)?),
+        QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
     }
 }
 
-pub fn query_config<S: Storage, A: Api, Q: Querier>(
+pub fn query_admin_list<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<AdminListResponse> {
     let cfg = admin_list_read(&deps.storage).load()?;
@@ -151,7 +151,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone(), carl.clone()],
             mutable: true,
         };
-        assert_eq!(query_config(&deps).unwrap(), expected);
+        assert_eq!(query_admin_list(&deps).unwrap(), expected);
 
         // anyone cannot modify the contract
         let msg = HandleMsg::UpdateAdmins {
@@ -176,7 +176,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
             mutable: true,
         };
-        assert_eq!(query_config(&deps).unwrap(), expected);
+        assert_eq!(query_admin_list(&deps).unwrap(), expected);
 
         // carl cannot freeze it
         let env = mock_env(&carl, &[]);
@@ -193,7 +193,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
         };
-        assert_eq!(query_config(&deps).unwrap(), expected);
+        assert_eq!(query_admin_list(&deps).unwrap(), expected);
 
         // and now alice cannot change it again
         let msg = HandleMsg::UpdateAdmins {
