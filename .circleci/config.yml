@@ -11,6 +11,14 @@ workflows:
       - package_cw2
       - package_cw20
       - lint
+  deploy:
+    jobs:
+      - build_and_upload_contracts:
+          filters:
+           tags:
+             only: /^v[0-9]+\.[0-9]+\.[0-9]+.*/
+           branches:
+             ignore: /.*/
 
 jobs:
   contract_cw1_subkeys:
@@ -325,3 +333,49 @@ jobs:
             - target/debug/build
             - target/debug/deps
           key: cargocache-v2-lint-rust:1.44.1-{{ checksum "Cargo.lock" }}
+
+  # This job roughly follows the instructions from https://circleci.com/blog/publishing-to-github-releases-via-circleci/
+  build_and_upload_contracts:
+    docker:
+      # Image from https://github.com/cibuilds/github, based on alpine
+      - image: cibuilds/github:0.13
+    steps:
+      - run:
+          name: Install Docker client
+          command: apk add docker-cli
+      - setup_remote_docker
+      - checkout
+      - run:
+          # We cannot mount local folders, see https://circleci.com/docs/2.0/building-docker-images/#mounting-folders
+          name: Prepare volume with source code
+          command: |
+            # create a dummy container which will hold a volume with config
+            docker create -v /code --name with_code alpine /bin/true
+            # copy a config file into this volume
+            docker cp Cargo.toml with_code:/code
+            docker cp Cargo.lock with_code:/code
+            # copy code into this volume
+            docker cp ./contracts with_code:/code
+            docker cp ./packages with_code:/code
+      - run:
+          name: Build development contracts
+          command: |
+            docker run --volumes-from with_code cosmwasm/rust-optimizer:0.10.1
+            docker cp with_code:/code/artifacts ./artifacts
+      - run:
+          name: Show data
+          command: |
+            ls -l artifacts
+            cat artifacts/checksums.txt
+      - run:
+          name: Publish artifacts on GitHub
+          command: |
+            TAG="$CIRCLE_TAG"
+            TITLE="$TAG"
+            BODY="Attached there are some build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
+            ghr -t "$GITHUB_TOKEN" \
+              -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
+              -c "$CIRCLE_SHA1" \
+              -n "$TITLE" -b "$BODY" \
+              -delete \
+              "$TAG" ./artifacts/
