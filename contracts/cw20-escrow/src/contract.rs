@@ -2,6 +2,7 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern,
     HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
+use cw2::{set_contract_version, ContractVersion};
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::msg::{
@@ -11,11 +12,20 @@ use crate::msg::{
 use crate::state::{all_escrow_ids, escrows, escrows_read, Cw20Coin, Escrow, PREFIX_ESCROW};
 use cosmwasm_storage::prefixed;
 
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
+const CONTRACT_VERSION: &str = "v0.1.0";
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
-    _deps: &mut Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     _env: Env,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    let version = ContractVersion {
+        contract: CONTRACT_NAME.to_string(),
+        version: CONTRACT_VERSION.to_string(),
+    };
+    set_contract_version(&mut deps.storage, &version)?;
     // no setup
     Ok(InitResponse::default())
 }

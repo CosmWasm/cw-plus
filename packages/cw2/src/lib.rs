@@ -20,14 +20,14 @@ pub struct ContractVersion {
     pub version: String,
 }
 
-/// get_contract_info can be use in migrate to read the previous version of this contract
-pub fn get_contract_info<S: ReadonlyStorage>(storage: &S) -> StdResult<ContractVersion> {
+/// get_contract_version can be use in migrate to read the previous version of this contract
+pub fn get_contract_version<S: ReadonlyStorage>(storage: &S) -> StdResult<ContractVersion> {
     ReadonlySingleton::new(storage, PREFIX_INFO).load()
 }
 
-/// set_contract_info should be used in init to store the original version, and after a successful
+/// set_contract_version should be used in init to store the original version, and after a successful
 /// migrate to update it
-pub fn set_contract_info<S: Storage>(storage: &mut S, info: &ContractVersion) -> StdResult<()> {
+pub fn set_contract_version<S: Storage>(storage: &mut S, info: &ContractVersion) -> StdResult<()> {
     Singleton::new(storage, PREFIX_INFO).save(info)
 }
 
@@ -57,15 +57,15 @@ mod tests {
         let mut store = MockStorage::new();
 
         // error if not set
-        assert!(get_contract_info(&store).is_err());
+        assert!(get_contract_version(&store).is_err());
 
         // set and get
         let info = ContractVersion {
             contract: "crate:cw20-base".to_string(),
             version: "v0.1.0".to_string(),
         };
-        set_contract_info(&mut store, &info).unwrap();
-        let loaded = get_contract_info(&store).unwrap();
+        set_contract_version(&mut store, &info).unwrap();
+        let loaded = get_contract_version(&store).unwrap();
         assert_eq!(info, loaded);
     }
 }

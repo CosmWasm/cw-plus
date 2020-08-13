@@ -10,17 +10,27 @@ use cw1_whitelist::{
     msg::InitMsg,
     state::admin_list_read,
 };
+use cw2::{set_contract_version, ContractVersion};
 use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
 use std::ops::{AddAssign, Sub};
 
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
+const CONTRACT_VERSION: &str = "v0.1.0";
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    let version = ContractVersion {
+        contract: CONTRACT_NAME.to_string(),
+        version: CONTRACT_VERSION.to_string(),
+    };
+    set_contract_version(&mut deps.storage, &version)?;
     whitelist_init(deps, env, msg)
 }
 

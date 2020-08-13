@@ -15,6 +15,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
+cw2 = { path = "../../packages/cw2", version = "0.1.0" }
 cw20 = { path = "../../packages/cw20", version = "0.1.0" }
 cosmwasm-std = { version = "0.10.0" }
 cosmwasm-storage = { version = "0.10.0" }
