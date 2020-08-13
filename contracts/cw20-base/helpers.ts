@@ -148,6 +148,13 @@ interface InitMsg {
   readonly mint?: MintInfo
 }
 
+interface CW20Instance {
+  readonly contractAddress: string
+
+  // returns balance of this account as stringified decimal
+  balance: (address?: string) => Promise<string>
+}
+
 interface CW20Contract {
   // upload a code blob and returns a codeId
   upload: () => Promise<number>
@@ -156,10 +163,26 @@ interface CW20Contract {
   // codeId must come from a previous deploy
   // label is the public name of the contract in listing
   // if you set admin, you can run migrations on this contract (likely client.senderAddress)
-  instantiate: (codeId: number, initMsg: InitMsg, label: string, admin?: string) => Promise<string>
+  instantiate: (codeId: number, initMsg: InitMsg, label: string, admin?: string) => Promise<CW20Instance>
+
+  use: (contractAddress: string) => CW20Instance
 }
 
+
 const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
+  const use = (contractAddress: string): CW20Instance => {
+    const balance = async (account?: string): Promise<string> => {
+      const address = account || client.senderAddress;  
+      const result = await client.queryContractSmart(contractAddress, {balance: { address }});
+      return result.balance;
+    };
+
+    return {
+      contractAddress,
+      balance,
+    };
+  }
+
   const downloadWasm = async (url: string): Promise<Uint8Array> => {
     const r = await axios.get(url, { responseType: 'arraybuffer' })
     if (r.status !== 200) {
@@ -179,12 +202,12 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
     return result.codeId;
   }
 
-  const instantiate = async (codeId: number, initMsg: InitMsg, label: string, admin?: string): Promise<string> => {
+  const instantiate = async (codeId: number, initMsg: InitMsg, label: string, admin?: string): Promise<CW20Instance> => {
     const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, admin});
-    return result.contractAddress;
+    return use(result.contractAddress);
   }
 
-  return { upload, instantiate };
+  return { upload, instantiate, use };
 }
 
 
