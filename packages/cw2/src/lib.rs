@@ -20,19 +20,14 @@ pub struct ContractVersion {
     pub version: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ContractInfo {
-    versions: Vec<ContractVersion>,
-}
-
 /// get_contract_info can be use in migrate to read the previous version of this contract
-pub fn get_contract_info<S: ReadonlyStorage>(storage: &S) -> StdResult<ContractInfo> {
+pub fn get_contract_info<S: ReadonlyStorage>(storage: &S) -> StdResult<ContractVersion> {
     ReadonlySingleton::new(storage, PREFIX_INFO).load()
 }
 
 /// set_contract_info should be used in init to store the original version, and after a successful
 /// migrate to update it
-pub fn set_contract_info<S: Storage>(storage: &mut S, info: &ContractInfo) -> StdResult<()> {
+pub fn set_contract_info<S: Storage>(storage: &mut S, info: &ContractVersion) -> StdResult<()> {
     Singleton::new(storage, PREFIX_INFO).save(info)
 }
 
@@ -44,7 +39,7 @@ pub fn set_contract_info<S: Storage>(storage: &mut S, info: &ContractInfo) -> St
 pub fn query_contract_info<Q: Querier, T: Into<HumanAddr>>(
     querier: &Q,
     contract_addr: T,
-) -> StdResult<ContractInfo> {
+) -> StdResult<ContractVersion> {
     let req = QueryRequest::Wasm(WasmQuery::Raw {
         contract_addr: contract_addr.into(),
         key: to_length_prefixed(PREFIX_INFO).into(),
@@ -54,7 +49,7 @@ pub fn query_contract_info<Q: Querier, T: Into<HumanAddr>>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{get_contract_info, set_contract_info, ContractInfo, ContractVersion};
+    use super::*;
     use cosmwasm_std::testing::MockStorage;
 
     #[test]
@@ -65,11 +60,9 @@ mod tests {
         assert!(get_contract_info(&store).is_err());
 
         // set and get
-        let info = ContractInfo {
-            versions: vec![ContractVersion {
-                contract: "crate:cw20-base".to_string(),
-                version: "v0.1.0".to_string(),
-            }],
+        let info = ContractVersion {
+            contract: "crate:cw20-base".to_string(),
+            version: "v0.1.0".to_string(),
         };
         set_contract_info(&mut store, &info).unwrap();
         let loaded = get_contract_info(&store).unwrap();

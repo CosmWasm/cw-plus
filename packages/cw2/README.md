@@ -24,12 +24,14 @@ paths.
 All CW2-compliant contracts must store the following data:
 
 * key: `\x00\x0dcontract_info` (length prefixed "contract_info" using Singleton pattern)
-* data: Json-serialized `ContractInfo`
+* data: Json-serialized `ContractVersion`
 
 ```rust
 pub struct ContractVersion {
-    /// contract is the crate name of the implementing contract, eg. `crate:cw20-base`
-    /// we will use other prefixes for other languages, and their standard global namespacing
+    /// contract is a globally unique identifier for the contract.
+    /// it should build off standard namespacing for whichever language it is in,
+    /// and prefix it with the registry we use. 
+    /// For rust we prefix with `crates.io:`, to give us eg. `crates.io:cw20-base`
     pub contract: String,
     /// version is any string that this implementation knows. It may be simple counter "1", "2".
     /// or semantic version on release tags "v0.6.2", or some custom feature flag list.
@@ -37,37 +39,14 @@ pub struct ContractVersion {
     /// migrate from the given contract (and is tied to it's implementation somehow)
     pub version: String,
 }
-
-pub struct ContractInfo {
-    versions: Vec<ContractVersion>,
-}
 ```
 
 Thus, an serialized example may looks like:
 
 ```json
 {
-  "versions": [{
-    "contract": "crate:cw20-base",
+    "contract": "crates.io:cw20-base",
     "version": "v0.1.0"
-  }]
-}
-```
-
-Note we explicitly allow multiple version for mix-ins. For example,
-`cw1-subkeys` imports the config/admin list bucket from `cw1-whitelist`
-as well as adding some more info to it. We may want to explicitly mention
-the source of the state to be migrated:
-
-```json
-{
-  "versions": [{
-    "contract": "crate:cw1-whitelist",
-    "version": "v0.1.0"
-  }, {
-    "contract": "crate:cw1-subkeys",
-    "version": "v0.1.0"
-  }]
 }
 ```
 
