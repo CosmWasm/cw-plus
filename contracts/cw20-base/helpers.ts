@@ -71,9 +71,9 @@ const useOptions = (options: Options): Network => {
     }
   
     return {
-      upload: stdFee(1000000, feeToken, gasPrice),
-      init: stdFee(500000, feeToken, gasPrice),
-      migrate: stdFee(500000, feeToken, gasPrice),
+      upload: stdFee(1500000, feeToken, gasPrice),
+      init: stdFee(600000, feeToken, gasPrice),
+      migrate: stdFee(600000, feeToken, gasPrice),
       exec: stdFee(200000, feeToken, gasPrice),
       send: stdFee(80000, feeToken, gasPrice),
       changeAdmin: stdFee(80000, feeToken, gasPrice),
@@ -153,6 +153,10 @@ interface CW20Instance {
 
   // returns balance of this account as stringified decimal
   balance: (address?: string) => Promise<string>
+  allowance: (owner: string, spender: string) => Promise<string>
+
+  token_info: () => Promise<any>
+  minter: () => Promise<any>
 }
 
 interface CW20Contract {
@@ -177,9 +181,24 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
       return result.balance;
     };
 
+    const allowance = async (owner: string, spender: string): Promise<any> => {
+      return client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
+    };
+
+    const token_info = async (): Promise<any> => {
+      return client.queryContractSmart(contractAddress, {token_info: { }});
+    };
+
+    const minter = async (): Promise<any> => {
+      return client.queryContractSmart(contractAddress, {minter: { }});
+    };
+
     return {
       contractAddress,
       balance,
+      allowance,
+      token_info,
+      minter,
     };
   }
 
@@ -194,7 +213,7 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
   const upload = async (): Promise<number> => {
     const meta = {
       source: "https://github.com/CosmWasm/cosmwasm-plus",
-      builder: "cosmwasm/rust-optimizer:0.10.1`"
+      builder: "cosmwasm/rust-optimizer:0.10.1"
     };
     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.1.1/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
@@ -212,14 +231,62 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
 
 
 /*** this is demo code  ***/
-const main = async () => {
+const demo = async () => {
   console.log("Running demo....");
   const client = await useOptions(coralnetOptions).setup("12345678");
   console.log(client.senderAddress);
   const account = await client.getAccount();
   console.log(account);
-
-  const cw20 = CW20(client);
 }
 
-await main()
+const exampleStars = async () => {
+  console.log("Setup....");
+  const client = await useOptions(coralnetOptions).setup("12345678");
+
+  const cw20 = CW20(client);
+  const codeId = await cw20.upload();
+  console.log(`CodeId: ${codeId}`);
+
+  const initMsg: InitMsg = {
+    name: "Golden Stars",
+    symbol: "STAR",
+    decimals: 2,
+    // list of all validator self-delegate addresses - 100 STARs each!
+    initial_balances: [
+      { address: "coral1exta8hzrghyt5umd4jh55kfkmp0tv3hyg8krc5", amount: "10000"},
+      { address: "coral13mcejut8e5tncs59zcs4yn4envcd98vx682frk", amount: "10000"},
+      { address: "coral10zn0d2eeust0495crtr3zqz7t688hg0s53afrh", amount: "10000"},
+      { address: "coral1qvrcashqpemlkhrqphzv9n5nutdxpafmdefgcl", amount: "10000"},
+      { address: "coral14f8nvyy4c9pyn78dgv0k6syek3jjjrkyz747kj", amount: "10000"},
+      { address: "coral1e86v774dch5uwkks0cepw8mdz8a9flhhapvf6w", amount: "10000"},
+      { address: "coral1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2nhyl7l", amount: "10000"},
+    ],
+    mint: {
+      minter: client.senderAddress,
+    },
+  };
+  const contract = await cw20.instantiate(codeId, initMsg, "STAR");
+  console.log(`Contract: ${contract.contractAddress}`);
+
+  console.log(await contract.balance("coral13mcejut8e5tncs59zcs4yn4envcd98vx682frk"));
+  console.log(await contract.balance());
+
+  // Setup....
+  // CodeId: 4
+  // Contract: coral16t7y0vrtpqjw2d7jvc2209yan9002339mg4mrv
+  // 10000
+  // 0
+}
+
+const usage = async () => {
+  const addr = "coral16t7y0vrtpqjw2d7jvc2209yan9002339mg4mrv";
+  const client = await useOptions(coralnetOptions).setup("12345678");
+  const stars = CW20(client).use(addr);
+  
+  console.log(`info: ${JSON.stringify(await stars.token_info())}`);
+  console.log(`minter: ${JSON.stringify(await stars.minter())}`);
+  const acct = "coral14f8nvyy4c9pyn78dgv0k6syek3jjjrkyz747kj";
+  console.log(`balance of ${acct}: ${await stars.balance(acct)}`);
+}
+
+usage()
