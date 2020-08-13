@@ -92,6 +92,7 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw1-whitelist",
+ "cw2",
  "cw20",
  "schemars",
  "serde",
