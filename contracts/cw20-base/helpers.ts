@@ -4,6 +4,13 @@
  * 
  * Usage: npx @cosmjs/cli --init https://github.com/CosmWasm/cosmwasm-plus/blob/master/contracts/cw20-base/helpers.ts
  * 
+ * Create a client:
+ *   const client = await useOptions(coralnetOptions).setup(password);
+ *   await client.getAccount()
+ * 
+ * Get the mnemonic:
+ *   await useOptions(coralnetOptions).recoverMnemonic(password)
+ * 
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
 
@@ -34,10 +41,8 @@ const coralnetOptions: Options = {
 }
 
 interface Network {
-  setup: (password: string, filename?: string) => Promise<{
-    client: SigningCosmWasmClient,
-    wallet: Secp256k1Wallet,
-  }>
+  setup: (password: string, filename?: string) => Promise<SigningCosmWasmClient>
+  recoverMnemonic: (password: string, filename?: string) => Promise<string>
 }
 
 const useOptions = (options: Options): Network => {
@@ -99,10 +104,7 @@ const useOptions = (options: Options): Network => {
     await axios.post(faucetUrl, { ticker, address });
   }
   
-  const setup = async (password: string, filename?: string): Promise<{
-    client: SigningCosmWasmClient,
-    wallet: Secp256k1Wallet,
-  }> => {
+  const setup = async (password: string, filename?: string): Promise<SigningCosmWasmClient> => {
     const keyfile = filename || options.defaultKeyFile;
     const wallet = await loadOrCreateWallet(coralnetOptions, keyfile, password);
     const client = await connect(wallet, coralnetOptions);
@@ -116,35 +118,85 @@ const useOptions = (options: Options): Network => {
       }  
     }
 
-    return {
-      client,
-      wallet,
-    };    
+    return client;
   }
 
-  return {setup};
-}
-
-
-const downloadWasm = async (url: string): Promise<Uint8Array> => {
-  const r = await axios.get(url, { responseType: 'arraybuffer' })
-  if (r.status !== 200) {
-    throw new Error(`Download error: ${r.status}`)
+  const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
+    const keyfile = filename || options.defaultKeyFile;
+    const wallet = await loadOrCreateWallet(coralnetOptions, keyfile, password);
+    return wallet.mnemonic;
   }
-  return r.data
+
+  return {setup, recoverMnemonic};
 }
 
+interface Balances {
+  readonly address: string
+  readonly amount: string  // decimal as string
+}
+
+interface MintInfo {
+  readonly minter: string
+  readonly cap?: string // decimal as string
+}
+
+interface InitMsg {
+  readonly name: string
+  readonly symbol: string
+  readonly decimals: number
+  readonly initial_balances: readonly Balances[]
+  readonly mint?: MintInfo
+}
+
+interface CW20Contract {
+  // upload a code blob and returns a codeId
+  upload: () => Promise<number>
+
+  // instantiates a cw20 contract
+  // codeId must come from a previous deploy
+  // label is the public name of the contract in listing
+  // if you set admin, you can run migrations on this contract (likely client.senderAddress)
+  instantiate: (codeId: number, initMsg: InitMsg, label: string, admin?: string) => Promise<string>
+}
+
+const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
+  const downloadWasm = async (url: string): Promise<Uint8Array> => {
+    const r = await axios.get(url, { responseType: 'arraybuffer' })
+    if (r.status !== 200) {
+      throw new Error(`Download error: ${r.status}`)
+    }
+    return r.data
+  }
+  
+  const upload = async (): Promise<number> => {
+    const meta = {
+      source: "https://github.com/CosmWasm/cosmwasm-plus",
+      builder: "cosmwasm/rust-optimizer:0.10.1`"
+    };
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.1.1/cw20_base.wasm";
+    const wasm = await downloadWasm(sourceUrl);
+    const result = await client.upload(wasm, meta);
+    return result.codeId;
+  }
+
+  const instantiate = async (codeId: number, initMsg: InitMsg, label: string, admin?: string): Promise<string> => {
+    const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, admin});
+    return result.contractAddress;
+  }
+
+  return { upload, instantiate };
+}
 
 
 /*** this is demo code  ***/
 const main = async () => {
   console.log("Running demo....");
-  const coralnet = useOptions(coralnetOptions);
-  const { client, wallet } = await coralnet.setup("12345678");
+  const client = await useOptions(coralnetOptions).setup("12345678");
   console.log(client.senderAddress);
-  console.log(wallet.mnemonic);
   const account = await client.getAccount();
   console.log(account);
+
+  const cw20 = CW20(client);
 }
 
 await main()
