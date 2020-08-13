@@ -5,15 +5,25 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
+use cw2::{set_contract_version, ContractVersion};
 
 use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{admin_list, admin_list_read, AdminList};
+
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
+const CONTRACT_VERSION: &str = "v0.1.0";
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    let version = ContractVersion {
+        contract: CONTRACT_NAME.to_string(),
+        version: CONTRACT_VERSION.to_string(),
+    };
+    set_contract_version(&mut deps.storage, &version)?;
     let cfg = AdminList {
         admins: map_canonical(&deps.api, &msg.admins)?,
         mutable: msg.mutable,

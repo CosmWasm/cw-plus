@@ -2,6 +2,7 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
     StdError, StdResult, Storage, Uint128,
 };
+use cw2::{set_contract_version, ContractVersion};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
@@ -11,11 +12,20 @@ use crate::allowances::{
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
 use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
 
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw20-base";
+const CONTRACT_VERSION: &str = "v0.1.0";
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    let version = ContractVersion {
+        contract: CONTRACT_NAME.to_string(),
+        version: CONTRACT_VERSION.to_string(),
+    };
+    set_contract_version(&mut deps.storage, &version)?;
     // check valid token info
     msg.validate()?;
     // create initial accounts
