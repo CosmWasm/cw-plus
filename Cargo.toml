@@ -1,14 +1,35 @@
 [workspace]
 members = ["packages/*", "contracts/*"]
 
+[profile.release.package.cw1-subkeys]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
+[profile.release.package.cw1-whitelist]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
 [profile.release.package.cw20-base]
 opt-level = 3
 debug = false
 debug-assertions = false
 codegen-units = 1
 incremental = false
-overflow-checks = true
+
+[profile.release.package.cw20-escrow]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
 
 [profile.release]
 rpath = false
 lto = true
+overflow-checks = true
