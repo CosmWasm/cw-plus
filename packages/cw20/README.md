@@ -36,8 +36,8 @@ and reduce `total_supply` by the same amount.
 Returns "0" if the address is unknown to the contract. Return type
 is `BalanceResponse{balance}`.
 
-`Meta{}` - Returns the meta-data of the contract. Return type is
-`MetaData{name, symbol, decimal, total_supply}`.
+`TokenInfo{}` - Returns the token info of the contract. Return type is
+`TokenInfoResponse{name, symbol, decimal, total_supply}`.
 
 ### Receiver
 

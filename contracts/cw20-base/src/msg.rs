@@ -128,8 +128,8 @@ pub enum QueryMsg {
     /// Return type: BalanceResponse.
     Balance { address: HumanAddr },
     /// Returns metadata on the contract - name, decimals, supply, etc.
-    /// Return type: MetaResponse.
-    Meta {},
+    /// Return type: TokenInfoResponse.
+    TokenInfo {},
     /// Only with "mintable" extension.
     /// Returns who can mint and how much.
     /// Return type: MinterResponse.

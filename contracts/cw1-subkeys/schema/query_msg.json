@@ -3,13 +3,13 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Shows all admins and whether or not it is mutable Returns cw1-whitelist::ConfigResponse",
+      "description": "Shows all admins and whether or not it is mutable Returns cw1-whitelist::AdminListResponse",
       "type": "object",
       "required": [
-        "config"
+        "admin_list"
       ],
       "properties": {
-        "config": {
+        "admin_list": {
           "type": "object"
         }
       }

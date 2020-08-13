@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg_for_Empty",
+  "title": "HandleMsg",
   "anyOf": [
     {
       "description": "Execute requests the contract to re-dispatch all these messages with the contract's address as sender. Every implementation has it's own logic to determine in",
@@ -55,74 +55,6 @@
               "items": {
                 "$ref": "#/definitions/HumanAddr"
               }
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Add an allowance to a given subkey (subkey must not be admin)",
-      "type": "object",
-      "required": [
-        "increase_allowance"
-      ],
-      "properties": {
-        "increase_allowance": {
-          "type": "object",
-          "required": [
-            "amount",
-            "spender"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Coin"
-            },
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Decreases an allowance for a given subkey (subkey must not be admin)",
-      "type": "object",
-      "required": [
-        "decrease_allowance"
-      ],
-      "properties": {
-        "decrease_allowance": {
-          "type": "object",
-          "required": [
-            "amount",
-            "spender"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Coin"
-            },
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
             }
           }
         }
@@ -234,66 +166,6 @@
     "Empty": {
       "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
       "type": "object"
-    },
-    "Expiration": {
-      "anyOf": [
-        {
-          "description": "AtHeight will expire when `env.block.height` >= height",
-          "type": "object",
-          "required": [
-            "at_height"
-          ],
-          "properties": {
-            "at_height": {
-              "type": "object",
-              "required": [
-                "height"
-              ],
-              "properties": {
-                "height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              }
-            }
-          }
-        },
-        {
-          "description": "AtTime will expire when `env.block.time` >= time",
-          "type": "object",
-          "required": [
-            "at_time"
-          ],
-          "properties": {
-            "at_time": {
-              "type": "object",
-              "required": [
-                "time"
-              ],
-              "properties": {
-                "time": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              }
-            }
-          }
-        },
-        {
-          "description": "Never will never expire. Used to distinguish None from Some(Expiration::Never)",
-          "type": "object",
-          "required": [
-            "never"
-          ],
-          "properties": {
-            "never": {
-              "type": "object"
-            }
-          }
-        }
-      ]
     },
     "HumanAddr": {
       "type": "string"

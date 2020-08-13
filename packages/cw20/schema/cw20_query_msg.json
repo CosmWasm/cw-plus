@@ -23,13 +23,13 @@
       }
     },
     {
-      "description": "Returns metadata on the contract - name, decimals, supply, etc. Return type: MetaResponse.",
+      "description": "Returns metadata on the contract - name, decimals, supply, etc. Return type: TokenInfoResponse.",
       "type": "object",
       "required": [
-        "meta"
+        "token_info"
       ],
       "properties": {
-        "meta": {
+        "token_info": {
           "type": "object"
         }
       }

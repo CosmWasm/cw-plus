@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
-use crate::state::{allowance_remove, allowances, allowances_read, balances, meta};
+use crate::state::{allowances, allowances_read, balances, token_info};
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -67,7 +67,7 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier>(
         }
         bucket.save(spender_raw.as_slice(), &allowance)?;
     } else {
-        allowance_remove(&mut deps.storage, owner_raw, spender_raw);
+        allowances(&mut deps.storage, owner_raw).remove(spender_raw.as_slice());
     }
 
     let res = HandleResponse {
@@ -173,7 +173,7 @@ pub fn handle_burn_from<S: Storage, A: Api, Q: Querier>(
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    meta(&mut deps.storage).update(|mut meta| {
+    token_info(&mut deps.storage).update(|mut meta| {
         meta.total_supply = (meta.total_supply - amount)?;
         Ok(meta)
     })?;
@@ -265,9 +265,9 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
-    use cw20::MetaResponse;
+    use cw20::TokenInfoResponse;
 
-    use crate::contract::{handle, init, query_balance, query_meta};
+    use crate::contract::{handle, init, query_balance, query_token_info};
     use crate::msg::{HandleMsg, InitMsg, InitialBalance};
 
     fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
@@ -282,7 +282,7 @@ mod tests {
         deps: &mut Extern<S, A, Q>,
         addr: &HumanAddr,
         amount: Uint128,
-    ) -> MetaResponse {
+    ) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -295,7 +295,7 @@ mod tests {
         };
         let env = mock_env(&HumanAddr("creator".to_string()), &[]);
         init(deps, env, init_msg).unwrap();
-        query_meta(&deps).unwrap()
+        query_token_info(&deps).unwrap()
     }
 
     #[test]

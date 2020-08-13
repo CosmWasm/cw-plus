@@ -6,7 +6,7 @@ mod receiver;
 pub use crate::helpers::{Cw20CanonicalContract, Cw20Contract};
 pub use crate::msg::{Cw20HandleMsg, Expiration};
 pub use crate::query::{
-    AllowanceResponse, BalanceResponse, Cw20QueryMsg, MetaResponse, MinterResponse,
+    AllowanceResponse, BalanceResponse, Cw20QueryMsg, MinterResponse, TokenInfoResponse,
 };
 pub use crate::receiver::Cw20ReceiveMsg;
 

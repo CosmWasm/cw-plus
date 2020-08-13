@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage, Uint128};
 use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, PrefixedStorage, ReadonlyBucket,
-    ReadonlySingleton, Singleton,
+    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
+    Singleton,
 };
 use cw20::AllowanceResponse;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub struct Meta {
+pub struct TokenInfo {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
@@ -25,23 +25,23 @@ pub struct MinterData {
     pub cap: Option<Uint128>,
 }
 
-impl Meta {
+impl TokenInfo {
     pub fn get_cap(&self) -> Option<Uint128> {
         self.mint.as_ref().and_then(|v| v.cap)
     }
 }
 
-const META_KEY: &[u8] = b"meta";
+const TOKEN_INFO_KEY: &[u8] = b"token_info";
 const PREFIX_BALANCE: &[u8] = b"balance";
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";
 
 // meta is the token definition as well as the total_supply
-pub fn meta<S: Storage>(storage: &mut S) -> Singleton<S, Meta> {
-    singleton(storage, META_KEY)
+pub fn token_info<S: Storage>(storage: &mut S) -> Singleton<S, TokenInfo> {
+    singleton(storage, TOKEN_INFO_KEY)
 }
 
-pub fn meta_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Meta> {
-    singleton_read(storage, META_KEY)
+pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, TokenInfo> {
+    singleton_read(storage, TOKEN_INFO_KEY)
 }
 
 /// balances are state of the erc20 tokens
@@ -69,14 +69,4 @@ pub fn allowances_read<'a, S: ReadonlyStorage>(
     owner: &CanonicalAddr,
 ) -> ReadonlyBucket<'a, S, AllowanceResponse> {
     ReadonlyBucket::multilevel(&[PREFIX_ALLOWANCE, owner.as_slice()], storage)
-}
-
-// we delete the allowance (TODO: expose this in Bucket for simpler API)
-pub fn allowance_remove<S: Storage>(
-    storage: &mut S,
-    owner: &CanonicalAddr,
-    spender: &CanonicalAddr,
-) {
-    PrefixedStorage::multilevel(&[PREFIX_ALLOWANCE, owner.as_slice()], storage)
-        .remove(spender.as_slice());
 }

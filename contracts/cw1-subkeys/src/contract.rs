@@ -6,9 +6,9 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw1_whitelist::{
-    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_config},
+    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
-    state::config_read,
+    state::admin_list_read,
 };
 use cw20::Expiration;
 
@@ -56,7 +56,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = config_read(&deps.storage).load()?;
+    let cfg = admin_list_read(&deps.storage).load()?;
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(owner_raw) {
@@ -108,7 +108,7 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = config_read(&deps.storage).load()?;
+    let cfg = admin_list_read(&deps.storage).load()?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
@@ -152,7 +152,7 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = config_read(&deps.storage).load()?;
+    let cfg = admin_list_read(&deps.storage).load()?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
@@ -196,7 +196,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
     }
 }
@@ -219,7 +219,7 @@ mod tests {
     use crate::balance::Balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins};
-    use cw1_whitelist::msg::ConfigResponse;
+    use cw1_whitelist::msg::AdminListResponse;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -318,10 +318,10 @@ mod tests {
         setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![]);
 
         // Verify
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         assert_eq!(
             config,
-            ConfigResponse {
+            AdminListResponse {
                 admins: initial_admins.clone(),
                 mutable: true,
             }
@@ -335,11 +335,11 @@ mod tests {
         handle(&mut deps, env.clone(), msg).unwrap();
 
         // Verify
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         println!("config: {:#?}", config);
         assert_eq!(
             config,
-            ConfigResponse {
+            AdminListResponse {
                 admins: new_admins,
                 mutable: true,
             }
@@ -352,11 +352,11 @@ mod tests {
         handle(&mut deps, env.clone(), msg).unwrap();
 
         // Verify admin3 is now the sole admin
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         println!("config: {:#?}", config);
         assert_eq!(
             config,
-            ConfigResponse {
+            AdminListResponse {
                 admins: vec![admin3.clone()],
                 mutable: true,
             }
@@ -380,11 +380,11 @@ mod tests {
         handle(&mut deps, env.clone(), msg).unwrap();
 
         // Verify
-        let config = query_config(&deps).unwrap();
+        let config = query_admin_list(&deps).unwrap();
         println!("config: {:#?}", config);
         assert_eq!(
             config,
-            ConfigResponse {
+            AdminListResponse {
                 admins: vec![admin3, owner],
                 mutable: true,
             }
