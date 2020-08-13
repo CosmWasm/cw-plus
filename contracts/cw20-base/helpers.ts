@@ -151,12 +151,19 @@ interface InitMsg {
 interface CW20Instance {
   readonly contractAddress: string
 
-  // returns balance of this account as stringified decimal
+  // queries
   balance: (address?: string) => Promise<string>
   allowance: (owner: string, spender: string) => Promise<string>
-
   token_info: () => Promise<any>
   minter: () => Promise<any>
+
+  // actions
+  mint: (recipient: string, amount: string) => Promise<string>
+  transfer: (recipient: string, amount: string) => Promise<string>
+  burn: (amount: string) => Promise<string>
+  increaseAllowance: (recipient: string, amount: string) => Promise<string>
+  decreaseAllowance: (recipient: string, amount: string) => Promise<string>
+  transferFrom: (owner: string, recipient: string, amount: string) => Promise<string>
 }
 
 interface CW20Contract {
@@ -181,8 +188,9 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
       return result.balance;
     };
 
-    const allowance = async (owner: string, spender: string): Promise<any> => {
-      return client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
+    const allowance = async (owner: string, spender: string): Promise<string> => {
+      const result = await client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
+      return result.allowance;
     };
 
     const token_info = async (): Promise<any> => {
@@ -193,12 +201,51 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
       return client.queryContractSmart(contractAddress, {minter: { }});
     };
 
+    // mints tokens, returns transactionHash
+    const mint = async (recipient: string, amount: string): Promise<string> => {
+      const result = await client.execute(contractAddress, {mint: {recipient, amount}});
+      return result.transactionHash;
+    }
+
+    // transfers tokens, returns transactionHash
+    const transfer = async (recipient: string, amount: string): Promise<string> => {
+      const result = await client.execute(contractAddress, {transfer: {recipient, amount}});
+      return result.transactionHash;
+    }
+
+    // burns tokens, returns transactionHash
+    const burn = async (amount: string): Promise<string> => {
+      const result = await client.execute(contractAddress, {burn: {amount}});
+      return result.transactionHash;
+    }
+
+    const increaseAllowance = async (spender: string, amount: string): Promise<string> => {
+      const result = await client.execute(contractAddress, {increase_allowance: {spender, amount}});
+      return result.transactionHash;
+    }
+
+    const decreaseAllowance = async (spender: string, amount: string): Promise<string> => {
+      const result = await client.execute(contractAddress, {decrease_allowance: {spender, amount}});
+      return result.transactionHash;
+    }
+
+    const transferFrom = async (owner: string, recipient: string, amount: string): Promise<string> => {
+      const result = await client.execute(contractAddress, {transfer_from: {owner, recipient, amount}});
+      return result.transactionHash;
+    }
+    
     return {
       contractAddress,
       balance,
       allowance,
       token_info,
       minter,
+      mint,
+      transfer,
+      burn,
+      increaseAllowance,
+      decreaseAllowance,
+      transferFrom,
     };
   }
 
@@ -287,6 +334,31 @@ const usage = async () => {
   console.log(`minter: ${JSON.stringify(await stars.minter())}`);
   const acct = "coral14f8nvyy4c9pyn78dgv0k6syek3jjjrkyz747kj";
   console.log(`balance of ${acct}: ${await stars.balance(acct)}`);
-}
 
-usage()
+  console.log(`my balance: ${await stars.balance()}`);
+  console.log("minting myself 100 STAR");
+  const mintTx = await stars.mint(client.senderAddress, "10000");
+  console.log(`Tx: ${mintTx}`);
+  console.log(`my balance: ${await stars.balance()}`);
+
+  const lucky = "coral1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2nhyl7l";
+  console.log(`balance of ${lucky}: ${await stars.balance(lucky)}`);
+  console.log("send 5 STAR to ${lucky}");
+  const transferTx = await stars.transfer(lucky, "500");
+  console.log(`Tx: ${transferTx}`);
+  console.log(`balance of ${lucky}: ${await stars.balance(lucky)}`);
+  console.log(`my balance: ${await stars.balance()}`);
+
+  // info: {"name":"Golden Stars","symbol":"STAR","decimals":2,"total_supply":"70000"}
+  // minter: {"minter":"coral15m4z2650nkcr7r6g5dyzf4qwcrcmrrjh6t7x0f","cap":null}
+  // balance of coral14f8nvyy4c9pyn78dgv0k6syek3jjjrkyz747kj: 10000
+  // my balance: 0
+  // minting myself 100 STAR
+  // Tx: 257283B98DB5D10412839ACC9667E0E5FFF001CC1BE4AFA4527157082C15F2FA
+  // my balance: 10000
+  // balance of coral1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2nhyl7l: 10000
+  // send 5 STAR to ${lucky}
+  // Tx: 83FBD409BFEBF62AB6926C592788EF7DC378CBBFA1337A33931F45F84D79B17B
+  // balance of coral1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2nhyl7l: 10500
+  // my balance: 9500
+}
