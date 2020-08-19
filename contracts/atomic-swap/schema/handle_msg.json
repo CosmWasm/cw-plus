@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HandleMsg",
+  "anyOf": [
+    {
+      "description": "Release sends all tokens to the recipient.",
+      "type": "object",
+      "required": [
+        "release"
+      ],
+      "properties": {
+        "release": {
+          "type": "object",
+          "required": [
+            "preimage"
+          ],
+          "properties": {
+            "preimage": {
+              "description": "This is the preimage, must be exactly 32 bytes in hex (64 chars) to release: sha256(from_hex(preimage)) == from_hex(hash)",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Refund returns all remaining tokens to the original sender,",
+      "type": "object",
+      "required": [
+        "refund"
+      ],
+      "properties": {
+        "refund": {
+          "type": "object"
+        }
+      }
+    }
+  ]
+}
