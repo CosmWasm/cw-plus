@@ -133,7 +133,7 @@ const useOptions = (options: Options): Network => {
   return {setup, recoverMnemonic};
 }
 
-type Expiration = { at_height: number } | { at_time: number } | { never: {}}
+type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {}}
 
 interface AllowanceResponse {
   readonly balance: readonly Coin[],
@@ -150,8 +150,18 @@ interface InitMsg {
   readonly mutable: boolean,
 }
 
-// TODO: define these more
-type CosmosMsg = any;
+// TODO: define more of these
+type CosmosMsg = SendMsg; 
+
+interface SendMsg {
+  readonly bank: {
+    readonly send: {
+      readonly from_address: string,
+      readonly to_address: string,
+      readonly amount: readonly Coin[],    
+    }
+  }
+}
 
 interface CW1Instance {
   readonly contractAddress: string
@@ -268,12 +278,39 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
 //
 // const codeId = await factory.upload();
 // codeId -> 12
-//
 // const contract = await factory.instantiate(12, { admins: [address], mutable: true}, "My Proxy")
 // contract.contractAddress -> 'coral1267wq2zk22kt5juypdczw3k4wxhc4z47mug9fd'
+// 
+// OR
+//
+// const contract = factory.use('coral1267wq2zk22kt5juypdczw3k4wxhc4z47mug9fd')
+//
+// TODO: use a key you control to test out execute with subkey
+// const randomAddress = 'coral162d3zk45ufaqke5wgcd3kh336k6p3kwwkdj3ma'
+//
 //
 // contract.admins()
-// const randomAddress = 'coral162d3zk45ufaqke5wgcd3kh336k6p3kwwkdj3ma';
+// contract.updateAdmins([address, randomAddress])
+// contract.admins()
+// -> remove this again so we can use subkeys
+// contract.updateAdmins([address])
+// contract.freeze()
+// contract.admins()
+//
 // contract.allowance(randomAddress)
 //
-// 
+// contract.increaseAllowance(randomAddress, {denom: "ushell", amount: "123456"})
+// contract.allowance(randomAddress)
+// contract.increaseAllowance(randomAddress, {denom: "ureef", amount: "5000"})
+// contract.decreaseAllowance(randomAddress, {denom: "ushell", amount: "3456"}, { at_height: { height: 500000 }})
+// contract.allowance(randomAddress)
+//
+// -> send some tokens and then use the execute command
+// const { contractAddress } = contract
+// client.sendTokens(contractAddress, [{denom: "ushell", amount: "500000"}])
+// client.getAccount(contractAddress)
+// client.getAccount()
+// TODO: send from randomAddress - some amount less than the allowance - same line will work
+// contract.execute([{bank: {send: {from_address: contractAddress, to_address: address, amount: [{denom: "ushell", amount: "440000"}]}}}])
+// client.getAccount(contractAddress)
+// client.getAccount()
