@@ -34,16 +34,17 @@ contract, along with the token_id.
 Requires `token_id` to point to a valid token, and `env.sender` to be 
 the owner of it, or have an allowance to transfer it. 
 
-`Approve{operator, token_id}` - Grants permission to `operator` to
-transfer or send the given token. This can only be granted when
-`env.sender` is the owner of the given `token_id`. All approvals
-are cleared once the token is transfered.
+`Approve{approved, token_id, expires}` - Grants permission to `approved` to
+transfer or send the given token. This can only be performed when
+`env.sender` is the owner of the given `token_id` or an `operator`. 
+There can only be one approved account per token, and it is cleared once
+the token  is transfered or sent.
 
-`Revoke{operator, token_id}` - This revokes a previously granted permission
+`Revoke{token_id}` - This revokes a previously granted permission
 to transfer the given `token_id`. This can only be granted when
-`env.sender` is the owner of the given `token_id`.
+`env.sender` is the owner of the given `token_id` or an `operator`.
 
-`ApproveAll{operator}` - Grant `operator` permission to transfer or send
+`ApproveAll{operator, expires}` - Grant `operator` permission to transfer or send
 all tokens owner by `env.sender`. This is tied to the owner, not the
 tokens and applies to any future token that the owner receives as well.
 
@@ -52,15 +53,19 @@ to the given `operator`.
 
 ### Queries
 
-`OwnerOf{token_id}` - Returns the owner of the given token.
+`OwnerOf{token_id}` - Returns the owner of the given token,
+as well as anyone with approval on this particular token.
 If the token is unknown, returns an error. Return type is
-`OwnerResponse{owner}` with a bech32 address.
+`OwnerResponse{owner}`.
 
 **TODO** Do we want to be this ambitious? Handle paging?
 Right now, let it just get big and expensive to query
 
 `Tokens{owner}` - List all token_ids that belong to a given owner.
 Return type is `TokensResponse{tokens: Vec<token_id>}`.
+
+`ApprovedForAll{owner}` - List all operators that can access all of 
+the owner's tokens. Return type is `ApprovedForAllResponse`
 
 ### Receiver
 

@@ -161,6 +161,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw721"
+version = "0.1.1"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "doc-comment"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
