@@ -164,8 +164,8 @@ interface CW1Instance {
   execute: (msgs: readonly CosmosMsg[]) => Promise<string>
   freeze: () => Promise<string>
   updateAdmins: (admins: readonly string[]) => Promise<string>
-  increaseAllowance: (recipient: string, amount: string, expires?: Expiration) => Promise<string>
-  decreaseAllowance: (recipient: string, amount: string, expires?: Expiration) => Promise<string>
+  increaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
+  decreaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
 }
 
 interface CW1Contract {
@@ -182,98 +182,98 @@ interface CW1Contract {
 }
 
 
-// const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
-//   const use = (contractAddress: string): CW20Instance => {
-//     const balance = async (account?: string): Promise<string> => {
-//       const address = account || client.senderAddress;  
-//       const result = await client.queryContractSmart(contractAddress, {balance: { address }});
-//       return result.balance;
-//     };
+const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
+  const use = (contractAddress: string): CW1Instance => {
+    const allowance = async (address?: string): Promise<AllowanceResponse> => {
+      const spender = address || client.senderAddress;
+      const result = await client.queryContractSmart(contractAddress, {allowance: { spender }});
+      return result;
+    };
 
-//     const allowance = async (owner: string, spender: string): Promise<string> => {
-//       const result = await client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
-//       return result.allowance;
-//     };
+    const admins = async (): Promise<AdminListResponse> => {
+      return client.queryContractSmart(contractAddress, {admin_list: { }});
+    };
 
-//     const tokenInfo = async (): Promise<any> => {
-//       return client.queryContractSmart(contractAddress, {token_info: { }});
-//     };
+    // called by an admin to make admin set immutable
+    const freeze = async (): Promise<string> => {
+      const result = await client.execute(contractAddress, {freeze: {}});
+      return result.transactionHash;
+    }
 
-//     const minter = async (): Promise<any> => {
-//       return client.queryContractSmart(contractAddress, {minter: { }});
-//     };
+    // burns tokens, returns transactionHash
+    const updateAdmins = async (admins: readonly string[]): Promise<string> => {
+      const result = await client.execute(contractAddress, {update_admins: {admins}});
+      return result.transactionHash;
+    }
 
-//     // mints tokens, returns transactionHash
-//     const mint = async (recipient: string, amount: string): Promise<string> => {
-//       const result = await client.execute(contractAddress, {mint: {recipient, amount}});
-//       return result.transactionHash;
-//     }
+    // transfers tokens, returns transactionHash
+    const execute = async (msgs: readonly CosmosMsg[]): Promise<string> => {
+      const result = await client.execute(contractAddress, {execute: {msgs}});
+      return result.transactionHash;
+    }
 
-//     // transfers tokens, returns transactionHash
-//     const transfer = async (recipient: string, amount: string): Promise<string> => {
-//       const result = await client.execute(contractAddress, {transfer: {recipient, amount}});
-//       return result.transactionHash;
-//     }
+    const increaseAllowance = async (spender: string, amount: Coin, expires?: Expiration): Promise<string> => {
+      const result = await client.execute(contractAddress, {increase_allowance: {spender, amount, expires}});
+      return result.transactionHash;
+    }
 
-//     // burns tokens, returns transactionHash
-//     const burn = async (amount: string): Promise<string> => {
-//       const result = await client.execute(contractAddress, {burn: {amount}});
-//       return result.transactionHash;
-//     }
-
-//     const increaseAllowance = async (spender: string, amount: string): Promise<string> => {
-//       const result = await client.execute(contractAddress, {increase_allowance: {spender, amount}});
-//       return result.transactionHash;
-//     }
-
-//     const decreaseAllowance = async (spender: string, amount: string): Promise<string> => {
-//       const result = await client.execute(contractAddress, {decrease_allowance: {spender, amount}});
-//       return result.transactionHash;
-//     }
-
-//     const transferFrom = async (owner: string, recipient: string, amount: string): Promise<string> => {
-//       const result = await client.execute(contractAddress, {transfer_from: {owner, recipient, amount}});
-//       return result.transactionHash;
-//     }
+    const decreaseAllowance = async (spender: string, amount: Coin, expires?: Expiration): Promise<string> => {
+      const result = await client.execute(contractAddress, {decrease_allowance: {spender, amount, expires}});
+      return result.transactionHash;
+    }
     
-//     return {
-//       contractAddress,
-//       balance,
-//       allowance,
-//       tokenInfo,
-//       minter,
-//       mint,
-//       transfer,
-//       burn,
-//       increaseAllowance,
-//       decreaseAllowance,
-//       transferFrom,
-//     };
-//   }
+    return {
+      contractAddress,
+      admins,
+      allowance,
+      execute,
+      freeze,
+      updateAdmins,
+      increaseAllowance,
+      decreaseAllowance,
+    };
+  }
 
-//   const downloadWasm = async (url: string): Promise<Uint8Array> => {
-//     const r = await axios.get(url, { responseType: 'arraybuffer' })
-//     if (r.status !== 200) {
-//       throw new Error(`Download error: ${r.status}`)
-//     }
-//     return r.data
-//   }
+  const downloadWasm = async (url: string): Promise<Uint8Array> => {
+    const r = await axios.get(url, { responseType: 'arraybuffer' })
+    if (r.status !== 200) {
+      throw new Error(`Download error: ${r.status}`)
+    }
+    return r.data
+  }
   
-//   const upload = async (): Promise<number> => {
-//     const meta = {
-//       source: "https://github.com/CosmWasm/cosmwasm-plus",
-//       builder: "cosmwasm/rust-optimizer:0.10.1"
-//     };
-//     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.1.1/cw20_base.wasm";
-//     const wasm = await downloadWasm(sourceUrl);
-//     const result = await client.upload(wasm, meta);
-//     return result.codeId;
-//   }
+  const upload = async (): Promise<number> => {
+    const meta = {
+      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.1.1/contracts/cw1-subkeys",
+      builder: "cosmwasm/rust-optimizer:0.10.1"
+    };
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.1.1/cw1_subkeys.wasm";
+    const wasm = await downloadWasm(sourceUrl);
+    const result = await client.upload(wasm, meta);
+    return result.codeId;
+  }
 
-//   const instantiate = async (codeId: number, initMsg: InitMsg, label: string, admin?: string): Promise<CW20Instance> => {
-//     const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, admin});
-//     return use(result.contractAddress);
-//   }
+  const instantiate = async (codeId: number, initMsg: InitMsg, label: string, admin?: string): Promise<CW1Instance> => {
+    const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, admin});
+    return use(result.contractAddress);
+  }
 
-//   return { upload, instantiate, use };
-// }
+  return { upload, instantiate, use };
+}
+
+// Demo:
+// const client = await useOptions(coralnetOptions).setup(PASSWORD);
+// const { address} = await client.getAccount()
+// const factory = CW1(client)
+//
+// const codeId = await factory.upload();
+// codeId -> 12
+//
+// const contract = await factory.instantiate(12, { admins: [address], mutable: true}, "My Proxy")
+// contract.contractAddress -> 'coral1267wq2zk22kt5juypdczw3k4wxhc4z47mug9fd'
+//
+// contract.admins()
+// const randomAddress = 'coral162d3zk45ufaqke5wgcd3kh336k6p3kwwkdj3ma';
+// contract.allowance(randomAddress)
+//
+// 
