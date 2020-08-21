@@ -5,13 +5,13 @@ use cosmwasm_std::{
     log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
+use cw0::Expiration;
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
     state::admin_list_read,
 };
 use cw2::{set_contract_version, ContractVersion};
-use cw20::Expiration;
 
 use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
@@ -427,9 +427,9 @@ mod tests {
         let allow3 = coin(amount3, denom3);
         let initial_allowances = vec![allow1.clone(), allow2.clone()];
 
-        let expires_height = Expiration::AtHeight { height: 5432 };
+        let expires_height = Expiration::AtHeight(5432);
         let expires_never = Expiration::Never {};
-        let expires_time = Expiration::AtTime { time: 1234567890 };
+        let expires_time = Expiration::AtTime(1234567890);
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
@@ -541,7 +541,7 @@ mod tests {
 
         let initial_allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
 
-        let expires_height = Expiration::AtHeight { height: 5432 };
+        let expires_height = Expiration::AtHeight(5432);
         let expires_never = Expiration::Never {};
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];

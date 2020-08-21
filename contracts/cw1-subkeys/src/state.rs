@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{ReadonlyStorage, Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
-use cw20::Expiration;
+use cw0::Expiration;
 
 use crate::balance::Balance;
 

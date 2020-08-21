@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
-use cw20::Expiration;
+use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
