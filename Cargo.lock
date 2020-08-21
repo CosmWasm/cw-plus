@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "cw0"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -175,6 +175,7 @@ version = "0.1.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw0",
  "schemars",
  "serde",
 ]
