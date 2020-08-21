@@ -61,6 +61,8 @@ If the token is unknown, returns an error. Return type is
 `ApprovedForAll{owner}` - List all operators that can access all of 
 the owner's tokens. Return type is `ApprovedForAllResponse`
 
+`NumTokens{}` - Total number of tokens issued
+
 ### Receiver
 
 The counter-part to `SendNft` is `ReceiveNft`, which must be implemented by
@@ -83,39 +85,16 @@ for.
 
 ### Queries
 
-`NftInfo{}` - This returns top-level metadata about the contract.
+`ContractInfo{}` - This returns top-level metadata about the contract.
 Namely, `name` and `symbol`.
 
-`TokenUri{token_id}` - Returns a URI that represents this token.
-URIs are defined in RFC 3986. The URI may point either to an image
-file or to a JSON file that conforms to the "CW721 Metadata JSON Schema".
+`NftInfo{token_id}` - This returns metadata about one particular token.
+The return value is based on *ERC721 Metadata JSON Schema*, but directly
+from the contract, not as a Uri. Only the image link is a Uri.
 
-An "image file" has mime type image/* and representing the asset to 
-which this NFT represents. Consider making any images at a width between
-320 and 1080 pixels and aspect ratio between 1.91:1 and 4:5 inclusive.
-
-*CW721 Metadata JSON Schema* is currently a copy of ERC721:
-
-```json
-{
-    "title": "Asset Metadata",
-    "type": "object",
-    "properties": {
-        "name": {
-            "type": "string",
-            "description": "Identifies the asset to which this NFT represents"
-        },
-        "description": {
-            "type": "string",
-            "description": "Describes the asset to which this NFT represents"
-        },
-        "image": {
-            "type": "string",
-            "description": "A URI pointing to a resource with mime type image/* representing the asset to which this NFT represents. Consider making any images at a width between 320 and 1080 pixels and aspect ratio between 1.91:1 and 4:5 inclusive."
-        }
-    }
-}
-```
+`AllNftInfo{token_id}` - This returns the result of both `NftInfo`
+and `OwnerOf` as one query as an optimization for clients, which may
+want both info to display one NFT.
 
 ## Enumerable
 
@@ -126,3 +105,6 @@ expensive to query. This API will most likely evolve.
 
 `Tokens{owner}` - List all token_ids that belong to a given owner.
 Return type is `TokensResponse{tokens: Vec<token_id>}`.
+
+`AllTokens{}` - Requires pagination. Lists all token_ids controlled by 
+the contract.
