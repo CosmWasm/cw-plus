@@ -10,6 +10,7 @@ workflows:
       - package_cw1
       - package_cw2
       - package_cw20
+      - package_cw721
       - lint
   deploy:
     jobs:
@@ -302,6 +303,49 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-v2-cw20:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+
+  package_cw721:
+    docker:
+      - image: rust:1.44.1
+    working_directory: ~/project/packages/cw721
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
+      - restore_cache:
+          keys:
+            - cargocache-v2-cw721:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Add wasm32 target
+          command: rustup target add wasm32-unknown-unknown && rustup target list --installed
+      - run:
+          name: Build library for native target
+          command: cargo build --locked
+      - run:
+          name: Build library for wasm target
+          command: cargo wasm --locked
+      - run:
+          name: Run unit tests
+          command: cargo test --locked
+      - run:
+          name: Build and run schema generator
+          command: cargo schema --locked
+      - run:
+          name: Ensure schemas are up-to-date
+          command: |
+            CHANGES_IN_REPO=$(git status --porcelain)
+            if [[ -n "$CHANGES_IN_REPO" ]]; then
+              echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
+              git status && git --no-pager diff
+              exit 1
+            fi
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-v2-cw721:1.44.1-{{ checksum "~/project/Cargo.lock" }}
 
   lint:
     docker:
