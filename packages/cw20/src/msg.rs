@@ -1,7 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, BlockInfo, HumanAddr, Uint128};
+use cosmwasm_std::{Binary, HumanAddr, Uint128};
+use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -59,32 +60,4 @@ pub enum Cw20HandleMsg {
         recipient: HumanAddr,
         amount: Uint128,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum Expiration {
-    /// AtHeight will expire when `env.block.height` >= height
-    AtHeight { height: u64 },
-    /// AtTime will expire when `env.block.time` >= time
-    AtTime { time: u64 },
-    /// Never will never expire. Used to distinguish None from Some(Expiration::Never)
-    Never {},
-}
-
-/// The default (empty value) is to never expire
-impl Default for Expiration {
-    fn default() -> Self {
-        Expiration::Never {}
-    }
-}
-
-impl Expiration {
-    pub fn is_expired(&self, block: &BlockInfo) -> bool {
-        match self {
-            Expiration::AtHeight { height } => block.height >= *height,
-            Expiration::AtTime { time } => block.time >= *time,
-            Expiration::Never {} => false,
-        }
-    }
 }

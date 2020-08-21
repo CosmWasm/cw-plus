@@ -7,6 +7,7 @@ description = "Definition and types for the CosmWasm-20 interface"
 license = "Apache-2.0"
 
 [dependencies]
+cw0 = { path = "../../packages/cw0", version = "0.1.1" }
 cosmwasm-std = { version = "0.10.0" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
