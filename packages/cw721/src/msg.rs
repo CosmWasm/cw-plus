@@ -47,7 +47,7 @@ pub enum Expiration {
     AtHeight(u64),
     /// AtTime will expire when `env.block.time` >= time
     AtTime(u64),
-    /// Never will never expire. Used to distinguish None from Some(Expiration::Never)
+    /// Never will never expire. Used to express the empty variant
     Never {},
 }
 

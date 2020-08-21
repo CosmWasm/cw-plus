@@ -5,7 +5,8 @@ use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use cw721::{
     AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Cw721HandleMsg,
-    Cw721QueryMsg, NftInfoResponse, NumTokensResponse, OwnerOfResponse, TokensResponse,
+    Cw721QueryMsg, Cw721ReceiveMsg, NftInfoResponse, NumTokensResponse, OwnerOfResponse,
+    TokensResponse,
 };
 
 fn main() {
@@ -16,7 +17,7 @@ fn main() {
 
     export_schema(&schema_for!(Cw721HandleMsg), &out_dir);
     export_schema(&schema_for!(Cw721QueryMsg), &out_dir);
-    // export_schema(&schema_for!(Cw20ReceiveMsg), &out_dir);
+    export_schema(&schema_for!(Cw721ReceiveMsg), &out_dir);
     export_schema(&schema_for!(AllNftInfoResponse), &out_dir);
     export_schema(&schema_for!(ApprovedForAllResponse), &out_dir);
     export_schema(&schema_for!(ContractInfoResponse), &out_dir);

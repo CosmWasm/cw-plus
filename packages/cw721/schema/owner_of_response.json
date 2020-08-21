@@ -83,7 +83,7 @@
           }
         },
         {
-          "description": "Never will never expire. Used to distinguish None from Some(Expiration::Never)",
+          "description": "Never will never expire. Used to express the empty variant",
           "type": "object",
           "required": [
             "never"
