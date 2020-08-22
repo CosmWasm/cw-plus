@@ -1,13 +1,13 @@
 use cosmwasm_std::{
-    log, Api, BankMsg, Coin, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdError, StdResult, Storage,
 };
 use sha2::{Digest, Sha256};
 
 use cw2::{set_contract_version, ContractVersion};
 
-use crate::msg::{CreateMsg, HandleMsg, InitMsg};
-use crate::state::{atomic_swaps, atomic_swaps_read, AtomicSwap};
+use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg};
+use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:atomic-swap";
@@ -177,7 +177,6 @@ fn send_native_tokens(from: &HumanAddr, to: &HumanAddr, amount: Vec<Coin>) -> Ve
     }
 }
 
-/*
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
@@ -192,42 +191,25 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     id: String,
 ) -> StdResult<DetailsResponse> {
-    let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
-
-    let cw20_whitelist = escrow.human_whitelist(&deps.api)?;
-
-    // transform tokens
-    let cw20_balance: StdResult<Vec<_>> = escrow
-        .cw20_balance
-        .into_iter()
-        .map(|token| {
-            Ok(Cw20CoinHuman {
-                address: deps.api.human_address(&token.address)?,
-                amount: token.amount,
-            })
-        })
-        .collect();
+    let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
 
     let details = DetailsResponse {
         id,
-        arbiter: deps.api.human_address(&escrow.arbiter)?,
-        recipient: deps.api.human_address(&escrow.recipient)?,
-        source: deps.api.human_address(&escrow.source)?,
-        end_height: escrow.end_height,
-        end_time: escrow.end_time,
-        native_balance: escrow.native_balance,
-        cw20_balance: cw20_balance?,
-        cw20_whitelist,
+        hash: swap.hash,
+        recipient: deps.api.human_address(&swap.recipient)?,
+        source: deps.api.human_address(&swap.source)?,
+        end_height: swap.end_height,
+        end_time: swap.end_time,
+        balance: swap.balance,
     };
     Ok(details)
 }
 
 fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<ListResponse> {
     Ok(ListResponse {
-        escrows: all_escrow_ids(&deps.storage)?,
+        swaps: all_swap_ids(&deps.storage)?,
     })
 }
-*/
 
 #[cfg(test)]
 mod tests {

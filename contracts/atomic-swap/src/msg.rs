@@ -1,4 +1,4 @@
-use cosmwasm_std::HumanAddr;
+use cosmwasm_std::{Coin, HumanAddr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -36,4 +36,41 @@ pub struct CreateMsg {
     /// and will be returned to the original funder.
     pub end_height: u64,
     pub end_time: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    /// Show all open swaps. Return type is ListResponse.
+    List {},
+    /// Returns the details of the named swap, error if not created.
+    /// Return type: DetailsResponse.
+    Details { id: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ListResponse {
+    /// List all open swap ids
+    pub swaps: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct DetailsResponse {
+    /// Id of this swap
+    pub id: String,
+    /// This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)
+    pub hash: String,
+    /// If released, funds go to the recipient
+    pub recipient: HumanAddr,
+    /// If refunded, funds go to the source
+    pub source: HumanAddr,
+    /// When end height greater than zero and block height exceeds this value, the swap is expired.
+    /// Once a swap is expired, it can be returned to the original source (via "refund").
+    pub end_height: u64,
+    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is greater than zero and
+    /// block time exceeds this value, the swap is expired.
+    /// Once a swap is expired, it can be returned to the original source (via "refund").
+    pub end_time: u64,
+    /// Balance in native tokens
+    pub balance: Vec<Coin>,
 }
