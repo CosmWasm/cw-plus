@@ -94,12 +94,12 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     id: String,
     preimage: String,
 ) -> StdResult<HandleResponse> {
-    let hash = Sha256::digest(&parse_hex_32(&preimage)?);
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
     if swap.is_expired(&env) {
         return Err(StdError::generic_err("Atomic swap expired"));
     }
 
+    let hash = Sha256::digest(&parse_hex_32(&preimage)?);
     let expected = parse_hex_32(&swap.hash)?;
     if hash.as_slice() != expected.as_slice() {
         return Err(StdError::generic_err("Invalid preimage"));
@@ -233,7 +233,7 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, CosmosMsg, StdError};
+    use cosmwasm_std::{coins, CosmosMsg, StdError, Uint128};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -242,6 +242,12 @@ mod tests {
     }
     fn real_hash() -> String {
         hex::encode(&Sha256::digest(&hex::decode(preimage()).unwrap()))
+    }
+
+    fn mock_env_height<U: Into<HumanAddr>>(sender: U, sent: &[Coin], height: u64) -> Env {
+        let mut env = mock_env(sender, sent);
+        env.block.height = height;
+        env
     }
 
     #[test]
@@ -373,83 +379,107 @@ mod tests {
         }
     }
 
-    /*
     #[test]
-    fn test_approve() {
-        let mut store = MockStorage::new();
+    fn test_release() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
 
-        // initialize the store
-        let msg = init_msg(1000, 600, real_hash());
-        let params = mock_params_height("creator", &coin("1000", "earth"), &[], 876, 0);
-        let init_res = init(&mut store, params, msg).unwrap();
-        assert_eq!(0, init_res.messages.len());
+        let env = mock_env("anyone", &[]);
+        init(&mut deps, env, InitMsg {}).unwrap();
 
-        // cannot release with bad hash
-        let bad_msg = to_vec(&HandleMsg::Release {
-            preimage: hex::encode(b"this is 3x bytes exact, for you!"),
-        })
-            .unwrap();
-        let params = mock_params_height(
-            "anyone",
-            &coin("0", "earth"),
-            &coin("1000", "earth"),
-            900,
-            30,
-        );
-        let handle_res = handle(&mut store, params, bad_msg);
-        match handle_res {
-            Ok(_) => panic!("expected error"),
-            Err(Error::ContractErr { msg, .. }) => assert_eq!(msg, "invalid preimage".to_string()),
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        let sender = HumanAddr::from("sender0001");
+        let balance = coins(1000, "tokens");
 
-        // cannot release it when expired
-        let msg = to_vec(&HandleMsg::Release {
+        let env = mock_env(&sender, &balance);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: "rcpt0001".into(),
+            end_time: 0,
+            end_height: 123456,
+        };
+        handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
+
+        // Cannot release, wrong id
+        let release = HandleMsg::Release {
+            id: "swap0002".to_string(),
             preimage: preimage(),
-        })
-            .unwrap();
-        let params = mock_params_height(
-            "anyone",
-            &coin("0", "earth"),
-            &coin("1000", "earth"),
-            1100,
-            0,
-        );
-        let handle_res = handle(&mut store, params, msg.clone());
-        match handle_res {
+        };
+        let res = handle(&mut deps, env.clone(), release);
+        match res {
             Ok(_) => panic!("expected error"),
-            Err(Error::ContractErr { msg, .. }) => assert_eq!(msg, "swap expired".to_string()),
+            Err(StdError::NotFound { .. }) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
-        // release with proper preimage, before expiration
-        let params = mock_params_height(
-            "random dude",
-            &coin("15", "earth"),
-            &coin("1000", "earth"),
-            999,
-            0,
-        );
-        let handle_res = handle(&mut store, params, msg.clone()).unwrap();
-        assert_eq!(1, handle_res.messages.len());
-        let msg = handle_res.messages.get(0).expect("no message");
+        // Cannot release, invalid hash
+        let release = HandleMsg::Release {
+            id: "swap0001".to_string(),
+            preimage: "bu115h17".to_string(),
+        };
+        let res = handle(&mut deps, env.clone(), release);
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => assert_eq!(
+                msg,
+                "Error parsing hash: Invalid character \'u\' at position 1".to_string()
+            ),
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // Cannot release, wrong hash
+        let release = HandleMsg::Release {
+            id: "swap0001".to_string(),
+            preimage: hex::encode(b"This is 32 bytes, but incorrect."),
+        };
+        let res = handle(&mut deps, env.clone(), release);
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, "Invalid preimage".to_string())
+            }
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // Cannot release, expired
+        let env = mock_env_height(&sender, &balance, 123457);
+        let release = HandleMsg::Release {
+            id: "swap0001".to_string(),
+            preimage: preimage(),
+        };
+        let res = handle(&mut deps, env.clone(), release);
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, "Atomic swap expired".to_string())
+            }
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        let env = mock_env("somebody", &balance);
+        let release = HandleMsg::Release {
+            id: "swap0001".to_string(),
+            preimage: preimage(),
+        };
+        let res = handle(&mut deps, env.clone(), release).unwrap();
+        assert_eq!(log("action", "release"), res.log[0]);
+        assert_eq!(1, res.messages.len());
+        let msg = res.messages.get(0).expect("No message");
         match &msg {
-            CosmosMsg::Send {
+            CosmosMsg::Bank(BankMsg::Send {
                 from_address,
                 to_address,
                 amount,
-            } => {
-                assert_eq!("cosmos2contract", from_address);
-                assert_eq!("benefits", to_address);
-                assert_eq!(1, amount.len());
+            }) => {
+                assert_eq!(from_address.to_string(), MOCK_CONTRACT_ADDR);
+                assert_eq!(to_address.to_string(), "rcpt0001");
+                assert_eq!(amount.len(), 1);
                 let coin = amount.get(0).expect("No coin");
-                assert_eq!(coin.denom, "earth");
-                assert_eq!(coin.amount, "1000");
+                assert_eq!(coin.amount, Uint128(1000));
+                assert_eq!(coin.denom, "tokens");
             }
             _ => panic!("Unexpected message type"),
         }
     }
-    */
 
     /*
     #[test]
