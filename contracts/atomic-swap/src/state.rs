@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Env, ReadonlyStorage, Storage};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+use cosmwasm_std::{CanonicalAddr, Coin, Env, ReadonlyStorage, Storage};
+use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AtomicSwap {
@@ -12,6 +12,8 @@ pub struct AtomicSwap {
     pub source: CanonicalAddr,
     pub end_height: u64,
     pub end_time: u64,
+    /// Balance in native tokens
+    pub balance: Vec<Coin>,
 }
 
 impl AtomicSwap {
@@ -21,13 +23,15 @@ impl AtomicSwap {
     }
 }
 
-pub const ATOMIC_SWAP_KEY: &[u8] = b"atomic_swap";
+pub const PREFIX_SWAP: &[u8] = b"atomic_swap";
 
-// config is all config information
-pub fn atomic_swap<S: Storage>(storage: &mut S) -> Singleton<S, AtomicSwap> {
-    singleton(storage, ATOMIC_SWAP_KEY)
+/// Returns a bucket with all swaps (query by id)
+pub fn atomic_swaps<S: Storage>(storage: &mut S) -> Bucket<S, AtomicSwap> {
+    bucket(PREFIX_SWAP, storage)
 }
 
-pub fn atomic_swap_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, AtomicSwap> {
-    singleton_read(storage, ATOMIC_SWAP_KEY)
+/// returns a bucket with all swaps (query by id)
+/// (read-only version for queries)
+pub fn atomic_swaps_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, AtomicSwap> {
+    bucket_read(PREFIX_SWAP, storage)
 }

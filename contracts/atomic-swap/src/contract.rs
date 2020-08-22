@@ -1,45 +1,30 @@
 use cosmwasm_std::{
-    log, Api, BankMsg, CosmosMsg, Env, Extern, HandleResponse, InitResponse, Querier, StdError,
-    StdResult, Storage,
+    log, Api, BankMsg, Coin, CosmosMsg, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    Querier, StdError, StdResult, Storage,
 };
 use sha2::{Digest, Sha256};
 
 use cw2::{set_contract_version, ContractVersion};
 
-use crate::msg::{HandleMsg, InitMsg};
-use crate::state::{atomic_swap, atomic_swap_read, AtomicSwap};
+use crate::msg::{CreateMsg, HandleMsg, InitMsg};
+use crate::state::{atomic_swaps, atomic_swaps_read, AtomicSwap};
 
-// version info for migration info
+// Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:atomic-swap";
 const CONTRACT_VERSION: &str = "v0.1.0";
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
-    msg: InitMsg,
+    _env: Env,
+    _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    // Ensure this is 32 bytes hex-encoded
-    let _ = parse_hex_32(&msg.hash)?;
-
-    let state = AtomicSwap {
-        hash: msg.hash,
-        recipient: deps.api.canonical_address(&msg.recipient)?,
-        source: deps.api.canonical_address(&env.message.sender)?,
-        end_height: msg.end_height,
-        end_time: msg.end_time,
+    let version = ContractVersion {
+        contract: CONTRACT_NAME.to_string(),
+        version: CONTRACT_VERSION.to_string(),
     };
-
-    if state.is_expired(&env) {
-        Err(StdError::generic_err("Creating expired atomic swap"))
-    } else {
-        let version = ContractVersion {
-            contract: CONTRACT_NAME.to_string(),
-            version: CONTRACT_VERSION.to_string(),
-        };
-        set_contract_version(&mut deps.storage, &version)?;
-        atomic_swap(&mut deps.storage).save(&state)?;
-        Ok(InitResponse::default())
-    }
+    set_contract_version(&mut deps.storage, &version)?;
+    // No setup
+    Ok(InitResponse::default())
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -48,41 +33,90 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Release { preimage } => try_release(deps, env, preimage),
-        HandleMsg::Refund {} => try_refund(deps, env),
+        HandleMsg::Create(msg) => try_create(deps, env, msg),
+        HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
+        HandleMsg::Refund { id } => try_refund(deps, env, id),
     }
+}
+
+pub fn try_create<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    msg: CreateMsg,
+) -> StdResult<HandleResponse> {
+    if msg.id.len() < 3 || msg.id.len() > 20 {
+        return Err(StdError::generic_err("Invalid atomic swap id length"));
+    }
+
+    if env.message.sent_funds.is_empty() {
+        return Err(StdError::generic_err(
+            "Send some coins to create an atomic swap",
+        ));
+    }
+
+    // Ensure this is 32 bytes hex-encoded
+    let _ = parse_hex_32(&msg.hash)?;
+
+    let recipient_raw = deps.api.canonical_address(&msg.recipient)?;
+
+    let swap = AtomicSwap {
+        hash: msg.hash.clone(),
+        recipient: recipient_raw,
+        source: deps.api.canonical_address(&env.message.sender)?,
+        end_height: msg.end_height,
+        end_time: msg.end_time,
+        balance: env.message.sent_funds.clone(),
+    };
+
+    if swap.is_expired(&env) {
+        return Err(StdError::generic_err("Expired atomic swap"));
+    }
+
+    // Try to store it, fail if the id already exists (unmodifiable swaps)
+    atomic_swaps(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
+        None => Ok(swap),
+        Some(_) => Err(StdError::generic_err("Atomic swap already exists")),
+    })?;
+
+    let mut res = HandleResponse::default();
+    res.log = vec![
+        log("action", "create"),
+        log("id", msg.id),
+        log("hash", msg.hash),
+        log("recipient", msg.recipient),
+    ];
+    Ok(res)
 }
 
 pub fn try_release<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    id: String,
     preimage: String,
 ) -> StdResult<HandleResponse> {
-    let state = atomic_swap_read(&deps.storage).load()?;
-    if state.is_expired(&env) {
+    let hash = Sha256::digest(&parse_hex_32(&preimage)?);
+    let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
+    if swap.is_expired(&env) {
         return Err(StdError::generic_err("Atomic swap expired"));
     }
 
-    let expected = parse_hex_32(&state.hash)?;
-    let hash = Sha256::digest(&parse_hex_32(&preimage)?);
+    let expected = parse_hex_32(&swap.hash)?;
     if hash.as_slice() != expected.as_slice() {
         return Err(StdError::generic_err("Invalid preimage"));
     }
 
+    let rcpt = deps.api.human_address(&swap.recipient)?;
+
     // We delete the swap
-    atomic_swap(&mut deps.storage).remove();
+    atomic_swaps(&mut deps.storage).remove(id.as_bytes());
 
-    let rcpt = deps.api.human_address(&state.recipient)?;
-
-    let msg = vec![CosmosMsg::Bank(BankMsg::Send {
-        from_address: env.contract.address,
-        to_address: rcpt.clone(),
-        amount: env.message.sent_funds,
-    })];
+    // Send all tokens out
+    let msgs = send_native_tokens(&env.contract.address, &rcpt, swap.balance);
     Ok(HandleResponse {
-        messages: msg,
+        messages: msgs,
         log: vec![
             log("action", "release"),
+            log("id", id),
             log("preimage", preimage),
             log("to", rcpt),
         ],
@@ -93,26 +127,23 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
 pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    id: String,
 ) -> StdResult<HandleResponse> {
-    let state = atomic_swap_read(&deps.storage).load()?;
+    let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
     // Anyone can try to refund, as long as the contract is expired
-    if !state.is_expired(&env) {
+    if !swap.is_expired(&env) {
         return Err(StdError::generic_err("Atomic swap not yet expired"));
     }
 
+    let rcpt = deps.api.human_address(&swap.source)?;
+
     // We delete the swap
-    atomic_swap(&mut deps.storage).remove();
+    atomic_swaps(&mut deps.storage).remove(id.as_bytes());
 
-    let src = deps.api.human_address(&state.source)?;
-
-    let msg = vec![CosmosMsg::Bank(BankMsg::Send {
-        from_address: env.contract.address,
-        to_address: src.clone(),
-        amount: env.message.sent_funds,
-    })];
+    let msgs = send_native_tokens(&env.contract.address, &rcpt, env.message.sent_funds);
     Ok(HandleResponse {
-        messages: msg,
-        log: vec![log("action", "refund"), log("to", src)],
+        messages: msgs,
+        log: vec![log("action", "refund"), log("id", id), log("to", rcpt)],
         data: None,
     })
 }
@@ -133,7 +164,6 @@ fn parse_hex_32(data: &str) -> StdResult<Vec<u8>> {
     }
 }
 
-/*
 fn send_native_tokens(from: &HumanAddr, to: &HumanAddr, amount: Vec<Coin>) -> Vec<CosmosMsg> {
     if amount.is_empty() {
         vec![]
@@ -146,65 +176,6 @@ fn send_native_tokens(from: &HumanAddr, to: &HumanAddr, amount: Vec<Coin>) -> Ve
         .into()]
     }
 }
-*/
-
-/*
-fn send_cw20_tokens<A: Api>(
-    api: &A,
-    to: &HumanAddr,
-    coins: Vec<Cw20Coin>,
-) -> StdResult<Vec<CosmosMsg>> {
-    coins
-        .into_iter()
-        .map(|c| {
-            let msg = Cw20HandleMsg::Transfer {
-                recipient: to.into(),
-                amount: c.amount,
-            };
-            let exec = WasmMsg::Execute {
-                contract_addr: api.human_address(&c.address)?,
-                msg: to_binary(&msg)?,
-                send: vec![],
-            };
-            Ok(exec.into())
-        })
-        .collect()
-}
-*/
-
-/*
-fn add_tokens(store: &mut Vec<Coin>, add: Vec<Coin>) {
-    for token in add {
-        let index = store.iter().enumerate().find_map(|(i, exist)| {
-            if exist.denom == token.denom {
-                Some(i)
-            } else {
-                None
-            }
-        });
-        match index {
-            Some(idx) => store[idx].amount += token.amount,
-            None => store.push(token),
-        }
-    }
-}
-*/
-
-/*
-fn add_cw20_token(store: &mut Vec<Cw20Coin>, token: Cw20Coin) {
-    let index = store.iter().enumerate().find_map(|(i, exist)| {
-        if exist.address == token.address {
-            Some(i)
-        } else {
-            None
-        }
-    });
-    match index {
-        Some(idx) => store[idx].amount += token.amount,
-        None => store.push(token),
-    }
-}
-*/
 
 /*
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -260,62 +231,323 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 
 #[cfg(test)]
 mod tests {
-    /*
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
+    use cosmwasm_std::{coins, CosmosMsg, StdError};
 
     const CANONICAL_LENGTH: usize = 20;
 
+    fn preimage() -> String {
+        hex::encode(b"This is a string, 32 bytes long.")
+    }
+    fn real_hash() -> String {
+        hex::encode(&Sha256::digest(&hex::decode(preimage()).unwrap()))
+    }
+
     #[test]
-    fn happy_path_native() {
+    fn test_init() {
         let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
 
-        // init an empty contract
+        // Init an empty contract
         let init_msg = InitMsg {};
-        let env = mock_env(&HumanAddr::from("anyone"), &[]);
+        let env = mock_env("anyone", &[]);
+        let res = init(&mut deps, env, init_msg).unwrap();
+        assert_eq!(0, res.messages.len());
+    }
+
+    #[test]
+    fn test_create() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        let env = mock_env("anyone", &[]);
+        init(&mut deps, env, InitMsg {}).unwrap();
+
+        let sender = HumanAddr::from("sender0001");
+        let balance = coins(100, "tokens");
+
+        // Cannot create, invalid ids
+        let env = mock_env(&sender, &balance);
+        for id in vec!["sh", "atomic_swap_id_too_long"] {
+            let create = CreateMsg {
+                id: id.to_string(),
+                hash: real_hash(),
+                recipient: HumanAddr::from("rcpt0001"),
+                end_time: 0,
+                end_height: 123456,
+            };
+            let res = handle(&mut deps, env.clone(), HandleMsg::Create(create.clone()));
+            match res {
+                Ok(_) => panic!("expected error"),
+                Err(StdError::GenericErr { msg, .. }) => {
+                    assert_eq!(msg, "Invalid atomic swap id length".to_string())
+                }
+                Err(e) => panic!("unexpected error: {:?}", e),
+            }
+        }
+
+        // Cannot create, no funds
+        let env = mock_env(&sender, &vec![]);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: "rcpt0001".into(),
+            end_time: 0,
+            end_height: 123456,
+        };
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, "Send some coins to create an atomic swap".to_string())
+            }
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // Cannot create, expired
+        let env = mock_env(&sender, &balance);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: "rcpt0001".into(),
+            end_height: 0,
+            end_time: 1,
+        };
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, "Expired atomic swap".to_string())
+            }
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // Cannot create, invalid hash
+        let env = mock_env(&sender, &balance);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: "bu115h17".to_string(),
+            recipient: "rcpt0001".into(),
+            end_time: 0,
+            end_height: 123456,
+        };
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => assert_eq!(
+                msg,
+                "Error parsing hash: Invalid character \'u\' at position 1".to_string()
+            ),
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // Can create, all valid
+        let env = mock_env(&sender, &balance);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: "rcpt0001".into(),
+            end_time: 0,
+            end_height: 123456,
+        };
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "create"), res.log[0]);
+
+        // Cannot re-create (modify), already existing
+        let new_balance = coins(1, "tokens");
+        let env = mock_env(&sender, &new_balance);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: "rcpt0001".into(),
+            end_time: 0,
+            end_height: 123456,
+        };
+        let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, "Atomic swap already exists".to_string())
+            }
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+    }
+
+    /*
+    #[test]
+    fn test_approve() {
+        let mut store = MockStorage::new();
+
+        // initialize the store
+        let msg = init_msg(1000, 600, real_hash());
+        let params = mock_params_height("creator", &coin("1000", "earth"), &[], 876, 0);
+        let init_res = init(&mut store, params, msg).unwrap();
+        assert_eq!(0, init_res.messages.len());
+
+        // cannot release with bad hash
+        let bad_msg = to_vec(&HandleMsg::Release {
+            preimage: hex::encode(b"this is 3x bytes exact, for you!"),
+        })
+            .unwrap();
+        let params = mock_params_height(
+            "anyone",
+            &coin("0", "earth"),
+            &coin("1000", "earth"),
+            900,
+            30,
+        );
+        let handle_res = handle(&mut store, params, bad_msg);
+        match handle_res {
+            Ok(_) => panic!("expected error"),
+            Err(Error::ContractErr { msg, .. }) => assert_eq!(msg, "invalid preimage".to_string()),
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // cannot release it when expired
+        let msg = to_vec(&HandleMsg::Release {
+            preimage: preimage(),
+        })
+            .unwrap();
+        let params = mock_params_height(
+            "anyone",
+            &coin("0", "earth"),
+            &coin("1000", "earth"),
+            1100,
+            0,
+        );
+        let handle_res = handle(&mut store, params, msg.clone());
+        match handle_res {
+            Ok(_) => panic!("expected error"),
+            Err(Error::ContractErr { msg, .. }) => assert_eq!(msg, "swap expired".to_string()),
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // release with proper preimage, before expiration
+        let params = mock_params_height(
+            "random dude",
+            &coin("15", "earth"),
+            &coin("1000", "earth"),
+            999,
+            0,
+        );
+        let handle_res = handle(&mut store, params, msg.clone()).unwrap();
+        assert_eq!(1, handle_res.messages.len());
+        let msg = handle_res.messages.get(0).expect("no message");
+        match &msg {
+            CosmosMsg::Send {
+                from_address,
+                to_address,
+                amount,
+            } => {
+                assert_eq!("cosmos2contract", from_address);
+                assert_eq!("benefits", to_address);
+                assert_eq!(1, amount.len());
+                let coin = amount.get(0).expect("No coin");
+                assert_eq!(coin.denom, "earth");
+                assert_eq!(coin.amount, "1000");
+            }
+            _ => panic!("Unexpected message type"),
+        }
+    }
+    */
+
+    /*
+    #[test]
+    fn test_refund() {
+        let mut store = MockStorage::new();
+
+        // initialize the store
+        let msg = init_msg(1000, 0, real_hash());
+        let params = mock_params_height("creator", &coin("1000", "earth"), &[], 876, 0);
+        let init_res = init(&mut store, params, msg).unwrap();
+        assert_eq!(0, init_res.messages.len());
+
+        // cannot release when unexpired
+        let msg = to_vec(&HandleMsg::Refund {}).unwrap();
+        let params = mock_params_height(
+            "anybody",
+            &coin("0", "earth"),
+            &coin("1000", "earth"),
+            800,
+            0,
+        );
+        let handle_res = handle(&mut store, params, msg.clone());
+        match handle_res {
+            Ok(_) => panic!("expected error"),
+            Err(Error::ContractErr { msg, .. }) => {
+                assert_eq!(msg, "swap not yet expired".to_string())
+            }
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // anyone can release after expiration
+        let params = mock_params_height(
+            "anybody",
+            &coin("0", "earth"),
+            &coin("1000", "earth"),
+            1001,
+            0,
+        );
+        let handle_res = handle(&mut store, params, msg.clone()).unwrap();
+        assert_eq!(1, handle_res.messages.len());
+        let msg = handle_res.messages.get(0).expect("no message");
+        match &msg {
+            CosmosMsg::Send {
+                from_address,
+                to_address,
+                amount,
+            } => {
+                assert_eq!("cosmos2contract", from_address);
+                assert_eq!("creator", to_address);
+                assert_eq!(1, amount.len());
+                let coin = amount.get(0).expect("No coin");
+                assert_eq!(coin.denom, "earth");
+                assert_eq!(coin.amount, "1000");
+            }
+            _ => panic!("Unexpected message type"),
+        }
+    }
+    */
+
+    #[test]
+    fn happy_path() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        // Init an empty contract
+        let init_msg = InitMsg {};
+        let env = mock_env("anyone", &[]);
         let res = init(&mut deps, env, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // create an escrow
+        // Create a swap
         let create = CreateMsg {
-            id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
-            end_time: None,
-            end_height: Some(123456),
-            cw20_whitelist: None,
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: HumanAddr::from("rcpt0001"),
+            end_time: 0,
+            end_height: 123456,
         };
-        let sender = HumanAddr::from("source");
+        let sender = HumanAddr::from("sender0001");
         let balance = coins(100, "tokens");
         let env = mock_env(&sender, &balance);
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(log("action", "create"), res.log[0]);
 
-        // ensure the details is what we expect
-        let details = query_details(&deps, "foobar".to_string()).unwrap();
-        assert_eq!(
-            details,
-            DetailsResponse {
-                id: "foobar".to_string(),
-                arbiter: HumanAddr::from("arbitrate"),
-                recipient: HumanAddr::from("recd"),
-                source: HumanAddr::from("source"),
-                end_height: Some(123456),
-                end_time: None,
-                native_balance: balance.clone(),
-                cw20_balance: vec![],
-                cw20_whitelist: vec![],
-            }
-        );
-
-        // approve it
+        // Release it
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+        let env = mock_env(&create.recipient, &[]);
+        let res = handle(
+            &mut deps,
+            env.clone(),
+            HandleMsg::Release {
+                id,
+                preimage: preimage(),
+            },
+        )
+        .unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(log("action", "approve"), res.log[0]);
+        assert_eq!(log("action", "release"), res.log[0]);
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
@@ -325,283 +557,19 @@ mod tests {
             })
         );
 
-        // second attempt fails (not found)
+        // Second attempt fails (not found)
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id });
+        let res = handle(
+            &mut deps,
+            env,
+            HandleMsg::Release {
+                id,
+                preimage: preimage(),
+            },
+        );
         match res.unwrap_err() {
             StdError::NotFound { .. } => {}
             e => panic!("Expected NotFound, got {}", e),
         }
     }
-
-    #[test]
-    fn happy_path_cw20() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-
-        // init an empty contract
-        let init_msg = InitMsg {};
-        let env = mock_env(&HumanAddr::from("anyone"), &[]);
-        let res = init(&mut deps, env, init_msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // create an escrow
-        let create = CreateMsg {
-            id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
-            end_time: None,
-            end_height: None,
-            cw20_whitelist: Some(vec![HumanAddr::from("other-token")]),
-        };
-        let receive = Cw20ReceiveMsg {
-            sender: HumanAddr::from("source"),
-            amount: Uint128(100),
-            msg: Some(to_binary(&HandleMsg::Create(create.clone())).unwrap()),
-        };
-        let token_contract = HumanAddr::from("my-cw20-token");
-        let env = mock_env(&token_contract, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "create"), res.log[0]);
-
-        // ensure the whitelist is what we expect
-        let details = query_details(&deps, "foobar".to_string()).unwrap();
-        assert_eq!(
-            details,
-            DetailsResponse {
-                id: "foobar".to_string(),
-                arbiter: HumanAddr::from("arbitrate"),
-                recipient: HumanAddr::from("recd"),
-                source: HumanAddr::from("source"),
-                end_height: None,
-                end_time: None,
-                native_balance: vec![],
-                cw20_balance: vec![Cw20CoinHuman {
-                    address: HumanAddr::from("my-cw20-token"),
-                    amount: Uint128(100)
-                }],
-                cw20_whitelist: vec![
-                    HumanAddr::from("other-token"),
-                    HumanAddr::from("my-cw20-token")
-                ],
-            }
-        );
-
-        // approve it
-        let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
-        assert_eq!(1, res.messages.len());
-        assert_eq!(log("action", "approve"), res.log[0]);
-        let send_msg = Cw20HandleMsg::Transfer {
-            recipient: create.recipient,
-            amount: receive.amount,
-        };
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: token_contract,
-                msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
-            })
-        );
-
-        // second attempt fails (not found)
-        let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id });
-        match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
-    }
-
-    #[test]
-    fn add_tokens_proper() {
-        let mut tokens = vec![];
-        add_tokens(&mut tokens, vec![coin(123, "atom"), coin(789, "eth")]);
-        add_tokens(&mut tokens, vec![coin(456, "atom"), coin(12, "btc")]);
-        assert_eq!(
-            tokens,
-            vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
-        );
-    }
-
-    #[test]
-    fn add_cw_tokens_proper() {
-        let mut tokens = vec![];
-        let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
-        let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
-        add_cw20_token(
-            &mut tokens,
-            Cw20Coin {
-                address: foo_token.clone(),
-                amount: Uint128(12345),
-            },
-        );
-        add_cw20_token(
-            &mut tokens,
-            Cw20Coin {
-                address: bar_token.clone(),
-                amount: Uint128(777),
-            },
-        );
-        add_cw20_token(
-            &mut tokens,
-            Cw20Coin {
-                address: foo_token.clone(),
-                amount: Uint128(23400),
-            },
-        );
-        assert_eq!(
-            tokens,
-            vec![
-                Cw20Coin {
-                    address: foo_token,
-                    amount: Uint128(35745)
-                },
-                Cw20Coin {
-                    address: bar_token,
-                    amount: Uint128(777)
-                }
-            ]
-        );
-    }
-
-    #[test]
-    fn top_up_mixed_tokens() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-
-        // init an empty contract
-        let init_msg = InitMsg {};
-        let env = mock_env(&HumanAddr::from("anyone"), &[]);
-        let res = init(&mut deps, env, init_msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // only accept these tokens
-        let whitelist = vec![HumanAddr::from("bar_token"), HumanAddr::from("foo_token")];
-
-        // create an escrow with 2 native tokens
-        let create = CreateMsg {
-            id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
-            end_time: None,
-            end_height: None,
-            cw20_whitelist: Some(whitelist),
-        };
-        let sender = HumanAddr::from("source");
-        let balance = vec![coin(100, "fee"), coin(200, "stake")];
-        let env = mock_env(&sender, &balance);
-        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "create"), res.log[0]);
-
-        // top it up with 2 more native tokens
-        let extra_native = vec![coin(250, "random"), coin(300, "stake")];
-        let env = mock_env(&sender, &extra_native);
-        let top_up = HandleMsg::TopUp {
-            id: create.id.clone(),
-        };
-        let res = handle(&mut deps, env, top_up).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "top_up"), res.log[0]);
-
-        // top up with one foreign token
-        let bar_token = HumanAddr::from("bar_token");
-        let base = TopUp {
-            id: create.id.clone(),
-        };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
-            amount: Uint128(7890),
-            msg: Some(to_binary(&base).unwrap()),
-        });
-        let env = mock_env(&bar_token, &[]);
-        let res = handle(&mut deps, env, top_up).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "top_up"), res.log[0]);
-
-        // top with a foreign token not on the whitelist
-        // top up with one foreign token
-        let baz_token = HumanAddr::from("baz_token");
-        let base = TopUp {
-            id: create.id.clone(),
-        };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
-            amount: Uint128(7890),
-            msg: Some(to_binary(&base).unwrap()),
-        });
-        let env = mock_env(&baz_token, &[]);
-        let res = handle(&mut deps, env, top_up);
-        match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg, "Only accepts tokens on the cw20_whitelist")
-            }
-            e => panic!("Unexpected error: {}", e),
-        }
-
-        // top up with second foreign token
-        let foo_token = HumanAddr::from("foo_token");
-        let base = TopUp {
-            id: create.id.clone(),
-        };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
-            amount: Uint128(888),
-            msg: Some(to_binary(&base).unwrap()),
-        });
-        let env = mock_env(&foo_token, &[]);
-        let res = handle(&mut deps, env, top_up).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "top_up"), res.log[0]);
-
-        // approve it
-        let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
-        assert_eq!(log("action", "approve"), res.log[0]);
-        assert_eq!(3, res.messages.len());
-
-        // first message releases all native coins
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
-                to_address: create.recipient.clone(),
-                amount: vec![coin(100, "fee"), coin(500, "stake"), coin(250, "random")],
-            })
-        );
-
-        // second one release bar cw20 token
-        let send_msg = Cw20HandleMsg::Transfer {
-            recipient: create.recipient.clone(),
-            amount: Uint128(7890),
-        };
-        assert_eq!(
-            res.messages[1],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bar_token,
-                msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
-            })
-        );
-
-        // third one release foo cw20 token
-        let send_msg = Cw20HandleMsg::Transfer {
-            recipient: create.recipient.clone(),
-            amount: Uint128(888),
-        };
-        assert_eq!(
-            res.messages[2],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: foo_token,
-                msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
-            })
-        );
-    }
-    */
 }
