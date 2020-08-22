@@ -233,7 +233,7 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, CosmosMsg, StdError, Uint128};
+    use cosmwasm_std::{coins, CosmosMsg, StdError};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -455,89 +455,100 @@ mod tests {
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
+        // Can release, valid id, valid hash, and not expired
         let env = mock_env("somebody", &balance);
         let release = HandleMsg::Release {
             id: "swap0001".to_string(),
             preimage: preimage(),
         };
-        let res = handle(&mut deps, env.clone(), release).unwrap();
+        let res = handle(&mut deps, env.clone(), release.clone()).unwrap();
         assert_eq!(log("action", "release"), res.log[0]);
         assert_eq!(1, res.messages.len());
-        let msg = res.messages.get(0).expect("No message");
-        match &msg {
+        assert_eq!(
+            res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
-                from_address,
-                to_address,
-                amount,
-            }) => {
-                assert_eq!(from_address.to_string(), MOCK_CONTRACT_ADDR);
-                assert_eq!(to_address.to_string(), "rcpt0001");
-                assert_eq!(amount.len(), 1);
-                let coin = amount.get(0).expect("No coin");
-                assert_eq!(coin.amount, Uint128(1000));
-                assert_eq!(coin.denom, "tokens");
-            }
-            _ => panic!("Unexpected message type"),
+                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                to_address: create.recipient,
+                amount: balance,
+            })
+        );
+
+        // Cannot release again
+        let res = handle(&mut deps, env.clone(), release);
+        match res.unwrap_err() {
+            StdError::NotFound { .. } => {}
+            e => panic!("Expected NotFound, got {}", e),
         }
     }
 
-    /*
     #[test]
     fn test_refund() {
-        let mut store = MockStorage::new();
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
 
-        // initialize the store
-        let msg = init_msg(1000, 0, real_hash());
-        let params = mock_params_height("creator", &coin("1000", "earth"), &[], 876, 0);
-        let init_res = init(&mut store, params, msg).unwrap();
-        assert_eq!(0, init_res.messages.len());
+        let env = mock_env("anyone", &[]);
+        init(&mut deps, env, InitMsg {}).unwrap();
 
-        // cannot release when unexpired
-        let msg = to_vec(&HandleMsg::Refund {}).unwrap();
-        let params = mock_params_height(
-            "anybody",
-            &coin("0", "earth"),
-            &coin("1000", "earth"),
-            800,
-            0,
-        );
-        let handle_res = handle(&mut store, params, msg.clone());
-        match handle_res {
+        let sender = HumanAddr::from("sender0001");
+        let balance = coins(1000, "tokens");
+
+        let env = mock_env(&sender, &balance);
+        let create = CreateMsg {
+            id: "swap0001".to_string(),
+            hash: real_hash(),
+            recipient: "rcpt0001".into(),
+            end_time: 0,
+            end_height: 123456,
+        };
+        handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
+
+        // Cannot refund, wrong id
+        let refund = HandleMsg::Refund {
+            id: "swap0002".to_string(),
+        };
+        let res = handle(&mut deps, env.clone(), refund);
+        match res {
             Ok(_) => panic!("expected error"),
-            Err(Error::ContractErr { msg, .. }) => {
-                assert_eq!(msg, "swap not yet expired".to_string())
+            Err(StdError::NotFound { .. }) => {}
+            Err(e) => panic!("unexpected error: {:?}", e),
+        }
+
+        // Cannot refund, not expired yet
+        let refund = HandleMsg::Refund {
+            id: "swap0001".to_string(),
+        };
+        let res = handle(&mut deps, env.clone(), refund);
+        match res {
+            Ok(_) => panic!("expected error"),
+            Err(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, "Atomic swap not yet expired".to_string())
             }
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
-        // anyone can release after expiration
-        let params = mock_params_height(
-            "anybody",
-            &coin("0", "earth"),
-            &coin("1000", "earth"),
-            1001,
-            0,
+        // Can refund, already expired
+        let env = mock_env_height("anybody", &balance, 123457);
+        let refund = HandleMsg::Refund {
+            id: "swap0001".to_string(),
+        };
+        let res = handle(&mut deps, env.clone(), refund.clone()).unwrap();
+        assert_eq!(log("action", "refund"), res.log[0]);
+        assert_eq!(1, res.messages.len());
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                to_address: sender,
+                amount: balance,
+            })
         );
-        let handle_res = handle(&mut store, params, msg.clone()).unwrap();
-        assert_eq!(1, handle_res.messages.len());
-        let msg = handle_res.messages.get(0).expect("no message");
-        match &msg {
-            CosmosMsg::Send {
-                from_address,
-                to_address,
-                amount,
-            } => {
-                assert_eq!("cosmos2contract", from_address);
-                assert_eq!("creator", to_address);
-                assert_eq!(1, amount.len());
-                let coin = amount.get(0).expect("No coin");
-                assert_eq!(coin.denom, "earth");
-                assert_eq!(coin.amount, "1000");
-            }
-            _ => panic!("Unexpected message type"),
+
+        // Cannot refund again
+        let res = handle(&mut deps, env.clone(), refund);
+        match res.unwrap_err() {
+            StdError::NotFound { .. } => {}
+            e => panic!("Expected NotFound, got {}", e),
         }
     }
-    */
 
     #[test]
     fn happy_path() {
