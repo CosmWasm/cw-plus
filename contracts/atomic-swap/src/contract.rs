@@ -224,6 +224,7 @@ mod tests {
     fn preimage() -> String {
         hex::encode(b"This is a string, 32 bytes long.")
     }
+
     fn real_hash() -> String {
         hex::encode(&Sha256::digest(&hex::decode(preimage()).unwrap()))
     }
@@ -528,70 +529,6 @@ mod tests {
 
         // Cannot refund again
         let res = handle(&mut deps, env.clone(), refund);
-        match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
-    }
-
-    #[test]
-    fn happy_path() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
-
-        // Init an empty contract
-        let init_msg = InitMsg {};
-        let env = mock_env("anyone", &[]);
-        let res = init(&mut deps, env, init_msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // Create a swap
-        let create = CreateMsg {
-            id: "swap0001".to_string(),
-            hash: real_hash(),
-            recipient: HumanAddr::from("rcpt0001"),
-            end_time: 0,
-            end_height: 123456,
-        };
-        let sender = HumanAddr::from("sender0001");
-        let balance = coins(100, "tokens");
-        let env = mock_env(&sender, &balance);
-        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "create"), res.log[0]);
-
-        // Release it
-        let id = create.id.clone();
-        let env = mock_env(&create.recipient, &[]);
-        let res = handle(
-            &mut deps,
-            env.clone(),
-            HandleMsg::Release {
-                id,
-                preimage: preimage(),
-            },
-        )
-        .unwrap();
-        assert_eq!(1, res.messages.len());
-        assert_eq!(log("action", "release"), res.log[0]);
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
-                to_address: create.recipient,
-                amount: balance,
-            })
-        );
-
-        // Second attempt fails (not found)
-        let id = create.id.clone();
-        let res = handle(
-            &mut deps,
-            env,
-            HandleMsg::Release {
-                id,
-                preimage: preimage(),
-            },
-        );
         match res.unwrap_err() {
             StdError::NotFound { .. } => {}
             e => panic!("Expected NotFound, got {}", e),
