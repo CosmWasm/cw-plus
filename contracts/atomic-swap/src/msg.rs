@@ -38,6 +38,14 @@ pub struct CreateMsg {
     pub end_time: u64,
 }
 
+pub fn is_valid_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    if bytes.len() < 3 || bytes.len() > 20 {
+        return false;
+    }
+    true
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {

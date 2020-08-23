@@ -6,7 +6,9 @@ use sha2::{Digest, Sha256};
 
 use cw2::{set_contract_version, ContractVersion};
 
-use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg};
+use crate::msg::{
+    is_valid_name, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
+};
 use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
 
 // Version info, for migration info
@@ -44,8 +46,8 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: CreateMsg,
 ) -> StdResult<HandleResponse> {
-    if msg.id.len() < 3 || msg.id.len() > 20 {
-        return Err(StdError::generic_err("Invalid atomic swap id length"));
+    if !is_valid_name(&msg.id) {
+        return Err(StdError::generic_err("Invalid atomic swap id"));
     }
 
     if env.message.sent_funds.is_empty() {
@@ -267,7 +269,7 @@ mod tests {
             match res {
                 Ok(_) => panic!("expected error"),
                 Err(StdError::GenericErr { msg, .. }) => {
-                    assert_eq!(msg, "Invalid atomic swap id length".to_string())
+                    assert_eq!(msg, "Invalid atomic swap id".to_string())
                 }
                 Err(e) => panic!("unexpected error: {:?}", e),
             }
