@@ -1,6 +1,13 @@
 [workspace]
 members = ["packages/*", "contracts/*"]
 
+[profile.release.package.atomic-swap]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
 [profile.release.package.cw1-subkeys]
 opt-level = 3
 debug = false
