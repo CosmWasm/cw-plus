@@ -270,3 +270,73 @@ fn test_release() {
         e => panic!("Expected NotFound, got {}", e),
     }
 }
+
+#[test]
+fn test_refund() {
+    let mut deps = mock_instance(WASM, &[]);
+
+    let env = mock_env("anyone", &[]);
+    let _: InitResponse = init(&mut deps, env, InitMsg {}).unwrap();
+
+    let sender = HumanAddr::from("sender0001");
+    let balance = coins(1000, "tokens");
+
+    let env = mock_env(&sender, &balance);
+    let create = CreateMsg {
+        id: "swap0001".to_string(),
+        hash: real_hash(),
+        recipient: "rcpt0001".into(),
+        end_time: 0,
+        end_height: 123456,
+    };
+    let _: HandleResponse =
+        handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
+
+    // Cannot refund, wrong id
+    let refund = HandleMsg::Refund {
+        id: "swap0002".to_string(),
+    };
+    let res: HandleResult = handle(&mut deps, env.clone(), refund);
+    match res {
+        Ok(_) => panic!("expected error"),
+        Err(StdError::NotFound { .. }) => {}
+        Err(e) => panic!("unexpected error: {:?}", e),
+    }
+
+    // Cannot refund, not expired yet
+    let refund = HandleMsg::Refund {
+        id: "swap0001".to_string(),
+    };
+    let res: HandleResult = handle(&mut deps, env.clone(), refund);
+    match res {
+        Ok(_) => panic!("expected error"),
+        Err(StdError::GenericErr { msg, .. }) => {
+            assert_eq!(msg, "Atomic swap not yet expired".to_string())
+        }
+        Err(e) => panic!("unexpected error: {:?}", e),
+    }
+
+    // Can refund, already expired
+    let env = mock_env_height("anybody", &balance, 123457);
+    let refund = HandleMsg::Refund {
+        id: "swap0001".to_string(),
+    };
+    let res: HandleResponse = handle(&mut deps, env.clone(), refund.clone()).unwrap();
+    assert_eq!(log("action", "refund"), res.log[0]);
+    assert_eq!(1, res.messages.len());
+    assert_eq!(
+        res.messages[0],
+        CosmosMsg::Bank(BankMsg::Send {
+            from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+            to_address: sender,
+            amount: balance,
+        })
+    );
+
+    // Cannot refund again
+    let res: HandleResult = handle(&mut deps, env.clone(), refund);
+    match res.unwrap_err() {
+        StdError::NotFound { .. } => {}
+        e => panic!("Expected NotFound, got {}", e),
+    }
+}
