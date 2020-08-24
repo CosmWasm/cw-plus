@@ -51,6 +51,8 @@ impl Cw721Contract {
         querier.query(&query)
     }
 
+    /*** queries ***/
+
     pub fn owner_of<Q: Querier, T: Into<String>>(
         &self,
         querier: &Q,

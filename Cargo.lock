@@ -75,6 +75,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw0"
+version = "0.1.1"
+dependencies = [
+ "cosmwasm-std",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "cw1"
 version = "0.1.1"
 dependencies = [
@@ -91,9 +100,9 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cw0",
  "cw1-whitelist",
  "cw2",
- "cw20",
  "schemars",
  "serde",
  "snafu",
@@ -128,6 +137,7 @@ version = "0.1.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw0",
  "schemars",
  "serde",
 ]
@@ -166,6 +176,7 @@ version = "0.1.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw0",
  "schemars",
  "serde",
 ]

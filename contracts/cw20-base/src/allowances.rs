@@ -313,7 +313,7 @@ mod tests {
 
         // set allowance with height expiration
         let allow1 = Uint128(7777);
-        let expires = Expiration::AtHeight { height: 5432 };
+        let expires = Expiration::AtHeight(5432);
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -352,7 +352,7 @@ mod tests {
         // increase it some more and override the expires
         let raise = Uint128(87654);
         let allow3 = allow2 + raise;
-        let new_expire = Expiration::AtTime { time: 8888888888 };
+        let new_expire = Expiration::AtTime(8888888888);
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: raise,
@@ -405,7 +405,7 @@ mod tests {
 
         // set allowance with height expiration
         let allow1 = Uint128(7777);
-        let expires = Expiration::AtHeight { height: 5432 };
+        let expires = Expiration::AtHeight(5432);
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -447,7 +447,7 @@ mod tests {
         // also allow spender -> spender2 with no interference
         let env = mock_env(spender.clone(), &[]);
         let allow3 = Uint128(1821);
-        let expires3 = Expiration::AtTime { time: 3767626296 };
+        let expires3 = Expiration::AtTime(3767626296);
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow3,
@@ -570,9 +570,7 @@ mod tests {
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
-            expires: Some(Expiration::AtHeight {
-                height: env.block.height,
-            }),
+            expires: Some(Expiration::AtHeight(env.block.height)),
         };
         handle(&mut deps, env.clone(), msg).unwrap();
 
@@ -647,9 +645,7 @@ mod tests {
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
-            expires: Some(Expiration::AtHeight {
-                height: env.block.height,
-            }),
+            expires: Some(Expiration::AtHeight(env.block.height)),
         };
         handle(&mut deps, env.clone(), msg).unwrap();
 
@@ -701,7 +697,6 @@ mod tests {
         assert_eq!(1, res.messages.len());
 
         // we record this as sent by the one who requested, not the one who was paying
-        // TODO: is this what we want??? or the owner???
         let binary_msg = Cw20ReceiveMsg {
             sender: spender.clone(),
             amount: transfer,
@@ -749,9 +744,7 @@ mod tests {
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
-            expires: Some(Expiration::AtHeight {
-                height: env.block.height,
-            }),
+            expires: Some(Expiration::AtHeight(env.block.height)),
         };
         handle(&mut deps, env.clone(), msg).unwrap();
 

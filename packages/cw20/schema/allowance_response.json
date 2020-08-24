@@ -25,17 +25,9 @@
           ],
           "properties": {
             "at_height": {
-              "type": "object",
-              "required": [
-                "height"
-              ],
-              "properties": {
-                "height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              }
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         },
@@ -47,22 +39,14 @@
           ],
           "properties": {
             "at_time": {
-              "type": "object",
-              "required": [
-                "time"
-              ],
-              "properties": {
-                "time": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              }
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         },
         {
-          "description": "Never will never expire. Used to distinguish None from Some(Expiration::Never)",
+          "description": "Never will never expire. Used to express the empty variant",
           "type": "object",
           "required": [
             "never"

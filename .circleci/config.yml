@@ -7,6 +7,7 @@ workflows:
       - contract_cw1_whitelist
       - contract_cw20_base
       - contract_cw20_escrow
+      - package_cw0
       - package_cw1
       - package_cw2
       - package_cw20
@@ -185,6 +186,31 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-cw20-escrow-rust:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+
+  package_cw0:
+    docker:
+      - image: rust:1.44.1
+    working_directory: ~/project/packages/cw0
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
+      - restore_cache:
+          keys:
+            - cargocache-v2-cw0:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Build library for native target
+          command: cargo build --locked
+      - run:
+          name: Run unit tests
+          command: cargo test --locked
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-v2-cw0:1.44.1-{{ checksum "~/project/Cargo.lock" }}
 
   package_cw1:
     docker:
