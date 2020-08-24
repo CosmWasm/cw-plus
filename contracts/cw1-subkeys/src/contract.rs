@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 use cw0::Expiration;
 use cw1::CanSendResponse;
@@ -14,7 +14,7 @@ use cw1_whitelist::{
 };
 use cw2::{set_contract_version, ContractVersion};
 
-use crate::msg::{HandleMsg, QueryMsg};
+use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
 use std::ops::{AddAssign, Sub};
 
@@ -207,6 +207,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
         QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
+        QueryMsg::AllAllowances {} => to_binary(&query_all_allowances(deps)?),
     }
 }
 
@@ -257,6 +258,26 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
         Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
         None => Ok(false),
     }
+}
+
+// return a list of all allowances here
+pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<AllAllowancesResponse> {
+    let api = &deps.api;
+    let res: StdResult<Vec<AllowanceInfo>> = allowances_read(&deps.storage)
+        .range(None, None, Order::Ascending)
+        .map(|item| {
+            item.and_then(|(k, allow)| {
+                Ok(AllowanceInfo {
+                    spender: api.human_address(&CanonicalAddr::from(k))?,
+                    balance: allow.balance,
+                    expires: allow.expires,
+                })
+            })
+        })
+        .collect();
+    Ok(AllAllowancesResponse { allowances: res? })
 }
 
 #[cfg(test)]

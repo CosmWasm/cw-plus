@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, export_schema_with_title, remove_schemas, schema_for};
 
-use cw1_subkeys::msg::{HandleMsg, QueryMsg};
+use cw1_subkeys::msg::{AllAllowancesResponse, HandleMsg, QueryMsg};
 use cw1_subkeys::state::Allowance;
 use cw1_whitelist::msg::{AdminListResponse, InitMsg};
 
@@ -18,4 +18,5 @@ fn main() {
     export_schema_with_title(&mut schema_for!(QueryMsg), &out_dir, "QueryMsg");
     export_schema(&schema_for!(Allowance), &out_dir);
     export_schema(&schema_for!(AdminListResponse), &out_dir);
+    export_schema(&schema_for!(AllAllowancesResponse), &out_dir);
 }
