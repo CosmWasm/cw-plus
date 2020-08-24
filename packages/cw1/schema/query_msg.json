@@ -1,25 +1,22 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cw1HandleMsg_for_Empty",
+  "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Execute requests the contract to re-dispatch all these messages with the contract's address as sender. Every implementation has it's own logic to determine in",
+      "description": "Checks permissions of the caller on this proxy. If CanSend returns true then a call to `Execute` with the same message, before any further state changes, should also succeed.",
       "type": "object",
       "required": [
-        "execute"
+        "can_send"
       ],
       "properties": {
-        "execute": {
+        "can_send": {
           "type": "object",
           "required": [
-            "msgs"
+            "msg"
           ],
           "properties": {
-            "msgs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/CosmosMsg_for_Empty"
-              }
+            "msg": {
+              "$ref": "#/definitions/CosmosMsg_for_Empty"
             }
           }
         }

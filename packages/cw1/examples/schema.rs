@@ -1,9 +1,9 @@
 use std::env::current_dir;
 use std::fs::create_dir_all;
 
-use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
+use cosmwasm_schema::{export_schema, export_schema_with_title, remove_schemas, schema_for};
 
-use cw1::Cw1HandleMsg;
+use cw1::{CanSendResponse, Cw1HandleMsg, Cw1QueryMsg};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -11,5 +11,7 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema(&schema_for!(Cw1HandleMsg), &out_dir);
+    export_schema_with_title(&mut schema_for!(Cw1HandleMsg), &out_dir, "HandleMsg");
+    export_schema_with_title(&mut schema_for!(Cw1QueryMsg), &out_dir, "QueryMsg");
+    export_schema(&schema_for!(CanSendResponse), &out_dir);
 }
