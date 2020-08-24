@@ -70,7 +70,7 @@
         "approve": {
           "type": "object",
           "required": [
-            "operator",
+            "spender",
             "token_id"
           ],
           "properties": {
@@ -84,7 +84,7 @@
                 }
               ]
             },
-            "operator": {
+            "spender": {
               "$ref": "#/definitions/HumanAddr"
             },
             "token_id": {
@@ -104,11 +104,11 @@
         "revoke": {
           "type": "object",
           "required": [
-            "operator",
+            "spender",
             "token_id"
           ],
           "properties": {
-            "operator": {
+            "spender": {
               "$ref": "#/definitions/HumanAddr"
             },
             "token_id": {

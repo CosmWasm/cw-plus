@@ -1,6 +1,6 @@
 # CW721 Spec: Non Fungible Tokens
 
-CW721 is a specification for fungible tokens based on CosmWasm.
+CW721 is a specification for non-fungible tokens based on CosmWasm.
 The name and design is based on Ethereum's ERC721 standard,
 with some enhancements. The types in here can be imported by 
 contracts that wish to implement this  spec, or by contracts that call 
@@ -34,18 +34,18 @@ contract, along with the token_id.
 Requires `token_id` to point to a valid token, and `env.sender` to be 
 the owner of it, or have an allowance to transfer it. 
 
-`Approve{approved, token_id, expires}` - Grants permission to `approved` to
+`Approve{spender, token_id, expires}` - Grants permission to `spender` to
 transfer or send the given token. This can only be performed when
 `env.sender` is the owner of the given `token_id` or an `operator`. 
-There can only be one approved account per token, and it is cleared once
-the token  is transfered or sent.
+There can multiple spender accounts per token, and they are cleared once
+the token is transfered or sent.
 
-`Revoke{token_id}` - This revokes a previously granted permission
+`Revoke{spender, token_id}` - This revokes a previously granted permission
 to transfer the given `token_id`. This can only be granted when
 `env.sender` is the owner of the given `token_id` or an `operator`.
 
 `ApproveAll{operator, expires}` - Grant `operator` permission to transfer or send
-all tokens owner by `env.sender`. This is tied to the owner, not the
+all tokens owned by `env.sender`. This approval is tied to the owner, not the
 tokens and applies to any future token that the owner receives as well.
 
 `RevokeAll{operator}` - Revoke a previous `ApproveAll` permission granted

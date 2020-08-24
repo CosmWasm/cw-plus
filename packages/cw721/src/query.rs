@@ -49,14 +49,14 @@ pub struct OwnerOfResponse {
     /// Owner of the token
     pub owner: HumanAddr,
     /// If set this address is approved to transfer/send the token as well
-    pub approval: Option<Approval>,
+    pub approvals: Vec<Approval>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Approval {
     /// Account that can transfer/send the token
-    pub approved: HumanAddr,
-    /// When the Approval expires (maybe never)
+    pub spender: HumanAddr,
+    /// When the Approval expires (maybe Expiration::never)
     pub expires: Expiration,
 }
 

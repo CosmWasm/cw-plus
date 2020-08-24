@@ -21,13 +21,13 @@ pub enum Cw721HandleMsg {
     /// Allows operator to transfer / send the token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit
     Approve {
-        operator: HumanAddr,
+        spender: HumanAddr,
         token_id: String,
         expires: Option<Expiration>,
     },
     /// Remove previously granted Approval
     Revoke {
-        operator: HumanAddr,
+        spender: HumanAddr,
         token_id: String,
     },
     /// Allows operator to transfer / send any token from the owner's account.

@@ -3,19 +3,16 @@
   "title": "OwnerOfResponse",
   "type": "object",
   "required": [
+    "approvals",
     "owner"
   ],
   "properties": {
-    "approval": {
+    "approvals": {
       "description": "If set this address is approved to transfer/send the token as well",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Approval"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Approval"
+      }
     },
     "owner": {
       "description": "Owner of the token",
@@ -30,23 +27,23 @@
     "Approval": {
       "type": "object",
       "required": [
-        "approved",
-        "expires"
+        "expires",
+        "spender"
       ],
       "properties": {
-        "approved": {
+        "expires": {
+          "description": "When the Approval expires (maybe Expiration::never)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            }
+          ]
+        },
+        "spender": {
           "description": "Account that can transfer/send the token",
           "allOf": [
             {
               "$ref": "#/definitions/HumanAddr"
-            }
-          ]
-        },
-        "expires": {
-          "description": "When the Approval expires (maybe never)",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Expiration"
             }
           ]
         }
