@@ -32,16 +32,18 @@ pub enum Cw721QueryMsg {
     /// With Enumerable extension.
     /// Returns all tokens owned by the given address, [] if unset.
     /// Return type: TokensResponse.
-    Tokens { owner: HumanAddr },
+    Tokens {
+        owner: HumanAddr,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     /// With Enumerable extension.
     /// Requires pagination. Lists all token_ids controlled by the contract.
     /// Return type: TokensResponse.
-    AllTokens {},
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct TokensResponse {
-    pub tokens: Vec<String>,
+    AllTokens {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -96,4 +98,12 @@ pub struct AllNftInfoResponse {
     pub access: OwnerOfResponse,
     /// Data on the token itself,
     pub info: NftInfoResponse,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct TokensResponse {
+    /// Contains all token_ids in lexographical ordering
+    /// If there are more than `limit`, use `start_from` in future queries
+    /// to achieve pagination.
+    pub tokens: Vec<String>,
 }

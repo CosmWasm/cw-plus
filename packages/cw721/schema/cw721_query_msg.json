@@ -119,8 +119,22 @@
             "owner"
           ],
           "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
             "owner": {
               "$ref": "#/definitions/HumanAddr"
+            },
+            "start_after": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }
@@ -134,7 +148,23 @@
       ],
       "properties": {
         "all_tokens": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
         }
       }
     }

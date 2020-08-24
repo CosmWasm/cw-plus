@@ -115,16 +115,25 @@ impl Cw721Contract {
         &self,
         querier: &Q,
         owner: T,
+        start_after: Option<String>,
+        limit: Option<u32>,
     ) -> StdResult<TokensResponse> {
         let req = Cw721QueryMsg::Tokens {
             owner: owner.into(),
+            start_after,
+            limit,
         };
         self.query(querier, req)
     }
 
     /// With enumerable extension
-    pub fn all_tokens<Q: Querier>(&self, querier: &Q) -> StdResult<TokensResponse> {
-        let req = Cw721QueryMsg::AllTokens {};
+    pub fn all_tokens<Q: Querier>(
+        &self,
+        querier: &Q,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<TokensResponse> {
+        let req = Cw721QueryMsg::AllTokens { start_after, limit };
         self.query(querier, req)
     }
 
@@ -135,7 +144,7 @@ impl Cw721Contract {
 
     /// returns true if the contract supports the enumerable extension
     pub fn has_enumerable<Q: Querier>(&self, querier: &Q) -> bool {
-        self.tokens(querier, self.addr()).is_ok()
+        self.tokens(querier, self.addr(), None, Some(1)).is_ok()
     }
 }
 

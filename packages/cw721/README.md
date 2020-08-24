@@ -100,11 +100,21 @@ want both info to display one NFT.
 
 ### Queries
 
-**TODO** Handle paging? Right now, let it just get big and 
-expensive to query. This API will most likely evolve.
+Pagination is acheived via `start_after` and `limit`. Limit is a request
+set by the client, if unset, the contract will automatically set it to
+`DefaultLimit` (suggested 10). If set, it will be used up to a `MaxLimit`
+value (suggested 30). Contracts can define other `DefaultLimit` and `MaxLimit`
+values without violating the CW721 spec, and clients should not rely on
+any particular values.
 
-`Tokens{owner}` - List all token_ids that belong to a given owner.
+If `start_after` is unset, the query returns the first results, ordered by
+lexogaphically by `token_id`. If `start_after` is set, then it returns the
+first `limit` tokens *after* the given one. This allows straight-forward 
+pagination by taking the last result returned (a `token_id`) and using it
+as the `start_after` value in a future query. 
+
+`Tokens{owner, start_after, limit}` - List all token_ids that belong to a given owner.
 Return type is `TokensResponse{tokens: Vec<token_id>}`.
 
-`AllTokens{}` - Requires pagination. Lists all token_ids controlled by 
+`AllTokens{start_after, limit}` - Requires pagination. Lists all token_ids controlled by 
 the contract.
