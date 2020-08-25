@@ -3,6 +3,17 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "type": "object",
+      "required": [
+        "create"
+      ],
+      "properties": {
+        "create": {
+          "$ref": "#/definitions/CreateMsg"
+        }
+      }
+    },
+    {
       "description": "Release sends all tokens to the recipient.",
       "type": "object",
       "required": [
@@ -12,9 +23,13 @@
         "release": {
           "type": "object",
           "required": [
+            "id",
             "preimage"
           ],
           "properties": {
+            "id": {
+              "type": "string"
+            },
             "preimage": {
               "description": "This is the preimage, must be exactly 32 bytes in hex (64 chars) to release: sha256(from_hex(preimage)) == from_hex(hash)",
               "type": "string"
@@ -31,9 +46,61 @@
       ],
       "properties": {
         "refund": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "CreateMsg": {
+      "type": "object",
+      "required": [
+        "end_height",
+        "end_time",
+        "hash",
+        "id",
+        "recipient"
+      ],
+      "properties": {
+        "end_height": {
+          "description": "You can set a last time or block height the contract is valid at. If *either* is non-zero and below current state, the contract is considered expired, and will be returned to the original funder.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "end_time": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "hash": {
+          "description": "This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)",
+          "type": "string"
+        },
+        "id": {
+          "description": "id is a human-readable name for the swap to use later. 3-20 bytes of utf-8 text",
+          "type": "string"
+        },
+        "recipient": {
+          "description": "If approved, funds go to the recipient",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }
