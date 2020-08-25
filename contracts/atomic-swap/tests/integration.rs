@@ -17,7 +17,7 @@
 //!      });
 //! 4. Anywhere you see query(&deps, ...) you must replace it with query(&mut deps, ...)
 
-use cosmwasm_std::{coins, from_binary, BankMsg, Coin, CosmosMsg, Env, StdError, StdResult};
+use cosmwasm_std::{coins, from_binary, BankMsg, Coin, CosmosMsg, Env, StdError};
 use cosmwasm_std::{log, HandleResponse, HandleResult, HumanAddr, InitResponse};
 use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance, query};
 use sha2::{Digest, Sha256};
