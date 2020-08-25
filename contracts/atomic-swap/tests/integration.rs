@@ -17,12 +17,12 @@
 //!      });
 //! 4. Anywhere you see query(&deps, ...) you must replace it with query(&mut deps, ...)
 
-use cosmwasm_std::{coins, BankMsg, Coin, CosmosMsg, Env, StdError};
+use cosmwasm_std::{coins, from_binary, BankMsg, Coin, CosmosMsg, Env, StdError, StdResult};
 use cosmwasm_std::{log, HandleResponse, HandleResult, HumanAddr, InitResponse};
-use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance};
+use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance, query};
 use sha2::{Digest, Sha256};
 
-use atomic_swap::msg::{CreateMsg, HandleMsg, InitMsg};
+use atomic_swap::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg};
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
 
 // This line will test the output of cargo wasm
@@ -34,9 +34,15 @@ static WASM: &[u8] =
 fn preimage() -> String {
     hex::encode(b"This is a string, 32 bytes long.")
 }
+fn custom_preimage(int: u16) -> String {
+    hex::encode(format!("This is a custom string: {:>7}", int))
+}
 
 fn real_hash() -> String {
     hex::encode(&Sha256::digest(&hex::decode(preimage()).unwrap()))
+}
+fn custom_hash(int: u16) -> String {
+    hex::encode(&Sha256::digest(&hex::decode(custom_preimage(int)).unwrap()))
 }
 
 fn mock_env_height<U: Into<HumanAddr>>(sender: U, sent: &[Coin], height: u64) -> Env {
@@ -339,4 +345,83 @@ fn test_refund() {
         StdError::NotFound { .. } => {}
         e => panic!("Expected NotFound, got {}", e),
     }
+}
+
+#[test]
+fn test_query() {
+    let mut deps = mock_instance(WASM, &[]);
+
+    let env = mock_env("anyone", &[]);
+    let _: InitResponse = init(&mut deps, env, InitMsg {}).unwrap();
+
+    let sender1 = HumanAddr::from("sender0001");
+    let sender2 = HumanAddr::from("sender0002");
+    // Same balance for simplicity
+    let balance = coins(1000, "tokens");
+
+    // Create a couple swaps (same hash for simplicity)
+    let env = mock_env(&sender1, &balance);
+    let create1 = CreateMsg {
+        id: "swap0001".to_string(),
+        hash: custom_hash(1),
+        recipient: "rcpt0001".into(),
+        end_time: 0,
+        end_height: 123456,
+    };
+    let _: HandleResponse =
+        handle(&mut deps, env.clone(), HandleMsg::Create(create1.clone())).unwrap();
+
+    let env = mock_env(&sender2, &balance);
+    let create2 = CreateMsg {
+        id: "swap0002".to_string(),
+        hash: custom_hash(2),
+        recipient: "rcpt0002".into(),
+        end_time: 2_000_000_000,
+        end_height: 0,
+    };
+    let _: HandleResponse =
+        handle(&mut deps, env.clone(), HandleMsg::Create(create2.clone())).unwrap();
+
+    // Get the list of ids
+    let query_msg = QueryMsg::List {};
+    let ids: ListResponse = from_binary(&query(&mut deps, query_msg).unwrap()).unwrap();
+    println!("ids: {:#?}", ids);
+    assert_eq!(2, ids.swaps.len());
+    assert_eq!(vec!["swap0001", "swap0002"], ids.swaps);
+
+    // Get the details for the first swap id
+    let query_msg = QueryMsg::Details {
+        id: ids.swaps[0].clone(),
+    };
+    let res: DetailsResponse = from_binary(&query(&mut deps, query_msg).unwrap()).unwrap();
+    assert_eq!(
+        res,
+        DetailsResponse {
+            id: create1.id,
+            hash: create1.hash,
+            recipient: create1.recipient,
+            source: sender1,
+            end_height: create1.end_height,
+            end_time: create1.end_time,
+            balance: balance.clone()
+        }
+    );
+
+    // Get the details for the second swap id
+    let query_msg = QueryMsg::Details {
+        id: ids.swaps[1].clone(),
+    };
+    let res: DetailsResponse = from_binary(&query(&mut deps, query_msg).unwrap()).unwrap();
+    assert_eq!(
+        res,
+        DetailsResponse {
+            id: create2.id,
+            hash: create2.hash,
+            recipient: create2.recipient,
+            source: sender2,
+            end_height: create2.end_height,
+            end_time: create2.end_time,
+            balance
+        }
+    );
 }
