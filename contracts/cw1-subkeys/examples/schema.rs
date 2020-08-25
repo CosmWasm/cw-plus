@@ -15,7 +15,7 @@ fn main() {
 
     export_schema(&schema_for!(InitMsg), &out_dir);
     export_schema_with_title(&mut schema_for!(HandleMsg), &out_dir, "HandleMsg");
-    export_schema(&schema_for!(QueryMsg), &out_dir);
+    export_schema_with_title(&mut schema_for!(QueryMsg), &out_dir, "QueryMsg");
     export_schema(&schema_for!(Allowance), &out_dir);
     export_schema(&schema_for!(AdminListResponse), &out_dir);
 }

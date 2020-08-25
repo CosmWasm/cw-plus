@@ -6,6 +6,7 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw0::Expiration;
+use cw1::CanSendResponse;
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
@@ -87,10 +88,7 @@ where
                     amount,
                 }) => {
                     // Decrease allowance
-                    for coin in amount {
-                        allowance.balance = allowance.balance.sub(coin.clone())?;
-                        // Fails if not enough tokens
-                    }
+                    allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
                 _ => {
@@ -208,6 +206,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
+        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
     }
 }
 
@@ -223,26 +222,63 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
     Ok(allow)
 }
 
+fn query_can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: HumanAddr,
+    msg: CosmosMsg,
+) -> StdResult<CanSendResponse> {
+    Ok(CanSendResponse {
+        can_send: can_send(deps, sender, msg)?,
+    })
+}
+
+// this can just return booleans and the query_can_send wrapper creates the struct once, not on every path
+fn can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: HumanAddr,
+    msg: CosmosMsg,
+) -> StdResult<bool> {
+    let owner_raw = deps.api.canonical_address(&sender)?;
+    let cfg = admin_list_read(&deps.storage).load()?;
+    if cfg.is_admin(&owner_raw) {
+        return Ok(true);
+    }
+
+    // we only accept bank messages - ensure type and get the amount
+    let amount = match msg {
+        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => amount,
+        _ => return Ok(false),
+    };
+
+    // now we check if there is enough allowance for this message
+    let allowance = allowances_read(&deps.storage).may_load(owner_raw.as_slice())?;
+    match allowance {
+        // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
+        Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
+        None => Ok(false),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::balance::Balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coin, coins};
+    use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
         mut deps: &mut Extern<S, A, Q>,
         env: &Env,
-        admins: &Vec<HumanAddr>,
-        spenders: &Vec<HumanAddr>,
-        allowances: &Vec<Coin>,
-        expirations: &Vec<Expiration>,
+        admins: &[HumanAddr],
+        spenders: &[HumanAddr],
+        allowances: &[Coin],
+        expirations: &[Expiration],
     ) {
         // Init a contract with admins
         let init_msg = InitMsg {
-            admins: admins.clone(),
+            admins: admins.to_vec(),
             mutable: true,
         };
         init(deps, env.clone(), init_msg).unwrap();
@@ -747,5 +783,68 @@ mod tests {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Message type rejected"),
             e => panic!("unexpected error: {}", e),
         }
+    }
+
+    #[test]
+    fn can_send_query_works() {
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin007");
+        let spender = HumanAddr::from("spender808");
+        let anyone = HumanAddr::from("anyone");
+
+        let env = mock_env(owner.clone(), &[]);
+        // spender has allowance of 55000 ushell
+        setup_test_case(
+            &mut deps,
+            &env,
+            &[owner.clone()],
+            &[spender.clone()],
+            &coins(55000, "ushell"),
+            &[Expiration::Never {}],
+        );
+
+        // let us make some queries... different msg types by owner and by other
+        let send_msg = CosmosMsg::Bank(BankMsg::Send {
+            from_address: MOCK_CONTRACT_ADDR.into(),
+            to_address: anyone.clone(),
+            amount: coins(12345, "ushell"),
+        });
+        let send_msg_large = CosmosMsg::Bank(BankMsg::Send {
+            from_address: MOCK_CONTRACT_ADDR.into(),
+            to_address: anyone.clone(),
+            amount: coins(1234567, "ushell"),
+        });
+        let staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: anyone.clone(),
+            amount: coin(70000, "ureef"),
+        });
+
+        // owner can send big or small
+        let res = query_can_send(&deps, owner.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+        let res = query_can_send(&deps, owner.clone(), send_msg_large.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+        // owner can stake
+        let res = query_can_send(&deps, owner.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+
+        // spender can send small
+        let res = query_can_send(&deps, spender.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+        // not too big
+        let res = query_can_send(&deps, spender.clone(), send_msg_large.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+        // and not stake
+        let res = query_can_send(&deps, spender.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+
+        // random person cannot do anything
+        let res = query_can_send(&deps, anyone.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+        let res = query_can_send(&deps, anyone.clone(), send_msg_large.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+        let res = query_can_send(&deps, anyone.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
     }
 }

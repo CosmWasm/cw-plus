@@ -3,38 +3,6 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Shows all admins and whether or not it is mutable Returns cw1-whitelist::AdminListResponse",
-      "type": "object",
-      "required": [
-        "admin_list"
-      ],
-      "properties": {
-        "admin_list": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "description": "Get the current allowance for the given subkey (how much it can spend) Returns crate::state::Allowance",
-      "type": "object",
-      "required": [
-        "allowance"
-      ],
-      "properties": {
-        "allowance": {
-          "type": "object",
-          "required": [
-            "spender"
-          ],
-          "properties": {
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
       "description": "Checks permissions of the caller on this proxy. If CanSend returns true then a call to `Execute` with the same message, before any further state changes, should also succeed.",
       "type": "object",
       "required": [

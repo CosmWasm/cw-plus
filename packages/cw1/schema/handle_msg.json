@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cw1HandleMsg_for_Empty",
+  "title": "HandleMsg",
   "anyOf": [
     {
       "description": "Execute requests the contract to re-dispatch all these messages with the contract's address as sender. Every implementation has it's own logic to determine in",

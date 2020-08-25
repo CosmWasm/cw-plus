@@ -5,6 +5,7 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
+use cw1::CanSendResponse;
 use cw2::{set_contract_version, ContractVersion};
 
 use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
@@ -65,8 +66,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = admin_list_read(&deps.storage).load()?;
-    if !cfg.is_admin(&deps.api.canonical_address(&env.message.sender)?) {
+    if !can_send(&deps, &env.message.sender)? {
         Err(StdError::unauthorized())
     } else {
         let mut res = HandleResponse::default();
@@ -111,12 +111,22 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+fn can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: &HumanAddr,
+) -> StdResult<bool> {
+    let cfg = admin_list_read(&deps.storage).load()?;
+    let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
+    Ok(can)
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
+        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
     }
 }
 
@@ -130,11 +140,21 @@ pub fn query_admin_list<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+pub fn query_can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: HumanAddr,
+    _msg: CosmosMsg,
+) -> StdResult<CanSendResponse> {
+    Ok(CanSendResponse {
+        can_send: can_send(&deps, &sender)?,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, BankMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, StdError, WasmMsg};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -265,5 +285,50 @@ mod tests {
         let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.log, vec![log("action", "execute")]);
+    }
+
+    #[test]
+    fn can_send_query_works() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        let alice = HumanAddr::from("alice");
+        let bob = HumanAddr::from("bob");
+
+        let anyone = HumanAddr::from("anyone");
+
+        // init the contract
+        let init_msg = InitMsg {
+            admins: vec![alice.clone(), bob.clone()],
+            mutable: false,
+        };
+        let env = mock_env(&anyone, &[]);
+        init(&mut deps, env, init_msg).unwrap();
+
+        // let us make some queries... different msg types by owner and by other
+        let send_msg = CosmosMsg::Bank(BankMsg::Send {
+            from_address: MOCK_CONTRACT_ADDR.into(),
+            to_address: anyone.clone(),
+            amount: coins(12345, "ushell"),
+        });
+        let staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: anyone.clone(),
+            amount: coin(70000, "ureef"),
+        });
+
+        // owner can send
+        let res = query_can_send(&deps, alice.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+
+        // owner can stake
+        let res = query_can_send(&deps, bob.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+
+        // anyone cannot send
+        let res = query_can_send(&deps, anyone.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+
+        // anyone cannot stake
+        let res = query_can_send(&deps, anyone.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
     }
 }

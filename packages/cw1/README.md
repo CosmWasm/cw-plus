@@ -22,3 +22,11 @@ execute arbitrary `CosmosMsg` in the same transaction.
 
 `Execute{msgs}` - This accepts `Vec<CosmosMsg>` and checks permissions
 before re-dispatching all those messages from the contract address.
+
+### Queries
+
+`CanSend{msg}` - This accepts one `CosmosMsg` and checks permissions,
+returning true or false based on the permissions. If `CanSend` returns true
+then a call to `Execute` with the same message, before any further state changes,
+should also succeed. This can be used to dynamically provide some client
+info on a generic cw1 contract without knowing the extension details.
