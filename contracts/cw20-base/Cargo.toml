@@ -17,13 +17,13 @@ library = []
 [dependencies]
 cw2 = { path = "../../packages/cw2", version = "0.1.1" }
 cw20 = { path = "../../packages/cw20", version = "0.1.1" }
-cosmwasm-std = { version = "0.10.0" }
-cosmwasm-storage = { version = "0.10.0" }
+cosmwasm-std = { version = "0.10.1" }
+cosmwasm-storage = { version = "0.10.1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
 
 [dev-dependencies]
 # we only need to enable this if we use integration tests
-#cosmwasm-vm = { version = "0.10.0", default-features = false }
-cosmwasm-schema = { version = "0.10.0" }
+#cosmwasm-vm = { version = "0.10.1", default-features = false }
+cosmwasm-schema = { version = "0.10.1" }
