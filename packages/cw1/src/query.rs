@@ -12,7 +12,7 @@ where
 {
     /// Checks permissions of the caller on this proxy.
     /// If CanSend returns true then a call to `Execute` with the same message,
-    /// before any further state changes, should also succeed.
+    /// from the given sender, before any further state changes, should also succeed.
     CanSend {
         sender: HumanAddr,
         msg: CosmosMsg<T>,
