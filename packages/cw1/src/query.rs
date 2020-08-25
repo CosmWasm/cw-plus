@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -13,10 +13,13 @@ where
     /// Checks permissions of the caller on this proxy.
     /// If CanSend returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
-    CanSend { msg: CosmosMsg<T> },
+    CanSend {
+        sender: HumanAddr,
+        msg: CosmosMsg<T>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct CanSendResponse {
-    can_send: bool,
+    pub can_send: bool,
 }

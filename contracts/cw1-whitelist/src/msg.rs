@@ -29,9 +29,19 @@ where
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum QueryMsg {
+pub enum QueryMsg<T = Empty>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     /// Shows all admins and whether or not it is mutable
     AdminList {},
+    /// Checks permissions of the caller on this proxy.
+    /// If CanSend returns true then a call to `Execute` with the same message,
+    /// before any further state changes, should also succeed.
+    CanSend {
+        sender: HumanAddr,
+        msg: CosmosMsg<T>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

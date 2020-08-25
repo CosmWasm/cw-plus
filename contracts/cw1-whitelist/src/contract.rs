@@ -5,6 +5,7 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
+use cw1::CanSendResponse;
 use cw2::{set_contract_version, ContractVersion};
 
 use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
@@ -65,8 +66,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = admin_list_read(&deps.storage).load()?;
-    if !cfg.is_admin(&deps.api.canonical_address(&env.message.sender)?) {
+    if !can_send(&deps, &env.message.sender)? {
         Err(StdError::unauthorized())
     } else {
         let mut res = HandleResponse::default();
@@ -111,12 +111,22 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+fn can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: &HumanAddr,
+) -> StdResult<bool> {
+    let cfg = admin_list_read(&deps.storage).load()?;
+    let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
+    Ok(can)
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
+        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
     }
 }
 
@@ -127,6 +137,16 @@ pub fn query_admin_list<S: Storage, A: Api, Q: Querier>(
     Ok(AdminListResponse {
         admins: map_human(&deps.api, &cfg.admins)?,
         mutable: cfg.mutable,
+    })
+}
+
+pub fn query_can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: HumanAddr,
+    _msg: CosmosMsg,
+) -> StdResult<CanSendResponse> {
+    Ok(CanSendResponse {
+        can_send: can_send(&deps, &sender)?,
     })
 }
 

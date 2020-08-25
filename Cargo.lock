@@ -115,6 +115,8 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cw0",
+ "cw1",
  "cw2",
  "schemars",
  "serde",

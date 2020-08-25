@@ -12,11 +12,15 @@
         "can_send": {
           "type": "object",
           "required": [
-            "msg"
+            "msg",
+            "sender"
           ],
           "properties": {
             "msg": {
               "$ref": "#/definitions/CosmosMsg_for_Empty"
+            },
+            "sender": {
+              "$ref": "#/definitions/HumanAddr"
             }
           }
         }
