@@ -154,7 +154,7 @@ pub fn query_can_send<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, BankMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, StdError, WasmMsg};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -285,5 +285,50 @@ mod tests {
         let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.log, vec![log("action", "execute")]);
+    }
+
+    #[test]
+    fn can_send_query_works() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        let alice = HumanAddr::from("alice");
+        let bob = HumanAddr::from("bob");
+
+        let anyone = HumanAddr::from("anyone");
+
+        // init the contract
+        let init_msg = InitMsg {
+            admins: vec![alice.clone(), bob.clone()],
+            mutable: false,
+        };
+        let env = mock_env(&anyone, &[]);
+        init(&mut deps, env, init_msg).unwrap();
+
+        // let us make some queries... different msg types by owner and by other
+        let send_msg = CosmosMsg::Bank(BankMsg::Send {
+            from_address: MOCK_CONTRACT_ADDR.into(),
+            to_address: anyone.clone(),
+            amount: coins(12345, "ushell"),
+        });
+        let staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
+            validator: anyone.clone(),
+            amount: coin(70000, "ureef"),
+        });
+
+        // owner can send
+        let res = query_can_send(&deps, alice.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+
+        // owner can stake
+        let res = query_can_send(&deps, bob.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+
+        // anyone cannot send
+        let res = query_can_send(&deps, anyone.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+
+        // anyone cannot stake
+        let res = query_can_send(&deps, anyone.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
     }
 }
