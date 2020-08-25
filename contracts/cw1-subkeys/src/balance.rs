@@ -146,6 +146,18 @@ impl ops::Sub<Coin> for Balance {
     }
 }
 
+impl ops::Sub<Vec<Coin>> for Balance {
+    type Output = StdResult<Self>;
+
+    fn sub(self, amount: Vec<Coin>) -> StdResult<Self> {
+        let mut res = self;
+        for coin in amount {
+            res = res.sub(coin.clone())?;
+        }
+        Ok(res)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

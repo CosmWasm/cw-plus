@@ -6,6 +6,7 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw0::Expiration;
+use cw1::CanSendResponse;
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
@@ -87,10 +88,7 @@ where
                     amount,
                 }) => {
                     // Decrease allowance
-                    for coin in amount {
-                        allowance.balance = allowance.balance.sub(coin.clone())?;
-                        // Fails if not enough tokens
-                    }
+                    allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
                 _ => {
@@ -208,6 +206,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
+        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
     }
 }
 
@@ -221,6 +220,43 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
         .may_load(subkey.as_slice())?
         .unwrap_or_default();
     Ok(allow)
+}
+
+fn query_can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: HumanAddr,
+    msg: CosmosMsg,
+) -> StdResult<CanSendResponse> {
+    Ok(CanSendResponse {
+        can_send: can_send(deps, sender, msg)?,
+    })
+}
+
+// this can just return booleans and the query_can_send wrapper creates the struct once, not on every path
+fn can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    sender: HumanAddr,
+    msg: CosmosMsg,
+) -> StdResult<bool> {
+    let owner_raw = deps.api.canonical_address(&sender)?;
+    let cfg = admin_list_read(&deps.storage).load()?;
+    if cfg.is_admin(&owner_raw) {
+        return Ok(true);
+    }
+
+    // we only accept bank messages - ensure type and get the amount
+    let amount = match msg {
+        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => amount,
+        _ => return Ok(false),
+    };
+
+    // now we check if there is enough allowance for this message
+    let allowance = allowances_read(&deps.storage).may_load(owner_raw.as_slice())?;
+    match allowance {
+        // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
+        Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
+        None => Ok(false),
+    }
 }
 
 #[cfg(test)]

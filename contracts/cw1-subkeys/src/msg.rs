@@ -37,11 +37,21 @@ where
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum QueryMsg {
+pub enum QueryMsg<T = Empty>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     /// Shows all admins and whether or not it is mutable
     /// Returns cw1-whitelist::AdminListResponse
     AdminList {},
     /// Get the current allowance for the given subkey (how much it can spend)
     /// Returns crate::state::Allowance
     Allowance { spender: HumanAddr },
+    /// Checks permissions of the caller on this proxy.
+    /// If CanSend returns true then a call to `Execute` with the same message,
+    /// before any further state changes, should also succeed.
+    CanSend {
+        sender: HumanAddr,
+        msg: CosmosMsg<T>,
+    },
 }
