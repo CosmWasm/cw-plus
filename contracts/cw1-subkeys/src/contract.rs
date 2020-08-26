@@ -318,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn query_allowances() {
+    fn query_allowance_works() {
         let mut deps = mock_dependencies(20, &coins(1111, "token1"));
 
         let owner = HumanAddr::from("admin0001");
@@ -370,6 +370,66 @@ mod tests {
         // Check allowances work for accounts with no balance
         let allowance = query_allowance(&deps, spender3.clone()).unwrap();
         assert_eq!(allowance, Allowance::default(),);
+    }
+
+    #[test]
+    fn query_all_allowances_works() {
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+        let initial_spenders = vec![spender1.clone(), spender2.clone(), spender3.clone()];
+
+        // Same allowances for all spenders, for simplicity
+        let initial_allowances = coins(1234, "mytoken");
+        let expires_later = Expiration::AtHeight(12345);
+        let initial_expirations = vec![
+            Expiration::Never {},
+            Expiration::Never {},
+            expires_later.clone(),
+        ];
+
+        let env = mock_env(owner, &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        // Check allowances work for accounts with balances
+        let allowances = query_all_allowances(&deps).unwrap().allowances;
+        assert_eq!(3, allowances.len());
+        assert_eq!(
+            allowances[0],
+            AllowanceInfo {
+                spender: spender1,
+                balance: Balance(initial_allowances.clone()),
+                expires: Expiration::Never {}
+            }
+        );
+        assert_eq!(
+            allowances[1],
+            AllowanceInfo {
+                spender: spender2,
+                balance: Balance(initial_allowances.clone()),
+                expires: Expiration::Never {}
+            }
+        );
+        assert_eq!(
+            allowances[2],
+            AllowanceInfo {
+                spender: spender3,
+                balance: Balance(initial_allowances.clone()),
+                expires: expires_later,
+            }
+        );
     }
 
     #[test]
