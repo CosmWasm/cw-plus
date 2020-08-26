@@ -5,6 +5,8 @@ use std::fmt;
 use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
 use cw0::Expiration;
 
+use crate::balance::Balance;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg<T = Empty>
@@ -54,4 +56,22 @@ where
         sender: HumanAddr,
         msg: CosmosMsg<T>,
     },
+    /// Gets all Allowances for this contract
+    /// Returns AllAllowancesResponse
+    AllAllowances {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AllAllowancesResponse {
+    pub allowances: Vec<AllowanceInfo>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AllowanceInfo {
+    pub spender: HumanAddr,
+    pub balance: Balance,
+    pub expires: Expiration,
 }

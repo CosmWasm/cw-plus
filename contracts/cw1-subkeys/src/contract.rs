@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 use cw0::Expiration;
 use cw1::CanSendResponse;
@@ -14,7 +14,7 @@ use cw1_whitelist::{
 };
 use cw2::{set_contract_version, ContractVersion};
 
-use crate::msg::{HandleMsg, QueryMsg};
+use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
 use std::ops::{AddAssign, Sub};
 
@@ -207,6 +207,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
         QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
+        QueryMsg::AllAllowances { start_after, limit } => {
+            to_binary(&query_all_allowances(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -259,6 +262,51 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+const MAX_LIMIT: u32 = 30;
+const DEFAULT_LIMIT: u32 = 10;
+
+fn calc_limit(request: Option<u32>) -> usize {
+    request.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize
+}
+
+// this will set the first key after the provided key, by appending a 1 byte
+fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
+    match start_after {
+        Some(human) => {
+            let mut v = Vec::from(human.0);
+            v.push(1);
+            Some(v)
+        }
+        None => None,
+    }
+}
+
+// return a list of all allowances here
+pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_after: Option<HumanAddr>,
+    limit: Option<u32>,
+) -> StdResult<AllAllowancesResponse> {
+    let limit = calc_limit(limit);
+    let range_start = calc_range_start(start_after);
+
+    let api = &deps.api;
+    let res: StdResult<Vec<AllowanceInfo>> = allowances_read(&deps.storage)
+        .range(range_start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.and_then(|(k, allow)| {
+                Ok(AllowanceInfo {
+                    spender: api.human_address(&CanonicalAddr::from(k))?,
+                    balance: allow.balance,
+                    expires: allow.expires,
+                })
+            })
+        })
+        .collect();
+    Ok(AllAllowancesResponse { allowances: res? })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn query_allowances() {
+    fn query_allowance_works() {
         let mut deps = mock_dependencies(20, &coins(1111, "token1"));
 
         let owner = HumanAddr::from("admin0001");
@@ -349,6 +397,74 @@ mod tests {
         // Check allowances work for accounts with no balance
         let allowance = query_allowance(&deps, spender3.clone()).unwrap();
         assert_eq!(allowance, Allowance::default(),);
+    }
+
+    #[test]
+    fn query_all_allowances_works() {
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+        let initial_spenders = vec![spender1.clone(), spender2.clone(), spender3.clone()];
+
+        // Same allowances for all spenders, for simplicity
+        let initial_allowances = coins(1234, "mytoken");
+        let expires_later = Expiration::AtHeight(12345);
+        let initial_expirations = vec![
+            Expiration::Never {},
+            Expiration::Never {},
+            expires_later.clone(),
+        ];
+
+        let env = mock_env(owner, &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        // let's try pagination
+        let allowances = query_all_allowances(&deps, None, Some(2))
+            .unwrap()
+            .allowances;
+        assert_eq!(2, allowances.len());
+        assert_eq!(
+            allowances[0],
+            AllowanceInfo {
+                spender: spender1,
+                balance: Balance(initial_allowances.clone()),
+                expires: Expiration::Never {}
+            }
+        );
+        assert_eq!(
+            allowances[1],
+            AllowanceInfo {
+                spender: spender2.clone(),
+                balance: Balance(initial_allowances.clone()),
+                expires: Expiration::Never {}
+            }
+        );
+
+        // now continue from after the last one
+        let allowances = query_all_allowances(&deps, Some(spender2), Some(2))
+            .unwrap()
+            .allowances;
+        assert_eq!(1, allowances.len());
+        assert_eq!(
+            allowances[0],
+            AllowanceInfo {
+                spender: spender3,
+                balance: Balance(initial_allowances.clone()),
+                expires: expires_later,
+            }
+        );
     }
 
     #[test]
