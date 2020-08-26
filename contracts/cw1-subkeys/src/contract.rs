@@ -1,10 +1,12 @@
-use schemars::JsonSchema;
 use std::fmt;
+use std::ops::{AddAssign, Sub};
 
 use cosmwasm_std::{
     log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
     HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
+use schemars::JsonSchema;
+
 use cw0::Expiration;
 use cw1::CanSendResponse;
 use cw1_whitelist::{
@@ -16,7 +18,6 @@ use cw2::{set_contract_version, ContractVersion};
 
 use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
-use std::ops::{AddAssign, Sub};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
@@ -310,11 +311,15 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::balance::Balance;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
+
     use cw1_whitelist::msg::AdminListResponse;
+    use cw2::get_contract_version;
+
+    use crate::balance::Balance;
+
+    use super::*;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -346,8 +351,44 @@ mod tests {
     }
 
     #[test]
+    fn check_contract_version() {
+        let mut deps = mock_dependencies(20, &[]);
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone()];
+        let initial_spenders = vec![];
+        let initial_allowances = vec![];
+        let initial_expirations = vec![];
+
+        let env = mock_env(owner, &[]);
+
+        // Check contract version not set
+        let contract_version = get_contract_version(&deps.storage);
+        assert!(contract_version.is_err());
+
+        // Init a contract
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        // Validate contract version
+        let contract_version = get_contract_version(&deps.storage).unwrap();
+        assert_eq!(
+            ContractVersion {
+                contract: CONTRACT_NAME.to_string(),
+                version: CONTRACT_VERSION.to_string(),
+            },
+            contract_version
+        );
+    }
+
+    #[test]
     fn query_allowance_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -383,7 +424,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
         let allowance = query_allowance(&deps, spender2.clone()).unwrap();
@@ -391,7 +432,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
 
@@ -402,7 +443,7 @@ mod tests {
 
     #[test]
     fn query_all_allowances_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -441,7 +482,7 @@ mod tests {
             AllowanceInfo {
                 spender: spender1,
                 balance: Balance(initial_allowances.clone()),
-                expires: Expiration::Never {}
+                expires: Expiration::Never {},
             }
         );
         assert_eq!(
@@ -449,7 +490,7 @@ mod tests {
             AllowanceInfo {
                 spender: spender2.clone(),
                 balance: Balance(initial_allowances.clone()),
-                expires: Expiration::Never {}
+                expires: Expiration::Never {},
             }
         );
 
@@ -470,7 +511,7 @@ mod tests {
 
     #[test]
     fn update_admins_and_query() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admin2 = HumanAddr::from("admin0002");
@@ -499,7 +540,6 @@ mod tests {
 
         // Verify
         let config = query_admin_list(&deps).unwrap();
-        println!("config: {:#?}", config);
         assert_eq!(
             config,
             AdminListResponse {
@@ -516,7 +556,6 @@ mod tests {
 
         // Verify admin3 is now the sole admin
         let config = query_admin_list(&deps).unwrap();
-        println!("config: {:#?}", config);
         assert_eq!(
             config,
             AdminListResponse {
@@ -544,7 +583,6 @@ mod tests {
 
         // Verify
         let config = query_admin_list(&deps).unwrap();
-        println!("config: {:#?}", config);
         assert_eq!(
             config,
             AdminListResponse {
@@ -556,7 +594,7 @@ mod tests {
 
     #[test]
     fn increase_allowances() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -610,7 +648,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -628,7 +666,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -646,7 +684,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
 
@@ -671,7 +709,7 @@ mod tests {
 
     #[test]
     fn decrease_allowances() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -725,7 +763,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -743,7 +781,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
 
@@ -764,7 +802,7 @@ mod tests {
                     coin(amount1 / 2 + (amount1 & 1), denom1),
                     allow2.clone()
                 ]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -805,14 +843,14 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow2]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
     }
 
     #[test]
     fn execute_checks() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -904,7 +942,7 @@ mod tests {
 
     #[test]
     fn can_send_query_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin007");
         let spender = HumanAddr::from("spender808");
