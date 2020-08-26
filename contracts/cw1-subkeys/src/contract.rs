@@ -20,7 +20,7 @@ use std::ops::{AddAssign, Sub};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
-const CONTRACT_VERSION: &str = "v0.1.0";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
