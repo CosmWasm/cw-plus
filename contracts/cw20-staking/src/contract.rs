@@ -3,8 +3,13 @@ use cosmwasm_std::{
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{set_contract_version, ContractVersion};
-use cw20_base::allowances::query_allowance;
-use cw20_base::contract::{query_balance, query_token_info};
+use cw20_base::allowances::{
+    handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
+    handle_transfer_from, query_allowance,
+};
+use cw20_base::contract::{
+    handle_burn, handle_send, handle_transfer, query_balance, query_token_info,
+};
 use cw20_base::state::{balances, token_info, TokenInfo};
 
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
@@ -77,6 +82,37 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::Claim {} => claim(deps, env),
         HandleMsg::Reinvest {} => reinvest(deps, env),
         HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env),
+
+        // these all come from cw20-base to implement the cw20 standard
+        HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, recipient, amount),
+        HandleMsg::Burn { amount } => handle_burn(deps, env, amount),
+        HandleMsg::Send {
+            contract,
+            amount,
+            msg,
+        } => handle_send(deps, env, contract, amount, msg),
+        HandleMsg::IncreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        HandleMsg::DecreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        HandleMsg::TransferFrom {
+            owner,
+            recipient,
+            amount,
+        } => handle_transfer_from(deps, env, owner, recipient, amount),
+        HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, owner, amount),
+        HandleMsg::SendFrom {
+            owner,
+            contract,
+            amount,
+            msg,
+        } => handle_send_from(deps, env, owner, contract, amount, msg),
     }
 }
 
