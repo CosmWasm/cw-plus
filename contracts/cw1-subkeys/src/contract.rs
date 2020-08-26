@@ -31,8 +31,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         contract: CONTRACT_NAME.to_string(),
         version: CONTRACT_VERSION.to_string(),
     };
+    let result = whitelist_init(deps, env, msg);
     set_contract_version(&mut deps.storage, &version)?;
-    whitelist_init(deps, env, msg)
+    result
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -314,6 +315,7 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
+    use cw2::get_contract_version;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -342,6 +344,42 @@ mod tests {
                 handle(&mut deps, env.clone(), msg).unwrap();
             }
         }
+    }
+
+        
+    #[test]
+    fn get_contract_version_works() {
+        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
+
+        // Same allowances for all spenders, for simplicity
+        let denom1 = "token1";
+        let amount1 = 1111;
+
+        let allow1 = coin(amount1, denom1);
+        let initial_allowances = vec![allow1.clone()];
+
+        let expires_never = Expiration::Never {};
+        let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+
+        let env = mock_env(owner, &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+        );
+
+        assert_eq!(get_contract_version(&deps.storage).unwrap().contract, CONTRACT_NAME)
     }
 
     #[test]
