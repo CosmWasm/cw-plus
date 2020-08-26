@@ -8,9 +8,9 @@ use cw20_base::allowances::{
     handle_transfer_from, query_allowance,
 };
 use cw20_base::contract::{
-    handle_burn, handle_send, handle_transfer, query_balance, query_token_info,
+    handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
 };
-use cw20_base::state::{balances, token_info, TokenInfo};
+use cw20_base::state::{token_info, MinterData, TokenInfo};
 
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
@@ -50,7 +50,11 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply: Uint128(0),
-        mint: None,
+        // set self as minter, so we can properly handle mint and burn
+        mint: Some(MinterData {
+            minter: deps.api.canonical_address(&env.contract.address)?,
+            cap: None,
+        }),
     };
     token_info(&mut deps.storage).save(&data)?;
 
@@ -152,8 +156,6 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> StdResult<HandleResponse> {
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-
     // ensure we have the proper denom
     let invest = invest_info_read(&deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
@@ -183,10 +185,10 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     supply.issued += to_mint;
     totals.save(&supply)?;
 
-    // update the balance of the sender
-    balances(&mut deps.storage).update(sender_raw.as_slice(), |balance| {
-        Ok(balance.unwrap_or_default() + to_mint)
-    })?;
+    // call into cw20-base to mint the token, call as self as no one else is allowed
+    let mut sub_env = env.clone();
+    sub_env.message.sender = env.contract.address.clone();
+    handle_mint(deps, sub_env, env.message.sender.clone(), to_mint)?;
 
     // bond them to the validator
     let res = HandleResponse {
@@ -224,16 +226,14 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     // calculate tax and remainer to unbond
     let tax = amount * invest.exit_tax;
 
-    // deduct all from the account
-    let mut accounts = balances(&mut deps.storage);
-    accounts.update(sender_raw.as_slice(), |balance| {
-        balance.unwrap_or_default() - amount
-    })?;
+    // burn from the original caller
+    handle_burn(deps, env.clone(), amount)?;
     if tax > Uint128(0) {
-        // add tax to the owner
-        accounts.update(invest.owner.as_slice(), |balance: Option<Uint128>| {
-            Ok(balance.unwrap_or_default() + tax)
-        })?;
+        let mut sub_env = env.clone();
+        sub_env.message.sender = env.contract.address.clone();
+        // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
+        let human_owner = deps.api.human_address(&invest.owner)?;
+        handle_mint(deps, sub_env, human_owner, tax)?;
     }
 
     // re-calculate bonded to ensure we have real values
@@ -578,6 +578,7 @@ mod tests {
         assert_eq!(&token.name, &msg.name);
         assert_eq!(&token.symbol, &msg.symbol);
         assert_eq!(token.decimals, msg.decimals);
+        assert_eq!(token.total_supply, Uint128(0));
 
         // no balance
         assert_eq!(get_balance(&deps, &creator), Uint128(0));
@@ -634,6 +635,10 @@ mod tests {
         assert_eq!(invest.token_supply, Uint128(1000));
         assert_eq!(invest.staked_tokens, coin(1000, "ustake"));
         assert_eq!(invest.nominal_value, Decimal::one());
+
+        // token info also properly updated
+        let token = query_token_info(&deps).unwrap();
+        assert_eq!(token.total_supply, Uint128(1000));
     }
 
     #[test]
@@ -874,9 +879,6 @@ mod tests {
             Uint128(100)
         );
 
-        // TODO: fix this, cw20-base tracks token_supply separate from cw20-staking...
-        // figure out burn solution
-
         // burn some, but not too much
         let burn_too_much = HandleMsg::Burn {
             amount: Uint128(1000),
@@ -884,13 +886,10 @@ mod tests {
         let failed = handle(&mut deps, bob_env.clone(), burn_too_much);
         assert!(failed.is_err());
         assert_eq!(get_balance(&deps, &bob), Uint128(550));
-        // let burn = HandleMsg::Burn {
-        //     amount: Uint128(130),
-        // };
-        // let e = handle(&mut deps, bob_env.clone(), burn).unwrap_err();
-        // println!("{:?}", e);
-        // assert!(false);
-        // handle(&mut deps, bob_env.clone(), burn).unwrap();
-        // assert_eq!(get_balance(&deps, &bob), Uint128(420));
+        let burn = HandleMsg::Burn {
+            amount: Uint128(130),
+        };
+        handle(&mut deps, bob_env.clone(), burn).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(420));
     }
 }
