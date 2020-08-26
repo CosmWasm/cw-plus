@@ -807,4 +807,90 @@ mod tests {
         assert_eq!(invest.staked_tokens, coin(690, "ustake")); // 1500 - 810
         assert_eq!(invest.nominal_value, ratio);
     }
+
+    #[test]
+    fn cw20_imports_work() {
+        let mut deps = mock_dependencies(20, &[]);
+        set_validator(&mut deps.querier);
+
+        // set the actors... bob stakes, sends coins to carl, and gives allowance to alice
+        let bob = HumanAddr::from("bob");
+        let alice = HumanAddr::from("alice");
+        let carl = HumanAddr::from("carl");
+
+        // create the contract
+        let creator = HumanAddr::from("creator");
+        let init_msg = default_init(2, 50);
+        let env = mock_env(&creator, &[]);
+        init(&mut deps, env, init_msg).unwrap();
+
+        // bond some tokens to create a balance
+        let env = mock_env(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
+        handle(&mut deps, env, HandleMsg::Bond {}).unwrap();
+
+        // bob got 1000 DRV for 1000 stake at a 1.0 ratio
+        assert_eq!(get_balance(&deps, &bob), Uint128(1000));
+
+        // send coins to carl
+        let bob_env = mock_env(&bob, &[]);
+        let transfer = HandleMsg::Transfer {
+            recipient: carl.clone(),
+            amount: Uint128(200),
+        };
+        handle(&mut deps, bob_env.clone(), transfer).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(800));
+        assert_eq!(get_balance(&deps, &carl), Uint128(200));
+
+        // allow alice
+        let allow = HandleMsg::IncreaseAllowance {
+            spender: alice.clone(),
+            amount: Uint128(350),
+            expires: None,
+        };
+        handle(&mut deps, bob_env.clone(), allow).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(800));
+        assert_eq!(get_balance(&deps, &alice), Uint128(0));
+        assert_eq!(
+            query_allowance(&deps, bob.clone(), alice.clone())
+                .unwrap()
+                .allowance,
+            Uint128(350)
+        );
+
+        // alice takes some for herself
+        let self_pay = HandleMsg::TransferFrom {
+            owner: bob.clone(),
+            recipient: alice.clone(),
+            amount: Uint128(250),
+        };
+        let alice_env = mock_env(&alice, &[]);
+        handle(&mut deps, alice_env.clone(), self_pay).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(550));
+        assert_eq!(get_balance(&deps, &alice), Uint128(250));
+        assert_eq!(
+            query_allowance(&deps, bob.clone(), alice.clone())
+                .unwrap()
+                .allowance,
+            Uint128(100)
+        );
+
+        // TODO: fix this, cw20-base tracks token_supply separate from cw20-staking...
+        // figure out burn solution
+
+        // burn some, but not too much
+        let burn_too_much = HandleMsg::Burn {
+            amount: Uint128(1000),
+        };
+        let failed = handle(&mut deps, bob_env.clone(), burn_too_much);
+        assert!(failed.is_err());
+        assert_eq!(get_balance(&deps, &bob), Uint128(550));
+        // let burn = HandleMsg::Burn {
+        //     amount: Uint128(130),
+        // };
+        // let e = handle(&mut deps, bob_env.clone(), burn).unwrap_err();
+        // println!("{:?}", e);
+        // assert!(false);
+        // handle(&mut deps, bob_env.clone(), burn).unwrap();
+        // assert_eq!(get_balance(&deps, &bob), Uint128(420));
+    }
 }
