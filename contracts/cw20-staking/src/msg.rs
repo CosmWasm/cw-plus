@@ -61,8 +61,6 @@ pub enum QueryMsg {
         owner: HumanAddr,
         spender: HumanAddr,
     },
-
-
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

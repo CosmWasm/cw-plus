@@ -3,26 +3,6 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Balance shows the number of staking derivatives",
-      "type": "object",
-      "required": [
-        "balance"
-      ],
-      "properties": {
-        "balance": {
-          "type": "object",
-          "required": [
-            "address"
-          ],
-          "properties": {
-            "address": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
       "description": "Claims shows the number of tokens this address can access when they are done unbonding",
       "type": "object",
       "required": [
@@ -43,7 +23,39 @@
       }
     },
     {
-      "description": "TokenInfo shows the metadata of the token for UIs",
+      "description": "Investment shows metadata on the staking info of the contract",
+      "type": "object",
+      "required": [
+        "investment"
+      ],
+      "properties": {
+        "investment": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Implements CW20. Returns the current balance of the given address, 0 if unset.",
+      "type": "object",
+      "required": [
+        "balance"
+      ],
+      "properties": {
+        "balance": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Implements CW20. Returns metadata on the contract - name, decimals, supply, etc.",
       "type": "object",
       "required": [
         "token_info"
@@ -55,14 +67,26 @@
       }
     },
     {
-      "description": "Investment shows info on total staking tokens under custody, with which validator, as well as how many derivative tokens are lists. It also shows with the exit tax.",
+      "description": "Implements CW20 \"allowance\" extension. Returns how much spender can use from owner account, 0 if unset.",
       "type": "object",
       "required": [
-        "investment"
+        "allowance"
       ],
       "properties": {
-        "investment": {
-          "type": "object"
+        "allowance": {
+          "type": "object",
+          "required": [
+            "owner",
+            "spender"
+          ],
+          "properties": {
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
         }
       }
     }

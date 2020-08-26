@@ -3,15 +3,14 @@ use cosmwasm_std::{
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{set_contract_version, ContractVersion};
-use cw20_base::allowances::{query_allowance};
+use cw20_base::allowances::query_allowance;
 use cw20_base::contract::{query_balance, query_token_info};
 use cw20_base::state::{balances, token_info, TokenInfo};
 
-use crate::msg::{
-    ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg,
-};
+use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
-    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
+    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read,
+    InvestmentInfo, Supply,
 };
 
 const FALLBACK_RATIO: Decimal = Decimal::one();

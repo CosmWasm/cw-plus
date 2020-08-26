@@ -3,10 +3,9 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cw20_staking::msg::{
-    BalanceResponse, ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg,
-    TokenInfoResponse,
-};
+use cw20::{BalanceResponse, TokenInfoResponse};
+use cw20_staking::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
+
 use cw20_staking::state::{InvestmentInfo, Supply};
 
 fn main() {
