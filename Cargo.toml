@@ -29,6 +29,13 @@ debug-assertions = false
 codegen-units = 1
 incremental = false
 
+[profile.release.package.cw20-staking]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
 [profile.release]
 rpath = false
 lto = true
