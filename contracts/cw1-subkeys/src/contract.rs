@@ -207,7 +207,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
         QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
-        QueryMsg::AllAllowances {} => to_binary(&query_all_allowances(deps)?),
+        QueryMsg::AllAllowances { start_after, limit } => {
+            to_binary(&query_all_allowances(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -260,13 +262,38 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+const MAX_LIMIT: u32 = 30;
+const DEFAULT_LIMIT: u32 = 10;
+
+fn calc_limit(request: Option<u32>) -> usize {
+    request.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize
+}
+
+// this will set the first key after the provided key, by appending a 1 byte
+fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
+    match start_after {
+        Some(human) => {
+            let mut v = Vec::from(human.0);
+            v.push(1);
+            Some(v)
+        }
+        None => None,
+    }
+}
+
 // return a list of all allowances here
 pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    start_after: Option<HumanAddr>,
+    limit: Option<u32>,
 ) -> StdResult<AllAllowancesResponse> {
+    let limit = calc_limit(limit);
+    let range_start = calc_range_start(start_after);
+
     let api = &deps.api;
     let res: StdResult<Vec<AllowanceInfo>> = allowances_read(&deps.storage)
-        .range(None, None, Order::Ascending)
+        .range(range_start.as_deref(), None, Order::Ascending)
+        .take(limit)
         .map(|item| {
             item.and_then(|(k, allow)| {
                 Ok(AllowanceInfo {
@@ -403,9 +430,11 @@ mod tests {
             &initial_expirations,
         );
 
-        // Check allowances work for accounts with balances
-        let allowances = query_all_allowances(&deps).unwrap().allowances;
-        assert_eq!(3, allowances.len());
+        // let's try pagination
+        let allowances = query_all_allowances(&deps, None, Some(2))
+            .unwrap()
+            .allowances;
+        assert_eq!(2, allowances.len());
         assert_eq!(
             allowances[0],
             AllowanceInfo {
@@ -417,13 +446,19 @@ mod tests {
         assert_eq!(
             allowances[1],
             AllowanceInfo {
-                spender: spender2,
+                spender: spender2.clone(),
                 balance: Balance(initial_allowances.clone()),
                 expires: Expiration::Never {}
             }
         );
+
+        // now continue from after the last one
+        let allowances = query_all_allowances(&deps, Some(spender2), Some(2))
+            .unwrap()
+            .allowances;
+        assert_eq!(1, allowances.len());
         assert_eq!(
-            allowances[2],
+            allowances[0],
             AllowanceInfo {
                 spender: spender3,
                 balance: Balance(initial_allowances.clone()),

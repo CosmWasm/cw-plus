@@ -58,7 +58,10 @@ where
     },
     /// Gets all Allowances for this contract
     /// Returns AllAllowancesResponse
-    AllAllowances {},
+    AllAllowances {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
