@@ -3,14 +3,19 @@ use cosmwasm_std::{
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{set_contract_version, ContractVersion};
-
-use crate::msg::{
-    BalanceResponse, ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg,
-    TokenInfoResponse,
+use cw20_base::allowances::{
+    handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
+    handle_transfer_from, query_allowance,
 };
+use cw20_base::contract::{
+    handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
+};
+use cw20_base::state::{token_info, MinterData, TokenInfo};
+
+use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
-    balances, balances_read, claims, claims_read, invest_info, invest_info_read, token_info,
-    token_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
+    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read,
+    InvestmentInfo, Supply,
 };
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -39,12 +44,19 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         )));
     }
 
-    let token = TokenInfoResponse {
+    // store token info using cw20-base format
+    let data = TokenInfo {
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
+        total_supply: Uint128(0),
+        // set self as minter, so we can properly handle mint and burn
+        mint: Some(MinterData {
+            minter: deps.api.canonical_address(&env.contract.address)?,
+            cap: None,
+        }),
     };
-    token_info(&mut deps.storage).save(&token)?;
+    token_info(&mut deps.storage).save(&data)?;
 
     let denom = deps.querier.query_bonded_denom()?;
     let invest = InvestmentInfo {
@@ -74,6 +86,37 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::Claim {} => claim(deps, env),
         HandleMsg::Reinvest {} => reinvest(deps, env),
         HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env),
+
+        // these all come from cw20-base to implement the cw20 standard
+        HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, recipient, amount),
+        HandleMsg::Burn { amount } => handle_burn(deps, env, amount),
+        HandleMsg::Send {
+            contract,
+            amount,
+            msg,
+        } => handle_send(deps, env, contract, amount, msg),
+        HandleMsg::IncreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        HandleMsg::DecreaseAllowance {
+            spender,
+            amount,
+            expires,
+        } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        HandleMsg::TransferFrom {
+            owner,
+            recipient,
+            amount,
+        } => handle_transfer_from(deps, env, owner, recipient, amount),
+        HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, owner, amount),
+        HandleMsg::SendFrom {
+            owner,
+            contract,
+            amount,
+            msg,
+        } => handle_send_from(deps, env, owner, contract, amount, msg),
     }
 }
 
@@ -113,8 +156,6 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> StdResult<HandleResponse> {
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-
     // ensure we have the proper denom
     let invest = invest_info_read(&deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
@@ -131,7 +172,9 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     // calculate to_mint and update total supply
     let mut totals = total_supply(&mut deps.storage);
     let mut supply = totals.load()?;
-    // TODO: this is just temporary check - we should use dynamic query or have a way to recover
+    // TODO: this is just a safety assertion - do we keep it, or remove caching?
+    // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
+    // have expensive queries everywhere
     assert_bonds(&supply, bonded)?;
     let to_mint = if supply.issued.is_zero() || bonded.is_zero() {
         FALLBACK_RATIO * payment.amount
@@ -142,10 +185,10 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     supply.issued += to_mint;
     totals.save(&supply)?;
 
-    // update the balance of the sender
-    balances(&mut deps.storage).update(sender_raw.as_slice(), |balance| {
-        Ok(balance.unwrap_or_default() + to_mint)
-    })?;
+    // call into cw20-base to mint the token, call as self as no one else is allowed
+    let mut sub_env = env.clone();
+    sub_env.message.sender = env.contract.address.clone();
+    handle_mint(deps, sub_env, env.message.sender.clone(), to_mint)?;
 
     // bond them to the validator
     let res = HandleResponse {
@@ -183,16 +226,14 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     // calculate tax and remainer to unbond
     let tax = amount * invest.exit_tax;
 
-    // deduct all from the account
-    let mut accounts = balances(&mut deps.storage);
-    accounts.update(sender_raw.as_slice(), |balance| {
-        balance.unwrap_or_default() - amount
-    })?;
+    // burn from the original caller
+    handle_burn(deps, env.clone(), amount)?;
     if tax > Uint128(0) {
-        // add tax to the owner
-        accounts.update(invest.owner.as_slice(), |balance: Option<Uint128>| {
-            Ok(balance.unwrap_or_default() + tax)
-        })?;
+        let mut sub_env = env.clone();
+        sub_env.message.sender = env.contract.address.clone();
+        // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
+        let human_owner = deps.api.human_address(&invest.owner)?;
+        handle_mint(deps, sub_env, human_owner, tax)?;
     }
 
     // re-calculate bonded to ensure we have real values
@@ -203,7 +244,9 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     let remainder = (amount - tax)?;
     let mut totals = total_supply(&mut deps.storage);
     let mut supply = totals.load()?;
-    // TODO: this is just temporary check - we should use dynamic query or have a way to recover
+    // TODO: this is just a safety assertion - do we keep it, or remove caching?
+    // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
+    // have expensive queries everywhere
     assert_bonds(&supply, bonded)?;
     let unbond = remainder.multiply_ratio(bonded, supply.issued);
     supply.bonded = (bonded - unbond)?;
@@ -363,28 +406,16 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
-        QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
-        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        // custom queries
         QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
+        QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
+        // inherited from cw20-base
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        QueryMsg::Allowance { owner, spender } => {
+            to_binary(&query_allowance(deps, owner, spender)?)
+        }
     }
-}
-
-pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<TokenInfoResponse> {
-    token_info_read(&deps.storage).load()
-}
-
-pub fn query_balance<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    address: HumanAddr,
-) -> StdResult<BalanceResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
-    let balance = balances_read(&deps.storage)
-        .may_load(address_raw.as_slice())?
-        .unwrap_or_default();
-    Ok(BalanceResponse { balance })
 }
 
 pub fn query_claims<S: Storage, A: Api, Q: Querier>(
@@ -547,6 +578,7 @@ mod tests {
         assert_eq!(&token.name, &msg.name);
         assert_eq!(&token.symbol, &msg.symbol);
         assert_eq!(token.decimals, msg.decimals);
+        assert_eq!(token.total_supply, Uint128(0));
 
         // no balance
         assert_eq!(get_balance(&deps, &creator), Uint128(0));
@@ -603,6 +635,10 @@ mod tests {
         assert_eq!(invest.token_supply, Uint128(1000));
         assert_eq!(invest.staked_tokens, coin(1000, "ustake"));
         assert_eq!(invest.nominal_value, Decimal::one());
+
+        // token info also properly updated
+        let token = query_token_info(&deps).unwrap();
+        assert_eq!(token.total_supply, Uint128(1000));
     }
 
     #[test]
@@ -775,5 +811,85 @@ mod tests {
         assert_eq!(invest.token_supply, bobs_balance + owner_cut);
         assert_eq!(invest.staked_tokens, coin(690, "ustake")); // 1500 - 810
         assert_eq!(invest.nominal_value, ratio);
+    }
+
+    #[test]
+    fn cw20_imports_work() {
+        let mut deps = mock_dependencies(20, &[]);
+        set_validator(&mut deps.querier);
+
+        // set the actors... bob stakes, sends coins to carl, and gives allowance to alice
+        let bob = HumanAddr::from("bob");
+        let alice = HumanAddr::from("alice");
+        let carl = HumanAddr::from("carl");
+
+        // create the contract
+        let creator = HumanAddr::from("creator");
+        let init_msg = default_init(2, 50);
+        let env = mock_env(&creator, &[]);
+        init(&mut deps, env, init_msg).unwrap();
+
+        // bond some tokens to create a balance
+        let env = mock_env(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
+        handle(&mut deps, env, HandleMsg::Bond {}).unwrap();
+
+        // bob got 1000 DRV for 1000 stake at a 1.0 ratio
+        assert_eq!(get_balance(&deps, &bob), Uint128(1000));
+
+        // send coins to carl
+        let bob_env = mock_env(&bob, &[]);
+        let transfer = HandleMsg::Transfer {
+            recipient: carl.clone(),
+            amount: Uint128(200),
+        };
+        handle(&mut deps, bob_env.clone(), transfer).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(800));
+        assert_eq!(get_balance(&deps, &carl), Uint128(200));
+
+        // allow alice
+        let allow = HandleMsg::IncreaseAllowance {
+            spender: alice.clone(),
+            amount: Uint128(350),
+            expires: None,
+        };
+        handle(&mut deps, bob_env.clone(), allow).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(800));
+        assert_eq!(get_balance(&deps, &alice), Uint128(0));
+        assert_eq!(
+            query_allowance(&deps, bob.clone(), alice.clone())
+                .unwrap()
+                .allowance,
+            Uint128(350)
+        );
+
+        // alice takes some for herself
+        let self_pay = HandleMsg::TransferFrom {
+            owner: bob.clone(),
+            recipient: alice.clone(),
+            amount: Uint128(250),
+        };
+        let alice_env = mock_env(&alice, &[]);
+        handle(&mut deps, alice_env.clone(), self_pay).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(550));
+        assert_eq!(get_balance(&deps, &alice), Uint128(250));
+        assert_eq!(
+            query_allowance(&deps, bob.clone(), alice.clone())
+                .unwrap()
+                .allowance,
+            Uint128(100)
+        );
+
+        // burn some, but not too much
+        let burn_too_much = HandleMsg::Burn {
+            amount: Uint128(1000),
+        };
+        let failed = handle(&mut deps, bob_env.clone(), burn_too_much);
+        assert!(failed.is_err());
+        assert_eq!(get_balance(&deps, &bob), Uint128(550));
+        let burn = HandleMsg::Burn {
+            amount: Uint128(130),
+        };
+        handle(&mut deps, bob_env.clone(), burn).unwrap();
+        assert_eq!(get_balance(&deps, &bob), Uint128(420));
     }
 }
