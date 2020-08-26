@@ -46,37 +46,28 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    /// Balance shows the number of staking derivatives
-    Balance { address: HumanAddr },
     /// Claims shows the number of tokens this address can access when they are done unbonding
     Claims { address: HumanAddr },
-    /// TokenInfo shows the metadata of the token for UIs
-    TokenInfo {},
-    /// Investment shows info on total staking tokens under custody,
-    /// with which validator, as well as how many derivative tokens are lists.
-    /// It also shows with the exit tax.
+    /// Investment shows metadata on the staking info of the contract
     Investment {},
-}
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct BalanceResponse {
-    pub balance: Uint128,
+    /// Implements CW20. Returns the current balance of the given address, 0 if unset.
+    Balance { address: HumanAddr },
+    /// Implements CW20. Returns metadata on the contract - name, decimals, supply, etc.
+    TokenInfo {},
+    /// Implements CW20 "allowance" extension.
+    /// Returns how much spender can use from owner account, 0 if unset.
+    Allowance {
+        owner: HumanAddr,
+        spender: HumanAddr,
+    },
+
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ClaimsResponse {
     pub claims: Uint128,
-}
-
-/// TokenInfoResponse is info to display the derivative token in a UI
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct TokenInfoResponse {
-    /// name of the derivative token
-    pub name: String,
-    /// symbol / ticker of the derivative token
-    pub symbol: String,
-    /// decimal places of the derivative token (for UI)
-    pub decimals: u8,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

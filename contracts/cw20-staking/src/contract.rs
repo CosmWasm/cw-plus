@@ -3,14 +3,15 @@ use cosmwasm_std::{
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::{set_contract_version, ContractVersion};
+use cw20_base::allowances::{query_allowance};
+use cw20_base::contract::{query_balance, query_token_info};
+use cw20_base::state::{balances, token_info, TokenInfo};
 
 use crate::msg::{
-    BalanceResponse, ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg,
-    TokenInfoResponse,
+    ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg,
 };
 use crate::state::{
-    balances, balances_read, claims, claims_read, invest_info, invest_info_read, token_info,
-    token_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
+    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
 };
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -39,12 +40,15 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         )));
     }
 
-    let token = TokenInfoResponse {
+    // store token info using cw20-base format
+    let data = TokenInfo {
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
+        total_supply: Uint128(0),
+        mint: None,
     };
-    token_info(&mut deps.storage).save(&token)?;
+    token_info(&mut deps.storage).save(&data)?;
 
     let denom = deps.querier.query_bonded_denom()?;
     let invest = InvestmentInfo {
@@ -131,7 +135,9 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     // calculate to_mint and update total supply
     let mut totals = total_supply(&mut deps.storage);
     let mut supply = totals.load()?;
-    // TODO: this is just temporary check - we should use dynamic query or have a way to recover
+    // TODO: this is just a safety assertion - do we keep it, or remove caching?
+    // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
+    // have expensive queries everywhere
     assert_bonds(&supply, bonded)?;
     let to_mint = if supply.issued.is_zero() || bonded.is_zero() {
         FALLBACK_RATIO * payment.amount
@@ -203,7 +209,9 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     let remainder = (amount - tax)?;
     let mut totals = total_supply(&mut deps.storage);
     let mut supply = totals.load()?;
-    // TODO: this is just temporary check - we should use dynamic query or have a way to recover
+    // TODO: this is just a safety assertion - do we keep it, or remove caching?
+    // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
+    // have expensive queries everywhere
     assert_bonds(&supply, bonded)?;
     let unbond = remainder.multiply_ratio(bonded, supply.issued);
     supply.bonded = (bonded - unbond)?;
@@ -363,28 +371,16 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
-        QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
-        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        // custom queries
         QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
+        QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
+        // inherited from cw20-base
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        QueryMsg::Allowance { owner, spender } => {
+            to_binary(&query_allowance(deps, owner, spender)?)
+        }
     }
-}
-
-pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-) -> StdResult<TokenInfoResponse> {
-    token_info_read(&deps.storage).load()
-}
-
-pub fn query_balance<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    address: HumanAddr,
-) -> StdResult<BalanceResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
-    let balance = balances_read(&deps.storage)
-        .may_load(address_raw.as_slice())?
-        .unwrap_or_default();
-    Ok(BalanceResponse { balance })
 }
 
 pub fn query_claims<S: Storage, A: Api, Q: Querier>(

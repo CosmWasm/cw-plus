@@ -7,23 +7,10 @@ use cosmwasm_storage::{
     Singleton,
 };
 
-use crate::msg::TokenInfoResponse;
-
 pub const KEY_INVESTMENT: &[u8] = b"invest";
-pub const KEY_TOKEN_INFO: &[u8] = b"token";
 pub const KEY_TOTAL_SUPPLY: &[u8] = b"total_supply";
 
-pub const PREFIX_BALANCE: &[u8] = b"balance";
 pub const PREFIX_CLAIMS: &[u8] = b"claim";
-
-/// balances are state of the erc20 tokens
-pub fn balances<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
-    bucket(PREFIX_BALANCE, storage)
-}
-
-pub fn balances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
-    bucket_read(PREFIX_BALANCE, storage)
-}
 
 /// claims are the claims to money being unbonded
 pub fn claims<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
@@ -68,14 +55,6 @@ pub fn invest_info<S: Storage>(storage: &mut S) -> Singleton<S, InvestmentInfo> 
 
 pub fn invest_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, InvestmentInfo> {
     singleton_read(storage, KEY_INVESTMENT)
-}
-
-pub fn token_info<S: Storage>(storage: &mut S) -> Singleton<S, TokenInfoResponse> {
-    singleton(storage, KEY_TOKEN_INFO)
-}
-
-pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, TokenInfoResponse> {
-    singleton_read(storage, KEY_TOKEN_INFO)
 }
 
 pub fn total_supply<S: Storage>(storage: &mut S) -> Singleton<S, Supply> {
