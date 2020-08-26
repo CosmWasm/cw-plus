@@ -10,11 +10,11 @@ license = "Apache-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-# use library feature to disable all init/handle/query exports
-library = []
 
 [features]
 backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all init/handle/query exports
+library = []
 
 [dependencies]
 cosmwasm-std = { version = "0.10.1", features = ["staking"] }
