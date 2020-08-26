@@ -32,7 +32,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         version: CONTRACT_VERSION.to_string(),
     };
     let result = whitelist_init(deps, env, msg);
-    set_contract_version(&mut deps.storage, &version)?;
+    if result.is_ok() {
+        set_contract_version(&mut deps.storage, &version)?;
+    };
     result
 }
 
