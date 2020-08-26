@@ -12,7 +12,7 @@
   ],
   "properties": {
     "decimals": {
-      "description": "decimal places of the derivative token (for UI) TODO: does this make sense? Do we need to normalize on this? We don't even know the decimals of the native token",
+      "description": "decimal places of the derivative token (for UI)",
       "type": "integer",
       "format": "uint8",
       "minimum": 0.0
@@ -34,7 +34,7 @@
       ]
     },
     "name": {
-      "description": "name of the derivative token (FIXME: auto-generate?)",
+      "description": "name of the derivative token",
       "type": "string"
     },
     "symbol": {

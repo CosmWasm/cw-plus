@@ -2,6 +2,7 @@ use cosmwasm_std::{
     coin, log, to_binary, Api, BankMsg, Binary, Decimal, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
+use cw2::{set_contract_version, ContractVersion};
 
 use crate::msg::{
     BalanceResponse, ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg,
@@ -14,11 +15,21 @@ use crate::state::{
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
 
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw20-staking";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    let version = ContractVersion {
+        contract: CONTRACT_NAME.to_string(),
+        version: CONTRACT_VERSION.to_string(),
+    };
+    set_contract_version(&mut deps.storage, &version)?;
+
     // ensure the validator is registered
     let vals = deps.querier.query_validators()?;
     if !vals.iter().any(|v| v.address == msg.validator) {
