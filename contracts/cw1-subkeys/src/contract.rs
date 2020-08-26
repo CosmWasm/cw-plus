@@ -31,8 +31,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         contract: CONTRACT_NAME.to_string(),
         version: CONTRACT_VERSION.to_string(),
     };
+    whitelist_init(deps, env, msg)?;
     set_contract_version(&mut deps.storage, &version)?;
-    whitelist_init(deps, env, msg)
+    Ok(InitResponse::default())
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
