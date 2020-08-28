@@ -82,6 +82,5 @@ pub struct AllAllowancesResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AllAccountsResponse {
-    pub allowance: Uint128,
-    pub expires: Expiration,
+    pub accounts: Vec<HumanAddr>,
 }

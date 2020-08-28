@@ -141,4 +141,19 @@ pub enum QueryMsg {
         owner: HumanAddr,
         spender: HumanAddr,
     },
+    /// Only with "enumerable" extension (and "allowances")
+    /// Returns all allowances this owner has approved. Supports pagination.
+    /// Return type: AllAllowancesResponse.
+    AllAllowances {
+        owner: HumanAddr,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
+    /// Only with "enumerable" extension
+    /// Returns all accounts that have balances. Supports pagination.
+    /// Return type: AllAccountsResponse.
+    AllAccounts {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }

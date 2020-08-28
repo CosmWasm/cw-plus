@@ -17,8 +17,8 @@ library = []
 [dependencies]
 cw2 = { path = "../../packages/cw2", version = "0.1.1" }
 cw20 = { path = "../../packages/cw20", version = "0.1.1" }
-cosmwasm-std = { version = "0.10.1" }
-cosmwasm-storage = { version = "0.10.1" }
+cosmwasm-std = { version = "0.10.1", features = ["iterator"] }
+cosmwasm-storage = { version = "0.10.1", features = ["iterator"] }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.3" }
