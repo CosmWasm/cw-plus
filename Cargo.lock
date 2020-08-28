@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "cw0"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "cw1"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-subkeys"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -111,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "cw2"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-escrow"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -175,7 +175,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-staking"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -190,7 +190,7 @@ dependencies = [
 
 [[package]]
 name = "cw721"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
