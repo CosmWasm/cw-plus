@@ -157,3 +157,7 @@ pub enum QueryMsg {
         limit: Option<u32>,
     },
 }
+
+/// We currently take no arguments for migrations
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

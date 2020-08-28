@@ -2,7 +2,7 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern,
     HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
-use cw2::{set_contract_version, ContractVersion};
+use cw2::set_contract_version;
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::msg::{
@@ -21,11 +21,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     _env: Env,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let version = ContractVersion {
-        contract: CONTRACT_NAME.to_string(),
-        version: CONTRACT_VERSION.to_string(),
-    };
-    set_contract_version(&mut deps.storage, &version)?;
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // no setup
     Ok(InitResponse::default())
 }
