@@ -38,12 +38,12 @@ pub fn migrate_v01_to_v02<S: Storage>(storage: &mut S) -> StdResult<()> {
 }
 
 /// this read the allowances bucket in the old format
-fn old_allowances<'a, S: Storage>(storage: &'a mut S) -> Bucket<'a, S, OldAllowanceResponse> {
+fn old_allowances<S: Storage>(storage: &mut S) -> Bucket<S, OldAllowanceResponse> {
     Bucket::new(PREFIX_ALLOWANCE, storage)
 }
 
 /// This allows us to write in the new format
-fn new_allowances<'a, S: Storage>(storage: &'a mut S) -> Bucket<'a, S, AllowanceResponse> {
+fn new_allowances<S: Storage>(storage: &mut S) -> Bucket<S, AllowanceResponse> {
     Bucket::new(PREFIX_ALLOWANCE, storage)
 }
 
