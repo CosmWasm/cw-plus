@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdError, StdResult, Storage, Uint128,
-};
+use cosmwasm_std::{log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, Uint128, MigrateResponse};
 use cw2::{set_contract_version, ContractVersion};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
@@ -10,7 +7,7 @@ use crate::allowances::{
     handle_transfer_from, query_allowance,
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
-use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, InitialBalance, MigrateMsg, QueryMsg};
 use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
 
 // version info for migration info
@@ -313,6 +310,14 @@ pub fn query_minter<S: Storage, A: Api, Q: Querier>(
         None => None,
     };
     Ok(minter)
+}
+
+pub fn migrate<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    _msg: MigrateMsg,
+) -> StdResult<MigrateResponse> {
+    Ok(MigrateResponse::default())
 }
 
 #[cfg(test)]
