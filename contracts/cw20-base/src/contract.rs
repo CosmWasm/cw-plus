@@ -1,5 +1,8 @@
-use cosmwasm_std::{log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, Uint128, MigrateResponse};
-use cw2::{set_contract_version, ContractVersion};
+use cosmwasm_std::{
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
+};
+use cw2::{get_contract_version, set_contract_version, ContractVersion};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
@@ -7,6 +10,7 @@ use crate::allowances::{
     handle_transfer_from, query_allowance,
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
+use crate::migrations::migrate_v01_to_v02;
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, MigrateMsg, QueryMsg};
 use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
 
@@ -14,16 +18,22 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+fn store_version<S: Storage>(storage: &mut S) -> StdResult<()> {
+    set_contract_version(
+        storage,
+        &ContractVersion {
+            contract: CONTRACT_NAME.to_string(),
+            version: CONTRACT_VERSION.to_string(),
+        },
+    )
+}
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let version = ContractVersion {
-        contract: CONTRACT_NAME.to_string(),
-        version: CONTRACT_VERSION.to_string(),
-    };
-    set_contract_version(&mut deps.storage, &version)?;
+    store_version(&mut deps.storage)?;
     // check valid token info
     msg.validate()?;
     // create initial accounts
@@ -314,10 +324,25 @@ pub fn query_minter<S: Storage, A: Api, Q: Querier>(
 
 pub fn migrate<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
     _msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    Ok(MigrateResponse::default())
+    let old_version = get_contract_version(&deps.storage)?;
+    if old_version.contract != CONTRACT_NAME {
+        return Err(StdError::generic_err(format!(
+            "This is {}, cannot migrate from {}",
+            CONTRACT_NAME, old_version.contract
+        )));
+    }
+    if old_version.version.starts_with("0.1.") {
+        migrate_v01_to_v02(&mut deps.storage)?;
+        store_version(&mut deps.storage)?;
+        return Ok(MigrateResponse::default());
+    }
+    Err(StdError::generic_err(format!(
+        "Unknown version {}",
+        old_version.version
+    )))
 }
 
 #[cfg(test)]
