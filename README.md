@@ -1,5 +1,24 @@
 # CosmWasm Plus
 
+[![CircleCI](https://circleci.com/gh/CosmWasm/cosmwasm-plus/tree/master.svg?style=shield)](https://circleci.com/gh/CosmWasm/cosmwasm-plus/tree/master)
+
+| Specification    | Download                                                                                                   | Docs                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
+| cw0              | [![cw0 on crates.io](https://img.shields.io/crates/v/cw0.svg)](https://crates.io/crates/cw0)              | [![Docs](https://docs.rs/cw0/badge.svg)](https://docs.rs/cw0)    |
+| cw1              | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)              | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)    |
+| cw2              | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)              | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)    |
+| cw20              | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20)              | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20)    |
+| cw721              | [![cw721 on crates.io](https://img.shields.io/crates/v/cw721.svg)](https://crates.io/crates/cw721)              | [![Docs](https://docs.rs/cw721/badge.svg)](https://docs.rs/cw721)    |
+
+| Contracts               | Download                                                                                                                      | Docs                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
+| cw1-subkeys             | [![cw1-subkeys on crates.io](https://img.shields.io/crates/v/cw1-subkeys.svg)](https://crates.io/crates/cw1-subkeys)          | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
+| cw1-whitelist           | [![cw1-whitelist on crates.io](https://img.shields.io/crates/v/cw1-whitelist.svg)](https://crates.io/crates/cw1-whitelist)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
+| cw20-base                | [![cw20-base on crates.io](https://img.shields.io/crates/v/cw20-base.svg)](https://crates.io/crates/cw20-base)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
+| cw20-escrow             | [![cw20-escrow on crates.io](https://img.shields.io/crates/v/cw20-escrow.svg)](https://crates.io/crates/cw20-escrow)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
+| cw20-staking             | [![cw20-staking on crates.io](https://img.shields.io/crates/v/cw20-staking.svg)](https://crates.io/crates/cw20-staking)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
+
+
 This is a collection of specification and contracts designed for
 use on real networks. They are designed not just as examples, but to
 solve real-world use cases, and to provide a reusable basis to build 
