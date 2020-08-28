@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage, Uint128};
 use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
-    Singleton,
+    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
+    ReadonlyPrefixedStorage, ReadonlySingleton, Singleton,
 };
 use cw20::AllowanceResponse;
 
@@ -52,6 +52,10 @@ pub fn balances<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
 /// balances are state of the erc20 tokens (read-only version for queries)
 pub fn balances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
     bucket_read(PREFIX_BALANCE, storage)
+}
+
+pub fn balances_prefix_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyPrefixedStorage<S> {
+    ReadonlyPrefixedStorage::new(PREFIX_BALANCE, storage)
 }
 
 /// returns a bucket with all allowances authorized by this owner (query it by spender)

@@ -9,6 +9,7 @@ use crate::allowances::{
     handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
     handle_transfer_from, query_allowance,
 };
+use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::msg::{HandleMsg, InitMsg, InitialBalance, QueryMsg};
 use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
 
@@ -264,6 +265,14 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
         QueryMsg::Allowance { owner, spender } => {
             to_binary(&query_allowance(deps, owner, spender)?)
+        }
+        QueryMsg::AllAllowances {
+            owner,
+            start_after,
+            limit,
+        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?),
+        QueryMsg::AllAccounts { start_after, limit } => {
+            to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
     }
 }

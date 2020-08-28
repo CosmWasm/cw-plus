@@ -348,7 +348,6 @@ mod tests {
         }
     }
 
-        
     #[test]
     fn get_contract_version_works() {
         let mut deps = mock_dependencies(20, &coins(1111, "token1"));
@@ -381,7 +380,10 @@ mod tests {
             &initial_expirations,
         );
 
-        assert_eq!(get_contract_version(&deps.storage).unwrap().contract, CONTRACT_NAME)
+        assert_eq!(
+            get_contract_version(&deps.storage).unwrap().contract,
+            CONTRACT_NAME
+        )
     }
 
     #[test]
