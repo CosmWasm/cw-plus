@@ -91,3 +91,29 @@ impl Into<Expiration> for OldExpiration {
         }
     }
 }
+
+pub mod testing {
+    use super::*;
+    use cw2::{set_contract_version, ContractVersion};
+
+    /// This generates test data as if it came from v0.1.0
+    /// TODO: make this more robust - how to manage old state?
+    /// Maybe we add export and import functions for MockStorage to generate JSON test vectors?
+    /// Maybe we embed the entire v0.1 code here to generate state??
+    pub fn generate_v01_test_data<S: Storage>(storage: &mut S) -> StdResult<()> {
+        // TokenInfo:
+        // name: Sample Coin
+        // symbol: SAMP
+        // decimals: 2
+        // total_supply: 777777
+
+        // User1: Balance 123456
+        //  - Allowance: Spender1, 5000, AtHeight(5000)
+        // User2: Balance 654321
+        //  - Allowance: Spender1, 15000, AtTime(1598647517)
+        //  - Allowance: Spender2, 77777, Never
+
+        set_contract_version(storage, "crates.io:cw20-base", "0.1.0")?;
+        Ok(())
+    }
+}

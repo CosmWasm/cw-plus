@@ -2,7 +2,7 @@ use cosmwasm_std::{
     coin, log, to_binary, Api, BankMsg, Binary, Decimal, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
-use cw2::{set_contract_version, ContractVersion};
+use cw2::set_contract_version;
 use cw20_base::allowances::{
     handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
     handle_transfer_from, query_allowance,
@@ -29,11 +29,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let version = ContractVersion {
-        contract: CONTRACT_NAME.to_string(),
-        version: CONTRACT_VERSION.to_string(),
-    };
-    set_contract_version(&mut deps.storage, &version)?;
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // ensure the validator is registered
     let vals = deps.querier.query_validators()?;

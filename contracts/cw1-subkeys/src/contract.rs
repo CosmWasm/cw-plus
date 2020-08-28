@@ -12,7 +12,7 @@ use cw1_whitelist::{
     msg::InitMsg,
     state::admin_list_read,
 };
-use cw2::{set_contract_version, ContractVersion};
+use cw2::set_contract_version;
 
 use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
 use crate::state::{allowances, allowances_read, Allowance};
@@ -27,15 +27,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let version = ContractVersion {
-        contract: CONTRACT_NAME.to_string(),
-        version: CONTRACT_VERSION.to_string(),
-    };
-    let result = whitelist_init(deps, env, msg);
-    if result.is_ok() {
-        set_contract_version(&mut deps.storage, &version)?;
-    };
-    result
+    let result = whitelist_init(deps, env, msg)?;
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    Ok(result)
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(

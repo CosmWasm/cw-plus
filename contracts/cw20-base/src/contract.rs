@@ -18,22 +18,12 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn store_version<S: Storage>(storage: &mut S) -> StdResult<()> {
-    set_contract_version(
-        storage,
-        &ContractVersion {
-            contract: CONTRACT_NAME.to_string(),
-            version: CONTRACT_VERSION.to_string(),
-        },
-    )
-}
-
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    store_version(&mut deps.storage)?;
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
     // create initial accounts
@@ -336,7 +326,7 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
     }
     if old_version.version.starts_with("0.1.") {
         migrate_v01_to_v02(&mut deps.storage)?;
-        store_version(&mut deps.storage)?;
+        set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
         return Ok(MigrateResponse::default());
     }
     Err(StdError::generic_err(format!(

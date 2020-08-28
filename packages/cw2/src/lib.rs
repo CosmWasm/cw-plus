@@ -27,8 +27,15 @@ pub fn get_contract_version<S: ReadonlyStorage>(storage: &S) -> StdResult<Contra
 
 /// set_contract_version should be used in init to store the original version, and after a successful
 /// migrate to update it
-pub fn set_contract_version<S: Storage>(storage: &mut S, info: &ContractVersion) -> StdResult<()> {
-    Singleton::new(storage, PREFIX_INFO).save(info)
+pub fn set_contract_version<S: Storage, T: Into<String>, U: Into<String>>(
+    storage: &mut S,
+    name: T,
+    version: U,
+) -> StdResult<()> {
+    Singleton::new(storage, PREFIX_INFO).save(&ContractVersion {
+        contract: name.into(),
+        version: version.into(),
+    })
 }
 
 /// This will make a raw_query to another contract to determine the current version it
