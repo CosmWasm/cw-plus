@@ -94,13 +94,15 @@ impl Into<Expiration> for OldExpiration {
 
 pub mod testing {
     use super::*;
-    use cw2::{set_contract_version, ContractVersion};
+    use cosmwasm_std::{Api, CanonicalAddr, HumanAddr};
+    use cw2::set_contract_version;
 
-    /// This generates test data as if it came from v0.1.0
+    /// This generates test data as if it came from v0.1.0 - only intended for usage in test cases
     /// TODO: make this more robust - how to manage old state?
     /// Maybe we add export and import functions for MockStorage to generate JSON test vectors?
     /// Maybe we embed the entire v0.1 code here to generate state??
-    pub fn generate_v01_test_data<S: Storage>(storage: &mut S) -> StdResult<()> {
+    #[allow(dead_code)]
+    pub fn generate_v01_test_data<S: Storage, A: Api>(storage: &mut S, api: &A) -> StdResult<()> {
         // TokenInfo:
         // name: Sample Coin
         // symbol: SAMP
@@ -114,6 +116,66 @@ pub mod testing {
         //  - Allowance: Spender2, 77777, Never
 
         set_contract_version(storage, "crates.io:cw20-base", "0.1.0")?;
+        crate::state::token_info(storage).save(&crate::state::TokenInfo {
+            name: "Sample Coin".to_string(),
+            symbol: "SAMP".to_string(),
+            decimals: 2,
+            total_supply: Uint128(777777),
+            mint: None,
+        })?;
+
+        let user1 = api.canonical_address(&HumanAddr::from("user1"))?;
+        let user2 = api.canonical_address(&HumanAddr::from("user2"))?;
+        crate::state::balances(storage).save(user1.as_slice(), &Uint128(123456))?;
+        crate::state::balances(storage).save(user2.as_slice(), &Uint128(654321))?;
+
+        let spender1 = api.canonical_address(&HumanAddr::from("spender1"))?;
+        let spender2 = api.canonical_address(&HumanAddr::from("spender2"))?;
+        allowances(storage, &user1).save(
+            spender1.as_slice(),
+            &OldAllowanceResponse {
+                allowance: Uint128(5000),
+                expires: OldExpiration::AtHeight { height: 5000 },
+            },
+        )?;
+        allowances(storage, &user2).save(
+            spender1.as_slice(),
+            &OldAllowanceResponse {
+                allowance: Uint128(15000),
+                expires: OldExpiration::AtTime { time: 1598647517 },
+            },
+        )?;
+        allowances(storage, &user2).save(
+            spender2.as_slice(),
+            &OldAllowanceResponse {
+                allowance: Uint128(77777),
+                expires: OldExpiration::Never {},
+            },
+        )?;
+
         Ok(())
+    }
+
+    /// this read the allowances bucket in the old format
+    fn allowances<'a, S: Storage>(
+        storage: &'a mut S,
+        owner: &CanonicalAddr,
+    ) -> Bucket<'a, S, OldAllowanceResponse> {
+        Bucket::multilevel(&[PREFIX_ALLOWANCE, owner.as_slice()], storage)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::testing::generate_v01_test_data;
+    use super::*;
+    use cosmwasm_std::testing::mock_dependencies;
+
+    #[test]
+    fn sanity_test_migration() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
+        migrate_v01_to_v02(&mut deps.storage).unwrap();
     }
 }

@@ -2,7 +2,7 @@ use cosmwasm_std::{
     log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
     MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
 };
-use cw2::{get_contract_version, set_contract_version, ContractVersion};
+use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
