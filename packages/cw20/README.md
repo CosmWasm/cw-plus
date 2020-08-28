@@ -132,3 +132,16 @@ add them to the balance of `recipient`.
 
 `Minter{}` - Returns who and how much can be minted. Return type is
 `MinterResponse {minter, cap}`. Cap may be unset.
+
+## Enumerable
+
+This should be enabled with all blockchains that have iterator support.
+It allows us to get lists of results with pagination.
+
+### Queries
+
+`AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
+by the given owner. `start_after` and `limit` provide pagination. 
+
+`AllAccounts{start_after, limit}` - Returns the list of all accounts that have been created on
+the contract (just the addresses). `start_after` and `limit` provide pagination. 

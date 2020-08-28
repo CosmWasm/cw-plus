@@ -25,6 +25,21 @@ pub enum Cw20QueryMsg {
     /// Returns who can mint and how much.
     /// Return type: MinterResponse.
     Minter {},
+    /// Only with "enumerable" extension (and "allowances")
+    /// Returns all allowances this owner has approved. Supports pagination.
+    /// Return type: AllAllowancesResponse.
+    AllAllowances {
+        owner: HumanAddr,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
+    /// Only with "enumerable" extension
+    /// Returns all accounts that have balances. Supports pagination.
+    /// Return type: AllAccountsResponse.
+    AllAccounts {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -51,4 +66,22 @@ pub struct MinterResponse {
     pub minter: HumanAddr,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct AllowanceInfo {
+    pub spender: HumanAddr,
+    pub allowance: Uint128,
+    pub expires: Expiration,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct AllAllowancesResponse {
+    pub allowances: Vec<AllowanceInfo>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct AllAccountsResponse {
+    pub allowance: Uint128,
+    pub expires: Expiration,
 }
