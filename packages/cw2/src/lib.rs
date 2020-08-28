@@ -67,12 +67,15 @@ mod tests {
         assert!(get_contract_version(&store).is_err());
 
         // set and get
-        let info = ContractVersion {
-            contract: "crate:cw20-base".to_string(),
-            version: "v0.1.0".to_string(),
-        };
-        set_contract_version(&mut store, &info).unwrap();
+        let contract_name = "crate:cw20-base";
+        let contract_version = "0.2.0";
+        set_contract_version(&mut store, contract_name, contract_version).unwrap();
+
         let loaded = get_contract_version(&store).unwrap();
-        assert_eq!(info, loaded);
+        let expected = ContractVersion {
+            contract: contract_name.to_string(),
+            version: contract_version.to_string(),
+        };
+        assert_eq!(expected, loaded);
     }
 }
