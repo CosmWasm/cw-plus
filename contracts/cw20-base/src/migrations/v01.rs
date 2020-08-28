@@ -115,7 +115,7 @@ pub mod testing {
         //  - Allowance: Spender1, 15000, AtTime(1598647517)
         //  - Allowance: Spender2, 77777, Never
 
-        set_contract_version(storage, "crates.io:cw20-base", "0.1.0")?;
+        set_contract_version(storage, "crates.io:cw20-base", "v0.1.0")?;
         crate::state::token_info(storage).save(&crate::state::TokenInfo {
             name: "Sample Coin".to_string(),
             symbol: "SAMP".to_string(),
