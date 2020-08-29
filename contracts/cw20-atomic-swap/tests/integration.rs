@@ -201,6 +201,9 @@ fn test_release() {
     let _: HandleResponse =
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
 
+    // Anyone can attempt release
+    let env = mock_env("somebody", &[]);
+
     // Cannot release, wrong id
     let release = HandleMsg::Release {
         id: "swap0002".to_string(),
@@ -254,7 +257,7 @@ fn test_release() {
     }
 
     // Can release, valid id, valid hash, and not expired
-    let env = mock_env("somebody", &balance);
+    let env = mock_env("somebody", &[]);
     let release = HandleMsg::Release {
         id: "swap0001".to_string(),
         preimage: preimage(),
@@ -300,6 +303,9 @@ fn test_refund() {
     let _: HandleResponse =
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
 
+    // Anyone can attempt refund
+    let env = mock_env("somebody", &[]);
+
     // Cannot refund, wrong id
     let refund = HandleMsg::Refund {
         id: "swap0002".to_string(),
@@ -324,8 +330,8 @@ fn test_refund() {
         Err(e) => panic!("unexpected error: {:?}", e),
     }
 
-    // Can refund, already expired
-    let env = mock_env_height("anybody", &balance, 123457);
+    // Anyone can refund, if already expired
+    let env = mock_env_height("somebody", &[], 123457);
     let refund = HandleMsg::Refund {
         id: "swap0001".to_string(),
     };
@@ -387,7 +393,6 @@ fn test_query() {
     // Get the list of ids
     let query_msg = QueryMsg::List {};
     let ids: ListResponse = from_binary(&query(&mut deps, query_msg).unwrap()).unwrap();
-    println!("ids: {:#?}", ids);
     assert_eq!(2, ids.swaps.len());
     assert_eq!(vec!["swap0001", "swap0002"], ids.swaps);
 
