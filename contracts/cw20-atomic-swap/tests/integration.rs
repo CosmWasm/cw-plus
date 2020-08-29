@@ -22,8 +22,10 @@ use cosmwasm_std::{log, HandleResponse, HandleResult, HumanAddr, InitResponse};
 use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance, query};
 use sha2::{Digest, Sha256};
 
-use cw20_atomic_swap::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg};
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
+use cw20_atomic_swap::msg::{
+    CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
+};
 
 // This line will test the output of cargo wasm
 static WASM: &[u8] =
