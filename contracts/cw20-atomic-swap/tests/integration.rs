@@ -22,12 +22,12 @@ use cosmwasm_std::{log, HandleResponse, HandleResult, HumanAddr, InitResponse};
 use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance, query};
 use sha2::{Digest, Sha256};
 
-use atomic_swap::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg};
+use cw20_atomic_swap::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg};
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
 
 // This line will test the output of cargo wasm
 static WASM: &[u8] =
-    include_bytes!("../../../target/wasm32-unknown-unknown/release/atomic_swap.wasm");
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/cw20_atomic_swap.wasm");
 // Uncomment this line instead to test productivized build from rust-optimizer
 // static WASM: &[u8] = include_bytes!("../contract.wasm");
 
