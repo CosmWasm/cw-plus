@@ -142,7 +142,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     // We delete the swap
     atomic_swaps(&mut deps.storage).remove(id.as_bytes());
 
-    let msgs = send_native_tokens(&env.contract.address, &rcpt, env.message.sent_funds);
+    let msgs = send_native_tokens(&env.contract.address, &rcpt, swap.balance);
     Ok(HandleResponse {
         messages: msgs,
         log: vec![log("action", "refund"), log("id", id), log("to", rcpt)],
@@ -390,6 +390,9 @@ mod tests {
         };
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
 
+        // Anyone can attempt release
+        let env = mock_env("somebody", &[]);
+
         // Cannot release, wrong id
         let release = HandleMsg::Release {
             id: "swap0002".to_string(),
@@ -432,7 +435,7 @@ mod tests {
         }
 
         // Cannot release, expired
-        let env = mock_env_height(&sender, &balance, 123457);
+        let env = mock_env_height("somebody", &[], 123457);
         let release = HandleMsg::Release {
             id: "swap0001".to_string(),
             preimage: preimage(),
@@ -447,7 +450,7 @@ mod tests {
         }
 
         // Can release, valid id, valid hash, and not expired
-        let env = mock_env("somebody", &balance);
+        let env = mock_env("somebody", &[]);
         let release = HandleMsg::Release {
             id: "swap0001".to_string(),
             preimage: preimage(),
@@ -492,6 +495,9 @@ mod tests {
         };
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
 
+        // Anyone can attempt refund
+        let env = mock_env("somebody", &[]);
+
         // Cannot refund, wrong id
         let refund = HandleMsg::Refund {
             id: "swap0002".to_string(),
@@ -516,8 +522,8 @@ mod tests {
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
-        // Can refund, already expired
-        let env = mock_env_height("anybody", &balance, 123457);
+        // Anyone can refund, if already expired
+        let env = mock_env_height("somebody", &[], 123457);
         let refund = HandleMsg::Refund {
             id: "swap0001".to_string(),
         };
