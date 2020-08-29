@@ -5,6 +5,7 @@ use cosmwasm_std::{
     Binary, CanonicalAddr, Coin, Env, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
+use cw20::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AtomicSwap {
@@ -12,16 +13,14 @@ pub struct AtomicSwap {
     pub hash: Binary,
     pub recipient: CanonicalAddr,
     pub source: CanonicalAddr,
-    pub end_height: u64,
-    pub end_time: u64,
+    pub expires: Expiration,
     /// Balance in native tokens
     pub balance: Vec<Coin>,
 }
 
 impl AtomicSwap {
     pub fn is_expired(&self, env: &Env) -> bool {
-        (self.end_height != 0 && env.block.height >= self.end_height)
-            || (self.end_time != 0 && env.block.time >= self.end_time)
+        self.expires.is_expired(&env.block)
     }
 }
 

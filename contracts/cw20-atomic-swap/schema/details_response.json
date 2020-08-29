@@ -4,8 +4,7 @@
   "type": "object",
   "required": [
     "balance",
-    "end_height",
-    "end_time",
+    "expires",
     "hash",
     "id",
     "recipient",
@@ -19,17 +18,13 @@
         "$ref": "#/definitions/Coin"
       }
     },
-    "end_height": {
-      "description": "When end height greater than zero and block height exceeds this value, the swap is expired. Once a swap is expired, it can be returned to the original source (via \"refund\").",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "end_time": {
-      "description": "When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is greater than zero and block time exceeds this value, the swap is expired. Once a swap is expired, it can be returned to the original source (via \"refund\").",
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
+    "expires": {
+      "description": "Once a swap is expired, it can be returned to the original source (via \"refund\").",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Expiration"
+        }
+      ]
     },
     "hash": {
       "description": "This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)",
@@ -71,6 +66,50 @@
           "type": "string"
         }
       }
+    },
+    "Expiration": {
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
     },
     "HumanAddr": {
       "type": "string"

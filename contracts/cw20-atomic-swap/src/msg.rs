@@ -1,4 +1,5 @@
 use cosmwasm_std::{Coin, HumanAddr};
+use cw20::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -31,11 +32,9 @@ pub struct CreateMsg {
     pub hash: String,
     /// If approved, funds go to the recipient
     pub recipient: HumanAddr,
-    /// You can set a last time or block height the contract is valid at.
-    /// If *either* is non-zero and below current state, the contract is considered expired,
-    /// and will be returned to the original funder.
-    pub end_height: u64,
-    pub end_time: u64,
+    /// You can set expiration at time or at block height the contract is valid at.
+    /// After the contract is expired, it can be returned to the original funder.
+    pub expires: Expiration,
 }
 
 pub fn is_valid_name(name: &str) -> bool {
@@ -72,13 +71,8 @@ pub struct DetailsResponse {
     pub recipient: HumanAddr,
     /// If refunded, funds go to the source
     pub source: HumanAddr,
-    /// When end height greater than zero and block height exceeds this value, the swap is expired.
     /// Once a swap is expired, it can be returned to the original source (via "refund").
-    pub end_height: u64,
-    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is greater than zero and
-    /// block time exceeds this value, the swap is expired.
-    /// Once a swap is expired, it can be returned to the original source (via "refund").
-    pub end_time: u64,
+    pub expires: Expiration,
     /// Balance in native tokens
     pub balance: Vec<Coin>,
 }

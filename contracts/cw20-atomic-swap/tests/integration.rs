@@ -23,6 +23,7 @@ use cosmwasm_vm::testing::{handle, init, mock_env, mock_instance, query};
 use sha2::{Digest, Sha256};
 
 use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
+use cw20::Expiration;
 use cw20_atomic_swap::msg::{
     CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
 };
@@ -81,8 +82,7 @@ fn test_create() {
             id: id.to_string(),
             hash: real_hash(),
             recipient: HumanAddr::from("rcpt0001"),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         let res: HandleResult = handle(&mut deps, env.clone(), HandleMsg::Create(create.clone()));
         match res {
@@ -100,8 +100,7 @@ fn test_create() {
         id: "swap0001".to_string(),
         hash: real_hash(),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let res: HandleResult = handle(&mut deps, env, HandleMsg::Create(create.clone()));
     match res {
@@ -118,8 +117,7 @@ fn test_create() {
         id: "swap0001".to_string(),
         hash: real_hash(),
         recipient: "rcpt0001".into(),
-        end_height: 0,
-        end_time: 1,
+        expires: Expiration::AtTime(1),
     };
     let res: HandleResult = handle(&mut deps, env, HandleMsg::Create(create.clone()));
     match res {
@@ -134,8 +132,7 @@ fn test_create() {
         id: "swap0001".to_string(),
         hash: "bu115h17".to_string(),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let res: HandleResult = handle(&mut deps, env, HandleMsg::Create(create.clone()));
     match res {
@@ -153,8 +150,7 @@ fn test_create() {
         id: "swap0001".to_string(),
         hash: real_hash(),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let res: HandleResponse = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
     assert_eq!(0, res.messages.len());
@@ -167,8 +163,7 @@ fn test_create() {
         id: "swap0001".to_string(),
         hash: real_hash(),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let res: HandleResult = handle(&mut deps, env, HandleMsg::Create(create.clone()));
     match res {
@@ -195,8 +190,7 @@ fn test_release() {
         id: "swap0001".to_string(),
         hash: real_hash(),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let _: HandleResponse =
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
@@ -297,8 +291,7 @@ fn test_refund() {
         id: "swap0001".to_string(),
         hash: real_hash(),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let _: HandleResponse =
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
@@ -373,8 +366,7 @@ fn test_query() {
         id: "swap0001".to_string(),
         hash: custom_hash(1),
         recipient: "rcpt0001".into(),
-        end_time: 0,
-        end_height: 123456,
+        expires: Expiration::AtHeight(123456),
     };
     let _: HandleResponse =
         handle(&mut deps, env.clone(), HandleMsg::Create(create1.clone())).unwrap();
@@ -384,8 +376,7 @@ fn test_query() {
         id: "swap0002".to_string(),
         hash: custom_hash(2),
         recipient: "rcpt0002".into(),
-        end_time: 2_000_000_000,
-        end_height: 0,
+        expires: Expiration::AtTime(2_000_000_000),
     };
     let _: HandleResponse =
         handle(&mut deps, env.clone(), HandleMsg::Create(create2.clone())).unwrap();
@@ -408,8 +399,7 @@ fn test_query() {
             hash: create1.hash,
             recipient: create1.recipient,
             source: sender1,
-            end_height: create1.end_height,
-            end_time: create1.end_time,
+            expires: create1.expires,
             balance: balance.clone()
         }
     );
@@ -426,8 +416,7 @@ fn test_query() {
             hash: create2.hash,
             recipient: create2.recipient,
             source: sender2,
-            end_height: create2.end_height,
-            end_time: create2.end_time,
+            expires: create2.expires,
             balance
         }
     );

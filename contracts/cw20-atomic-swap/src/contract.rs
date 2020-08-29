@@ -65,8 +65,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         hash: Binary(hash),
         recipient: recipient_raw,
         source: deps.api.canonical_address(&env.message.sender)?,
-        end_height: msg.end_height,
-        end_time: msg.end_time,
+        expires: msg.expires,
         balance: env.message.sent_funds.clone(),
     };
 
@@ -199,8 +198,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
         hash: hex::encode(swap.hash.as_slice()),
         recipient: deps.api.human_address(&swap.recipient)?,
         source: deps.api.human_address(&swap.source)?,
-        end_height: swap.end_height,
-        end_time: swap.end_time,
+        expires: swap.expires,
         balance: swap.balance,
     };
     Ok(details)
@@ -217,6 +215,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError};
+    use cw20::Expiration;
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -268,8 +267,7 @@ mod tests {
                 id: id.to_string(),
                 hash: real_hash(),
                 recipient: HumanAddr::from("rcpt0001"),
-                end_time: 0,
-                end_height: 123456,
+                expires: Expiration::AtHeight(123456),
             };
             let res = handle(&mut deps, env.clone(), HandleMsg::Create(create.clone()));
             match res {
@@ -287,8 +285,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
@@ -305,8 +302,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            end_height: 0,
-            end_time: 1,
+            expires: Expiration::AtTime(1),
         };
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
@@ -323,8 +319,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: "bu115h17".to_string(),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
@@ -342,8 +337,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
         assert_eq!(0, res.messages.len());
@@ -356,8 +350,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
@@ -384,8 +377,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
 
@@ -489,8 +481,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         handle(&mut deps, env.clone(), HandleMsg::Create(create.clone())).unwrap();
 
@@ -564,8 +555,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: custom_hash(1),
             recipient: "rcpt0001".into(),
-            end_time: 0,
-            end_height: 123456,
+            expires: Expiration::AtHeight(123456),
         };
         handle(&mut deps, env.clone(), HandleMsg::Create(create1.clone())).unwrap();
 
@@ -574,8 +564,7 @@ mod tests {
             id: "swap0002".to_string(),
             hash: custom_hash(2),
             recipient: "rcpt0002".into(),
-            end_time: 2_000_000_000,
-            end_height: 0,
+            expires: Expiration::AtTime(2_000_000_000),
         };
         handle(&mut deps, env.clone(), HandleMsg::Create(create2.clone())).unwrap();
 
@@ -597,8 +586,7 @@ mod tests {
                 hash: create1.hash,
                 recipient: create1.recipient,
                 source: sender1,
-                end_height: create1.end_height,
-                end_time: create1.end_time,
+                expires: create1.expires,
                 balance: balance.clone()
             }
         );
@@ -615,8 +603,7 @@ mod tests {
                 hash: create2.hash,
                 recipient: create2.recipient,
                 source: sender2,
-                end_height: create2.end_height,
-                end_time: create2.end_time,
+                expires: create2.expires,
                 balance
             }
         );
