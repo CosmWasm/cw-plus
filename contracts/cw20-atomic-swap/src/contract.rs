@@ -59,6 +59,10 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     // Ensure this is 32 bytes hex-encoded, and decode
     let hash = parse_hex_32(&msg.hash)?;
 
+    if msg.expires.is_expired(&env.block) {
+        return Err(StdError::generic_err("Expired atomic swap"));
+    }
+
     let recipient_raw = deps.api.canonical_address(&msg.recipient)?;
 
     let swap = AtomicSwap {
@@ -68,10 +72,6 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         expires: msg.expires,
         balance: env.message.sent_funds.clone(),
     };
-
-    if swap.is_expired(&env) {
-        return Err(StdError::generic_err("Expired atomic swap"));
-    }
 
     // Try to store it, fail if the id already exists (unmodifiable swaps)
     atomic_swaps(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
