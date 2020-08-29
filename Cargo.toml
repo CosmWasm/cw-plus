@@ -1,7 +1,7 @@
 [workspace]
 members = ["packages/*", "contracts/*"]
 
-[profile.release.package.atomic-swap]
+[profile.release.package.cw20-atomic-swap]
 opt-level = 3
 debug = false
 debug-assertions = false

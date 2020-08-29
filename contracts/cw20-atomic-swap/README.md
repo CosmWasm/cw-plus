@@ -39,9 +39,9 @@ Once you are happy with the content, you can compile it to wasm via:
 
 ```
 RUSTFLAGS='-C link-arg=-s' cargo wasm
-cp ../../target/wasm32-unknown-unknown/release/atomic_swap.wasm .
-ls -l atomic_swap.wasm
-sha256sum atomic_swap.wasm
+cp ../../target/wasm32-unknown-unknown/release/cw20_atomic_swap.wasm .
+ls -l cw20_atomic_swap.wasm
+sha256sum cw20_atomic_swap.wasm
 ```
 
 Or for a production-ready (compressed) build, run the following from the
@@ -51,6 +51,6 @@ repository root (not currently working with this monorepo...)
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.9.0 ./contracts/atomic-swap
-mv contract.wasm atomic_swap.wasm
+  cosmwasm/rust-optimizer:0.9.0 ./contracts/cw20-atomic-swap
+mv contract.wasm cw20_atomic_swap.wasm
 ```

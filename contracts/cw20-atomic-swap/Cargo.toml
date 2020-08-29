@@ -1,5 +1,5 @@
 [package]
-name = "atomic-swap"
+name = "cw20-atomic-swap"
 version = "0.1.0"
 authors = ["Mauro Lacy <maurolacy@users.noreply.github.com>"]
 edition = "2018"

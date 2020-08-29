@@ -3,7 +3,7 @@ workflows:
   version: 2
   test:
     jobs:
-      - contract_atomic_swap
+      - contract_cw20_atomic_swap
       - contract_cw1_subkeys
       - contract_cw1_whitelist
       - contract_cw20_base
@@ -26,10 +26,10 @@ workflows:
              ignore: /.*/
 
 jobs:
-  contract_atomic_swap:
+  contract_cw20_atomic_swap:
     docker:
       - image: rust:1.44.1
-    working_directory: ~/project/contracts/atomic-swap
+    working_directory: ~/project/contracts/cw20-atomic-swap
     steps:
       - checkout:
           path: ~/project
@@ -38,7 +38,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - restore_cache:
           keys:
-            - cargocache-atomic-swap-rust:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+            - cargocache-cw20-atomic-swap-rust:1.44.1-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
@@ -65,7 +65,7 @@ jobs:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-atomic-swap-rust:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+          key: cargocache-cw20-atomic-swap-rust:1.44.1-{{ checksum "~/project/Cargo.lock" }}
 
   contract_cw1_subkeys:
     docker:
