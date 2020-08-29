@@ -13,7 +13,7 @@ use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
-const CONTRACT_VERSION: &str = "v0.1.0";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
