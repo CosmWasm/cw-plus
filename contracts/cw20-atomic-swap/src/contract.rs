@@ -178,7 +178,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::List {} => to_binary(&query_list(deps)?),
+        QueryMsg::List { start_after, limit } => to_binary(&query_list(deps, start_after, limit)?),
         QueryMsg::Details { id } => to_binary(&query_details(deps, id)?),
     }
 }
@@ -200,9 +200,28 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
     Ok(details)
 }
 
-fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<ListResponse> {
+// Settings for pagination
+const MAX_LIMIT: u32 = 30;
+const DEFAULT_LIMIT: u32 = 10;
+
+fn query_list<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<ListResponse> {
+    let start = calc_range_start(start_after);
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     Ok(ListResponse {
-        swaps: all_swap_ids(&deps.storage)?,
+        swaps: all_swap_ids(&deps.storage, start, limit)?,
+    })
+}
+
+// This will set the first key after the provided key, by appending a 1 byte
+fn calc_range_start(start_after: Option<String>) -> Option<Vec<u8>> {
+    start_after.map(|id| {
+        let mut v = Vec::from(id);
+        v.push(1);
+        v
     })
 }
 
@@ -565,7 +584,10 @@ mod tests {
         handle(&mut deps, env.clone(), HandleMsg::Create(create2.clone())).unwrap();
 
         // Get the list of ids
-        let query_msg = QueryMsg::List {};
+        let query_msg = QueryMsg::List {
+            start_after: None,
+            limit: None,
+        };
         let ids: ListResponse = from_binary(&query(&mut deps, query_msg).unwrap()).unwrap();
         assert_eq!(2, ids.swaps.len());
         assert_eq!(vec!["swap0001", "swap0002"], ids.swaps);

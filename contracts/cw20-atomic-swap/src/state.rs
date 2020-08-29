@@ -38,9 +38,14 @@ pub fn atomic_swaps_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, A
 }
 
 /// This returns the list of ids for all active swaps
-pub fn all_swap_ids<S: ReadonlyStorage>(storage: &S) -> StdResult<Vec<String>> {
+pub fn all_swap_ids<S: ReadonlyStorage>(
+    storage: &S,
+    start: Option<Vec<u8>>,
+    limit: usize,
+) -> StdResult<Vec<String>> {
     prefixed_read(PREFIX_SWAP, storage)
-        .range(None, None, Order::Ascending)
+        .range(start.as_deref(), None, Order::Ascending)
+        .take(limit)
         .map(|(k, _)| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("Parsing swap id")))
         .collect()
 }
@@ -55,7 +60,7 @@ mod tests {
     #[test]
     fn test_no_swap_ids() {
         let storage = MockStorage::new();
-        let ids = all_swap_ids(&storage).unwrap();
+        let ids = all_swap_ids(&storage, None, 10).unwrap();
         assert_eq!(0, ids.len());
     }
 
@@ -81,7 +86,7 @@ mod tests {
             .save("zen".as_bytes(), &dummy_swap())
             .unwrap();
 
-        let ids = all_swap_ids(&storage).unwrap();
+        let ids = all_swap_ids(&storage, None, 10).unwrap();
         assert_eq!(3, ids.len());
         assert_eq!(
             vec!["assign".to_string(), "lazy".to_string(), "zen".to_string()],

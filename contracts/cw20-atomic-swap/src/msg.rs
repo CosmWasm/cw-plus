@@ -49,7 +49,10 @@ pub fn is_valid_name(name: &str) -> bool {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Show all open swaps. Return type is ListResponse.
-    List {},
+    List {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     /// Returns the details of the named swap, error if not created.
     /// Return type: DetailsResponse.
     Details { id: String },
