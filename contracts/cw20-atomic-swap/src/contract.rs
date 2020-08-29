@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use sha2::{Digest, Sha256};
 
-use cw2::{set_contract_version, ContractVersion};
+use cw2::set_contract_version;
 
 use crate::msg::{
     is_valid_name, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
@@ -20,11 +20,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     _env: Env,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let version = ContractVersion {
-        contract: CONTRACT_NAME.to_string(),
-        version: CONTRACT_VERSION.to_string(),
-    };
-    set_contract_version(&mut deps.storage, &version)?;
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // No setup
     Ok(InitResponse::default())
 }
