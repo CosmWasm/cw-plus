@@ -2,14 +2,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    CanonicalAddr, Coin, Env, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Binary, CanonicalAddr, Coin, Env, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AtomicSwap {
-    /// This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)
-    pub hash: String,
+    /// This is the sha-256 hash of the preimage
+    pub hash: Binary,
     pub recipient: CanonicalAddr,
     pub source: CanonicalAddr,
     pub end_height: u64,
@@ -64,7 +64,7 @@ mod tests {
         AtomicSwap {
             recipient: CanonicalAddr(Binary(b"recip".to_vec())),
             source: CanonicalAddr(Binary(b"source".to_vec())),
-            hash: "hash".to_string(),
+            hash: Binary("hash".into()),
             ..AtomicSwap::default()
         }
     }

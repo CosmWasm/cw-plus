@@ -56,13 +56,13 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         ));
     }
 
-    // Ensure this is 32 bytes hex-encoded
-    let _ = parse_hex_32(&msg.hash)?;
+    // Ensure this is 32 bytes hex-encoded, and decode
+    let hash = parse_hex_32(&msg.hash)?;
 
     let recipient_raw = deps.api.canonical_address(&msg.recipient)?;
 
     let swap = AtomicSwap {
-        hash: msg.hash.clone(),
+        hash: Binary(hash),
         recipient: recipient_raw,
         source: deps.api.canonical_address(&env.message.sender)?,
         end_height: msg.end_height,
@@ -102,8 +102,7 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     }
 
     let hash = Sha256::digest(&parse_hex_32(&preimage)?);
-    let expected = parse_hex_32(&swap.hash)?;
-    if hash.as_slice() != expected.as_slice() {
+    if hash.as_slice() != swap.hash.as_slice() {
         return Err(StdError::generic_err("Invalid preimage"));
     }
 
@@ -197,7 +196,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 
     let details = DetailsResponse {
         id,
-        hash: swap.hash,
+        hash: hex::encode(swap.hash.as_slice()),
         recipient: deps.api.human_address(&swap.recipient)?,
         source: deps.api.human_address(&swap.source)?,
         end_height: swap.end_height,
