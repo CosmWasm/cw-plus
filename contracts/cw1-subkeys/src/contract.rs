@@ -311,7 +311,7 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
-    use cw2::get_contract_version;
+    use cw2::{get_contract_version, ContractVersion};
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -351,7 +351,6 @@ mod tests {
 
         let spender1 = HumanAddr::from("spender0001");
         let spender2 = HumanAddr::from("spender0002");
-        let spender3 = HumanAddr::from("spender0003");
         let initial_spenders = vec![spender1.clone(), spender2.clone()];
 
         // Same allowances for all spenders, for simplicity
@@ -375,8 +374,11 @@ mod tests {
         );
 
         assert_eq!(
-            get_contract_version(&deps.storage).unwrap().contract,
-            CONTRACT_NAME
+            ContractVersion {
+                contract: CONTRACT_NAME.to_string(),
+                version: CONTRACT_VERSION.to_string(),
+            },
+            get_contract_version(&deps.storage).unwrap()
         )
     }
 
