@@ -151,12 +151,37 @@ interface InitMsg {
   readonly mint?: MintInfo
 }
 
+type Expiration = {readonly at_height: number} | {readonly at_time: number} | {readonly never: {}}; 
+
+interface AllowanceResponse {
+  readonly allowance: string;  // integer as string
+  readonly expires: Expiration;
+}
+
+interface AllowanceInfo {
+  readonly allowance: string;  // integer as string
+  readonly spender: string; // bech32 address
+  readonly expires: Expiration;
+}
+
+interface AllAllowancesResponse {
+  readonly allowances: readonly AllowanceInfo[];
+}
+
+interface AllAccountsResponse {
+  // list of bech32 address that have a balance
+  readonly accounts: readonly string[];
+}
+
+
 interface CW20Instance {
   readonly contractAddress: string
 
   // queries
   balance: (address?: string) => Promise<string>
-  allowance: (owner: string, spender: string) => Promise<string>
+  allowance: (owner: string, spender: string) => Promise<AllowanceResponse>
+  allAllowances: (owner: string, startAfter?: string, limit?: number) => Promise<AllAllowancesResponse>
+  allAccounts: (startAfter?: string, limit?: number) => Promise<readonly string[]>
   tokenInfo: () => Promise<any>
   minter: () => Promise<any>
 
@@ -191,9 +216,17 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
       return result.balance;
     };
 
-    const allowance = async (owner: string, spender: string): Promise<string> => {
-      const result = await client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
-      return result.allowance;
+    const allowance = async (owner: string, spender: string): Promise<AllowanceResponse> => {
+      return client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
+    };
+
+    const allAllowances = async (owner: string, startAfter?: string, limit?: number): Promise<AllAllowancesResponse> => {
+      return client.queryContractSmart(contractAddress, {all_allowances: { owner, start_after: startAfter, limit }});
+    };
+
+    const allAccounts = async (startAfter?: string, limit?: number): Promise<readonly string[]> => {
+      const accounts: AllAccountsResponse = await client.queryContractSmart(contractAddress, {all_accounts: { start_after: startAfter, limit }});
+      return accounts.accounts;
     };
 
     const tokenInfo = async (): Promise<any> => {
@@ -241,6 +274,8 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
       contractAddress,
       balance,
       allowance,
+      allAllowances,
+      allAccounts,
       tokenInfo,
       minter,
       mint,
@@ -262,10 +297,10 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
   
   const upload = async (): Promise<number> => {
     const meta = {
-      source: "https://github.com/CosmWasm/cosmwasm-plus",
-      builder: "cosmwasm/rust-optimizer:0.10.1"
+      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.2.0/contracts/cw20-base",
+      builder: "cosmwasm/workspace-optimizer:0.10.2"
     };
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.1.1/cw20_base.wasm";
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.2.0/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
     const result = await client.upload(wasm, meta);
     return result.codeId;
