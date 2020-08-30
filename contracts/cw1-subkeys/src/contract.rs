@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn get_contract_version_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn query_allowance_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn query_all_allowances_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn update_admins_and_query() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admin2 = HumanAddr::from("admin0002");
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn increase_allowances() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -708,7 +708,7 @@ mod tests {
 
     #[test]
     fn decrease_allowances() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -849,7 +849,7 @@ mod tests {
 
     #[test]
     fn execute_checks() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -941,7 +941,7 @@ mod tests {
 
     #[test]
     fn can_send_query_works() {
-        let mut deps = mock_dependencies(20, &coins(1111, "token1"));
+        let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin007");
         let spender = HumanAddr::from("spender808");
