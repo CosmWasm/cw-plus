@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HandleMsg",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "create"
+      ],
+      "properties": {
+        "create": {
+          "$ref": "#/definitions/CreateMsg"
+        }
+      }
+    },
+    {
+      "description": "Release sends all tokens to the recipient.",
+      "type": "object",
+      "required": [
+        "release"
+      ],
+      "properties": {
+        "release": {
+          "type": "object",
+          "required": [
+            "id",
+            "preimage"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "preimage": {
+              "description": "This is the preimage, must be exactly 32 bytes in hex (64 chars) to release: sha256(from_hex(preimage)) == from_hex(hash)",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Refund returns all remaining tokens to the original sender,",
+      "type": "object",
+      "required": [
+        "refund"
+      ],
+      "properties": {
+        "refund": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "CreateMsg": {
+      "type": "object",
+      "required": [
+        "expires",
+        "hash",
+        "id",
+        "recipient"
+      ],
+      "properties": {
+        "expires": {
+          "description": "You can set expiration at time or at block height the contract is valid at. After the contract is expired, it can be returned to the original funder.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            }
+          ]
+        },
+        "hash": {
+          "description": "This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)",
+          "type": "string"
+        },
+        "id": {
+          "description": "id is a human-readable name for the swap to use later. 3-20 bytes of utf-8 text",
+          "type": "string"
+        },
+        "recipient": {
+          "description": "If approved, funds go to the recipient",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "Expiration": {
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
+}
