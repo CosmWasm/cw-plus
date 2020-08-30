@@ -1,7 +1,8 @@
-use cosmwasm_std::{Coin, HumanAddr};
-use cw20::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use cosmwasm_std::{Coin, HumanAddr};
+use cw20::Expiration;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InitMsg {}

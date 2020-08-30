@@ -1,9 +1,9 @@
+use sha2::{Digest, Sha256};
+
 use cosmwasm_std::{
     log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, StdError, StdResult, Storage,
 };
-use sha2::{Digest, Sha256};
-
 use cw2::set_contract_version;
 
 use crate::msg::{
