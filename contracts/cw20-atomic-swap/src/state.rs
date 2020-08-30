@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    Binary, CanonicalAddr, Coin, Env, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Binary, BlockInfo, CanonicalAddr, Coin, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 use cw20::Expiration;
@@ -19,8 +19,8 @@ pub struct AtomicSwap {
 }
 
 impl AtomicSwap {
-    pub fn is_expired(&self, env: &Env) -> bool {
-        self.expires.is_expired(&env.block)
+    pub fn is_expired(&self, block: &BlockInfo) -> bool {
+        self.expires.is_expired(&block)
     }
 }
 

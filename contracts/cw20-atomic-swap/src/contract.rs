@@ -92,7 +92,7 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     preimage: String,
 ) -> StdResult<HandleResponse> {
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
-    if swap.is_expired(&env) {
+    if swap.is_expired(&env.block) {
         return Err(StdError::generic_err("Atomic swap expired"));
     }
 
@@ -127,7 +127,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
     // Anyone can try to refund, as long as the contract is expired
-    if !swap.is_expired(&env) {
+    if !swap.is_expired(&env.block) {
         return Err(StdError::generic_err("Atomic swap not yet expired"));
     }
 
