@@ -29,15 +29,16 @@ sha256sum cw20_base.wasm
 ```
 
 Or for a production-ready (compressed) build, run the following from the
-repository root (not currently working with this monorepo...)
+repository root:
 
 ```
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.9.0 ./contracts/cw20-base
-mv contract.wasm cw20_base.wasm
+  cosmwasm/workspace-optimizer:0.10.2
 ```
+
+The optimized contracts are generated in the `artifacts/` directory.
 
 ## Importing this contract
 
