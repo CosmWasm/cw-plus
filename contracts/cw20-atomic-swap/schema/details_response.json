@@ -12,11 +12,12 @@
   ],
   "properties": {
     "balance": {
-      "description": "Balance in native tokens",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Coin"
-      }
+      "description": "Balance: An array of native tokens, or one cw20 token",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Balance"
+        }
+      ]
     },
     "expires": {
       "description": "Once a swap is expired, it can be returned to the original source (via \"refund\").",
@@ -52,6 +53,42 @@
     }
   },
   "definitions": {
+    "Balance": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "native"
+          ],
+          "properties": {
+            "native": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Coin"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "cw20"
+          ],
+          "properties": {
+            "cw20": {
+              "$ref": "#/definitions/Cw20Coin"
+            }
+          }
+        }
+      ]
+    },
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "CanonicalAddr": {
+      "$ref": "#/definitions/Binary"
+    },
     "Coin": {
       "type": "object",
       "required": [
@@ -64,6 +101,21 @@
         },
         "denom": {
           "type": "string"
+        }
+      }
+    },
+    "Cw20Coin": {
+      "type": "object",
+      "required": [
+        "address",
+        "amount"
+      ],
+      "properties": {
+        "address": {
+          "$ref": "#/definitions/CanonicalAddr"
+        },
+        "amount": {
+          "$ref": "#/definitions/Uint128"
         }
       }
     },
