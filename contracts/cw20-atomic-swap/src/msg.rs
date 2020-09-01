@@ -1,8 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, HumanAddr};
+use cosmwasm_std::HumanAddr;
 use cw20::Expiration;
+
+use crate::balance::Balance;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InitMsg {}
@@ -77,6 +79,6 @@ pub struct DetailsResponse {
     pub source: HumanAddr,
     /// Once a swap is expired, it can be returned to the original source (via "refund").
     pub expires: Expiration,
-    /// Balance in native tokens
-    pub balance: Vec<Coin>,
+    /// Balance: An array of native tokens, or one cw20 token
+    pub balance: Balance,
 }

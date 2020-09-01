@@ -1,15 +1,17 @@
 use sha2::{Digest, Sha256};
 
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage,
+    log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
 use cw2::set_contract_version;
 
+use crate::balance::Balance;
 use crate::msg::{
     is_valid_name, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
 };
 use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
+use cw20::Cw20HandleMsg;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
@@ -31,7 +33,12 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Create(msg) => try_create(deps, env, msg),
+        HandleMsg::Create(msg) => try_create(
+            deps,
+            env.clone(),
+            msg,
+            Balance::Native(env.message.sent_funds),
+        ),
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
     }
@@ -41,12 +48,14 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: CreateMsg,
+    balance: Balance,
 ) -> StdResult<HandleResponse> {
     if !is_valid_name(&msg.id) {
         return Err(StdError::generic_err("Invalid atomic swap id"));
     }
 
-    if env.message.sent_funds.is_empty() {
+    // FIXME? A Non-empty array, but with zero-valued coins
+    if balance.is_empty() {
         return Err(StdError::generic_err(
             "Send some coins to create an atomic swap",
         ));
@@ -66,7 +75,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         recipient: recipient_raw,
         source: deps.api.canonical_address(&env.message.sender)?,
         expires: msg.expires,
-        balance: env.message.sent_funds.clone(),
+        balance,
     };
 
     // Try to store it, fail if the id already exists (unmodifiable swaps)
@@ -103,11 +112,11 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
 
     let rcpt = deps.api.human_address(&swap.recipient)?;
 
-    // We delete the swap
+    // Delete the swap
     atomic_swaps(&mut deps.storage).remove(id.as_bytes());
 
     // Send all tokens out
-    let msgs = send_native_tokens(&env.contract.address, &rcpt, swap.balance);
+    let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
         messages: msgs,
         log: vec![
@@ -136,7 +145,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     // We delete the swap
     atomic_swaps(&mut deps.storage).remove(id.as_bytes());
 
-    let msgs = send_native_tokens(&env.contract.address, &rcpt, swap.balance);
+    let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
         messages: msgs,
         log: vec![log("action", "refund"), log("id", id), log("to", rcpt)],
@@ -160,16 +169,37 @@ fn parse_hex_32(data: &str) -> StdResult<Vec<u8>> {
     }
 }
 
-fn send_native_tokens(from: &HumanAddr, to: &HumanAddr, amount: Vec<Coin>) -> Vec<CosmosMsg> {
+fn send_tokens<A: Api>(
+    api: &A,
+    from: &HumanAddr,
+    to: &HumanAddr,
+    amount: Balance,
+) -> StdResult<Vec<CosmosMsg>> {
     if amount.is_empty() {
-        vec![]
+        Ok(vec![])
     } else {
-        vec![BankMsg::Send {
-            from_address: from.into(),
-            to_address: to.into(),
-            amount,
+        match amount {
+            Balance::Native(coins) => {
+                let msg = BankMsg::Send {
+                    from_address: from.into(),
+                    to_address: to.into(),
+                    amount: coins,
+                };
+                Ok(vec![msg.into()])
+            }
+            Balance::Cw20(coin) => {
+                let msg = Cw20HandleMsg::Transfer {
+                    recipient: to.into(),
+                    amount: coin.amount,
+                };
+                let exec = WasmMsg::Execute {
+                    contract_addr: api.human_address(&coin.address)?,
+                    msg: to_binary(&msg)?,
+                    send: vec![],
+                };
+                Ok(vec![exec.into()])
+            }
         }
-        .into()]
     }
 }
 
@@ -229,7 +259,7 @@ fn calc_range_start(start_after: Option<String>) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError};
+    use cosmwasm_std::{coins, from_binary, Coin, CosmosMsg, StdError};
     use cw20::Expiration;
 
     const CANONICAL_LENGTH: usize = 20;
@@ -605,7 +635,7 @@ mod tests {
                 recipient: create1.recipient,
                 source: sender1,
                 expires: create1.expires,
-                balance: balance.clone()
+                balance: Balance::Native(balance.clone())
             }
         );
 
@@ -622,7 +652,7 @@ mod tests {
                 recipient: create2.recipient,
                 source: sender2,
                 expires: create2.expires,
-                balance
+                balance: Balance::Native(balance),
             }
         );
     }

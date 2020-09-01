@@ -1,8 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::balance::Balance;
 use cosmwasm_std::{
-    Binary, BlockInfo, CanonicalAddr, Coin, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Binary, BlockInfo, CanonicalAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 use cw20::Expiration;
@@ -14,8 +15,8 @@ pub struct AtomicSwap {
     pub recipient: CanonicalAddr,
     pub source: CanonicalAddr,
     pub expires: Expiration,
-    /// Balance in native tokens
-    pub balance: Vec<Coin>,
+    /// Balance in native tokens, or cw20 token
+    pub balance: Balance,
 }
 
 impl AtomicSwap {
