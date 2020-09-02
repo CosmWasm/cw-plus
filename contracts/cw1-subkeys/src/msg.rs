@@ -6,6 +6,7 @@ use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
 use cw0::Expiration;
 
 use crate::balance::Balance;
+use crate::state::Permissions;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -35,6 +36,11 @@ where
         amount: Coin,
         expires: Option<Expiration>,
     },
+
+    SetupPermissions {
+        spender: HumanAddr,
+        permissions: Permissions,
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -74,4 +80,5 @@ pub struct AllowanceInfo {
     pub spender: HumanAddr,
     pub balance: Balance,
     pub expires: Expiration,
+    pub permissions: Permissions,
 }

@@ -7,10 +7,30 @@ use cw0::Expiration;
 
 use crate::balance::Balance;
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
+pub struct Permissions {
+    pub delegate: bool,
+    pub redelegate: bool,
+    pub undelegate: bool,
+    pub withdraw: bool,
+}
+
+impl Default for Permissions {
+    fn default() -> Self {
+        Permissions {
+            delegate: false,
+            redelegate: false,
+            undelegate: false,
+            withdraw: false
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Allowance {
     pub balance: Balance,
     pub expires: Expiration,
+    pub permissions: Permissions,
 }
 
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";

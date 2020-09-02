@@ -1,10 +1,7 @@
 use schemars::JsonSchema;
 use std::fmt;
 
-use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
-};
+use cosmwasm_std::{log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage, StakingMsg};
 use cw0::Expiration;
 use cw1::CanSendResponse;
 use cw1_whitelist::{
@@ -15,7 +12,7 @@ use cw1_whitelist::{
 use cw2::set_contract_version;
 
 use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
-use crate::state::{allowances, allowances_read, Allowance};
+use crate::state::{allowances, allowances_read, Allowance, Permissions};
 use std::ops::{AddAssign, Sub};
 
 // version info for migration info
@@ -53,6 +50,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             expires,
         } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        HandleMsg::SetupPermissions {
+            spender,
+            permissions
+        } => handle_setup_permissions(deps, env, spender, permissions),
     }
 }
 
@@ -85,6 +86,13 @@ where
                     amount,
                 }) => {
                     // Decrease allowance
+                    allowance.balance = allowance.balance.sub(amount.clone())?;
+                    allowances.save(owner_raw.as_slice(), &allowance)?;
+                }
+                CosmosMsg::Staking(StakingMsg::Delegate{
+                                       validator: _,
+                                       amount: _,
+                                   }) => {
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
@@ -196,6 +204,47 @@ where
     Ok(res)
 }
 
+pub fn handle_setup_permissions<S: Storage, A: Api, Q: Querier, T>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    spender: HumanAddr,
+    permissions: Permissions,
+) -> StdResult<HandleResponse<T>>
+    where
+        T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    let cfg = admin_list_read(&deps.storage).load()?;
+    let spender_raw = &deps.api.canonical_address(&spender)?;
+    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
+
+    if !cfg.is_admin(&owner_raw) {
+        return Err(StdError::unauthorized());
+    }
+    if spender_raw == owner_raw {
+        return Err(StdError::generic_err("Cannot set allowance to own account"));
+    }
+
+    // update allowence permissions
+    allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
+        let mut allowance =
+            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
+        allowance.permissions = permissions;
+        Ok(allowance)
+    })?;
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "setup_permissions"),
+            log("owner", deps.api.human_address(owner_raw)?),
+            log("spender", spender),
+            log("permissions", permissions),
+        ],
+        data: None,
+    };
+    Ok(res)
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
@@ -297,6 +346,7 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
                     spender: api.human_address(&CanonicalAddr::from(k))?,
                     balance: allow.balance,
                     expires: allow.expires,
+                    permissions: allow.permissions,
                 })
             })
         })
@@ -312,6 +362,7 @@ mod tests {
     use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
+    use crate::state::Permissions;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -420,7 +471,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
+                permissions: Permissions::default(),
             }
         );
         let allowance = query_allowance(&deps, spender2.clone()).unwrap();
@@ -428,7 +480,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -478,7 +531,8 @@ mod tests {
             AllowanceInfo {
                 spender: spender1,
                 balance: Balance(initial_allowances.clone()),
-                expires: Expiration::Never {}
+                expires: Expiration::Never {},
+                permissions: Permissions::default()
             }
         );
         assert_eq!(
@@ -486,7 +540,8 @@ mod tests {
             AllowanceInfo {
                 spender: spender2.clone(),
                 balance: Balance(initial_allowances.clone()),
-                expires: Expiration::Never {}
+                expires: Expiration::Never {},
+                permissions: Permissions::default()
             }
         );
 
@@ -501,6 +556,7 @@ mod tests {
                 spender: spender3,
                 balance: Balance(initial_allowances.clone()),
                 expires: expires_later,
+                permissions: Permissions::default()
             }
         );
     }
@@ -647,7 +703,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -665,7 +722,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -683,7 +741,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -702,6 +761,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow2.clone()]),
                 expires: expires_time,
+                permissions: Permissions::default(),
             }
         );
     }
@@ -762,7 +822,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -780,7 +841,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -801,7 +863,8 @@ mod tests {
                     coin(amount1 / 2 + (amount1 & 1), denom1),
                     allow2.clone()
                 ]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -842,7 +905,8 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow2]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
+                permissions: Permissions::default(),
             }
         );
     }
