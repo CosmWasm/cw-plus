@@ -22,7 +22,7 @@ impl Balance {
     pub fn is_empty(&self) -> bool {
         match self {
             Balance::Native(coins) => coins.is_empty(),
-            Balance::Cw20(_) => false, // FIXME? zero amount coin
+            Balance::Cw20(_) => false,
         }
     }
 }

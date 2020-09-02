@@ -11,10 +11,11 @@ use cw20_escrow::state::Cw20Coin;
 
 use crate::balance::Balance;
 use crate::msg::{
-    is_valid_name, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
-    ReceiveMsg,
+    is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse,
+    QueryMsg, ReceiveMsg,
 };
 use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
+use cw20_escrow::msg::Cw20CoinHuman;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
@@ -241,7 +242,14 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<DetailsResponse> {
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
 
-    // TODO: Convert Cw20Coin address in balance to HumanAddress
+    // Convert balance to human balance
+    let balance_human = match swap.balance {
+        Balance::Native(coins) => BalanceHuman::Native(coins),
+        Balance::Cw20(coin) => BalanceHuman::Cw20(Cw20CoinHuman {
+            address: deps.api.human_address(&coin.address)?,
+            amount: coin.amount,
+        }),
+    };
 
     let details = DetailsResponse {
         id,
@@ -249,7 +257,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
         recipient: deps.api.human_address(&swap.recipient)?,
         source: deps.api.human_address(&swap.source)?,
         expires: swap.expires,
-        balance: swap.balance,
+        balance: balance_human,
     };
     Ok(details)
 }
@@ -659,7 +667,7 @@ mod tests {
                 recipient: create1.recipient,
                 source: sender1,
                 expires: create1.expires,
-                balance: Balance::Native(balance.clone())
+                balance: BalanceHuman::Native(balance.clone())
             }
         );
 
@@ -676,7 +684,7 @@ mod tests {
                 recipient: create2.recipient,
                 source: sender2,
                 expires: create2.expires,
-                balance: Balance::Native(balance),
+                balance: BalanceHuman::Native(balance),
             }
         );
     }
