@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::HumanAddr;
-use cw20::Expiration;
+use cw20::{Cw20ReceiveMsg, Expiration};
 
 use crate::balance::Balance;
 
@@ -24,6 +24,14 @@ pub enum HandleMsg {
     Refund {
         id: String,
     },
+    /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
+    Receive(Cw20ReceiveMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiveMsg {
+    Create(CreateMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

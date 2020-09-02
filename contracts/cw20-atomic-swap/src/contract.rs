@@ -1,17 +1,18 @@
 use sha2::{Digest, Sha256};
 
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
+    from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
+    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
 use cw2::set_contract_version;
+use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 
-use crate::balance::Balance;
+use crate::balance::{Balance, Cw20Coin};
 use crate::msg::{
     is_valid_name, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
+    ReceiveMsg,
 };
 use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
-use cw20::Cw20HandleMsg;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
@@ -41,6 +42,25 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         ),
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
+        HandleMsg::Receive(msg) => try_receive(deps, env, msg),
+    }
+}
+
+pub fn try_receive<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    wrapper: Cw20ReceiveMsg,
+) -> StdResult<HandleResponse> {
+    let msg: ReceiveMsg = match wrapper.msg {
+        Some(bin) => from_binary(&bin),
+        None => Err(StdError::parse_err("ReceiveMsg", "no data")),
+    }?;
+    let token = Cw20Coin {
+        address: deps.api.canonical_address(&env.message.sender)?,
+        amount: wrapper.amount,
+    };
+    match msg {
+        ReceiveMsg::Create(create) => try_create(deps, env, create, Balance::Cw20(token)),
     }
 }
 
@@ -54,7 +74,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         return Err(StdError::generic_err("Invalid atomic swap id"));
     }
 
-    // FIXME? A Non-empty array, but with zero-valued coins
+    // FIXME? What about a non-empty array, but with zero-valued coins?
     if balance.is_empty() {
         return Err(StdError::generic_err(
             "Send some coins to create an atomic swap",
