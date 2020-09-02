@@ -7,7 +7,9 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
 
-use crate::balance::{Balance, Cw20Coin};
+use cw20_escrow::state::Cw20Coin;
+
+use crate::balance::Balance;
 use crate::msg::{
     is_valid_name, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
     ReceiveMsg,
@@ -238,6 +240,8 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
     id: String,
 ) -> StdResult<DetailsResponse> {
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
+
+    // TODO: Convert Cw20Coin address in balance to HumanAddress
 
     let details = DetailsResponse {
         id,

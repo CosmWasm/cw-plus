@@ -1,14 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Coin, Uint128};
+use cosmwasm_std::Coin;
 
-// TODO: Import from cw20-escrow
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct Cw20Coin {
-    pub address: CanonicalAddr,
-    pub amount: Uint128,
-}
+use cw20_escrow::state::Cw20Coin;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
