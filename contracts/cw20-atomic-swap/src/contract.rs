@@ -703,7 +703,7 @@ mod tests {
         let native_rcpt = HumanAddr::from("B_in_X");
         let native_coins = coins(1000, "tokens_native");
 
-        // Create the native swap offer
+        // Create the Native swap offer
         let native_swap_id = "native_swap".to_string();
         let create = CreateMsg {
             id: native_swap_id.clone(),
@@ -724,7 +724,7 @@ mod tests {
             amount: Uint128(1),
         };
 
-        // Create the cw20 side swap offer
+        // Create the Cw20 side swap counter offer
         let cw20_swap_id = "cw20_swap".to_string();
         let create = CreateMsg {
             id: cw20_swap_id.clone(),
@@ -743,21 +743,23 @@ mod tests {
         assert_eq!(0, res.messages.len());
         assert_eq!(log("action", "create"), res.log[0]);
 
-        // Somebody (typically, A) releases it, on the Cw20 (Y) blockchain, using her knowledge of the
-        // preimage
-        let id = cw20_swap_id;
+        // Somebody (typically, A) releases the swap side on the Cw20 (Y) blockchain,
+        // using her knowledge of the preimage
         let env = mock_env("somebody", &[]);
         let res = handle(
             &mut deps,
             env,
             HandleMsg::Release {
-                id,
+                id: cw20_swap_id.clone(),
                 preimage: preimage(),
             },
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(log("action", "release"), res.log[0]);
+        assert_eq!(log("id", cw20_swap_id), res.log[1]);
+
+        // Verify the resulting Cw20 transfer message
         let send_msg = Cw20HandleMsg::Transfer {
             recipient: cw20_rcpt,
             amount: cw20_coin.amount,
@@ -773,17 +775,22 @@ mod tests {
 
         // Now somebody (typically, B) releases the original offer on the Native (X) blockchain,
         // using the (now public) preimage
-        let id = native_swap_id;
-        // Can release, valid id, valid hash, and not expired
         let env = mock_env("other_somebody", &[]);
+
+        // First, let's obtain the preimage from the logs of the release() transaction on Y
+        let preimage_log = &res.log[2];
+        assert_eq!("preimage", preimage_log.key);
+        let preimage = preimage_log.value.clone();
+
         let release = HandleMsg::Release {
-            id,
-            // TODO: Recover the preimage from the logs of the release() transaction in Y
-            preimage: preimage(),
+            id: native_swap_id.clone(),
+            preimage,
         };
         let res = handle(&mut deps, env.clone(), release.clone()).unwrap();
-        assert_eq!(log("action", "release"), res.log[0]);
         assert_eq!(1, res.messages.len());
+        assert_eq!(log("action", "release"), res.log[0]);
+        assert_eq!(log("id", native_swap_id), res.log[1]);
+
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
