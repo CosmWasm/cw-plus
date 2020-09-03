@@ -291,7 +291,7 @@ fn calc_range_start(start_after: Option<String>) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, from_binary, Coin, CosmosMsg, StdError};
+    use cosmwasm_std::{coins, from_binary, Coin, CosmosMsg, StdError, Uint128};
     use cw20::Expiration;
 
     const CANONICAL_LENGTH: usize = 20;
@@ -686,6 +686,111 @@ mod tests {
                 expires: create2.expires,
                 balance: BalanceHuman::Native(balance),
             }
+        );
+    }
+
+    #[test]
+    fn test_native_cw20_swap() {
+        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+
+        // Create the contract
+        let env = mock_env("anyone", &[]);
+        let res = init(&mut deps, env, InitMsg {}).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // Native side (offer)
+        let native_sender = HumanAddr::from("A_in_X");
+        let native_rcpt = HumanAddr::from("B_in_X");
+        let native_coins = coins(1000, "tokens_native");
+
+        // Create the native swap offer
+        let native_swap_id = "native_swap".to_string();
+        let create = CreateMsg {
+            id: native_swap_id.clone(),
+            hash: real_hash(),
+            recipient: native_rcpt.clone(),
+            expires: Expiration::AtHeight(123456),
+        };
+        let env = mock_env(&native_sender, &native_coins);
+        let res = handle(&mut deps, env, HandleMsg::Create(create)).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "create"), res.log[0]);
+
+        // Cw20 side (counter offer (1:1000))
+        let cw20_sender = HumanAddr::from("B_in_Y");
+        let cw20_rcpt = HumanAddr::from("A_in_Y");
+        let cw20_coin = Cw20CoinHuman {
+            address: HumanAddr::from("my_cw20_token"),
+            amount: Uint128(1),
+        };
+
+        // Create the cw20 side swap offer
+        let cw20_swap_id = "cw20_swap".to_string();
+        let create = CreateMsg {
+            id: cw20_swap_id.clone(),
+            hash: real_hash(),
+            recipient: cw20_rcpt.clone(),
+            expires: Expiration::AtHeight(123458),
+        };
+        let receive = Cw20ReceiveMsg {
+            sender: cw20_sender,
+            amount: cw20_coin.amount,
+            msg: Some(to_binary(&HandleMsg::Create(create)).unwrap()),
+        };
+        let token_contract = cw20_coin.address; // TODO: Confirm
+        let env = mock_env(&token_contract, &[]);
+        let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(log("action", "create"), res.log[0]);
+
+        // Somebody (typically, A) releases it, on the Cw20 (Y) blockchain, using her knowledge of the
+        // preimage
+        let id = cw20_swap_id;
+        let env = mock_env("somebody", &[]);
+        let res = handle(
+            &mut deps,
+            env,
+            HandleMsg::Release {
+                id,
+                preimage: preimage(),
+            },
+        )
+        .unwrap();
+        assert_eq!(1, res.messages.len());
+        assert_eq!(log("action", "release"), res.log[0]);
+        let send_msg = Cw20HandleMsg::Transfer {
+            recipient: cw20_rcpt,
+            amount: cw20_coin.amount,
+        };
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: token_contract,
+                msg: to_binary(&send_msg).unwrap(),
+                send: vec![]
+            })
+        );
+
+        // Now somebody (typically, B) releases the original offer on the Native (X) blockchain,
+        // using the (now public) preimage
+        let id = native_swap_id;
+        // Can release, valid id, valid hash, and not expired
+        let env = mock_env("other_somebody", &[]);
+        let release = HandleMsg::Release {
+            id,
+            // TODO: Recover the preimage from the logs of the release() transaction in Y
+            preimage: preimage(),
+        };
+        let res = handle(&mut deps, env.clone(), release.clone()).unwrap();
+        assert_eq!(log("action", "release"), res.log[0]);
+        assert_eq!(1, res.messages.len());
+        assert_eq!(
+            res.messages[0],
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                to_address: native_rcpt,
+                amount: native_coins,
+            })
         );
     }
 }
