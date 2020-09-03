@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use std::fmt;
 
-use cosmwasm_std::{log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage, StakingMsg};
+use cosmwasm_std::{log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage, StakingMsg, LogAttribute};
 use cw0::Expiration;
 use cw1::CanSendResponse;
 use cw1_whitelist::{
@@ -89,11 +89,44 @@ where
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
-                CosmosMsg::Staking(StakingMsg::Delegate{
-                                       validator: _,
-                                       amount: _,
-                                   }) => {
+                CosmosMsg::Staking(StakingMsg::Delegate {
+                    validator: _,
+                    amount: _,
+                }) => {
+                    if !allowance.permissions.delegate {
+                        return Err(StdError::generic_err("Allowance is not permissioned to delegate"));
+                    }
+                    // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
+                    allowances.save(owner_raw.as_slice(), &allowance)?;
+                }
+                CosmosMsg::Staking(StakingMsg::Undelegate {
+                    validator: _,
+                    amount: _,
+                }) => {
+                    if !allowance.permissions.undelegate {
+                        return Err(StdError::generic_err("Allowance is not permissioned to undelegate"));
+                    }
+                    // Undelegation takes 21 days, it is not logical to increase balance
+                    // What is the best thing to do?
+                }
+                CosmosMsg::Staking(StakingMsg::Redelegate {
+                    src_validator: _,
+                    dst_validator: _,
+                    amount: _,
+                }) => {
+                    if !allowance.permissions.redelegate {
+                        return Err(StdError::generic_err("Allowance is not permissioned to redelegate"));
+                    }
+                }
+                CosmosMsg::Staking(StakingMsg::Withdraw {
+                    validator: _, recipient: _
+                }) => {
+                    if !allowance.permissions.withdraw {
+                        return Err(StdError::generic_err("Allowance is not permissioned to redelegate"));
+                    }
+                    // Decrease allowance
+                    allowance.balance = allowance.balance.add(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
                 _ => {
