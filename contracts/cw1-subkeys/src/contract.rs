@@ -13,7 +13,7 @@ use cw1_whitelist::{
 use cw2::set_contract_version;
 
 use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
-use crate::state::{allowances, allowances_read, Allowance, Permissions};
+use crate::state::{allowances, allowances_read, Allowance, Permissions, PermissionErr};
 use std::ops::{AddAssign, Sub};
 
 // version info for migration info
@@ -95,7 +95,7 @@ where
                     amount,
                 }) => {
                     if !allowance.permissions.delegate {
-                        return Err(StdError::generic_err("Subkey is not permissioned to delegate"));
+                        return Err(StdError::generic_err(PermissionErr::Delegate{}));
                     }
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
@@ -106,7 +106,7 @@ where
                     amount: _,
                 }) => {
                     if !allowance.permissions.undelegate {
-                        return Err(StdError::generic_err("Subkey is not permissioned to undelegate"));
+                        return Err(StdError::generic_err(PermissionErr::Undelegate{}));
                     }
                     // Undelegation takes 21 days, it is not logical to increase balance
                     // What is the best thing to do?
@@ -117,7 +117,7 @@ where
                     amount: _,
                 }) => {
                     if !allowance.permissions.redelegate {
-                        return Err(StdError::generic_err("Subkey is not permissioned to redelegate"));
+                        return Err(StdError::generic_err(PermissionErr::Redelegate{}));
                     }
                 }
                 CosmosMsg::Staking(StakingMsg::Withdraw {
@@ -125,7 +125,7 @@ where
                     recipient: _,
                 }) => {
                     if !allowance.permissions.withdraw {
-                        return Err(StdError::generic_err("Subkey is not permissioned to redelegate"));
+                        return Err(StdError::generic_err(PermissionErr::Withdraw{}));
                     }
                 }
                 _ => {
@@ -1055,6 +1055,84 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_permission_checks() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone()];
+
+        // spender1 has every permission to stake
+        let spender1 = HumanAddr::from("spender0001");
+        // spender2 do not have permission
+        let spender2 = HumanAddr::from("spender0002");
+        let initial_spenders = vec![spender1.clone(), spender2.clone()];
+
+        let denom = "token1";
+        let amount = 10000;
+        let allow = coin(amount, denom);
+        let initial_allowances = vec![allow.clone(), allow.clone()];
+
+        let expires_never = Expiration::Never {};
+        let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+        let god_mode = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: true,
+            withdraw: true,
+        };
+        let initial_permissions = vec![god_mode.clone(), Permissions::default()];
+
+        let env = mock_env(owner.clone(), &[]);
+        setup_test_case(
+            &mut deps,
+            &env,
+            &admins,
+            &initial_spenders,
+            &initial_allowances,
+            &initial_expirations,
+            &initial_permissions,
+        );
+
+        let msg_delegate = vec![StakingMsg::Delegate{
+            validator: HumanAddr(String::from("validator")),
+            amount: allow.clone(),
+        }.into()];
+        let msg_redelegate = vec![StakingMsg::Redelegate{
+            src_validator: Default::default(),
+            dst_validator: Default::default(),
+            amount: allow.clone(),
+        }.into()];
+        let msg_undelegate= vec![StakingMsg::Undelegate{
+            validator: HumanAddr(String::from("validator")),
+            amount: allow.clone(),
+        }.into()];
+        let msg_withdraw = vec![StakingMsg::Withdraw{
+            validator: Default::default(),
+            recipient: None,
+        }.into()];
+
+        let msgs = vec![
+            msg_delegate,
+            msg_redelegate,
+            msg_undelegate,
+            msg_withdraw,
+        ];
+
+        // spender1 can execute
+        for msg in &msgs {
+            let env = mock_env(&spender1, &[]);
+            let res = handle(&mut deps, env, HandleMsg::Execute { msgs: msg.clone() });
+            assert!(res.is_ok())
+        }
+
+        // spender2 cannot execute (no permission)
+        for msg in &msgs {
+            let env = mock_env(&spender2, &[]);
+            let res = handle(&mut deps, env, HandleMsg::Execute { msgs: msg.clone() });
+            assert!(res.is_err())
+        }
+    }
     #[test]
     fn can_send_query_works() {
         let mut deps = mock_dependencies(20, &[]);
