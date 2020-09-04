@@ -19,6 +19,7 @@
       "required": [
         "balance",
         "expires",
+        "permissions",
         "spender"
       ],
       "properties": {
@@ -27,6 +28,9 @@
         },
         "expires": {
           "$ref": "#/definitions/Expiration"
+        },
+        "permissions": {
+          "$ref": "#/definitions/Permissions"
         },
         "spender": {
           "$ref": "#/definitions/HumanAddr"
@@ -100,6 +104,29 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "Permissions": {
+      "type": "object",
+      "required": [
+        "delegate",
+        "redelegate",
+        "undelegate",
+        "withdraw"
+      ],
+      "properties": {
+        "delegate": {
+          "type": "boolean"
+        },
+        "redelegate": {
+          "type": "boolean"
+        },
+        "undelegate": {
+          "type": "boolean"
+        },
+        "withdraw": {
+          "type": "boolean"
+        }
+      }
     },
     "Uint128": {
       "type": "string"
