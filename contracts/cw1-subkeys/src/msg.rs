@@ -37,6 +37,7 @@ where
         expires: Option<Expiration>,
     },
 
+    // Setups up permissions for a given subkey.
     SetupPermissions {
         spender: HumanAddr,
         permissions: Permissions,
