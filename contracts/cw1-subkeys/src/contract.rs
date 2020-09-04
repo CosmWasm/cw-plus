@@ -1,7 +1,8 @@
 use schemars::JsonSchema;
 use std::fmt;
 
-use cosmwasm_std::{log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage, StakingMsg, LogAttribute};
+use cosmwasm_std::{log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse,
+                   HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage, StakingMsg};
 use cw0::Expiration;
 use cw1::CanSendResponse;
 use cw1_whitelist::{
@@ -91,10 +92,10 @@ where
                 }
                 CosmosMsg::Staking(StakingMsg::Delegate {
                     validator: _,
-                    amount: _,
+                    amount,
                 }) => {
                     if !allowance.permissions.delegate {
-                        return Err(StdError::generic_err("Allowance is not permissioned to delegate"));
+                        return Err(StdError::generic_err("Subkey is not permissioned to delegate"));
                     }
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
@@ -105,7 +106,7 @@ where
                     amount: _,
                 }) => {
                     if !allowance.permissions.undelegate {
-                        return Err(StdError::generic_err("Allowance is not permissioned to undelegate"));
+                        return Err(StdError::generic_err("Subkey is not permissioned to undelegate"));
                     }
                     // Undelegation takes 21 days, it is not logical to increase balance
                     // What is the best thing to do?
@@ -116,18 +117,16 @@ where
                     amount: _,
                 }) => {
                     if !allowance.permissions.redelegate {
-                        return Err(StdError::generic_err("Allowance is not permissioned to redelegate"));
+                        return Err(StdError::generic_err("Subkey is not permissioned to redelegate"));
                     }
                 }
                 CosmosMsg::Staking(StakingMsg::Withdraw {
-                    validator: _, recipient: _
+                    validator: _,
+                    recipient: _,
                 }) => {
                     if !allowance.permissions.withdraw {
-                        return Err(StdError::generic_err("Allowance is not permissioned to redelegate"));
+                        return Err(StdError::generic_err("Subkey is not permissioned to redelegate"));
                     }
-                    // Decrease allowance
-                    allowance.balance = allowance.balance.add(amount.clone())?;
-                    allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
                 _ => {
                     return Err(StdError::generic_err("Message type rejected"));
@@ -405,6 +404,7 @@ mod tests {
         spenders: &[HumanAddr],
         allowances: &[Coin],
         expirations: &[Expiration],
+        permissions: &[Permissions],
     ) {
         // Init a contract with admins
         let init_msg = InitMsg {
@@ -413,8 +413,8 @@ mod tests {
         };
         init(deps, env.clone(), init_msg).unwrap();
 
-        // Add subkeys with initial allowances
-        for (spender, expiration) in spenders.iter().zip(expirations) {
+        // Add subkeys with initial allowances and permissions
+        for ((spender, expiration), permission) in spenders.iter().zip(expirations).zip(permissions) {
             for amount in allowances {
                 let msg = HandleMsg::IncreaseAllowance {
                     spender: spender.clone(),
@@ -422,6 +422,11 @@ mod tests {
                     expires: Some(expiration.clone()),
                 };
                 handle(&mut deps, env.clone(), msg).unwrap();
+                let permission_msg = HandleMsg::SetupPermissions{
+                    spender: spender.clone(),
+                    permissions: permission.clone(),
+                };
+                handle(&mut deps, env.clone(), permission_msg).unwrap();
             }
         }
     }
@@ -446,6 +451,7 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -455,6 +461,7 @@ mod tests {
             &initial_spenders,
             &initial_allowances,
             &initial_expirations,
+            &initial_permissions,
         );
 
         assert_eq!(
@@ -487,6 +494,7 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -496,6 +504,7 @@ mod tests {
             &initial_spenders,
             &initial_allowances,
             &initial_expirations,
+            &initial_permissions,
         );
 
         // Check allowances work for accounts with balances
@@ -543,6 +552,7 @@ mod tests {
             Expiration::Never {},
             expires_later.clone(),
         ];
+        let initial_permissions = vec![Permissions::default(),Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -552,7 +562,9 @@ mod tests {
             &initial_spenders,
             &initial_allowances,
             &initial_expirations,
+            &initial_permissions,
         );
+
 
         // let's try pagination
         let allowances = query_all_allowances(&deps, None, Some(2))
@@ -604,7 +616,7 @@ mod tests {
         let initial_admins = vec![owner.clone(), admin2.clone()];
 
         let env = mock_env(owner.clone(), &[]);
-        setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![]);
+        setup_test_case(&mut deps, &env, &initial_admins, &vec![], &vec![], &vec![], &vec![]);
 
         // Verify
         let config = query_admin_list(&deps).unwrap();
@@ -711,6 +723,8 @@ mod tests {
         let expires_time = Expiration::AtTime(1234567890);
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
+
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -720,6 +734,7 @@ mod tests {
             &initial_spenders,
             &initial_allowances,
             &initial_expirations,
+            &initial_permissions,
         );
 
         // Add to spender1 account (expires = None) => don't change Expiration
@@ -828,6 +843,7 @@ mod tests {
         let expires_never = Expiration::Never {};
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -837,6 +853,7 @@ mod tests {
             &initial_spenders,
             &initial_allowances,
             &initial_expirations,
+            &initial_permissions,
         );
 
         // Subtract from spender1 (existing) account (has none of that denom)
@@ -962,6 +979,7 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone()];
+        let initial_permissions = vec![Permissions::default()];
 
         let env = mock_env(owner.clone(), &[]);
         setup_test_case(
@@ -971,6 +989,7 @@ mod tests {
             &initial_spenders,
             &initial_allowances,
             &initial_expirations,
+            &initial_permissions,
         );
 
         // Create Send message
@@ -1053,6 +1072,7 @@ mod tests {
             &[spender.clone()],
             &coins(55000, "ushell"),
             &[Expiration::Never {}],
+            &[Permissions::default()],
         );
 
         // let us make some queries... different msg types by owner and by other

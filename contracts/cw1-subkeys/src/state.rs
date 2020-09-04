@@ -6,6 +6,7 @@ use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::Expiration;
 
 use crate::balance::Balance;
+use std::fmt;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
 pub struct Permissions {
@@ -15,14 +16,10 @@ pub struct Permissions {
     pub withdraw: bool,
 }
 
-impl Default for Permissions {
-    fn default() -> Self {
-        Permissions {
-            delegate: false,
-            redelegate: false,
-            undelegate: false,
-            withdraw: false
-        }
+impl fmt::Display for Permissions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "delegate: {}, redelegate: {}, undelegate: {}, withdraw: {}",
+               self.delegate, self.redelegate, self.undelegate, self.withdraw)
     }
 }
 
