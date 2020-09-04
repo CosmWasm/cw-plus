@@ -13,7 +13,7 @@ use cw1_whitelist::{
 use cw2::set_contract_version;
 
 use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
-use crate::state::{allowances, allowances_read, Allowance, Permission, PermissionErr};
+use crate::state::{allowances, allowances_read, Allowance, Permissions, PermissionErr};
 use std::ops::{AddAssign, Sub};
 
 // version info for migration info
@@ -51,9 +51,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             expires,
         } => handle_decrease_allowance(deps, env, spender, amount, expires),
-        HandleMsg::SetupPermission {
+        HandleMsg::SetupPermissions {
             spender,
-            permissions
+            permissions,
         } => handle_setup_permissions(deps, env, spender, permissions),
     }
 }
@@ -108,8 +108,8 @@ where
                     if !allowance.permissions.undelegate {
                         return Err(StdError::generic_err(PermissionErr::Undelegate{}));
                     }
-                    // Undelegation takes 21 days, it is not logical to increase balance
-                    // What is the best thing to do?
+                    // TODO Undelegation takes 21 days, it is not logical to increase balance
+                    // What to do?
                 }
                 CosmosMsg::Staking(StakingMsg::Redelegate {
                     src_validator: _,
@@ -240,7 +240,7 @@ pub fn handle_setup_permissions<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     spender: HumanAddr,
-    permissions: Permission,
+    permissions: Permissions,
 ) -> StdResult<HandleResponse<T>>
     where
         T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -256,7 +256,7 @@ pub fn handle_setup_permissions<S: Storage, A: Api, Q: Querier, T>(
         return Err(StdError::generic_err("Cannot set allowance to own account"));
     }
 
-    // update allowence permissions
+    // update allowance permissions
     allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
         let mut allowance =
             allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
@@ -394,7 +394,7 @@ mod tests {
     use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
-    use crate::state::Permission;
+    use crate::state::Permissions;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -404,7 +404,7 @@ mod tests {
         spenders: &[HumanAddr],
         allowances: &[Coin],
         expirations: &[Expiration],
-        permissions: &[Permission],
+        permissions: &[Permissions],
     ) {
         // Init a contract with admins
         let init_msg = InitMsg {
@@ -414,7 +414,7 @@ mod tests {
         init(deps, env.clone(), init_msg).unwrap();
 
         // Add subkeys with initial allowances and permissions
-        for ((spender, expiration), permission) in spenders.iter().zip(expirations).zip(permissions) {
+        for ((spender, expiration), permissions) in spenders.iter().zip(expirations).zip(permissions) {
             for amount in allowances {
                 let msg = HandleMsg::IncreaseAllowance {
                     spender: spender.clone(),
@@ -422,9 +422,9 @@ mod tests {
                     expires: Some(expiration.clone()),
                 };
                 handle(&mut deps, env.clone(), msg).unwrap();
-                let permission_msg = HandleMsg::SetupPermission {
+                let permission_msg = HandleMsg::SetupPermissions {
                     spender: spender.clone(),
-                    permissions: permission.clone(),
+                    permissions: permissions.clone(),
                 };
                 handle(&mut deps, env.clone(), permission_msg).unwrap();
             }
@@ -451,7 +451,7 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
-        let initial_permissions = vec![Permission::default(), Permission::default()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -494,7 +494,7 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
-        let initial_permissions = vec![Permission::default(), Permission::default()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -514,7 +514,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
         let allowance = query_allowance(&deps, spender2.clone()).unwrap();
@@ -523,7 +523,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -552,7 +552,7 @@ mod tests {
             Expiration::Never {},
             expires_later.clone(),
         ];
-        let initial_permissions = vec![Permission::default(), Permission::default(), Permission::default()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -577,7 +577,7 @@ mod tests {
                 spender: spender1,
                 balance: Balance(initial_allowances.clone()),
                 expires: Expiration::Never {},
-                permissions: Permission::default()
+                permissions: Permissions::default()
             }
         );
         assert_eq!(
@@ -586,7 +586,7 @@ mod tests {
                 spender: spender2.clone(),
                 balance: Balance(initial_allowances.clone()),
                 expires: Expiration::Never {},
-                permissions: Permission::default()
+                permissions: Permissions::default()
             }
         );
 
@@ -601,7 +601,7 @@ mod tests {
                 spender: spender3,
                 balance: Balance(initial_allowances.clone()),
                 expires: expires_later,
-                permissions: Permission::default()
+                permissions: Permissions::default()
             }
         );
     }
@@ -723,7 +723,7 @@ mod tests {
         let expires_time = Expiration::AtTime(1234567890);
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
-        let initial_permissions = vec![Permission::default(), Permission::default()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
 
         let env = mock_env(owner, &[]);
@@ -752,7 +752,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
                 expires: expires_height.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -771,7 +771,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
                 expires: expires_height.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -790,7 +790,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -809,7 +809,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow2.clone()]),
                 expires: expires_time,
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
     }
@@ -843,7 +843,7 @@ mod tests {
         let expires_never = Expiration::Never {};
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
-        let initial_permissions = vec![Permission::default(), Permission::default()];
+        let initial_permissions = vec![Permissions::default(), Permissions::default()];
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -873,7 +873,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone()]),
                 expires: expires_height.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -892,7 +892,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -914,7 +914,7 @@ mod tests {
                     allow2.clone()
                 ]),
                 expires: expires_height.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
 
@@ -956,7 +956,7 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow2]),
                 expires: expires_height.clone(),
-                permissions: Permission::default(),
+                permissions: Permissions::default(),
             }
         );
     }
@@ -979,7 +979,7 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone()];
-        let initial_permissions = vec![Permission::default()];
+        let initial_permissions = vec![Permissions::default()];
 
         let env = mock_env(owner.clone(), &[]);
         setup_test_case(
@@ -1075,13 +1075,13 @@ mod tests {
 
         let expires_never = Expiration::Never {};
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
-        let god_mode = Permission {
+        let god_mode = Permissions {
             delegate: true,
             redelegate: true,
             undelegate: true,
             withdraw: true,
         };
-        let initial_permissions = vec![god_mode.clone(), Permission::default()];
+        let initial_permissions = vec![god_mode.clone(), Permissions::default()];
 
         let env = mock_env(owner.clone(), &[]);
         setup_test_case(
@@ -1150,7 +1150,7 @@ mod tests {
             &[spender.clone()],
             &coins(55000, "ushell"),
             &[Expiration::Never {}],
-            &[Permission::default()],
+            &[Permissions::default()],
         );
 
         // let us make some queries... different msg types by owner and by other
