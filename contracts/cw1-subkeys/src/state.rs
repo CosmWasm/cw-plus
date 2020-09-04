@@ -9,14 +9,14 @@ use crate::balance::Balance;
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
-pub struct Permissions {
+pub struct Permission {
     pub delegate: bool,
     pub redelegate: bool,
     pub undelegate: bool,
     pub withdraw: bool,
 }
 
-impl fmt::Display for Permissions {
+impl fmt::Display for Permission {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "delegate: {}, redelegate: {}, undelegate: {}, withdraw: {}",
                self.delegate, self.redelegate, self.undelegate, self.withdraw)
@@ -45,7 +45,7 @@ impl Into<String> for PermissionErr {
 pub struct Allowance {
     pub balance: Balance,
     pub expires: Expiration,
-    pub permissions: Permissions,
+    pub permissions: Permission,
 }
 
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";

@@ -6,7 +6,7 @@ use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
 use cw0::Expiration;
 
 use crate::balance::Balance;
-use crate::state::Permissions;
+use crate::state::Permission;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -38,9 +38,9 @@ where
     },
 
     // Setups up permissions for a given subkey.
-    SetupPermissions {
+    SetupPermission {
         spender: HumanAddr,
-        permissions: Permissions,
+        permission: Permission,
     }
 }
 
@@ -81,5 +81,5 @@ pub struct AllowanceInfo {
     pub spender: HumanAddr,
     pub balance: Balance,
     pub expires: Expiration,
-    pub permissions: Permissions,
+    pub permissions: Permission,
 }
