@@ -135,9 +135,12 @@ const useOptions = (options: Options): Network => {
 
 type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {}}
 
+type Permissions = { delegate: boolean } | { undelegate: boolean } | { redelegate: boolean } | { withdraw: boolean }
+
 interface AllowanceResponse {
   readonly balance: readonly Coin[],
   readonly expires: Expiration,
+  readonly permission: Permissions,
 }
 
 interface AdminListResponse {
@@ -176,6 +179,7 @@ interface CW1Instance {
   updateAdmins: (admins: readonly string[]) => Promise<string>
   increaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
   decreaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
+  setupPermissions: (recipient: string, permission: Permissions) => Promise<string>
 }
 
 interface CW1Contract {
@@ -231,7 +235,12 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       const result = await client.execute(contractAddress, {decrease_allowance: {spender, amount, expires}});
       return result.transactionHash;
     }
-    
+
+    const setupPermissions = async (spender: string, permission: Permissions): Promise<string> => {
+      const result = await client.execute(contractAddress, {setup_permissions: {spender, permission}});
+      return result.transactionHash;
+    }
+
     return {
       contractAddress,
       admins,
@@ -241,6 +250,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       updateAdmins,
       increaseAllowance,
       decreaseAllowance,
+      setupPermissions
     };
   }
 
