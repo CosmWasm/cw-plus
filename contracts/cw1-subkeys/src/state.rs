@@ -23,6 +23,24 @@ impl fmt::Display for Permissions {
     }
 }
 
+pub enum PermissionErr {
+    Delegate {},
+    Redelegate {},
+    Undelegate {},
+    Withdraw {},
+}
+
+impl Into<String> for PermissionErr {
+    fn into(self) -> String {
+        return String::from(match self {
+            PermissionErr::Redelegate {} => "Redelegate is not allowed",
+            PermissionErr::Delegate {} => "Delegate is not allowed",
+            PermissionErr::Undelegate {} => "Undelegate is not allowed",
+            PermissionErr::Withdraw {} => "Withdraw is not allowed"
+        });
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Allowance {
     pub balance: Balance,
