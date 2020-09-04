@@ -699,8 +699,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // Native side (offer)
-        let native_sender = HumanAddr::from("A_in_X");
-        let native_rcpt = HumanAddr::from("B_in_X");
+        let native_sender = HumanAddr::from("A_on_X");
+        let native_rcpt = HumanAddr::from("B_on_X");
         let native_coins = coins(1000, "tokens_native");
 
         // Create the Native swap offer
@@ -717,8 +717,8 @@ mod tests {
         assert_eq!(log("action", "create"), res.log[0]);
 
         // Cw20 side (counter offer (1:1000))
-        let cw20_sender = HumanAddr::from("B_in_Y");
-        let cw20_rcpt = HumanAddr::from("A_in_Y");
+        let cw20_sender = HumanAddr::from("B_on_Y");
+        let cw20_rcpt = HumanAddr::from("A_on_Y");
         let cw20_coin = Cw20CoinHuman {
             address: HumanAddr::from("my_cw20_token"),
             amount: Uint128(1),
@@ -730,7 +730,7 @@ mod tests {
             id: cw20_swap_id.clone(),
             hash: real_hash(),
             recipient: cw20_rcpt.clone(),
-            expires: Expiration::AtHeight(123458),
+            expires: Expiration::AtHeight(123000),
         };
         let receive = Cw20ReceiveMsg {
             sender: cw20_sender,
@@ -791,6 +791,7 @@ mod tests {
         assert_eq!(log("action", "release"), res.log[0]);
         assert_eq!(log("id", native_swap_id), res.log[1]);
 
+        // Verify the resulting Native send message
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
