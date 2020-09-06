@@ -135,7 +135,12 @@ const useOptions = (options: Options): Network => {
 
 type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {}}
 
-type Permissions = { delegate: boolean } | { undelegate: boolean } | { redelegate: boolean } | { withdraw: boolean }
+interface Permissions {
+  readonly delegate: boolean
+  readonly undelegate: boolean
+  readonly redelegate: boolean
+  readonly withdraw: boolean
+}
 
 interface AllowanceResponse {
   readonly balance: readonly Coin[],
@@ -361,3 +366,13 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
 // contract.execute([{bank: {send: {from_address: contractAddress, to_address: address, amount: [{denom: "ushell", amount: "440000"}]}}}])
 // client.getAccount(contractAddress)
 // client.getAccount()
+
+// let permissions: Permissions = { delegate: true, undelegate: true, redelegate: true, withdraw: true }
+// contract.setupPermissions(randomAddress, permissions)
+
+// test delegating and undelegating from another account
+// let dmsg: DelegateMsg = {staking: {delegate: {validator:"coralvaloper1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2uch4gp", amount:{denom:"ureef",amount:"999"}}}}
+// contract.execute([dmsg])
+//
+// let unmsg: UndelegateMsg = {staking: {undelegate: {validator:"coralvaloper1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2uch4gp", amount:{denom:"ureef",amount:"999"}}}}
+// contract.execute([unmsg])
