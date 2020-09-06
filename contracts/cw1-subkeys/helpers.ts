@@ -140,7 +140,7 @@ type Permissions = { delegate: boolean } | { undelegate: boolean } | { redelegat
 interface AllowanceResponse {
   readonly balance: readonly Coin[],
   readonly expires: Expiration,
-  readonly permission: Permissions,
+  readonly permissions: Permissions,
 }
 
 interface AdminListResponse {
@@ -154,14 +154,23 @@ interface InitMsg {
 }
 
 // TODO: define more of these
-type CosmosMsg = SendMsg; 
+type CosmosMsg = {};
 
-interface SendMsg {
+interface SendMsg extends CosmosMsg {
   readonly bank: {
     readonly send: {
       readonly from_address: string,
       readonly to_address: string,
       readonly amount: readonly Coin[],    
+    }
+  }
+}
+
+interface DelegateMsg extends CosmosMsg {
+  readonly staking: {
+    readonly delegate: {
+      readonly validator: string,
+      readonly amount: readonly Coin[],
     }
   }
 }
@@ -179,7 +188,7 @@ interface CW1Instance {
   updateAdmins: (admins: readonly string[]) => Promise<string>
   increaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
   decreaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
-  setupPermissions: (recipient: string, permission: Permissions) => Promise<string>
+  setupPermissions: (recipient: string, permissions: Permissions) => Promise<string>
 }
 
 interface CW1Contract {
@@ -236,8 +245,8 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       return result.transactionHash;
     }
 
-    const setupPermissions = async (spender: string, permission: Permissions): Promise<string> => {
-      const result = await client.execute(contractAddress, {setup_permissions: {spender, permission}});
+    const setupPermissions = async (spender: string, permissions: Permissions): Promise<string> => {
+      const result = await client.execute(contractAddress, {setup_permissions: {spender, permissions}});
       return result.transactionHash;
     }
 
@@ -283,7 +292,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
 
 // Demo:
 // const client = await useOptions(coralnetOptions).setup(PASSWORD);
-// const { address} = await client.getAccount()
+// const { address } = await client.getAccount()
 // const factory = CW1(client)
 //
 // const codeId = await factory.upload();
