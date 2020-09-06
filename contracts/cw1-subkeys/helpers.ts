@@ -154,7 +154,7 @@ interface InitMsg {
 }
 
 // TODO: define more of these
-type CosmosMsg = {};
+interface CosmosMsg {}
 
 interface SendMsg extends CosmosMsg {
   readonly bank: {
@@ -170,7 +170,35 @@ interface DelegateMsg extends CosmosMsg {
   readonly staking: {
     readonly delegate: {
       readonly validator: string,
-      readonly amount: readonly Coin[],
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface UndelegateMsg extends CosmosMsg {
+  readonly staking: {
+    readonly undelegate: {
+      readonly validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface RedelegateMsg extends CosmosMsg {
+  readonly staking: {
+    readonly redelegate: {
+      readonly src_validator: string,
+      readonly dst_validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface WithdrawMsg extends CosmosMsg {
+  readonly staking: {
+    readonly withdraw: {
+      readonly validator: string,
+      readonly recipient?: string,
     }
   }
 }
