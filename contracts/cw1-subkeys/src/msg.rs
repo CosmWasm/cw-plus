@@ -38,7 +38,7 @@ where
     },
 
     // Setups up permissions for a given subkey.
-    SetupPermissions {
+    SetStakingPermissions {
         spender: HumanAddr,
         permissions: Permissions,
     }

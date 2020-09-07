@@ -51,7 +51,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             expires,
         } => handle_decrease_allowance(deps, env, spender, amount, expires),
-        HandleMsg::SetupPermissions {
+        HandleMsg::SetStakingPermissions {
             spender,
             permissions,
         } => handle_setup_permissions(deps, env, spender, permissions),
@@ -422,7 +422,7 @@ mod tests {
                     expires: Some(expiration.clone()),
                 };
                 handle(&mut deps, env.clone(), msg).unwrap();
-                let permission_msg = HandleMsg::SetupPermissions {
+                let permission_msg = HandleMsg::SetStakingPermissions {
                     spender: spender.clone(),
                     permissions: permissions.clone(),
                 };

@@ -221,7 +221,7 @@ interface CW1Instance {
   updateAdmins: (admins: readonly string[]) => Promise<string>
   increaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
   decreaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
-  setupPermissions: (recipient: string, permissions: Permissions) => Promise<string>
+  setStakingPermissions: (recipient: string, permissions: Permissions) => Promise<string>
 }
 
 interface CW1Contract {
@@ -278,7 +278,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       return result.transactionHash;
     }
 
-    const setupPermissions = async (spender: string, permissions: Permissions): Promise<string> => {
+    const setStakingPermissions = async (spender: string, permissions: Permissions): Promise<string> => {
       const result = await client.execute(contractAddress, {setup_permissions: {spender, permissions}});
       return result.transactionHash;
     }
@@ -292,7 +292,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       updateAdmins,
       increaseAllowance,
       decreaseAllowance,
-      setupPermissions
+      setStakingPermissions
     };
   }
 
@@ -368,7 +368,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
 // client.getAccount()
 
 // let permissions: Permissions = { delegate: true, undelegate: true, redelegate: true, withdraw: true }
-// contract.setupPermissions(randomAddress, permissions)
+// contract.setStakingPermissions(randomAddress, permissions)
 
 // test delegating and undelegating from another account
 // let dmsg: DelegateMsg = {staking: {delegate: {validator:"coralvaloper1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2uch4gp", amount:{denom:"ureef",amount:"999"}}}}
