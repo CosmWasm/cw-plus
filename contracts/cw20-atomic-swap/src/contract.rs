@@ -75,7 +75,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         return Err(StdError::generic_err("Invalid atomic swap id"));
     }
 
-    // FIXME? What about a non-empty array, but with zero-valued coins?
+    // FIXME: normalize array first (remove zero-valued coins), and then check for empty
     if balance.is_empty() {
         return Err(StdError::generic_err(
             "Send some coins to create an atomic swap",
