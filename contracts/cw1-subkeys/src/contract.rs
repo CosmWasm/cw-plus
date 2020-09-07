@@ -628,6 +628,165 @@ mod tests {
     }
 
     #[test]
+    fn query_permissions_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone()];
+
+        // spender1 has every permission to stake
+        let spender1 = HumanAddr::from("spender0001");
+        // spender2 do not have permission
+        let spender2 = HumanAddr::from("spender0002");
+        // non existent spender
+        let spender3 = HumanAddr::from("spender0003");
+
+        let god_mode = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: true,
+            withdraw: true,
+        };
+
+        let env = mock_env(owner.clone(), &[]);
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        let setup_perm_msg1 = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: god_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
+
+        let setup_perm_msg2 = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            // default is no permission
+            permissions: Default::default(),
+        };
+        // default is no permission
+        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
+
+        let permissions = query_permissions(&deps, spender1.clone()).unwrap();
+        assert_eq!(
+            permissions,
+            god_mode,
+        );
+
+        let permissions = query_permissions(&deps, spender2.clone()).unwrap();
+        assert_eq!(
+            permissions,
+            Permissions {
+                delegate: false,
+                redelegate: false,
+                undelegate: false,
+                withdraw: false
+            },
+        );
+
+        // no permission is set. should return false
+        let permissions = query_permissions(&deps, spender3.clone()).unwrap();
+        assert_eq!(
+            permissions,
+            Permissions {
+                delegate: false,
+                redelegate: false,
+                undelegate: false,
+                withdraw: false
+            },
+        );
+    }
+
+    #[test]
+    fn query_all_permissions_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+
+        let god_mode = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: true,
+            withdraw: true,
+        };
+
+        let noob_mode = Permissions{
+            delegate: false,
+            redelegate: false,
+            undelegate: false,
+            withdraw: false
+        };
+        
+        let env = mock_env(owner, &[]);
+
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        let setup_perm_msg1 = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: god_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
+
+        let setup_perm_msg2 = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            permissions: noob_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
+
+        let setup_perm_msg3 = HandleMsg::SetPermissions {
+            spender: spender3.clone(),
+            permissions: noob_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg3).unwrap();
+
+        // let's try pagination
+        let permissions = query_all_permissions(&deps, None, Some(2))
+            .unwrap()
+            .permissions;
+        assert_eq!(2, permissions.len());
+        assert_eq!(
+            permissions[0],
+            PermissionsInfo {
+                spender: spender1,
+                permissions: god_mode,
+            }
+        );
+        assert_eq!(
+            permissions[1],
+            PermissionsInfo{
+                spender: spender2.clone(),
+                permissions: noob_mode,
+            }
+        );
+
+        // now continue from after the last one
+        let permissions = query_all_permissions(&deps, Some(spender2), Some(2))
+            .unwrap()
+            .permissions;
+        assert_eq!(1, permissions.len());
+        assert_eq!(
+            permissions[0],
+            PermissionsInfo{
+                spender: spender3,
+                permissions: noob_mode,
+            }
+        );
+    }
+
+    #[test]
     fn update_admins_and_query() {
         let mut deps = mock_dependencies(20, &[]);
 
@@ -1223,70 +1382,6 @@ mod tests {
         let res = query_can_send(&deps, anyone.clone(), staking_delegate_msg.clone()).unwrap();
         assert_eq!(res.can_send, false);
         let res = query_can_send(&deps, anyone.clone(), staking_withdraw_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-    }
-
-    #[test]
-    fn permissions_query_works() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin007");
-        let spender = HumanAddr::from("spender808");
-        let anyone = HumanAddr::from("anyone");
-
-        let env = mock_env(owner.clone(), &[]);
-        // spender has allowance of 55000 ushell
-        setup_test_case(
-            &mut deps,
-            &env,
-            &[owner.clone()],
-            &[spender.clone()],
-            &coins(55000, "ushell"),
-            &[Expiration::Never {}],
-        );
-
-
-        // let us make some queries... different msg types by owner and by other
-        let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
-            to_address: anyone.clone(),
-            amount: coins(12345, "ushell"),
-        });
-        let send_msg_large = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
-            to_address: anyone.clone(),
-            amount: coins(1234567, "ushell"),
-        });
-        let staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: anyone.clone(),
-            amount: coin(70000, "ureef"),
-        });
-
-        // owner can send big or small
-        let res = query_can_send(&deps, owner.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        let res = query_can_send(&deps, owner.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        // owner can stake
-        let res = query_can_send(&deps, owner.clone(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-
-        // spender can send small
-        let res = query_can_send(&deps, spender.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        // not too big
-        let res = query_can_send(&deps, spender.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        // and not stake
-        let res = query_can_send(&deps, spender.clone(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-
-        // random person cannot do anything
-        let res = query_can_send(&deps, anyone.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        let res = query_can_send(&deps, anyone.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        let res = query_can_send(&deps, anyone.clone(), staking_msg.clone()).unwrap();
         assert_eq!(res.can_send, false);
     }
 }
