@@ -318,6 +318,7 @@ fn query_can_send<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+// FIXME refactor this function
 // this can just return booleans and the query_can_send wrapper creates the struct once, not on every path
 fn can_send<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
@@ -329,19 +330,30 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
     if cfg.is_admin(&owner_raw) {
         return Ok(true);
     }
-
-    // we only accept bank messages - ensure type and get the amount
-    let amount = match msg {
-        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => amount,
+    match msg {
+        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
+            // now we check if there is enough allowance for this message
+            let allowance = allowances_read(&deps.storage).may_load(owner_raw.as_slice())?;
+            match allowance {
+                // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
+                Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
+                None => Ok(false),
+            }
+        },
+        CosmosMsg::Staking(staking_msg) => {
+            let permissions = permissions_read(&deps.storage).may_load(owner_raw.as_slice())?;
+            match permissions {
+                // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
+                Some(perm) => {
+                    match check_staking_msg(&staking_msg, perm) {
+                        Ok(_) => Ok(true),
+                        Err(_) => Ok(false),
+                    }
+                } ,
+                None => Ok(false),
+            }
+        }
         _ => return Ok(false),
-    };
-
-    // now we check if there is enough allowance for this message
-    let allowance = allowances_read(&deps.storage).may_load(owner_raw.as_slice())?;
-    match allowance {
-        // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
-        Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
-        None => Ok(false),
     }
 }
 
@@ -1156,7 +1168,7 @@ mod tests {
         };
 
         let spender_raw = &deps.api.canonical_address(&spender).unwrap();
-        permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm);
+        let _ = permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm);
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
