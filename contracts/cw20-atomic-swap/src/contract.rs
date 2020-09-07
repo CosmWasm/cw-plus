@@ -37,12 +37,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Create(msg) => try_create(
-            deps,
-            env.clone(),
-            msg,
-            Balance::Native(env.message.sent_funds),
-        ),
+        HandleMsg::Create(msg) => {
+            let sent_funds = env.message.sent_funds.clone();
+            try_create(deps, env, msg, Balance::Native(sent_funds))
+        }
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
         HandleMsg::Receive(msg) => try_receive(deps, env, msg),
