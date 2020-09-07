@@ -83,7 +83,7 @@ where
                     let perm =
                         perm.ok_or_else(|| StdError::not_found("No permissions for this account"))?;
 
-                    check_staking_msg(staking_msg, perm)?;
+                    check_staking_permissions(staking_msg, perm)?;
                 }
                 CosmosMsg::Bank(BankMsg::Send {
                     from_address: _,
@@ -113,7 +113,7 @@ where
     }
 }
 
-pub fn check_staking_msg(staking_msg: &StakingMsg, permissions: Permissions) -> Result<bool, PermissionErr> {
+pub fn check_staking_permissions(staking_msg: &StakingMsg, permissions: Permissions) -> Result<bool, PermissionErr> {
     match staking_msg {
         StakingMsg::Delegate { validator: _, amount: _ } => {
             if !permissions.delegate {
@@ -346,7 +346,7 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
                     // if permission exists
                     perm_opt.map_or(
                         false,
-                        |perm| check_staking_msg(&staking_msg, perm).is_ok()
+                        |perm| check_staking_permissions(&staking_msg, perm).is_ok()
                     )
                 });
         }
