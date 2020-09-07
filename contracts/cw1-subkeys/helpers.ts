@@ -241,7 +241,7 @@ interface CW1Instance {
   updateAdmins: (admins: readonly string[]) => Promise<string>
   increaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
   decreaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
-  setStakingPermissions: (recipient: string, permissions: Permissions) => Promise<string>
+  setPermissions: (recipient: string, permissions: Permissions) => Promise<string>
 }
 
 interface CW1Contract {
@@ -314,8 +314,8 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       return result.transactionHash;
     }
 
-    const setStakingPermissions = async (spender: string, permissions: Permissions): Promise<string> => {
-      const result = await client.execute(contractAddress, {setup_permissions: {spender, permissions}});
+    const setPermissions = async (spender: string, permissions: Permissions): Promise<string> => {
+      const result = await client.execute(contractAddress, {set_permissions: {spender, permissions}});
       return result.transactionHash;
     }
 
@@ -332,7 +332,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       updateAdmins,
       increaseAllowance,
       decreaseAllowance,
-      setStakingPermissions
+      setPermissions
     };
   }
 
