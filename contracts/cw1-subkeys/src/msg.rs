@@ -64,7 +64,7 @@ where
     /// before any further state changes, should also succeed.
     CanSend {
         sender: HumanAddr,
-        msgs: CosmosMsg<T>,
+        msg: CosmosMsg<T>,
     },
     /// Gets all Allowances for this contract
     /// Returns AllAllowancesResponse
