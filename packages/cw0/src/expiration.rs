@@ -20,7 +20,7 @@ impl fmt::Display for Expiration {
         match self {
             Expiration::AtHeight(height) => write!(f, "expiration height: {}", height),
             Expiration::AtTime(time) => write!(f, "expiration time: {}", time),
-            Expiration::Never {} => write!(f, "expiration: never")
+            Expiration::Never {} => write!(f, "expiration: never"),
         }
     }
 }

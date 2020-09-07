@@ -18,7 +18,8 @@ pub struct Permissions {
 
 impl fmt::Display for Permissions {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "delegate: {}, redelegate: {}, undelegate: {}, withdraw: {}",
+        write!(f,
+               "delegate: {}, redelegate: {}, undelegate: {}, withdraw: {}",
                self.delegate, self.redelegate, self.undelegate, self.withdraw)
     }
 }
@@ -36,7 +37,7 @@ impl Into<String> for PermissionErr {
             PermissionErr::Redelegate {} => "Redelegate is not allowed",
             PermissionErr::Delegate {} => "Delegate is not allowed",
             PermissionErr::Undelegate {} => "Undelegate is not allowed",
-            PermissionErr::Withdraw {} => "Withdraw is not allowed"
+            PermissionErr::Withdraw {} => "Withdraw is not allowed",
         });
     }
 }
