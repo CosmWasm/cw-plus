@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, Storage};
+use cosmwasm_std::{ReadonlyStorage, Storage, StdError};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::Expiration;
 
@@ -52,6 +52,13 @@ impl Into<String> for PermissionErr {
             PermissionErr::Undelegate {} => "Undelegate is not allowed",
             PermissionErr::Withdraw {} => "Withdraw is not allowed",
         });
+    }
+}
+
+impl From<PermissionErr> for StdError {
+    fn from(err: PermissionErr) -> Self {
+        let msg: String = err.into();
+        StdError::generic_err(msg)
     }
 }
 

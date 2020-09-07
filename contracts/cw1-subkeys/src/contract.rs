@@ -113,26 +113,26 @@ where
     }
 }
 
-pub fn check_staking_msg(staking_msg: &StakingMsg, permissions: Permissions) -> StdResult<bool> {
+pub fn check_staking_msg(staking_msg: &StakingMsg, permissions: Permissions) -> Result<bool, PermissionErr> {
     match staking_msg {
         StakingMsg::Delegate { validator: _, amount: _ } => {
             if !permissions.delegate {
-                return Err(StdError::generic_err(PermissionErr::Delegate {}));
+                return Err(PermissionErr::Delegate {});
             }
         }
         StakingMsg::Undelegate { validator: _, amount: _ } => {
             if !permissions.undelegate {
-                return Err(StdError::generic_err(PermissionErr::Undelegate {}));
+                return Err(PermissionErr::Undelegate {});
             }
         }
         StakingMsg::Redelegate { src_validator: _, dst_validator: _, amount: _ } => {
             if !permissions.redelegate {
-                return Err(StdError::generic_err(PermissionErr::Redelegate {}));
+                return Err(PermissionErr::Redelegate {});
             }
         }
         StakingMsg::Withdraw { validator: _, recipient: _ } => {
             if !permissions.withdraw {
-                return Err(StdError::generic_err(PermissionErr::Withdraw {}));
+                return Err(PermissionErr::Withdraw {});
             }
         }
     }
