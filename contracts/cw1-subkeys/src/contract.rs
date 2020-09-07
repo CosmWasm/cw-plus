@@ -1063,7 +1063,7 @@ mod tests {
     }
 
     #[test]
-    fn test_permission_checks() {
+    fn test_staking_permission_checks() {
         let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
@@ -1073,15 +1073,10 @@ mod tests {
         let spender1 = HumanAddr::from("spender0001");
         // spender2 do not have permission
         let spender2 = HumanAddr::from("spender0002");
-        let initial_spenders = vec![spender1.clone(), spender2.clone()];
-
         let denom = "token1";
         let amount = 10000;
         let allow = coin(amount, denom);
-        let initial_allowances = vec![allow.clone(), allow.clone()];
 
-        let expires_never = Expiration::Never {};
-        let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
         let god_mode = Permissions {
             delegate: true,
             redelegate: true,
@@ -1090,30 +1085,42 @@ mod tests {
         };
 
         let env = mock_env(owner.clone(), &[]);
-        setup_test_case(
-            &mut deps,
-            &env,
-            &admins,
-            &initial_spenders,
-            &initial_allowances,
-            &initial_expirations,
-        );
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        let setup_perm_msg1 = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: god_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
+
+        let setup_perm_msg2 = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            // default is no permission
+            permissions: Default::default(),
+        };
+        // default is no permission
+        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
 
         let msg_delegate = vec![StakingMsg::Delegate{
-            validator: HumanAddr(String::from("validator")),
+            validator: HumanAddr::from("validator1"),
             amount: allow.clone(),
         }.into()];
         let msg_redelegate = vec![StakingMsg::Redelegate{
-            src_validator: Default::default(),
-            dst_validator: Default::default(),
+            src_validator: HumanAddr::from("validator1"),
+            dst_validator: HumanAddr::from("validator2"),
             amount: allow.clone(),
         }.into()];
         let msg_undelegate= vec![StakingMsg::Undelegate{
-            validator: HumanAddr(String::from("validator")),
+            validator: HumanAddr::from("validator1"),
             amount: allow.clone(),
         }.into()];
         let msg_withdraw = vec![StakingMsg::Withdraw{
-            validator: Default::default(),
+            validator: HumanAddr::from("validator1"),
             recipient: None,
         }.into()];
 
