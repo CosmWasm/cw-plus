@@ -318,7 +318,6 @@ fn query_can_send<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-// FIXME refactor this function
 // this can just return booleans and the query_can_send wrapper creates the struct once, not on every path
 fn can_send<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
@@ -341,17 +340,15 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
             }
         },
         CosmosMsg::Staking(staking_msg) => {
-            let permissions = permissions_read(&deps.storage).may_load(owner_raw.as_slice())?;
-            match permissions {
-                // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
-                Some(perm) => {
-                    match check_staking_msg(&staking_msg, perm) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                } ,
-                None => Ok(false),
-            }
+            return permissions_read(&deps.storage)
+                .may_load(owner_raw.as_slice())
+                .map(|perm_opt| {
+                    // if permission exists
+                    perm_opt.map_or(
+                        false,
+                        |perm| check_staking_msg(&staking_msg, perm).is_ok()
+                    )
+                });
         }
         _ => return Ok(false),
     }
