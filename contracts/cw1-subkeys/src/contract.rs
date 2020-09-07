@@ -13,7 +13,7 @@ use cw1_whitelist::{
 use cw2::set_contract_version;
 
 use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
-use crate::state::{allowances, allowances_read, Allowance, Permissions, PermissionErr};
+use crate::state::{allowances, allowances_read, permissions, Allowance, Permissions, PermissionErr};
 use std::ops::{AddAssign, Sub};
 
 // version info for migration info
@@ -51,10 +51,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             expires,
         } => handle_decrease_allowance(deps, env, spender, amount, expires),
-        HandleMsg::SetStakingPermissions {
+        HandleMsg::SetPermissions {
             spender,
             permissions,
-        } => handle_setup_permissions(deps, env, spender, permissions),
+        } => handle_set_permissions(deps, env, spender, permissions),
     }
 }
 
@@ -75,58 +75,28 @@ where
         res.log = vec![log("action", "execute"), log("owner", env.message.sender)];
         Ok(res)
     } else {
-        let mut allowances = allowances(&mut deps.storage);
-        let allow = allowances.may_load(owner_raw.as_slice())?;
-        let mut allowance =
-            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
         for msg in &msgs {
             match msg {
+                CosmosMsg::Staking(staking_msg) => {
+                    let permissions = permissions(&mut deps.storage);
+                    let perm = permissions.may_load(owner_raw.as_slice())?;
+                    let perm =
+                        perm.ok_or_else(|| StdError::not_found("No permissions for this account"))?;
+
+                    check_staking_msg(staking_msg, perm)?;
+                }
                 CosmosMsg::Bank(BankMsg::Send {
                     from_address: _,
                     to_address: _,
                     amount,
                 }) => {
+                    let mut allowances = allowances(&mut deps.storage);
+                    let allow = allowances.may_load(owner_raw.as_slice())?;
+                    let mut allowance =
+                        allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
-                }
-                CosmosMsg::Staking(StakingMsg::Delegate {
-                    validator: _,
-                    amount,
-                }) => {
-                    if !allowance.permissions.delegate {
-                        return Err(StdError::generic_err(PermissionErr::Delegate{}));
-                    }
-                    // Decrease allowance
-                    allowance.balance = allowance.balance.sub(amount.clone())?;
-                    allowances.save(owner_raw.as_slice(), &allowance)?;
-                }
-                CosmosMsg::Staking(StakingMsg::Undelegate {
-                    validator: _,
-                    amount: _,
-                }) => {
-                    if !allowance.permissions.undelegate {
-                        return Err(StdError::generic_err(PermissionErr::Undelegate{}));
-                    }
-                    // TODO Undelegation takes 21 days, it is not logical to increase balance
-                    // What to do?
-                }
-                CosmosMsg::Staking(StakingMsg::Redelegate {
-                    src_validator: _,
-                    dst_validator: _,
-                    amount: _,
-                }) => {
-                    if !allowance.permissions.redelegate {
-                        return Err(StdError::generic_err(PermissionErr::Redelegate{}));
-                    }
-                }
-                CosmosMsg::Staking(StakingMsg::Withdraw {
-                    validator: _,
-                    recipient: _,
-                }) => {
-                    if !allowance.permissions.withdraw {
-                        return Err(StdError::generic_err(PermissionErr::Withdraw{}));
-                    }
                 }
                 _ => {
                     return Err(StdError::generic_err("Message type rejected"));
@@ -141,6 +111,32 @@ where
         };
         Ok(res)
     }
+}
+
+pub fn check_staking_msg(staking_msg: &StakingMsg, permissions: Permissions) -> StdResult<()> {
+    match staking_msg {
+        StakingMsg::Delegate { validator: _, amount: _ } => {
+            if !permissions.delegate {
+                return Err(StdError::generic_err(PermissionErr::Delegate {}));
+            }
+        }
+        StakingMsg::Undelegate { validator: _, amount: _ } => {
+            if !permissions.undelegate {
+                return Err(StdError::generic_err(PermissionErr::Undelegate {}));
+            }
+        }
+        StakingMsg::Redelegate { src_validator: _, dst_validator: _, amount: _ } => {
+            if !permissions.redelegate {
+                return Err(StdError::generic_err(PermissionErr::Redelegate {}));
+            }
+        }
+        StakingMsg::Withdraw { validator: _, recipient: _ } => {
+            if !permissions.withdraw {
+                return Err(StdError::generic_err(PermissionErr::Withdraw {}));
+            }
+        }
+    }
+    return Ok(())
 }
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
@@ -236,11 +232,11 @@ where
     Ok(res)
 }
 
-pub fn handle_setup_permissions<S: Storage, A: Api, Q: Querier, T>(
+pub fn handle_set_permissions<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     spender: HumanAddr,
-    permissions: Permissions,
+    perm: Permissions,
 ) -> StdResult<HandleResponse<T>>
     where
         T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -255,14 +251,7 @@ pub fn handle_setup_permissions<S: Storage, A: Api, Q: Querier, T>(
     if spender_raw == owner_raw {
         return Err(StdError::generic_err("Cannot set allowance to own account"));
     }
-
-    // update allowance permissions
-    allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
-        let mut allowance =
-            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
-        allowance.permissions = permissions;
-        Ok(allowance)
-    })?;
+    permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm)?;
 
     let res = HandleResponse {
         messages: vec![],
@@ -270,7 +259,7 @@ pub fn handle_setup_permissions<S: Storage, A: Api, Q: Querier, T>(
             log("action", "setup_permissions"),
             log("owner", deps.api.human_address(owner_raw)?),
             log("spender", spender),
-            log("permissions", permissions),
+            log("permissions", perm),
         ],
         data: None,
     };
@@ -378,7 +367,6 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
                     spender: api.human_address(&CanonicalAddr::from(k))?,
                     balance: allow.balance,
                     expires: allow.expires,
-                    permissions: allow.permissions,
                 })
             })
         })
@@ -422,7 +410,7 @@ mod tests {
                     expires: Some(expiration.clone()),
                 };
                 handle(&mut deps, env.clone(), msg).unwrap();
-                let permission_msg = HandleMsg::SetStakingPermissions {
+                let permission_msg = HandleMsg::SetPermissions {
                     spender: spender.clone(),
                     permissions: permissions.clone(),
                 };
@@ -514,7 +502,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permissions::default(),
             }
         );
         let allowance = query_allowance(&deps, spender2.clone()).unwrap();
@@ -523,7 +510,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -577,7 +563,6 @@ mod tests {
                 spender: spender1,
                 balance: Balance(initial_allowances.clone()),
                 expires: Expiration::Never {},
-                permissions: Permissions::default()
             }
         );
         assert_eq!(
@@ -586,7 +571,6 @@ mod tests {
                 spender: spender2.clone(),
                 balance: Balance(initial_allowances.clone()),
                 expires: Expiration::Never {},
-                permissions: Permissions::default()
             }
         );
 
@@ -601,7 +585,6 @@ mod tests {
                 spender: spender3,
                 balance: Balance(initial_allowances.clone()),
                 expires: expires_later,
-                permissions: Permissions::default()
             }
         );
     }
@@ -752,7 +735,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
                 expires: expires_height.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -771,7 +753,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
                 expires: expires_height.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -790,7 +771,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -809,7 +789,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow2.clone()]),
                 expires: expires_time,
-                permissions: Permissions::default(),
             }
         );
     }
@@ -873,7 +852,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone()]),
                 expires: expires_height.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -892,7 +870,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -914,7 +891,6 @@ mod tests {
                     allow2.clone()
                 ]),
                 expires: expires_height.clone(),
-                permissions: Permissions::default(),
             }
         );
 
@@ -956,7 +932,6 @@ mod tests {
             Allowance {
                 balance: Balance(vec![allow2]),
                 expires: expires_height.clone(),
-                permissions: Permissions::default(),
             }
         );
     }

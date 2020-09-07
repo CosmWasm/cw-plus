@@ -38,7 +38,7 @@ where
     },
 
     // Setups up permissions for a given subkey.
-    SetStakingPermissions {
+    SetPermissions {
         spender: HumanAddr,
         permissions: Permissions,
     }
@@ -81,5 +81,4 @@ pub struct AllowanceInfo {
     pub spender: HumanAddr,
     pub balance: Balance,
     pub expires: Expiration,
-    pub permissions: Permissions,
 }
