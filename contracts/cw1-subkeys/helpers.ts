@@ -142,10 +142,22 @@ interface Permissions {
   readonly withdraw: boolean
 }
 
-interface AllowanceResponse {
+interface PermissionsInfo {
+  readonly spender: string;
+  readonly permissions: Permissions;
+}
+
+interface AllPermissionsResponse {
+  readonly permissions: readonly PermissionsInfo[];
+}
+
+interface AllowanceInfo {
   readonly balance: readonly Coin[],
   readonly expires: Expiration,
-  readonly permissions: Permissions,
+}
+
+interface AllAllowancesResponse {
+  readonly allowances: readonly AllowanceInfo[];
 }
 
 interface AdminListResponse {
@@ -158,10 +170,9 @@ interface InitMsg {
   readonly mutable: boolean,
 }
 
-// TODO: define more of these
-interface CosmosMsg {}
+type CosmosMsg = SendMsg | DelegateMsg | UndelegateMsg | RedelegateMsg | WithdrawMsg
 
-interface SendMsg extends CosmosMsg {
+interface SendMsg {
   readonly bank: {
     readonly send: {
       readonly from_address: string,
@@ -171,7 +182,7 @@ interface SendMsg extends CosmosMsg {
   }
 }
 
-interface DelegateMsg extends CosmosMsg {
+interface DelegateMsg {
   readonly staking: {
     readonly delegate: {
       readonly validator: string,
@@ -180,7 +191,7 @@ interface DelegateMsg extends CosmosMsg {
   }
 }
 
-interface UndelegateMsg extends CosmosMsg {
+interface UndelegateMsg {
   readonly staking: {
     readonly undelegate: {
       readonly validator: string,
@@ -189,7 +200,7 @@ interface UndelegateMsg extends CosmosMsg {
   }
 }
 
-interface RedelegateMsg extends CosmosMsg {
+interface RedelegateMsg {
   readonly staking: {
     readonly redelegate: {
       readonly src_validator: string,
@@ -199,7 +210,7 @@ interface RedelegateMsg extends CosmosMsg {
   }
 }
 
-interface WithdrawMsg extends CosmosMsg {
+interface WithdrawMsg {
   readonly staking: {
     readonly withdraw: {
       readonly validator: string,
@@ -213,7 +224,12 @@ interface CW1Instance {
 
   // queries
   admins: () => Promise<AdminListResponse>
-  allowance: (address?: string) => Promise<AllowanceResponse>
+  allowance: (address?: string) => Promise<AllowanceInfo>
+  allAllowances: (startAfter?: string, limit?: number) => Promise<AllAllowancesResponse>
+
+  permissions: (address?: string) => Promise<PermissionsInfo>
+  allPermissions: (startAfter?: string, limit?: number) => Promise<AllPermissionsResponse>
+  canSend: (sender: string, msgs: readonly CosmosMsg[]) => Promise<Boolean>
 
   // actions
   execute: (msgs: readonly CosmosMsg[]) => Promise<string>
@@ -240,10 +256,26 @@ interface CW1Contract {
 
 const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
   const use = (contractAddress: string): CW1Instance => {
-    const allowance = async (address?: string): Promise<AllowanceResponse> => {
+    const allowance = async (address?: string): Promise<AllowanceInfo> => {
       const spender = address || client.senderAddress;
-      const result = await client.queryContractSmart(contractAddress, {allowance: { spender }});
-      return result;
+      return await client.queryContractSmart(contractAddress, {allowance: {spender}});
+    };
+
+    const allAllowances = async (startAfter?: string, limit?: number): Promise<AllAllowancesResponse> => {
+      return client.queryContractSmart(contractAddress, {all_allowances: { start_after: startAfter, limit: limit }});
+    };
+
+    const permissions = async (address?: string): Promise<PermissionsInfo> => {
+      const spender = address || client.senderAddress;
+      return await client.queryContractSmart(contractAddress, {permissions: {spender}});
+    };
+
+    const allPermissions = async (startAfter?: string, limit?: number): Promise<AllPermissionsResponse> => {
+      return client.queryContractSmart(contractAddress, {all_permissions: { start_after: startAfter, limit: limit }});
+    };
+
+    const canSend = async (sender: string, msgs: readonly CosmosMsg[]): Promise<Boolean> => {
+      return client.queryContractSmart(contractAddress, {can_send: { sender: sender, msgs: msgs }});
     };
 
     const admins = async (): Promise<AdminListResponse> => {
@@ -287,6 +319,10 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       contractAddress,
       admins,
       allowance,
+      allAllowances,
+      permissions,
+      allPermissions,
+      canSend,
       execute,
       freeze,
       updateAdmins,

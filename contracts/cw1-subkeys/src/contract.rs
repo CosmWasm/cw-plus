@@ -274,7 +274,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
         QueryMsg::Permissions { spender } => to_binary(&query_permissions(deps, spender)?),
-        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
+        QueryMsg::CanSend { sender, msgs } => to_binary(&query_can_send(deps, sender, msgs)?),
         QueryMsg::AllAllowances { start_after, limit } => {
             to_binary(&query_all_allowances(deps, start_after, limit)?)
         },

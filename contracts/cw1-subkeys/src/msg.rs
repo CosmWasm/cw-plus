@@ -57,14 +57,14 @@ where
     /// Returns crate::state::Allowance
     Allowance { spender: HumanAddr },
     /// Get the current permissions for the given subkey (how much it can spend)
-    /// Returns crate::state::Permissions
-    Permissions{ spender: HumanAddr },
+    /// Returns PermissionsInfo
+    Permissions { spender: HumanAddr },
     /// Checks permissions of the caller on this proxy.
     /// If CanSend returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
     CanSend {
         sender: HumanAddr,
-        msg: CosmosMsg<T>,
+        msgs: CosmosMsg<T>,
     },
     /// Gets all Allowances for this contract
     /// Returns AllAllowancesResponse
