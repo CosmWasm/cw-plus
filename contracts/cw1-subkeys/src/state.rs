@@ -8,6 +8,10 @@ use cw0::Expiration;
 use crate::balance::Balance;
 use std::fmt;
 
+// Permissions struct defines users message execution permissions.
+// Could have implemented permissions for each cosmos module(StakingPermissions, GovPermissions etc...)
+// But that meant a lot of code for each module. Keeping the permissions inside one struct is more
+// optimal. Define other modules permissions here.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default, Copy)]
 pub struct Permissions {
     pub delegate: bool,
