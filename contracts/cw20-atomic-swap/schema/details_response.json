@@ -12,11 +12,12 @@
   ],
   "properties": {
     "balance": {
-      "description": "Balance in native tokens",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Coin"
-      }
+      "description": "Balance in native tokens or cw20 token, with human address",
+      "allOf": [
+        {
+          "$ref": "#/definitions/BalanceHuman"
+        }
+      ]
     },
     "expires": {
       "description": "Once a swap is expired, it can be returned to the original source (via \"refund\").",
@@ -52,6 +53,35 @@
     }
   },
   "definitions": {
+    "BalanceHuman": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "Native"
+          ],
+          "properties": {
+            "Native": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Coin"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "Cw20"
+          ],
+          "properties": {
+            "Cw20": {
+              "$ref": "#/definitions/Cw20CoinHuman"
+            }
+          }
+        }
+      ]
+    },
     "Coin": {
       "type": "object",
       "required": [
@@ -64,6 +94,21 @@
         },
         "denom": {
           "type": "string"
+        }
+      }
+    },
+    "Cw20CoinHuman": {
+      "type": "object",
+      "required": [
+        "address",
+        "amount"
+      ],
+      "properties": {
+        "address": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "amount": {
+          "$ref": "#/definitions/Uint128"
         }
       }
     },

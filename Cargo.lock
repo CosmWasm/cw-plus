@@ -411,6 +411,7 @@ dependencies = [
  "cosmwasm-vm",
  "cw2",
  "cw20",
+ "cw20-escrow",
  "hex 0.3.2",
  "schemars",
  "serde",
