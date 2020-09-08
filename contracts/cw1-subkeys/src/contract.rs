@@ -161,7 +161,7 @@ pub fn check_staking_permissions(
             }
         }
     }
-    return Ok(true);
+    Ok(true)
 }
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
@@ -365,16 +365,16 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
             }
         }
         CosmosMsg::Staking(staking_msg) => {
-            return permissions_read(&deps.storage)
+            permissions_read(&deps.storage)
                 .may_load(owner_raw.as_slice())
                 .map(|perm_opt| {
                     // if permission exists
                     perm_opt.map_or(false, |perm| {
                         check_staking_permissions(&staking_msg, perm).is_ok()
                     })
-                });
+                })
         }
-        _ => return Ok(false),
+        _ => Ok(false)
     }
 }
 
