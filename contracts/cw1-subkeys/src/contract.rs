@@ -1,8 +1,11 @@
 use schemars::JsonSchema;
 use std::fmt;
 
-use cosmwasm_std::{log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern, HandleResponse,
-                   HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage, StakingMsg};
+use cosmwasm_std::{
+    log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, Order, Querier, StakingMsg, StdError, StdResult,
+    Storage,
+};
 use cw0::Expiration;
 use cw1::CanSendResponse;
 use cw1_whitelist::{
@@ -12,8 +15,14 @@ use cw1_whitelist::{
 };
 use cw2::set_contract_version;
 
-use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg, AllPermissionsResponse, PermissionsInfo};
-use crate::state::{allowances, allowances_read, permissions, Allowance, Permissions, PermissionErr, permissions_read};
+use crate::msg::{
+    AllAllowancesResponse, AllPermissionsResponse, AllowanceInfo, HandleMsg, PermissionsInfo,
+    QueryMsg,
+};
+use crate::state::{
+    allowances, allowances_read, permissions, permissions_read, Allowance, PermissionErr,
+    Permissions,
+};
 use std::ops::{AddAssign, Sub};
 
 // version info for migration info
@@ -92,8 +101,8 @@ where
                 }) => {
                     let mut allowances = allowances(&mut deps.storage);
                     let allow = allowances.may_load(owner_raw.as_slice())?;
-                    let mut allowance =
-                        allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
+                    let mut allowance = allow
+                        .ok_or_else(|| StdError::not_found("No allowance for this account"))?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
@@ -113,30 +122,46 @@ where
     }
 }
 
-pub fn check_staking_permissions(staking_msg: &StakingMsg, permissions: Permissions) -> Result<bool, PermissionErr> {
+pub fn check_staking_permissions(
+    staking_msg: &StakingMsg,
+    permissions: Permissions,
+) -> Result<bool, PermissionErr> {
     match staking_msg {
-        StakingMsg::Delegate { validator: _, amount: _ } => {
+        StakingMsg::Delegate {
+            validator: _,
+            amount: _,
+        } => {
             if !permissions.delegate {
                 return Err(PermissionErr::Delegate {});
             }
         }
-        StakingMsg::Undelegate { validator: _, amount: _ } => {
+        StakingMsg::Undelegate {
+            validator: _,
+            amount: _,
+        } => {
             if !permissions.undelegate {
                 return Err(PermissionErr::Undelegate {});
             }
         }
-        StakingMsg::Redelegate { src_validator: _, dst_validator: _, amount: _ } => {
+        StakingMsg::Redelegate {
+            src_validator: _,
+            dst_validator: _,
+            amount: _,
+        } => {
             if !permissions.redelegate {
                 return Err(PermissionErr::Redelegate {});
             }
         }
-        StakingMsg::Withdraw { validator: _, recipient: _ } => {
+        StakingMsg::Withdraw {
+            validator: _,
+            recipient: _,
+        } => {
             if !permissions.withdraw {
                 return Err(PermissionErr::Withdraw {});
             }
         }
     }
-    return Ok(true)
+    return Ok(true);
 }
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
@@ -238,8 +263,8 @@ pub fn handle_set_permissions<S: Storage, A: Api, Q: Querier, T>(
     spender: HumanAddr,
     perm: Permissions,
 ) -> StdResult<HandleResponse<T>>
-    where
-        T: Clone + fmt::Debug + PartialEq + JsonSchema,
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = admin_list_read(&deps.storage).load()?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
@@ -277,10 +302,10 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
         QueryMsg::AllAllowances { start_after, limit } => {
             to_binary(&query_all_allowances(deps, start_after, limit)?)
-        },
-        QueryMsg::AllPermissions{ start_after, limit } => {
+        }
+        QueryMsg::AllPermissions { start_after, limit } => {
             to_binary(&query_all_permissions(deps, start_after, limit)?)
-        },
+        }
     }
 }
 
@@ -338,16 +363,15 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
                 Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
                 None => Ok(false),
             }
-        },
+        }
         CosmosMsg::Staking(staking_msg) => {
             return permissions_read(&deps.storage)
                 .may_load(owner_raw.as_slice())
                 .map(|perm_opt| {
                     // if permission exists
-                    perm_opt.map_or(
-                        false,
-                        |perm| check_staking_permissions(&staking_msg, perm).is_ok()
-                    )
+                    perm_opt.map_or(false, |perm| {
+                        check_staking_permissions(&staking_msg, perm).is_ok()
+                    })
                 });
         }
         _ => return Ok(false),
@@ -414,25 +438,25 @@ pub fn query_all_permissions<S: Storage, A: Api, Q: Querier>(
         .take(limit)
         .map(|item| {
             item.and_then(|(k, perm)| {
-                Ok(PermissionsInfo{
+                Ok(PermissionsInfo {
                     spender: api.human_address(&CanonicalAddr::from(k))?,
                     permissions: perm,
                 })
             })
         })
         .collect();
-    Ok(AllPermissionsResponse{ permissions: res? })
+    Ok(AllPermissionsResponse { permissions: res? })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::balance::Balance;
+    use crate::state::Permissions;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
-    use crate::state::Permissions;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -451,7 +475,7 @@ mod tests {
         init(deps, env.clone(), init_msg).unwrap();
 
         // Add subkeys with initial allowances
-        for (spender, expiration) in spenders.iter().zip(expirations){
+        for (spender, expiration) in spenders.iter().zip(expirations) {
             for amount in allowances {
                 let msg = HandleMsg::IncreaseAllowance {
                     spender: spender.clone(),
@@ -589,7 +613,6 @@ mod tests {
             &initial_expirations,
         );
 
-
         // let's try pagination
         let allowances = query_all_allowances(&deps, None, Some(2))
             .unwrap()
@@ -671,10 +694,7 @@ mod tests {
         handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
 
         let permissions = query_permissions(&deps, spender1.clone()).unwrap();
-        assert_eq!(
-            permissions,
-            god_mode,
-        );
+        assert_eq!(permissions, god_mode,);
 
         let permissions = query_permissions(&deps, spender2.clone()).unwrap();
         assert_eq!(
@@ -718,13 +738,13 @@ mod tests {
             withdraw: true,
         };
 
-        let noob_mode = Permissions{
+        let noob_mode = Permissions {
             delegate: false,
             redelegate: false,
             undelegate: false,
-            withdraw: false
+            withdraw: false,
         };
-        
+
         let env = mock_env(owner, &[]);
 
         // Init a contract with admins
@@ -766,7 +786,7 @@ mod tests {
         );
         assert_eq!(
             permissions[1],
-            PermissionsInfo{
+            PermissionsInfo {
                 spender: spender2.clone(),
                 permissions: noob_mode,
             }
@@ -779,7 +799,7 @@ mod tests {
         assert_eq!(1, permissions.len());
         assert_eq!(
             permissions[0],
-            PermissionsInfo{
+            PermissionsInfo {
                 spender: spender3,
                 permissions: noob_mode,
             }
@@ -903,7 +923,6 @@ mod tests {
         let expires_time = Expiration::AtTime(1234567890);
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
-
 
         let env = mock_env(owner, &[]);
         setup_test_case(
@@ -1265,30 +1284,29 @@ mod tests {
         // default is no permission
         handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
 
-        let msg_delegate = vec![StakingMsg::Delegate{
+        let msg_delegate = vec![StakingMsg::Delegate {
             validator: HumanAddr::from("validator1"),
             amount: allow.clone(),
-        }.into()];
-        let msg_redelegate = vec![StakingMsg::Redelegate{
+        }
+        .into()];
+        let msg_redelegate = vec![StakingMsg::Redelegate {
             src_validator: HumanAddr::from("validator1"),
             dst_validator: HumanAddr::from("validator2"),
             amount: allow.clone(),
-        }.into()];
-        let msg_undelegate= vec![StakingMsg::Undelegate{
+        }
+        .into()];
+        let msg_undelegate = vec![StakingMsg::Undelegate {
             validator: HumanAddr::from("validator1"),
             amount: allow.clone(),
-        }.into()];
-        let msg_withdraw = vec![StakingMsg::Withdraw{
+        }
+        .into()];
+        let msg_withdraw = vec![StakingMsg::Withdraw {
             validator: HumanAddr::from("validator1"),
             recipient: None,
-        }.into()];
+        }
+        .into()];
 
-        let msgs = vec![
-            msg_delegate,
-            msg_redelegate,
-            msg_undelegate,
-            msg_withdraw,
-        ];
+        let msgs = vec![msg_delegate, msg_redelegate, msg_undelegate, msg_withdraw];
 
         // spender1 can execute
         for msg in &msgs {
@@ -1327,7 +1345,7 @@ mod tests {
             delegate: true,
             redelegate: true,
             undelegate: false,
-            withdraw: false
+            withdraw: false,
         };
 
         let spender_raw = &deps.api.canonical_address(&spender).unwrap();

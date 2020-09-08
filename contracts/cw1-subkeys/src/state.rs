@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, Storage, StdError};
+use cosmwasm_std::{ReadonlyStorage, StdError, Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::Expiration;
 
@@ -22,9 +22,11 @@ pub struct Permissions {
 
 impl fmt::Display for Permissions {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "staking: {{ delegate: {}, redelegate: {}, undelegate: {}, withdraw: {} }}",
-               self.delegate, self.redelegate, self.undelegate, self.withdraw)
+        write!(
+            f,
+            "staking: {{ delegate: {}, redelegate: {}, undelegate: {}, withdraw: {} }}",
+            self.delegate, self.redelegate, self.undelegate, self.withdraw
+        )
     }
 }
 

@@ -41,7 +41,7 @@ where
     SetPermissions {
         spender: HumanAddr,
         permissions: Permissions,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
