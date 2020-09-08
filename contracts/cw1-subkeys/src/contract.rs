@@ -374,7 +374,7 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
                     })
                 })
         }
-        _ => Ok(false)
+        _ => Ok(false),
     }
 }
 
