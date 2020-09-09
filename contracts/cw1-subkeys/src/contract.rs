@@ -356,7 +356,7 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
         CosmosMsg::Staking(staking_msg) => {
             let perm_opt = permissions_read(&deps.storage).may_load(owner_raw.as_slice())?;
             match perm_opt {
-                Some(permission) => check_staking_permissions(&staking_msg, permission).is_ok(),
+                Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
                 None => Ok(false),
             }
         }
