@@ -356,10 +356,7 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
         CosmosMsg::Staking(staking_msg) => {
             let perm_opt = permissions_read(&deps.storage).may_load(owner_raw.as_slice())?;
             match perm_opt {
-                Some(permission) => match check_staking_permissions(&staking_msg, permission) {
-                    Ok(..) => Ok(true),
-                    Err(..) => Ok(false),
-                },
+                Some(permission) => check_staking_permissions(&staking_msg, permission).is_ok(),
                 None => Ok(false),
             }
         }
@@ -1243,7 +1240,7 @@ mod tests {
         let spender2 = HumanAddr::from("spender0002");
         let denom = "token1";
         let amount = 10000;
-        let coin = coin(amount, denom);
+        let coin1 = coin(amount, denom);
 
         let god_mode = Permissions {
             delegate: true,
@@ -1276,18 +1273,18 @@ mod tests {
 
         let msg_delegate = vec![StakingMsg::Delegate {
             validator: HumanAddr::from("validator1"),
-            amount: coin.clone(),
+            amount: coin1.clone(),
         }
         .into()];
         let msg_redelegate = vec![StakingMsg::Redelegate {
             src_validator: HumanAddr::from("validator1"),
             dst_validator: HumanAddr::from("validator2"),
-            amount: coin.clone(),
+            amount: coin1.clone(),
         }
         .into()];
         let msg_undelegate = vec![StakingMsg::Undelegate {
             validator: HumanAddr::from("validator1"),
-            amount: coin.clone(),
+            amount: coin1.clone(),
         }
         .into()];
         let msg_withdraw = vec![StakingMsg::Withdraw {
