@@ -2,15 +2,14 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern,
     HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
+use cosmwasm_storage::prefixed;
 use cw2::set_contract_version;
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::msg::{
-    CreateMsg, Cw20CoinHuman, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg,
-    ReceiveMsg,
+    CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
-use crate::state::{all_escrow_ids, escrows, escrows_read, Cw20Coin, Escrow, PREFIX_ESCROW};
-use cosmwasm_storage::prefixed;
+use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, PREFIX_ESCROW};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";

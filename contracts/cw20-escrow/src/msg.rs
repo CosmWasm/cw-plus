@@ -1,7 +1,9 @@
-use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult, Uint128};
-use cw20::Cw20ReceiveMsg;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult};
+
+use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InitMsg {}
@@ -118,10 +120,4 @@ pub struct DetailsResponse {
     pub cw20_balance: Vec<Cw20CoinHuman>,
     /// Whitelisted cw20 tokens
     pub cw20_whitelist: Vec<HumanAddr>,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct Cw20CoinHuman {
-    pub address: HumanAddr,
-    pub amount: Uint128,
 }
