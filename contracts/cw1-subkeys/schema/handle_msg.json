@@ -127,6 +127,29 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "set_permissions"
+      ],
+      "properties": {
+        "set_permissions": {
+          "type": "object",
+          "required": [
+            "permissions",
+            "spender"
+          ],
+          "properties": {
+            "permissions": {
+              "$ref": "#/definitions/Permissions"
+            },
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
@@ -281,6 +304,29 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "Permissions": {
+      "type": "object",
+      "required": [
+        "delegate",
+        "redelegate",
+        "undelegate",
+        "withdraw"
+      ],
+      "properties": {
+        "delegate": {
+          "type": "boolean"
+        },
+        "redelegate": {
+          "type": "boolean"
+        },
+        "undelegate": {
+          "type": "boolean"
+        },
+        "withdraw": {
+          "type": "boolean"
+        }
+      }
     },
     "StakingMsg": {
       "anyOf": [

@@ -16,6 +16,9 @@ account can try to execute a `CosmosMsg::Bank(BankMsg::Send{})` from this
 contract and if they have the required allowances, their allowance will be
 reduced and the send message relayed. If they don't have sufficient authorization,
 or if they try to proxy any other message type, then the attempt will be rejected.
+Admin can give permissions to subkeys to relay specific types of messages 
+(covers _Delegate, Undelegate, Redelegate, Withdraw_ for now). Subkeys have no permission
+on creation, it can be setup with `SetupPermission` message.
 
 ### Messages
 
@@ -34,6 +37,10 @@ enum HandleMsg {
         denom: String,
         amount: Uint128,
         expires: Option<Expiration>,
+    },
+    SetupPermissions {
+        spender: HumanAddr,
+        permissions: Permissions,
     }
 }
 ```
@@ -46,12 +53,22 @@ It also adds one more query type:
 enum QueryMsg {
     Allowance {
         spender: HumanAddr,
-    }
+    },
+    AllAllowances {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }
 
-pub struct AllowanceResponse {
-    pub allowance: Vec<Coin>,
+pub struct AllowanceInfo {
+    pub spender: HumanAddr,
+    pub balance: Balance,
     pub expires: Expiration,
+    pub permissions: Permissions,
+}
+
+pub struct AllAllowancesResponse {
+    pub allowances: Vec<AllowanceInfo>,
 }
 ```
 

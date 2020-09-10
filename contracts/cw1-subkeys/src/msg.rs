@@ -6,6 +6,7 @@ use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
 use cw0::Expiration;
 
 use crate::balance::Balance;
+use crate::state::Permissions;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -35,6 +36,12 @@ where
         amount: Coin,
         expires: Option<Expiration>,
     },
+
+    // Setups up permissions for a given subkey.
+    SetPermissions {
+        spender: HumanAddr,
+        permissions: Permissions,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -49,6 +56,9 @@ where
     /// Get the current allowance for the given subkey (how much it can spend)
     /// Returns crate::state::Allowance
     Allowance { spender: HumanAddr },
+    /// Get the current permissions for the given subkey (how much it can spend)
+    /// Returns PermissionsInfo
+    Permissions { spender: HumanAddr },
     /// Checks permissions of the caller on this proxy.
     /// If CanSend returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
@@ -59,6 +69,12 @@ where
     /// Gets all Allowances for this contract
     /// Returns AllAllowancesResponse
     AllAllowances {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
+    /// Gets all Permissions for this contract
+    /// Returns AllPermissionsResponse
+    AllPermissions {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
@@ -74,4 +90,15 @@ pub struct AllowanceInfo {
     pub spender: HumanAddr,
     pub balance: Balance,
     pub expires: Expiration,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct PermissionsInfo {
+    pub spender: HumanAddr,
+    pub permissions: Permissions,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AllPermissionsResponse {
+    pub permissions: Vec<PermissionsInfo>,
 }

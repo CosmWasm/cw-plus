@@ -3,7 +3,8 @@ use std::fmt;
 
 use cosmwasm_std::{
     log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
+    HandleResponse, HumanAddr, InitResponse, Order, Querier, StakingMsg, StdError, StdResult,
+    Storage,
 };
 use cw0::Expiration;
 use cw1::CanSendResponse;
@@ -14,8 +15,14 @@ use cw1_whitelist::{
 };
 use cw2::set_contract_version;
 
-use crate::msg::{AllAllowancesResponse, AllowanceInfo, HandleMsg, QueryMsg};
-use crate::state::{allowances, allowances_read, Allowance};
+use crate::msg::{
+    AllAllowancesResponse, AllPermissionsResponse, AllowanceInfo, HandleMsg, PermissionsInfo,
+    QueryMsg,
+};
+use crate::state::{
+    allowances, allowances_read, permissions, permissions_read, Allowance, PermissionErr,
+    Permissions,
+};
 use std::ops::{AddAssign, Sub};
 
 // version info for migration info
@@ -53,6 +60,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             amount,
             expires,
         } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        HandleMsg::SetPermissions {
+            spender,
+            permissions,
+        } => handle_set_permissions(deps, env, spender, permissions),
     }
 }
 
@@ -73,17 +84,25 @@ where
         res.log = vec![log("action", "execute"), log("owner", env.message.sender)];
         Ok(res)
     } else {
-        let mut allowances = allowances(&mut deps.storage);
-        let allow = allowances.may_load(owner_raw.as_slice())?;
-        let mut allowance =
-            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
         for msg in &msgs {
             match msg {
+                CosmosMsg::Staking(staking_msg) => {
+                    let permissions = permissions(&mut deps.storage);
+                    let perm = permissions.may_load(owner_raw.as_slice())?;
+                    let perm =
+                        perm.ok_or_else(|| StdError::not_found("No permissions for this account"))?;
+
+                    check_staking_permissions(staking_msg, perm)?;
+                }
                 CosmosMsg::Bank(BankMsg::Send {
                     from_address: _,
                     to_address: _,
                     amount,
                 }) => {
+                    let mut allowances = allowances(&mut deps.storage);
+                    let allow = allowances.may_load(owner_raw.as_slice())?;
+                    let mut allowance = allow
+                        .ok_or_else(|| StdError::not_found("No allowance for this account"))?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
@@ -101,6 +120,35 @@ where
         };
         Ok(res)
     }
+}
+
+pub fn check_staking_permissions(
+    staking_msg: &StakingMsg,
+    permissions: Permissions,
+) -> Result<bool, PermissionErr> {
+    match staking_msg {
+        StakingMsg::Delegate { .. } => {
+            if !permissions.delegate {
+                return Err(PermissionErr::Delegate {});
+            }
+        }
+        StakingMsg::Undelegate { .. } => {
+            if !permissions.undelegate {
+                return Err(PermissionErr::Undelegate {});
+            }
+        }
+        StakingMsg::Redelegate { .. } => {
+            if !permissions.redelegate {
+                return Err(PermissionErr::Redelegate {});
+            }
+        }
+        StakingMsg::Withdraw { .. } => {
+            if !permissions.withdraw {
+                return Err(PermissionErr::Withdraw {});
+            }
+        }
+    }
+    Ok(true)
 }
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
@@ -196,6 +244,42 @@ where
     Ok(res)
 }
 
+pub fn handle_set_permissions<S: Storage, A: Api, Q: Querier, T>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    spender: HumanAddr,
+    perm: Permissions,
+) -> StdResult<HandleResponse<T>>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    let cfg = admin_list_read(&deps.storage).load()?;
+    let spender_raw = &deps.api.canonical_address(&spender)?;
+    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
+
+    if !cfg.is_admin(&owner_raw) {
+        return Err(StdError::unauthorized());
+    }
+    if spender_raw == owner_raw {
+        return Err(StdError::generic_err(
+            "Cannot set permission to own account",
+        ));
+    }
+    permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm)?;
+
+    let res = HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "set_permissions"),
+            log("owner", deps.api.human_address(owner_raw)?),
+            log("spender", spender),
+            log("permissions", perm),
+        ],
+        data: None,
+    };
+    Ok(res)
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
@@ -203,9 +287,13 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
+        QueryMsg::Permissions { spender } => to_binary(&query_permissions(deps, spender)?),
         QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
         QueryMsg::AllAllowances { start_after, limit } => {
             to_binary(&query_all_allowances(deps, start_after, limit)?)
+        }
+        QueryMsg::AllPermissions { start_after, limit } => {
+            to_binary(&query_all_permissions(deps, start_after, limit)?)
         }
     }
 }
@@ -220,6 +308,18 @@ pub fn query_allowance<S: Storage, A: Api, Q: Querier>(
         .may_load(subkey.as_slice())?
         .unwrap_or_default();
     Ok(allow)
+}
+
+// if the subkey has no permissions, return an empty struct (not an error)
+pub fn query_permissions<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    spender: HumanAddr,
+) -> StdResult<Permissions> {
+    let subkey = deps.api.canonical_address(&spender)?;
+    let permissions = permissions_read(&deps.storage)
+        .may_load(subkey.as_slice())?
+        .unwrap_or_default();
+    Ok(permissions)
 }
 
 fn query_can_send<S: Storage, A: Api, Q: Querier>(
@@ -243,19 +343,24 @@ fn can_send<S: Storage, A: Api, Q: Querier>(
     if cfg.is_admin(&owner_raw) {
         return Ok(true);
     }
-
-    // we only accept bank messages - ensure type and get the amount
-    let amount = match msg {
-        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => amount,
-        _ => return Ok(false),
-    };
-
-    // now we check if there is enough allowance for this message
-    let allowance = allowances_read(&deps.storage).may_load(owner_raw.as_slice())?;
-    match allowance {
-        // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
-        Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
-        None => Ok(false),
+    match msg {
+        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
+            // now we check if there is enough allowance for this message
+            let allowance = allowances_read(&deps.storage).may_load(owner_raw.as_slice())?;
+            match allowance {
+                // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
+                Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
+                None => Ok(false),
+            }
+        }
+        CosmosMsg::Staking(staking_msg) => {
+            let perm_opt = permissions_read(&deps.storage).may_load(owner_raw.as_slice())?;
+            match perm_opt {
+                Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
+                None => Ok(false),
+            }
+        }
+        _ => Ok(false),
     }
 }
 
@@ -304,10 +409,36 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
     Ok(AllAllowancesResponse { allowances: res? })
 }
 
+// return a list of all permissions here
+pub fn query_all_permissions<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_after: Option<HumanAddr>,
+    limit: Option<u32>,
+) -> StdResult<AllPermissionsResponse> {
+    let limit = calc_limit(limit);
+    let range_start = calc_range_start(start_after);
+
+    let api = &deps.api;
+    let res: StdResult<Vec<PermissionsInfo>> = permissions_read(&deps.storage)
+        .range(range_start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.and_then(|(k, perm)| {
+                Ok(PermissionsInfo {
+                    spender: api.human_address(&CanonicalAddr::from(k))?,
+                    permissions: perm,
+                })
+            })
+        })
+        .collect();
+    Ok(AllPermissionsResponse { permissions: res? })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::balance::Balance;
+    use crate::state::Permissions;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
     use cw1_whitelist::msg::AdminListResponse;
@@ -420,7 +551,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
         let allowance = query_allowance(&deps, spender2.clone()).unwrap();
@@ -428,7 +559,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
 
@@ -478,7 +609,7 @@ mod tests {
             AllowanceInfo {
                 spender: spender1,
                 balance: Balance(initial_allowances.clone()),
-                expires: Expiration::Never {}
+                expires: Expiration::Never {},
             }
         );
         assert_eq!(
@@ -486,7 +617,7 @@ mod tests {
             AllowanceInfo {
                 spender: spender2.clone(),
                 balance: Balance(initial_allowances.clone()),
-                expires: Expiration::Never {}
+                expires: Expiration::Never {},
             }
         );
 
@@ -501,6 +632,163 @@ mod tests {
                 spender: spender3,
                 balance: Balance(initial_allowances.clone()),
                 expires: expires_later,
+            }
+        );
+    }
+
+    #[test]
+    fn query_permissions_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone()];
+
+        // spender1 has every permission to stake
+        let spender1 = HumanAddr::from("spender0001");
+        // spender2 do not have permission
+        let spender2 = HumanAddr::from("spender0002");
+        // non existent spender
+        let spender3 = HumanAddr::from("spender0003");
+
+        let god_mode = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: true,
+            withdraw: true,
+        };
+
+        let env = mock_env(owner.clone(), &[]);
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        let setup_perm_msg1 = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: god_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
+
+        let setup_perm_msg2 = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            // default is no permission
+            permissions: Default::default(),
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
+
+        let permissions = query_permissions(&deps, spender1.clone()).unwrap();
+        assert_eq!(permissions, god_mode);
+
+        let permissions = query_permissions(&deps, spender2.clone()).unwrap();
+        assert_eq!(
+            permissions,
+            Permissions {
+                delegate: false,
+                redelegate: false,
+                undelegate: false,
+                withdraw: false
+            },
+        );
+
+        // no permission is set. should return false
+        let permissions = query_permissions(&deps, spender3.clone()).unwrap();
+        assert_eq!(
+            permissions,
+            Permissions {
+                delegate: false,
+                redelegate: false,
+                undelegate: false,
+                withdraw: false
+            },
+        );
+
+        //
+    }
+
+    #[test]
+    fn query_all_permissions_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
+
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let spender3 = HumanAddr::from("spender0003");
+
+        let god_mode = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: true,
+            withdraw: true,
+        };
+
+        let noob_mode = Permissions {
+            delegate: false,
+            redelegate: false,
+            undelegate: false,
+            withdraw: false,
+        };
+
+        let env = mock_env(owner, &[]);
+
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        let setup_perm_msg1 = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: god_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
+
+        let setup_perm_msg2 = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            permissions: noob_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
+
+        let setup_perm_msg3 = HandleMsg::SetPermissions {
+            spender: spender3.clone(),
+            permissions: noob_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg3).unwrap();
+
+        // let's try pagination
+        let permissions = query_all_permissions(&deps, None, Some(2))
+            .unwrap()
+            .permissions;
+        assert_eq!(2, permissions.len());
+        assert_eq!(
+            permissions[0],
+            PermissionsInfo {
+                spender: spender1,
+                permissions: god_mode,
+            }
+        );
+        assert_eq!(
+            permissions[1],
+            PermissionsInfo {
+                spender: spender2.clone(),
+                permissions: noob_mode,
+            }
+        );
+
+        // now continue from after the last one
+        let permissions = query_all_permissions(&deps, Some(spender2), Some(2))
+            .unwrap()
+            .permissions;
+        assert_eq!(1, permissions.len());
+        assert_eq!(
+            permissions[0],
+            PermissionsInfo {
+                spender: spender3,
+                permissions: noob_mode,
             }
         );
     }
@@ -647,7 +935,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -665,7 +953,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -683,7 +971,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
 
@@ -762,7 +1050,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone(), allow2.clone()]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -780,7 +1068,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow1.clone()]),
-                expires: expires_never.clone()
+                expires: expires_never.clone(),
             }
         );
 
@@ -801,7 +1089,7 @@ mod tests {
                     coin(amount1 / 2 + (amount1 & 1), denom1),
                     allow2.clone()
                 ]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
 
@@ -842,7 +1130,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: Balance(vec![allow2]),
-                expires: expires_height.clone()
+                expires: expires_height.clone(),
             }
         );
     }
@@ -940,6 +1228,214 @@ mod tests {
     }
 
     #[test]
+    fn staking_permission_checks() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone()];
+
+        // spender1 has every permission to stake
+        let spender1 = HumanAddr::from("spender0001");
+        // spender2 do not have permission
+        let spender2 = HumanAddr::from("spender0002");
+        let denom = "token1";
+        let amount = 10000;
+        let coin1 = coin(amount, denom);
+
+        let god_mode = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: true,
+            withdraw: true,
+        };
+
+        let env = mock_env(owner.clone(), &[]);
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        let setup_perm_msg1 = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: god_mode,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
+
+        let setup_perm_msg2 = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            // default is no permission
+            permissions: Default::default(),
+        };
+        // default is no permission
+        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
+
+        let msg_delegate = vec![StakingMsg::Delegate {
+            validator: HumanAddr::from("validator1"),
+            amount: coin1.clone(),
+        }
+        .into()];
+        let msg_redelegate = vec![StakingMsg::Redelegate {
+            src_validator: HumanAddr::from("validator1"),
+            dst_validator: HumanAddr::from("validator2"),
+            amount: coin1.clone(),
+        }
+        .into()];
+        let msg_undelegate = vec![StakingMsg::Undelegate {
+            validator: HumanAddr::from("validator1"),
+            amount: coin1.clone(),
+        }
+        .into()];
+        let msg_withdraw = vec![StakingMsg::Withdraw {
+            validator: HumanAddr::from("validator1"),
+            recipient: None,
+        }
+        .into()];
+
+        let msgs = vec![
+            msg_delegate.clone(),
+            msg_redelegate.clone(),
+            msg_undelegate.clone(),
+            msg_withdraw.clone(),
+        ];
+
+        // spender1 can execute
+        for msg in &msgs {
+            let env = mock_env(&spender1, &[]);
+            let res = handle(&mut deps, env, HandleMsg::Execute { msgs: msg.clone() });
+            assert!(res.is_ok())
+        }
+
+        // spender2 cannot execute (no permission)
+        for msg in &msgs {
+            let env = mock_env(&spender2, &[]);
+            let res = handle(&mut deps, env, HandleMsg::Execute { msgs: msg.clone() });
+            assert!(res.is_err())
+        }
+
+        // test mixed permissions
+        let spender3 = HumanAddr::from("spender0003");
+        let setup_perm_msg3 = HandleMsg::SetPermissions {
+            spender: spender3.clone(),
+            permissions: Permissions {
+                delegate: false,
+                redelegate: true,
+                undelegate: true,
+                withdraw: false,
+            },
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg3).unwrap();
+        let env = mock_env(&spender3, &[]);
+        let res = handle(
+            &mut deps,
+            env.clone(),
+            HandleMsg::Execute {
+                msgs: msg_delegate.clone(),
+            },
+        );
+        // FIXME need better error check here
+        assert!(res.is_err());
+        let res = handle(
+            &mut deps,
+            env.clone(),
+            HandleMsg::Execute {
+                msgs: msg_redelegate.clone(),
+            },
+        );
+        assert!(res.is_ok());
+        let res = handle(
+            &mut deps,
+            env.clone(),
+            HandleMsg::Execute {
+                msgs: msg_undelegate.clone(),
+            },
+        );
+        assert!(res.is_ok());
+        let res = handle(
+            &mut deps,
+            env.clone(),
+            HandleMsg::Execute {
+                msgs: msg_withdraw.clone(),
+            },
+        );
+        assert!(res.is_err())
+    }
+
+    // tests permissions and allowances are independent features and does not affect each other
+    #[test]
+    fn permissions_allowances_independent() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let owner = HumanAddr::from("admin0001");
+        let admins = vec![owner.clone()];
+
+        // spender1 has every permission to stake
+        let spender1 = HumanAddr::from("spender0001");
+        let spender2 = HumanAddr::from("spender0002");
+        let denom = "token1";
+        let amount = 10000;
+        let coin = coin(amount, denom);
+
+        let allow = Allowance {
+            balance: Balance(vec![coin.clone()]),
+            expires: Expiration::Never {},
+        };
+        let perm = Permissions {
+            delegate: true,
+            redelegate: false,
+            undelegate: false,
+            withdraw: true,
+        };
+
+        let env = mock_env(owner.clone(), &[]);
+        // Init a contract with admins
+        let init_msg = InitMsg {
+            admins: admins.clone(),
+            mutable: true,
+        };
+        init(&mut deps, env.clone(), init_msg).unwrap();
+
+        // setup permission and then allowance and check if changed
+        let setup_perm_msg = HandleMsg::SetPermissions {
+            spender: spender1.clone(),
+            permissions: perm,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg).unwrap();
+
+        let setup_allowance_msg = HandleMsg::IncreaseAllowance {
+            spender: spender1.clone(),
+            amount: coin.clone(),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), setup_allowance_msg).unwrap();
+
+        let res_perm = query_permissions(&deps, spender1.clone()).unwrap();
+        assert_eq!(perm, res_perm);
+        let res_allow = query_allowance(&deps, spender1.clone()).unwrap();
+        assert_eq!(allow, res_allow);
+
+        // setup allowance and then permission and check if changed
+        let setup_allowance_msg = HandleMsg::IncreaseAllowance {
+            spender: spender2.clone(),
+            amount: coin.clone(),
+            expires: None,
+        };
+        handle(&mut deps, env.clone(), setup_allowance_msg).unwrap();
+
+        let setup_perm_msg = HandleMsg::SetPermissions {
+            spender: spender2.clone(),
+            permissions: perm,
+        };
+        handle(&mut deps, env.clone(), setup_perm_msg).unwrap();
+
+        let res_perm = query_permissions(&deps, spender2.clone()).unwrap();
+        assert_eq!(perm, res_perm);
+        let res_allow = query_allowance(&deps, spender2.clone()).unwrap();
+        assert_eq!(allow, res_allow);
+    }
+
+    #[test]
     fn can_send_query_works() {
         let mut deps = mock_dependencies(20, &[]);
 
@@ -958,6 +1454,16 @@ mod tests {
             &[Expiration::Never {}],
         );
 
+        let perm = Permissions {
+            delegate: true,
+            redelegate: true,
+            undelegate: false,
+            withdraw: false,
+        };
+
+        let spender_raw = &deps.api.canonical_address(&spender).unwrap();
+        let _ = permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm);
+
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
             from_address: MOCK_CONTRACT_ADDR.into(),
@@ -969,9 +1475,13 @@ mod tests {
             to_address: anyone.clone(),
             amount: coins(1234567, "ushell"),
         });
-        let staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
+        let staking_delegate_msg = CosmosMsg::Staking(StakingMsg::Delegate {
             validator: anyone.clone(),
             amount: coin(70000, "ureef"),
+        });
+        let staking_withdraw_msg = CosmosMsg::Staking(StakingMsg::Withdraw {
+            validator: anyone.clone(),
+            recipient: None,
         });
 
         // owner can send big or small
@@ -980,7 +1490,7 @@ mod tests {
         let res = query_can_send(&deps, owner.clone(), send_msg_large.clone()).unwrap();
         assert_eq!(res.can_send, true);
         // owner can stake
-        let res = query_can_send(&deps, owner.clone(), staking_msg.clone()).unwrap();
+        let res = query_can_send(&deps, owner.clone(), staking_delegate_msg.clone()).unwrap();
         assert_eq!(res.can_send, true);
 
         // spender can send small
@@ -989,8 +1499,10 @@ mod tests {
         // not too big
         let res = query_can_send(&deps, spender.clone(), send_msg_large.clone()).unwrap();
         assert_eq!(res.can_send, false);
-        // and not stake
-        let res = query_can_send(&deps, spender.clone(), staking_msg.clone()).unwrap();
+        // spender can send staking msgs if permissioned
+        let res = query_can_send(&deps, spender.clone(), staking_delegate_msg.clone()).unwrap();
+        assert_eq!(res.can_send, true);
+        let res = query_can_send(&deps, spender.clone(), staking_withdraw_msg.clone()).unwrap();
         assert_eq!(res.can_send, false);
 
         // random person cannot do anything
@@ -998,7 +1510,9 @@ mod tests {
         assert_eq!(res.can_send, false);
         let res = query_can_send(&deps, anyone.clone(), send_msg_large.clone()).unwrap();
         assert_eq!(res.can_send, false);
-        let res = query_can_send(&deps, anyone.clone(), staking_msg.clone()).unwrap();
+        let res = query_can_send(&deps, anyone.clone(), staking_delegate_msg.clone()).unwrap();
+        assert_eq!(res.can_send, false);
+        let res = query_can_send(&deps, anyone.clone(), staking_withdraw_msg.clone()).unwrap();
         assert_eq!(res.can_send, false);
     }
 }

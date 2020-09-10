@@ -35,6 +35,26 @@
       }
     },
     {
+      "description": "Get the current permissions for the given subkey (how much it can spend) Returns PermissionsInfo",
+      "type": "object",
+      "required": [
+        "permissions"
+      ],
+      "properties": {
+        "permissions": {
+          "type": "object",
+          "required": [
+            "spender"
+          ],
+          "properties": {
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "Checks permissions of the caller on this proxy. If CanSend returns true then a call to `Execute` with the same message, before any further state changes, should also succeed.",
       "type": "object",
       "required": [
@@ -66,6 +86,38 @@
       ],
       "properties": {
         "all_allowances": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Gets all Permissions for this contract Returns AllPermissionsResponse",
+      "type": "object",
+      "required": [
+        "all_permissions"
+      ],
+      "properties": {
+        "all_permissions": {
           "type": "object",
           "properties": {
             "limit": {

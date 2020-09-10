@@ -135,9 +135,33 @@ const useOptions = (options: Options): Network => {
 
 type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {}}
 
-interface AllowanceResponse {
+interface CanSendResponse {
+  readonly canSend: boolean;
+}
+
+interface Permissions {
+  readonly delegate: boolean
+  readonly undelegate: boolean
+  readonly redelegate: boolean
+  readonly withdraw: boolean
+}
+
+interface PermissionsInfo {
+  readonly spender: string;
+  readonly permissions: Permissions;
+}
+
+interface AllPermissionsResponse {
+  readonly permissions: readonly PermissionsInfo[];
+}
+
+interface AllowanceInfo {
   readonly balance: readonly Coin[],
   readonly expires: Expiration,
+}
+
+interface AllAllowancesResponse {
+  readonly allowances: readonly AllowanceInfo[];
 }
 
 interface AdminListResponse {
@@ -150,8 +174,7 @@ interface InitMsg {
   readonly mutable: boolean,
 }
 
-// TODO: define more of these
-type CosmosMsg = SendMsg; 
+type CosmosMsg = SendMsg | DelegateMsg | UndelegateMsg | RedelegateMsg | WithdrawMsg
 
 interface SendMsg {
   readonly bank: {
@@ -163,12 +186,54 @@ interface SendMsg {
   }
 }
 
+interface DelegateMsg {
+  readonly staking: {
+    readonly delegate: {
+      readonly validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface UndelegateMsg {
+  readonly staking: {
+    readonly undelegate: {
+      readonly validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface RedelegateMsg {
+  readonly staking: {
+    readonly redelegate: {
+      readonly src_validator: string,
+      readonly dst_validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface WithdrawMsg {
+  readonly staking: {
+    readonly withdraw: {
+      readonly validator: string,
+      readonly recipient?: string,
+    }
+  }
+}
+
 interface CW1Instance {
   readonly contractAddress: string
 
   // queries
   admins: () => Promise<AdminListResponse>
-  allowance: (address?: string) => Promise<AllowanceResponse>
+  allowance: (address?: string) => Promise<AllowanceInfo>
+  allAllowances: (startAfter?: string, limit?: number) => Promise<AllAllowancesResponse>
+
+  permissions: (address?: string) => Promise<PermissionsInfo>
+  allPermissions: (startAfter?: string, limit?: number) => Promise<AllPermissionsResponse>
+  canSend: (sender: string, msg: CosmosMsg) => Promise<CanSendResponse>
 
   // actions
   execute: (msgs: readonly CosmosMsg[]) => Promise<string>
@@ -176,6 +241,7 @@ interface CW1Instance {
   updateAdmins: (admins: readonly string[]) => Promise<string>
   increaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
   decreaseAllowance: (recipient: string, amount: Coin, expires?: Expiration) => Promise<string>
+  setPermissions: (recipient: string, permissions: Permissions) => Promise<string>
 }
 
 interface CW1Contract {
@@ -194,10 +260,26 @@ interface CW1Contract {
 
 const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
   const use = (contractAddress: string): CW1Instance => {
-    const allowance = async (address?: string): Promise<AllowanceResponse> => {
+    const allowance = async (address?: string): Promise<AllowanceInfo> => {
       const spender = address || client.senderAddress;
-      const result = await client.queryContractSmart(contractAddress, {allowance: { spender }});
-      return result;
+      return await client.queryContractSmart(contractAddress, {allowance: {spender}});
+    };
+
+    const allAllowances = async (startAfter?: string, limit?: number): Promise<AllAllowancesResponse> => {
+      return client.queryContractSmart(contractAddress, {all_allowances: { start_after: startAfter, limit: limit }});
+    };
+
+    const permissions = async (address?: string): Promise<PermissionsInfo> => {
+      const spender = address || client.senderAddress;
+      return await client.queryContractSmart(contractAddress, {permissions: {spender}});
+    };
+
+    const allPermissions = async (startAfter?: string, limit?: number): Promise<AllPermissionsResponse> => {
+      return client.queryContractSmart(contractAddress, {all_permissions: { start_after: startAfter, limit: limit }});
+    };
+
+    const canSend = async (sender: string, msg: CosmosMsg): Promise<CanSendResponse> => {
+      return client.queryContractSmart(contractAddress, {can_send: { sender: sender, msg: msg }});
     };
 
     const admins = async (): Promise<AdminListResponse> => {
@@ -231,16 +313,26 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       const result = await client.execute(contractAddress, {decrease_allowance: {spender, amount, expires}});
       return result.transactionHash;
     }
-    
+
+    const setPermissions = async (spender: string, permissions: Permissions): Promise<string> => {
+      const result = await client.execute(contractAddress, {set_permissions: {spender, permissions}});
+      return result.transactionHash;
+    }
+
     return {
       contractAddress,
       admins,
       allowance,
+      allAllowances,
+      permissions,
+      allPermissions,
+      canSend,
       execute,
       freeze,
       updateAdmins,
       increaseAllowance,
       decreaseAllowance,
+      setPermissions
     };
   }
 
@@ -273,7 +365,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
 
 // Demo:
 // const client = await useOptions(coralnetOptions).setup(PASSWORD);
-// const { address} = await client.getAccount()
+// const { address } = await client.getAccount()
 // const factory = CW1(client)
 //
 // const codeId = await factory.upload();
@@ -314,3 +406,13 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
 // contract.execute([{bank: {send: {from_address: contractAddress, to_address: address, amount: [{denom: "ushell", amount: "440000"}]}}}])
 // client.getAccount(contractAddress)
 // client.getAccount()
+
+// let permissions: Permissions = { delegate: true, undelegate: true, redelegate: true, withdraw: true }
+// contract.setStakingPermissions(randomAddress, permissions)
+
+// test delegating and undelegating from another account
+// let dmsg: DelegateMsg = {staking: {delegate: {validator:"coralvaloper1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2uch4gp", amount:{denom:"ureef",amount:"999"}}}}
+// contract.execute([dmsg])
+//
+// let unmsg: UndelegateMsg = {staking: {undelegate: {validator:"coralvaloper1hf50trj7plz2sd8cmcvn7c8ruh3tjhc2uch4gp", amount:{denom:"ureef",amount:"999"}}}}
+// contract.execute([unmsg])
