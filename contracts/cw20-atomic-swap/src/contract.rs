@@ -5,9 +5,7 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
 use cw2::set_contract_version;
-use cw20::{Cw20HandleMsg, Cw20ReceiveMsg};
-
-use cw20_escrow::state::Cw20Coin;
+use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::balance::Balance;
 use crate::msg::{
@@ -15,7 +13,6 @@ use crate::msg::{
     QueryMsg, ReceiveMsg,
 };
 use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
-use cw20_escrow::msg::Cw20CoinHuman;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
@@ -735,7 +732,7 @@ mod tests {
             amount: cw20_coin.amount,
             msg: Some(to_binary(&HandleMsg::Create(create)).unwrap()),
         };
-        let token_contract = cw20_coin.address; // TODO: Confirm
+        let token_contract = cw20_coin.address;
         let env = mock_env(&token_contract, &[]);
         let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
         assert_eq!(0, res.messages.len());

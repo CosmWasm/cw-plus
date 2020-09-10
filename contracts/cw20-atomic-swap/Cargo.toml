@@ -18,7 +18,6 @@ singlepass = ["cosmwasm-vm/default-singlepass"]
 library = []
 
 [dependencies]
-cw20-escrow = { path = "../cw20-escrow", version = "0.2.0", features = ["library"] }
 cw2 = { path = "../../packages/cw2", version = "0.2.0" }
 cw20 = { path = "../../packages/cw20", version = "0.2.0" }
 cosmwasm-std = { version = "0.10.0", features = ["iterator"] }
