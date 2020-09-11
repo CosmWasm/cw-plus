@@ -84,3 +84,60 @@ pub struct AllAllowancesResponse {
 pub struct AllAccountsResponse {
     pub accounts: Vec<HumanAddr>,
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use cosmwasm_schema::schema_for;
+    use serde_json;
+    use valico::json_schema;
+
+    #[test]
+    fn it_should_ser_de() {
+        let response = AllowanceResponse {
+            allowance: Uint128(500000),
+            expires: Expiration::AtTime(1234),
+        };
+
+        let info = AllowanceInfo {
+            allowance_response: response,
+            spender: HumanAddr::from("spender"),
+        };
+        let allowance_info = serde_json::to_value(info.clone()).unwrap();
+        let serialized = serde_json::to_string(&allowance_info).unwrap();
+        let deserialized: AllowanceInfo = serde_json::from_str(&serialized).unwrap();
+        assert!(info.eq(&deserialized));
+    }
+
+    #[test]
+    fn it_should_make_correct_schema() {
+        let response = AllowanceResponse {
+            allowance: Uint128(500000),
+            expires: Expiration::AtTime(1234),
+        };
+
+        let info = AllowanceInfo {
+            allowance_response: response.clone(),
+            spender: HumanAddr::from("spender"),
+        };
+
+        let allowance_info = serde_json::to_value(info).unwrap();
+        let allowance_res = serde_json::to_value(response).unwrap();
+
+        let schema = schema_for!(AllowanceInfo);
+        let schema_string = serde_json::to_string(&schema).unwrap();
+        let schema_json: serde_json::Value = serde_json::from_str(&schema_string).unwrap();
+
+        let mut scope = json_schema::Scope::new();
+        let r_schema = scope
+            .compile_and_return(schema_json.clone(), true)
+            .ok()
+            .unwrap();
+
+        println!("AllowanceInfo json schema \n {:#?}", schema_json);
+
+        assert_eq!(r_schema.validate(&allowance_info).is_valid(), true);
+
+        assert_eq!(r_schema.validate(&allowance_res).is_valid(), false);
+    }
+}
