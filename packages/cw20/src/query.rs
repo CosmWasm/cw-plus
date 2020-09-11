@@ -70,9 +70,9 @@ pub struct MinterResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AllowanceInfo {
+    #[serde(flatten)]
+    pub allowance_response: AllowanceResponse,
     pub spender: HumanAddr,
-    pub allowance: Uint128,
-    pub expires: Expiration,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]

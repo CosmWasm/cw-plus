@@ -1,7 +1,7 @@
 use cosmwasm_std::{
     Api, CanonicalAddr, Extern, HumanAddr, Order, Querier, ReadonlyStorage, StdResult, Storage,
 };
-use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
+use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo, AllowanceResponse};
 
 use crate::state::{allowances_read, balances_prefix_read};
 
@@ -27,8 +27,10 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
             let (k, v) = item?;
             Ok(AllowanceInfo {
                 spender: api.human_address(&CanonicalAddr::from(k))?,
-                allowance: v.allowance,
-                expires: v.expires,
+                allowance_response: AllowanceResponse {
+                    allowance: v.allowance,
+                    expires: v.expires,
+                },
             })
         })
         .collect();
@@ -142,8 +144,8 @@ mod tests {
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.spender, &spender2);
-        assert_eq!(&allow.expires, &Expiration::Never {});
-        assert_eq!(&allow.allowance, &allow2);
+        assert_eq!(&allow.allowance_response.expires, &Expiration::Never {});
+        assert_eq!(&allow.allowance_response.allowance, &allow2);
 
         // next one is spender1 ("later")
         let allowances =
@@ -151,8 +153,8 @@ mod tests {
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.spender, &spender1);
-        assert_eq!(&allow.expires, &expires);
-        assert_eq!(&allow.allowance, &allow1);
+        assert_eq!(&allow.allowance_response.expires, &expires);
+        assert_eq!(&allow.allowance_response.allowance, &allow1);
     }
 
     #[test]
