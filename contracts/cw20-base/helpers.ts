@@ -297,10 +297,10 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
   
   const upload = async (): Promise<number> => {
     const meta = {
-      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.2.0/contracts/cw20-base",
-      builder: "cosmwasm/workspace-optimizer:0.10.2"
+      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.2.1/contracts/cw20-base",
+      builder: "cosmwasm/workspace-optimizer:0.10.3"
     };
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.2.0/cw20_base.wasm";
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.2.1/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
     const result = await client.upload(wasm, meta);
     return result.codeId;

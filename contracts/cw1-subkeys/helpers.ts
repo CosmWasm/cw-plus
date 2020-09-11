@@ -347,7 +347,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
   const upload = async (): Promise<number> => {
     const meta = {
       source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.2.1/contracts/cw1-subkeys",
-      builder: "cosmwasm/rust-optimizer:0.10.1"
+      builder: "cosmwasm/rust-optimizer:0.10.3"
     };
     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.2.1/cw1_subkeys.wasm";
     const wasm = await downloadWasm(sourceUrl);
