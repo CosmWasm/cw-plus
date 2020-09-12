@@ -9,6 +9,12 @@ pub struct Cw20Coin {
     pub amount: Uint128,
 }
 
+impl Cw20Coin {
+    pub fn is_empty(&self) -> bool {
+        self.amount == Uint128(0)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Cw20CoinHuman {
     pub address: HumanAddr,
