@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{ReadonlyStorage, StdError, Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
-use cw0::Expiration;
+use cw0::{Balance, Expiration};
 
-use crate::balance::Balance;
 use std::fmt;
 
 // Permissions struct defines users message execution permissions.

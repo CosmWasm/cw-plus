@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
-use cw0::Expiration;
+use cw0::{Balance, Expiration};
 
-use crate::balance::Balance;
 use crate::state::Permissions;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

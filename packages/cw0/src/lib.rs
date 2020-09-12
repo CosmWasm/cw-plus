@@ -1,5 +1,7 @@
+mod balance;
 mod expiration;
 
+pub use crate::balance::Balance;
 pub use crate::expiration::Expiration;
 
 #[cfg(test)]
