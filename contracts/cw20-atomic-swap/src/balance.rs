@@ -1,18 +1,19 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use cw0::NativeBalance;
 use cw20::Cw20Coin;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Balance {
-    Native(cw0::Balance),
+    Native(NativeBalance),
     Cw20(Cw20Coin),
 }
 
 impl Default for Balance {
     fn default() -> Balance {
-        Balance::Native(cw0::Balance(vec![]))
+        Balance::Native(NativeBalance(vec![]))
     }
 }
 

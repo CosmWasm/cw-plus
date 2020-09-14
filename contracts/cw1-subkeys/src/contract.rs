@@ -440,7 +440,7 @@ mod tests {
     use crate::state::Permissions;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
-    use cw0::Balance;
+    use cw0::NativeBalance;
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
 
@@ -550,7 +550,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow1.clone()]),
+                balance: NativeBalance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
             }
         );
@@ -558,7 +558,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow1.clone()]),
+                balance: NativeBalance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
             }
         );
@@ -608,7 +608,7 @@ mod tests {
             allowances[0],
             AllowanceInfo {
                 spender: spender1,
-                balance: Balance(initial_allowances.clone()),
+                balance: NativeBalance(initial_allowances.clone()),
                 expires: Expiration::Never {},
             }
         );
@@ -616,7 +616,7 @@ mod tests {
             allowances[1],
             AllowanceInfo {
                 spender: spender2.clone(),
-                balance: Balance(initial_allowances.clone()),
+                balance: NativeBalance(initial_allowances.clone()),
                 expires: Expiration::Never {},
             }
         );
@@ -630,7 +630,7 @@ mod tests {
             allowances[0],
             AllowanceInfo {
                 spender: spender3,
-                balance: Balance(initial_allowances.clone()),
+                balance: NativeBalance(initial_allowances.clone()),
                 expires: expires_later,
             }
         );
@@ -934,7 +934,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
+                balance: NativeBalance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
                 expires: expires_height.clone(),
             }
         );
@@ -952,7 +952,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
+                balance: NativeBalance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
                 expires: expires_height.clone(),
             }
         );
@@ -970,7 +970,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow1.clone()]),
+                balance: NativeBalance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
             }
         );
@@ -988,7 +988,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow2.clone()]),
+                balance: NativeBalance(vec![allow2.clone()]),
                 expires: expires_time,
             }
         );
@@ -1049,7 +1049,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow1.clone(), allow2.clone()]),
+                balance: NativeBalance(vec![allow1.clone(), allow2.clone()]),
                 expires: expires_height.clone(),
             }
         );
@@ -1067,7 +1067,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow1.clone()]),
+                balance: NativeBalance(vec![allow1.clone()]),
                 expires: expires_never.clone(),
             }
         );
@@ -1085,7 +1085,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![
+                balance: NativeBalance(vec![
                     coin(amount1 / 2 + (amount1 & 1), denom1),
                     allow2.clone()
                 ]),
@@ -1129,7 +1129,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: Balance(vec![allow2]),
+                balance: NativeBalance(vec![allow2]),
                 expires: expires_height.clone(),
             }
         );
@@ -1378,7 +1378,7 @@ mod tests {
         let coin = coin(amount, denom);
 
         let allow = Allowance {
-            balance: Balance(vec![coin.clone()]),
+            balance: NativeBalance(vec![coin.clone()]),
             expires: Expiration::Never {},
         };
         let perm = Permissions {

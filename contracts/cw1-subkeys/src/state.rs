@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{ReadonlyStorage, StdError, Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
-use cw0::{Balance, Expiration};
+use cw0::{Expiration, NativeBalance};
 
 use std::fmt;
 
@@ -69,7 +69,7 @@ impl From<PermissionErr> for StdError {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct Allowance {
-    pub balance: Balance,
+    pub balance: NativeBalance,
     pub expires: Expiration,
 }
 

@@ -4,6 +4,7 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
+use cw0::NativeBalance;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
@@ -36,7 +37,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::Create(msg) => {
             let sent_funds = env.message.sent_funds.clone();
-            try_create(deps, env, msg, Balance::Native(cw0::Balance(sent_funds)))
+            try_create(deps, env, msg, Balance::Native(NativeBalance(sent_funds)))
         }
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
@@ -198,7 +199,7 @@ fn send_tokens<A: Api>(
         Ok(vec![])
     } else {
         match amount {
-            Balance::Native(cw0::Balance(coins)) => {
+            Balance::Native(NativeBalance(coins)) => {
                 let msg = BankMsg::Send {
                     from_address: from.into(),
                     to_address: to.into(),
