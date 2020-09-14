@@ -240,7 +240,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 
     // Convert balance to human balance
     let balance_human = match swap.balance {
-        Balance::Native(cw0::Balance(coins)) => BalanceHuman::Native(coins),
+        Balance::Native(coins) => BalanceHuman::Native(coins.0),
         Balance::Cw20(coin) => BalanceHuman::Cw20(Cw20CoinHuman {
             address: deps.api.human_address(&coin.address)?,
             amount: coin.amount,
