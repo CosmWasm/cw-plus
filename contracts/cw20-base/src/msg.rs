@@ -1,20 +1,14 @@
 use cosmwasm_std::{Binary, HumanAddr, StdError, StdResult, Uint128};
-use cw20::{Expiration, MinterResponse};
+use cw20::{Cw20CoinHuman, Expiration, MinterResponse};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
-pub struct InitialBalance {
-    pub address: HumanAddr,
-    pub amount: Uint128,
-}
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InitMsg {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
-    pub initial_balances: Vec<InitialBalance>,
+    pub initial_balances: Vec<Cw20CoinHuman>,
     pub mint: Option<MinterResponse>,
 }
 

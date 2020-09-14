@@ -98,6 +98,11 @@ pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
     token: Cw20Coin,
     msg: CreateMsg,
 ) -> StdResult<HandleResponse> {
+    if token.is_empty() {
+        return Err(StdError::generic_err(
+            "Send some amount to create an escrow",
+        ));
+    }
     let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
     // make sure the token sent is on the whitelist by default
     if !cw20_whitelist.iter().any(|t| t == &token.address) {
@@ -151,6 +156,11 @@ pub fn try_cw20_top_up<S: Storage, A: Api, Q: Querier>(
     token: Cw20Coin,
     id: String,
 ) -> StdResult<HandleResponse> {
+    if token.is_empty() {
+        return Err(StdError::generic_err(
+            "Send some amount to increase an escrow",
+        ));
+    }
     // this fails is no escrow there
     let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 

@@ -72,10 +72,10 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, Uint128};
-    use cw20::{Expiration, TokenInfoResponse};
+    use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_token_info};
-    use crate::msg::{HandleMsg, InitMsg, InitialBalance};
+    use crate::msg::{HandleMsg, InitMsg};
 
     // this will set up the init for other tests
     fn do_init<S: Storage, A: Api, Q: Querier>(
@@ -87,7 +87,7 @@ mod tests {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
-            initial_balances: vec![InitialBalance {
+            initial_balances: vec![Cw20CoinHuman {
                 address: addr.into(),
                 amount,
             }],

@@ -3,7 +3,7 @@ use cosmwasm_std::{
     MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
 };
 use cw2::{get_contract_version, set_contract_version};
-use cw20::{BalanceResponse, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
+use cw20::{BalanceResponse, Cw20CoinHuman, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
     handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
@@ -11,7 +11,7 @@ use crate::allowances::{
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::migrations::migrate_v01_to_v02;
-use crate::msg::{HandleMsg, InitMsg, InitialBalance, MigrateMsg, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, MigrateMsg, QueryMsg};
 use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
 
 // version info for migration info
@@ -57,7 +57,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
 pub fn create_accounts<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    accounts: &[InitialBalance],
+    accounts: &[Cw20CoinHuman],
 ) -> StdResult<Uint128> {
     let mut total_supply = Uint128::zero();
     let mut store = balances(&mut deps.storage);
@@ -396,7 +396,7 @@ mod tests {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
-            initial_balances: vec![InitialBalance {
+            initial_balances: vec![Cw20CoinHuman {
                 address: addr.into(),
                 amount,
             }],
@@ -429,7 +429,7 @@ mod tests {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
-            initial_balances: vec![InitialBalance {
+            initial_balances: vec![Cw20CoinHuman {
                 address: HumanAddr("addr0000".to_string()),
                 amount,
             }],
@@ -461,7 +461,7 @@ mod tests {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
-            initial_balances: vec![InitialBalance {
+            initial_balances: vec![Cw20CoinHuman {
                 address: HumanAddr("addr0000".to_string()),
                 amount,
             }],
@@ -503,7 +503,7 @@ mod tests {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
-            initial_balances: vec![InitialBalance {
+            initial_balances: vec![Cw20CoinHuman {
                 address: HumanAddr("addr0000".to_string()),
                 amount,
             }],
@@ -612,11 +612,11 @@ mod tests {
             symbol: "BASH".to_string(),
             decimals: 6,
             initial_balances: vec![
-                InitialBalance {
+                Cw20CoinHuman {
                     address: addr1.clone(),
                     amount: amount1,
                 },
-                InitialBalance {
+                Cw20CoinHuman {
                     address: addr2.clone(),
                     amount: amount2,
                 },

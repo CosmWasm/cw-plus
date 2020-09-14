@@ -265,10 +265,10 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
-    use cw20::TokenInfoResponse;
+    use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_balance, query_token_info};
-    use crate::msg::{HandleMsg, InitMsg, InitialBalance};
+    use crate::msg::{HandleMsg, InitMsg};
 
     fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
         deps: &Extern<S, A, Q>,
@@ -287,7 +287,7 @@ mod tests {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
-            initial_balances: vec![InitialBalance {
+            initial_balances: vec![Cw20CoinHuman {
                 address: addr.into(),
                 amount,
             }],
