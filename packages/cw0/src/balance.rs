@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops;
 
-use cosmwasm_std::{Coin, StdError, StdResult};
+use cosmwasm_std::{Coin, StdError, StdResult, Uint128};
 
 // Balance wraps Vec<Coin> and provides some nice helpers. It mutates the Vec and can be
 // unwrapped when done.
@@ -65,7 +65,7 @@ impl Balance {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        !self.0.iter().any(|x| x.amount != Uint128(0))
     }
 
     /// similar to `Balance.sub`, but doesn't fail when minuend less than subtrahend
