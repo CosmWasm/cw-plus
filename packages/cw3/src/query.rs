@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{CosmosMsg, Empty, HumanAddr, Decimal};
+use cosmwasm_std::{CosmosMsg, Decimal, Empty, HumanAddr};
 use cw0::Expiration;
 
 use crate::msg::Vote;
@@ -68,9 +68,8 @@ pub enum ThresholdResponse {
         threshold: Decimal,
         quroum: Decimal,
         total_weight: u64,
-    }
+    },
 }
-
 
 /// Note, if you are storing custom messages in the proposal,
 /// the querier needs to know what possible custom message types

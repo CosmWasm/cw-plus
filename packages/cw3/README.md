@@ -79,7 +79,7 @@ simple no, but this may just act like a normal no vote.
 
 `Execute{proposal_id}` - This will check if the voting
 conditions have passed for the given proposal. If it has
-succeeded, the contracts is marked as `Executed` and the
+succeeded, the proposal is marked as `Executed` and the
 messages are dispatched. If the messages fail (eg out of gas),
 this is all reverted and can be tried again later with
 more gas.
@@ -98,7 +98,7 @@ to declare a contract a success. What percentage of the votes
 and how they are tallied.
 
 `Proposal{proposal_id}` - Returns the information set when
-creating the contract, along with the current status.
+creating the proposal, along with the current status.
 
 `ListProposals{start_after, limit}` - Returns the same info
 as `Proposal`, but for all proposals along with pagination.
@@ -113,8 +113,9 @@ is what you will want for a UI)
 voter (HumanAddr) voted on the proposal. (May be null)
 
 `ListVotes{proposal_id, start_after, limit}` - Returns the same info
-as `Proposal`, but for all proposals along with pagination.
-Starts at proposal_id 1 and accending. 
+as `Vote`, but for all votes along with pagination.
+Returns the voters sorted by the voters' address in
+lexographically ascending order. 
 
 ## Voter Info
 

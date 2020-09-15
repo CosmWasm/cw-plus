@@ -10,6 +10,9 @@ use cw0::Expiration;
 /// for working with this.
 ///
 /// If you wish to persist this, convert to Cw3CanonicalContract via .canonical()
+///
+/// FIXME: Cw3Contract currently only supports CosmosMsg<Empty>. When we actually
+/// use this in some consuming code, we should make it generic over CosmosMsg<T>.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Cw3Contract(pub HumanAddr);
 

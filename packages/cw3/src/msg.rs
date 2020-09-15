@@ -33,10 +33,10 @@ where
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Vote {
-    YES,
-    NO,
-    ABSTAIN,
-    VETO,
+    Yes,
+    No,
+    Abstain,
+    Veto,
 }
 
 #[cfg(test)]
@@ -46,7 +46,7 @@ mod test {
 
     #[test]
     fn vote_encoding() {
-        let a = Vote::YES;
+        let a = Vote::Yes;
         let encoded = to_vec(&a).unwrap();
         let json = String::from_utf8_lossy(&encoded).to_string();
         assert_eq!(r#""yes""#, json.as_str());
@@ -56,7 +56,7 @@ mod test {
     fn vote_encoding_embedded() {
         let msg = Cw3HandleMsg::Vote::<Empty> {
             proposal_id: 17,
-            vote: Vote::NO,
+            vote: Vote::No,
         };
         let encoded = to_vec(&msg).unwrap();
         let json = String::from_utf8_lossy(&encoded).to_string();
