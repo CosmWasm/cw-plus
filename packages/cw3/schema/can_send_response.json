@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CanSendResponse",
+  "type": "object",
+  "required": [
+    "can_send"
+  ],
+  "properties": {
+    "can_send": {
+      "type": "boolean"
+    }
+  }
+}
