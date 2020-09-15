@@ -8,7 +8,7 @@ ALL_PACKAGES="cw1 cw2 cw3 cw20 cw721"
 
 # these are imported by other contracts
 BASE_CONTRACTS="cw1-whitelist cw20-base"
-ALL_CONTRACTS="cw1-subkeys cw20-atomic-swap cw20-escrow cw20-staking"
+ALL_CONTRACTS="cw1-subkeys cw3-fixed-multisig cw20-atomic-swap cw20-escrow cw20-staking"
 
 SLEEP_TIME=30
 
