@@ -1,33 +1,102 @@
-# CW1 Spec: Proxy Contracts
+# CW3 Spec: MultiSig/Voting Contracts
 
-CW1 is a specification for proxy contracts based on CosmWasm.
-It is a very simple, but flexible interface designed for the case
-where one contract is meant to hold assets (or rights) on behalf of
-other contracts.
+CW3 is a specification for voting contracts based on CosmWasm.
+It is an extension of CW1 (which served as an immediate 1 of N multisig).
+In this case, no key can immediately execute, but only propose
+a set of messages for execution. The proposal, subsequent
+approvals, and signature aggregation all happen on chain.  
 
-The simplest example is a contract that will accept messages from
-the creator and resend them from it's address. Simply by making this
-transferable, you can then begin to transfer non-transferable assets
-(eg. staked tokens, voting power, etc).
+There are at least 3 different cases we want to cover in this spec:
 
-You can imagine more complex examples, such as a "1 of N" multisig,
-or conditional approval, where "sub-accounts" have the right to spend
-a limited amount of funds from this account, with a "admin account"
-retaining full control.
+- K of N immutible multisig. One key proposes a set of messages,
+  after K-1 others approve it, it can be executed with the
+  multisig address.
+- K of N flexible, mutable multisig. Like above, but with
+  multiple contracts. One contract stores the group, which is 
+  referenced from multiple multisig contracts (which in turn
+  implement cw3). One cw3 contracts is able to update the 
+  group content (maybe needing 67% vote). Other cw3 contracts
+  may hold tokens, staking rights, etc with various execution 
+  thresholds, all controlled by one group. (Group interface
+  and updating them will be defined in a future spec, likely cw4).
 
-The common denominator is that they allow you to immediately
-execute arbitrary `CosmosMsg` in the same transaction.
+This should fit in this interface (possibly with some 
+extensions for pieces, but the usage should look the 
+same externally):
+
+- Token weighted voting. People lock tokens in a contract 
+  for voting rights. There is a vote threshold to execute 
+  messages. The voting set is dynamic. This has a similar
+  "propose, approve, execute" flow, but we will need to 
+  support clear YES/NO votes and quora not just absolute 
+  thresholds.
+
+The common denominator is that they allow you to propose
+arbitrary `CosmosMsg` to a contract, and allow a series
+of votes/approvals to determine if it can be executed,
+as well as a final step to execute any approved proposal once.
+
+## Base
+
+The following interfaces must be implemented for all cw3
+contracts
 
 ### Messages
 
-`Execute{msgs}` - This accepts `Vec<CosmosMsg>` and checks permissions
-before re-dispatching all those messages from the contract address.
+`Propose{title, description, msgs, expires}` - This accepts 
+`Vec<CosmosMsg>` and creates a new proposal. This will return
+an auto-generated ID in the `Data` field (and the logs) that
+can be used to reference the proposal later. You can specify
+an expiration time/height in Propose, but this may be set 
+automatically by the contract (overriding or just enforcing
+min/max/default values).
+ 
+Many implementations will want to restrict who can propose.
+Maybe only people in the voting set. Maybe there is some
+deposit to be made along with the proposal. This is not
+in the spec but left open to the implementation.
+
+`Vote{proposal_id, vote}` - Given a proposal_id, you can
+vote yes, no, abstain or veto. Many contracts (like typical 
+multisig with absolute threshold) may consider veto and 
+abstain as no and just count yes votes. Contracts with quora
+may count abstain towards quora but not yes or no for threshold.
+Some contracts may give extra power to veto rather than a
+simple no, but this may just act like a normal no vote.
+
+`Execute{proposal_id}` - This will check if the voting
+conditions have passed for the given proposal. If it has
+succeeded, the contracts is marked as `Executed` and the
+messages are dispatched. If the messages fail (eg out of gas),
+this is all reverted and can be tried again later with
+more gas.
+
+`Close{proposal_id}` - This will check if the voting conditions
+have failed for the given proposal. If so (eg. time expired
+and insufficient votes), then the proposal is marked `Failed`.
+This is not strictly necessary, as it will only act when
+it is impossible the contract would ever be executed,
+but can be triggered to provide some better UI.
 
 ### Queries
 
-`CanSend{sender, msg}` - This accepts one `CosmosMsg` and checks permissions,
-returning true or false based on the permissions. If `CanSend` returns true
-then a call to `Execute` from that sender, with the same message, 
-before any further state changes, should also succeed. This can be used 
-to dynamically provide some client info on a generic cw1 contract without 
-knowing the extension details. (eg. detect if they can send coins or stake)
+`Proposal{proposal_id}` - Returns the information set when
+creating the contract, along with the current status.
+
+`Votes{proposal_id, start_after, limit}` - Returns all votes
+submitted for the given proposal, with pagination.
+
+`ListProposals{start_after, limit}` - Returns the same info
+as `Proposal`, but for all proposals along with pagination.
+Starts at proposal_id 1 and accending. 
+
+`ReverseProposals{start_before, limit}` - Returns the same info
+as `Proposal`, but for all proposals along with pagination.
+Starts at latest proposal_id and descending. 
+
+## Voter Info
+
+Information on who can vote is contract dependent. But
+we will work on a common API to display some of this.
+
+**TODO** 
