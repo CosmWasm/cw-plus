@@ -54,6 +54,11 @@ governance controls.
 an auto-generated ID in the `Data` field (and the logs) that
 can be used to reference the proposal later. 
 
+If the Proposer is a valid voter on the proposal, this will imply a Yes vote by
+the Proposer for a faster workflow, especially useful in eg. 2 of 3 
+or 3 of 5 multisig, we don't need to propose in one block, get result,
+and vote in another block.
+
 Earliest and latest are optional and can request the first
 and last height/time that we can try `Execute`. For a vote,
 we may require at least 2 days to pass, but no more than 7. 
