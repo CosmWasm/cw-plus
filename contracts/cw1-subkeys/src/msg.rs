@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
-use cw0::Expiration;
+use cw0::{Expiration, NativeBalance};
 
-use crate::balance::Balance;
 use crate::state::Permissions;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -88,7 +87,7 @@ pub struct AllAllowancesResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct AllowanceInfo {
     pub spender: HumanAddr,
-    pub balance: Balance,
+    pub balance: NativeBalance,
     pub expires: Expiration,
 }
 

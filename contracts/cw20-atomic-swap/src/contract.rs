@@ -4,6 +4,7 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
+use cw0::NativeBalance;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
@@ -36,7 +37,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::Create(msg) => {
             let sent_funds = env.message.sent_funds.clone();
-            try_create(deps, env, msg, Balance::Native(sent_funds))
+            try_create(deps, env, msg, Balance::Native(NativeBalance(sent_funds)))
         }
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
@@ -72,7 +73,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         return Err(StdError::generic_err("Invalid atomic swap id"));
     }
 
-    // FIXME: normalize array first (remove zero-valued coins), and then check for empty
+    // this ignores 0 value coins, must have one or more with positive balance
     if balance.is_empty() {
         return Err(StdError::generic_err(
             "Send some coins to create an atomic swap",
@@ -197,7 +198,7 @@ fn send_tokens<A: Api>(
         Ok(vec![])
     } else {
         match amount {
-            Balance::Native(coins) => {
+            Balance::Native(NativeBalance(coins)) => {
                 let msg = BankMsg::Send {
                     from_address: from.into(),
                     to_address: to.into(),
@@ -239,7 +240,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 
     // Convert balance to human balance
     let balance_human = match swap.balance {
-        Balance::Native(coins) => BalanceHuman::Native(coins),
+        Balance::Native(coins) => BalanceHuman::Native(coins.0),
         Balance::Cw20(coin) => BalanceHuman::Cw20(Cw20CoinHuman {
             address: deps.api.human_address(&coin.address)?,
             amount: coin.amount,

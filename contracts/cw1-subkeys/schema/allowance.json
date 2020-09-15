@@ -8,19 +8,13 @@
   ],
   "properties": {
     "balance": {
-      "$ref": "#/definitions/Balance"
+      "$ref": "#/definitions/NativeBalance"
     },
     "expires": {
       "$ref": "#/definitions/Expiration"
     }
   },
   "definitions": {
-    "Balance": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Coin"
-      }
-    },
     "Coin": {
       "type": "object",
       "required": [
@@ -79,6 +73,12 @@
           }
         }
       ]
+    },
+    "NativeBalance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Coin"
+      }
     },
     "Uint128": {
       "type": "string"

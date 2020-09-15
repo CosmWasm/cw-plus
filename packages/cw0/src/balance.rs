@@ -2,14 +2,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops;
 
-use cosmwasm_std::{Coin, StdError, StdResult};
+use cosmwasm_std::{Coin, StdError, StdResult, Uint128};
 
 // Balance wraps Vec<Coin> and provides some nice helpers. It mutates the Vec and can be
 // unwrapped when done.
 #[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq, JsonSchema)]
-pub struct Balance(pub Vec<Coin>);
+pub struct NativeBalance(pub Vec<Coin>);
 
-impl Balance {
+impl NativeBalance {
     pub fn into_vec(self) -> Vec<Coin> {
         self.0
     }
@@ -65,7 +65,7 @@ impl Balance {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        !self.0.iter().any(|x| x.amount != Uint128(0))
     }
 
     /// similar to `Balance.sub`, but doesn't fail when minuend less than subtrahend
@@ -85,7 +85,7 @@ impl Balance {
     }
 }
 
-impl ops::AddAssign<Coin> for Balance {
+impl ops::AddAssign<Coin> for NativeBalance {
     fn add_assign(&mut self, other: Coin) {
         match self.find(&other.denom) {
             Some((i, c)) => {
@@ -100,7 +100,7 @@ impl ops::AddAssign<Coin> for Balance {
     }
 }
 
-impl ops::Add<Coin> for Balance {
+impl ops::Add<Coin> for NativeBalance {
     type Output = Self;
 
     fn add(mut self, other: Coin) -> Self {
@@ -109,24 +109,24 @@ impl ops::Add<Coin> for Balance {
     }
 }
 
-impl ops::AddAssign<Balance> for Balance {
-    fn add_assign(&mut self, other: Balance) {
+impl ops::AddAssign<NativeBalance> for NativeBalance {
+    fn add_assign(&mut self, other: NativeBalance) {
         for coin in other.0.into_iter() {
             self.add_assign(coin);
         }
     }
 }
 
-impl ops::Add<Balance> for Balance {
+impl ops::Add<NativeBalance> for NativeBalance {
     type Output = Self;
 
-    fn add(mut self, other: Balance) -> Self {
+    fn add(mut self, other: NativeBalance) -> Self {
         self += other;
         self
     }
 }
 
-impl ops::Sub<Coin> for Balance {
+impl ops::Sub<Coin> for NativeBalance {
     type Output = StdResult<Self>;
 
     fn sub(mut self, other: Coin) -> StdResult<Self> {
@@ -146,7 +146,7 @@ impl ops::Sub<Coin> for Balance {
     }
 }
 
-impl ops::Sub<Vec<Coin>> for Balance {
+impl ops::Sub<Vec<Coin>> for NativeBalance {
     type Output = StdResult<Self>;
 
     fn sub(self, amount: Vec<Coin>) -> StdResult<Self> {
@@ -165,7 +165,7 @@ mod test {
 
     #[test]
     fn balance_has_works() {
-        let balance = Balance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
+        let balance = NativeBalance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
 
         // less than same type
         assert!(balance.has(&coin(777, "ETH")));
@@ -180,20 +180,20 @@ mod test {
 
     #[test]
     fn balance_add_works() {
-        let balance = Balance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
+        let balance = NativeBalance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
 
         // add an existing coin
         let more_eth = balance.clone() + coin(54321, "ETH");
         assert_eq!(
             more_eth,
-            Balance(vec![coin(555, "BTC"), coin(66666, "ETH")])
+            NativeBalance(vec![coin(555, "BTC"), coin(66666, "ETH")])
         );
 
         // add an new coin
         let add_atom = balance.clone() + coin(777, "ATOM");
         assert_eq!(
             add_atom,
-            Balance(vec![
+            NativeBalance(vec![
                 coin(777, "ATOM"),
                 coin(555, "BTC"),
                 coin(12345, "ETH"),
@@ -203,40 +203,40 @@ mod test {
 
     #[test]
     fn balance_in_place_addition() {
-        let mut balance = Balance(vec![coin(555, "BTC")]);
+        let mut balance = NativeBalance(vec![coin(555, "BTC")]);
         balance += coin(777, "ATOM");
         assert_eq!(
             &balance,
-            &Balance(vec![coin(777, "ATOM"), coin(555, "BTC")])
+            &NativeBalance(vec![coin(777, "ATOM"), coin(555, "BTC")])
         );
 
-        balance += Balance(vec![coin(666, "ETH"), coin(123, "ATOM")]);
+        balance += NativeBalance(vec![coin(666, "ETH"), coin(123, "ATOM")]);
         assert_eq!(
             &balance,
-            &Balance(vec![coin(900, "ATOM"), coin(555, "BTC"), coin(666, "ETH")])
+            &NativeBalance(vec![coin(900, "ATOM"), coin(555, "BTC"), coin(666, "ETH")])
         );
 
-        let foo = balance + Balance(vec![coin(234, "BTC")]);
+        let foo = balance + NativeBalance(vec![coin(234, "BTC")]);
         assert_eq!(
             &foo,
-            &Balance(vec![coin(900, "ATOM"), coin(789, "BTC"), coin(666, "ETH")])
+            &NativeBalance(vec![coin(900, "ATOM"), coin(789, "BTC"), coin(666, "ETH")])
         );
     }
 
     #[test]
     fn balance_subtract_works() {
-        let balance = Balance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
+        let balance = NativeBalance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
 
         // subtract less than we have
         let less_eth = (balance.clone() - coin(2345, "ETH")).unwrap();
         assert_eq!(
             less_eth,
-            Balance(vec![coin(555, "BTC"), coin(10000, "ETH")])
+            NativeBalance(vec![coin(555, "BTC"), coin(10000, "ETH")])
         );
 
         // subtract all of one coin (and remove with 0 amount)
         let no_btc = (balance.clone() - coin(555, "BTC")).unwrap();
-        assert_eq!(no_btc, Balance(vec![coin(12345, "ETH")]));
+        assert_eq!(no_btc, NativeBalance(vec![coin(12345, "ETH")]));
 
         // subtract more than we have
         let underflow = balance.clone() - coin(666, "BTC");
@@ -249,23 +249,23 @@ mod test {
 
     #[test]
     fn balance_subtract_saturating_works() {
-        let balance = Balance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
+        let balance = NativeBalance(vec![coin(555, "BTC"), coin(12345, "ETH")]);
 
         // subtract less than we have
         let less_eth = balance.clone().sub_saturating(coin(2345, "ETH")).unwrap();
         assert_eq!(
             less_eth,
-            Balance(vec![coin(555, "BTC"), coin(10000, "ETH")])
+            NativeBalance(vec![coin(555, "BTC"), coin(10000, "ETH")])
         );
 
         // subtract all of one coin (and remove with 0 amount)
         let no_btc = balance.clone().sub_saturating(coin(555, "BTC")).unwrap();
-        assert_eq!(no_btc, Balance(vec![coin(12345, "ETH")]));
+        assert_eq!(no_btc, NativeBalance(vec![coin(12345, "ETH")]));
 
         // subtract more than we have
         let saturating = balance.clone().sub_saturating(coin(666, "BTC"));
         assert!(saturating.is_ok());
-        assert_eq!(saturating.unwrap(), Balance(vec![coin(12345, "ETH")]));
+        assert_eq!(saturating.unwrap(), NativeBalance(vec![coin(12345, "ETH")]));
 
         // subtract non-existent denom
         let missing = balance.clone() - coin(1, "ATOM");
@@ -275,18 +275,24 @@ mod test {
     #[test]
     fn normalize_balance() {
         // remove 0 value items and sort
-        let mut balance = Balance(vec![coin(123, "ETH"), coin(0, "BTC"), coin(8990, "ATOM")]);
+        let mut balance = NativeBalance(vec![coin(123, "ETH"), coin(0, "BTC"), coin(8990, "ATOM")]);
         balance.normalize();
-        assert_eq!(balance, Balance(vec![coin(8990, "ATOM"), coin(123, "ETH")]));
+        assert_eq!(
+            balance,
+            NativeBalance(vec![coin(8990, "ATOM"), coin(123, "ETH")])
+        );
 
         // merge duplicate entries of same denom
-        let mut balance = Balance(vec![
+        let mut balance = NativeBalance(vec![
             coin(123, "ETH"),
             coin(789, "BTC"),
             coin(321, "ETH"),
             coin(11, "BTC"),
         ]);
         balance.normalize();
-        assert_eq!(balance, Balance(vec![coin(800, "BTC"), coin(444, "ETH")]));
+        assert_eq!(
+            balance,
+            NativeBalance(vec![coin(800, "BTC"), coin(444, "ETH")])
+        );
     }
 }

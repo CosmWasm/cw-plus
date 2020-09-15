@@ -23,7 +23,7 @@
       ],
       "properties": {
         "balance": {
-          "$ref": "#/definitions/Balance"
+          "$ref": "#/definitions/NativeBalance"
         },
         "expires": {
           "$ref": "#/definitions/Expiration"
@@ -31,12 +31,6 @@
         "spender": {
           "$ref": "#/definitions/HumanAddr"
         }
-      }
-    },
-    "Balance": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Coin"
       }
     },
     "Coin": {
@@ -100,6 +94,12 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "NativeBalance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Coin"
+      }
     },
     "Uint128": {
       "type": "string"
