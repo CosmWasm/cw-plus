@@ -1,115 +1,37 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg",
-  "anyOf": [
-    {
-      "type": "object",
-      "required": [
-        "propose"
-      ],
-      "properties": {
-        "propose": {
-          "type": "object",
-          "required": [
-            "description",
-            "msgs",
-            "title"
-          ],
-          "properties": {
-            "description": {
-              "type": "string"
-            },
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "msgs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/CosmosMsg_for_Empty"
-              }
-            },
-            "title": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "vote"
-      ],
-      "properties": {
-        "vote": {
-          "type": "object",
-          "required": [
-            "proposal_id",
-            "vote"
-          ],
-          "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "vote": {
-              "$ref": "#/definitions/Vote"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "execute"
-      ],
-      "properties": {
-        "execute": {
-          "type": "object",
-          "required": [
-            "proposal_id"
-          ],
-          "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "close"
-      ],
-      "properties": {
-        "close": {
-          "type": "object",
-          "required": [
-            "proposal_id"
-          ],
-          "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        }
-      }
-    }
+  "title": "ProposalResponse_for_Empty",
+  "description": "Note, if you are storing custom messages in the proposal, the querier needs to know what possible custom message types those are in order to parse the response",
+  "type": "object",
+  "required": [
+    "description",
+    "expires",
+    "id",
+    "msgs",
+    "title"
   ],
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "expires": {
+      "$ref": "#/definitions/Expiration"
+    },
+    "id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "msgs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CosmosMsg_for_Empty"
+      }
+    },
+    "title": {
+      "type": "string"
+    }
+  },
   "definitions": {
     "BankMsg": {
       "anyOf": [
@@ -372,15 +294,6 @@
     },
     "Uint128": {
       "type": "string"
-    },
-    "Vote": {
-      "type": "string",
-      "enum": [
-        "y_e_s",
-        "n_o",
-        "a_b_s_t_a_i_n",
-        "v_e_t_o"
-      ]
     },
     "WasmMsg": {
       "anyOf": [

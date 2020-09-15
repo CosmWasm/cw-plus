@@ -4,7 +4,9 @@ mod query;
 
 // pub use crate::helpers::{Cw3CanonicalContract, Cw3Contract};
 pub use crate::msg::Cw3HandleMsg;
-pub use crate::query::{Cw3QueryMsg, ProposalListResponse, ProposalResponse, VoteListResponse};
+pub use crate::query::{
+    Cw3QueryMsg, ProposalListResponse, ProposalResponse, VoteListResponse, VoteResponse,
+};
 
 #[cfg(test)]
 mod tests {

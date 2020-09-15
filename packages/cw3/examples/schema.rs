@@ -3,7 +3,10 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, export_schema_with_title, remove_schemas, schema_for};
 
-use cw3::{CanSendResponse, Cw1HandleMsg, Cw1QueryMsg};
+use cw3::{
+    Cw3HandleMsg, Cw3QueryMsg, ProposalListResponse, ProposalResponse, VoteListResponse,
+    VoteResponse,
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -11,7 +14,10 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema_with_title(&mut schema_for!(Cw1HandleMsg), &out_dir, "HandleMsg");
-    export_schema_with_title(&mut schema_for!(Cw1QueryMsg), &out_dir, "QueryMsg");
-    export_schema(&schema_for!(CanSendResponse), &out_dir);
+    export_schema_with_title(&mut schema_for!(Cw3HandleMsg), &out_dir, "HandleMsg");
+    export_schema_with_title(&mut schema_for!(Cw3QueryMsg), &out_dir, "QueryMsg");
+    export_schema(&schema_for!(ProposalResponse), &out_dir);
+    export_schema(&schema_for!(ProposalListResponse), &out_dir);
+    export_schema(&schema_for!(VoteResponse), &out_dir);
+    export_schema(&schema_for!(VoteListResponse), &out_dir);
 }
