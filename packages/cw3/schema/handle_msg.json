@@ -376,10 +376,10 @@
     "Vote": {
       "type": "string",
       "enum": [
-        "y_e_s",
-        "n_o",
-        "a_b_s_t_a_i_n",
-        "v_e_t_o"
+        "yes",
+        "no",
+        "abstain",
+        "veto"
       ]
     },
     "WasmMsg": {
