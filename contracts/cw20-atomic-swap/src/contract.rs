@@ -67,14 +67,13 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: CreateMsg,
-    mut balance: Balance,
+    balance: Balance,
 ) -> StdResult<HandleResponse> {
     if !is_valid_name(&msg.id) {
         return Err(StdError::generic_err("Invalid atomic swap id"));
     }
 
-    // Normalize coins first
-    balance.normalize();
+    // this ignores 0 value coins, must have one or more with positive balance
     if balance.is_empty() {
         return Err(StdError::generic_err(
             "Send some coins to create an atomic swap",
