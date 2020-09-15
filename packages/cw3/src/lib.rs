@@ -1,8 +1,9 @@
 // mod helpers;
+mod helpers;
 mod msg;
 mod query;
 
-// pub use crate::helpers::{Cw3CanonicalContract, Cw3Contract};
+pub use crate::helpers::{Cw3CanonicalContract, Cw3Contract};
 pub use crate::msg::Cw3HandleMsg;
 pub use crate::query::{
     Cw3QueryMsg, ProposalListResponse, ProposalResponse, VoteListResponse, VoteResponse,

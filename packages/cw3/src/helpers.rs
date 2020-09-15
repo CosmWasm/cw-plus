@@ -3,28 +3,28 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 
-use crate::msg::Cw3HandleMsg;
+use crate::msg::{Cw3HandleMsg, Vote};
+use cw0::Expiration;
 
-/// Cw1Contract is a wrapper around HumanAddr that provides a lot of helpers
+/// Cw3Contract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with this.
 ///
-/// If you wish to persist this, convert to Cw1CanonicalContract via .canonical()
+/// If you wish to persist this, convert to Cw3CanonicalContract via .canonical()
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw1Contract(pub HumanAddr);
+pub struct Cw3Contract(pub HumanAddr);
 
-impl Cw1Contract {
+impl Cw3Contract {
     pub fn addr(&self) -> HumanAddr {
         self.0.clone()
     }
 
     /// Convert this address to a form fit for storage
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw1CanonicalContract> {
+    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw3CanonicalContract> {
         let canon = api.canonical_address(&self.0)?;
-        Ok(Cw1CanonicalContract(canon))
+        Ok(Cw3CanonicalContract(canon))
     }
 
-    pub fn execute<T: Into<Vec<CosmosMsg>>>(&self, msgs: T) -> StdResult<CosmosMsg> {
-        let msg = Cw1HandleMsg::Execute { msgs: msgs.into() };
+    pub fn encode_msg(&self, msg: Cw3HandleMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),
             msg: to_binary(&msg)?,
@@ -32,17 +32,49 @@ impl Cw1Contract {
         }
         .into())
     }
+
+    /// helper doesn't support custom messages now
+    pub fn proposal<T: Into<String>, U: Into<String>>(
+        &self,
+        title: T,
+        description: U,
+        msgs: Vec<CosmosMsg>,
+        expires: Option<Expiration>,
+    ) -> StdResult<CosmosMsg> {
+        let msg = Cw3HandleMsg::Propose {
+            title: title.into(),
+            description: description.into(),
+            msgs,
+            expires,
+        };
+        self.encode_msg(msg)
+    }
+
+    pub fn vote(&self, proposal_id: u64, vote: Vote) -> StdResult<CosmosMsg> {
+        let msg = Cw3HandleMsg::Vote { proposal_id, vote };
+        self.encode_msg(msg)
+    }
+
+    pub fn execute(&self, proposal_id: u64) -> StdResult<CosmosMsg> {
+        let msg = Cw3HandleMsg::Execute { proposal_id };
+        self.encode_msg(msg)
+    }
+
+    pub fn close(&self, proposal_id: u64) -> StdResult<CosmosMsg> {
+        let msg = Cw3HandleMsg::Close { proposal_id };
+        self.encode_msg(msg)
+    }
 }
 
-/// This is a respresentation of Cw1Contract for storage.
-/// Don't use it directly, just translate to the Cw1Contract when needed.
+/// This is a respresentation of Cw3Contract for storage.
+/// Don't use it directly, just translate to the Cw3Contract when needed.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw1CanonicalContract(pub CanonicalAddr);
+pub struct Cw3CanonicalContract(pub CanonicalAddr);
 
-impl Cw1CanonicalContract {
+impl Cw3CanonicalContract {
     /// Convert this address to a form fit for usage in messages and queries
-    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw1Contract> {
+    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw3Contract> {
         let human = api.human_address(&self.0)?;
-        Ok(Cw1Contract(human))
+        Ok(Cw3Contract(human))
     }
 }
