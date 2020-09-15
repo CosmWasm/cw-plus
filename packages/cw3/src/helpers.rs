@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 
-use crate::msg::Cw1HandleMsg;
+use crate::msg::Cw3HandleMsg;
 
 /// Cw1Contract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with this.

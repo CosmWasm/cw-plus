@@ -83,16 +83,21 @@ but can be triggered to provide some better UI.
 `Proposal{proposal_id}` - Returns the information set when
 creating the contract, along with the current status.
 
-`Votes{proposal_id, start_after, limit}` - Returns all votes
-submitted for the given proposal, with pagination.
-
 `ListProposals{start_after, limit}` - Returns the same info
 as `Proposal`, but for all proposals along with pagination.
 Starts at proposal_id 1 and accending. 
 
 `ReverseProposals{start_before, limit}` - Returns the same info
 as `Proposal`, but for all proposals along with pagination.
-Starts at latest proposal_id and descending. 
+Starts at latest proposal_id and descending. (Often this
+is what you will want for a UI)
+
+`Vote{proposal_id, voter}` - Returns how the given 
+voter (HumanAddr) voted on the proposal. (May be null)
+
+`ListVotes{proposal_id, start_after, limit}` - Returns the same info
+as `Proposal`, but for all proposals along with pagination.
+Starts at proposal_id 1 and accending. 
 
 ## Voter Info
 

@@ -1,10 +1,10 @@
-pub mod helpers;
-pub mod msg;
-pub mod query;
+// mod helpers;
+mod msg;
+mod query;
 
-pub use crate::helpers::{Cw1CanonicalContract, Cw1Contract};
-pub use crate::msg::Cw1HandleMsg;
-pub use crate::query::{CanSendResponse, Cw1QueryMsg};
+// pub use crate::helpers::{Cw3CanonicalContract, Cw3Contract};
+pub use crate::msg::Cw3HandleMsg;
+pub use crate::query::{Cw3QueryMsg, ProposalListResponse, ProposalResponse, VoteListResponse};
 
 #[cfg(test)]
 mod tests {
