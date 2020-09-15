@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ThresholdResponse",
+  "description": "This defines the different ways tallies can happen. It can be extended as needed, but once the spec is frozen, these should not be modified. They are designed to be general.",
+  "anyOf": [
+    {
+      "description": "Declares a total weight needed to pass This usually implies that count_needed is stable, even if total_weight changes eg. 3 of 5 multisig -> 3 of 6 multisig",
+      "type": "object",
+      "required": [
+        "absolute_count"
+      ],
+      "properties": {
+        "absolute_count": {
+          "type": "object",
+          "required": [
+            "total_weight",
+            "weight_needed"
+          ],
+          "properties": {
+            "total_weight": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "weight_needed": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Declares a percentage of the total weight needed to pass This implies the percentage is stable, when total_weight changes eg. at 50.1%, we go from needing 51/100 to needing 101/200\n\nNote: percentage_needed = 60% is different than threshold = 60%, quora = 100% as the first will pass with 60% yes votes and 10% no votes, while the second will require the others to vote anything (no, abstain...) to pass",
+      "type": "object",
+      "required": [
+        "absolute_percentage"
+      ],
+      "properties": {
+        "absolute_percentage": {
+          "type": "object",
+          "required": [
+            "percentage_needed",
+            "total_weight"
+          ],
+          "properties": {
+            "percentage_needed": {
+              "$ref": "#/definitions/Decimal"
+            },
+            "total_weight": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Declares a threshold (minimum percentage of votes that must approve) and a quorum (minimum percentage of voter weight that must vote). This allows eg. 25% of total weight YES to pass, if we have quorum of 40% and threshold of 51% and most of the people sit out the election. This is more common in general elections where participation is expected to be low.",
+      "type": "object",
+      "required": [
+        "threshold_quora"
+      ],
+      "properties": {
+        "threshold_quora": {
+          "type": "object",
+          "required": [
+            "quroum",
+            "threshold",
+            "total_weight"
+          ],
+          "properties": {
+            "quroum": {
+              "$ref": "#/definitions/Decimal"
+            },
+            "threshold": {
+              "$ref": "#/definitions/Decimal"
+            },
+            "total_weight": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "Decimal": {
+      "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
+      "type": "string"
+    }
+  }
+}
