@@ -19,7 +19,17 @@
             "description": {
               "type": "string"
             },
-            "expires": {
+            "earliest": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "latest": {
               "anyOf": [
                 {
                   "$ref": "#/definitions/Expiration"

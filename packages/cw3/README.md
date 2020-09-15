@@ -39,17 +39,26 @@ as well as a final step to execute any approved proposal once.
 ## Base
 
 The following interfaces must be implemented for all cw3
-contracts
+contracts. Note that updating the members of the voting
+contract is not contained here (one approach is defined in cw4).
+Also, how to change the threshold rules (if at all) is not
+standardized. Those are considered admin tasks, and the common
+API is designed for standard usage, as that is where we can
+standardize the most tooling without limiting more complex
+governance controls.
 
 ### Messages
 
-`Propose{title, description, msgs, expires}` - This accepts 
+`Propose{title, description, msgs, earliest, latest}` - This accepts 
 `Vec<CosmosMsg>` and creates a new proposal. This will return
 an auto-generated ID in the `Data` field (and the logs) that
-can be used to reference the proposal later. You can specify
-an expiration time/height in Propose, but this may be set 
-automatically by the contract (overriding or just enforcing
-min/max/default values).
+can be used to reference the proposal later. 
+
+Earliest and latest are optional and can request the first
+and last height/time that we can try `Execute`. For a vote,
+we may require at least 2 days to pass, but no more than 7. 
+This is optional and even if set, may be modified by the contract
+(overriding or just enforcing min/max/default values).
  
 Many implementations will want to restrict who can propose.
 Maybe only people in the voting set. Maybe there is some
@@ -57,7 +66,11 @@ deposit to be made along with the proposal. This is not
 in the spec but left open to the implementation.
 
 `Vote{proposal_id, vote}` - Given a proposal_id, you can
-vote yes, no, abstain or veto. Many contracts (like typical 
+vote yes, no, abstain or veto. Each signed may have a
+different "weight" in the voting and they apply their
+entire weight on the vote.
+
+Many contracts (like typical 
 multisig with absolute threshold) may consider veto and 
 abstain as no and just count yes votes. Contracts with quora
 may count abstain towards quora but not yes or no for threshold.
@@ -79,6 +92,10 @@ it is impossible the contract would ever be executed,
 but can be triggered to provide some better UI.
 
 ### Queries
+
+`Threshold{}` - This returns information on the rules needed
+to declare a contract a success. What percentage of the votes
+and how they are tallied.
 
 `Proposal{proposal_id}` - Returns the information set when
 creating the contract, along with the current status.

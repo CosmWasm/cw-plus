@@ -3,6 +3,18 @@
   "title": "QueryMsg",
   "anyOf": [
     {
+      "description": "Return ThresholdResponse",
+      "type": "object",
+      "required": [
+        "threshold"
+      ],
+      "properties": {
+        "threshold": {
+          "type": "object"
+        }
+      }
+    },
+    {
       "description": "Returns ProposalResponse",
       "type": "object",
       "required": [

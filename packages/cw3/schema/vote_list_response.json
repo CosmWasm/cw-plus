@@ -30,7 +30,8 @@
       "type": "object",
       "required": [
         "vote",
-        "voter"
+        "voter",
+        "weight"
       ],
       "properties": {
         "vote": {
@@ -38,6 +39,11 @@
         },
         "voter": {
           "$ref": "#/definitions/HumanAddr"
+        },
+        "weight": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         }
       }
     }

@@ -39,13 +39,15 @@ impl Cw3Contract {
         title: T,
         description: U,
         msgs: Vec<CosmosMsg>,
-        expires: Option<Expiration>,
+        earliest: Option<Expiration>,
+        latest: Option<Expiration>,
     ) -> StdResult<CosmosMsg> {
         let msg = Cw3HandleMsg::Propose {
             title: title.into(),
             description: description.into(),
             msgs,
-            expires,
+            earliest,
+            latest,
         };
         self.encode_msg(msg)
     }

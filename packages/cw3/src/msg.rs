@@ -15,7 +15,8 @@ where
         title: String,
         description: String,
         msgs: Vec<CosmosMsg<T>>,
-        expires: Option<Expiration>,
+        earliest: Option<Expiration>,
+        latest: Option<Expiration>,
     },
     Vote {
         proposal_id: u64,
