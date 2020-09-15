@@ -4,7 +4,7 @@ command -v shellcheck > /dev/null && shellcheck "$0"
 
 # these are imported by other packages
 BASE_PACKAGES="cw0"
-ALL_PACKAGES="cw1 cw2 cw20 cw721"
+ALL_PACKAGES="cw1 cw2 cw3 cw20 cw721"
 
 # these are imported by other contracts
 BASE_CONTRACTS="cw1-whitelist cw20-base"
