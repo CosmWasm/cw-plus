@@ -1,51 +1,71 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
+use cw0::Expiration;
+use cw3::Vote;
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
-    pub admins: Vec<HumanAddr>,
-    pub mutable: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum HandleMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    /// Execute requests the contract to re-dispatch all these messages with the
-    /// contract's address as sender. Every implementation has it's own logic to
-    /// determine in
-    Execute { msgs: Vec<CosmosMsg<T>> },
-    /// Freeze will make a mutable contract immutable, must be called by an admin
-    Freeze {},
-    /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,
-    /// and only works if the contract is mutable
-    UpdateAdmins { admins: Vec<HumanAddr> },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum QueryMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    /// Shows all admins and whether or not it is mutable
-    AdminList {},
-    /// Checks permissions of the caller on this proxy.
-    /// If CanSend returns true then a call to `Execute` with the same message,
-    /// before any further state changes, should also succeed.
-    CanSend {
-        sender: HumanAddr,
-        msg: CosmosMsg<T>,
-    },
+    pub voters: Vec<Voter>,
+    pub required_weight: u64,
+    pub max_voting_period: Expiration,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct AdminListResponse {
-    pub admins: Vec<HumanAddr>,
-    pub mutable: bool,
+pub struct Voter {
+    pub addr: HumanAddr,
+    pub weight: u64,
+}
+
+// TODO: add some T variants? Maybe good enough as fixed Empty for now
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandleMsg{
+    Propose {
+        title: String,
+        description: String,
+        msgs: Vec<CosmosMsg<Empty>>,
+        earliest: Option<Expiration>,
+        latest: Option<Expiration>,
+    },
+    Vote {
+        proposal_id: u64,
+        vote: Vote,
+    },
+    Execute {
+        proposal_id: u64,
+    },
+    Close {
+        proposal_id: u64,
+    },
+}
+
+// TODO: add a custom query to return the voter list (all potential voters)
+// We can also add this as a cw3 extension
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    /// Return ThresholdResponse
+    Threshold {},
+    /// Returns ProposalResponse
+    Proposal { proposal_id: u64 },
+    /// Returns ProposalListResponse
+    ListProposals {
+        start_after: Option<u64>,
+        limit: Option<u32>,
+    },
+    /// Returns ProposalListResponse
+    ReverseProposals {
+        start_before: Option<u64>,
+        limit: Option<u32>,
+    },
+    /// Returns VoteResponse
+    Vote { proposal_id: u64, voter: HumanAddr },
+    /// Returns VoteListResponse
+    ListVotes {
+        proposal_id: u64,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }

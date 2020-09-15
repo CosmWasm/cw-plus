@@ -4,7 +4,7 @@ mod msg;
 mod query;
 
 pub use crate::helpers::{Cw3CanonicalContract, Cw3Contract};
-pub use crate::msg::Cw3HandleMsg;
+pub use crate::msg::{Cw3HandleMsg, Vote};
 pub use crate::query::{
     Cw3QueryMsg, ProposalListResponse, ProposalResponse, ThresholdResponse, VoteListResponse,
     VoteResponse,
