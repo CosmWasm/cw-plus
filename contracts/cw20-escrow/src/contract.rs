@@ -1,15 +1,18 @@
 use cosmwasm_std::{
-    from_binary, log, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
+    from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
+    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
 use cosmwasm_storage::prefixed;
+
+use cw0::NativeBalance;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20_atomic_swap::balance::Balance;
 
 use crate::msg::{
     CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
-use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, PREFIX_ESCROW};
+use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, EscrowBalance, PREFIX_ESCROW};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
@@ -31,9 +34,18 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Create(msg) => try_create(deps, env, msg),
+        HandleMsg::Create(msg) => try_create(
+            deps,
+            msg,
+            Balance::Native(NativeBalance(env.message.sent_funds)),
+            &env.message.sender,
+        ),
         HandleMsg::Approve { id } => try_approve(deps, env, id),
-        HandleMsg::TopUp { id } => try_top_up(deps, env, id),
+        HandleMsg::TopUp { id } => try_top_up(
+            deps,
+            id,
+            Balance::Native(NativeBalance(env.message.sent_funds)),
+        ),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
         HandleMsg::Receive(msg) => try_receive(deps, env, msg),
     }
@@ -48,66 +60,38 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
         Some(bin) => from_binary(&bin),
         None => Err(StdError::parse_err("ReceiveMsg", "no data")),
     }?;
-    let token = Cw20Coin {
+    let balance = Balance::Cw20(Cw20Coin {
         address: deps.api.canonical_address(&env.message.sender)?,
         amount: wrapper.amount,
-    };
+    });
     match msg {
-        ReceiveMsg::Create(create) => try_cw20_create(deps, wrapper.sender, token, create),
-        ReceiveMsg::TopUp { id } => try_cw20_top_up(deps, wrapper.sender, token, id),
+        ReceiveMsg::Create(msg) => try_create(deps, msg, balance, &wrapper.sender),
+        ReceiveMsg::TopUp { id } => try_top_up(deps, id, balance),
     }
 }
 
 pub fn try_create<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
     msg: CreateMsg,
+    balance: Balance,
+    sender: &HumanAddr,
 ) -> StdResult<HandleResponse> {
-    if env.message.sent_funds.is_empty() {
-        return Err(StdError::generic_err(
-            "You must send some coins to create an escrow",
-        ));
+    if balance.is_empty() {
+        return Err(StdError::generic_err("Send some coins to create an escrow"));
     }
 
-    let escrow = Escrow {
-        arbiter: deps.api.canonical_address(&msg.arbiter)?,
-        recipient: deps.api.canonical_address(&msg.recipient)?,
-        source: deps.api.canonical_address(&env.message.sender)?,
-        end_height: msg.end_height,
-        end_time: msg.end_time,
-        // there are native coins sent with the message
-        native_balance: env.message.sent_funds,
-        cw20_balance: vec![],
-        cw20_whitelist: msg.canonical_whitelist(&deps.api)?,
-    };
-
-    // try to store it, fail if the id was already in use
-    escrows(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
-        None => Ok(escrow),
-        Some(_) => Err(StdError::generic_err("escrow id already in use")),
-    })?;
-
-    let mut res = HandleResponse::default();
-    res.log = vec![log("action", "create"), log("id", msg.id)];
-    Ok(res)
-}
-
-pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    sender: HumanAddr,
-    token: Cw20Coin,
-    msg: CreateMsg,
-) -> StdResult<HandleResponse> {
-    if token.is_empty() {
-        return Err(StdError::generic_err(
-            "Send some amount to create an escrow",
-        ));
-    }
     let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
-    // make sure the token sent is on the whitelist by default
-    if !cw20_whitelist.iter().any(|t| t == &token.address) {
-        cw20_whitelist.push(token.address.clone())
-    }
+
+    let escrow_balance: EscrowBalance = match balance {
+        Balance::Native(balance) => (balance, vec![]),
+        Balance::Cw20(token) => {
+            // make sure the token sent is on the whitelist by default
+            if !cw20_whitelist.iter().any(|t| t == &token.address) {
+                cw20_whitelist.push(token.address.clone())
+            }
+            (NativeBalance::default(), vec![token])
+        }
+    };
 
     let escrow = Escrow {
         arbiter: deps.api.canonical_address(&msg.arbiter)?,
@@ -115,9 +99,7 @@ pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
         source: deps.api.canonical_address(&sender)?,
         end_height: msg.end_height,
         end_time: msg.end_time,
-        // there are native coins sent with the message
-        native_balance: vec![],
-        cw20_balance: vec![token],
+        balance: escrow_balance,
         cw20_whitelist,
     };
 
@@ -134,29 +116,10 @@ pub fn try_cw20_create<S: Storage, A: Api, Q: Querier>(
 
 pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
     id: String,
+    balance: Balance,
 ) -> StdResult<HandleResponse> {
-    // this fails is no escrow there
-    let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
-
-    // combine these two
-    add_tokens(&mut escrow.native_balance, env.message.sent_funds);
-    // and save
-    escrows(&mut deps.storage).save(id.as_bytes(), &escrow)?;
-
-    let mut res = HandleResponse::default();
-    res.log = vec![log("action", "top_up"), log("id", id)];
-    Ok(res)
-}
-
-pub fn try_cw20_top_up<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _sender: HumanAddr,
-    token: Cw20Coin,
-    id: String,
-) -> StdResult<HandleResponse> {
-    if token.is_empty() {
+    if balance.is_empty() {
         return Err(StdError::generic_err(
             "Send some amount to increase an escrow",
         ));
@@ -164,15 +127,16 @@ pub fn try_cw20_top_up<S: Storage, A: Api, Q: Querier>(
     // this fails is no escrow there
     let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
-    // ensure the token is on the whitelist
-    if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
-        return Err(StdError::generic_err(
-            "Only accepts tokens on the cw20_whitelist",
-        ));
-    }
+    if let Balance::Cw20(token) = &balance {
+        // ensure the token is on the whitelist
+        if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
+            return Err(StdError::generic_err(
+                "Only accepts tokens on the cw20_whitelist",
+            ));
+        }
+    };
 
-    // combine these two
-    add_cw20_token(&mut escrow.cw20_balance, token);
+    add_tokens(&mut escrow.balance, balance);
     // and save
     escrows(&mut deps.storage).save(id.as_bytes(), &escrow)?;
 
@@ -200,9 +164,7 @@ pub fn try_approve<S: Storage, A: Api, Q: Querier>(
         let rcpt = deps.api.human_address(&escrow.recipient)?;
 
         // send all tokens out
-        let mut messages = send_native_tokens(&env.contract.address, &rcpt, escrow.native_balance);
-        let mut cw20_send = send_cw20_tokens(&deps.api, &rcpt, escrow.cw20_balance)?;
-        messages.append(&mut cw20_send);
+        let messages = send_tokens(&deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
 
         let log = vec![log("action", "approve"), log("id", id), log("to", rcpt)];
         Ok(HandleResponse {
@@ -233,9 +195,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
         let rcpt = deps.api.human_address(&escrow.source)?;
 
         // send all tokens out
-        let mut messages = send_native_tokens(&env.contract.address, &rcpt, escrow.native_balance);
-        let mut cw20_send = send_cw20_tokens(&deps.api, &rcpt, escrow.cw20_balance)?;
-        messages.append(&mut cw20_send);
+        let messages = send_tokens(&deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
 
         let log = vec![log("action", "refund"), log("id", id), log("to", rcpt)];
         Ok(HandleResponse {
@@ -246,26 +206,35 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn send_native_tokens(from: &HumanAddr, to: &HumanAddr, amount: Vec<Coin>) -> Vec<CosmosMsg> {
-    if amount.is_empty() {
+fn send_tokens<A: Api>(
+    api: &A,
+    from: &HumanAddr,
+    to: &HumanAddr,
+    balance: &EscrowBalance,
+) -> StdResult<Vec<CosmosMsg>> {
+    let native_balance = &(balance.0).0;
+    let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
         vec![]
     } else {
         vec![BankMsg::Send {
             from_address: from.into(),
             to_address: to.into(),
-            amount,
+            amount: native_balance.to_vec(),
         }
         .into()]
-    }
+    };
+
+    msgs.append(&mut send_cw20_tokens(api, &to, &balance.1)?);
+    Ok(msgs)
 }
 
 fn send_cw20_tokens<A: Api>(
     api: &A,
     to: &HumanAddr,
-    coins: Vec<Cw20Coin>,
+    balance: &[Cw20Coin],
 ) -> StdResult<Vec<CosmosMsg>> {
-    coins
-        .into_iter()
+    balance
+        .iter()
         .map(|c| {
             let msg = Cw20HandleMsg::Transfer {
                 recipient: to.into(),
@@ -281,34 +250,40 @@ fn send_cw20_tokens<A: Api>(
         .collect()
 }
 
-fn add_tokens(store: &mut Vec<Coin>, add: Vec<Coin>) {
-    for token in add {
-        let index = store.iter().enumerate().find_map(|(i, exist)| {
-            if exist.denom == token.denom {
-                Some(i)
-            } else {
-                None
+fn add_tokens(store: &mut EscrowBalance, add: Balance) {
+    // TODO: Simplify
+    match add {
+        Balance::Native(balance) => {
+            let native_balance = &mut (store.0).0;
+            for token in balance.0 {
+                let index = native_balance.iter().enumerate().find_map(|(i, exist)| {
+                    if exist.denom == token.denom {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                });
+                match index {
+                    Some(idx) => native_balance[idx].amount += token.amount,
+                    None => native_balance.push(token),
+                }
             }
-        });
-        match index {
-            Some(idx) => store[idx].amount += token.amount,
-            None => store.push(token),
         }
-    }
-}
-
-fn add_cw20_token(store: &mut Vec<Cw20Coin>, token: Cw20Coin) {
-    let index = store.iter().enumerate().find_map(|(i, exist)| {
-        if exist.address == token.address {
-            Some(i)
-        } else {
-            None
+        Balance::Cw20(token) => {
+            let cw20_balance = &mut store.1;
+            let index = cw20_balance.iter().enumerate().find_map(|(i, exist)| {
+                if exist.address == token.address {
+                    Some(i)
+                } else {
+                    None
+                }
+            });
+            match index {
+                Some(idx) => cw20_balance[idx].amount += token.amount,
+                None => cw20_balance.push(token),
+            }
         }
-    });
-    match index {
-        Some(idx) => store[idx].amount += token.amount,
-        None => store.push(token),
-    }
+    };
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -330,8 +305,11 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
     let cw20_whitelist = escrow.human_whitelist(&deps.api)?;
 
     // transform tokens
+    let native_balance = (escrow.balance.0).0;
+
     let cw20_balance: StdResult<Vec<_>> = escrow
-        .cw20_balance
+        .balance
+        .1
         .into_iter()
         .map(|token| {
             Ok(Cw20CoinHuman {
@@ -348,7 +326,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
         source: deps.api.human_address(&escrow.source)?,
         end_height: escrow.end_height,
         end_time: escrow.end_time,
-        native_balance: escrow.native_balance,
+        native_balance,
         cw20_balance: cw20_balance?,
         cw20_whitelist,
     };
@@ -363,10 +341,12 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::msg::HandleMsg::TopUp;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
+
+    use crate::msg::HandleMsg::TopUp;
+
+    use super::*;
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -482,7 +462,7 @@ mod tests {
                 native_balance: vec![],
                 cw20_balance: vec![Cw20CoinHuman {
                     address: HumanAddr::from("my-cw20-token"),
-                    amount: Uint128(100)
+                    amount: Uint128(100),
                 }],
                 cw20_whitelist: vec![
                     HumanAddr::from("other-token"),
@@ -506,7 +486,7 @@ mod tests {
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: token_contract,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
+                send: vec![],
             })
         );
 
@@ -522,51 +502,57 @@ mod tests {
 
     #[test]
     fn add_tokens_proper() {
-        let mut tokens = vec![];
-        add_tokens(&mut tokens, vec![coin(123, "atom"), coin(789, "eth")]);
-        add_tokens(&mut tokens, vec![coin(456, "atom"), coin(12, "btc")]);
+        let mut tokens = (NativeBalance::default(), vec![]);
+        add_tokens(
+            &mut tokens,
+            Balance::Native(NativeBalance(vec![coin(123, "atom"), coin(789, "eth")])),
+        );
+        add_tokens(
+            &mut tokens,
+            Balance::Native(NativeBalance(vec![coin(456, "atom"), coin(12, "btc")])),
+        );
         assert_eq!(
-            tokens,
-            vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
+            tokens.0,
+            NativeBalance(vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")])
         );
     }
 
     #[test]
     fn add_cw_tokens_proper() {
-        let mut tokens = vec![];
+        let mut tokens = (NativeBalance::default(), vec![]);
         let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
         let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
-        add_cw20_token(
+        add_tokens(
             &mut tokens,
-            Cw20Coin {
+            Balance::Cw20(Cw20Coin {
                 address: foo_token.clone(),
                 amount: Uint128(12345),
-            },
+            }),
         );
-        add_cw20_token(
+        add_tokens(
             &mut tokens,
-            Cw20Coin {
+            Balance::Cw20(Cw20Coin {
                 address: bar_token.clone(),
                 amount: Uint128(777),
-            },
+            }),
         );
-        add_cw20_token(
+        add_tokens(
             &mut tokens,
-            Cw20Coin {
+            Balance::Cw20(Cw20Coin {
                 address: foo_token.clone(),
                 amount: Uint128(23400),
-            },
+            }),
         );
         assert_eq!(
-            tokens,
+            tokens.1,
             vec![
                 Cw20Coin {
                     address: foo_token,
-                    amount: Uint128(35745)
+                    amount: Uint128(35745),
                 },
                 Cw20Coin {
                     address: bar_token,
-                    amount: Uint128(777)
+                    amount: Uint128(777),
                 }
             ]
         );
@@ -688,7 +674,7 @@ mod tests {
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: bar_token,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
+                send: vec![],
             })
         );
 
@@ -702,7 +688,7 @@ mod tests {
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: foo_token,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
+                send: vec![],
             })
         );
     }

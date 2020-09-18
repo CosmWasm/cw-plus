@@ -2,11 +2,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    Api, CanonicalAddr, Coin, Env, HumanAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Api, CanonicalAddr, Env, HumanAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
+use cw0::NativeBalance;
 use cw20::Cw20Coin;
+
+pub(crate) type EscrowBalance = (NativeBalance, Vec<Cw20Coin>);
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Escrow {
@@ -23,10 +26,8 @@ pub struct Escrow {
     /// block time exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_time: Option<u64>,
-    /// Balance in native tokens
-    pub native_balance: Vec<Coin>,
-    /// Balance in cw20 tokens
-    pub cw20_balance: Vec<Cw20Coin>,
+    /// Balance in Native tokens and Cw20 coins
+    pub balance: EscrowBalance,
     /// All possible contracts that we accept tokens from
     pub cw20_whitelist: Vec<CanonicalAddr>,
 }
