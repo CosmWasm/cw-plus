@@ -247,8 +247,8 @@ fn send_tokens<A: Api>(
 fn add_tokens(store: &mut GenericBalance, add: Balance) {
     match add {
         Balance::Native(add_balance) => {
+            let native_balance = &mut store.0;
             for token in add_balance.0 {
-                let native_balance = &mut store.0;
                 add_token(native_balance, token);
             }
         }
