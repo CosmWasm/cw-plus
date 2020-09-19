@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
+    from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, GenericCoin,
+    HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
 use cosmwasm_storage::prefixed;
 
@@ -245,39 +245,36 @@ fn send_tokens<A: Api>(
 }
 
 fn add_tokens(store: &mut GenericBalance, add: Balance) {
-    // TODO: Simplify
     match add {
-        Balance::Native(balance) => {
-            let native_balance = &mut store.0;
-            for token in balance.0 {
-                let index = native_balance.iter().enumerate().find_map(|(i, exist)| {
-                    if exist.denom == token.denom {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                });
-                match index {
-                    Some(idx) => native_balance[idx].amount += token.amount,
-                    None => native_balance.push(token),
-                }
+        Balance::Native(add_balance) => {
+            for token in add_balance.0 {
+                let native_balance = &mut store.0;
+                add_token(native_balance, token);
             }
         }
         Balance::Cw20(token) => {
             let cw20_balance = &mut store.1;
-            let index = cw20_balance.iter().enumerate().find_map(|(i, exist)| {
-                if exist.address == token.address {
-                    Some(i)
-                } else {
-                    None
-                }
-            });
-            match index {
-                Some(idx) => cw20_balance[idx].amount += token.amount,
-                None => cw20_balance.push(token),
-            }
+            add_token(cw20_balance, token);
         }
     };
+}
+
+fn add_token<T: GenericCoin>(balance: &mut Vec<T>, token: T) {
+    let index = find_token(&balance, &token);
+    match index {
+        Some(idx) => balance[idx].add_value(token.value()),
+        None => balance.push(token),
+    }
+}
+
+fn find_token<T: GenericCoin>(balance: &Vec<T>, token: &T) -> Option<usize> {
+    balance.iter().enumerate().find_map(|(i, exist)| {
+        if token.key() == exist.key() {
+            Some(i)
+        } else {
+            None
+        }
+    })
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(

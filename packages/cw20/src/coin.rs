@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, HumanAddr, Uint128};
+use cosmwasm_std::{CanonicalAddr, GenericCoin, HumanAddr, Uint128};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Cw20Coin {
@@ -12,6 +12,20 @@ pub struct Cw20Coin {
 impl Cw20Coin {
     pub fn is_empty(&self) -> bool {
         self.amount == Uint128(0)
+    }
+}
+
+impl GenericCoin for Cw20Coin {
+    fn key(&self) -> String {
+        self.address.to_string()
+    }
+
+    fn value(&self) -> Uint128 {
+        self.amount
+    }
+
+    fn add_value(&mut self, add_value: Uint128) {
+        self.amount += add_value;
     }
 }
 
