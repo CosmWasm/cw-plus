@@ -224,16 +224,8 @@ fn send_tokens<A: Api>(
         .into()]
     };
 
-    msgs.append(&mut send_cw20_tokens(api, &to, &balance.1)?);
-    Ok(msgs)
-}
-
-fn send_cw20_tokens<A: Api>(
-    api: &A,
-    to: &HumanAddr,
-    balance: &[Cw20Coin],
-) -> StdResult<Vec<CosmosMsg>> {
-    balance
+    let cw20_balance = &balance.1;
+    let cw20_msgs: StdResult<Vec<_>> = cw20_balance
         .iter()
         .map(|c| {
             let msg = Cw20HandleMsg::Transfer {
@@ -247,7 +239,9 @@ fn send_cw20_tokens<A: Api>(
             };
             Ok(exec.into())
         })
-        .collect()
+        .collect();
+    msgs.append(&mut cw20_msgs?);
+    Ok(msgs)
 }
 
 fn add_tokens(store: &mut EscrowBalance, add: Balance) {
