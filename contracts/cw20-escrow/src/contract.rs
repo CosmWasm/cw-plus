@@ -12,7 +12,7 @@ use cw20_atomic_swap::balance::Balance;
 use crate::msg::{
     CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
-use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, EscrowBalance, PREFIX_ESCROW};
+use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, GenericBalance, PREFIX_ESCROW};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
@@ -82,7 +82,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
 
     let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
 
-    let escrow_balance: EscrowBalance = match balance {
+    let escrow_balance: GenericBalance = match balance {
         Balance::Native(balance) => (balance.0, vec![]),
         Balance::Cw20(token) => {
             // make sure the token sent is on the whitelist by default
@@ -210,7 +210,7 @@ fn send_tokens<A: Api>(
     api: &A,
     from: &HumanAddr,
     to: &HumanAddr,
-    balance: &EscrowBalance,
+    balance: &GenericBalance,
 ) -> StdResult<Vec<CosmosMsg>> {
     let native_balance = &balance.0;
     let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
@@ -244,7 +244,7 @@ fn send_tokens<A: Api>(
     Ok(msgs)
 }
 
-fn add_tokens(store: &mut EscrowBalance, add: Balance) {
+fn add_tokens(store: &mut GenericBalance, add: Balance) {
     // TODO: Simplify
     match add {
         Balance::Native(balance) => {
