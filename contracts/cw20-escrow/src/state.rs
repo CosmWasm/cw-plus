@@ -8,7 +8,7 @@ use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucke
 
 use cw20::Cw20Coin;
 
-pub(crate) type EscrowBalance = (Vec<Coin>, Vec<Cw20Coin>);
+pub(crate) type GenericBalance = (Vec<Coin>, Vec<Cw20Coin>);
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Escrow {
@@ -25,8 +25,8 @@ pub struct Escrow {
     /// block time exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_time: Option<u64>,
-    /// Balance in Native tokens and Cw20 coins
-    pub balance: EscrowBalance,
+    /// Balance in Native and Cw20 tokens
+    pub balance: GenericBalance,
     /// All possible contracts that we accept tokens from
     pub cw20_whitelist: Vec<CanonicalAddr>,
 }
