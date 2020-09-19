@@ -2,14 +2,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    Api, CanonicalAddr, Env, HumanAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Api, CanonicalAddr, Coin, Env, HumanAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
-use cw0::NativeBalance;
 use cw20::Cw20Coin;
 
-pub(crate) type EscrowBalance = (NativeBalance, Vec<Cw20Coin>);
+pub(crate) type EscrowBalance = (Vec<Coin>, Vec<Cw20Coin>);
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Escrow {
