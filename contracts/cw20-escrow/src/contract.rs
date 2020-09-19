@@ -83,13 +83,13 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
 
     let escrow_balance: EscrowBalance = match balance {
-        Balance::Native(balance) => (balance, vec![]),
+        Balance::Native(balance) => (balance.0, vec![]),
         Balance::Cw20(token) => {
             // make sure the token sent is on the whitelist by default
             if !cw20_whitelist.iter().any(|t| t == &token.address) {
                 cw20_whitelist.push(token.address.clone())
             }
-            (NativeBalance::default(), vec![token])
+            (vec![], vec![token])
         }
     };
 
@@ -212,7 +212,7 @@ fn send_tokens<A: Api>(
     to: &HumanAddr,
     balance: &EscrowBalance,
 ) -> StdResult<Vec<CosmosMsg>> {
-    let native_balance = &(balance.0).0;
+    let native_balance = &balance.0;
     let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
         vec![]
     } else {
@@ -248,7 +248,7 @@ fn add_tokens(store: &mut EscrowBalance, add: Balance) {
     // TODO: Simplify
     match add {
         Balance::Native(balance) => {
-            let native_balance = &mut (store.0).0;
+            let native_balance = &mut store.0;
             for token in balance.0 {
                 let index = native_balance.iter().enumerate().find_map(|(i, exist)| {
                     if exist.denom == token.denom {
@@ -299,7 +299,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
     let cw20_whitelist = escrow.human_whitelist(&deps.api)?;
 
     // transform tokens
-    let native_balance = (escrow.balance.0).0;
+    let native_balance = escrow.balance.0;
 
     let cw20_balance: StdResult<Vec<_>> = escrow
         .balance
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn add_tokens_proper() {
-        let mut tokens = (NativeBalance::default(), vec![]);
+        let mut tokens = (vec![], vec![]);
         add_tokens(
             &mut tokens,
             Balance::Native(NativeBalance(vec![coin(123, "atom"), coin(789, "eth")])),
@@ -507,13 +507,13 @@ mod tests {
         );
         assert_eq!(
             tokens.0,
-            NativeBalance(vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")])
+            vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
         );
     }
 
     #[test]
     fn add_cw_tokens_proper() {
-        let mut tokens = (NativeBalance::default(), vec![]);
+        let mut tokens = (vec![], vec![]);
         let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
         let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
         add_tokens(
