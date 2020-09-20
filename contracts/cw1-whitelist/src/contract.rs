@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
+    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw1::CanSendResponse;
@@ -67,7 +67,7 @@ where
     } else {
         let mut res = HandleResponse::default();
         res.messages = msgs;
-        res.log = vec![log("action", "execute")];
+        res.attributes = vec![attr("action", "execute")];
         Ok(res)
     }
 }
@@ -84,7 +84,7 @@ pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
         admin_list(&mut deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
-        res.log = vec![log("action", "freeze")];
+        res.attributes = vec![attr("action", "freeze")];
         Ok(res)
     }
 }
@@ -102,7 +102,7 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
         admin_list(&mut deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
-        res.log = vec![log("action", "update_admins")];
+        res.attributes = vec![attr("action", "update_admins")];
         Ok(res)
     }
 }
@@ -280,7 +280,7 @@ mod tests {
         let env = mock_env(&carl, &[]);
         let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
-        assert_eq!(res.log, vec![log("action", "execute")]);
+        assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }
 
     #[test]

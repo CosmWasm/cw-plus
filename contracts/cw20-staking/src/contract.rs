@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    coin, log, to_binary, Api, BankMsg, Binary, Decimal, Env, Extern, HandleResponse, HumanAddr,
+    attr, coin, to_binary, Api, BankMsg, Binary, Decimal, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
@@ -193,11 +193,11 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
             amount: payment.clone(),
         }
         .into()],
-        log: vec![
-            log("action", "bond"),
-            log("from", env.message.sender),
-            log("bonded", payment.amount),
-            log("minted", to_mint),
+        attributes: vec![
+            attr("action", "bond"),
+            attr("from", env.message.sender),
+            attr("bonded", payment.amount),
+            attr("minted", to_mint),
         ],
         data: None,
     };
@@ -262,11 +262,11 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
             amount: coin(unbond.u128(), &invest.bond_denom),
         }
         .into()],
-        log: vec![
-            log("action", "unbond"),
-            log("to", env.message.sender),
-            log("unbonded", unbond),
-            log("burnt", amount),
+        attributes: vec![
+            attr("action", "unbond"),
+            attr("to", env.message.sender),
+            attr("unbonded", unbond),
+            attr("burnt", amount),
         ],
         data: None,
     };
@@ -312,10 +312,10 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
             amount: vec![balance],
         }
         .into()],
-        log: vec![
-            log("action", "claim"),
-            log("from", env.message.sender),
-            log("amount", to_send),
+        attributes: vec![
+            attr("action", "claim"),
+            attr("from", env.message.sender),
+            attr("amount", to_send),
         ],
         data: None,
     };
@@ -348,7 +348,7 @@ pub fn reinvest<S: Storage, A: Api, Q: Querier>(
             }
             .into(),
         ],
-        log: vec![],
+        attributes: vec![],
         data: None,
     };
     Ok(res)
@@ -391,7 +391,7 @@ pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
             amount: balance.clone(),
         }
         .into()],
-        log: vec![log("action", "reinvest"), log("bonded", balance.amount)],
+        attributes: vec![attr("action", "reinvest"), attr("bonded", balance.amount)],
         data: None,
     };
     Ok(res)

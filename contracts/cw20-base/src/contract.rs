@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    attr, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
     MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
 };
 use cw2::{get_contract_version, set_contract_version};
@@ -131,11 +131,11 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "transfer"),
-            log("from", deps.api.human_address(&sender_raw)?),
-            log("to", recipient),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "transfer"),
+            attr("from", deps.api.human_address(&sender_raw)?),
+            attr("to", recipient),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -166,10 +166,10 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "burn"),
-            log("from", deps.api.human_address(&sender_raw)?),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "burn"),
+            attr("from", deps.api.human_address(&sender_raw)?),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -211,10 +211,10 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "mint"),
-            log("to", recipient),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "mint"),
+            attr("to", recipient),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -245,11 +245,11 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     })?;
 
     let sender = deps.api.human_address(&sender_raw)?;
-    let logs = vec![
-        log("action", "send"),
-        log("from", &sender),
-        log("to", &contract),
-        log("amount", amount),
+    let attrs = vec![
+        attr("action", "send"),
+        attr("from", &sender),
+        attr("to", &contract),
+        attr("amount", amount),
     ];
 
     // create a send message
@@ -262,7 +262,7 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![msg],
-        log: logs,
+        attributes: attrs,
         data: None,
     };
     Ok(res)

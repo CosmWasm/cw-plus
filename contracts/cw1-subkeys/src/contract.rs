@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    log, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
+    attr, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
     HandleResponse, HumanAddr, InitResponse, Order, Querier, StakingMsg, StdError, StdResult,
     Storage,
 };
@@ -81,7 +81,7 @@ where
     if cfg.is_admin(owner_raw) {
         let mut res = HandleResponse::default();
         res.messages = msgs;
-        res.log = vec![log("action", "execute"), log("owner", env.message.sender)];
+        res.attributes = vec![attr("action", "execute"), attr("owner", env.message.sender)];
         Ok(res)
     } else {
         for msg in &msgs {
@@ -115,7 +115,7 @@ where
         // Relay messages
         let res = HandleResponse {
             messages: msgs,
-            log: vec![log("action", "execute"), log("owner", env.message.sender)],
+            attributes: vec![attr("action", "execute"), attr("owner", env.message.sender)],
             data: None,
         };
         Ok(res)
@@ -183,12 +183,12 @@ where
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "increase_allowance"),
-            log("owner", env.message.sender),
-            log("spender", spender),
-            log("denomination", amount.denom),
-            log("amount", amount.amount),
+        attributes: vec![
+            attr("action", "increase_allowance"),
+            attr("owner", env.message.sender),
+            attr("spender", spender),
+            attr("denomination", amount.denom),
+            attr("amount", amount.amount),
         ],
         data: None,
     };
@@ -232,12 +232,12 @@ where
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "decrease_allowance"),
-            log("owner", deps.api.human_address(owner_raw)?),
-            log("spender", spender),
-            log("denomination", amount.denom),
-            log("amount", amount.amount),
+        attributes: vec![
+            attr("action", "decrease_allowance"),
+            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("spender", spender),
+            attr("denomination", amount.denom),
+            attr("amount", amount.amount),
         ],
         data: None,
     };
@@ -269,11 +269,11 @@ where
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "set_permissions"),
-            log("owner", deps.api.human_address(owner_raw)?),
-            log("spender", spender),
-            log("permissions", perm),
+        attributes: vec![
+            attr("action", "set_permissions"),
+            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("spender", spender),
+            attr("permissions", perm),
         ],
         data: None,
     };
@@ -1175,8 +1175,8 @@ mod tests {
         let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(
-            res.log,
-            vec![log("action", "execute"), log("owner", spender1.clone())]
+            res.attributes,
+            vec![attr("action", "execute"), attr("owner", spender1.clone())]
         );
 
         // And then cannot (not enough funds anymore)
@@ -1191,8 +1191,8 @@ mod tests {
         let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(
-            res.log,
-            vec![log("action", "execute"), log("owner", owner.clone())]
+            res.attributes,
+            vec![attr("action", "execute"), attr("owner", owner.clone())]
         );
 
         // For admins, even other message types are allowed
@@ -1204,7 +1204,10 @@ mod tests {
         let env = mock_env(&owner, &[]);
         let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, other_msgs);
-        assert_eq!(res.log, vec![log("action", "execute"), log("owner", owner)]);
+        assert_eq!(
+            res.attributes,
+            vec![attr("action", "execute"), attr("owner", owner)]
+        );
 
         // But not for mere mortals
         let env = mock_env(&spender1, &[]);

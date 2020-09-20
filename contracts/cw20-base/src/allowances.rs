@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    log, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, Querier,
+    attr, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, Querier,
     StdError, StdResult, Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
@@ -31,11 +31,11 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "increase_allowance"),
-            log("owner", deps.api.human_address(owner_raw)?),
-            log("spender", spender),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "increase_allowance"),
+            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("spender", spender),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -72,11 +72,11 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "decrease_allowance"),
-            log("owner", deps.api.human_address(owner_raw)?),
-            log("spender", spender),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "decrease_allowance"),
+            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("spender", spender),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -137,12 +137,12 @@ pub fn handle_transfer_from<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "transfer_from"),
-            log("from", owner),
-            log("to", recipient),
-            log("by", deps.api.human_address(&spender_raw)?),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "transfer_from"),
+            attr("from", owner),
+            attr("to", recipient),
+            attr("by", deps.api.human_address(&spender_raw)?),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -180,11 +180,11 @@ pub fn handle_burn_from<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "burn_from"),
-            log("from", owner),
-            log("by", deps.api.human_address(&spender_raw)?),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "burn_from"),
+            attr("from", owner),
+            attr("by", deps.api.human_address(&spender_raw)?),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -222,12 +222,12 @@ pub fn handle_send_from<S: Storage, A: Api, Q: Querier>(
     })?;
 
     let spender = deps.api.human_address(&spender_raw)?;
-    let logs = vec![
-        log("action", "send_from"),
-        log("from", &owner),
-        log("to", &contract),
-        log("by", &spender),
-        log("amount", amount),
+    let attrs = vec![
+        attr("action", "send_from"),
+        attr("from", &owner),
+        attr("to", &contract),
+        attr("by", &spender),
+        attr("amount", amount),
     ];
 
     // create a send message
@@ -240,7 +240,7 @@ pub fn handle_send_from<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![msg],
-        log: logs,
+        attributes: attrs,
         data: None,
     };
     Ok(res)
@@ -538,7 +538,7 @@ mod tests {
         };
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(res.log[0], log("action", "transfer_from"));
+        assert_eq!(res.attributes[0], attr("action", "transfer_from"));
 
         // make sure money arrived
         assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
@@ -615,7 +615,7 @@ mod tests {
         };
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(res.log[0], log("action", "burn_from"));
+        assert_eq!(res.attributes[0], attr("action", "burn_from"));
 
         // make sure money burnt
         assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
@@ -693,7 +693,7 @@ mod tests {
         };
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(res.log[0], log("action", "send_from"));
+        assert_eq!(res.attributes[0], attr("action", "send_from"));
         assert_eq!(1, res.messages.len());
 
         // we record this as sent by the one who requested, not the one who was paying

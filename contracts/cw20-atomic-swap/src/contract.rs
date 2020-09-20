@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 
 use cosmwasm_std::{
-    from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
+    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
 use cw0::calc_range_start_string;
@@ -104,11 +104,11 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     })?;
 
     let mut res = HandleResponse::default();
-    res.log = vec![
-        log("action", "create"),
-        log("id", msg.id),
-        log("hash", msg.hash),
-        log("recipient", msg.recipient),
+    res.attributes = vec![
+        attr("action", "create"),
+        attr("id", msg.id),
+        attr("hash", msg.hash),
+        attr("recipient", msg.recipient),
     ];
     Ok(res)
 }
@@ -138,11 +138,11 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
         messages: msgs,
-        log: vec![
-            log("action", "release"),
-            log("id", id),
-            log("preimage", preimage),
-            log("to", rcpt),
+        attributes: vec![
+            attr("action", "release"),
+            attr("id", id),
+            attr("preimage", preimage),
+            attr("to", rcpt),
         ],
         data: None,
     })
@@ -167,7 +167,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
         messages: msgs,
-        log: vec![log("action", "refund"), log("id", id), log("to", rcpt)],
+        attributes: vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)],
         data: None,
     })
 }
@@ -405,7 +405,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "create"), res.log[0]);
+        assert_eq!(attr("action", "create"), res.attributes[0]);
 
         // Cannot re-create (modify), already existing
         let new_balance = coins(1, "tokens");
@@ -511,7 +511,7 @@ mod tests {
             preimage: preimage(),
         };
         let res = handle(&mut deps, env.clone(), release.clone()).unwrap();
-        assert_eq!(log("action", "release"), res.log[0]);
+        assert_eq!(attr("action", "release"), res.attributes[0]);
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
@@ -582,7 +582,7 @@ mod tests {
             id: "swap0001".to_string(),
         };
         let res = handle(&mut deps, env.clone(), refund.clone()).unwrap();
-        assert_eq!(log("action", "refund"), res.log[0]);
+        assert_eq!(attr("action", "refund"), res.attributes[0]);
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
@@ -701,7 +701,7 @@ mod tests {
         let env = mock_env(&native_sender, &native_coins);
         let res = handle(&mut deps, env, HandleMsg::Create(create)).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "create"), res.log[0]);
+        assert_eq!(attr("action", "create"), res.attributes[0]);
 
         // Cw20 side (counter offer (1:1000))
         let cw20_sender = HumanAddr::from("B_on_Y");
@@ -728,7 +728,7 @@ mod tests {
         let env = mock_env(&token_contract, &[]);
         let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(log("action", "create"), res.log[0]);
+        assert_eq!(attr("action", "create"), res.attributes[0]);
 
         // Somebody (typically, A) releases the swap side on the Cw20 (Y) blockchain,
         // using her knowledge of the preimage
@@ -743,8 +743,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(log("action", "release"), res.log[0]);
-        assert_eq!(log("id", cw20_swap_id), res.log[1]);
+        assert_eq!(attr("action", "release"), res.attributes[0]);
+        assert_eq!(attr("id", cw20_swap_id), res.attributes[1]);
 
         // Verify the resulting Cw20 transfer message
         let send_msg = Cw20HandleMsg::Transfer {
@@ -765,9 +765,9 @@ mod tests {
         let env = mock_env("other_somebody", &[]);
 
         // First, let's obtain the preimage from the logs of the release() transaction on Y
-        let preimage_log = &res.log[2];
-        assert_eq!("preimage", preimage_log.key);
-        let preimage = preimage_log.value.clone();
+        let preimage_attr = &res.attributes[2];
+        assert_eq!("preimage", preimage_attr.key);
+        let preimage = preimage_attr.value.clone();
 
         let release = HandleMsg::Release {
             id: native_swap_id.clone(),
@@ -775,8 +775,8 @@ mod tests {
         };
         let res = handle(&mut deps, env.clone(), release.clone()).unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(log("action", "release"), res.log[0]);
-        assert_eq!(log("id", native_swap_id), res.log[1]);
+        assert_eq!(attr("action", "release"), res.attributes[0]);
+        assert_eq!(attr("id", native_swap_id), res.attributes[1]);
 
         // Verify the resulting Native send message
         assert_eq!(
