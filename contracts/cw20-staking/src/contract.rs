@@ -465,7 +465,7 @@ mod tests {
 
     fn sample_delegation<U: Into<HumanAddr>>(addr: U, amount: Coin) -> FullDelegation {
         let can_redelegate = amount.clone();
-        let accumulated_rewards = coin(0, &amount.denom);
+        let accumulated_rewards = coins(0, &amount.denom);
         FullDelegation {
             validator: addr.into(),
             delegator: HumanAddr::from(MOCK_CONTRACT_ADDR),
