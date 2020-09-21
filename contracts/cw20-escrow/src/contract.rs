@@ -82,14 +82,20 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
 
     let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
 
-    let escrow_balance: GenericBalance = match balance {
-        Balance::Native(balance) => (balance.0, vec![]),
+    let escrow_balance = match balance {
+        Balance::Native(balance) => GenericBalance {
+            native: balance.0,
+            cw20: vec![],
+        },
         Balance::Cw20(token) => {
             // make sure the token sent is on the whitelist by default
             if !cw20_whitelist.iter().any(|t| t == &token.address) {
                 cw20_whitelist.push(token.address.clone())
             }
-            (vec![], vec![token])
+            GenericBalance {
+                native: vec![],
+                cw20: vec![token],
+            }
         }
     };
 
@@ -212,7 +218,7 @@ fn send_tokens<A: Api>(
     to: &HumanAddr,
     balance: &GenericBalance,
 ) -> StdResult<Vec<CosmosMsg>> {
-    let native_balance = &balance.0;
+    let native_balance = &balance.native;
     let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
         vec![]
     } else {
@@ -224,7 +230,7 @@ fn send_tokens<A: Api>(
         .into()]
     };
 
-    let cw20_balance = &balance.1;
+    let cw20_balance = &balance.cw20;
     let cw20_msgs: StdResult<Vec<_>> = cw20_balance
         .iter()
         .map(|c| {
@@ -248,7 +254,7 @@ fn add_tokens(store: &mut GenericBalance, add: Balance) {
     // TODO: Simplify
     match add {
         Balance::Native(balance) => {
-            let native_balance = &mut store.0;
+            let native_balance = &mut store.native;
             for token in balance.0 {
                 let index = native_balance.iter().enumerate().find_map(|(i, exist)| {
                     if exist.denom == token.denom {
@@ -264,7 +270,7 @@ fn add_tokens(store: &mut GenericBalance, add: Balance) {
             }
         }
         Balance::Cw20(token) => {
-            let cw20_balance = &mut store.1;
+            let cw20_balance = &mut store.cw20;
             let index = cw20_balance.iter().enumerate().find_map(|(i, exist)| {
                 if exist.address == token.address {
                     Some(i)
@@ -299,11 +305,11 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
     let cw20_whitelist = escrow.human_whitelist(&deps.api)?;
 
     // transform tokens
-    let native_balance = escrow.balance.0;
+    let native_balance = escrow.balance.native;
 
     let cw20_balance: StdResult<Vec<_>> = escrow
         .balance
-        .1
+        .cw20
         .into_iter()
         .map(|token| {
             Ok(Cw20CoinHuman {
@@ -496,7 +502,7 @@ mod tests {
 
     #[test]
     fn add_tokens_proper() {
-        let mut tokens = (vec![], vec![]);
+        let mut tokens = GenericBalance::default();
         add_tokens(
             &mut tokens,
             Balance::Native(NativeBalance(vec![coin(123, "atom"), coin(789, "eth")])),
@@ -506,14 +512,14 @@ mod tests {
             Balance::Native(NativeBalance(vec![coin(456, "atom"), coin(12, "btc")])),
         );
         assert_eq!(
-            tokens.0,
+            tokens.native,
             vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
         );
     }
 
     #[test]
     fn add_cw_tokens_proper() {
-        let mut tokens = (vec![], vec![]);
+        let mut tokens = GenericBalance::default();
         let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
         let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
         add_tokens(
@@ -538,7 +544,7 @@ mod tests {
             }),
         );
         assert_eq!(
-            tokens.1,
+            tokens.cw20,
             vec![
                 Cw20Coin {
                     address: foo_token,

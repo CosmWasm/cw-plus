@@ -8,7 +8,11 @@ use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucke
 
 use cw20::Cw20Coin;
 
-pub(crate) type GenericBalance = (Vec<Coin>, Vec<Cw20Coin>);
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct GenericBalance {
+    pub native: Vec<Coin>,
+    pub cw20: Vec<Cw20Coin>,
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Escrow {
