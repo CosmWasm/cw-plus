@@ -114,6 +114,10 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     recipient: HumanAddr,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
+    if amount == Uint128::zero() {
+        return Err(StdError::generic_err("Invalid zero amount"));
+    }
+
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
@@ -143,6 +147,10 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
     env: Env,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
+    if amount == Uint128::zero() {
+        return Err(StdError::generic_err("Invalid zero amount"));
+    }
+
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
     // lower balance
@@ -174,6 +182,10 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     recipient: HumanAddr,
     amount: Uint128,
 ) -> StdResult<HandleResponse> {
+    if amount == Uint128::zero() {
+        return Err(StdError::generic_err("Invalid zero amount"));
+    }
+
     let mut config = token_info_read(&deps.storage).load()?;
     if config.mint.is_none()
         || config.mint.as_ref().unwrap().minter
@@ -216,6 +228,10 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     amount: Uint128,
     msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
+    if amount == Uint128::zero() {
+        return Err(StdError::generic_err("Invalid zero amount"));
+    }
+
     let rcpt_raw = deps.api.canonical_address(&contract)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
@@ -544,6 +560,18 @@ mod tests {
         assert_eq!(get_balance(&deps, &genesis), amount);
         assert_eq!(get_balance(&deps, &winner), prize);
 
+        // but cannot mint nothing
+        let msg = HandleMsg::Mint {
+            recipient: winner.clone(),
+            amount: Uint128::zero(),
+        };
+        let env = mock_env(&minter, &[]);
+        let res = handle(&mut deps, env, msg.clone());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            e => panic!("Unexpected error: {}", e),
+        }
+
         // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
         let msg = HandleMsg::Mint {
@@ -686,6 +714,18 @@ mod tests {
 
         do_init(&mut deps, &addr1, amount1);
 
+        // cannot transfer nothing
+        let env = mock_env(addr1.clone(), &[]);
+        let msg = HandleMsg::Transfer {
+            recipient: addr2.clone(),
+            amount: Uint128::zero(),
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            e => panic!("Unexpected error: {}", e),
+        }
+
         // cannot send more than we have
         let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Transfer {
@@ -735,6 +775,18 @@ mod tests {
 
         do_init(&mut deps, &addr1, amount1);
 
+        // cannot burn nothing
+        let env = mock_env(addr1.clone(), &[]);
+        let msg = HandleMsg::Burn {
+            amount: Uint128::zero(),
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            e => panic!("Unexpected error: {}", e),
+        }
+        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
+
         // cannot burn more than we have
         let env = mock_env(addr1.clone(), &[]);
         let msg = HandleMsg::Burn { amount: too_much };
@@ -767,6 +819,19 @@ mod tests {
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
         do_init(&mut deps, &addr1, amount1);
+
+        // cannot send nothing
+        let env = mock_env(addr1.clone(), &[]);
+        let msg = HandleMsg::Send {
+            contract: contract.clone(),
+            amount: Uint128::zero(),
+            msg: Some(send_msg.clone()),
+        };
+        let res = handle(&mut deps, env, msg);
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            e => panic!("Unexpected error: {}", e),
+        }
 
         // cannot send more than we have
         let env = mock_env(addr1.clone(), &[]);
