@@ -1,6 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use cosmwasm_std::Coin;
 use cw0::NativeBalance;
 use cw20::Cw20Coin;
 
@@ -31,5 +32,17 @@ impl Balance {
             Balance::Native(balance) => balance.normalize(),
             Balance::Cw20(_) => {}
         }
+    }
+}
+
+impl From<Vec<Coin>> for Balance {
+    fn from(coins: Vec<Coin>) -> Balance {
+        Balance::Native(NativeBalance(coins))
+    }
+}
+
+impl From<Cw20Coin> for Balance {
+    fn from(cw20_coin: Cw20Coin) -> Balance {
+        Balance::Cw20(cw20_coin)
     }
 }

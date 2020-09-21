@@ -4,7 +4,6 @@ use cosmwasm_std::{
 };
 use cosmwasm_storage::prefixed;
 
-use cw0::NativeBalance;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 use cw20_atomic_swap::balance::Balance;
@@ -37,15 +36,11 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::Create(msg) => try_create(
             deps,
             msg,
-            Balance::Native(NativeBalance(env.message.sent_funds)),
+            Balance::from(env.message.sent_funds),
             &env.message.sender,
         ),
         HandleMsg::Approve { id } => try_approve(deps, env, id),
-        HandleMsg::TopUp { id } => try_top_up(
-            deps,
-            id,
-            Balance::Native(NativeBalance(env.message.sent_funds)),
-        ),
+        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(env.message.sent_funds)),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
         HandleMsg::Receive(msg) => try_receive(deps, env, msg),
     }
@@ -468,14 +463,8 @@ mod tests {
     #[test]
     fn add_tokens_proper() {
         let mut tokens = GenericBalance::default();
-        tokens.add_tokens(Balance::Native(NativeBalance(vec![
-            coin(123, "atom"),
-            coin(789, "eth"),
-        ])));
-        tokens.add_tokens(Balance::Native(NativeBalance(vec![
-            coin(456, "atom"),
-            coin(12, "btc"),
-        ])));
+        tokens.add_tokens(Balance::from(vec![coin(123, "atom"), coin(789, "eth")]));
+        tokens.add_tokens(Balance::from(vec![coin(456, "atom"), coin(12, "btc")]));
         assert_eq!(
             tokens.native,
             vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
