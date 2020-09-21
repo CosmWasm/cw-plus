@@ -142,7 +142,8 @@ pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
         }
     };
 
-    add_tokens(&mut escrow.balance, balance);
+    escrow.balance.add_tokens(balance);
+
     // and save
     escrows(&mut deps.storage).save(id.as_bytes(), &escrow)?;
 
@@ -248,42 +249,6 @@ fn send_tokens<A: Api>(
         .collect();
     msgs.append(&mut cw20_msgs?);
     Ok(msgs)
-}
-
-fn add_tokens(store: &mut GenericBalance, add: Balance) {
-    // TODO: Simplify
-    match add {
-        Balance::Native(balance) => {
-            let native_balance = &mut store.native;
-            for token in balance.0 {
-                let index = native_balance.iter().enumerate().find_map(|(i, exist)| {
-                    if exist.denom == token.denom {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                });
-                match index {
-                    Some(idx) => native_balance[idx].amount += token.amount,
-                    None => native_balance.push(token),
-                }
-            }
-        }
-        Balance::Cw20(token) => {
-            let cw20_balance = &mut store.cw20;
-            let index = cw20_balance.iter().enumerate().find_map(|(i, exist)| {
-                if exist.address == token.address {
-                    Some(i)
-                } else {
-                    None
-                }
-            });
-            match index {
-                Some(idx) => cw20_balance[idx].amount += token.amount,
-                None => cw20_balance.push(token),
-            }
-        }
-    };
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -503,14 +468,14 @@ mod tests {
     #[test]
     fn add_tokens_proper() {
         let mut tokens = GenericBalance::default();
-        add_tokens(
-            &mut tokens,
-            Balance::Native(NativeBalance(vec![coin(123, "atom"), coin(789, "eth")])),
-        );
-        add_tokens(
-            &mut tokens,
-            Balance::Native(NativeBalance(vec![coin(456, "atom"), coin(12, "btc")])),
-        );
+        tokens.add_tokens(Balance::Native(NativeBalance(vec![
+            coin(123, "atom"),
+            coin(789, "eth"),
+        ])));
+        tokens.add_tokens(Balance::Native(NativeBalance(vec![
+            coin(456, "atom"),
+            coin(12, "btc"),
+        ])));
         assert_eq!(
             tokens.native,
             vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
@@ -522,27 +487,18 @@ mod tests {
         let mut tokens = GenericBalance::default();
         let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
         let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
-        add_tokens(
-            &mut tokens,
-            Balance::Cw20(Cw20Coin {
-                address: foo_token.clone(),
-                amount: Uint128(12345),
-            }),
-        );
-        add_tokens(
-            &mut tokens,
-            Balance::Cw20(Cw20Coin {
-                address: bar_token.clone(),
-                amount: Uint128(777),
-            }),
-        );
-        add_tokens(
-            &mut tokens,
-            Balance::Cw20(Cw20Coin {
-                address: foo_token.clone(),
-                amount: Uint128(23400),
-            }),
-        );
+        tokens.add_tokens(Balance::Cw20(Cw20Coin {
+            address: foo_token.clone(),
+            amount: Uint128(12345),
+        }));
+        tokens.add_tokens(Balance::Cw20(Cw20Coin {
+            address: bar_token.clone(),
+            amount: Uint128(777),
+        }));
+        tokens.add_tokens(Balance::Cw20(Cw20Coin {
+            address: foo_token.clone(),
+            amount: Uint128(23400),
+        }));
         assert_eq!(
             tokens.cw20,
             vec![
