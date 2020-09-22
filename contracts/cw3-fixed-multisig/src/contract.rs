@@ -1,11 +1,10 @@
 use cosmwasm_std::{
-    Api, Binary, Empty, Env, Extern, HandleResponse,
-    InitResponse, Querier, StdResult, Storage,
+    Api, Binary, Empty, Env, Extern, HandleResponse, InitResponse, Querier, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{Voters, voters};
+use crate::state::{config, voters, Config};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -18,14 +17,19 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let total_weight = msg.voters.iter().map(|v| v.weight).sum();
-    let cfg =  Voters{
-        // TODO: map to canonical addresses?
-        voters: msg.voters,
+    let cfg = Config {
         required_weight: msg.required_weight,
         total_weight,
         max_voting_period: msg.max_voting_period,
     };
-    voters(&mut deps.storage).save(&cfg)?;
+    config(&mut deps.storage).save(&cfg)?;
+
+    // add all voters
+    let mut voters = voters(&mut deps.storage);
+    for voter in msg.voters.iter() {
+        let v = voter.canonical(&deps.api)?;
+        voters.save(v.addr.as_slice(), &v)?;
+    }
     Ok(InitResponse::default())
 }
 
