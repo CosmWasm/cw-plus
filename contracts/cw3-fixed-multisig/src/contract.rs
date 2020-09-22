@@ -1,10 +1,13 @@
 use cosmwasm_std::{
-    Api, Binary, Empty, Env, Extern, HandleResponse, InitResponse, Querier, StdResult, Storage,
+    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, InitResponse, Querier,
+    StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, voters, Config};
+use crate::state::{config, config_read, next_id, proposal, voters, voters_read, Config, Proposal};
+use cw0::Expiration;
+use cw3::{Status, ThresholdResponse};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -39,8 +42,58 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse<Empty>> {
     match msg {
-        // TODO
+        HandleMsg::Propose {
+            title,
+            description,
+            msgs,
+            earliest,
+            latest,
+        } => handle_propose(deps, env, title, description, msgs, earliest, latest),
+        _ => panic!("unimplemented"),
     }
+}
+
+pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    title: String,
+    description: String,
+    msgs: Vec<CosmosMsg>,
+    // we ignore earliest
+    _earliest: Option<Expiration>,
+    latest: Option<Expiration>,
+) -> StdResult<HandleResponse<Empty>> {
+    // only members of the multisig can create a proposal
+    let raw_sender = deps.api.canonical_address(&env.message.sender)?;
+    let _voter = voters_read(&deps.storage)
+        .may_load(raw_sender.as_slice())?
+        .ok_or_else(StdError::unauthorized)?;
+
+    // TODO: using max as default here, also enforce max
+    let expires = match latest {
+        Some(ex) => ex,
+        None => config_read(&deps.storage).load()?.max_voting_period,
+    };
+
+    // create a proposal
+    let prop = Proposal {
+        title,
+        description,
+        expires,
+        msgs,
+        status: Status::Open,
+    };
+
+    // get next id
+    let id = next_id(&mut deps.storage)?;
+
+    // save the proposal
+    proposal(&mut deps.storage).save(&id.to_be_bytes(), &prop)?;
+
+    // TODO: add the first vote from voter
+
+    // TODO: add some event attributes
+    Ok(HandleResponse::default())
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -48,8 +101,19 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        // TODO
+        QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
+        _ => panic!("unimplemented"),
     }
+}
+
+fn query_threshold<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<ThresholdResponse> {
+    let cfg = config_read(&deps.storage).load()?;
+    Ok(ThresholdResponse::AbsoluteCount {
+        weight_needed: cfg.required_weight,
+        total_weight: cfg.total_weight,
+    })
 }
 
 #[cfg(test)]

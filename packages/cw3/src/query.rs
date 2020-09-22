@@ -84,6 +84,20 @@ where
     description: String,
     msgs: Vec<CosmosMsg<T>>,
     expires: Expiration,
+    status: Status,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    /// proposal was created, but voting has not yet begun for whatever reason
+    Pending,
+    /// you can vote on this
+    Open,
+    /// voting is over and it did not pass
+    Failed,
+    /// voting is over it passed, and the proposal was executed
+    Executed,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
