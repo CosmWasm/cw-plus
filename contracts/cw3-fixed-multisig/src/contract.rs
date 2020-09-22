@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage,
+    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
@@ -189,7 +189,10 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     // anyone can trigger this if the vote passed
 
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
-    if [Status::Executed, Status::Failed].iter().any(|x| *x == prop.status) {
+    if [Status::Executed, Status::Failed]
+        .iter()
+        .any(|x| *x == prop.status)
+    {
         return Err(StdError::generic_err("Cannot closed completed proposals"));
     }
     if !prop.expires.is_expired(&env.block) {
