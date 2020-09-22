@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Querier, StdError, StdResult, Storage,
+    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
@@ -53,7 +53,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             latest,
         } => handle_propose(deps, env, title, description, msgs, earliest, latest),
         HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, proposal_id, vote),
-        _ => panic!("unimplemented"),
+        HandleMsg::Execute { proposal_id } => handle_execute(deps, env, proposal_id),
+        HandleMsg::Close { proposal_id } => handle_close(deps, env, proposal_id),
     }
 }
 
@@ -137,6 +138,73 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
         prop.yes_weight += weight;
         proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
     }
+
+    // TODO: add event attributes
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    proposal_id: u64,
+) -> StdResult<HandleResponse<Empty>> {
+    // anyone can trigger this if the vote passed
+
+    let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
+    if prop.status != Status::Open {
+        return Err(StdError::generic_err("Proposal is not open for voting"));
+    }
+    // we enforce this for now, but maybe it doesn't make sense... since no one can *vote*
+    // after expiration, if it is expired but there were enough yes votes, it means it passed
+    // in the period. Do we enforce execution then as well?
+    if prop.expires.is_expired(&env.block) {
+        return Err(StdError::generic_err("Proposal voting period has expired"));
+    }
+    // ensure it passed
+    if prop.yes_weight < prop.required_weight {
+        return Err(StdError::generic_err(format!(
+            "Insufficient yes votes: {} of needed {}",
+            prop.yes_weight, prop.required_weight
+        )));
+    }
+
+    // set it to executed
+    prop.status = Status::Executed;
+    proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
+
+    // dispatch all proposed messages
+    // TODO: add event attributes
+    Ok(HandleResponse {
+        messages: prop.msgs,
+        log: vec![],
+        data: None,
+    })
+}
+
+pub fn handle_close<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    proposal_id: u64,
+) -> StdResult<HandleResponse<Empty>> {
+    // anyone can trigger this if the vote passed
+
+    let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
+    if [Status::Executed, Status::Failed].iter().any(|x| *x == prop.status) {
+        return Err(StdError::generic_err("Cannot closed completed proposals"));
+    }
+    if !prop.expires.is_expired(&env.block) {
+        return Err(StdError::generic_err(
+            "Proposal must expire before you can close it",
+        ));
+    }
+    // ensure it did not pass (think about the above... passed and expired should be EITHER closeable or executable)
+    if prop.yes_weight >= prop.required_weight {
+        return Err(StdError::generic_err("Already passed, try to execute it"));
+    }
+
+    // set it to failed
+    prop.status = Status::Failed;
+    proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
 
     // TODO: add event attributes
     Ok(HandleResponse::default())
