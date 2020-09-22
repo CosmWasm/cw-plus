@@ -5,9 +5,11 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, next_id, proposal, voters, voters_read, Config, Proposal};
+use crate::state::{
+    config, config_read, next_id, proposal, proposal_read, voters, voters_read, Config, Proposal,
+};
 use cw0::Expiration;
-use cw3::{Status, ThresholdResponse};
+use cw3::{ProposalResponse, Status, ThresholdResponse};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -102,6 +104,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
+        QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, proposal_id)?),
         _ => panic!("unimplemented"),
     }
 }
@@ -113,6 +116,21 @@ fn query_threshold<S: Storage, A: Api, Q: Querier>(
     Ok(ThresholdResponse::AbsoluteCount {
         weight_needed: cfg.required_weight,
         total_weight: cfg.total_weight,
+    })
+}
+
+fn query_proposal<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    id: u64,
+) -> StdResult<ProposalResponse> {
+    let prop = proposal_read(&deps.storage).load(&id.to_be_bytes())?;
+    Ok(ProposalResponse {
+        id,
+        title: prop.title,
+        description: prop.description,
+        msgs: prop.msgs,
+        expires: prop.expires,
+        status: prop.status,
     })
 }
 

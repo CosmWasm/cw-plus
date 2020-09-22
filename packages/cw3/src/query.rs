@@ -79,12 +79,12 @@ pub struct ProposalResponse<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    id: u64,
-    title: String,
-    description: String,
-    msgs: Vec<CosmosMsg<T>>,
-    expires: Expiration,
-    status: Status,
+    pub id: u64,
+    pub title: String,
+    pub description: String,
+    pub msgs: Vec<CosmosMsg<T>>,
+    pub expires: Expiration,
+    pub status: Status,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -102,22 +102,22 @@ pub enum Status {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ProposalListResponse {
-    proposals: Vec<ProposalResponse>,
+    pub proposals: Vec<ProposalResponse>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteListResponse {
-    proposal: Vec<VoteInfo>,
+    pub proposal: Vec<VoteInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteInfo {
-    voter: HumanAddr,
-    vote: Vote,
-    weight: u64,
+    pub voter: HumanAddr,
+    pub vote: Vote,
+    pub weight: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteResponse {
-    vote: Option<Vote>,
+    pub vote: Option<Vote>,
 }
