@@ -1,16 +1,16 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, InitResponse, Querier,
-    StdError, StdResult, Storage,
+    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
-    ballots, config, config_read, next_id, proposal, proposal_read, voter_weight,
+    ballots, ballots_read, config, config_read, next_id, proposal, proposal_read, voter_weight,
     voter_weight_read, Ballot, Config, Proposal,
 };
 use cw0::Expiration;
-use cw3::{ProposalResponse, Status, ThresholdResponse, Vote};
+use cw3::{ProposalResponse, Status, ThresholdResponse, Vote, VoteResponse};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -52,6 +52,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             earliest,
             latest,
         } => handle_propose(deps, env, title, description, msgs, earliest, latest),
+        HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, proposal_id, vote),
         _ => panic!("unimplemented"),
     }
 }
@@ -104,6 +105,43 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     Ok(HandleResponse::default())
 }
 
+pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    proposal_id: u64,
+    vote: Vote,
+) -> StdResult<HandleResponse<Empty>> {
+    // only members of the multisig can vote
+    let raw_sender = deps.api.canonical_address(&env.message.sender)?;
+    let weight = voter_weight_read(&deps.storage)
+        .may_load(raw_sender.as_slice())?
+        .ok_or_else(StdError::unauthorized)?;
+
+    // ensure proposal exists and can be voted on
+    let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
+    if prop.status != Status::Open {
+        return Err(StdError::generic_err("Proposal is not open for voting"));
+    }
+    if prop.expires.is_expired(&env.block) {
+        return Err(StdError::generic_err("Proposal voting period has expired"));
+    }
+
+    // cast vote if no vote previously cast
+    ballots(&mut deps.storage, proposal_id).update(raw_sender.as_slice(), |bal| match bal {
+        Some(_) => Err(StdError::generic_err("Already voted on this proposal")),
+        None => Ok(Ballot { weight, vote }),
+    })?;
+
+    // if yes vote, update tally
+    if vote == Vote::Yes {
+        prop.yes_weight += weight;
+        proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
+    }
+
+    // TODO: add event attributes
+    Ok(HandleResponse::default())
+}
+
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     msg: QueryMsg,
@@ -111,6 +149,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
         QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, proposal_id)?),
+        QueryMsg::Vote { proposal_id, voter } => to_binary(&query_vote(deps, proposal_id, voter)?),
         _ => panic!("unimplemented"),
     }
 }
@@ -138,6 +177,17 @@ fn query_proposal<S: Storage, A: Api, Q: Querier>(
         expires: prop.expires,
         status: prop.status,
     })
+}
+
+fn query_vote<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    proposal_id: u64,
+    voter: HumanAddr,
+) -> StdResult<VoteResponse> {
+    let voter_raw = deps.api.canonical_address(&voter)?;
+    let prop = ballots_read(&deps.storage, proposal_id).may_load(voter_raw.as_slice())?;
+    let vote = prop.map(|b| b.vote);
+    Ok(VoteResponse { vote })
 }
 
 #[cfg(test)]

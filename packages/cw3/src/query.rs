@@ -87,7 +87,7 @@ where
     pub status: Status,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     /// proposal was created, but voting has not yet begun for whatever reason
