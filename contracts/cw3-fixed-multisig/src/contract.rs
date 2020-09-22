@@ -6,10 +6,11 @@ use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
-    config, config_read, next_id, proposal, proposal_read, voters, voters_read, Config, Proposal,
+    ballots, config, config_read, next_id, proposal, proposal_read, voter_weight,
+    voter_weight_read, Ballot, Config, Proposal,
 };
 use cw0::Expiration;
-use cw3::{ProposalResponse, Status, ThresholdResponse};
+use cw3::{ProposalResponse, Status, ThresholdResponse, Vote};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -30,10 +31,10 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     config(&mut deps.storage).save(&cfg)?;
 
     // add all voters
-    let mut voters = voters(&mut deps.storage);
+    let mut voters = voter_weight(&mut deps.storage);
     for voter in msg.voters.iter() {
-        let v = voter.canonical(&deps.api)?;
-        voters.save(v.addr.as_slice(), &v)?;
+        let key = deps.api.canonical_address(&voter.addr)?;
+        voters.save(key.as_slice(), &voter.weight)?;
     }
     Ok(InitResponse::default())
 }
@@ -67,15 +68,13 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse<Empty>> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&env.message.sender)?;
-    let _voter = voters_read(&deps.storage)
+    let weight = voter_weight_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
         .ok_or_else(StdError::unauthorized)?;
 
     // TODO: using max as default here, also enforce max
-    let expires = match latest {
-        Some(ex) => ex,
-        None => config_read(&deps.storage).load()?.max_voting_period,
-    };
+    let cfg = config_read(&deps.storage).load()?;
+    let expires = latest.unwrap_or(cfg.max_voting_period);
 
     // create a proposal
     let prop = Proposal {
@@ -84,6 +83,8 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         expires,
         msgs,
         status: Status::Open,
+        yes_weight: weight,
+        required_weight: cfg.required_weight,
     };
 
     // get next id
@@ -92,7 +93,12 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     // save the proposal
     proposal(&mut deps.storage).save(&id.to_be_bytes(), &prop)?;
 
-    // TODO: add the first vote from voter
+    // add the first yes vote from voter
+    let ballot = Ballot {
+        weight,
+        vote: Vote::Yes,
+    };
+    ballots(&mut deps.storage, id).save(raw_sender.as_slice(), &ballot)?;
 
     // TODO: add some event attributes
     Ok(HandleResponse::default())

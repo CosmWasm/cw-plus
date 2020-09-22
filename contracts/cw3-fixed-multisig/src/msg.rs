@@ -1,8 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::VoterState;
-use cosmwasm_std::{Api, CosmosMsg, Empty, HumanAddr, StdResult};
+use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
 use cw0::Expiration;
 use cw3::Vote;
 
@@ -17,15 +16,6 @@ pub struct InitMsg {
 pub struct Voter {
     pub addr: HumanAddr,
     pub weight: u64,
-}
-
-impl Voter {
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<VoterState> {
-        Ok(VoterState {
-            addr: api.canonical_address(&self.addr)?,
-            weight: self.weight,
-        })
-    }
 }
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
