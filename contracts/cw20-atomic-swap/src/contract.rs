@@ -4,7 +4,6 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
-use cw0::NativeBalance;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
@@ -37,7 +36,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     match msg {
         HandleMsg::Create(msg) => {
             let sent_funds = env.message.sent_funds.clone();
-            try_create(deps, env, msg, Balance::Native(NativeBalance(sent_funds)))
+            try_create(deps, env, msg, Balance::from(sent_funds))
         }
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
@@ -198,11 +197,11 @@ fn send_tokens<A: Api>(
         Ok(vec![])
     } else {
         match amount {
-            Balance::Native(NativeBalance(coins)) => {
+            Balance::Native(coins) => {
                 let msg = BankMsg::Send {
                     from_address: from.into(),
                     to_address: to.into(),
-                    amount: coins,
+                    amount: coins.into_vec(),
                 };
                 Ok(vec![msg.into()])
             }
@@ -240,7 +239,7 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 
     // Convert balance to human balance
     let balance_human = match swap.balance {
-        Balance::Native(coins) => BalanceHuman::Native(coins.0),
+        Balance::Native(coins) => BalanceHuman::Native(coins.into_vec()),
         Balance::Cw20(coin) => BalanceHuman::Cw20(Cw20CoinHuman {
             address: deps.api.human_address(&coin.address)?,
             amount: coin.amount,

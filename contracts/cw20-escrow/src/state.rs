@@ -7,6 +7,48 @@ use cosmwasm_std::{
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
 use cw20::Cw20Coin;
+use cw20_atomic_swap::balance::Balance;
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct GenericBalance {
+    pub native: Vec<Coin>,
+    pub cw20: Vec<Cw20Coin>,
+}
+
+impl GenericBalance {
+    pub fn add_tokens(&mut self, add: Balance) {
+        match add {
+            Balance::Native(balance) => {
+                for token in balance.0 {
+                    let index = self.native.iter().enumerate().find_map(|(i, exist)| {
+                        if exist.denom == token.denom {
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    });
+                    match index {
+                        Some(idx) => self.native[idx].amount += token.amount,
+                        None => self.native.push(token),
+                    }
+                }
+            }
+            Balance::Cw20(token) => {
+                let index = self.cw20.iter().enumerate().find_map(|(i, exist)| {
+                    if exist.address == token.address {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                });
+                match index {
+                    Some(idx) => self.cw20[idx].amount += token.amount,
+                    None => self.cw20.push(token),
+                }
+            }
+        };
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Escrow {
@@ -23,10 +65,8 @@ pub struct Escrow {
     /// block time exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_time: Option<u64>,
-    /// Balance in native tokens
-    pub native_balance: Vec<Coin>,
-    /// Balance in cw20 tokens
-    pub cw20_balance: Vec<Cw20Coin>,
+    /// Balance in Native and Cw20 tokens
+    pub balance: GenericBalance,
     /// All possible contracts that we accept tokens from
     pub cw20_whitelist: Vec<CanonicalAddr>,
 }
