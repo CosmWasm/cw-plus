@@ -12,7 +12,7 @@ use crate::state::{
 use cw0::Expiration;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
-    VoteListResponse, VoteResponse,
+    VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
 };
 use std::cmp::Ordering;
 
@@ -231,6 +231,10 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             start_after,
             limit,
         } => to_binary(&list_votes(deps, proposal_id, start_after, limit)?),
+        QueryMsg::Voter { address } => to_binary(&query_voter(deps, address)?),
+        QueryMsg::ListVoters { start_after, limit } => {
+            to_binary(&list_voters(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -344,6 +348,44 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
         .collect();
 
     Ok(VoteListResponse { votes: votes? })
+}
+
+fn query_voter<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    voter: HumanAddr,
+) -> StdResult<VoterResponse> {
+    let voter_raw = deps.api.canonical_address(&voter)?;
+    let weight = voters_read(&deps.storage)
+        .may_load(voter_raw.as_slice())?
+        .unwrap_or_default();
+    Ok(VoterResponse {
+        addr: voter,
+        weight,
+    })
+}
+
+fn list_voters<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_after: Option<HumanAddr>,
+    limit: Option<u32>,
+) -> StdResult<VoterListResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = calc_range_start(start_after);
+    let api = &deps.api;
+
+    let voters: StdResult<Vec<_>> = voters_read(&deps.storage)
+        .range(start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            let (key, weight) = item?;
+            Ok(VoterResponse {
+                addr: api.human_address(&CanonicalAddr::from(key))?,
+                weight,
+            })
+        })
+        .collect();
+
+    Ok(VoterListResponse { voters: voters? })
 }
 
 // this will set the first key after the provided key, by appending a 1 byte
