@@ -172,7 +172,7 @@ where
         return Err(StdError::generic_err("Cannot set allowance to own account"));
     }
 
-    allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
+    allowances(&mut deps.storage).update::<_, StdError>(spender_raw.as_slice(), |allow| {
         let mut allowance = allow.unwrap_or_default();
         if let Some(exp) = expires {
             allowance.expires = exp;
@@ -216,16 +216,17 @@ where
         return Err(StdError::generic_err("Cannot set allowance to own account"));
     }
 
-    let allowance = allowances(&mut deps.storage).update(spender_raw.as_slice(), |allow| {
-        // Fail fast
-        let mut allowance =
-            allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
-        if let Some(exp) = expires {
-            allowance.expires = exp;
-        }
-        allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
-        Ok(allowance)
-    })?;
+    let allowance =
+        allowances(&mut deps.storage).update::<_, StdError>(spender_raw.as_slice(), |allow| {
+            // Fail fast
+            let mut allowance =
+                allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
+            if let Some(exp) = expires {
+                allowance.expires = exp;
+            }
+            allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
+            Ok(allowance)
+        })?;
     if allowance.balance.is_empty() {
         allowances(&mut deps.storage).remove(spender_raw.as_slice());
     }

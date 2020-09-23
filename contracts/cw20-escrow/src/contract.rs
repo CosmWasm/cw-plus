@@ -130,7 +130,7 @@ pub fn try_approve<S: Storage, A: Api, Q: Querier>(
         Err(StdError::generic_err("escrow expired"))
     } else {
         // we delete the escrow (TODO: expose this in Bucket for simpler API)
-        prefixed(PREFIX_ESCROW, &mut deps.storage).remove(id.as_bytes());
+        prefixed(&mut deps.storage, PREFIX_ESCROW).remove(id.as_bytes());
 
         let rcpt = deps.api.human_address(&escrow.recipient)?;
 
@@ -161,7 +161,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
         Err(StdError::unauthorized())
     } else {
         // we delete the escrow (TODO: expose this in Bucket for simpler API)
-        prefixed(PREFIX_ESCROW, &mut deps.storage).remove(id.as_bytes());
+        prefixed(&mut deps.storage, PREFIX_ESCROW).remove(id.as_bytes());
 
         let rcpt = deps.api.human_address(&escrow.source)?;
 

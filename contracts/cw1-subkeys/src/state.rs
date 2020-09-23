@@ -33,13 +33,13 @@ const PREFIX_PERMISSIONS: &[u8] = b"permissions";
 
 /// returns a bucket with all permissions (query by subkey)
 pub fn permissions<S: Storage>(storage: &mut S) -> Bucket<S, Permissions> {
-    bucket(PREFIX_PERMISSIONS, storage)
+    bucket(storage, PREFIX_PERMISSIONS)
 }
 
 /// returns a bucket with all permissionsk (query by subkey)
 /// (read-only version for queries)
 pub fn permissions_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Permissions> {
-    bucket_read(PREFIX_PERMISSIONS, storage)
+    bucket_read(storage, PREFIX_PERMISSIONS)
 }
 
 pub enum PermissionErr {
@@ -77,11 +77,11 @@ const PREFIX_ALLOWANCE: &[u8] = b"allowance";
 
 /// returns a bucket with all allowances (query by subkey)
 pub fn allowances<S: Storage>(storage: &mut S) -> Bucket<S, Allowance> {
-    bucket(PREFIX_ALLOWANCE, storage)
+    bucket(storage, PREFIX_ALLOWANCE)
 }
 
 /// returns a bucket with all allowances (query by subkey)
 /// (read-only version for queries)
 pub fn allowances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Allowance> {
-    bucket_read(PREFIX_ALLOWANCE, storage)
+    bucket_read(storage, PREFIX_ALLOWANCE)
 }

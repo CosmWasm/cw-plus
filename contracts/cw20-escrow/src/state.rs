@@ -99,16 +99,16 @@ impl Escrow {
 pub const PREFIX_ESCROW: &[u8] = b"escrow";
 
 pub fn escrows<S: Storage>(storage: &mut S) -> Bucket<S, Escrow> {
-    bucket(PREFIX_ESCROW, storage)
+    bucket(storage, PREFIX_ESCROW)
 }
 
 pub fn escrows_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Escrow> {
-    bucket_read(PREFIX_ESCROW, storage)
+    bucket_read(storage, PREFIX_ESCROW)
 }
 
 /// This returns the list of ids for all registered escrows
 pub fn all_escrow_ids<S: ReadonlyStorage>(storage: &S) -> StdResult<Vec<String>> {
-    prefixed_read(PREFIX_ESCROW, storage)
+    prefixed_read(storage, PREFIX_ESCROW)
         .range(None, None, Order::Ascending)
         .map(|(k, _)| {
             String::from_utf8(k).map_err(|_| StdError::invalid_utf8("parsing escrow key"))
