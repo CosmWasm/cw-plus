@@ -16,7 +16,11 @@ fn main() {
 
     export_schema_with_title(&mut schema_for!(Cw3HandleMsg), &out_dir, "HandleMsg");
     export_schema_with_title(&mut schema_for!(Cw3QueryMsg), &out_dir, "QueryMsg");
-    export_schema(&schema_for!(ProposalResponse), &out_dir);
+    export_schema_with_title(
+        &mut schema_for!(ProposalResponse),
+        &out_dir,
+        "ProposalResponse",
+    );
     export_schema(&schema_for!(ProposalListResponse), &out_dir);
     export_schema(&schema_for!(VoteResponse), &out_dir);
     export_schema(&schema_for!(VoteListResponse), &out_dir);

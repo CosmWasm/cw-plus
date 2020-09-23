@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ProposalResponse_for_Empty",
+  "title": "ProposalResponse",
   "description": "Note, if you are storing custom messages in the proposal, the querier needs to know what possible custom message types those are in order to parse the response",
   "type": "object",
   "required": [
@@ -301,7 +301,8 @@
       "enum": [
         "pending",
         "open",
-        "failed",
+        "rejected",
+        "passed",
         "executed"
       ]
     },

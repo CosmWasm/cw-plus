@@ -315,7 +315,8 @@
       "enum": [
         "pending",
         "open",
-        "failed",
+        "rejected",
+        "passed",
         "executed"
       ]
     },

@@ -95,7 +95,9 @@ pub enum Status {
     /// you can vote on this
     Open,
     /// voting is over and it did not pass
-    Failed,
+    Rejected,
+    /// voting is over and it did pass, but has not yet executed
+    Passed,
     /// voting is over it passed, and the proposal was executed
     Executed,
 }

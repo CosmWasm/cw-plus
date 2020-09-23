@@ -192,7 +192,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     // anyone can trigger this if the vote passed
 
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
-    if [Status::Executed, Status::Failed]
+    if [Status::Executed, Status::Rejected]
         .iter()
         .any(|x| *x == prop.status)
     {
@@ -209,7 +209,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     }
 
     // set it to failed
-    prop.status = Status::Failed;
+    prop.status = Status::Rejected;
     proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
 
     // TODO: add event attributes
@@ -243,13 +243,14 @@ fn query_proposal<S: Storage, A: Api, Q: Querier>(
     id: u64,
 ) -> StdResult<ProposalResponse> {
     let prop = proposal_read(&deps.storage).load(&id.to_be_bytes())?;
+    let status = prop.current_status();
     Ok(ProposalResponse {
         id,
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
         expires: prop.expires,
-        status: prop.status,
+        status,
     })
 }
 

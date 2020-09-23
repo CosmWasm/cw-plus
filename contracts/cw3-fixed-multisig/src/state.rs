@@ -31,6 +31,22 @@ pub struct Proposal {
     pub required_weight: u64,
 }
 
+impl Proposal {
+    /// TODO: we should get the current BlockInfo and then we can determine this a bit better
+    pub fn current_status(&self) -> Status {
+        let mut status = self.status;
+
+        // if open, check if voting is passed on timed out
+        if status == Status::Open {
+            if self.yes_weight >= self.required_weight {
+                status = Status::Passed
+            }
+        }
+
+        status
+    }
+}
+
 // we cast a ballot with our chosen vote and a given weight
 // stored under the key that voted
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
