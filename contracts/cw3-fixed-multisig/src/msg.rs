@@ -2,14 +2,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
-use cw0::Expiration;
+use cw0::{Duration, Expiration};
 use cw3::Vote;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
     pub voters: Vec<Voter>,
     pub required_weight: u64,
-    pub max_voting_period: Expiration,
+    pub max_voting_period: Duration,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -26,7 +26,7 @@ pub enum HandleMsg {
         title: String,
         description: String,
         msgs: Vec<CosmosMsg<Empty>>,
-        earliest: Option<Expiration>,
+        // note: we ignore API-spec'd earliest if passed, always opens immediately
         latest: Option<Expiration>,
     },
     Vote {

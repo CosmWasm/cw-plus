@@ -7,15 +7,14 @@ use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
 };
-use cw0::Expiration;
+use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
     pub required_weight: u64,
     pub total_weight: u64,
-    // TODO: use duration not expiration!
-    pub max_voting_period: Expiration,
+    pub max_voting_period: Duration,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

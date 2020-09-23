@@ -14,6 +14,7 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse,
 };
+use std::cmp::Ordering;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -52,9 +53,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             title,
             description,
             msgs,
-            earliest,
             latest,
-        } => handle_propose(deps, env, title, description, msgs, earliest, latest),
+        } => handle_propose(deps, env, title, description, msgs, latest),
         HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, proposal_id, vote),
         HandleMsg::Execute { proposal_id } => handle_execute(deps, env, proposal_id),
         HandleMsg::Close { proposal_id } => handle_close(deps, env, proposal_id),
@@ -68,7 +68,6 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     description: String,
     msgs: Vec<CosmosMsg>,
     // we ignore earliest
-    _earliest: Option<Expiration>,
     latest: Option<Expiration>,
 ) -> StdResult<HandleResponse<Empty>> {
     // only members of the multisig can create a proposal
@@ -77,9 +76,13 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         .may_load(raw_sender.as_slice())?
         .ok_or_else(StdError::unauthorized)?;
 
-    // TODO: using max as default here, also enforce max
     let cfg = config_read(&deps.storage).load()?;
-    let expires = latest.unwrap_or(cfg.max_voting_period);
+    // max expires also used as default
+    let max_expires = cfg.max_voting_period.after(&env.block);
+    let mut expires = latest.unwrap_or(max_expires);
+    if expires.partial_cmp(&max_expires) != Some(Ordering::Less) {
+        expires = max_expires;
+    }
 
     // create a proposal
     let prop = Proposal {
@@ -91,11 +94,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         yes_weight: vote_power,
         required_weight: cfg.required_weight,
     };
-
-    // get next id
     let id = next_id(&mut deps.storage)?;
-
-    // save the proposal
     proposal(&mut deps.storage).save(&id.to_be_bytes(), &prop)?;
 
     // add the first yes vote from voter
