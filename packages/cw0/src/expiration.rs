@@ -110,5 +110,28 @@ impl Duration {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     // TODO: add tests for the logic
+    #[test]
+    fn compare_expiration() {
+        // matching pairs
+        assert_eq!(true, Expiration::AtHeight(5) < Expiration::AtHeight(10));
+        assert_eq!(false, Expiration::AtHeight(8) < Expiration::AtHeight(7));
+        assert_eq!(true, Expiration::AtTime(555) < Expiration::AtTime(777));
+        assert_eq!(false, Expiration::AtTime(86) > Expiration::AtTime(100));
+
+        // never as infinity
+        assert!(Expiration::AtHeight(500000) < Expiration::Never {});
+        assert!(Expiration::Never {} > Expiration::AtTime(500000));
+
+        // what happens for the uncomparables?? all compares are false
+        assert_eq!(
+            None,
+            Expiration::AtTime(1000).partial_cmp(&Expiration::AtHeight(230))
+        );
+        assert_eq!(false, Expiration::AtTime(1000) < Expiration::AtHeight(230));
+        assert_eq!(false, Expiration::AtTime(1000) > Expiration::AtHeight(230));
+        assert_eq!(false, Expiration::AtTime(1000) == Expiration::AtHeight(230));
+    }
 }
