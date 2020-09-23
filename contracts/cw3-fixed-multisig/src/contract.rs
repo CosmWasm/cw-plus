@@ -141,6 +141,10 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     // if yes vote, update tally
     if vote == Vote::Yes {
         prop.yes_weight += vote_power;
+        // update status when the passing vote comes in
+        if prop.yes_weight >= prop.required_weight {
+            prop.status = Status::Passed;
+        }
         proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
     }
 
@@ -150,27 +154,18 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
     proposal_id: u64,
 ) -> StdResult<HandleResponse<Empty>> {
     // anyone can trigger this if the vote passed
 
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
-    if prop.status != Status::Open {
-        return Err(StdError::generic_err("Proposal is not open for voting"));
-    }
-    // we enforce this for now, but maybe it doesn't make sense... since no one can *vote*
-    // after expiration, if it is expired but there were enough yes votes, it means it passed
-    // in the period. Do we enforce execution then as well?
-    if prop.expires.is_expired(&env.block) {
-        return Err(StdError::generic_err("Proposal voting period has expired"));
-    }
-    // ensure it passed
-    if prop.yes_weight < prop.required_weight {
-        return Err(StdError::generic_err(format!(
-            "Insufficient yes votes: {} of needed {}",
-            prop.yes_weight, prop.required_weight
-        )));
+    // we allow execution even after the proposal "expiration" as long as all vote come in before
+    // that point. If it was approved on time, it can be executed any time.
+    if prop.status != Status::Passed {
+        return Err(StdError::generic_err(
+            "Proposal must have passed and not yet been executed",
+        ));
     }
 
     // set it to executed
@@ -194,20 +189,18 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     // anyone can trigger this if the vote passed
 
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
-    if [Status::Executed, Status::Rejected]
+    if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
         .any(|x| *x == prop.status)
     {
-        return Err(StdError::generic_err("Cannot close completed proposals"));
+        return Err(StdError::generic_err(
+            "Cannot close completed or passed proposals",
+        ));
     }
     if !prop.expires.is_expired(&env.block) {
         return Err(StdError::generic_err(
             "Proposal must expire before you can close it",
         ));
-    }
-    // ensure it did not pass (think about the above... passed and expired should be EITHER closeable or executable)
-    if prop.yes_weight >= prop.required_weight {
-        return Err(StdError::generic_err("Already passed, try to execute it"));
     }
 
     // set it to failed
