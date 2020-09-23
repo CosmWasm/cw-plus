@@ -6,8 +6,8 @@ use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
-    ballots, ballots_read, config, config_read, next_id, proposal, proposal_read, voter_weight,
-    voter_weight_read, Ballot, Config, Proposal,
+    ballots, ballots_read, config, config_read, next_id, proposal, proposal_read, voters,
+    voters_read, Ballot, Config, Proposal,
 };
 use cw0::Expiration;
 use cw3::{ProposalResponse, Status, ThresholdResponse, Vote, VoteResponse};
@@ -31,10 +31,10 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     config(&mut deps.storage).save(&cfg)?;
 
     // add all voters
-    let mut voters = voter_weight(&mut deps.storage);
+    let mut bucket = voters(&mut deps.storage);
     for voter in msg.voters.iter() {
         let key = deps.api.canonical_address(&voter.addr)?;
-        voters.save(key.as_slice(), &voter.weight)?;
+        bucket.save(key.as_slice(), &voter.weight)?;
     }
     Ok(InitResponse::default())
 }
@@ -70,7 +70,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse<Empty>> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&env.message.sender)?;
-    let weight = voter_weight_read(&deps.storage)
+    let vote_power = voters_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
         .ok_or_else(StdError::unauthorized)?;
 
@@ -85,7 +85,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         expires,
         msgs,
         status: Status::Open,
-        yes_weight: weight,
+        yes_weight: vote_power,
         required_weight: cfg.required_weight,
     };
 
@@ -97,7 +97,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
 
     // add the first yes vote from voter
     let ballot = Ballot {
-        weight,
+        weight: vote_power,
         vote: Vote::Yes,
     };
     ballots(&mut deps.storage, id).save(raw_sender.as_slice(), &ballot)?;
@@ -114,14 +114,14 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse<Empty>> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&env.message.sender)?;
-    let weight = voter_weight_read(&deps.storage)
+    let vote_power = voters_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
         .ok_or_else(StdError::unauthorized)?;
 
     // ensure proposal exists and can be voted on
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
     if prop.status != Status::Open {
-        return Err(StdError::generic_err("Proposal is not open for voting"));
+        return Err(StdError::generic_err("Proposal is not open"));
     }
     if prop.expires.is_expired(&env.block) {
         return Err(StdError::generic_err("Proposal voting period has expired"));
@@ -130,12 +130,15 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     // cast vote if no vote previously cast
     ballots(&mut deps.storage, proposal_id).update(raw_sender.as_slice(), |bal| match bal {
         Some(_) => Err(StdError::generic_err("Already voted on this proposal")),
-        None => Ok(Ballot { weight, vote }),
+        None => Ok(Ballot {
+            weight: vote_power,
+            vote,
+        }),
     })?;
 
     // if yes vote, update tally
     if vote == Vote::Yes {
-        prop.yes_weight += weight;
+        prop.yes_weight += vote_power;
         proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
     }
 
@@ -193,7 +196,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
         .iter()
         .any(|x| *x == prop.status)
     {
-        return Err(StdError::generic_err("Cannot closed completed proposals"));
+        return Err(StdError::generic_err("Cannot close completed proposals"));
     }
     if !prop.expires.is_expired(&env.block) {
         return Err(StdError::generic_err(

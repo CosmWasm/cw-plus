@@ -54,11 +54,11 @@ pub fn config_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Conf
     singleton_read(storage, CONFIG_KEY)
 }
 
-pub fn voter_weight<S: Storage>(storage: &mut S) -> Bucket<S, u64> {
+pub fn voters<S: Storage>(storage: &mut S) -> Bucket<S, u64> {
     bucket(PREFIX_VOTERS, storage)
 }
 
-pub fn voter_weight_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, u64> {
+pub fn voters_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, u64> {
     bucket_read(PREFIX_VOTERS, storage)
 }
 
