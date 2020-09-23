@@ -2,7 +2,7 @@ mod balance;
 mod expiration;
 
 pub use crate::balance::NativeBalance;
-pub use crate::expiration::Expiration;
+pub use crate::expiration::{Duration, Expiration};
 
 #[cfg(test)]
 mod tests {
