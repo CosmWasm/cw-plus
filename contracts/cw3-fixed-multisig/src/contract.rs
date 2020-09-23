@@ -1,16 +1,16 @@
 use cosmwasm_std::{
     to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Querier, StdError, StdResult, Storage,
+    Order, Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
-    ballots, ballots_read, config, config_read, next_id, proposal, proposal_read, voters,
+    ballots, ballots_read, config, config_read, next_id, parse_id, proposal, proposal_read, voters,
     voters_read, Ballot, Config, Proposal,
 };
 use cw0::Expiration;
-use cw3::{ProposalResponse, Status, ThresholdResponse, Vote, VoteResponse};
+use cw3::{ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteResponse};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -224,7 +224,18 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
         QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, proposal_id)?),
         QueryMsg::Vote { proposal_id, voter } => to_binary(&query_vote(deps, proposal_id, voter)?),
-        _ => panic!("unimplemented"),
+        QueryMsg::ListProposals { start_after, limit } => {
+            to_binary(&list_proposals(deps, start_after, limit)?)
+        }
+        QueryMsg::ReverseProposals {
+            start_before,
+            limit,
+        } => to_binary(&reverse_proposals(deps, start_before, limit)?),
+        QueryMsg::ListVotes { ..
+            // proposal_id,
+            // start_after,
+            // limit,
+        } => panic!("unimplemented"),
     }
 }
 
@@ -246,6 +257,55 @@ fn query_proposal<S: Storage, A: Api, Q: Querier>(
     let status = prop.current_status();
     Ok(ProposalResponse {
         id,
+        title: prop.title,
+        description: prop.description,
+        msgs: prop.msgs,
+        expires: prop.expires,
+        status,
+    })
+}
+
+// settings for pagination
+const MAX_LIMIT: u32 = 30;
+const DEFAULT_LIMIT: u32 = 10;
+
+fn list_proposals<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_after: Option<u64>,
+    limit: Option<u32>,
+) -> StdResult<ProposalListResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = start_after.map(|id| (id + 1).to_be_bytes().to_vec());
+    let props: StdResult<Vec<_>> = proposal_read(&deps.storage)
+        .range(start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(map_proposal)
+        .collect();
+
+    Ok(ProposalListResponse { proposals: props? })
+}
+
+fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_before: Option<u64>,
+    limit: Option<u32>,
+) -> StdResult<ProposalListResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let end = start_before.map(|id| id.to_be_bytes().to_vec());
+    let props: StdResult<Vec<_>> = proposal_read(&deps.storage)
+        .range(None, end.as_deref(), Order::Descending)
+        .take(limit)
+        .map(map_proposal)
+        .collect();
+
+    Ok(ProposalListResponse { proposals: props? })
+}
+
+fn map_proposal(item: StdResult<(Vec<u8>, Proposal)>) -> StdResult<ProposalResponse> {
+    let (key, prop) = item?;
+    let status = prop.current_status();
+    Ok(ProposalResponse {
+        id: parse_id(&key)?,
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
