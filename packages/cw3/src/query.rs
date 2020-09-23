@@ -32,6 +32,13 @@ pub enum Cw3QueryMsg {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
+    /// Voter extension: Returns VoterResponse
+    Voter { address: HumanAddr },
+    /// Voter extension: Returns VoterListResponse
+    ListVoters {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }
 
 /// This defines the different ways tallies can happen.
@@ -122,4 +129,15 @@ pub struct VoteInfo {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteResponse {
     pub vote: Option<Vote>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VoterResponse {
+    pub addr: HumanAddr,
+    pub weight: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VoterListResponse {
+    pub voters: Vec<VoterResponse>,
 }

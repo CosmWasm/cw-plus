@@ -127,4 +127,6 @@ lexographically ascending order.
 Information on who can vote is contract dependent. But
 we will work on a common API to display some of this.
 
-**TODO** 
+`Voter { address }` - returns voting power (weight) of this address, if any
+
+`ListVoters { start_after, limit }` - list all eligable voters

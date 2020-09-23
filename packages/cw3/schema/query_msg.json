@@ -161,6 +161,58 @@
           }
         }
       }
+    },
+    {
+      "description": "Voter extension: Returns VoterResponse",
+      "type": "object",
+      "required": [
+        "voter"
+      ],
+      "properties": {
+        "voter": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Voter extension: Returns VoterListResponse",
+      "type": "object",
+      "required": [
+        "list_voters"
+      ],
+      "properties": {
+        "list_voters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
