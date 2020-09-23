@@ -37,10 +37,8 @@ impl Proposal {
         let mut status = self.status;
 
         // if open, check if voting is passed on timed out
-        if status == Status::Open {
-            if self.yes_weight >= self.required_weight {
-                status = Status::Passed
-            }
+        if status == Status::Open && self.yes_weight >= self.required_weight {
+            status = Status::Passed
         }
 
         status

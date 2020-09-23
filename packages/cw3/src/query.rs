@@ -109,7 +109,7 @@ pub struct ProposalListResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteListResponse {
-    pub proposal: Vec<VoteInfo>,
+    pub votes: Vec<VoteInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

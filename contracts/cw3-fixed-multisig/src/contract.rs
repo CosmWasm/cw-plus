@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Order, Querier, StdError, StdResult, Storage,
+    to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
+    HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
@@ -10,7 +10,10 @@ use crate::state::{
     voters_read, Ballot, Config, Proposal,
 };
 use cw0::Expiration;
-use cw3::{ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteResponse};
+use cw3::{
+    ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
+    VoteListResponse, VoteResponse,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -231,11 +234,11 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             start_before,
             limit,
         } => to_binary(&reverse_proposals(deps, start_before, limit)?),
-        QueryMsg::ListVotes { ..
-            // proposal_id,
-            // start_after,
-            // limit,
-        } => panic!("unimplemented"),
+        QueryMsg::ListVotes {
+            proposal_id,
+            start_after,
+            limit,
+        } => to_binary(&list_votes(deps, proposal_id, start_after, limit)?),
     }
 }
 
@@ -323,6 +326,41 @@ fn query_vote<S: Storage, A: Api, Q: Querier>(
     let prop = ballots_read(&deps.storage, proposal_id).may_load(voter_raw.as_slice())?;
     let vote = prop.map(|b| b.vote);
     Ok(VoteResponse { vote })
+}
+
+fn list_votes<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    proposal_id: u64,
+    start_after: Option<HumanAddr>,
+    limit: Option<u32>,
+) -> StdResult<VoteListResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = calc_range_start(start_after);
+    let api = &deps.api;
+
+    let votes: StdResult<Vec<_>> = ballots_read(&deps.storage, proposal_id)
+        .range(start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            let (key, ballot) = item?;
+            Ok(VoteInfo {
+                voter: api.human_address(&CanonicalAddr::from(key))?,
+                vote: ballot.vote,
+                weight: ballot.weight,
+            })
+        })
+        .collect();
+
+    Ok(VoteListResponse { votes: votes? })
+}
+
+// this will set the first key after the provided key, by appending a 1 byte
+fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
+    start_after.map(|human| {
+        let mut v = Vec::from(human.0);
+        v.push(1);
+        v
+    })
 }
 
 #[cfg(test)]

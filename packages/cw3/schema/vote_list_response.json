@@ -3,10 +3,10 @@
   "title": "VoteListResponse",
   "type": "object",
   "required": [
-    "proposal"
+    "votes"
   ],
   "properties": {
-    "proposal": {
+    "votes": {
       "type": "array",
       "items": {
         "$ref": "#/definitions/VoteInfo"
