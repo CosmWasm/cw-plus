@@ -75,16 +75,33 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
         return Err(StdError::generic_err("Send some coins to create an escrow"));
     }
 
+    let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
+
+    let escrow_balance = match balance {
+        Balance::Native(balance) => GenericBalance {
+            native: balance.0,
+            cw20: vec![],
+        },
+        Balance::Cw20(token) => {
+            // make sure the token sent is on the whitelist by default
+            if !cw20_whitelist.iter().any(|t| t == &token.address) {
+                cw20_whitelist.push(token.address.clone())
+            }
+            GenericBalance {
+                native: vec![],
+                cw20: vec![token],
+            }
+        }
+    };
+
     let escrow = Escrow {
         arbiter: deps.api.canonical_address(&msg.arbiter)?,
         recipient: deps.api.canonical_address(&msg.recipient)?,
-        source: deps.api.canonical_address(&env.message.sender)?,
+        source: deps.api.canonical_address(&sender)?,
         end_height: msg.end_height,
         end_time: msg.end_time,
-        // there are native coins sent with the message
-        native_balance: env.message.sent_funds,
-        cw20_balance: vec![],
-        cw20_whitelist: msg.canonical_whitelist(&deps.api)?,
+        balance: escrow_balance,
+        cw20_whitelist,
     };
 
     // try to store it, fail if the id was already in use
@@ -100,14 +117,28 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
 
 pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
     id: String,
+    balance: Balance,
 ) -> StdResult<HandleResponse> {
+    if balance.is_empty() {
+        return Err(StdError::generic_err(
+            "Send some amount to increase an escrow",
+        ));
+    }
     // this fails is no escrow there
     let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
-    // combine these two
-    add_tokens(&mut escrow.native_balance, env.message.sent_funds);
+    if let Balance::Cw20(token) = &balance {
+        // ensure the token is on the whitelist
+        if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
+            return Err(StdError::generic_err(
+                "Only accepts tokens on the cw20_whitelist",
+            ));
+        }
+    };
+
+    escrow.balance.add_tokens(balance);
+
     // and save
     escrows(&mut deps.storage).save(id.as_bytes(), &escrow)?;
 
