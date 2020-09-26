@@ -5,6 +5,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
+    /// name of the NFT contract
+    pub name: String,
+    /// symbol of the NFT contract
+    pub symbol: String,
+
     /// The minter is the only one who can create new NFTs.
     /// This is designed for a base NFT that is controlled by an external program
     /// or contract. You will likely replace this with custom logic in custom NFTs
@@ -58,8 +63,8 @@ pub enum HandleMsg {
         owner: HumanAddr,
         /// Identifies the asset to which this NFT represents
         name: String,
-        /// Describes the asset to which this NFT represents
-        description: String,
+        /// Describes the asset to which this NFT represents (may be empty)
+        description: Option<String>,
         /// A URI pointing to an image representing the asset
         image: Option<String>,
     },
@@ -70,10 +75,14 @@ pub enum HandleMsg {
 pub enum QueryMsg {
     /// Return the owner of the given token, error if token does not exist
     /// Return type: OwnerOfResponse
-    OwnerOf { token_id: String },
+    OwnerOf {
+        token_id: String,
+    },
     /// List all operators that can access all of the owner's tokens
     /// Return type: `ApprovedForAllResponse`
-    ApprovedForAll { owner: HumanAddr },
+    ApprovedForAll {
+        owner: HumanAddr,
+    },
     /// Total number of tokens issued
     NumTokens {},
 
@@ -83,11 +92,15 @@ pub enum QueryMsg {
     /// With MetaData Extension.
     /// Returns metadata about one particular token, based on *ERC721 Metadata JSON Schema*
     /// but directly from the contract: `NftInfoResponse`
-    NftInfo { token_id: String },
+    NftInfo {
+        token_id: String,
+    },
     /// With MetaData Extension.
     /// Returns the result of both `NftInfo` and `OwnerOf` as one query as an optimization
     /// for clients: `AllNftInfo`
-    AllNftInfo { token_id: String },
+    AllNftInfo {
+        token_id: String,
+    },
 
     // Return the minter
     Minter {},
