@@ -1,12 +1,12 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage,
+    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens,
+    contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, operators,
     operators_read, tokens, tokens_read, Approval, TokenInfo,
 };
 use cw721::{
@@ -54,6 +54,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             expires,
         } => handle_approve(deps, env, spender, token_id, expires),
         HandleMsg::Revoke { spender, token_id } => handle_revoke(deps, env, spender, token_id),
+        HandleMsg::ApproveAll { operator, expires } => {
+            handle_approve_all(deps, env, operator, expires)
+        }
+        HandleMsg::RevokeAll { operator } => handle_revoke_all(deps, env, operator),
         _ => panic!("not implemented"),
     }
 }
@@ -145,6 +149,42 @@ pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
         .filter(|apr| apr.spender != spender_raw)
         .collect();
     tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+
+    // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    operator: HumanAddr,
+    expires: Option<Expiration>,
+) -> StdResult<HandleResponse> {
+    // reject expired data as invalid
+    let expires = expires.unwrap_or_default();
+    if expires.is_expired(&env.block) {
+        return Err(StdError::generic_err(
+            "Cannot set approval that is already expired",
+        ));
+    }
+
+    // set the operator for us
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let operator_raw = deps.api.canonical_address(&operator)?;
+    operators(&mut deps.storage, &sender_raw).save(operator_raw.as_slice(), &expires)?;
+
+    // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    operator: HumanAddr,
+) -> StdResult<HandleResponse> {
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let operator_raw = deps.api.canonical_address(&operator)?;
+    operators(&mut deps.storage, &sender_raw).remove(operator_raw.as_slice());
 
     // TODO: set logs
     Ok(HandleResponse::default())
