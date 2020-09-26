@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AllNftInfoResponse",
+  "type": "object",
+  "required": [
+    "access",
+    "info"
+  ],
+  "properties": {
+    "access": {
+      "description": "Who can transfer the token",
+      "allOf": [
+        {
+          "$ref": "#/definitions/OwnerOfResponse"
+        }
+      ]
+    },
+    "info": {
+      "description": "Data on the token itself,",
+      "allOf": [
+        {
+          "$ref": "#/definitions/NftInfoResponse"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "Approval": {
+      "type": "object",
+      "required": [
+        "expires",
+        "spender"
+      ],
+      "properties": {
+        "expires": {
+          "description": "When the Approval expires (maybe Expiration::never)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            }
+          ]
+        },
+        "spender": {
+          "description": "Account that can transfer/send the token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "Expiration": {
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "NftInfoResponse": {
+      "type": "object",
+      "required": [
+        "description",
+        "name"
+      ],
+      "properties": {
+        "description": {
+          "description": "Describes the asset to which this NFT represents",
+          "type": "string"
+        },
+        "image": {
+          "description": "\"A URI pointing to a resource with mime type image/* representing the asset to which this NFT represents. Consider making any images at a width between 320 and 1080 pixels and aspect ratio between 1.91:1 and 4:5 inclusive. TODO: Use https://docs.rs/url_serde for type-safety",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Identifies the asset to which this NFT represents",
+          "type": "string"
+        }
+      }
+    },
+    "OwnerOfResponse": {
+      "type": "object",
+      "required": [
+        "approvals",
+        "owner"
+      ],
+      "properties": {
+        "approvals": {
+          "description": "If set this address is approved to transfer/send the token as well",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Approval"
+          }
+        },
+        "owner": {
+          "description": "Owner of the token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
