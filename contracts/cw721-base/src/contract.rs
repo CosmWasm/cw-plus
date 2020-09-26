@@ -166,69 +166,106 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
+    use cosmwasm_std::StdError;
+
+    const MINTER: &str = "merlin";
+    const CONTRACT_NAME: &str = "Magic Power";
+    const SYMBOL: &str = "MGK";
+
+    fn setup_contract<S: Storage, A: Api, Q: Querier>(deps: &mut Extern<S, A, Q>) {
+        let msg = InitMsg {
+            name: CONTRACT_NAME.to_string(),
+            symbol: SYMBOL.to_string(),
+            minter: MINTER.into(),
+        };
+        let env = mock_env("creator", &[]);
+        let res = init(deps, env, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+    }
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(20, &[]);
 
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(1000, "earth"));
+        let msg = InitMsg {
+            name: CONTRACT_NAME.to_string(),
+            symbol: SYMBOL.to_string(),
+            minter: MINTER.into(),
+        };
+        let env = mock_env("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
         let res = init(&mut deps, env, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
+        let res = query_minter(&deps).unwrap();
+        assert_eq!(MINTER, res.minter.as_str());
+        let info = query_contract_info(&deps).unwrap();
+        assert_eq!(
+            info,
+            ContractInfoResponse {
+                name: CONTRACT_NAME.to_string(),
+                symbol: SYMBOL.to_string(),
+            }
+        )
+
+        // TODO: check 0 num tokens
     }
 
     #[test]
-    fn increment() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
+    fn minting() {
+        let mut deps = mock_dependencies(20, &[]);
+        setup_contract(&mut deps);
 
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
+        let token_id = "petrify".to_string();
+        let name = "Petrify with Gaze".to_string();
+        let description = "Allows the owner to petrify anyone looking at him or her".to_string();
 
-        // beneficiary can release it
-        let env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Increment {};
-        let _res = handle(&mut deps, env, msg).unwrap();
+        let mint_msg = HandleMsg::Mint {
+            token_id: token_id.clone(),
+            owner: "medusa".into(),
+            name: name.clone(),
+            description: Some(description.clone()),
+            image: None,
+        };
 
-        // should increase counter by 1
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies(20, &coins(2, "token"));
-
-        let msg = InitMsg { count: 17 };
-        let env = mock_env("creator", &coins(2, "token"));
-        let _res = init(&mut deps, env, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let res = handle(&mut deps, unauth_env, msg);
-        match res {
-            Err(StdError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
+        // random cannot mint
+        let random = mock_env("random", &[]);
+        let err = handle(&mut deps, random, mint_msg.clone()).unwrap_err();
+        match err {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
         }
 
-        // only the original creator can reset the counter
-        let auth_env = mock_env("creator", &coins(2, "token"));
-        let msg = HandleMsg::Reset { count: 5 };
-        let _res = handle(&mut deps, auth_env, msg).unwrap();
+        // minter can mint
+        let allowed = mock_env(MINTER, &[]);
+        let _ = handle(&mut deps, allowed, mint_msg.clone()).unwrap();
 
-        // should now be 5
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
+        // TODO: ensure num tokens increases
+
+        // unknown nft returns error
+        let _ = query_nft_info(&deps, "unknown".to_string()).unwrap_err();
+
+        // this nft info is correct
+        let info = query_nft_info(&deps, token_id.clone()).unwrap();
+        assert_eq!(
+            info,
+            NftInfoResponse {
+                name: name.clone(),
+                description: description.clone(),
+                image: None
+            }
+        );
+
+        // owner info is correct
+        let owner = query_owner_of(&deps, token_id.clone()).unwrap();
+        assert_eq!(
+            owner,
+            OwnerOfResponse {
+                owner: "medusa".into(),
+                approvals: vec![]
+            }
+        );
     }
 }
