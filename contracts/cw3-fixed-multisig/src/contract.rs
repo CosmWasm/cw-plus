@@ -106,9 +106,11 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         .ok_or_else(StdError::unauthorized)?;
 
     let cfg = config_read(&deps.storage).load()?;
+
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
     let mut expires = latest.unwrap_or(max_expires);
+    // FIXME: partial_cmp() fails when expires is height based, but max_expires is time-based (by example)
     if expires.partial_cmp(&max_expires) != Some(Ordering::Less) {
         expires = max_expires;
     }
@@ -463,6 +465,12 @@ mod tests {
 
     use super::*;
 
+    fn mock_env_height<U: Into<HumanAddr>>(sender: U, height: u64) -> Env {
+        let mut env = mock_env(sender, &[]);
+        env.block.height = height;
+        env
+    }
+
     const OWNER: &str = "admin0001";
     const VOTER1: &str = "voter0001";
     const VOTER2: &str = "voter0002";
@@ -816,5 +824,99 @@ mod tests {
                 data: None
             }
         );
+    }
+
+    #[test]
+    fn test_close_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let required_weight = 3;
+        let voting_period = Duration::Height(2000000);
+
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs: msgs.clone(),
+            latest: None,
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        let closing = HandleMsg::Close { proposal_id };
+
+        // Anybody can close
+        let env = mock_env(SOMEBODY, &[]);
+
+        // Non-expired proposals cannot be closed
+        let res = handle(&mut deps, env.clone(), closing.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Proposal must expire before you can close it");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Expired proposals can be closed
+        let env = mock_env(OWNER, &[]);
+
+        let proposal = HandleMsg::Propose {
+            title: "(Try to) pay somebody".to_string(),
+            description: "Pay somebody after time?".to_string(),
+            msgs: msgs.clone(),
+            latest: Some(Expiration::AtHeight(123456)),
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        let closing = HandleMsg::Close { proposal_id };
+
+        // Close expired works
+        let env = mock_env_height(SOMEBODY, 123457);
+        let res = handle(&mut deps, env.clone(), closing.clone()).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "close"),
+                    log("sender", SOMEBODY),
+                    log("proposal_id", proposal_id),
+                ],
+                data: None
+            }
+        );
+
+        // Close it again fails
+        let res = handle(&mut deps, env, closing);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Cannot close completed or passed proposals");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // TODO: Close Passed/Executed fails
     }
 }
