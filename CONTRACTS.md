@@ -18,7 +18,7 @@ rm .cargo-ok
 git add .
 ```
 
-Now, integrate it into the CI system
+Now, integrate it into the CI and build system
 
 1. Edit `.circleci/config.yml`, copy an existing contracts job and replace the name.
 Then add your new job to the jobs list on top. (eg. copy `contracts_cw1_whitelist`
@@ -30,6 +30,10 @@ to `workflows.test.jobs`)
 
 1. Set the `version` variable in `Cargo.toml` to the same version as `packages/cw20`.
 For example, "0.2.1" rather than the default "0.1.0" 
+
+1. Edit the root `Cargo.toml` file and add a `profile.release.package.CONTRACT_NAME` 
+section, just like `profile.release.package.cw1-subkeys`, but with your
+package name.
 
 1. Run `cargo build && cargo test` in the new contract dir
 

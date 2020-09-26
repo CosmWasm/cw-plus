@@ -1,13 +1,6 @@
 [workspace]
 members = ["packages/*", "contracts/*"]
 
-[profile.release.package.cw20-atomic-swap]
-opt-level = 3
-debug = false
-debug-assertions = false
-codegen-units = 1
-incremental = false
-
 [profile.release.package.cw1-subkeys]
 opt-level = 3
 debug = false
@@ -16,6 +9,13 @@ codegen-units = 1
 incremental = false
 
 [profile.release.package.cw1-whitelist]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
+[profile.release.package.cw20-atomic-swap]
 opt-level = 3
 debug = false
 debug-assertions = false
@@ -37,6 +37,13 @@ codegen-units = 1
 incremental = false
 
 [profile.release.package.cw20-staking]
+opt-level = 3
+debug = false
+debug-assertions = false
+codegen-units = 1
+incremental = false
+
+[profile.release.package.cw721-base]
 opt-level = 3
 debug = false
 debug-assertions = false
