@@ -6,9 +6,12 @@ use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    contract_info, contract_info_read, mint, mint_read, tokens, tokens_read, Approval, TokenInfo,
+    contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, tokens,
+    tokens_read, Approval, TokenInfo,
 };
-use cw721::{AllNftInfoResponse, ContractInfoResponse, NftInfoResponse, OwnerOfResponse};
+use cw721::{
+    AllNftInfoResponse, ContractInfoResponse, NftInfoResponse, NumTokensResponse, OwnerOfResponse,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -74,6 +77,8 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     };
     tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
 
+    increment_tokens(&mut deps.storage)?;
+
     // TODO: set logs
     Ok(HandleResponse::default())
 }
@@ -89,7 +94,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::OwnerOf { token_id } => to_binary(&query_owner_of(deps, token_id)?),
         QueryMsg::AllNftInfo { token_id } => to_binary(&query_all_nft_info(deps, token_id)?),
         QueryMsg::ApprovedForAll { owner: _ } => panic!("not implemented"),
-        QueryMsg::NumTokens {} => panic!("not implemented"),
+        QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
     }
 }
 
@@ -105,6 +110,13 @@ fn query_contract_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<ContractInfoResponse> {
     contract_info_read(&deps.storage).load()
+}
+
+fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<NumTokensResponse> {
+    let count = num_tokens(&deps.storage)?;
+    Ok(NumTokensResponse { count })
 }
 
 fn query_nft_info<S: Storage, A: Api, Q: Querier>(
@@ -208,9 +220,10 @@ mod tests {
                 name: CONTRACT_NAME.to_string(),
                 symbol: SYMBOL.to_string(),
             }
-        )
+        );
 
-        // TODO: check 0 num tokens
+        let count = query_num_tokens(&deps).unwrap();
+        assert_eq!(0, count.count);
     }
 
     #[test]
@@ -242,7 +255,9 @@ mod tests {
         let allowed = mock_env(MINTER, &[]);
         let _ = handle(&mut deps, allowed, mint_msg.clone()).unwrap();
 
-        // TODO: ensure num tokens increases
+        // ensure num tokens increases
+        let count = query_num_tokens(&deps).unwrap();
+        assert_eq!(1, count.count);
 
         // unknown nft returns error
         let _ = query_nft_info(&deps, "unknown".to_string()).unwrap_err();
