@@ -8,8 +8,8 @@ cw20-compatible tokens with custom logic.
 Implements:
 
 - [x] CW20 Base
-- [ ] Mintable extension
-- [ ] Allowances extension
+- [x] Mintable extension
+- [x] Allowances extension
 
 ## Running this contract
 
@@ -35,7 +35,7 @@ repository root:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.10.2
+  cosmwasm/workspace-optimizer:0.10.3
 ```
 
 The optimized contracts are generated in the `artifacts/` directory.
@@ -53,4 +53,5 @@ calls, but then use the underlying implementation for the standard cw20
 messages you want to support. The same with `QueryMsg`. You *could* reuse `init`
 as it, but it is likely you will want to change it. And it is rather simple.
 
-**TODO: add example**
+Look at [`cw20-staking`](../cw20-staking/README.md) for an example of how to "inherit"
+all this token functionality and combine it with custom logic.
