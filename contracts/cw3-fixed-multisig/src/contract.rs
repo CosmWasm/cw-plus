@@ -190,6 +190,7 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
             log("action", "vote"),
             log("sender", env.message.sender),
             log("proposal_id", proposal_id),
+            log("status", format!("{:?}", prop.status)),
         ],
         data: None,
     })
@@ -453,7 +454,7 @@ fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coin, from_binary, BankMsg};
+    use cosmwasm_std::{coin, BankMsg};
 
     use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
@@ -645,32 +646,29 @@ mod tests {
         setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
 
         // Propose
-        let msgs = vec![CosmosMsg::Custom(Empty {})];
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
         let proposal = HandleMsg::Propose {
-            title: "Title".to_string(),
-            description: "Description".to_string(),
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
             msgs,
             latest: None,
         };
-        handle(&mut deps, env.clone(), proposal).unwrap();
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
 
-        // Query the proposal id
-        let query_msg = QueryMsg::ListProposals {
-            start_after: None,
-            limit: None,
-        };
-        let proposals: ProposalListResponse =
-            from_binary(&query(&deps, query_msg).unwrap()).unwrap();
-        let proposals = &proposals.proposals;
-        assert_eq!(1, proposals.len());
-        let proposal = &proposals[0];
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
 
-        // owner cannot vote (again)
+        // Owner cannot vote (again)
         let vote = HandleMsg::Vote {
-            proposal_id: proposal.id,
+            proposal_id,
             vote: Vote::Yes,
         };
-        let res = handle(&mut deps, env, vote);
+        let res = handle(&mut deps, env, vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -679,13 +677,20 @@ mod tests {
             e => panic!("unexpected error: {}", e),
         }
 
+        // Only voters can vote
+        let env = mock_env(SOMEBODY, &[]);
+        let res = handle(&mut deps, env, vote.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
         // But voter1 can
         let env = mock_env(VOTER1, &[]);
-        let vote = HandleMsg::Vote {
-            proposal_id: proposal.id,
-            vote: Vote::Yes,
-        };
-        let res = handle(&mut deps, env, vote).unwrap();
+        let res = handle(&mut deps, env, vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -695,649 +700,34 @@ mod tests {
                 log: vec![
                     log("action", "vote"),
                     log("sender", VOTER1),
-                    log("proposal_id", proposal.id),
+                    log("proposal_id", proposal_id),
+                    log("status", "Open"),
                 ],
                 data: None
             }
-        )
+        );
+
+        // Vote again, so it passes
+        let env = mock_env(VOTER2, &[]);
+        let res = handle(&mut deps, env, vote).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "vote"),
+                    log("sender", VOTER2),
+                    log("proposal_id", proposal_id),
+                    log("status", "Passed"),
+                ],
+                data: None
+            }
+        );
+
+        // TODO: non-Open proposals cannot be voted
+
+        // TODO: expired proposals cannot be voted
     }
-
-    /*
-    #[test]
-    fn increase_allowances() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin0001");
-        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
-
-        let spender1 = HumanAddr::from("spender0001");
-        let spender2 = HumanAddr::from("spender0002");
-        let spender3 = HumanAddr::from("spender0003");
-        let spender4 = HumanAddr::from("spender0004");
-        let initial_spenders = vec![spender1.clone(), spender2.clone()];
-
-        // Same allowances for all spenders, for simplicity
-        let denom1 = "token1";
-        let denom2 = "token2";
-        let denom3 = "token3";
-        let amount1 = 1111;
-        let amount2 = 2222;
-        let amount3 = 3333;
-
-        let allow1 = coin(amount1, denom1);
-        let allow2 = coin(amount2, denom2);
-        let allow3 = coin(amount3, denom3);
-        let initial_allowances = vec![allow1.clone(), allow2.clone()];
-
-        let expires_height = Expiration::AtHeight(5432);
-        let expires_never = Expiration::Never {};
-        let expires_time = Expiration::AtTime(1234567890);
-        // Initially set first spender allowance with height expiration, the second with no expiration
-        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
-
-        let env = mock_env(owner, &[]);
-        setup_test_case(
-            &mut deps,
-            &env,
-            &admins,
-            &initial_spenders,
-            &initial_allowances,
-            &initial_expirations,
-        );
-
-        // Add to spender1 account (expires = None) => don't change Expiration
-        let msg = HandleMsg::IncreaseAllowance {
-            spender: spender1.clone(),
-            amount: allow1.clone(),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
-                expires: expires_height.clone(),
-            }
-        );
-
-        // Add to spender2 account (expires = Some)
-        let msg = HandleMsg::IncreaseAllowance {
-            spender: spender2.clone(),
-            amount: allow3.clone(),
-            expires: Some(expires_height.clone()),
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
-                expires: expires_height.clone(),
-            }
-        );
-
-        // Add to spender3 (new account) (expires = None) => default Expiration::Never
-        let msg = HandleMsg::IncreaseAllowance {
-            spender: spender3.clone(),
-            amount: allow1.clone(),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender3.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![allow1.clone()]),
-                expires: expires_never.clone(),
-            }
-        );
-
-        // Add to spender4 (new account) (expires = Some)
-        let msg = HandleMsg::IncreaseAllowance {
-            spender: spender4.clone(),
-            amount: allow2.clone(),
-            expires: Some(expires_time.clone()),
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender4.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![allow2.clone()]),
-                expires: expires_time,
-            }
-        );
-    }
-
-    #[test]
-    fn decrease_allowances() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin0001");
-        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
-
-        let spender1 = HumanAddr::from("spender0001");
-        let spender2 = HumanAddr::from("spender0002");
-        let initial_spenders = vec![spender1.clone(), spender2.clone()];
-
-        // Same allowances for all spenders, for simplicity
-        let denom1 = "token1";
-        let denom2 = "token2";
-        let denom3 = "token3";
-        let amount1 = 1111;
-        let amount2 = 2222;
-        let amount3 = 3333;
-
-        let allow1 = coin(amount1, denom1);
-        let allow2 = coin(amount2, denom2);
-        let allow3 = coin(amount3, denom3);
-
-        let initial_allowances = vec![coin(amount1, denom1), coin(amount2, denom2)];
-
-        let expires_height = Expiration::AtHeight(5432);
-        let expires_never = Expiration::Never {};
-        // Initially set first spender allowance with height expiration, the second with no expiration
-        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
-
-        let env = mock_env(owner, &[]);
-        setup_test_case(
-            &mut deps,
-            &env,
-            &admins,
-            &initial_spenders,
-            &initial_allowances,
-            &initial_expirations,
-        );
-
-        // Subtract from spender1 (existing) account (has none of that denom)
-        let msg = HandleMsg::DecreaseAllowance {
-            spender: spender1.clone(),
-            amount: allow3.clone(),
-            expires: None,
-        };
-        let res = handle(&mut deps, env.clone(), msg);
-
-        // Verify
-        assert!(res.is_err());
-        // Verify everything stays the same for that spender
-        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![allow1.clone(), allow2.clone()]),
-                expires: expires_height.clone(),
-            }
-        );
-
-        // Subtract from spender2 (existing) account (brings denom to 0, other denoms left)
-        let msg = HandleMsg::DecreaseAllowance {
-            spender: spender2.clone(),
-            amount: allow2.clone(),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![allow1.clone()]),
-                expires: expires_never.clone(),
-            }
-        );
-
-        // Subtract from spender1 (existing) account (brings denom to > 0)
-        let msg = HandleMsg::DecreaseAllowance {
-            spender: spender1.clone(),
-            amount: coin(amount1 / 2, denom1),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![
-                    coin(amount1 / 2 + (amount1 & 1), denom1),
-                    allow2.clone()
-                ]),
-                expires: expires_height.clone(),
-            }
-        );
-
-        // Subtract from spender2 (existing) account (brings denom to 0, no other denoms left => should delete Allowance)
-        let msg = HandleMsg::DecreaseAllowance {
-            spender: spender2.clone(),
-            amount: allow1.clone(),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender2.clone()).unwrap();
-        assert_eq!(allowance, Allowance::default());
-
-        // Subtract from spender2 (empty) account (should error)
-        let msg = HandleMsg::DecreaseAllowance {
-            spender: spender2.clone(),
-            amount: allow1.clone(),
-            expires: None,
-        };
-        let res = handle(&mut deps, env.clone(), msg);
-
-        // Verify
-        assert!(res.is_err());
-
-        // Subtract from spender1 (existing) account (underflows denom => should delete denom)
-        let msg = HandleMsg::DecreaseAllowance {
-            spender: spender1.clone(),
-            amount: coin(amount1 * 10, denom1),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), msg).unwrap();
-
-        // Verify
-        let allowance = query_allowance(&deps, spender1.clone()).unwrap();
-        assert_eq!(
-            allowance,
-            Allowance {
-                balance: NativeBalance(vec![allow2]),
-                expires: expires_height.clone(),
-            }
-        );
-    }
-
-    #[test]
-    fn execute_checks() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin0001");
-        let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
-
-        let spender1 = HumanAddr::from("spender0001");
-        let spender2 = HumanAddr::from("spender0002");
-        let initial_spenders = vec![spender1.clone()];
-
-        let denom1 = "token1";
-        let amount1 = 1111;
-        let allow1 = coin(amount1, denom1);
-        let initial_allowances = vec![allow1];
-
-        let expires_never = Expiration::Never {};
-        let initial_expirations = vec![expires_never.clone()];
-
-        let env = mock_env(owner.clone(), &[]);
-        setup_test_case(
-            &mut deps,
-            &env,
-            &admins,
-            &initial_spenders,
-            &initial_allowances,
-            &initial_expirations,
-        );
-
-        // Create Send message
-        let msgs = vec![BankMsg::Send {
-            from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
-            to_address: spender2.clone(),
-            amount: coins(1000, "token1"),
-        }
-            .into()];
-
-        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
-
-        // spender2 cannot spend funds (no initial allowance)
-        let env = mock_env(&spender2, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone());
-        match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // But spender1 can (he has enough funds)
-        let env = mock_env(&spender1, &[]);
-        let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
-        assert_eq!(res.messages, msgs);
-        assert_eq!(
-            res.log,
-            vec![log("action", "execute"), log("owner", spender1.clone())]
-        );
-
-        // And then cannot (not enough funds anymore)
-        let res = handle(&mut deps, env, handle_msg.clone());
-        match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // Owner / admins can do anything (at the contract level)
-        let env = mock_env(&owner.clone(), &[]);
-        let res = handle(&mut deps, env.clone(), handle_msg.clone()).unwrap();
-        assert_eq!(res.messages, msgs);
-        assert_eq!(
-            res.log,
-            vec![log("action", "execute"), log("owner", owner.clone())]
-        );
-
-        // For admins, even other message types are allowed
-        let other_msgs = vec![CosmosMsg::Custom(Empty {})];
-        let handle_msg = HandleMsg::Execute {
-            msgs: other_msgs.clone(),
-        };
-
-        let env = mock_env(&owner, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
-        assert_eq!(res.messages, other_msgs);
-        assert_eq!(res.log, vec![log("action", "execute"), log("owner", owner)]);
-
-        // But not for mere mortals
-        let env = mock_env(&spender1, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone());
-        match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Message type rejected"),
-            e => panic!("unexpected error: {}", e),
-        }
-    }
-
-    #[test]
-    fn staking_permission_checks() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin0001");
-        let admins = vec![owner.clone()];
-
-        // spender1 has every permission to stake
-        let spender1 = HumanAddr::from("spender0001");
-        // spender2 do not have permission
-        let spender2 = HumanAddr::from("spender0002");
-        let denom = "token1";
-        let amount = 10000;
-        let coin1 = coin(amount, denom);
-
-        let god_mode = Permissions {
-            delegate: true,
-            redelegate: true,
-            undelegate: true,
-            withdraw: true,
-        };
-
-        let env = mock_env(owner.clone(), &[]);
-        // Init a contract with admins
-        let init_msg = InitMsg {
-            admins: admins.clone(),
-            mutable: true,
-        };
-        init(&mut deps, env.clone(), init_msg).unwrap();
-
-        let setup_perm_msg1 = HandleMsg::SetPermissions {
-            spender: spender1.clone(),
-            permissions: god_mode,
-        };
-        handle(&mut deps, env.clone(), setup_perm_msg1).unwrap();
-
-        let setup_perm_msg2 = HandleMsg::SetPermissions {
-            spender: spender2.clone(),
-            // default is no permission
-            permissions: Default::default(),
-        };
-        // default is no permission
-        handle(&mut deps, env.clone(), setup_perm_msg2).unwrap();
-
-        let msg_delegate = vec![StakingMsg::Delegate {
-            validator: HumanAddr::from("validator1"),
-            amount: coin1.clone(),
-        }
-            .into()];
-        let msg_redelegate = vec![StakingMsg::Redelegate {
-            src_validator: HumanAddr::from("validator1"),
-            dst_validator: HumanAddr::from("validator2"),
-            amount: coin1.clone(),
-        }
-            .into()];
-        let msg_undelegate = vec![StakingMsg::Undelegate {
-            validator: HumanAddr::from("validator1"),
-            amount: coin1.clone(),
-        }
-            .into()];
-        let msg_withdraw = vec![StakingMsg::Withdraw {
-            validator: HumanAddr::from("validator1"),
-            recipient: None,
-        }
-            .into()];
-
-        let msgs = vec![
-            msg_delegate.clone(),
-            msg_redelegate.clone(),
-            msg_undelegate.clone(),
-            msg_withdraw.clone(),
-        ];
-
-        // spender1 can execute
-        for msg in &msgs {
-            let env = mock_env(&spender1, &[]);
-            let res = handle(&mut deps, env, HandleMsg::Execute { msgs: msg.clone() });
-            assert!(res.is_ok())
-        }
-
-        // spender2 cannot execute (no permission)
-        for msg in &msgs {
-            let env = mock_env(&spender2, &[]);
-            let res = handle(&mut deps, env, HandleMsg::Execute { msgs: msg.clone() });
-            assert!(res.is_err())
-        }
-
-        // test mixed permissions
-        let spender3 = HumanAddr::from("spender0003");
-        let setup_perm_msg3 = HandleMsg::SetPermissions {
-            spender: spender3.clone(),
-            permissions: Permissions {
-                delegate: false,
-                redelegate: true,
-                undelegate: true,
-                withdraw: false,
-            },
-        };
-        handle(&mut deps, env.clone(), setup_perm_msg3).unwrap();
-        let env = mock_env(&spender3, &[]);
-        let res = handle(
-            &mut deps,
-            env.clone(),
-            HandleMsg::Execute {
-                msgs: msg_delegate.clone(),
-            },
-        );
-        // FIXME need better error check here
-        assert!(res.is_err());
-        let res = handle(
-            &mut deps,
-            env.clone(),
-            HandleMsg::Execute {
-                msgs: msg_redelegate.clone(),
-            },
-        );
-        assert!(res.is_ok());
-        let res = handle(
-            &mut deps,
-            env.clone(),
-            HandleMsg::Execute {
-                msgs: msg_undelegate.clone(),
-            },
-        );
-        assert!(res.is_ok());
-        let res = handle(
-            &mut deps,
-            env.clone(),
-            HandleMsg::Execute {
-                msgs: msg_withdraw.clone(),
-            },
-        );
-        assert!(res.is_err())
-    }
-
-    // tests permissions and allowances are independent features and does not affect each other
-    #[test]
-    fn permissions_allowances_independent() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin0001");
-        let admins = vec![owner.clone()];
-
-        // spender1 has every permission to stake
-        let spender1 = HumanAddr::from("spender0001");
-        let spender2 = HumanAddr::from("spender0002");
-        let denom = "token1";
-        let amount = 10000;
-        let coin = coin(amount, denom);
-
-        let allow = Allowance {
-            balance: NativeBalance(vec![coin.clone()]),
-            expires: Expiration::Never {},
-        };
-        let perm = Permissions {
-            delegate: true,
-            redelegate: false,
-            undelegate: false,
-            withdraw: true,
-        };
-
-        let env = mock_env(owner.clone(), &[]);
-        // Init a contract with admins
-        let init_msg = InitMsg {
-            admins: admins.clone(),
-            mutable: true,
-        };
-        init(&mut deps, env.clone(), init_msg).unwrap();
-
-        // setup permission and then allowance and check if changed
-        let setup_perm_msg = HandleMsg::SetPermissions {
-            spender: spender1.clone(),
-            permissions: perm,
-        };
-        handle(&mut deps, env.clone(), setup_perm_msg).unwrap();
-
-        let setup_allowance_msg = HandleMsg::IncreaseAllowance {
-            spender: spender1.clone(),
-            amount: coin.clone(),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), setup_allowance_msg).unwrap();
-
-        let res_perm = query_permissions(&deps, spender1.clone()).unwrap();
-        assert_eq!(perm, res_perm);
-        let res_allow = query_allowance(&deps, spender1.clone()).unwrap();
-        assert_eq!(allow, res_allow);
-
-        // setup allowance and then permission and check if changed
-        let setup_allowance_msg = HandleMsg::IncreaseAllowance {
-            spender: spender2.clone(),
-            amount: coin.clone(),
-            expires: None,
-        };
-        handle(&mut deps, env.clone(), setup_allowance_msg).unwrap();
-
-        let setup_perm_msg = HandleMsg::SetPermissions {
-            spender: spender2.clone(),
-            permissions: perm,
-        };
-        handle(&mut deps, env.clone(), setup_perm_msg).unwrap();
-
-        let res_perm = query_permissions(&deps, spender2.clone()).unwrap();
-        assert_eq!(perm, res_perm);
-        let res_allow = query_allowance(&deps, spender2.clone()).unwrap();
-        assert_eq!(allow, res_allow);
-    }
-
-    #[test]
-    fn can_send_query_works() {
-        let mut deps = mock_dependencies(20, &[]);
-
-        let owner = HumanAddr::from("admin007");
-        let spender = HumanAddr::from("spender808");
-        let anyone = HumanAddr::from("anyone");
-
-        let env = mock_env(owner.clone(), &[]);
-        // spender has allowance of 55000 ushell
-        setup_test_case(
-            &mut deps,
-            &env,
-            &[owner.clone()],
-            &[spender.clone()],
-            &coins(55000, "ushell"),
-            &[Expiration::Never {}],
-        );
-
-        let perm = Permissions {
-            delegate: true,
-            redelegate: true,
-            undelegate: false,
-            withdraw: false,
-        };
-
-        let spender_raw = &deps.api.canonical_address(&spender).unwrap();
-        let _ = permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm);
-
-        // let us make some queries... different msg types by owner and by other
-        let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
-            to_address: anyone.clone(),
-            amount: coins(12345, "ushell"),
-        });
-        let send_msg_large = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
-            to_address: anyone.clone(),
-            amount: coins(1234567, "ushell"),
-        });
-        let staking_delegate_msg = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: anyone.clone(),
-            amount: coin(70000, "ureef"),
-        });
-        let staking_withdraw_msg = CosmosMsg::Staking(StakingMsg::Withdraw {
-            validator: anyone.clone(),
-            recipient: None,
-        });
-
-        // owner can send big or small
-        let res = query_can_send(&deps, owner.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        let res = query_can_send(&deps, owner.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        // owner can stake
-        let res = query_can_send(&deps, owner.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-
-        // spender can send small
-        let res = query_can_send(&deps, spender.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        // not too big
-        let res = query_can_send(&deps, spender.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        // spender can send staking msgs if permissioned
-        let res = query_can_send(&deps, spender.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        let res = query_can_send(&deps, spender.clone(), staking_withdraw_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-
-        // random person cannot do anything
-        let res = query_can_send(&deps, anyone.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        let res = query_can_send(&deps, anyone.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        let res = query_can_send(&deps, anyone.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        let res = query_can_send(&deps, anyone.clone(), staking_withdraw_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-    }
-    */
 }
