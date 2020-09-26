@@ -1,90 +1,55 @@
-# CosmWasm Starter Pack
+# Cw721 Basic
 
-This is a template to build smart contracts in Rust to run inside a
-[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) module on all chains that enable it.
-To understand the framework better, please read the overview in the
-[cosmwasm repo](https://github.com/CosmWasm/cosmwasm/blob/master/README.md),
-and dig into the [cosmwasm docs](https://www.cosmwasm.com).
-This assumes you understand the theory and just want to get coding.
+This is a basic implementation of a cw721 NFT contract. It implements
+the [CW721 spec](../../packages/cw721/README.md) and is designed to
+be deployed as is, or imported into other contracts to easily build
+cw721-compatible NFTs with custom logic.
 
-## Creating a new repo from template
+Implements:
 
-Assuming you have a recent version of rust and cargo installed (via [rustup](https://rustup.rs/)),
-then the following should get you a new repo to start a contract:
+- [ ] CW721 Base
+- [ ] Enumerable extension
 
-First, install
-[cargo-generate](https://github.com/ashleygwilliams/cargo-generate).
-Unless you did that before, run this line now:
+## Running this contract
 
-```sh
-cargo install cargo-generate --features vendored-openssl
+You will need Rust 1.44.1+ with `wasm32-unknown-unknown` target installed.
+
+You can run unit tests on this via: 
+
+`cargo test`
+
+Once you are happy with the content, you can compile it to wasm via:
+
+```
+RUSTFLAGS='-C link-arg=-s' cargo wasm
+cp ../../target/wasm32-unknown-unknown/release/cw20_base.wasm .
+ls -l cw20_base.wasm
+sha256sum cw20_base.wasm
 ```
 
-Now, use it to create your new contract.
-Go to the folder in which you want to place it and run:
+Or for a production-ready (compressed) build, run the following from the
+repository root:
 
-**0.10 (latest)**
-
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --name PROJECT_NAME
+```
+docker run --rm -v "$(pwd)":/code \
+  --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
+  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+  cosmwasm/workspace-optimizer:0.10.3
 ```
 
-**0.9**
+The optimized contracts are generated in the `artifacts/` directory.
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --branch 0.9 --name PROJECT_NAME
-```
+## Importing this contract
 
-**0.8**
+You can also import much of the logic of this contract to build another
+CW721-compliant contract, such as tradable names, crypto kitties,
+or tokenized real estate.
 
-```sh
-cargo generate --git https://github.com/CosmWasm/cosmwasm-template.git --branch 0.8 --name PROJECT_NAME
-```
+Basically, you just need to write your handle function and import 
+`cw721_base::contract::handle_transfer`, etc and dispatch to them.
+This allows you to use custom `HandleMsg` and `QueryMsg` with your additional
+calls, but then use the underlying implementation for the standard cw721
+messages you want to support. The same with `QueryMsg`. You will most
+likely want to write a custom, domain-specific `init`.
 
-You will now have a new folder called `PROJECT_NAME` (I hope you changed that to something else)
-containing a simple working contract and build system that you can customize.
-
-## Create a Repo
-
-After generating, you have a initialized local git repo, but no commits, and no remote.
-Go to a server (eg. github) and create a new upstream repo (called `YOUR-GIT-URL` below).
-Then run the following:
-
-```sh
-# this is needed to create a valid Cargo.lock file (see below)
-cargo check
-git checkout -b master # in case you generate from non-master
-git add .
-git commit -m 'Initial Commit'
-git remote add origin YOUR-GIT-URL
-git push -u origin master
-```
-
-## CI Support
-
-We have template configurations for both [GitHub Actions](.github/workflows/Basic.yml)
-and [Circle CI](.circleci/config.yml) in the generated project, so you can
-get up and running with CI right away.
-
-One note is that the CI runs all `cargo` commands
-with `--locked` to ensure it uses the exact same versions as you have locally. This also means
-you must have an up-to-date `Cargo.lock` file, which is not auto-generated.
-The first time you set up the project (or after adding any dep), you should ensure the
-`Cargo.lock` file is updated, so the CI will test properly. This can be done simply by
-running `cargo check` or `cargo unit-test`.
-
-## Using your project
-
-Once you have your custom repo, you should check out [Developing](./Developing.md) to explain
-more on how to run tests and develop code. Or go through the
-[online tutorial](https://www.cosmwasm.com/docs/getting-started/intro) to get a better feel
-of how to develop.
-
-[Publishing](./Publishing.md) contains useful information on how to publish your contract
-to the world, once you are ready to deploy it on a running blockchain. And
-[Importing](./Importing.md) contains information about pulling in other contracts or crates
-that have been published.
-
-Please replace this README file with information about your specific project. You can keep
-the `Developing.md` and `Publishing.md` files as useful referenced, but please set some
-proper description in the README.
+**TODO: add example**
