@@ -428,8 +428,8 @@ fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::from_binary;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
+    use cosmwasm_std::{coin, from_binary, BankMsg};
 
     use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
@@ -442,6 +442,7 @@ mod tests {
     const VOTER1: &str = "voter0001";
     const VOTER2: &str = "voter0002";
     const VOTER3: &str = "voter0003";
+    const SOMEBODY: &str = "somebody";
 
     fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
         Voter {
@@ -566,14 +567,32 @@ mod tests {
         let env = mock_env(OWNER, &[]);
         setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
 
-        // Propose
-        let msgs = vec![CosmosMsg::Custom(Empty {})];
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+
+        // Only voters can propose
+        let env = mock_env(SOMEBODY, &[]);
         let proposal = HandleMsg::Propose {
-            title: "Title".to_string(),
-            description: "Description".to_string(),
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
             msgs,
             latest: None,
         };
+        let res = handle(&mut deps, env, proposal.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Proposal from voter works
+        let env = mock_env(VOTER3, &[]);
         let res = handle(&mut deps, env, proposal).unwrap();
 
         // Verify
