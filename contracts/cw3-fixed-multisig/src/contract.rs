@@ -707,7 +707,11 @@ mod tests {
             }
         );
 
-        // Vote again, so it passes
+        // TODO: No/Veto votes have no effect on the tally
+
+        // TODO: Once voted, votes cannot be changed
+
+        // Vote it again, so it passes
         let env = mock_env(VOTER2, &[]);
         let res = handle(&mut deps, env, vote).unwrap();
 
@@ -729,5 +733,88 @@ mod tests {
         // TODO: non-Open proposals cannot be voted
 
         // TODO: expired proposals cannot be voted
+    }
+
+    #[test]
+    fn test_execute_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let required_weight = 3;
+        let voting_period = Duration::Time(2000000);
+
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs: msgs.clone(),
+            latest: None,
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        // Only Passed can be executed
+        let execution = HandleMsg::Execute { proposal_id };
+        let res = handle(&mut deps, env.clone(), execution.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Proposal must have passed and not yet been executed")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Vote it, so it passes
+        let vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let env = mock_env(VOTER3, &[]);
+        let res = handle(&mut deps, env, vote).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "vote"),
+                    log("sender", VOTER3),
+                    log("proposal_id", proposal_id),
+                    log("status", "Passed"),
+                ],
+                data: None
+            }
+        );
+
+        // Execute works. Anybody can execute Passed proposals
+        let env = mock_env(SOMEBODY, &[]);
+        let res = handle(&mut deps, env.clone(), execution).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: msgs,
+                log: vec![
+                    log("action", "execute"),
+                    log("sender", SOMEBODY),
+                    log("proposal_id", proposal_id),
+                ],
+                data: None
+            }
+        );
     }
 }
