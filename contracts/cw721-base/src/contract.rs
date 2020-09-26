@@ -58,7 +58,15 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             handle_approve_all(deps, env, operator, expires)
         }
         HandleMsg::RevokeAll { operator } => handle_revoke_all(deps, env, operator),
-        _ => panic!("not implemented"),
+        HandleMsg::TransferNft {
+            recipient,
+            token_id,
+        } => handle_transfer_nft(deps, env, recipient, token_id),
+        HandleMsg::SendNft {
+            contract,
+            token_id,
+            msg,
+        } => handle_send_nft(deps, env, contract, token_id, msg),
     }
 }
 
@@ -91,6 +99,44 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     increment_tokens(&mut deps.storage)?;
 
     // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    recipient: HumanAddr,
+    token_id: String,
+) -> StdResult<HandleResponse> {
+    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    // ensure we have permissions
+    check_can_send(&deps, &env, &token)?;
+    // set owner and remove existing approvals
+    token.owner = deps.api.canonical_address(&recipient)?;
+    token.approvals = vec![];
+    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+
+    // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    contract: HumanAddr,
+    token_id: String,
+    _msg: Option<Binary>,
+) -> StdResult<HandleResponse> {
+    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    // ensure we have permissions
+    check_can_send(&deps, &env, &token)?;
+    // set owner and remove existing approvals
+    token.owner = deps.api.canonical_address(&contract)?;
+    token.approvals = vec![];
+    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+
+    // TODO: set logs
+    // TODO: send msg to contract
     Ok(HandleResponse::default())
 }
 
@@ -202,6 +248,41 @@ fn check_can_approve<S: Storage, A: Api, Q: Querier>(
         return Ok(());
     }
     // operator can approve
+    let op = operators_read(&deps.storage, &token.owner).may_load(sender_raw.as_slice())?;
+    match op {
+        Some(ex) => {
+            if ex.is_expired(&env.block) {
+                Err(StdError::unauthorized())
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(StdError::unauthorized()),
+    }
+}
+
+/// returns true iff the sender can transfer ownership of the token
+fn check_can_send<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    env: &Env,
+    token: &TokenInfo,
+) -> StdResult<()> {
+    // owner can send
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    if token.owner == sender_raw {
+        return Ok(());
+    }
+
+    // any non-expired token approval can send
+    if token
+        .approvals
+        .iter()
+        .any(|apr| apr.spender == sender_raw && !apr.expires.is_expired(&env.block))
+    {
+        return Ok(());
+    }
+
+    // operator can send
     let op = operators_read(&deps.storage, &token.owner).may_load(sender_raw.as_slice())?;
     match op {
         Some(ex) => {
