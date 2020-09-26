@@ -1,23 +1,31 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier, StdError,
-    StdResult, Storage,
+    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    StdError, StdResult, Storage,
 };
+use cw2::set_contract_version;
 
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State};
+use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
+use crate::state::{contract_info, mint, mint_read, tokens, TokenInfo};
+use cw721::ContractInfoResponse;
+
+// version info for migration info
+const CONTRACT_NAME: &str = "crates.io:cw721-base";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State {
-        count: msg.count,
-        owner: deps.api.canonical_address(&env.message.sender)?,
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let info = ContractInfoResponse {
+        name: msg.name,
+        symbol: msg.symbol,
     };
-
-    config(&mut deps.storage).save(&state)?;
-
+    contract_info(&mut deps.storage).save(&info)?;
+    let minter = deps.api.canonical_address(&msg.minter)?;
+    mint(&mut deps.storage).save(&minter)?;
     Ok(InitResponse::default())
 }
 
@@ -27,36 +35,44 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps, env),
-        HandleMsg::Reset { count } => try_reset(deps, env, count),
+        HandleMsg::Mint {
+            token_id,
+            owner,
+            name,
+            description,
+            image,
+        } => handle_mint(deps, env, token_id, owner, name, description, image),
+        _ => panic!("not implemented"),
     }
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _env: Env,
-) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    Ok(HandleResponse::default())
-}
-
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
+pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    count: i32,
+    token_id: String,
+    owner: HumanAddr,
+    name: String,
+    description: Option<String>,
+    image: Option<String>,
 ) -> StdResult<HandleResponse> {
-    let api = &deps.api;
-    config(&mut deps.storage).update(|mut state| {
-        if api.canonical_address(&env.message.sender)? != state.owner {
-            return Err(StdError::unauthorized());
-        }
-        state.count = count;
-        Ok(state)
-    })?;
+    let minter = mint(&mut deps.storage).load()?;
+    let minter_human = deps.api.human_address(&minter)?;
+
+    if minter_human != env.message.sender {
+        return Err(StdError::unauthorized());
+    }
+
+    // create the token
+    let token = TokenInfo {
+        owner: deps.api.canonical_address(&owner)?,
+        approvals: vec![],
+        name,
+        description: description.unwrap_or_default(),
+        image,
+    };
+    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+
+    // TODO: set logs
     Ok(HandleResponse::default())
 }
 
@@ -65,13 +81,17 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
+        _ => panic!("not implemented"),
     }
 }
 
-fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
-    let state = config_read(&deps.storage).load()?;
-    Ok(CountResponse { count: state.count })
+fn query_minter<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<MinterResponse> {
+    let minter_raw = mint_read(&deps.storage).load()?;
+    let minter = deps.api.human_address(&minter_raw)?;
+    Ok(MinterResponse { minter })
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, HumanAddr, ReadonlyStorage, Storage};
+use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
@@ -18,16 +18,16 @@ pub const OPERATOR_PREFIX: &[u8] = b"operators";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {
     /// The owner of the newly minter NFT
-    owner: CanonicalAddr,
+    pub owner: CanonicalAddr,
     /// approvals are stored here, as we clear them all upon transfer and cannot accumulate much
-    approvals: Vec<Approval>,
+    pub approvals: Vec<Approval>,
 
     /// Identifies the asset to which this NFT represents
-    name: String,
+    pub name: String,
     /// Describes the asset to which this NFT represents
-    description: String,
+    pub description: String,
     /// A URI pointing to an image representing the asset
-    image: Option<String>,
+    pub image: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -48,11 +48,11 @@ pub fn contract_info_read<S: ReadonlyStorage>(
     singleton_read(storage, CONTRACT_INFO_KEY)
 }
 
-pub fn mint<S: Storage>(storage: &mut S) -> Singleton<S, HumanAddr> {
+pub fn mint<S: Storage>(storage: &mut S) -> Singleton<S, CanonicalAddr> {
     singleton(storage, MINTER_KEY)
 }
 
-pub fn mint_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, HumanAddr> {
+pub fn mint_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, CanonicalAddr> {
     singleton_read(storage, MINTER_KEY)
 }
 
