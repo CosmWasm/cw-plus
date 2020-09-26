@@ -110,9 +110,11 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
     let mut expires = latest.unwrap_or(max_expires);
-    // FIXME: partial_cmp() fails when expires is height based, but max_expires is time-based (by example)
-    if expires.partial_cmp(&max_expires) != Some(Ordering::Less) {
+    let comp = expires.partial_cmp(&max_expires);
+    if let Some(Ordering::Greater) = comp {
         expires = max_expires;
+    } else if comp.is_none() {
+        return Err(StdError::generic_err("Wrong expiration option"));
     }
 
     // create a proposal
@@ -612,7 +614,7 @@ mod tests {
         let proposal = HandleMsg::Propose {
             title: "Rewarding somebody".to_string(),
             description: "Do we reward her?".to_string(),
-            msgs,
+            msgs: msgs.clone(),
             latest: None,
         };
         let res = handle(&mut deps, env, proposal.clone());
@@ -621,6 +623,23 @@ mod tests {
         assert!(res.is_err());
         match res.unwrap_err() {
             StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Wrong expiration option fails
+        let env = mock_env(OWNER, &[]);
+        let proposal_wrong_exp = HandleMsg::Propose {
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
+            msgs: msgs.clone(),
+            latest: Some(Expiration::AtHeight(123456)),
+        };
+        let res = handle(&mut deps, env, proposal_wrong_exp);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!("Wrong expiration option", &msg),
             e => panic!("unexpected error: {}", e),
         }
 
