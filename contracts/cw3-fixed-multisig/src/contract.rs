@@ -401,46 +401,56 @@ fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
+    use cosmwasm_std::from_binary;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
+
     use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
 
     use crate::msg::Voter;
 
     use super::*;
-    use cosmwasm_std::from_binary;
+
+    fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
+        Voter {
+            addr: addr.into(),
+            weight,
+        }
+    }
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
-        deps: &mut Extern<S, A, Q>,
+        mut deps: &mut Extern<S, A, Q>,
         env: Env,
-        voters: Vec<Voter>,
         required_weight: u64,
         max_voting_period: Duration,
     ) {
-        // Init a contract with admins
+        // Init a contract with voters
+        let voters = vec![
+            voter(env.message.sender.clone(), 1),
+            voter("voter0001", 1),
+            voter("voter0002", 2),
+            voter("voter0003", 3),
+        ];
+
         let init_msg = InitMsg {
             voters,
             required_weight,
             max_voting_period,
         };
-        init(deps, env, init_msg).unwrap();
+        init(&mut deps, env, init_msg).unwrap();
     }
 
     #[test]
     fn test_init_works() {
         let mut deps = mock_dependencies(20, &[]);
-
         let owner = HumanAddr::from("admin0001");
-        let voters = vec![Voter {
-            addr: HumanAddr::from("voter0001"),
-            weight: 1,
-        }];
+        let env = mock_env(owner, &[]);
+
         let required_weight = 1;
         let voting_period = Duration::Time(1234567);
 
-        let env = mock_env(owner, &[]);
-        setup_test_case(&mut deps, env, voters, required_weight, voting_period);
+        setup_test_case(&mut deps, env, required_weight, voting_period);
 
         assert_eq!(
             ContractVersion {
@@ -457,36 +467,12 @@ mod tests {
     fn test_propose_works() {
         let mut deps = mock_dependencies(20, &[]);
 
-        let owner = HumanAddr::from("admin0001");
-        let voters = vec![
-            Voter {
-                addr: owner.clone(),
-                weight: 0,
-            },
-            Voter {
-                addr: HumanAddr::from("voter0001"),
-                weight: 1,
-            },
-            Voter {
-                addr: HumanAddr::from("voter0002"),
-                weight: 2,
-            },
-            Voter {
-                addr: HumanAddr::from("voter0003"),
-                weight: 3,
-            },
-        ];
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
 
+        let owner = HumanAddr::from("admin0001");
         let env = mock_env(owner, &[]);
-        setup_test_case(
-            &mut deps,
-            env.clone(),
-            voters,
-            required_weight,
-            voting_period,
-        );
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period);
 
         // Propose
         let msgs = vec![CosmosMsg::Custom(Empty {})];
@@ -507,36 +493,12 @@ mod tests {
         let mut deps = mock_dependencies(20, &[]);
 
         let owner = HumanAddr::from("admin0001");
-        let voter1 = HumanAddr::from("voter0001");
-        let voters = vec![
-            Voter {
-                addr: owner.clone(),
-                weight: 0,
-            },
-            Voter {
-                addr: voter1.clone(),
-                weight: 1,
-            },
-            Voter {
-                addr: HumanAddr::from("voter0002"),
-                weight: 2,
-            },
-            Voter {
-                addr: HumanAddr::from("voter0003"),
-                weight: 3,
-            },
-        ];
+
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
 
         let env = mock_env(owner, &[]);
-        setup_test_case(
-            &mut deps,
-            env.clone(),
-            voters,
-            required_weight,
-            voting_period,
-        );
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period);
 
         // Propose
         let msgs = vec![CosmosMsg::Custom(Empty {})];
@@ -559,7 +521,7 @@ mod tests {
         assert_eq!(1, proposals.len());
         let proposal = &proposals[0];
 
-        // owner cannot Vote (again)
+        // owner cannot vote (again)
         let vote = HandleMsg::Vote {
             proposal_id: proposal.id,
             vote: Vote::Yes,
@@ -574,7 +536,7 @@ mod tests {
         }
 
         // But voter1 can
-        let env = mock_env(voter1, &[]);
+        let env = mock_env("voter0001", &[]);
         let vote = HandleMsg::Vote {
             proposal_id: proposal.id,
             vote: Vote::Yes,
