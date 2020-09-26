@@ -1,16 +1,17 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdError, StdResult, Storage,
+    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, tokens,
-    tokens_read, Approval, TokenInfo,
+    contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens,
+    operators_read, tokens, tokens_read, Approval, TokenInfo,
 };
 use cw721::{
-    AllNftInfoResponse, ContractInfoResponse, NftInfoResponse, NumTokensResponse, OwnerOfResponse,
+    AllNftInfoResponse, ContractInfoResponse, Expiration, NftInfoResponse, NumTokensResponse,
+    OwnerOfResponse,
 };
 
 // version info for migration info
@@ -47,6 +48,12 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             description,
             image,
         } => handle_mint(deps, env, token_id, owner, name, description, image),
+        HandleMsg::Approve {
+            spender,
+            token_id,
+            expires,
+        } => handle_approve(deps, env, spender, token_id, expires),
+        HandleMsg::Revoke { spender, token_id } => handle_revoke(deps, env, spender, token_id),
         _ => panic!("not implemented"),
     }
 }
@@ -81,6 +88,91 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 
     // TODO: set logs
     Ok(HandleResponse::default())
+}
+
+pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    spender: HumanAddr,
+    token_id: String,
+    expires: Option<Expiration>,
+) -> StdResult<HandleResponse> {
+    // reject expired data as invalid
+    let expires = expires.unwrap_or_default();
+    if expires.is_expired(&env.block) {
+        return Err(StdError::generic_err(
+            "Cannot set approval that is already expired",
+        ));
+    }
+
+    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    // ensure we have permissions
+    check_can_approve(&deps, &env, &token)?;
+
+    // update the approval list (remove any for the same spender before adding)
+    let spender_raw = deps.api.canonical_address(&spender)?;
+    token.approvals = token
+        .approvals
+        .into_iter()
+        .filter(|apr| apr.spender != spender_raw)
+        .collect();
+    let approval = Approval {
+        spender: spender_raw,
+        expires,
+    };
+    token.approvals.push(approval);
+    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+
+    // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    spender: HumanAddr,
+    token_id: String,
+) -> StdResult<HandleResponse> {
+    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    // ensure we have permissions
+    check_can_approve(&deps, &env, &token)?;
+
+    // remove this spender from the list
+    let spender_raw = deps.api.canonical_address(&spender)?;
+    token.approvals = token
+        .approvals
+        .into_iter()
+        .filter(|apr| apr.spender != spender_raw)
+        .collect();
+    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+
+    // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+/// returns true iff the sender can execute approve or reject on the contract
+fn check_can_approve<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    env: &Env,
+    token: &TokenInfo,
+) -> StdResult<()> {
+    // owner can approve
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    if token.owner == sender_raw {
+        return Ok(());
+    }
+    // operator can approve
+    let op = operators_read(&deps.storage, &token.owner).may_load(sender_raw.as_slice())?;
+    match op {
+        Some(ex) => {
+            if ex.is_expired(&env.block) {
+                Err(StdError::unauthorized())
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(StdError::unauthorized()),
+    }
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
