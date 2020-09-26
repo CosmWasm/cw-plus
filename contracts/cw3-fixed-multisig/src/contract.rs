@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
+    log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 
@@ -133,8 +133,15 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     };
     ballots(&mut deps.storage, id).save(raw_sender.as_slice(), &ballot)?;
 
-    // TODO: add some event attributes
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "propose"),
+            log("sender", env.message.sender),
+            log("proposal_id", id),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
@@ -177,13 +184,20 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
         proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
     }
 
-    // TODO: add event attributes
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "vote"),
+            log("sender", env.message.sender),
+            log("proposal_id", proposal_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     proposal_id: u64,
 ) -> StdResult<HandleResponse<Empty>> {
     // anyone can trigger this if the vote passed
@@ -202,10 +216,13 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
 
     // dispatch all proposed messages
-    // TODO: add event attributes
     Ok(HandleResponse {
         messages: prop.msgs,
-        log: vec![],
+        log: vec![
+            log("action", "execute"),
+            log("sender", env.message.sender),
+            log("proposal_id", proposal_id),
+        ],
         data: None,
     })
 }
@@ -236,8 +253,15 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     prop.status = Status::Rejected;
     proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
 
-    // TODO: add event attributes
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "close"),
+            log("sender", env.message.sender),
+            log("proposal_id", proposal_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -596,7 +620,18 @@ mod tests {
         let res = handle(&mut deps, env, proposal).unwrap();
 
         // Verify
-        assert_eq!(res, HandleResponse::default());
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "propose"),
+                    log("sender", VOTER3),
+                    log("proposal_id", 1),
+                ],
+                data: None
+            }
+        )
     }
 
     #[test]
@@ -653,7 +688,18 @@ mod tests {
         let res = handle(&mut deps, env, vote).unwrap();
 
         // Verify
-        assert_eq!(res, HandleResponse::default());
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "vote"),
+                    log("sender", VOTER1),
+                    log("proposal_id", proposal.id),
+                ],
+                data: None
+            }
+        )
     }
 
     /*
