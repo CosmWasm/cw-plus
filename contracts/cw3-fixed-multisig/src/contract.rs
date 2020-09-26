@@ -24,11 +24,38 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
+    if msg.required_weight == 0 {
+        return Err(StdError::generic_err("Required weight cannot be zero"));
+    }
+    if msg.voters.is_empty() {
+        return Err(StdError::generic_err("No voters"));
+    }
+    let weights: StdResult<Vec<u64>> = msg
+        .voters
+        .iter()
+        .map(|v| {
+            if v.weight == 0 && v.addr != env.message.sender {
+                Err(StdError::generic_err(
+                    "Voting weights (except sender's) cannot be zero",
+                ))
+            } else {
+                Ok(v.weight)
+            }
+        })
+        .collect();
+    let total_weight = weights?.iter().sum();
+
+    if total_weight < msg.required_weight {
+        return Err(StdError::generic_err(
+            "Not possible to reach required (passing) weight",
+        ));
+    }
+
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    let total_weight = msg.voters.iter().map(|v| v.weight).sum();
+
     let cfg = Config {
         required_weight: msg.required_weight,
         total_weight,
@@ -411,6 +438,11 @@ mod tests {
 
     use super::*;
 
+    const OWNER: &str = "admin0001";
+    const VOTER1: &str = "voter0001";
+    const VOTER2: &str = "voter0002";
+    const VOTER3: &str = "voter0003";
+
     fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
         Voter {
             addr: addr.into(),
@@ -424,13 +456,13 @@ mod tests {
         env: Env,
         required_weight: u64,
         max_voting_period: Duration,
-    ) {
+    ) -> StdResult<InitResponse<Empty>> {
         // Init a contract with voters
         let voters = vec![
-            voter(env.message.sender.clone(), 1),
-            voter("voter0001", 1),
-            voter("voter0002", 2),
-            voter("voter0003", 3),
+            voter(&env.message.sender, 0),
+            voter(VOTER1, 1),
+            voter(VOTER2, 2),
+            voter(VOTER3, 3),
         ];
 
         let init_msg = InitMsg {
@@ -438,20 +470,81 @@ mod tests {
             required_weight,
             max_voting_period,
         };
-        init(&mut deps, env, init_msg).unwrap();
+        init(&mut deps, env, init_msg)
     }
 
     #[test]
     fn test_init_works() {
         let mut deps = mock_dependencies(20, &[]);
-        let owner = HumanAddr::from("admin0001");
-        let env = mock_env(owner, &[]);
+        let env = mock_env(OWNER, &[]);
 
+        let max_voting_period = Duration::Time(1234567);
+
+        // No voters fails
+        let init_msg = InitMsg {
+            voters: vec![],
+            required_weight: 1,
+            max_voting_period,
+        };
+        let res = init(&mut deps, env.clone(), init_msg);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "No voters"),
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Zero required weight fails
+        let init_msg = InitMsg {
+            voters: vec![voter(OWNER, 1)],
+            required_weight: 0,
+            max_voting_period,
+        };
+        let res = init(&mut deps, env.clone(), init_msg);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Required weight cannot be zero"),
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Zero weights for voters other than sender not allowed
+        let init_msg = InitMsg {
+            voters: vec![voter(OWNER, 1), voter(VOTER1, 0)],
+            required_weight: 1,
+            max_voting_period,
+        };
+        let res = init(&mut deps, env.clone(), init_msg);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Voting weights (except sender's) cannot be zero")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Total weight less than required weight not allowed
+        let required_weight = 10;
+        let res = setup_test_case(&mut deps, env.clone(), required_weight, max_voting_period);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Not possible to reach required (passing) weight")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // All valid
         let required_weight = 1;
-        let voting_period = Duration::Time(1234567);
+        setup_test_case(&mut deps, env, required_weight, max_voting_period).unwrap();
 
-        setup_test_case(&mut deps, env, required_weight, voting_period);
-
+        // Verify
         assert_eq!(
             ContractVersion {
                 contract: CONTRACT_NAME.to_string(),
@@ -470,9 +563,8 @@ mod tests {
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
 
-        let owner = HumanAddr::from("admin0001");
-        let env = mock_env(owner, &[]);
-        setup_test_case(&mut deps, env.clone(), required_weight, voting_period);
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let msgs = vec![CosmosMsg::Custom(Empty {})];
@@ -492,13 +584,11 @@ mod tests {
     fn test_vote_works() {
         let mut deps = mock_dependencies(20, &[]);
 
-        let owner = HumanAddr::from("admin0001");
-
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
 
-        let env = mock_env(owner, &[]);
-        setup_test_case(&mut deps, env.clone(), required_weight, voting_period);
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let msgs = vec![CosmosMsg::Custom(Empty {})];
@@ -536,7 +626,7 @@ mod tests {
         }
 
         // But voter1 can
-        let env = mock_env("voter0001", &[]);
+        let env = mock_env(VOTER1, &[]);
         let vote = HandleMsg::Vote {
             proposal_id: proposal.id,
             vote: Vote::Yes,
