@@ -5,8 +5,10 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
-use crate::state::{contract_info, mint, mint_read, tokens, TokenInfo};
-use cw721::ContractInfoResponse;
+use crate::state::{
+    contract_info, contract_info_read, mint, mint_read, tokens, tokens_read, Approval, TokenInfo,
+};
+use cw721::{AllNftInfoResponse, ContractInfoResponse, NftInfoResponse, OwnerOfResponse};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -82,7 +84,12 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
-        _ => panic!("not implemented"),
+        QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
+        QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info(deps, token_id)?),
+        QueryMsg::OwnerOf { token_id } => to_binary(&query_owner_of(deps, token_id)?),
+        QueryMsg::AllNftInfo { token_id } => to_binary(&query_all_nft_info(deps, token_id)?),
+        QueryMsg::ApprovedForAll { owner: _ } => panic!("not implemented"),
+        QueryMsg::NumTokens {} => panic!("not implemented"),
     }
 }
 
@@ -92,6 +99,67 @@ fn query_minter<S: Storage, A: Api, Q: Querier>(
     let minter_raw = mint_read(&deps.storage).load()?;
     let minter = deps.api.human_address(&minter_raw)?;
     Ok(MinterResponse { minter })
+}
+
+fn query_contract_info<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<ContractInfoResponse> {
+    contract_info_read(&deps.storage).load()
+}
+
+fn query_nft_info<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    token_id: String,
+) -> StdResult<NftInfoResponse> {
+    let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
+    Ok(NftInfoResponse {
+        name: info.name,
+        description: info.description,
+        image: info.image,
+    })
+}
+
+fn query_owner_of<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    token_id: String,
+) -> StdResult<OwnerOfResponse> {
+    let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
+    Ok(OwnerOfResponse {
+        owner: deps.api.human_address(&info.owner)?,
+        approvals: humanize_approvals(deps.api, &info)?,
+    })
+}
+
+fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    token_id: String,
+) -> StdResult<AllNftInfoResponse> {
+    let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
+    Ok(AllNftInfoResponse {
+        access: OwnerOfResponse {
+            owner: deps.api.human_address(&info.owner)?,
+            approvals: humanize_approvals(deps.api, &info)?,
+        },
+        info: NftInfoResponse {
+            name: info.name,
+            description: info.description,
+            image: info.image,
+        },
+    })
+}
+
+fn humanize_approvals<A: Api>(api: A, info: &TokenInfo) -> StdResult<Vec<cw721::Approval>> {
+    info.approvals
+        .iter()
+        .map(|apr| humanize_approval(api, apr))
+        .collect()
+}
+
+fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Approval> {
+    Ok(cw721::Approval {
+        spender: api.human_address(&approval.spender)?,
+        expires: approval.expires.clone(),
+    })
 }
 
 #[cfg(test)]
