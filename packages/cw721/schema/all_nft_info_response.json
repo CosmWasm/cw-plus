@@ -1,7 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "AllNftInfoResponse",
-  "description": "TODO: cleaner way of combining the two structs than cut and paste?",
   "type": "object",
   "required": [
     "access",

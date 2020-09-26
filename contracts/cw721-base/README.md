@@ -8,6 +8,7 @@ cw721-compatible NFTs with custom logic.
 Implements:
 
 - [ ] CW721 Base
+- [ ] Metadata extension
 - [ ] Enumerable extension
 
 ## Running this contract
