@@ -91,7 +91,6 @@ pub struct NftInfoResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-/// TODO: cleaner way of combining the two structs than cut and paste?
 pub struct AllNftInfoResponse {
     /// Who can transfer the token
     pub access: OwnerOfResponse,
