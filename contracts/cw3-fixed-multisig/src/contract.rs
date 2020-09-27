@@ -467,6 +467,12 @@ mod tests {
         env
     }
 
+    fn mock_env_time<U: Into<HumanAddr>>(sender: U, time: u64) -> Env {
+        let mut env = mock_env(sender, &[]);
+        env.block.time = time;
+        env
+    }
+
     const OWNER: &str = "admin0001";
     const VOTER1: &str = "voter0001";
     const VOTER2: &str = "voter0002";
@@ -765,7 +771,7 @@ mod tests {
             vote: Vote::No,
         };
         let env = mock_env(VOTER2, &[]);
-        handle(&mut deps, env, no_vote).unwrap();
+        handle(&mut deps, env, no_vote.clone()).unwrap();
 
         // Cast a Veto vote
         let veto_vote = HandleMsg::Vote {
@@ -779,7 +785,7 @@ mod tests {
         assert_eq!(tally, get_tally(&deps, proposal_id));
 
         // Once voted, votes cannot be changed
-        let res = handle(&mut deps, env, yes_vote.clone());
+        let res = handle(&mut deps, env.clone(), yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -788,6 +794,22 @@ mod tests {
             e => panic!("unexpected error: {}", e),
         }
         assert_eq!(tally, get_tally(&deps, proposal_id));
+
+        // Expired proposals cannot be voted
+        let env = match voting_period {
+            Duration::Time(duration) => mock_env_time(VOTER4, env.block.time + duration + 1),
+            Duration::Height(duration) => mock_env_height(VOTER4, env.block.height + duration + 1),
+        };
+        let res = handle(&mut deps, env, no_vote);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Proposal voting period has expired")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
 
         // Vote it again, so it passes
         let env = mock_env(VOTER4, &[]);
@@ -809,7 +831,6 @@ mod tests {
         );
 
         // non-Open proposals cannot be voted
-        // Vote it again
         let env = mock_env(VOTER5, &[]);
         let res = handle(&mut deps, env, yes_vote);
 
@@ -819,8 +840,6 @@ mod tests {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Proposal is not open"),
             e => panic!("unexpected error: {}", e),
         }
-
-        // TODO: expired proposals cannot be voted
     }
 
     #[test]
