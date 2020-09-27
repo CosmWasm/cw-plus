@@ -24,7 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     if msg.required_weight == 0 {
@@ -33,20 +33,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     if msg.voters.is_empty() {
         return Err(StdError::generic_err("No voters"));
     }
-    let weights: StdResult<Vec<u64>> = msg
-        .voters
-        .iter()
-        .map(|v| {
-            if v.weight == 0 && v.addr != env.message.sender {
-                Err(StdError::generic_err(
-                    "Voting weights (except sender's) cannot be zero",
-                ))
-            } else {
-                Ok(v.weight)
-            }
-        })
-        .collect();
-    let total_weight = weights?.iter().sum();
+    let total_weight = msg.voters.iter().map(|v| v.weight).sum();
 
     if total_weight < msg.required_weight {
         return Err(StdError::generic_err(
@@ -564,23 +551,6 @@ mod tests {
         assert!(res.is_err());
         match res.unwrap_err() {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Required weight cannot be zero"),
-            e => panic!("unexpected error: {}", e),
-        }
-
-        // Zero weights for voters other than sender not allowed
-        let init_msg = InitMsg {
-            voters: vec![voter(OWNER, 1), voter(VOTER1, 0)],
-            required_weight: 1,
-            max_voting_period,
-        };
-        let res = init(&mut deps, env.clone(), init_msg);
-
-        // Verify
-        assert!(res.is_err());
-        match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Voting weights (except sender's) cannot be zero")
-            }
             e => panic!("unexpected error: {}", e),
         }
 
