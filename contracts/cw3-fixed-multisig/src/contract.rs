@@ -889,7 +889,7 @@ mod tests {
             vote: Vote::Yes,
         };
         let env = mock_env(VOTER3, &[]);
-        let res = handle(&mut deps, env, vote).unwrap();
+        let res = handle(&mut deps, env.clone(), vote).unwrap();
 
         // Verify
         assert_eq!(
@@ -905,6 +905,19 @@ mod tests {
                 data: None,
             }
         );
+
+        // In passing: Try to close Passed fails
+        let closing = HandleMsg::Close { proposal_id };
+        let res = handle(&mut deps, env, closing);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Cannot close completed or passed proposals");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
 
         // Execute works. Anybody can execute Passed proposals
         let env = mock_env(SOMEBODY, &[]);
@@ -923,6 +936,19 @@ mod tests {
                 data: None,
             }
         );
+
+        // In passing: Try to close Executed fails
+        let closing = HandleMsg::Close { proposal_id };
+        let res = handle(&mut deps, env, closing);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Cannot close completed or passed proposals");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
     }
 
     #[test]
@@ -1004,7 +1030,7 @@ mod tests {
             }
         );
 
-        // Close it again fails
+        // Trying to close it again fails
         let res = handle(&mut deps, env, closing);
 
         // Verify
@@ -1015,7 +1041,5 @@ mod tests {
             }
             e => panic!("unexpected error: {}", e),
         }
-
-        // TODO: Close Passed/Executed fails
     }
 }
