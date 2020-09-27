@@ -1,20 +1,22 @@
+use std::cmp::Ordering;
+
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
+    log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
+
+use cw0::Expiration;
 use cw2::set_contract_version;
+use cw3::{
+    ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
+    VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
+};
 
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
     ballots, ballots_read, config, config_read, next_id, parse_id, proposal, proposal_read, voters,
     voters_read, Ballot, Config, Proposal,
 };
-use cw0::Expiration;
-use cw3::{
-    ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
-    VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
-};
-use std::cmp::Ordering;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -25,8 +27,22 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     _env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    if msg.required_weight == 0 {
+        return Err(StdError::generic_err("Required weight cannot be zero"));
+    }
+    if msg.voters.is_empty() {
+        return Err(StdError::generic_err("No voters"));
+    }
     let total_weight = msg.voters.iter().map(|v| v.weight).sum();
+
+    if total_weight < msg.required_weight {
+        return Err(StdError::generic_err(
+            "Not possible to reach required (passing) weight",
+        ));
+    }
+
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     let cfg = Config {
         required_weight: msg.required_weight,
         total_weight,
@@ -77,12 +93,22 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         .ok_or_else(StdError::unauthorized)?;
 
     let cfg = config_read(&deps.storage).load()?;
+
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
     let mut expires = latest.unwrap_or(max_expires);
-    if expires.partial_cmp(&max_expires) != Some(Ordering::Less) {
+    let comp = expires.partial_cmp(&max_expires);
+    if let Some(Ordering::Greater) = comp {
         expires = max_expires;
+    } else if comp.is_none() {
+        return Err(StdError::generic_err("Wrong expiration option"));
     }
+
+    let status = if vote_power < cfg.required_weight {
+        Status::Open
+    } else {
+        Status::Passed
+    };
 
     // create a proposal
     let prop = Proposal {
@@ -90,7 +116,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         description,
         expires,
         msgs,
-        status: Status::Open,
+        status,
         yes_weight: vote_power,
         required_weight: cfg.required_weight,
     };
@@ -104,8 +130,16 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     };
     ballots(&mut deps.storage, id).save(raw_sender.as_slice(), &ballot)?;
 
-    // TODO: add some event attributes
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "propose"),
+            log("sender", env.message.sender),
+            log("proposal_id", id),
+            log("status", format!("{:?}", prop.status)),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
@@ -148,13 +182,21 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
         proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
     }
 
-    // TODO: add event attributes
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "vote"),
+            log("sender", env.message.sender),
+            log("proposal_id", proposal_id),
+            log("status", format!("{:?}", prop.status)),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     proposal_id: u64,
 ) -> StdResult<HandleResponse<Empty>> {
     // anyone can trigger this if the vote passed
@@ -173,10 +215,13 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
 
     // dispatch all proposed messages
-    // TODO: add event attributes
     Ok(HandleResponse {
         messages: prop.msgs,
-        log: vec![],
+        log: vec![
+            log("action", "execute"),
+            log("sender", env.message.sender),
+            log("proposal_id", proposal_id),
+        ],
         data: None,
     })
 }
@@ -207,8 +252,15 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     prop.status = Status::Rejected;
     proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
 
-    // TODO: add event attributes
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "close"),
+            log("sender", env.message.sender),
+            log("proposal_id", proposal_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -399,5 +451,595 @@ fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    // TODO
+    use cosmwasm_std::testing::{mock_dependencies, mock_env};
+    use cosmwasm_std::{coin, from_binary, BankMsg};
+
+    use cw0::Duration;
+    use cw2::{get_contract_version, ContractVersion};
+
+    use crate::msg::Voter;
+
+    use super::*;
+
+    fn mock_env_height<U: Into<HumanAddr>>(sender: U, height: u64) -> Env {
+        let mut env = mock_env(sender, &[]);
+        env.block.height = height;
+        env
+    }
+
+    fn mock_env_time<U: Into<HumanAddr>>(sender: U, time: u64) -> Env {
+        let mut env = mock_env(sender, &[]);
+        env.block.time = time;
+        env
+    }
+
+    const OWNER: &str = "admin0001";
+    const VOTER1: &str = "voter0001";
+    const VOTER2: &str = "voter0002";
+    const VOTER3: &str = "voter0003";
+    const VOTER4: &str = "voter0004";
+    const VOTER5: &str = "voter0005";
+    const SOMEBODY: &str = "somebody";
+
+    fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
+        Voter {
+            addr: addr.into(),
+            weight,
+        }
+    }
+
+    // this will set up the init for other tests
+    fn setup_test_case<S: Storage, A: Api, Q: Querier>(
+        mut deps: &mut Extern<S, A, Q>,
+        env: Env,
+        required_weight: u64,
+        max_voting_period: Duration,
+    ) -> StdResult<InitResponse<Empty>> {
+        // Init a contract with voters
+        let voters = vec![
+            voter(&env.message.sender, 0),
+            voter(VOTER1, 1),
+            voter(VOTER2, 2),
+            voter(VOTER3, 3),
+            voter(VOTER4, 4),
+            voter(VOTER5, 5),
+        ];
+
+        let init_msg = InitMsg {
+            voters,
+            required_weight,
+            max_voting_period,
+        };
+        init(&mut deps, env, init_msg)
+    }
+
+    fn get_tally<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, proposal_id: u64) -> u64 {
+        // Get all the voters on the proposal
+        let voters = QueryMsg::ListVotes {
+            proposal_id,
+            start_after: None,
+            limit: None,
+        };
+        let votes: VoteListResponse = from_binary(&query(&deps, voters).unwrap()).unwrap();
+        // Sum the weights of the Yes votes to get the tally
+        votes
+            .votes
+            .iter()
+            .filter(|&v| v.vote == Vote::Yes)
+            .map(|v| v.weight)
+            .sum()
+    }
+
+    #[test]
+    fn test_init_works() {
+        let mut deps = mock_dependencies(20, &[]);
+        let env = mock_env(OWNER, &[]);
+
+        let max_voting_period = Duration::Time(1234567);
+
+        // No voters fails
+        let init_msg = InitMsg {
+            voters: vec![],
+            required_weight: 1,
+            max_voting_period,
+        };
+        let res = init(&mut deps, env.clone(), init_msg);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "No voters"),
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Zero required weight fails
+        let init_msg = InitMsg {
+            voters: vec![voter(OWNER, 1)],
+            required_weight: 0,
+            max_voting_period,
+        };
+        let res = init(&mut deps, env.clone(), init_msg);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Required weight cannot be zero"),
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Total weight less than required weight not allowed
+        let required_weight = 100;
+        let res = setup_test_case(&mut deps, env.clone(), required_weight, max_voting_period);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Not possible to reach required (passing) weight")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // All valid
+        let required_weight = 1;
+        setup_test_case(&mut deps, env, required_weight, max_voting_period).unwrap();
+
+        // Verify
+        assert_eq!(
+            ContractVersion {
+                contract: CONTRACT_NAME.to_string(),
+                version: CONTRACT_VERSION.to_string(),
+            },
+            get_contract_version(&deps.storage).unwrap()
+        )
+    }
+
+    // TODO: query() tests
+
+    #[test]
+    fn test_propose_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let required_weight = 4;
+        let voting_period = Duration::Time(2000000);
+
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
+
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+
+        // Only voters can propose
+        let env = mock_env(SOMEBODY, &[]);
+        let proposal = HandleMsg::Propose {
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
+            msgs: msgs.clone(),
+            latest: None,
+        };
+        let res = handle(&mut deps, env, proposal.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Wrong expiration option fails
+        let env = mock_env(OWNER, &[]);
+        let proposal_wrong_exp = HandleMsg::Propose {
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
+            msgs: msgs.clone(),
+            latest: Some(Expiration::AtHeight(123456)),
+        };
+        let res = handle(&mut deps, env, proposal_wrong_exp);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!("Wrong expiration option", &msg),
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Proposal from voter works
+        let env = mock_env(VOTER3, &[]);
+        let res = handle(&mut deps, env, proposal.clone()).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "propose"),
+                    log("sender", VOTER3),
+                    log("proposal_id", 1),
+                    log("status", "Open"),
+                ],
+                data: None,
+            }
+        );
+
+        // Proposal from voter with enough vote power directly passes
+        let env = mock_env(VOTER4, &[]);
+        let res = handle(&mut deps, env, proposal).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "propose"),
+                    log("sender", VOTER4),
+                    log("proposal_id", 2),
+                    log("status", "Passed"),
+                ],
+                data: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_vote_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let required_weight = 3;
+        let voting_period = Duration::Time(2000000);
+
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        // Owner cannot vote (again)
+        let yes_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let res = handle(&mut deps, env, yes_vote.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Already voted on this proposal"),
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Only voters can vote
+        let env = mock_env(SOMEBODY, &[]);
+        let res = handle(&mut deps, env, yes_vote.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // But voter1 can
+        let env = mock_env(VOTER1, &[]);
+        let res = handle(&mut deps, env, yes_vote.clone()).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "vote"),
+                    log("sender", VOTER1),
+                    log("proposal_id", proposal_id),
+                    log("status", "Open"),
+                ],
+                data: None,
+            }
+        );
+
+        // No/Veto votes have no effect on the tally
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        // Compute the current tally
+        let tally = get_tally(&deps, proposal_id);
+
+        // Cast a No vote
+        let no_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        let env = mock_env(VOTER2, &[]);
+        handle(&mut deps, env, no_vote.clone()).unwrap();
+
+        // Cast a Veto vote
+        let veto_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Veto,
+        };
+        let env = mock_env(VOTER3, &[]);
+        handle(&mut deps, env.clone(), veto_vote).unwrap();
+
+        // Verify
+        assert_eq!(tally, get_tally(&deps, proposal_id));
+
+        // Once voted, votes cannot be changed
+        let res = handle(&mut deps, env.clone(), yes_vote.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Already voted on this proposal"),
+            e => panic!("unexpected error: {}", e),
+        }
+        assert_eq!(tally, get_tally(&deps, proposal_id));
+
+        // Expired proposals cannot be voted
+        let env = match voting_period {
+            Duration::Time(duration) => mock_env_time(VOTER4, env.block.time + duration + 1),
+            Duration::Height(duration) => mock_env_height(VOTER4, env.block.height + duration + 1),
+        };
+        let res = handle(&mut deps, env, no_vote);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Proposal voting period has expired")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Vote it again, so it passes
+        let env = mock_env(VOTER4, &[]);
+        let res = handle(&mut deps, env, yes_vote.clone()).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "vote"),
+                    log("sender", VOTER4),
+                    log("proposal_id", proposal_id),
+                    log("status", "Passed"),
+                ],
+                data: None,
+            }
+        );
+
+        // non-Open proposals cannot be voted
+        let env = mock_env(VOTER5, &[]);
+        let res = handle(&mut deps, env, yes_vote);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Proposal is not open"),
+            e => panic!("unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_execute_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let required_weight = 3;
+        let voting_period = Duration::Time(2000000);
+
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs: msgs.clone(),
+            latest: None,
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        // Only Passed can be executed
+        let execution = HandleMsg::Execute { proposal_id };
+        let res = handle(&mut deps, env.clone(), execution.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Proposal must have passed and not yet been executed")
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Vote it, so it passes
+        let vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let env = mock_env(VOTER3, &[]);
+        let res = handle(&mut deps, env.clone(), vote).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "vote"),
+                    log("sender", VOTER3),
+                    log("proposal_id", proposal_id),
+                    log("status", "Passed"),
+                ],
+                data: None,
+            }
+        );
+
+        // In passing: Try to close Passed fails
+        let closing = HandleMsg::Close { proposal_id };
+        let res = handle(&mut deps, env, closing);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Cannot close completed or passed proposals");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Execute works. Anybody can execute Passed proposals
+        let env = mock_env(SOMEBODY, &[]);
+        let res = handle(&mut deps, env.clone(), execution).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: msgs,
+                log: vec![
+                    log("action", "execute"),
+                    log("sender", SOMEBODY),
+                    log("proposal_id", proposal_id),
+                ],
+                data: None,
+            }
+        );
+
+        // In passing: Try to close Executed fails
+        let closing = HandleMsg::Close { proposal_id };
+        let res = handle(&mut deps, env, closing);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Cannot close completed or passed proposals");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_close_works() {
+        let mut deps = mock_dependencies(20, &[]);
+
+        let required_weight = 3;
+        let voting_period = Duration::Height(2000000);
+
+        let env = mock_env(OWNER, &[]);
+        setup_test_case(&mut deps, env.clone(), required_weight, voting_period).unwrap();
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: OWNER.into(),
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs: msgs.clone(),
+            latest: None,
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        let closing = HandleMsg::Close { proposal_id };
+
+        // Anybody can close
+        let env = mock_env(SOMEBODY, &[]);
+
+        // Non-expired proposals cannot be closed
+        let res = handle(&mut deps, env.clone(), closing.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Proposal must expire before you can close it");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // Expired proposals can be closed
+        let env = mock_env(OWNER, &[]);
+
+        let proposal = HandleMsg::Propose {
+            title: "(Try to) pay somebody".to_string(),
+            description: "Pay somebody after time?".to_string(),
+            msgs: msgs.clone(),
+            latest: Some(Expiration::AtHeight(123456)),
+        };
+        let res = handle(&mut deps, env.clone(), proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+
+        let closing = HandleMsg::Close { proposal_id };
+
+        // Close expired works
+        let env = mock_env_height(SOMEBODY, 123457);
+        let res = handle(&mut deps, env.clone(), closing.clone()).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "close"),
+                    log("sender", SOMEBODY),
+                    log("proposal_id", proposal_id),
+                ],
+                data: None,
+            }
+        );
+
+        // Trying to close it again fails
+        let res = handle(&mut deps, env, closing);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(&msg, "Cannot close completed or passed proposals");
+            }
+            e => panic!("unexpected error: {}", e),
+        }
+    }
 }
