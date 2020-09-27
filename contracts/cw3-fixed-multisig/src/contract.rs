@@ -478,6 +478,7 @@ mod tests {
     const VOTER2: &str = "voter0002";
     const VOTER3: &str = "voter0003";
     const VOTER4: &str = "voter0004";
+    const VOTER5: &str = "voter0005";
     const SOMEBODY: &str = "somebody";
 
     fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
@@ -501,6 +502,7 @@ mod tests {
             voter(VOTER2, 2),
             voter(VOTER3, 3),
             voter(VOTER4, 4),
+            voter(VOTER5, 5),
         ];
 
         let init_msg = InitMsg {
@@ -792,7 +794,7 @@ mod tests {
 
         // Vote it again, so it passes
         let env = mock_env(VOTER4, &[]);
-        let res = handle(&mut deps, env, yes_vote).unwrap();
+        let res = handle(&mut deps, env, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -809,7 +811,17 @@ mod tests {
             }
         );
 
-        // TODO: non-Open proposals cannot be voted
+        // non-Open proposals cannot be voted
+        // Vote it again
+        let env = mock_env(VOTER5, &[]);
+        let res = handle(&mut deps, env, yes_vote);
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Proposal is not open"),
+            e => panic!("unexpected error: {}", e),
+        }
 
         // TODO: expired proposals cannot be voted
     }
