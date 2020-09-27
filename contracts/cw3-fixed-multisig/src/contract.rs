@@ -458,7 +458,7 @@ fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coin, BankMsg};
+    use cosmwasm_std::{coin, from_binary, BankMsg};
 
     use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
@@ -477,6 +477,7 @@ mod tests {
     const VOTER1: &str = "voter0001";
     const VOTER2: &str = "voter0002";
     const VOTER3: &str = "voter0003";
+    const VOTER4: &str = "voter0004";
     const SOMEBODY: &str = "somebody";
 
     fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
@@ -499,6 +500,7 @@ mod tests {
             voter(VOTER1, 1),
             voter(VOTER2, 2),
             voter(VOTER3, 3),
+            voter(VOTER4, 4),
         ];
 
         let init_msg = InitMsg {
@@ -507,6 +509,23 @@ mod tests {
             max_voting_period,
         };
         init(&mut deps, env, init_msg)
+    }
+
+    fn get_tally<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, proposal_id: u64) -> u64 {
+        // Get all the voters on the proposal
+        let voters = QueryMsg::ListVotes {
+            proposal_id,
+            start_after: None,
+            limit: None,
+        };
+        let votes: VoteListResponse = from_binary(&query(&deps, voters).unwrap()).unwrap();
+        // Sum the weights of the Yes votes to get the tally
+        votes
+            .votes
+            .iter()
+            .filter(|&v| v.vote == Vote::Yes)
+            .map(|v| v.weight)
+            .sum()
     }
 
     #[test]
@@ -564,7 +583,7 @@ mod tests {
         }
 
         // Total weight less than required weight not allowed
-        let required_weight = 10;
+        let required_weight = 100;
         let res = setup_test_case(&mut deps, env.clone(), required_weight, max_voting_period);
 
         // Verify
@@ -657,7 +676,7 @@ mod tests {
                     log("sender", VOTER3),
                     log("proposal_id", 1),
                 ],
-                data: None
+                data: None,
             }
         )
     }
@@ -691,11 +710,11 @@ mod tests {
         let proposal_id: u64 = res.log[2].value.parse().unwrap();
 
         // Owner cannot vote (again)
-        let vote = HandleMsg::Vote {
+        let yes_vote = HandleMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
-        let res = handle(&mut deps, env, vote.clone());
+        let res = handle(&mut deps, env, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -706,7 +725,7 @@ mod tests {
 
         // Only voters can vote
         let env = mock_env(SOMEBODY, &[]);
-        let res = handle(&mut deps, env, vote.clone());
+        let res = handle(&mut deps, env, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -717,7 +736,7 @@ mod tests {
 
         // But voter1 can
         let env = mock_env(VOTER1, &[]);
-        let res = handle(&mut deps, env, vote.clone()).unwrap();
+        let res = handle(&mut deps, env, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -730,17 +749,50 @@ mod tests {
                     log("proposal_id", proposal_id),
                     log("status", "Open"),
                 ],
-                data: None
+                data: None,
             }
         );
 
-        // TODO: No/Veto votes have no effect on the tally
+        // No/Veto votes have no effect on the tally
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.log[2].value.parse().unwrap();
 
-        // TODO: Once voted, votes cannot be changed
+        // Compute the current tally
+        let tally = get_tally(&deps, proposal_id);
+
+        // Cast a No vote
+        let no_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        let env = mock_env(VOTER2, &[]);
+        handle(&mut deps, env, no_vote).unwrap();
+
+        // Cast a Veto vote
+        let veto_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Veto,
+        };
+        let env = mock_env(VOTER3, &[]);
+        handle(&mut deps, env.clone(), veto_vote).unwrap();
+
+        // Verify
+        assert_eq!(tally, get_tally(&deps, proposal_id));
+
+        // Once voted, votes cannot be changed
+        let res = handle(&mut deps, env, yes_vote.clone());
+
+        // Verify
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Already voted on this proposal"),
+            e => panic!("unexpected error: {}", e),
+        }
+        assert_eq!(tally, get_tally(&deps, proposal_id));
 
         // Vote it again, so it passes
-        let env = mock_env(VOTER2, &[]);
-        let res = handle(&mut deps, env, vote).unwrap();
+        let env = mock_env(VOTER4, &[]);
+        let res = handle(&mut deps, env, yes_vote).unwrap();
 
         // Verify
         assert_eq!(
@@ -749,11 +801,11 @@ mod tests {
                 messages: vec![],
                 log: vec![
                     log("action", "vote"),
-                    log("sender", VOTER2),
+                    log("sender", VOTER4),
                     log("proposal_id", proposal_id),
                     log("status", "Passed"),
                 ],
-                data: None
+                data: None,
             }
         );
 
@@ -822,7 +874,7 @@ mod tests {
                     log("proposal_id", proposal_id),
                     log("status", "Passed"),
                 ],
-                data: None
+                data: None,
             }
         );
 
@@ -840,7 +892,7 @@ mod tests {
                     log("sender", SOMEBODY),
                     log("proposal_id", proposal_id),
                 ],
-                data: None
+                data: None,
             }
         );
     }
@@ -920,7 +972,7 @@ mod tests {
                     log("sender", SOMEBODY),
                     log("proposal_id", proposal_id),
                 ],
-                data: None
+                data: None,
             }
         );
 
