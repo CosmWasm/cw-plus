@@ -104,13 +104,19 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         return Err(StdError::generic_err("Wrong expiration option"));
     }
 
+    let status = if vote_power < cfg.required_weight {
+        Status::Open
+    } else {
+        Status::Passed
+    };
+
     // create a proposal
     let prop = Proposal {
         title,
         description,
         expires,
         msgs,
-        status: Status::Open,
+        status,
         yes_weight: vote_power,
         required_weight: cfg.required_weight,
     };
@@ -130,6 +136,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
             log("action", "propose"),
             log("sender", env.message.sender),
             log("proposal_id", id),
+            log("status", format!("{:?}", prop.status)),
         ],
         data: None,
     })
@@ -587,7 +594,7 @@ mod tests {
     fn test_propose_works() {
         let mut deps = mock_dependencies(20, &[]);
 
-        let required_weight = 3;
+        let required_weight = 4;
         let voting_period = Duration::Time(2000000);
 
         let env = mock_env(OWNER, &[]);
@@ -636,7 +643,7 @@ mod tests {
 
         // Proposal from voter works
         let env = mock_env(VOTER3, &[]);
-        let res = handle(&mut deps, env, proposal).unwrap();
+        let res = handle(&mut deps, env, proposal.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -647,10 +654,30 @@ mod tests {
                     log("action", "propose"),
                     log("sender", VOTER3),
                     log("proposal_id", 1),
+                    log("status", "Open"),
                 ],
                 data: None,
             }
-        )
+        );
+
+        // Proposal from voter with enough vote power directly passes
+        let env = mock_env(VOTER4, &[]);
+        let res = handle(&mut deps, env, proposal).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "propose"),
+                    log("sender", VOTER4),
+                    log("proposal_id", 2),
+                    log("status", "Passed"),
+                ],
+                data: None,
+            }
+        );
     }
 
     #[test]
