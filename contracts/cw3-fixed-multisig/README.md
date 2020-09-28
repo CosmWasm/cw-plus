@@ -1,34 +1,48 @@
 # CW3 Fixed Multisig
 
-**TODO** 
+This is a simple implementation of the [cw3 spec](../../packages/cw3/README.md).
+It is a multisig with a fixed set of addresses created upon initialization.
+Each address may have the same weight (K of N) or some may have extra voting
+power. This works much like the native Cosmos SDK multisig, except that rather
+than aggregating the signatures off chain and submitting the final result,
+we aggregate the approvals on-chain.
 
-Look at https://github.com/CosmWasm/cosmwasm-plus/issues/8
-and the cw3 package as references
+This is usable as is, and probably the most secure implementation of cw3
+(as it is the simplest), but we will be adding more complex cases, such
+as updating the multisig set, different voting rules for the same group
+with different permissions, and even allow token-weighted voting. All through
+the same client interface.
 
--------------
+## Init
 
-This may be the simplest implementation of CW1, a whitelist of addresses.
-It contains a set of admins that are defined upon creation.
-Any of those admins may `Execute` any message via the contract,
-per the CW1 spec.
+To create the multisig, you must pass in a set of `HumanAddr` with a weight
+for each one, as well as a required weight to pass a proposal. To create
+a 2 of 3 multisig, pass 3 voters with weight 1 and a `required_weight` of 2.
 
-To make this slighly less minimalistic, you can allow the admin set
-to be mutable or immutable. If it is mutable, then any admin may
-(a) change the admin set and (b) freeze it (making it immutable).
+Note that 0 *is an allowed weight*. This doesn't give any voting rights, but
+it does allow that key to submit proposals that can later be approved by the
+voters. Any address not in the voter set cannot submit a proposal.
 
-While largely an example contract for CW1, this has various real-world use-cases,
-such as a common account that is shared among multiple trusted devices,
-or trading an entire account (used as 1 of 1 mutable). Most of the time,
-this can be used as a framework to build your own, 
-more advanced cw1 implementations.
+## Handle Process
 
-## Allowing Custom Messages
+First, a registered voter must submit a proposal. This also includes the
+first "Yes" vote on the proposal by the proposer. The proposer can set
+an expiration time for the voting process, or it defaults to the limit
+provided when creating the contract (so proposals can be closed after several
+days).
 
-By default, this doesn't support `CustomMsg` in order to be fully generic
-among blockchains. However, all types are Generic over `T`, and this is only
-fixed in `handle`. You can import this contract and just redefine your `handle`
-function, setting a different parameter to `HandleMsg`, and you can produce
-a chain-specific message.
+Before the proposal has expired, any voter with non-zero weight can add their
+vote. Only "Yes" votes are tallied. If enough "Yes" votes were submitted before
+the proposal expiration date, the status is set to "Passed".
+
+Once a proposal is "Passed", anyone may submit an "Execute" message. This will
+trigger the proposal to send all stored messages from the proposal and update
+it's state to "Executed", so it cannot run again. (Note if the execution fails
+for any reason - out of gas, insufficient funds, etc - the state update will
+be reverted and it will remain "Passed" so you can try again).
+
+Once a proposal has expired without passing, anyone can submit a "Close"
+message to mark it closed. This has no effect beyond cleaning up the UI/database.
 
 ## Running this contract
 
@@ -42,9 +56,9 @@ Once you are happy with the content, you can compile it to wasm via:
 
 ```
 RUSTFLAGS='-C link-arg=-s' cargo wasm
-cp ../../target/wasm32-unknown-unknown/release/cw1_whitelist.wasm .
-ls -l cw1_whitelist.wasm
-sha256sum cw1_whitelist.wasm
+cp ../../target/wasm32-unknown-unknown/release/cw3_fixed_multisig.wasm .
+ls -l cw3_fixed_multisig.wasm
+sha256sum cw3_fixed_multisig.wasm
 ```
 
 Or for a production-ready (compressed) build, run the following from the
@@ -54,7 +68,7 @@ repository root:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.10.2
+  cosmwasm/workspace-optimizer:0.10.3
 ```
 
 The optimized contracts are generated in the `artifacts/` directory.
