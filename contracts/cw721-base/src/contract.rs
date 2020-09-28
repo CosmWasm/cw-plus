@@ -111,13 +111,7 @@ pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
     recipient: HumanAddr,
     token_id: String,
 ) -> StdResult<HandleResponse> {
-    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
-    // ensure we have permissions
-    check_can_send(&deps, &env, &token)?;
-    // set owner and remove existing approvals
-    token.owner = deps.api.canonical_address(&recipient)?;
-    token.approvals = vec![];
-    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    _transfer_nft(deps, &env, &recipient, &token_id)?;
 
     // TODO: set logs
     Ok(HandleResponse::default())
@@ -130,17 +124,27 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     _msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
-    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
-    // ensure we have permissions
-    check_can_send(&deps, &env, &token)?;
-    // set owner and remove existing approvals
-    token.owner = deps.api.canonical_address(&contract)?;
-    token.approvals = vec![];
-    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    _transfer_nft(deps, &env, &contract, &token_id)?;
 
     // TODO: set logs
     // TODO: send msg to contract
     Ok(HandleResponse::default())
+}
+
+pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: &Env,
+    recipient: &HumanAddr,
+    token_id: &str,
+) -> StdResult<TokenInfo> {
+    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    // ensure we have permissions
+    check_can_send(&deps, env, &token)?;
+    // set owner and remove existing approvals
+    token.owner = deps.api.canonical_address(recipient)?;
+    token.approvals = vec![];
+    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    Ok(token)
 }
 
 pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
@@ -150,31 +154,7 @@ pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     expires: Option<Expiration>,
 ) -> StdResult<HandleResponse> {
-    // reject expired data as invalid
-    let expires = expires.unwrap_or_default();
-    if expires.is_expired(&env.block) {
-        return Err(StdError::generic_err(
-            "Cannot set approval that is already expired",
-        ));
-    }
-
-    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
-    // ensure we have permissions
-    check_can_approve(&deps, &env, &token)?;
-
-    // update the approval list (remove any for the same spender before adding)
-    let spender_raw = deps.api.canonical_address(&spender)?;
-    token.approvals = token
-        .approvals
-        .into_iter()
-        .filter(|apr| apr.spender != spender_raw)
-        .collect();
-    let approval = Approval {
-        spender: spender_raw,
-        expires,
-    };
-    token.approvals.push(approval);
-    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    _update_approvals(deps, &env, &spender, &token_id, true, expires)?;
 
     // TODO: set logs
     Ok(HandleResponse::default())
@@ -186,21 +166,52 @@ pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
     spender: HumanAddr,
     token_id: String,
 ) -> StdResult<HandleResponse> {
+    _update_approvals(deps, &env, &spender, &token_id, false, None)?;
+
+    // TODO: set logs
+    Ok(HandleResponse::default())
+}
+
+pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: &Env,
+    spender: &HumanAddr,
+    token_id: &str,
+    // if add == false, remove. if add == true, remove then set with this expiration
+    add: bool,
+    expires: Option<Expiration>,
+) -> StdResult<TokenInfo> {
     let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
     // ensure we have permissions
     check_can_approve(&deps, &env, &token)?;
 
-    // remove this spender from the list
+    // update the approval list (remove any for the same spender before adding)
     let spender_raw = deps.api.canonical_address(&spender)?;
     token.approvals = token
         .approvals
         .into_iter()
         .filter(|apr| apr.spender != spender_raw)
         .collect();
+
+    // only difference between approve and revoke
+    if add {
+        // reject expired data as invalid
+        let expires = expires.unwrap_or_default();
+        if expires.is_expired(&env.block) {
+            return Err(StdError::generic_err(
+                "Cannot set approval that is already expired",
+            ));
+        }
+        let approval = Approval {
+            spender: spender_raw,
+            expires,
+        };
+        token.approvals.push(approval);
+    }
+
     tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(token)
 }
 
 pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
