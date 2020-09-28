@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ProposalResponse_for_Empty",
+  "title": "ProposalResponse",
   "description": "Note, if you are storing custom messages in the proposal, the querier needs to know what possible custom message types those are in order to parse the response",
   "type": "object",
   "required": [
@@ -8,6 +8,7 @@
     "expires",
     "id",
     "msgs",
+    "status",
     "title"
   ],
   "properties": {
@@ -27,6 +28,9 @@
       "items": {
         "$ref": "#/definitions/CosmosMsg_for_Empty"
       }
+    },
+    "status": {
+      "$ref": "#/definitions/Status"
     },
     "title": {
       "type": "string"
@@ -139,6 +143,7 @@
       "type": "object"
     },
     "Expiration": {
+      "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
       "anyOf": [
         {
           "description": "AtHeight will expire when `env.block.height` >= height",
@@ -290,6 +295,16 @@
             }
           }
         }
+      ]
+    },
+    "Status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "open",
+        "rejected",
+        "passed",
+        "executed"
       ]
     },
     "Uint128": {

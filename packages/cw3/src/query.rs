@@ -32,6 +32,13 @@ pub enum Cw3QueryMsg {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
+    /// Voter extension: Returns VoterResponse
+    Voter { address: HumanAddr },
+    /// Voter extension: Returns VoterListResponse
+    ListVoters {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
 }
 
 /// This defines the different ways tallies can happen.
@@ -79,31 +86,58 @@ pub struct ProposalResponse<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    id: u64,
-    title: String,
-    description: String,
-    msgs: Vec<CosmosMsg<T>>,
-    expires: Expiration,
+    pub id: u64,
+    pub title: String,
+    pub description: String,
+    pub msgs: Vec<CosmosMsg<T>>,
+    pub expires: Expiration,
+    pub status: Status,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Status {
+    /// proposal was created, but voting has not yet begun for whatever reason
+    Pending,
+    /// you can vote on this
+    Open,
+    /// voting is over and it did not pass
+    Rejected,
+    /// voting is over and it did pass, but has not yet executed
+    Passed,
+    /// voting is over it passed, and the proposal was executed
+    Executed,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ProposalListResponse {
-    proposals: Vec<ProposalResponse>,
+    pub proposals: Vec<ProposalResponse>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteListResponse {
-    proposal: Vec<VoteInfo>,
+    pub votes: Vec<VoteInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteInfo {
-    voter: HumanAddr,
-    vote: Vote,
-    weight: u64,
+    pub voter: HumanAddr,
+    pub vote: Vote,
+    pub weight: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteResponse {
-    vote: Option<Vote>,
+    pub vote: Option<Vote>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VoterResponse {
+    pub addr: HumanAddr,
+    pub weight: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VoterListResponse {
+    pub voters: Vec<VoterResponse>,
 }

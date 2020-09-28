@@ -163,7 +163,7 @@
       }
     },
     {
-      "description": "Voter extension: Returns VoterResponse",
+      "description": "Returns VoterResponse",
       "type": "object",
       "required": [
         "voter"
@@ -183,7 +183,7 @@
       }
     },
     {
-      "description": "Voter extension: Returns VoterListResponse",
+      "description": "Returns VoterListResponse",
       "type": "object",
       "required": [
         "list_voters"

@@ -19,16 +19,6 @@
             "description": {
               "type": "string"
             },
-            "earliest": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "latest": {
               "anyOf": [
                 {
