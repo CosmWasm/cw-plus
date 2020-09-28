@@ -94,7 +94,10 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         description: description.unwrap_or_default(),
         image,
     };
-    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    tokens(&mut deps.storage).update(token_id.as_bytes(), |old| match old {
+        Some(_) => Err(StdError::generic_err("token_id already claimed")),
+        None => Ok(token),
+    })?;
 
     increment_tokens(&mut deps.storage)?;
 

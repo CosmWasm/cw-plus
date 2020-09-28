@@ -100,7 +100,7 @@ pub struct AllNftInfoResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct TokensResponse {
-    /// Contains all token_ids in lexographical ordering
+    /// Contains all token_ids in lexicographical ordering
     /// If there are more than `limit`, use `start_from` in future queries
     /// to achieve pagination.
     pub tokens: Vec<String>,
