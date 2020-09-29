@@ -142,7 +142,7 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     // Unwrap message first
     let msgs: Vec<CosmosMsg> = match &msg {
         None => vec![],
-        Some(msg) => from_binary(msg)?,
+        Some(msg) => vec![from_binary(msg)?],
     };
 
     // Transfer token
