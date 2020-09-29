@@ -139,14 +139,16 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
-    _transfer_nft(deps, &env, &contract, &token_id)?;
-
-    // Unwrap message
+    // Unwrap message first
     let msgs: Vec<CosmosMsg> = match &msg {
         None => vec![],
         Some(msg) => from_binary(msg)?,
     };
 
+    // Transfer token
+    _transfer_nft(deps, &env, &contract, &token_id)?;
+
+    // Send message
     Ok(HandleResponse {
         messages: msgs,
         log: vec![
