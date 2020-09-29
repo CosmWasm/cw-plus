@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
-    StdError, StdResult, Storage,
+    from_binary, log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, Querier, StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
 
@@ -137,13 +137,18 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     env: Env,
     contract: HumanAddr,
     token_id: String,
-    _msg: Option<Binary>,
+    msg: Option<Binary>,
 ) -> StdResult<HandleResponse> {
     _transfer_nft(deps, &env, &contract, &token_id)?;
 
-    // TODO: send msg to contract
+    // Unwrap message
+    let msgs: Vec<CosmosMsg> = match &msg {
+        None => vec![],
+        Some(msg) => from_binary(msg)?,
+    };
+
     Ok(HandleResponse {
-        messages: vec![],
+        messages: msgs,
         log: vec![
             log("action", "send_nft"),
             log("sender", env.message.sender),
