@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
     StdError, StdResult, Storage,
 };
 use cw2::set_contract_version;
@@ -101,8 +101,15 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 
     increment_tokens(&mut deps.storage)?;
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "mint"),
+            log("minter", minter_human),
+            log("token_id", token_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
@@ -113,8 +120,16 @@ pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     _transfer_nft(deps, &env, &recipient, &token_id)?;
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "transfer_nft"),
+            log("sender", env.message.sender),
+            log("recipient", recipient),
+            log("token_id", token_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
@@ -126,9 +141,17 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     _transfer_nft(deps, &env, &contract, &token_id)?;
 
-    // TODO: set logs
     // TODO: send msg to contract
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "send_nft"),
+            log("sender", env.message.sender),
+            log("recipient", contract),
+            log("token_id", token_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
@@ -156,8 +179,16 @@ pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     _update_approvals(deps, &env, &spender, &token_id, true, expires)?;
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "approve"),
+            log("sender", env.message.sender),
+            log("spender", spender),
+            log("token_id", token_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
@@ -168,8 +199,16 @@ pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleResponse> {
     _update_approvals(deps, &env, &spender, &token_id, false, None)?;
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "revoke"),
+            log("sender", env.message.sender),
+            log("spender", spender),
+            log("token_id", token_id),
+        ],
+        data: None,
+    })
 }
 
 pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
@@ -233,8 +272,15 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
     let operator_raw = deps.api.canonical_address(&operator)?;
     operators(&mut deps.storage, &sender_raw).save(operator_raw.as_slice(), &expires)?;
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "approve_all"),
+            log("sender", env.message.sender),
+            log("operator", operator),
+        ],
+        data: None,
+    })
 }
 
 pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
@@ -246,8 +292,15 @@ pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
     let operator_raw = deps.api.canonical_address(&operator)?;
     operators(&mut deps.storage, &sender_raw).remove(operator_raw.as_slice());
 
-    // TODO: set logs
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("action", "revoke_all"),
+            log("sender", env.message.sender),
+            log("operator", operator),
+        ],
+        data: None,
+    })
 }
 
 /// returns true iff the sender can execute approve or reject on the contract
