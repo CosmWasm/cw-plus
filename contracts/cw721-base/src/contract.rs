@@ -569,5 +569,66 @@ mod tests {
                 approvals: vec![]
             }
         );
+
+        // TODO: Cannot mint same token again
+    }
+
+    #[test]
+    fn transfering_nft() {
+        let mut deps = mock_dependencies(20, &[]);
+        setup_contract(&mut deps);
+
+        // Mint a token
+        let token_id = "melt".to_string();
+        let name = "Melting power".to_string();
+        let description = "Allows the owner to melt anyone looking at him or her".to_string();
+
+        let mint_msg = HandleMsg::Mint {
+            token_id: token_id.clone(),
+            owner: "venus".into(),
+            name: name.clone(),
+            description: Some(description.clone()),
+            image: None,
+        };
+
+        let minter = mock_env(MINTER, &[]);
+        handle(&mut deps, minter, mint_msg).unwrap();
+
+        // random cannot transfer
+        let random = mock_env("random", &[]);
+        let transfer_msg = HandleMsg::TransferNft {
+            recipient: "random".into(),
+            token_id: token_id.clone(),
+        };
+
+        let err = handle(&mut deps, random, transfer_msg.clone()).unwrap_err();
+
+        match err {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // owner can
+        let random = mock_env("venus", &[]);
+        let transfer_msg = HandleMsg::TransferNft {
+            recipient: "random".into(),
+            token_id: token_id.clone(),
+        };
+
+        let res = handle(&mut deps, random, transfer_msg.clone()).unwrap();
+
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "transfer_nft"),
+                    log("sender", "venus"),
+                    log("recipient", "random"),
+                    log("token_id", token_id),
+                ],
+                data: None,
+            }
+        );
     }
 }
