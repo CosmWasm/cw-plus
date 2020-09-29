@@ -2,16 +2,17 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Querier, StdError, StdResult, Storage,
 };
+
 use cw2::set_contract_version;
+use cw721::{
+    AllNftInfoResponse, ContractInfoResponse, Expiration, NftInfoResponse, NumTokensResponse,
+    OwnerOfResponse,
+};
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
 use crate::state::{
     contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, operators,
     operators_read, tokens, tokens_read, Approval, TokenInfo,
-};
-use cw721::{
-    AllNftInfoResponse, ContractInfoResponse, Expiration, NftInfoResponse, NumTokensResponse,
-    OwnerOfResponse,
 };
 
 // version info for migration info
@@ -463,9 +464,10 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{StdError, WasmMsg};
+
+    use super::*;
 
     const MINTER: &str = "merlin";
     const CONTRACT_NAME: &str = "Magic Power";
@@ -556,7 +558,7 @@ mod tests {
             NftInfoResponse {
                 name: name.clone(),
                 description: description.clone(),
-                image: None
+                image: None,
             }
         );
 
@@ -566,7 +568,7 @@ mod tests {
             owner,
             OwnerOfResponse {
                 owner: "medusa".into(),
-                approvals: vec![]
+                approvals: vec![],
             }
         );
 
@@ -688,6 +690,96 @@ mod tests {
                     log("token_id", token_id),
                 ],
                 data: None,
+            }
+        );
+    }
+
+    #[test]
+    fn approving_revoking() {
+        let mut deps = mock_dependencies(20, &[]);
+        setup_contract(&mut deps);
+
+        // Mint a token
+        let token_id = "grow".to_string();
+        let name = "Growing power".to_string();
+        let description = "Allows the owner to grow anything".to_string();
+
+        let mint_msg = HandleMsg::Mint {
+            token_id: token_id.clone(),
+            owner: "demeter".into(),
+            name: name.clone(),
+            description: Some(description.clone()),
+            image: None,
+        };
+
+        let minter = mock_env(MINTER, &[]);
+        handle(&mut deps, minter, mint_msg).unwrap();
+
+        // Give random transferring power
+        let approve_msg = HandleMsg::Approve {
+            spender: "random".into(),
+            token_id: token_id.clone(),
+            expires: None,
+        };
+        let owner = mock_env("demeter", &[]);
+        let res = handle(&mut deps, owner, approve_msg).unwrap();
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "approve"),
+                    log("sender", "demeter"),
+                    log("spender", "random"),
+                    log("token_id", token_id.clone()),
+                ],
+                data: None,
+            }
+        );
+
+        // random can now transfer
+        let random = mock_env("random", &[]);
+        let transfer_msg = HandleMsg::TransferNft {
+            recipient: "person".into(),
+            token_id: token_id.clone(),
+        };
+        handle(&mut deps, random, transfer_msg).unwrap();
+
+        // Approvals are now removed / cleared
+        let query_msg = QueryMsg::OwnerOf {
+            token_id: token_id.clone(),
+        };
+        let res: OwnerOfResponse = from_binary(&query(&deps, query_msg.clone()).unwrap()).unwrap();
+        assert_eq!(
+            res,
+            OwnerOfResponse {
+                owner: "person".into(),
+                approvals: vec![],
+            }
+        );
+
+        // Approve / revoke and check for empty, to test revoke
+        let approve_msg = HandleMsg::Approve {
+            spender: "random".into(),
+            token_id: token_id.clone(),
+            expires: None,
+        };
+        let owner = mock_env("person", &[]);
+        handle(&mut deps, owner.clone(), approve_msg).unwrap();
+
+        let revoke_msg = HandleMsg::Revoke {
+            spender: "random".into(),
+            token_id: token_id.clone(),
+        };
+        handle(&mut deps, owner, revoke_msg).unwrap();
+
+        // Approvals are now removed / cleared
+        let res: OwnerOfResponse = from_binary(&query(&deps, query_msg).unwrap()).unwrap();
+        assert_eq!(
+            res,
+            OwnerOfResponse {
+                owner: "person".into(),
+                approvals: vec![],
             }
         );
     }
