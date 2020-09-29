@@ -465,7 +465,7 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::StdError;
+    use cosmwasm_std::{StdError, WasmMsg};
 
     const MINTER: &str = "merlin";
     const CONTRACT_NAME: &str = "Magic Power";
@@ -574,7 +574,7 @@ mod tests {
     }
 
     #[test]
-    fn transfering_nft() {
+    fn transferring_nft() {
         let mut deps = mock_dependencies(20, &[]);
         setup_contract(&mut deps);
 
@@ -625,6 +625,66 @@ mod tests {
                     log("action", "transfer_nft"),
                     log("sender", "venus"),
                     log("recipient", "random"),
+                    log("token_id", token_id),
+                ],
+                data: None,
+            }
+        );
+    }
+
+    #[test]
+    fn sending_nft() {
+        let mut deps = mock_dependencies(20, &[]);
+        setup_contract(&mut deps);
+
+        // Mint a token
+        let token_id = "melt".to_string();
+        let name = "Melting power".to_string();
+        let description = "Allows the owner to melt anyone looking at him or her".to_string();
+
+        let mint_msg = HandleMsg::Mint {
+            token_id: token_id.clone(),
+            owner: "venus".into(),
+            name: name.clone(),
+            description: Some(description.clone()),
+            image: None,
+        };
+
+        let minter = mock_env(MINTER, &[]);
+        handle(&mut deps, minter, mint_msg).unwrap();
+
+        // random cannot send
+        let inner_msg = WasmMsg::Execute {
+            contract_addr: "another_contract".into(),
+            msg: to_binary("You now have the melting power").unwrap(),
+            send: vec![],
+        };
+        let msg: CosmosMsg = CosmosMsg::Wasm(inner_msg);
+
+        let transfer_msg = HandleMsg::SendNft {
+            contract: "another_contract".into(),
+            token_id: token_id.clone(),
+            msg: Some(to_binary(&msg).unwrap()),
+        };
+
+        let random = mock_env("random", &[]);
+        let err = handle(&mut deps, random, transfer_msg.clone()).unwrap_err();
+        match err {
+            StdError::Unauthorized { .. } => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // but owner can
+        let random = mock_env("venus", &[]);
+        let res = handle(&mut deps, random, transfer_msg).unwrap();
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![msg],
+                log: vec![
+                    log("action", "send_nft"),
+                    log("sender", "venus"),
+                    log("recipient", "another_contract"),
                     log("token_id", token_id),
                 ],
                 data: None,
