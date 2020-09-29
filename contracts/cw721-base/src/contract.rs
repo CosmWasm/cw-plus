@@ -397,7 +397,7 @@ fn humanize_approvals<A: Api>(api: A, info: &TokenInfo) -> StdResult<Vec<cw721::
 fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Approval> {
     Ok(cw721::Approval {
         spender: api.human_address(&approval.spender)?,
-        expires: approval.expires.clone(),
+        expires: approval.expires,
     })
 }
 
