@@ -10,9 +10,13 @@ pub enum Cw721QueryMsg {
     /// Return the owner of the given token, error if token does not exist
     /// Return type: OwnerOfResponse
     OwnerOf { token_id: String },
-    /// List all operators that can access all of the owner's tokens
+    /// List all operators that can access all of the owner's tokens.
     /// Return type: `ApprovedForAllResponse`
-    ApprovedForAll { owner: HumanAddr },
+    ApprovedForAll {
+        owner: HumanAddr,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
     /// Total number of tokens issued
     NumTokens {},
 
@@ -63,7 +67,7 @@ pub struct Approval {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ApprovedForAllResponse {
-    pub operators: Vec<HumanAddr>,
+    pub operators: Vec<Approval>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -91,7 +95,6 @@ pub struct NftInfoResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-/// TODO: cleaner way of combining the two structs than cut and paste?
 pub struct AllNftInfoResponse {
     /// Who can transfer the token
     pub access: OwnerOfResponse,
@@ -101,7 +104,7 @@ pub struct AllNftInfoResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct TokensResponse {
-    /// Contains all token_ids in lexographical ordering
+    /// Contains all token_ids in lexicographical ordering
     /// If there are more than `limit`, use `start_from` in future queries
     /// to achieve pagination.
     pub tokens: Vec<String>,

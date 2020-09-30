@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cw721QueryMsg",
+  "title": "QueryMsg",
   "anyOf": [
     {
       "description": "Return the owner of the given token, error if token does not exist Return type: OwnerOfResponse",
@@ -23,7 +23,7 @@
       }
     },
     {
-      "description": "List all operators that can access all of the owner's tokens. Return type: `ApprovedForAllResponse`",
+      "description": "List all operators that can access all of the owner's tokens Return type: `ApprovedForAllResponse`",
       "type": "object",
       "required": [
         "approved_for_all"
@@ -125,40 +125,6 @@
       }
     },
     {
-      "description": "With Enumerable extension. Returns all tokens owned by the given address, [] if unset. Return type: TokensResponse.",
-      "type": "object",
-      "required": [
-        "tokens"
-      ],
-      "properties": {
-        "tokens": {
-          "type": "object",
-          "required": [
-            "owner"
-          ],
-          "properties": {
-            "limit": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "owner": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "start_after": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          }
-        }
-      }
-    },
-    {
       "description": "With Enumerable extension. Requires pagination. Lists all token_ids controlled by the contract. Return type: TokensResponse.",
       "type": "object",
       "required": [
@@ -183,6 +149,17 @@
               ]
             }
           }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "minter"
+      ],
+      "properties": {
+        "minter": {
+          "type": "object"
         }
       }
     }
