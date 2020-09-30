@@ -6,7 +6,7 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw721::{
     AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Expiration, NftInfoResponse,
-    NumTokensResponse, OwnerOfResponse,
+    NumTokensResponse, OwnerOfResponse, TokensResponse,
 };
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
@@ -387,6 +387,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             limit,
         } => to_binary(&query_all_approvals(deps, owner, start_after, limit)?),
         QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
+        QueryMsg::AllTokens { start_after, limit } => {
+            to_binary(&query_all_tokens(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -445,7 +448,7 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<ApprovedForAllResponse> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(deps.api, start_after)?;
+    let start = calc_range_start_human(deps.api, start_after)?;
 
     let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
         .range(start.as_deref(), None, Order::Ascending)
@@ -460,6 +463,22 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
         })
         .collect();
     Ok(ApprovedForAllResponse { operators: res? })
+}
+
+fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<TokensResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = calc_range_start_string(start_after);
+
+    let tokens: StdResult<Vec<String>> = tokens_read(&deps.storage)
+        .range(start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
+        .collect();
+    Ok(TokensResponse { tokens: tokens? })
 }
 
 fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
@@ -494,8 +513,11 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
     })
 }
 
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start<A: Api>(api: A, start_after: Option<HumanAddr>) -> StdResult<Option<Vec<u8>>> {
+// this will set the first key after the provided key, by appending a 0 byte
+fn calc_range_start_human<A: Api>(
+    api: A,
+    start_after: Option<HumanAddr>,
+) -> StdResult<Option<Vec<u8>>> {
     match start_after {
         Some(human) => {
             let mut v: Vec<u8> = api.canonical_address(&human)?.0.into();
@@ -504,6 +526,15 @@ fn calc_range_start<A: Api>(api: A, start_after: Option<HumanAddr>) -> StdResult
         }
         None => Ok(None),
     }
+}
+
+// this will set the first key after the provided key, by appending a 1 byte
+fn calc_range_start_string(start_after: Option<String>) -> Option<Vec<u8>> {
+    start_after.map(|token_id| {
+        let mut v: Vec<u8> = token_id.into_bytes();
+        v.push(0);
+        v
+    })
 }
 
 #[cfg(test)]
@@ -558,6 +589,10 @@ mod tests {
 
         let count = query_num_tokens(&deps).unwrap();
         assert_eq!(0, count.count);
+
+        // list the token_ids
+        let tokens = query_all_tokens(&deps, None, None).unwrap();
+        assert_eq!(0, tokens.tokens.len());
     }
 
     #[test]
@@ -629,9 +664,16 @@ mod tests {
         let allowed = mock_env(MINTER, &[]);
         let err = handle(&mut deps, allowed, mint_msg2).unwrap_err();
         match err {
-            StdError::GenericErr { msg, .. } => assert_eq!(msg.as_str(), "token_id already claimed"),
+            StdError::GenericErr { msg, .. } => {
+                assert_eq!(msg.as_str(), "token_id already claimed")
+            }
             e => panic!("unexpected error: {}", e),
         }
+
+        // list the token_ids
+        let tokens = query_all_tokens(&deps, None, None).unwrap();
+        assert_eq!(1, tokens.tokens.len());
+        assert_eq!(vec![token_id], tokens.tokens);
     }
 
     #[test]
@@ -876,6 +918,14 @@ mod tests {
         };
 
         handle(&mut deps, minter, mint_msg2).unwrap();
+
+        // paginate the token_ids
+        let tokens = query_all_tokens(&deps, None, Some(1)).unwrap();
+        assert_eq!(1, tokens.tokens.len());
+        assert_eq!(vec![token_id1.clone()], tokens.tokens);
+        let tokens = query_all_tokens(&deps, Some(token_id1.clone()), Some(3)).unwrap();
+        assert_eq!(1, tokens.tokens.len());
+        assert_eq!(vec![token_id2.clone()], tokens.tokens);
 
         // demeter gives random full (operator) power over her tokens
         let approve_all_msg = HandleMsg::ApproveAll {
