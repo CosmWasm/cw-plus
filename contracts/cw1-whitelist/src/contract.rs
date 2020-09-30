@@ -3,11 +3,12 @@ use std::fmt;
 
 use cosmwasm_std::{
     attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage,
+    HumanAddr, InitResponse, Querier, StdResult, Storage,
 };
 use cw1::CanSendResponse;
 use cw2::set_contract_version;
 
+use crate::error::ContractError;
 use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{admin_list, admin_list_read, AdminList};
 
@@ -46,7 +47,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse<Empty>, ContractError> {
     match msg {
         HandleMsg::Execute { msgs } => handle_execute(deps, env, msgs),
         HandleMsg::Freeze {} => handle_freeze(deps, env),
@@ -58,12 +59,12 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msgs: Vec<CosmosMsg<T>>,
-) -> StdResult<HandleResponse<T>>
+) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     if !can_send(&deps, &env.message.sender)? {
-        Err(StdError::unauthorized())
+        Err(ContractError::Unauthorized {})
     } else {
         let mut res = HandleResponse::default();
         res.messages = msgs;
@@ -75,10 +76,10 @@ where
 pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let mut cfg = admin_list_read(&deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
-        Err(StdError::unauthorized())
+        Err(ContractError::Unauthorized {})
     } else {
         cfg.mutable = false;
         admin_list(&mut deps.storage).save(&cfg)?;
@@ -93,10 +94,10 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     admins: Vec<HumanAddr>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let mut cfg = admin_list_read(&deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
-        Err(StdError::unauthorized())
+        Err(ContractError::Unauthorized {})
     } else {
         cfg.admins = map_canonical(&deps.api, &admins)?;
         admin_list(&mut deps.storage).save(&cfg)?;
@@ -150,7 +151,7 @@ pub fn query_can_send<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -186,7 +187,7 @@ mod tests {
         let env = mock_env(&anyone, &[]);
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -208,7 +209,7 @@ mod tests {
         let env = mock_env(&carl, &[]);
         let res = handle(&mut deps, env, HandleMsg::Freeze {});
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -228,7 +229,7 @@ mod tests {
         let env = mock_env(&alice, &[]);
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
     }
@@ -272,7 +273,7 @@ mod tests {
         let env = mock_env(&bob, &[]);
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
