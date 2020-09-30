@@ -5,7 +5,7 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 
-use cw0::Expiration;
+use cw0::{calc_range_start_human, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
@@ -383,7 +383,7 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<VoteListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after);
+    let start = calc_range_start_human(deps.api, start_after)?;
     let api = &deps.api;
 
     let votes: StdResult<Vec<_>> = ballots_read(&deps.storage, proposal_id)
@@ -422,7 +422,7 @@ fn list_voters<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after);
+    let start = calc_range_start_human(deps.api, start_after)?;
     let api = &deps.api;
 
     let voters: StdResult<Vec<_>> = voters_read(&deps.storage)
@@ -438,15 +438,6 @@ fn list_voters<S: Storage, A: Api, Q: Querier>(
         .collect();
 
     Ok(VoterListResponse { voters: voters? })
-}
-
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
-    start_after.map(|human| {
-        let mut v = Vec::from(human.0);
-        v.push(1);
-        v
-    })
 }
 
 #[cfg(test)]
