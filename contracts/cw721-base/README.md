@@ -7,9 +7,27 @@ cw721-compatible NFTs with custom logic.
 
 Implements:
 
-- [ ] CW721 Base
-- [ ] Metadata extension
-- [ ] Enumerable extension
+- [x] CW721 Base
+- [x] Metadata extension
+- [ ] Enumerable extension (AllTokens done, but not Tokens - requires [#81](https://github.com/CosmWasm/cosmwasm-plus/issues/81))
+
+## Implementation
+
+The `HandleMsg` and `QueryMsg` implementations follow the [CW721 spec](../../packages/cw721/README.md) and are described there.
+Beyond that, we make a few additions:
+
+* `InitMsg` takes name and symbol (for metadata), as well as a **Minter** address. This is a special address that has full 
+power to mint new NFTs (but not modify existing ones)
+* `HandleMsg::Mint{token_id, owner, name, description, image}` - creates a new token with given owner and metadata. It can only be called by
+the Minter set in `init`.
+* `QueryMsg::Minter{}` - returns the minter address for this contract.
+
+It requires all tokens to have defined metadata in the standard format (with no extensions). For generic NFTs this may
+often be enough.
+
+The *Minter* can either be an external actor (eg. web server, using PubKey) or another contract. If you just want to customize
+the minting behavior but not other functionality, you could extend this contract (importing code and wiring it together)
+or just create a custom contract as the owner and use that contract to Mint.
 
 ## Running this contract
 
@@ -53,4 +71,8 @@ calls, but then use the underlying implementation for the standard cw721
 messages you want to support. The same with `QueryMsg`. You will most
 likely want to write a custom, domain-specific `init`.
 
-**TODO: add example**
+**TODO: add example when written**
+
+For now, you can look at [`cw20-staking`](../cw20-staking/README.md)
+for an example of how to "inherit" cw20 functionality and combine it with custom logic.
+The process is similar for cw721.
