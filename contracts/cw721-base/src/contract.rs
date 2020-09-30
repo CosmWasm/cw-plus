@@ -5,8 +5,8 @@ use cosmwasm_std::{
 
 use cw2::set_contract_version;
 use cw721::{
-    AllNftInfoResponse, ContractInfoResponse, Expiration, NftInfoResponse, NumTokensResponse,
-    OwnerOfResponse,
+    AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Expiration, NftInfoResponse,
+    NumTokensResponse, OwnerOfResponse,
 };
 
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
@@ -381,7 +381,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info(deps, token_id)?),
         QueryMsg::OwnerOf { token_id } => to_binary(&query_owner_of(deps, token_id)?),
         QueryMsg::AllNftInfo { token_id } => to_binary(&query_all_nft_info(deps, token_id)?),
-        QueryMsg::ApprovedForAll { owner: _ } => panic!("not implemented"),
+        QueryMsg::ApprovedForAll { owner } => to_binary(&query_all_approvals(deps, owner)?),
         QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
     }
 }
@@ -430,6 +430,27 @@ fn query_owner_of<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
+    _deps: &Extern<S, A, Q>,
+    _owner: HumanAddr,
+) -> StdResult<ApprovedForAllResponse> {
+    // FIXME!
+    /*
+    let owner_raw = deps.api.canonical_address(&owner)?;
+    let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
+        .range(None, None, Order::Ascending)
+        .map(|item| {
+            item.and_then(|(k, _)| {
+                let human_addr = deps.api.human_address(&CanonicalAddr::from(k))?;
+                Ok(human_addr)
+            })
+        })
+        .collect();
+    Ok(ApprovedForAllResponse { operators: res? })
+    */
+    Ok(ApprovedForAllResponse { operators: vec![] })
+}
+
 fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: String,
@@ -468,6 +489,7 @@ mod tests {
     use cosmwasm_std::{StdError, WasmMsg};
 
     use super::*;
+    use cw721::ApprovedForAllResponse;
 
     const MINTER: &str = "merlin";
     const CONTRACT_NAME: &str = "Magic Power";
@@ -663,14 +685,14 @@ mod tests {
         };
         let msg: CosmosMsg = CosmosMsg::Wasm(inner_msg);
 
-        let transfer_msg = HandleMsg::SendNft {
+        let send_msg = HandleMsg::SendNft {
             contract: "another_contract".into(),
             token_id: token_id.clone(),
             msg: Some(to_binary(&msg).unwrap()),
         };
 
         let random = mock_env("random", &[]);
-        let err = handle(&mut deps, random, transfer_msg.clone()).unwrap_err();
+        let err = handle(&mut deps, random, send_msg.clone()).unwrap_err();
         match err {
             StdError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -678,7 +700,7 @@ mod tests {
 
         // but owner can
         let random = mock_env("venus", &[]);
-        let res = handle(&mut deps, random, transfer_msg).unwrap();
+        let res = handle(&mut deps, random, send_msg).unwrap();
         assert_eq!(
             res,
             HandleResponse {
@@ -745,7 +767,7 @@ mod tests {
         };
         handle(&mut deps, random, transfer_msg).unwrap();
 
-        // Approvals are now removed / cleared
+        // Approvals are removed / cleared
         let query_msg = QueryMsg::OwnerOf {
             token_id: token_id.clone(),
         };
@@ -758,7 +780,7 @@ mod tests {
             }
         );
 
-        // Approve / revoke and check for empty, to test revoke
+        // Approve, revoke, and check for empty, to test revoke
         let approve_msg = HandleMsg::Approve {
             spender: "random".into(),
             token_id: token_id.clone(),
@@ -782,5 +804,104 @@ mod tests {
                 approvals: vec![],
             }
         );
+    }
+
+    #[test]
+    fn approving_all_revoking_all() {
+        let mut deps = mock_dependencies(20, &[]);
+        setup_contract(&mut deps);
+
+        // Mint a couple tokens (from the same owner)
+        let token_id1 = "grow1".to_string();
+        let name1 = "Growing power".to_string();
+        let description1 = "Allows the owner the power to grow anything".to_string();
+        let token_id2 = "grow2".to_string();
+        let name2 = "Growing power".to_string();
+        let description2 = "Allows the owner the power to grow anything".to_string();
+
+        let mint_msg1 = HandleMsg::Mint {
+            token_id: token_id1.clone(),
+            owner: "demeter".into(),
+            name: name1.clone(),
+            description: Some(description1.clone()),
+            image: None,
+        };
+
+        let minter = mock_env(MINTER, &[]);
+        handle(&mut deps, minter.clone(), mint_msg1).unwrap();
+
+        let mint_msg2 = HandleMsg::Mint {
+            token_id: token_id2.clone(),
+            owner: "demeter".into(),
+            name: name2.clone(),
+            description: Some(description2.clone()),
+            image: None,
+        };
+
+        handle(&mut deps, minter, mint_msg2).unwrap();
+
+        // demeter gives random full (operator) power over her tokens
+        let approve_all_msg = HandleMsg::ApproveAll {
+            operator: "random".into(),
+            expires: None,
+        };
+        let owner = mock_env("demeter", &[]);
+        let res = handle(&mut deps, owner, approve_all_msg).unwrap();
+        assert_eq!(
+            res,
+            HandleResponse {
+                messages: vec![],
+                log: vec![
+                    log("action", "approve_all"),
+                    log("sender", "demeter"),
+                    log("operator", "random"),
+                ],
+                data: None,
+            }
+        );
+
+        // random can now transfer
+        let random = mock_env("random", &[]);
+        let transfer_msg = HandleMsg::TransferNft {
+            recipient: "person".into(),
+            token_id: token_id1.clone(),
+        };
+        handle(&mut deps, random.clone(), transfer_msg).unwrap();
+
+        // random can now send
+        let inner_msg = WasmMsg::Execute {
+            contract_addr: "another_contract".into(),
+            msg: to_binary("You now also have the growing power").unwrap(),
+            send: vec![],
+        };
+        let msg: CosmosMsg = CosmosMsg::Wasm(inner_msg);
+
+        let send_msg = HandleMsg::SendNft {
+            contract: "another_contract".into(),
+            token_id: token_id2.clone(),
+            msg: Some(to_binary(&msg).unwrap()),
+        };
+        handle(&mut deps, random, send_msg).unwrap();
+
+        // Approve_all, revoke_all, and check for empty, to test revoke_all
+        let approve_all_msg = HandleMsg::ApproveAll {
+            operator: "operator".into(),
+            expires: None,
+        };
+        // person is now the owner of the tokens
+        let owner = mock_env("person", &[]);
+        handle(&mut deps, owner.clone(), approve_all_msg).unwrap();
+
+        let revoke_all_msg = HandleMsg::RevokeAll {
+            operator: "operator".into(),
+        };
+        handle(&mut deps, owner, revoke_all_msg).unwrap();
+
+        // Approvals are removed / cleared
+        let query_msg = QueryMsg::ApprovedForAll {
+            owner: "person".into(),
+        };
+        let res: ApprovedForAllResponse = from_binary(&query(&deps, query_msg).unwrap()).unwrap();
+        assert_eq!(res, ApprovedForAllResponse { operators: vec![] });
     }
 }
