@@ -445,7 +445,7 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<ApprovedForAllResponse> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after);
+    let start = calc_range_start(deps.api, start_after)?;
 
     let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
         .range(start.as_deref(), None, Order::Ascending)
@@ -495,12 +495,15 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
 }
 
 // this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
-    start_after.map(|human| {
-        let mut v = Vec::from(human.0);
-        v.push(1);
-        v
-    })
+fn calc_range_start<A: Api>(api: A, start_after: Option<HumanAddr>) -> StdResult<Option<Vec<u8>>> {
+    match start_after {
+        Some(human) => {
+            let mut v: Vec<u8> = api.canonical_address(&human)?.0.into();
+            v.push(0);
+            Ok(Some(v))
+        }
+        None => Ok(None),
+    }
 }
 
 #[cfg(test)]
@@ -923,13 +926,53 @@ mod tests {
             }
         );
 
+        // second approval
+        let buddy_expires = Expiration::AtHeight(1234567);
+        let approve_all_msg = HandleMsg::ApproveAll {
+            operator: "buddy".into(),
+            expires: Some(buddy_expires),
+        };
+        let owner = mock_env("person", &[]);
+        handle(&mut deps, owner.clone(), approve_all_msg).unwrap();
+
+        // and paginate queries
+        let res = query_all_approvals(&deps, "person".into(), None, Some(1)).unwrap();
+        assert_eq!(
+            res,
+            ApprovedForAllResponse {
+                operators: vec![cw721::Approval {
+                    spender: "buddy".into(),
+                    expires: buddy_expires,
+                }]
+            }
+        );
+        let res =
+            query_all_approvals(&deps, "person".into(), Some("buddy".into()), Some(2)).unwrap();
+        assert_eq!(
+            res,
+            ApprovedForAllResponse {
+                operators: vec![cw721::Approval {
+                    spender: "operator".into(),
+                    expires: Expiration::Never {}
+                }]
+            }
+        );
+
         let revoke_all_msg = HandleMsg::RevokeAll {
             operator: "operator".into(),
         };
         handle(&mut deps, owner, revoke_all_msg).unwrap();
 
-        // Approvals are removed / cleared
+        // Approvals are removed / cleared without affecting others
         let res = query_all_approvals(&deps, "person".into(), None, None).unwrap();
-        assert_eq!(res, ApprovedForAllResponse { operators: vec![] });
+        assert_eq!(
+            res,
+            ApprovedForAllResponse {
+                operators: vec![cw721::Approval {
+                    spender: "buddy".into(),
+                    expires: buddy_expires,
+                }]
+            }
+        );
     }
 }
