@@ -81,9 +81,9 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     image: Option<String>,
 ) -> StdResult<HandleResponse> {
     let minter = mint(&mut deps.storage).load()?;
-    let minter_human = deps.api.human_address(&minter)?;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
-    if minter_human != env.message.sender {
+    if sender_raw != minter {
         return Err(StdError::unauthorized());
     }
 
@@ -106,7 +106,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         log: vec![
             log("action", "mint"),
-            log("minter", minter_human),
+            log("minter", env.message.sender),
             log("token_id", token_id),
         ],
         data: None,
