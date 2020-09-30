@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     from_binary, log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StdError, StdResult, Storage,
+    InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 
 use cw2::set_contract_version;
@@ -431,24 +431,15 @@ fn query_owner_of<S: Storage, A: Api, Q: Querier>(
 }
 
 fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
-    _deps: &Extern<S, A, Q>,
-    _owner: HumanAddr,
+    deps: &Extern<S, A, Q>,
+    owner: HumanAddr,
 ) -> StdResult<ApprovedForAllResponse> {
-    // FIXME!
-    /*
     let owner_raw = deps.api.canonical_address(&owner)?;
     let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
         .range(None, None, Order::Ascending)
-        .map(|item| {
-            item.and_then(|(k, _)| {
-                let human_addr = deps.api.human_address(&CanonicalAddr::from(k))?;
-                Ok(human_addr)
-            })
-        })
+        .map(|item| item.and_then(|(k, _)| deps.api.human_address(&k.into())))
         .collect();
     Ok(ApprovedForAllResponse { operators: res? })
-    */
-    Ok(ApprovedForAllResponse { operators: vec![] })
 }
 
 fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
@@ -892,16 +883,16 @@ mod tests {
         let owner = mock_env("person", &[]);
         handle(&mut deps, owner.clone(), approve_all_msg).unwrap();
 
+        let res = query_all_approvals(&deps, "person".into()).unwrap();
+        assert_eq!(res, ApprovedForAllResponse { operators: vec!["operator".into()] });
+
         let revoke_all_msg = HandleMsg::RevokeAll {
             operator: "operator".into(),
         };
         handle(&mut deps, owner, revoke_all_msg).unwrap();
 
         // Approvals are removed / cleared
-        let query_msg = QueryMsg::ApprovedForAll {
-            owner: "person".into(),
-        };
-        let res: ApprovedForAllResponse = from_binary(&query(&deps, query_msg).unwrap()).unwrap();
+        let res = query_all_approvals(&deps, "person".into()).unwrap();
         assert_eq!(res, ApprovedForAllResponse { operators: vec![] });
     }
 }
