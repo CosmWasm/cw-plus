@@ -807,8 +807,8 @@ mod tests {
         let name1 = "Growing power".to_string();
         let description1 = "Allows the owner the power to grow anything".to_string();
         let token_id2 = "grow2".to_string();
-        let name2 = "Growing power".to_string();
-        let description2 = "Allows the owner the power to grow anything".to_string();
+        let name2 = "More growing power".to_string();
+        let description2 = "Allows the owner the power to grow anything even faster".to_string();
 
         let mint_msg1 = HandleMsg::Mint {
             token_id: token_id1.clone(),
@@ -884,7 +884,12 @@ mod tests {
         handle(&mut deps, owner.clone(), approve_all_msg).unwrap();
 
         let res = query_all_approvals(&deps, "person".into()).unwrap();
-        assert_eq!(res, ApprovedForAllResponse { operators: vec!["operator".into()] });
+        assert_eq!(
+            res,
+            ApprovedForAllResponse {
+                operators: vec!["operator".into()]
+            }
+        );
 
         let revoke_all_msg = HandleMsg::RevokeAll {
             operator: "operator".into(),
