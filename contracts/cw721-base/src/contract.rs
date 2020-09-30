@@ -617,7 +617,21 @@ mod tests {
             }
         );
 
-        // TODO: Cannot mint same token again
+        // Cannot mint same token_id again
+        let mint_msg2 = HandleMsg::Mint {
+            token_id: token_id.clone(),
+            owner: "hercules".into(),
+            name: "copy cat".into(),
+            description: None,
+            image: None,
+        };
+
+        let allowed = mock_env(MINTER, &[]);
+        let err = handle(&mut deps, allowed, mint_msg2).unwrap_err();
+        match err {
+            StdError::GenericErr { msg, .. } => assert_eq!(msg.as_str(), "token_id already claimed"),
+            e => panic!("unexpected error: {}", e),
+        }
     }
 
     #[test]
