@@ -3,6 +3,7 @@ use cosmwasm_std::{
     InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 
+use cw0::{calc_range_start_human, calc_range_start_string};
 use cw2::set_contract_version;
 use cw721::{
     AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Expiration, NftInfoResponse,
@@ -510,30 +511,6 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
     Ok(cw721::Approval {
         spender: api.human_address(&approval.spender)?,
         expires: approval.expires,
-    })
-}
-
-// this will set the first key after the provided key, by appending a 0 byte
-fn calc_range_start_human<A: Api>(
-    api: A,
-    start_after: Option<HumanAddr>,
-) -> StdResult<Option<Vec<u8>>> {
-    match start_after {
-        Some(human) => {
-            let mut v: Vec<u8> = api.canonical_address(&human)?.0.into();
-            v.push(0);
-            Ok(Some(v))
-        }
-        None => Ok(None),
-    }
-}
-
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start_string(start_after: Option<String>) -> Option<Vec<u8>> {
-    start_after.map(|token_id| {
-        let mut v: Vec<u8> = token_id.into_bytes();
-        v.push(0);
-        v
     })
 }
 

@@ -22,6 +22,7 @@ library = []
 [dependencies]
 cosmwasm-std = { version = "0.10.1" }
 cosmwasm-storage = { version = "0.10.1", features = ["iterator"] }
+cw0 = { path = "../../packages/cw0", version = "0.2.1" }
 cw2 = { path = "../../packages/cw2", version = "0.2.1" }
 cw721 = { path = "../../packages/cw721", version = "0.2.1" }
 schemars = "0.7"
