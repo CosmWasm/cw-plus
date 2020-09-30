@@ -3,6 +3,11 @@ name = "cw721-base"
 version = "0.2.2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
+description = "Basic implementation cw721 NFTs"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cosmwasm-plus"
+homepage = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
