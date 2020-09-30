@@ -4,6 +4,7 @@ use cosmwasm_std::{
     from_binary, log, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
 };
+use cw0::calc_range_start_string;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
@@ -266,19 +267,10 @@ fn query_list<S: Storage, A: Api, Q: Querier>(
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<ListResponse> {
-    let start = calc_range_start(start_after);
+    let start = calc_range_start_string(start_after);
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     Ok(ListResponse {
         swaps: all_swap_ids(&deps.storage, start, limit)?,
-    })
-}
-
-// This will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start(start_after: Option<String>) -> Option<Vec<u8>> {
-    start_after.map(|id| {
-        let mut v = Vec::from(id);
-        v.push(1);
-        v
     })
 }
 

@@ -6,7 +6,7 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, Order, Querier, StakingMsg, StdError, StdResult,
     Storage,
 };
-use cw0::Expiration;
+use cw0::{calc_range_start_human, Expiration};
 use cw1::CanSendResponse;
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
@@ -371,18 +371,6 @@ fn calc_limit(request: Option<u32>) -> usize {
     request.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize
 }
 
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
-    match start_after {
-        Some(human) => {
-            let mut v = Vec::from(human.0);
-            v.push(1);
-            Some(v)
-        }
-        None => None,
-    }
-}
-
 // return a list of all allowances here
 pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
@@ -390,7 +378,7 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<AllAllowancesResponse> {
     let limit = calc_limit(limit);
-    let range_start = calc_range_start(start_after);
+    let range_start = calc_range_start_human(deps.api, start_after)?;
 
     let api = &deps.api;
     let res: StdResult<Vec<AllowanceInfo>> = allowances_read(&deps.storage)
@@ -416,7 +404,7 @@ pub fn query_all_permissions<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<AllPermissionsResponse> {
     let limit = calc_limit(limit);
-    let range_start = calc_range_start(start_after);
+    let range_start = calc_range_start_human(deps.api, start_after)?;
 
     let api = &deps.api;
     let res: StdResult<Vec<PermissionsInfo>> = permissions_read(&deps.storage)

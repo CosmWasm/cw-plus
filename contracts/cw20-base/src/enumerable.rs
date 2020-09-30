@@ -1,6 +1,7 @@
 use cosmwasm_std::{
     Api, CanonicalAddr, Extern, HumanAddr, Order, Querier, ReadonlyStorage, StdResult, Storage,
 };
+use cw0::calc_range_start_human;
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
 use crate::state::{allowances_read, balances_prefix_read};
@@ -17,7 +18,7 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<AllAllowancesResponse> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after);
+    let start = calc_range_start_human(deps.api, start_after)?;
     let api = &deps.api;
 
     let allowances: StdResult<Vec<AllowanceInfo>> = allowances_read(&deps.storage, &owner_raw)
@@ -43,7 +44,7 @@ pub fn query_all_accounts<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<AllAccountsResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start(start_after);
+    let start = calc_range_start_human(deps.api, start_after)?;
     let api = &deps.api;
 
     let accounts: StdResult<Vec<_>> = balances_prefix_read(&deps.storage)
@@ -54,15 +55,6 @@ pub fn query_all_accounts<S: Storage, A: Api, Q: Querier>(
 
     Ok(AllAccountsResponse {
         accounts: accounts?,
-    })
-}
-
-// this will set the first key after the provided key, by appending a 1 byte
-fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
-    start_after.map(|human| {
-        let mut v = Vec::from(human.0);
-        v.push(1);
-        v
     })
 }
 
