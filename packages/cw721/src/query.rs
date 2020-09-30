@@ -10,9 +10,13 @@ pub enum Cw721QueryMsg {
     /// Return the owner of the given token, error if token does not exist
     /// Return type: OwnerOfResponse
     OwnerOf { token_id: String },
-    /// List all operators that can access all of the owner's tokens
+    /// List all operators that can access all of the owner's tokens.
     /// Return type: `ApprovedForAllResponse`
-    ApprovedForAll { owner: HumanAddr },
+    ApprovedForAll {
+        owner: HumanAddr,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    },
     /// Total number of tokens issued
     NumTokens {},
 
@@ -63,7 +67,7 @@ pub struct Approval {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ApprovedForAllResponse {
-    pub operators: Vec<HumanAddr>,
+    pub operators: Vec<Approval>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

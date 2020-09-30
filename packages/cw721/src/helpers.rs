@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Cw721HandleMsg,
+    AllNftInfoResponse, Approval, ApprovedForAllResponse, ContractInfoResponse, Cw721HandleMsg,
     Cw721QueryMsg, NftInfoResponse, NumTokensResponse, OwnerOfResponse, TokensResponse,
 };
 
@@ -68,9 +68,13 @@ impl Cw721Contract {
         &self,
         querier: &Q,
         owner: T,
-    ) -> StdResult<Vec<HumanAddr>> {
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    ) -> StdResult<Vec<Approval>> {
         let req = Cw721QueryMsg::ApprovedForAll {
             owner: owner.into(),
+            start_after,
+            limit,
         };
         let res: ApprovedForAllResponse = self.query(querier, req)?;
         Ok(res.operators)

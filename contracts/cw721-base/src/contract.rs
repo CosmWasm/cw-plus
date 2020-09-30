@@ -381,7 +381,11 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info(deps, token_id)?),
         QueryMsg::OwnerOf { token_id } => to_binary(&query_owner_of(deps, token_id)?),
         QueryMsg::AllNftInfo { token_id } => to_binary(&query_all_nft_info(deps, token_id)?),
-        QueryMsg::ApprovedForAll { owner } => to_binary(&query_all_approvals(deps, owner)?),
+        QueryMsg::ApprovedForAll {
+            owner,
+            start_after,
+            limit,
+        } => to_binary(&query_all_approvals(deps, owner, start_after, limit)?),
         QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
     }
 }
@@ -430,14 +434,30 @@ fn query_owner_of<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+const DEFAULT_LIMIT: u32 = 10;
+const MAX_LIMIT: u32 = 30;
+
 fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     owner: HumanAddr,
+    start_after: Option<HumanAddr>,
+    limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
     let owner_raw = deps.api.canonical_address(&owner)?;
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = calc_range_start(start_after);
+
     let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
-        .range(None, None, Order::Ascending)
-        .map(|item| item.and_then(|(k, _)| deps.api.human_address(&k.into())))
+        .range(start.as_deref(), None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.and_then(|(k, expires)| {
+                Ok(cw721::Approval {
+                    spender: deps.api.human_address(&k.into())?,
+                    expires,
+                })
+            })
+        })
         .collect();
     Ok(ApprovedForAllResponse { operators: res? })
 }
@@ -471,6 +491,15 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
     Ok(cw721::Approval {
         spender: api.human_address(&approval.spender)?,
         expires: approval.expires,
+    })
+}
+
+// this will set the first key after the provided key, by appending a 1 byte
+fn calc_range_start(start_after: Option<HumanAddr>) -> Option<Vec<u8>> {
+    start_after.map(|human| {
+        let mut v = Vec::from(human.0);
+        v.push(1);
+        v
     })
 }
 
@@ -883,11 +912,14 @@ mod tests {
         let owner = mock_env("person", &[]);
         handle(&mut deps, owner.clone(), approve_all_msg).unwrap();
 
-        let res = query_all_approvals(&deps, "person".into()).unwrap();
+        let res = query_all_approvals(&deps, "person".into(), None, None).unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
-                operators: vec!["operator".into()]
+                operators: vec![cw721::Approval {
+                    spender: "operator".into(),
+                    expires: Expiration::Never {}
+                }]
             }
         );
 
@@ -897,7 +929,7 @@ mod tests {
         handle(&mut deps, owner, revoke_all_msg).unwrap();
 
         // Approvals are removed / cleared
-        let res = query_all_approvals(&deps, "person".into()).unwrap();
+        let res = query_all_approvals(&deps, "person".into(), None, None).unwrap();
         assert_eq!(res, ApprovedForAllResponse { operators: vec![] });
     }
 }

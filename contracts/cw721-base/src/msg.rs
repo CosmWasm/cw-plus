@@ -82,6 +82,8 @@ pub enum QueryMsg {
     /// Return type: `ApprovedForAllResponse`
     ApprovedForAll {
         owner: HumanAddr,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
     },
     /// Total number of tokens issued
     NumTokens {},

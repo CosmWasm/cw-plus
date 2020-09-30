@@ -23,7 +23,7 @@
       }
     },
     {
-      "description": "List all operators that can access all of the owner's tokens Return type: `ApprovedForAllResponse`",
+      "description": "List all operators that can access all of the owner's tokens. Return type: `ApprovedForAllResponse`",
       "type": "object",
       "required": [
         "approved_for_all"
@@ -35,8 +35,26 @@
             "owner"
           ],
           "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
             "owner": {
               "$ref": "#/definitions/HumanAddr"
+            },
+            "start_after": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }
