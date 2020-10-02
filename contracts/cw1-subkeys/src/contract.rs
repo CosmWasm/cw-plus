@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use std::fmt;
+use std::ops::{AddAssign, Sub};
 
 use cosmwasm_std::{
     attr, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
@@ -15,15 +16,14 @@ use cw1_whitelist::{
 };
 use cw2::set_contract_version;
 
+use crate::error::ContractError;
 use crate::msg::{
     AllAllowancesResponse, AllPermissionsResponse, AllowanceInfo, HandleMsg, PermissionsInfo,
     QueryMsg,
 };
 use crate::state::{
-    allowances, allowances_read, permissions, permissions_read, Allowance, PermissionErr,
-    Permissions,
+    allowances, allowances_read, permissions, permissions_read, Allowance, Permissions,
 };
-use std::ops::{AddAssign, Sub};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
@@ -45,11 +45,11 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse<Empty>, ContractError> {
     match msg {
         HandleMsg::Execute { msgs } => handle_execute(deps, env, msgs),
-        HandleMsg::Freeze {} => handle_freeze(deps, env),
-        HandleMsg::UpdateAdmins { admins } => handle_update_admins(deps, env, admins),
+        HandleMsg::Freeze {} => Ok(handle_freeze(deps, env)?),
+        HandleMsg::UpdateAdmins { admins } => Ok(handle_update_admins(deps, env, admins)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
@@ -71,7 +71,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msgs: Vec<CosmosMsg<T>>,
-) -> StdResult<HandleResponse<T>>
+) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -89,8 +89,7 @@ where
                 CosmosMsg::Staking(staking_msg) => {
                     let permissions = permissions(&mut deps.storage);
                     let perm = permissions.may_load(owner_raw.as_slice())?;
-                    let perm =
-                        perm.ok_or_else(|| StdError::not_found("No permissions for this account"))?;
+                    let perm = perm.ok_or_else(|| ContractError::NotAllowed {})?;
 
                     check_staking_permissions(staking_msg, perm)?;
                 }
@@ -101,14 +100,13 @@ where
                 }) => {
                     let mut allowances = allowances(&mut deps.storage);
                     let allow = allowances.may_load(owner_raw.as_slice())?;
-                    let mut allowance = allow
-                        .ok_or_else(|| StdError::not_found("No allowance for this account"))?;
+                    let mut allowance = allow.ok_or_else(|| ContractError::NoAllowance {})?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
                 }
                 _ => {
-                    return Err(StdError::generic_err("Message type rejected"));
+                    return Err(ContractError::MessageTypeRejected {});
                 }
             }
         }
@@ -125,26 +123,26 @@ where
 pub fn check_staking_permissions(
     staking_msg: &StakingMsg,
     permissions: Permissions,
-) -> Result<bool, PermissionErr> {
+) -> Result<bool, ContractError> {
     match staking_msg {
         StakingMsg::Delegate { .. } => {
             if !permissions.delegate {
-                return Err(PermissionErr::Delegate {});
+                return Err(ContractError::DelegatePerm {});
             }
         }
         StakingMsg::Undelegate { .. } => {
             if !permissions.undelegate {
-                return Err(PermissionErr::Undelegate {});
+                return Err(ContractError::UnDelegatePerm {});
             }
         }
         StakingMsg::Redelegate { .. } => {
             if !permissions.redelegate {
-                return Err(PermissionErr::Redelegate {});
+                return Err(ContractError::ReDelegatePerm {});
             }
         }
         StakingMsg::Withdraw { .. } => {
             if !permissions.withdraw {
-                return Err(PermissionErr::Withdraw {});
+                return Err(ContractError::WithdrawPerm {});
             }
         }
     }
@@ -157,7 +155,7 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
     spender: HumanAddr,
     amount: Coin,
     expires: Option<Expiration>,
-) -> StdResult<HandleResponse<T>>
+) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -166,10 +164,10 @@ where
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
     if !cfg.is_admin(&owner_raw) {
-        return Err(StdError::unauthorized());
+        return Err(ContractError::Unauthorized {});
     }
     if spender_raw == owner_raw {
-        return Err(StdError::generic_err("Cannot set allowance to own account"));
+        return Err(ContractError::CannotSetOwnAccount {});
     }
 
     allowances(&mut deps.storage).update::<_, StdError>(spender_raw.as_slice(), |allow| {
@@ -201,7 +199,7 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier, T>(
     spender: HumanAddr,
     amount: Coin,
     expires: Option<Expiration>,
-) -> StdResult<HandleResponse<T>>
+) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -210,23 +208,24 @@ where
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
     if !cfg.is_admin(&owner_raw) {
-        return Err(StdError::unauthorized());
+        return Err(ContractError::Unauthorized {});
     }
     if spender_raw == owner_raw {
-        return Err(StdError::generic_err("Cannot set allowance to own account"));
+        return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let allowance =
-        allowances(&mut deps.storage).update::<_, StdError>(spender_raw.as_slice(), |allow| {
+    let allowance = allowances(&mut deps.storage).update::<_, ContractError>(
+        spender_raw.as_slice(),
+        |allow| {
             // Fail fast
-            let mut allowance =
-                allow.ok_or_else(|| StdError::not_found("No allowance for this account"))?;
+            let mut allowance = allow.ok_or_else(|| ContractError::NoAllowance {})?;
             if let Some(exp) = expires {
                 allowance.expires = exp;
             }
             allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
             Ok(allowance)
-        })?;
+        },
+    )?;
     if allowance.balance.is_empty() {
         allowances(&mut deps.storage).remove(spender_raw.as_slice());
     }
@@ -250,7 +249,7 @@ pub fn handle_set_permissions<S: Storage, A: Api, Q: Querier, T>(
     env: Env,
     spender: HumanAddr,
     perm: Permissions,
-) -> StdResult<HandleResponse<T>>
+) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -259,12 +258,10 @@ where
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
     if !cfg.is_admin(&owner_raw) {
-        return Err(StdError::unauthorized());
+        return Err(ContractError::Unauthorized {});
     }
     if spender_raw == owner_raw {
-        return Err(StdError::generic_err(
-            "Cannot set permission to own account",
-        ));
+        return Err(ContractError::CannotSetPermOwnAccount {});
     }
     permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm)?;
 
@@ -425,13 +422,16 @@ pub fn query_all_permissions<S: Storage, A: Api, Q: Querier>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::state::Permissions;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, StakingMsg};
+
     use cw0::NativeBalance;
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
+
+    use crate::state::Permissions;
+
+    use super::*;
 
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
@@ -677,7 +677,7 @@ mod tests {
                 delegate: false,
                 redelegate: false,
                 undelegate: false,
-                withdraw: false
+                withdraw: false,
             },
         );
 
@@ -689,7 +689,7 @@ mod tests {
                 delegate: false,
                 redelegate: false,
                 undelegate: false,
-                withdraw: false
+                withdraw: false,
             },
         );
 
@@ -1167,7 +1167,7 @@ mod tests {
         let env = mock_env(&spender2, &[]);
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
+            ContractError::NoAllowance { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -1183,7 +1183,7 @@ mod tests {
         // And then cannot (not enough funds anymore)
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(Underflow) => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -1214,7 +1214,7 @@ mod tests {
         let env = mock_env(&spender1, &[]);
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Message type rejected"),
+            ContractError::MessageTypeRejected { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
     }

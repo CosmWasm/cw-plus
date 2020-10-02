@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, StdError, Storage};
+use cosmwasm_std::{ReadonlyStorage, Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::{Expiration, NativeBalance};
 
@@ -40,31 +40,6 @@ pub fn permissions<S: Storage>(storage: &mut S) -> Bucket<S, Permissions> {
 /// (read-only version for queries)
 pub fn permissions_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Permissions> {
     bucket_read(storage, PREFIX_PERMISSIONS)
-}
-
-pub enum PermissionErr {
-    Delegate {},
-    Redelegate {},
-    Undelegate {},
-    Withdraw {},
-}
-
-impl Into<String> for PermissionErr {
-    fn into(self) -> String {
-        String::from(match self {
-            PermissionErr::Redelegate {} => "Redelegate is not allowed",
-            PermissionErr::Delegate {} => "Delegate is not allowed",
-            PermissionErr::Undelegate {} => "Undelegate is not allowed",
-            PermissionErr::Withdraw {} => "Withdraw is not allowed",
-        })
-    }
-}
-
-impl From<PermissionErr> for StdError {
-    fn from(err: PermissionErr) -> Self {
-        let msg: String = err.into();
-        StdError::generic_err(msg)
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]

@@ -10,7 +10,6 @@ homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
-<<<<<<< HEAD
 cw0 = { path = "../../packages/cw0", version = "0.2.2" }
 cosmwasm-std = { version = "0.11.0-alpha3" }
 schemars = "0.7"
