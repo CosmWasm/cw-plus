@@ -1183,7 +1183,7 @@ mod tests {
         // And then cannot (not enough funds anymore)
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            ContractError::Std(Underflow) => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("unexpected error: {}", e),
         }
 
