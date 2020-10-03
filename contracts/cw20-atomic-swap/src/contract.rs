@@ -1,14 +1,15 @@
-use sha2::{Digest, Sha256};
-
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
+    HumanAddr, InitResponse, Querier, StdResult, Storage, WasmMsg,
 };
+use sha2::{Digest, Sha256};
+
 use cw0::calc_range_start_string;
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::balance::Balance;
+use crate::error::ContractError;
 use crate::msg::{
     is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse,
     QueryMsg, ReceiveMsg,
@@ -33,7 +34,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Create(msg) => {
             let sent_funds = env.message.sent_funds.clone();
@@ -49,10 +50,10 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     wrapper: Cw20ReceiveMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
-        Some(bin) => from_binary(&bin),
-        None => Err(StdError::parse_err("ReceiveMsg", "no data")),
+        Some(bin) => Ok(from_binary(&bin)?),
+        None => Err(ContractError::ParseError("ReceiveMsg: no data".into())),
     }?;
     let token = Cw20Coin {
         address: deps.api.canonical_address(&env.message.sender)?,
@@ -68,15 +69,15 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: CreateMsg,
     balance: Balance,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if !is_valid_name(&msg.id) {
-        return Err(StdError::generic_err("Invalid atomic swap id"));
+        return Err(ContractError::Invalid("atomic swap id".into()));
     }
 
     // this ignores 0 value coins, must have one or more with positive balance
     if balance.is_empty() {
-        return Err(StdError::generic_err(
-            "Send some coins to create an atomic swap",
+        return Err(ContractError::EmptyBalance(
+            "Send some coins to create an atomic swap".into(),
         ));
     }
 
@@ -84,7 +85,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     let hash = parse_hex_32(&msg.hash)?;
 
     if msg.expires.is_expired(&env.block) {
-        return Err(StdError::generic_err("Expired atomic swap"));
+        return Err(ContractError::Expired {});
     }
 
     let recipient_raw = deps.api.canonical_address(&msg.recipient)?;
@@ -100,7 +101,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     // Try to store it, fail if the id already exists (unmodifiable swaps)
     atomic_swaps(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
         None => Ok(swap),
-        Some(_) => Err(StdError::generic_err("Atomic swap already exists")),
+        Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
 
     let mut res = HandleResponse::default();
@@ -118,15 +119,15 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     env: Env,
     id: String,
     preimage: String,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
     if swap.is_expired(&env.block) {
-        return Err(StdError::generic_err("Atomic swap expired"));
+        return Err(ContractError::Expired {});
     }
 
     let hash = Sha256::digest(&parse_hex_32(&preimage)?);
     if hash.as_slice() != swap.hash.as_slice() {
-        return Err(StdError::generic_err("Invalid preimage"));
+        return Err(ContractError::Invalid("preimage".into()));
     }
 
     let rcpt = deps.api.human_address(&swap.recipient)?;
@@ -152,11 +153,11 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     id: String,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
     // Anyone can try to refund, as long as the contract is expired
     if !swap.is_expired(&env.block) {
-        return Err(StdError::generic_err("Atomic swap not yet expired"));
+        return Err(ContractError::NotExpired {});
     }
 
     let rcpt = deps.api.human_address(&swap.source)?;
@@ -172,17 +173,17 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-fn parse_hex_32(data: &str) -> StdResult<Vec<u8>> {
+fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
     match hex::decode(data) {
         Ok(bin) => {
             if bin.len() == 32 {
                 Ok(bin)
             } else {
-                Err(StdError::generic_err("Hash must be 64 characters"))
+                Err(ContractError::Invalid("hash: must be 64 characters".into()))
             }
         }
-        Err(e) => Err(StdError::generic_err(format!(
-            "Error parsing hash: {}",
+        Err(e) => Err(ContractError::ParseError(format!(
+            "hash: {}",
             e.to_string()
         ))),
     }
@@ -276,16 +277,19 @@ fn query_list<S: Storage, A: Api, Q: Querier>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coins, from_binary, Coin, CosmosMsg, StdError, Uint128};
+
     use cw20::Expiration;
+
+    use super::*;
 
     const CANONICAL_LENGTH: usize = 20;
 
     fn preimage() -> String {
         hex::encode(b"This is a string, 32 bytes long.")
     }
+
     fn custom_preimage(int: u16) -> String {
         hex::encode(format!("This is a custom string: {:>7}", int))
     }
@@ -293,6 +297,7 @@ mod tests {
     fn real_hash() -> String {
         hex::encode(&Sha256::digest(&hex::decode(preimage()).unwrap()))
     }
+
     fn custom_hash(int: u16) -> String {
         hex::encode(&Sha256::digest(&hex::decode(custom_preimage(int)).unwrap()))
     }
@@ -336,9 +341,7 @@ mod tests {
             let res = handle(&mut deps, env.clone(), HandleMsg::Create(create.clone()));
             match res {
                 Ok(_) => panic!("expected error"),
-                Err(StdError::GenericErr { msg, .. }) => {
-                    assert_eq!(msg, "Invalid atomic swap id".to_string())
-                }
+                Err(ContractError::Invalid(msg)) => assert_eq!(msg, "atomic swap id".to_string()),
                 Err(e) => panic!("unexpected error: {:?}", e),
             }
         }
@@ -354,7 +357,7 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => {
+            Err(ContractError::EmptyBalance(msg)) => {
                 assert_eq!(msg, "Send some coins to create an atomic swap".to_string())
             }
             Err(e) => panic!("unexpected error: {:?}", e),
@@ -371,9 +374,7 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Expired atomic swap".to_string())
-            }
+            Err(ContractError::Expired) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -388,9 +389,9 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => assert_eq!(
+            Err(ContractError::ParseError(msg)) => assert_eq!(
                 msg,
-                "Error parsing hash: Invalid character \'u\' at position 1".to_string()
+                "hash: Invalid character \'u\' at position 1".to_string()
             ),
             Err(e) => panic!("unexpected error: {:?}", e),
         }
@@ -419,9 +420,7 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Atomic swap already exists".to_string())
-            }
+            Err(ContractError::AlreadyExists {}) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
     }
@@ -456,7 +455,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::NotFound { .. }) => {}
+            Err(ContractError::Std(StdError::NotFound { .. })) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -468,9 +467,9 @@ mod tests {
         let res = handle(&mut deps, env.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => assert_eq!(
+            Err(ContractError::ParseError(msg)) => assert_eq!(
                 msg,
-                "Error parsing hash: Invalid character \'u\' at position 1".to_string()
+                "hash: Invalid character \'u\' at position 1".to_string()
             ),
             Err(e) => panic!("unexpected error: {:?}", e),
         }
@@ -483,9 +482,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Invalid preimage".to_string())
-            }
+            Err(ContractError::Invalid(obj)) => assert_eq!(obj, "preimage".to_string()),
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -498,9 +495,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Atomic swap expired".to_string())
-            }
+            Err(ContractError::Expired) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -525,7 +520,7 @@ mod tests {
         // Cannot release again
         let res = handle(&mut deps, env.clone(), release);
         match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
+            ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
         }
     }
@@ -559,7 +554,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), refund);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::NotFound { .. }) => {}
+            Err(ContractError::Std(StdError::NotFound { .. })) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -570,9 +565,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), refund);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Atomic swap not yet expired".to_string())
-            }
+            Err(ContractError::NotExpired {}) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -596,7 +589,7 @@ mod tests {
         // Cannot refund again
         let res = handle(&mut deps, env.clone(), refund);
         match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
+            ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
         }
     }
@@ -654,7 +647,7 @@ mod tests {
                 recipient: create1.recipient,
                 source: sender1,
                 expires: create1.expires,
-                balance: BalanceHuman::Native(balance.clone())
+                balance: BalanceHuman::Native(balance.clone()),
             }
         );
 
@@ -756,7 +749,7 @@ mod tests {
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: token_contract,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![]
+                send: vec![],
             })
         );
 

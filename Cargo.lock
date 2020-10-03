@@ -416,7 +416,7 @@ dependencies = [
  "schemars",
  "serde",
  "sha2 0.8.2",
- "snafu",
+ "thiserror",
 ]
 
 [[package]]
@@ -431,7 +431,7 @@ dependencies = [
  "cw20",
  "schemars",
  "serde",
- "snafu",
+ "thiserror",
 ]
 
 [[package]]
