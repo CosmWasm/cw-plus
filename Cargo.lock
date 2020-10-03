@@ -431,7 +431,7 @@ dependencies = [
  "cw20",
  "schemars",
  "serde",
- "thiserror",
+ "snafu",
 ]
 
 [[package]]
