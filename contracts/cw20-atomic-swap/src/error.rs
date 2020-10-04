@@ -6,14 +6,23 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
-    #[error("Parse error: {0}")]
+    #[error("No data in ReceiveMsg")]
+    NoData {},
+
+    #[error("Hash parse error: {0}")]
     ParseError(String),
 
-    #[error("Invalid {0}")]
-    Invalid(String),
+    #[error("Invalid atomic swap id")]
+    InvalidId {},
 
-    #[error("{0}")]
-    EmptyBalance(String),
+    #[error("Invalid preimage")]
+    InvalidPreimage {},
+
+    #[error("Invalid hash ({0} chars): must be 64 characters")]
+    InvalidHash(usize),
+
+    #[error("Send some coins to create an atomic swap")]
+    EmptyBalance {},
 
     #[error("Atomic swap not yet expired")]
     NotExpired,

@@ -53,7 +53,7 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
         Some(bin) => Ok(from_binary(&bin)?),
-        None => Err(ContractError::ParseError("ReceiveMsg: no data".into())),
+        None => Err(ContractError::NoData {}),
     }?;
     let token = Cw20Coin {
         address: deps.api.canonical_address(&env.message.sender)?,
@@ -71,14 +71,12 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     balance: Balance,
 ) -> Result<HandleResponse, ContractError> {
     if !is_valid_name(&msg.id) {
-        return Err(ContractError::Invalid("atomic swap id".into()));
+        return Err(ContractError::InvalidId {});
     }
 
     // this ignores 0 value coins, must have one or more with positive balance
     if balance.is_empty() {
-        return Err(ContractError::EmptyBalance(
-            "Send some coins to create an atomic swap".into(),
-        ));
+        return Err(ContractError::EmptyBalance {});
     }
 
     // Ensure this is 32 bytes hex-encoded, and decode
@@ -127,7 +125,7 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
 
     let hash = Sha256::digest(&parse_hex_32(&preimage)?);
     if hash.as_slice() != swap.hash.as_slice() {
-        return Err(ContractError::Invalid("preimage".into()));
+        return Err(ContractError::InvalidPreimage {});
     }
 
     let rcpt = deps.api.human_address(&swap.recipient)?;
@@ -179,13 +177,10 @@ fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
             if bin.len() == 32 {
                 Ok(bin)
             } else {
-                Err(ContractError::Invalid("hash: must be 64 characters".into()))
+                Err(ContractError::InvalidHash(bin.len() * 2))
             }
         }
-        Err(e) => Err(ContractError::ParseError(format!(
-            "hash: {}",
-            e.to_string()
-        ))),
+        Err(e) => Err(ContractError::ParseError(e.to_string())),
     }
 }
 
@@ -341,7 +336,7 @@ mod tests {
             let res = handle(&mut deps, env.clone(), HandleMsg::Create(create.clone()));
             match res {
                 Ok(_) => panic!("expected error"),
-                Err(ContractError::Invalid(msg)) => assert_eq!(msg, "atomic swap id".to_string()),
+                Err(ContractError::InvalidId {}) => {}
                 Err(e) => panic!("unexpected error: {:?}", e),
             }
         }
@@ -357,9 +352,7 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::EmptyBalance(msg)) => {
-                assert_eq!(msg, "Send some coins to create an atomic swap".to_string())
-            }
+            Err(ContractError::EmptyBalance {}) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -389,10 +382,9 @@ mod tests {
         let res = handle(&mut deps, env, HandleMsg::Create(create.clone()));
         match res {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::ParseError(msg)) => assert_eq!(
-                msg,
-                "hash: Invalid character \'u\' at position 1".to_string()
-            ),
+            Err(ContractError::ParseError(msg)) => {
+                assert_eq!(msg, "Invalid character \'u\' at position 1".to_string())
+            }
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -467,10 +459,9 @@ mod tests {
         let res = handle(&mut deps, env.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::ParseError(msg)) => assert_eq!(
-                msg,
-                "hash: Invalid character \'u\' at position 1".to_string()
-            ),
+            Err(ContractError::ParseError(msg)) => {
+                assert_eq!(msg, "Invalid character \'u\' at position 1".to_string())
+            }
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
@@ -482,7 +473,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
-            Err(ContractError::Invalid(obj)) => assert_eq!(obj, "preimage".to_string()),
+            Err(ContractError::InvalidPreimage {}) => {}
             Err(e) => panic!("unexpected error: {:?}", e),
         }
 
