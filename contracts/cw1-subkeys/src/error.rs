@@ -16,7 +16,7 @@ pub enum ContractError {
     NotAllowed {},
 
     #[error("No allowance for this account")]
-    NotFound {},
+    NoAllowance {},
 
     #[error("Message type rejected")]
     MessageTypeRejected {},
