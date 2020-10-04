@@ -9,8 +9,6 @@
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
-| cw1-subkeys             | [![cw1-subkeys on crates.io](https://img.shields.io/crates/v/cw1-subkeys.svg)](https://crates.io/crates/cw1-subkeys)          | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
-| cw1-whitelist           | [![cw1-whitelist on crates.io](https://img.shields.io/crates/v/cw1-whitelist.svg)](https://crates.io/crates/cw1-whitelist)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
 | cw3-fixed-multisig       | [![cw3-fixed-multisig on crates.io](https://img.shields.io/crates/v/cw3-fixed-multisig.svg)](https://crates.io/crates/cw3-fixed-multisig)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
 | cw20-atomic-swap        | [![cw20-atomic-swap on crates.io](https://img.shields.io/crates/v/cw20-atomic-swap.svg)](https://crates.io/crates/cw20-atomic-swap)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
 | cw20-base               | [![cw20-base on crates.io](https://img.shields.io/crates/v/cw20-base.svg)](https://crates.io/crates/cw20-base)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
