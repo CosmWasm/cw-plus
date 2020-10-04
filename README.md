@@ -1,15 +1,11 @@
+# MoorNet
+- Submission for the Hack Atom India 2020
+- Convergence of CosmWasm and CDot Substrate IBM for the Cosmos SDK based MoorNet
+
+
 # CosmWasm Plus
 
 [![CircleCI](https://circleci.com/gh/CosmWasm/cosmwasm-plus/tree/master.svg?style=shield)](https://circleci.com/gh/CosmWasm/cosmwasm-plus/tree/master)
-
-| Specification    | Download                                                                                                   | Docs                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
-| cw0              | [![cw0 on crates.io](https://img.shields.io/crates/v/cw0.svg)](https://crates.io/crates/cw0)              | [![Docs](https://docs.rs/cw0/badge.svg)](https://docs.rs/cw0)    |
-| cw1              | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)              | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)    |
-| cw2              | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)              | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)    |
-| cw3              | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)              | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)    |
-| cw20              | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20)              | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20)    |
-| cw721              | [![cw721 on crates.io](https://img.shields.io/crates/v/cw721.svg)](https://crates.io/crates/cw721)              | [![Docs](https://docs.rs/cw721/badge.svg)](https://docs.rs/cw721)    |
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
