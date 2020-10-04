@@ -1,0 +1,62 @@
+[package]
+authors = ['Cdot Network <https://cdot.network>']
+description = 'An IBC implementation on Substrate.'
+edition = '2018'
+homepage = 'https://cdot.network'
+license = 'Apache-2.0'
+name = 'pallet-ibc'
+repository = 'https://github.com/cdot-network/substrate-ibc/'
+version = '2.0.0'
+
+[package.metadata.docs.rs]
+targets = ['x86_64-unknown-linux-gnu']
+
+# alias "parity-scale-code" to "codec"
+[dependencies.codec]
+default-features = false
+features = ['derive']
+package = 'parity-scale-codec'
+version = '1.3.4'
+
+[dependencies]
+frame-support = { default-features = false, version = '2.0.0' }
+frame-system = { default-features = false, version = '2.0.0' }
+sp-core = { default-features = false, version = '2.0.0' }
+sp-finality-grandpa = { default-features = false, version = '2.0.0' }
+sp-io = { default-features = false, version = '2.0.0' }
+sp-runtime = { default-features = false, version = '2.0.0' }
+sp-std = { default-features = false, version = '2.0.0' }
+sp-trie = { default-features = false, version = '2.0.0' }
+
+[dev-dependencies]
+hex = '0.4.0'
+
+[dependencies.finality-grandpa]
+default-features = false
+features = ['derive-codec']
+version = '0.12.3'
+
+[dependencies.hash-db]
+default-features = false
+version = '0.15.2'
+
+[dependencies.serde]
+default-features = false
+optional = true
+version = '1.0.101'
+
+[features]
+default = ['std']
+std = [
+    'codec/std',
+    'frame-support/std',
+    'frame-system/std',
+    'finality-grandpa/std',
+    'hash-db/std',
+    'serde',
+    'sp-core/std',
+    'sp-finality-grandpa/std',
+    'sp-runtime/std',
+    'sp-std/std',
+    'sp-trie/std',
+]

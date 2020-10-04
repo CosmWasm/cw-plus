@@ -1,2 +1,0 @@
-extends: "@istanbuljs/nyc-config-typescript"
-include: [build/**, 'src/**']
