@@ -12,6 +12,7 @@ use cw20_base::contract::{
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
+use crate::error::ContractError;
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
     claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read,
@@ -28,16 +29,13 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
-) -> StdResult<InitResponse> {
+) -> Result<InitResponse, ContractError> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // ensure the validator is registered
     let vals = deps.querier.query_validators()?;
     if !vals.iter().any(|v| v.address == msg.validator) {
-        return Err(StdError::generic_err(format!(
-            "{} is not in the current validator set",
-            msg.validator
-        )));
+        return Err(ContractError::NotInValidatorSet(msg.validator.to_string()));
     }
 
     // store token info using cw20-base format
@@ -75,7 +73,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Bond {} => bond(deps, env),
         HandleMsg::Unbond { amount } => unbond(deps, env, amount),
@@ -84,41 +82,47 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env),
 
         // these all come from cw20-base to implement the cw20 standard
-        HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, recipient, amount),
-        HandleMsg::Burn { amount } => handle_burn(deps, env, amount),
+        HandleMsg::Transfer { recipient, amount } => {
+            Ok(handle_transfer(deps, env, recipient, amount)?)
+        }
+        HandleMsg::Burn { amount } => Ok(handle_burn(deps, env, amount)?),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => handle_send(deps, env, contract, amount, msg),
+        } => Ok(handle_send(deps, env, contract, amount, msg)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        } => Ok(handle_increase_allowance(
+            deps, env, spender, amount, expires,
+        )?),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        } => Ok(handle_decrease_allowance(
+            deps, env, spender, amount, expires,
+        )?),
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => handle_transfer_from(deps, env, owner, recipient, amount),
-        HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, owner, amount),
+        } => Ok(handle_transfer_from(deps, env, owner, recipient, amount)?),
+        HandleMsg::BurnFrom { owner, amount } => Ok(handle_burn_from(deps, env, owner, amount)?),
         HandleMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => handle_send_from(deps, env, owner, contract, amount, msg),
+        } => Ok(handle_send_from(deps, env, owner, contract, amount, msg)?),
     }
 }
 
 // get_bonded returns the total amount of delegations from contract
 // it ensures they are all the same denom
-fn get_bonded<Q: Querier>(querier: &Q, contract: &HumanAddr) -> StdResult<Uint128> {
+fn get_bonded<Q: Querier>(querier: &Q, contract: &HumanAddr) -> Result<Uint128, ContractError> {
     let bonds = querier.query_all_delegations(contract)?;
     if bonds.is_empty() {
         return Ok(Uint128(0));
@@ -127,22 +131,19 @@ fn get_bonded<Q: Querier>(querier: &Q, contract: &HumanAddr) -> StdResult<Uint12
     bonds.iter().fold(Ok(Uint128(0)), |racc, d| {
         let acc = racc?;
         if d.amount.denom.as_str() != denom {
-            Err(StdError::generic_err(format!(
-                "different denoms in bonds: '{}' vs '{}'",
-                denom, &d.amount.denom
-            )))
+            Err(ContractError::DifferentBondDenom(
+                denom.into(),
+                d.amount.denom.to_string(),
+            ))
         } else {
             Ok(acc + d.amount.amount)
         }
     })
 }
 
-fn assert_bonds(supply: &Supply, bonded: Uint128) -> StdResult<()> {
+fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
     if supply.bonded != bonded {
-        Err(StdError::generic_err(format!(
-            "Stored bonded {}, but query bonded: {}",
-            supply.bonded, bonded
-        )))
+        Err(ContractError::BondedMismatch(supply.bonded, bonded))
     } else {
         Ok(())
     }
@@ -151,7 +152,7 @@ fn assert_bonds(supply: &Supply, bonded: Uint128) -> StdResult<()> {
 pub fn bond<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // ensure we have the proper denom
     let invest = invest_info_read(&deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
@@ -160,7 +161,7 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
         .sent_funds
         .iter()
         .find(|x| x.denom == invest.bond_denom)
-        .ok_or_else(|| StdError::generic_err(format!("No {} tokens sent", &invest.bond_denom)))?;
+        .ok_or_else(|| ContractError::EmptyBalance(invest.bond_denom.clone()))?;
 
     // bonded is the total number of tokens we have delegated from this address
     let bonded = get_bonded(&deps.querier, &env.contract.address)?;
@@ -208,16 +209,16 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
     let invest = invest_info_read(&deps.storage).load()?;
     // ensure it is big enough to care
     if amount < invest.min_withdrawal {
-        return Err(StdError::generic_err(format!(
-            "Must unbond at least {} {}",
-            invest.min_withdrawal, invest.bond_denom
-        )));
+        return Err(ContractError::UnbondTooSmall(
+            invest.min_withdrawal,
+            invest.bond_denom,
+        ));
     }
     // calculate tax and remainer to unbond
     let tax = amount * invest.exit_tax;
@@ -251,7 +252,7 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     totals.save(&supply)?;
 
     // add a claim to this user to get their tokens after the unbonding period
-    claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
+    claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| -> StdResult<_> {
         Ok(claim.unwrap_or_default() + unbond)
     })?;
 
@@ -276,29 +277,27 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
 pub fn claim<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // find how many tokens the contract has
     let invest = invest_info_read(&deps.storage).load()?;
     let mut balance = deps
         .querier
         .query_balance(&env.contract.address, &invest.bond_denom)?;
     if balance.amount < invest.min_withdrawal {
-        return Err(StdError::generic_err(
-            "Insufficient balance in contract to process claim",
-        ));
+        return Err(ContractError::BalanceTooSmall {});
     }
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let mut to_send = balance.amount;
-    claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
+    claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| -> StdResult<_> {
         let claim = claim.ok_or_else(|| StdError::generic_err("no claim for this address"))?;
         to_send = to_send.min(claim);
         claim - to_send
     })?;
 
     // update total supply (lower claim)
-    total_supply(&mut deps.storage).update(|mut supply| {
+    total_supply(&mut deps.storage).update(|mut supply| -> StdResult<_> {
         supply.claims = (supply.claims - to_send)?;
         Ok(supply)
     })?;
@@ -328,7 +327,7 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
 pub fn reinvest<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let contract_addr = env.contract.address;
     let invest = invest_info_read(&deps.storage).load()?;
     let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
@@ -357,10 +356,10 @@ pub fn reinvest<S: Storage, A: Api, Q: Querier>(
 pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // this is just meant as a call-back to ourself
     if env.message.sender != env.contract.address {
-        return Err(StdError::unauthorized());
+        return Err(ContractError::Unauthorized {});
     }
 
     // find how many tokens we have to bond
@@ -371,7 +370,7 @@ pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
 
     // we deduct pending claims from our account balance before reinvesting.
     // if there is not enough funds, we just return a no-op
-    match total_supply(&mut deps.storage).update(|mut supply| {
+    match total_supply(&mut deps.storage).update(|mut supply| -> StdResult<_> {
         balance.amount = (balance.amount - supply.claims)?;
         // this just triggers the "no op" case if we don't have min_withdrawal left to reinvest
         (balance.amount - invest.min_withdrawal)?;
@@ -381,7 +380,7 @@ pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
         Ok(_) => {}
         // if it is below the minimum, we do a no-op (do not revert other state from withdrawal)
         Err(StdError::Underflow { .. }) => return Ok(HandleResponse::default()),
-        Err(e) => return Err(e),
+        Err(e) => return Err(ContractError::Std(e)),
     }
 
     // and bond them to the validator
@@ -534,9 +533,7 @@ mod tests {
         // make sure we can init with this
         let res = init(&mut deps, env, msg.clone());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg, "my-validator is not in the current validator set")
-            }
+            ContractError::NotInValidatorSet { .. } => {}
             _ => panic!("expected unregistered validator error"),
         }
     }
@@ -718,7 +715,7 @@ mod tests {
         // try to bond and make sure we trigger delegation
         let res = handle(&mut deps, env, bond_msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(msg, "No ustake tokens sent"),
+            ContractError::EmptyBalance { .. } => {}
             e => panic!("Expected wrong denom error, got: {:?}", e),
         };
     }
@@ -766,7 +763,7 @@ mod tests {
         let env = mock_env(&creator, &[]);
         let res = handle(&mut deps, env, unbond_msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("unexpected error: {}", e),
         }
 
