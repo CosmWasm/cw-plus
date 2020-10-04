@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, Coin, CosmosMsg, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, WasmMsg,
+    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
+    HumanAddr, InitResponse, Querier, StdResult, Storage, WasmMsg,
 };
 use cosmwasm_storage::prefixed;
 
@@ -8,6 +8,7 @@ use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 use cw20_atomic_swap::balance::Balance;
 
+use crate::error::ContractError;
 use crate::msg::{
     CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
@@ -31,7 +32,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Create(msg) => try_create(
             deps,
@@ -50,10 +51,10 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     wrapper: Cw20ReceiveMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
-        Some(bin) => from_binary(&bin),
-        None => Err(StdError::parse_err("ReceiveMsg", "no data")),
+        Some(bin) => Ok(from_binary(&bin)?),
+        None => Err(ContractError::NoData {}),
     }?;
     let balance = Balance::Cw20(Cw20Coin {
         address: deps.api.canonical_address(&env.message.sender)?,
@@ -70,9 +71,9 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     msg: CreateMsg,
     balance: Balance,
     sender: &HumanAddr,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if balance.is_empty() {
-        return Err(StdError::generic_err("Send some coins to create an escrow"));
+        return Err(ContractError::EmptyBalance {});
     }
 
     let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
@@ -107,7 +108,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     // try to store it, fail if the id was already in use
     escrows(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
         None => Ok(escrow),
-        Some(_) => Err(StdError::generic_err("escrow id already in use")),
+        Some(_) => Err(ContractError::AlreadyInUse {}),
     })?;
 
     let mut res = HandleResponse::default();
@@ -119,11 +120,9 @@ pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     id: String,
     balance: Balance,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if balance.is_empty() {
-        return Err(StdError::generic_err(
-            "Send some amount to increase an escrow",
-        ));
+        return Err(ContractError::EmptyBalance {});
     }
     // this fails is no escrow there
     let mut escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
@@ -131,9 +130,7 @@ pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
     if let Balance::Cw20(token) = &balance {
         // ensure the token is on the whitelist
         if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
-            return Err(StdError::generic_err(
-                "Only accepts tokens on the cw20_whitelist",
-            ));
+            return Err(ContractError::NotInWhitelist {});
         }
     };
 
@@ -151,14 +148,14 @@ pub fn try_approve<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     id: String,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
     if deps.api.canonical_address(&env.message.sender)? != escrow.arbiter {
-        Err(StdError::unauthorized())
+        Err(ContractError::Unauthorized {})
     } else if escrow.is_expired(&env) {
-        Err(StdError::generic_err("escrow expired"))
+        Err(ContractError::Expired {})
     } else {
         // we delete the escrow (TODO: expose this in Bucket for simpler API)
         prefixed(&mut deps.storage, PREFIX_ESCROW).remove(id.as_bytes());
@@ -181,7 +178,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     id: String,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
@@ -189,7 +186,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     if !escrow.is_expired(&env)
         && deps.api.canonical_address(&env.message.sender)? != escrow.arbiter
     {
-        Err(StdError::unauthorized())
+        Err(ContractError::Unauthorized {})
     } else {
         // we delete the escrow (TODO: expose this in Bucket for simpler API)
         prefixed(&mut deps.storage, PREFIX_ESCROW).remove(id.as_bytes());
@@ -373,7 +370,7 @@ mod tests {
         let env = mock_env(&create.arbiter, &[]);
         let res = handle(&mut deps, env, HandleMsg::Approve { id });
         match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
+            ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
         }
     }
@@ -455,7 +452,7 @@ mod tests {
         let env = mock_env(&create.arbiter, &[]);
         let res = handle(&mut deps, env, HandleMsg::Approve { id });
         match res.unwrap_err() {
-            StdError::NotFound { .. } => {}
+            ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
         }
     }
@@ -571,9 +568,7 @@ mod tests {
         let env = mock_env(&baz_token, &[]);
         let res = handle(&mut deps, env, top_up);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg, "Only accepts tokens on the cw20_whitelist")
-            }
+            ContractError::NotInWhitelist {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
