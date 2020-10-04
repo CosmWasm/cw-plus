@@ -9,8 +9,17 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Cannot set to own account")]
+    CannotSetOwnAccount {},
+
     #[error("Invalid zero amount")]
     InvalidZeroAmount {},
+
+    #[error("Allowance is expired")]
+    Expired {},
+
+    #[error("No allowance for this account")]
+    NoAllowance {},
 
     #[error("Minting cannot exceed the cap")]
     CannotExceedCap {},
