@@ -9,17 +9,14 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
-    #[error("Cannot set allowance to own account")]
+    #[error("Cannot set to own account")]
     CannotSetOwnAccount {},
 
     #[error("No permissions for this account")]
     NotAllowed {},
 
     #[error("No allowance for this account")]
-    NoAllowance {},
-
-    #[error("Cannot set permission to own account")]
-    CannotSetPermOwnAccount {},
+    NotFound {},
 
     #[error("Message type rejected")]
     MessageTypeRejected {},

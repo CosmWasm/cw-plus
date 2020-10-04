@@ -100,7 +100,7 @@ where
                 }) => {
                     let mut allowances = allowances(&mut deps.storage);
                     let allow = allowances.may_load(owner_raw.as_slice())?;
-                    let mut allowance = allow.ok_or_else(|| ContractError::NoAllowance {})?;
+                    let mut allowance = allow.ok_or_else(|| ContractError::NotFound {})?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
@@ -218,7 +218,7 @@ where
         spender_raw.as_slice(),
         |allow| {
             // Fail fast
-            let mut allowance = allow.ok_or_else(|| ContractError::NoAllowance {})?;
+            let mut allowance = allow.ok_or_else(|| ContractError::NotFound {})?;
             if let Some(exp) = expires {
                 allowance.expires = exp;
             }
@@ -261,7 +261,7 @@ where
         return Err(ContractError::Unauthorized {});
     }
     if spender_raw == owner_raw {
-        return Err(ContractError::CannotSetPermOwnAccount {});
+        return Err(ContractError::CannotSetOwnAccount {});
     }
     permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm)?;
 
@@ -1167,7 +1167,7 @@ mod tests {
         let env = mock_env(&spender2, &[]);
         let res = handle(&mut deps, env, handle_msg.clone());
         match res.unwrap_err() {
-            ContractError::NoAllowance { .. } => {}
+            ContractError::NotFound { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
