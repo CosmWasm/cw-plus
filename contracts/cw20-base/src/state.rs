@@ -46,16 +46,16 @@ pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, 
 
 /// balances are state of the erc20 tokens
 pub fn balances<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
-    bucket(PREFIX_BALANCE, storage)
+    bucket(storage, PREFIX_BALANCE)
 }
 
 /// balances are state of the erc20 tokens (read-only version for queries)
 pub fn balances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
-    bucket_read(PREFIX_BALANCE, storage)
+    bucket_read(storage, PREFIX_BALANCE)
 }
 
 pub fn balances_prefix_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyPrefixedStorage<S> {
-    ReadonlyPrefixedStorage::new(PREFIX_BALANCE, storage)
+    ReadonlyPrefixedStorage::new(storage, PREFIX_BALANCE)
 }
 
 /// returns a bucket with all allowances authorized by this owner (query it by spender)
@@ -63,7 +63,7 @@ pub fn allowances<'a, S: Storage>(
     storage: &'a mut S,
     owner: &CanonicalAddr,
 ) -> Bucket<'a, S, AllowanceResponse> {
-    Bucket::multilevel(&[PREFIX_ALLOWANCE, owner.as_slice()], storage)
+    Bucket::multilevel(storage, &[PREFIX_ALLOWANCE, owner.as_slice()])
 }
 
 /// returns a bucket with all allowances authorized by this owner (query it by spender)
@@ -72,5 +72,5 @@ pub fn allowances_read<'a, S: ReadonlyStorage>(
     storage: &'a S,
     owner: &CanonicalAddr,
 ) -> ReadonlyBucket<'a, S, AllowanceResponse> {
-    ReadonlyBucket::multilevel(&[PREFIX_ALLOWANCE, owner.as_slice()], storage)
+    ReadonlyBucket::multilevel(storage, &[PREFIX_ALLOWANCE, owner.as_slice()])
 }

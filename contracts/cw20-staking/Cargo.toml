@@ -23,11 +23,11 @@ library = []
 cw2 = { path = "../../packages/cw2", version = "0.2.2" }
 cw20 = { path = "../../packages/cw20", version = "0.2.2" }
 cw20-base = { path = "../../contracts/cw20-base", version = "0.2.2", features = ["library"] }
-cosmwasm-std = { version = "0.10.1", features = ["staking"] }
-cosmwasm-storage = { version = "0.10.1" }
+cosmwasm-std = { version = "0.11.0-alpha3", features = ["staking"] }
+cosmwasm-storage = { version = "0.11.0-alpha3" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-snafu = { version = "0.6.3" }
+thiserror = { version = "1.0.20" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.10.1" }
+cosmwasm-schema = { version = "0.11.0-alpha3" }

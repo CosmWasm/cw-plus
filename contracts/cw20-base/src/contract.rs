@@ -1,7 +1,8 @@
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    attr, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
     MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
 };
+
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20CoinHuman, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
@@ -10,6 +11,7 @@ use crate::allowances::{
     handle_transfer_from, query_allowance,
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
+use crate::error::ContractError;
 use crate::migrations::migrate_v01_to_v02;
 use crate::msg::{HandleMsg, InitMsg, MigrateMsg, QueryMsg};
 use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
@@ -73,7 +75,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, recipient, amount),
         HandleMsg::Burn { amount } => handle_burn(deps, env, amount),
@@ -113,9 +115,9 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     env: Env,
     recipient: HumanAddr,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if amount == Uint128::zero() {
-        return Err(StdError::generic_err("Invalid zero amount"));
+        return Err(ContractError::InvalidZeroAmount {});
     }
 
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
@@ -125,17 +127,18 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
-        Ok(balance.unwrap_or_default() + amount)
-    })?;
+    accounts.update(
+        rcpt_raw.as_slice(),
+        |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+    )?;
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "transfer"),
-            log("from", deps.api.human_address(&sender_raw)?),
-            log("to", recipient),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "transfer"),
+            attr("from", deps.api.human_address(&sender_raw)?),
+            attr("to", recipient),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -146,9 +149,9 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if amount == Uint128::zero() {
-        return Err(StdError::generic_err("Invalid zero amount"));
+        return Err(ContractError::InvalidZeroAmount {});
     }
 
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
@@ -159,17 +162,17 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    token_info(&mut deps.storage).update(|mut info| {
+    token_info(&mut deps.storage).update(|mut info| -> StdResult<_> {
         info.total_supply = (info.total_supply - amount)?;
         Ok(info)
     })?;
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "burn"),
-            log("from", deps.api.human_address(&sender_raw)?),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "burn"),
+            attr("from", deps.api.human_address(&sender_raw)?),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -181,9 +184,9 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     env: Env,
     recipient: HumanAddr,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if amount == Uint128::zero() {
-        return Err(StdError::generic_err("Invalid zero amount"));
+        return Err(ContractError::InvalidZeroAmount {});
     }
 
     let mut config = token_info_read(&deps.storage).load()?;
@@ -191,30 +194,31 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         || config.mint.as_ref().unwrap().minter
             != deps.api.canonical_address(&env.message.sender)?
     {
-        return Err(StdError::unauthorized());
+        return Err(ContractError::Unauthorized {});
     }
 
     // update supply and enforce cap
     config.total_supply += amount;
     if let Some(limit) = config.get_cap() {
         if config.total_supply > limit {
-            return Err(StdError::generic_err("Minting cannot exceed the cap"));
+            return Err(ContractError::CannotExceedCap {});
         }
     }
     token_info(&mut deps.storage).save(&config)?;
 
     // add amount to recipient balance
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
-    balances(&mut deps.storage).update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
-        Ok(balance.unwrap_or_default() + amount)
-    })?;
+    balances(&mut deps.storage).update(
+        rcpt_raw.as_slice(),
+        |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+    )?;
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "mint"),
-            log("to", recipient),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "mint"),
+            attr("to", recipient),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -227,9 +231,9 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     contract: HumanAddr,
     amount: Uint128,
     msg: Option<Binary>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     if amount == Uint128::zero() {
-        return Err(StdError::generic_err("Invalid zero amount"));
+        return Err(ContractError::InvalidZeroAmount {});
     }
 
     let rcpt_raw = deps.api.canonical_address(&contract)?;
@@ -240,16 +244,17 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
-        Ok(balance.unwrap_or_default() + amount)
-    })?;
+    accounts.update(
+        rcpt_raw.as_slice(),
+        |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+    )?;
 
     let sender = deps.api.human_address(&sender_raw)?;
-    let logs = vec![
-        log("action", "send"),
-        log("from", &sender),
-        log("to", &contract),
-        log("amount", amount),
+    let attrs = vec![
+        attr("action", "send"),
+        attr("from", &sender),
+        attr("to", &contract),
+        attr("amount", amount),
     ];
 
     // create a send message
@@ -262,7 +267,7 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![msg],
-        log: logs,
+        attributes: attrs,
         data: None,
     };
     Ok(res)
@@ -357,12 +362,14 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, from_binary, CosmosMsg, Order, StdError, WasmMsg};
-    use cw2::ContractVersion;
 
-    use super::*;
+    use cw2::ContractVersion;
+    use cw20::{AllowanceResponse, Expiration};
+
     use crate::migrations::generate_v01_test_data;
     use crate::state::allowances_read;
-    use cw20::{AllowanceResponse, Expiration};
+
+    use super::*;
 
     const CANONICAL_LENGTH: usize = 20;
 
@@ -504,7 +511,7 @@ mod tests {
             query_minter(&deps).unwrap(),
             Some(MinterResponse {
                 minter: minter.clone(),
-                cap: Some(limit)
+                cap: Some(limit),
             }),
         );
     }
@@ -568,7 +575,7 @@ mod tests {
         let env = mock_env(&minter, &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -581,9 +588,7 @@ mod tests {
         let env = mock_env(&minter, &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg, "Minting cannot exceed the cap".to_string())
-            }
+            ContractError::CannotExceedCap {} => {}
             e => panic!("Unexpected error: {}", e),
         }
     }
@@ -606,7 +611,7 @@ mod tests {
         let env = mock_env(&HumanAddr::from("anyone else"), &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized { .. } => {}
             e => panic!("expected unauthorized error, got {}", e),
         }
     }
@@ -623,7 +628,7 @@ mod tests {
         let env = mock_env(&HumanAddr::from("genesis"), &[]);
         let res = handle(&mut deps, env, msg.clone());
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized { .. } => {}
             e => panic!("expected unauthorized error, got {}", e),
         }
     }
@@ -722,7 +727,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -734,7 +739,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -746,7 +751,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -782,7 +787,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
         assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
@@ -792,7 +797,7 @@ mod tests {
         let msg = HandleMsg::Burn { amount: too_much };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
         assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
@@ -829,7 +834,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!("Invalid zero amount", msg),
+            ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -842,7 +847,7 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -875,7 +880,7 @@ mod tests {
             })
         );
 
-        // ensure balance is properly transfered
+        // ensure balance is properly transferred
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(&deps, &addr1), remainder);
         assert_eq!(get_balance(&deps, &contract), transfer);

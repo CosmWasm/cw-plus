@@ -1,9 +1,10 @@
 use cosmwasm_std::{
-    log, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, Querier,
-    StdError, StdResult, Storage, Uint128,
+    attr, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, Querier,
+    StdResult, Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
+use crate::error::ContractError;
 use crate::state::{allowances, allowances_read, balances, token_info};
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier>(
@@ -12,30 +13,33 @@ pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier>(
     spender: HumanAddr,
     amount: Uint128,
     expires: Option<Expiration>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
     if spender_raw == owner_raw {
-        return Err(StdError::generic_err("Cannot set allowance to own account"));
+        return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    allowances(&mut deps.storage, owner_raw).update(spender_raw.as_slice(), |allow| {
-        let mut val = allow.unwrap_or_default();
-        if let Some(exp) = expires {
-            val.expires = exp;
-        }
-        val.allowance += amount;
-        Ok(val)
-    })?;
+    allowances(&mut deps.storage, owner_raw).update(
+        spender_raw.as_slice(),
+        |allow| -> StdResult<_> {
+            let mut val = allow.unwrap_or_default();
+            if let Some(exp) = expires {
+                val.expires = exp;
+            }
+            val.allowance += amount;
+            Ok(val)
+        },
+    )?;
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "increase_allowance"),
-            log("owner", deps.api.human_address(owner_raw)?),
-            log("spender", spender),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "increase_allowance"),
+            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("spender", spender),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -48,12 +52,12 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier>(
     spender: HumanAddr,
     amount: Uint128,
     expires: Option<Expiration>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
 
     if spender_raw == owner_raw {
-        return Err(StdError::generic_err("Cannot set allowance to own account"));
+        return Err(ContractError::CannotSetOwnAccount {});
     }
 
     // load value and delete if it hits 0, or update otherwise
@@ -72,11 +76,11 @@ pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "decrease_allowance"),
-            log("owner", deps.api.human_address(owner_raw)?),
-            log("spender", spender),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "decrease_allowance"),
+            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("spender", spender),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -90,19 +94,19 @@ fn deduct_allowance<S: Storage>(
     spender: &CanonicalAddr,
     block: &BlockInfo,
     amount: Uint128,
-) -> StdResult<AllowanceResponse> {
+) -> Result<AllowanceResponse, ContractError> {
     allowances(storage, owner).update(spender.as_slice(), |current| {
         match current {
             Some(mut a) => {
                 if a.expires.is_expired(block) {
-                    Err(StdError::generic_err("Allowance is expired"))
+                    Err(ContractError::Expired {})
                 } else {
                     // deduct the allowance if enough
                     a.allowance = (a.allowance - amount)?;
                     Ok(a)
                 }
             }
-            None => Err(StdError::generic_err("No allowance for this account")),
+            None => Err(ContractError::NoAllowance {}),
         }
     })
 }
@@ -113,7 +117,7 @@ pub fn handle_transfer_from<S: Storage, A: Api, Q: Querier>(
     owner: HumanAddr,
     recipient: HumanAddr,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&env.message.sender)?;
@@ -131,18 +135,19 @@ pub fn handle_transfer_from<S: Storage, A: Api, Q: Querier>(
     accounts.update(owner_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
-        Ok(balance.unwrap_or_default() + amount)
-    })?;
+    accounts.update(
+        rcpt_raw.as_slice(),
+        |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+    )?;
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "transfer_from"),
-            log("from", owner),
-            log("to", recipient),
-            log("by", deps.api.human_address(&spender_raw)?),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "transfer_from"),
+            attr("from", owner),
+            attr("to", recipient),
+            attr("by", deps.api.human_address(&spender_raw)?),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -154,7 +159,7 @@ pub fn handle_burn_from<S: Storage, A: Api, Q: Querier>(
     env: Env,
     owner: HumanAddr,
     amount: Uint128,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&env.message.sender)?;
 
@@ -173,18 +178,18 @@ pub fn handle_burn_from<S: Storage, A: Api, Q: Querier>(
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    token_info(&mut deps.storage).update(|mut meta| {
+    token_info(&mut deps.storage).update(|mut meta| -> StdResult<_> {
         meta.total_supply = (meta.total_supply - amount)?;
         Ok(meta)
     })?;
 
     let res = HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "burn_from"),
-            log("from", owner),
-            log("by", deps.api.human_address(&spender_raw)?),
-            log("amount", amount),
+        attributes: vec![
+            attr("action", "burn_from"),
+            attr("from", owner),
+            attr("by", deps.api.human_address(&spender_raw)?),
+            attr("amount", amount),
         ],
         data: None,
     };
@@ -198,7 +203,7 @@ pub fn handle_send_from<S: Storage, A: Api, Q: Querier>(
     contract: HumanAddr,
     amount: Uint128,
     msg: Option<Binary>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let rcpt_raw = deps.api.canonical_address(&contract)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&env.message.sender)?;
@@ -217,17 +222,18 @@ pub fn handle_send_from<S: Storage, A: Api, Q: Querier>(
     accounts.update(owner_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(rcpt_raw.as_slice(), |balance: Option<Uint128>| {
-        Ok(balance.unwrap_or_default() + amount)
-    })?;
+    accounts.update(
+        rcpt_raw.as_slice(),
+        |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+    )?;
 
     let spender = deps.api.human_address(&spender_raw)?;
-    let logs = vec![
-        log("action", "send_from"),
-        log("from", &owner),
-        log("to", &contract),
-        log("by", &spender),
-        log("amount", amount),
+    let attrs = vec![
+        attr("action", "send_from"),
+        attr("from", &owner),
+        attr("to", &contract),
+        attr("by", &spender),
+        attr("amount", amount),
     ];
 
     // create a send message
@@ -240,7 +246,7 @@ pub fn handle_send_from<S: Storage, A: Api, Q: Querier>(
 
     let res = HandleResponse {
         messages: vec![msg],
-        log: logs,
+        attributes: attrs,
         data: None,
     };
     Ok(res)
@@ -488,9 +494,7 @@ mod tests {
         };
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg, "Cannot set allowance to own account")
-            }
+            ContractError::CannotSetOwnAccount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -502,9 +506,7 @@ mod tests {
         };
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg, "Cannot set allowance to own account")
-            }
+            ContractError::CannotSetOwnAccount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
     }
@@ -538,7 +540,7 @@ mod tests {
         };
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(res.log[0], log("action", "transfer_from"));
+        assert_eq!(res.attributes[0], attr("action", "transfer_from"));
 
         // make sure money arrived
         assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
@@ -561,7 +563,7 @@ mod tests {
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -583,7 +585,7 @@ mod tests {
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(msg, "Allowance is expired"),
+            ContractError::Expired {} => {}
             e => panic!("Unexpected error: {}", e),
         }
     }
@@ -615,7 +617,7 @@ mod tests {
         };
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(res.log[0], log("action", "burn_from"));
+        assert_eq!(res.attributes[0], attr("action", "burn_from"));
 
         // make sure money burnt
         assert_eq!(get_balance(&deps, &owner), (start - transfer).unwrap());
@@ -636,7 +638,7 @@ mod tests {
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -657,7 +659,7 @@ mod tests {
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(msg, "Allowance is expired"),
+            ContractError::Expired {} => {}
             e => panic!("Unexpected error: {}", e),
         }
     }
@@ -693,7 +695,7 @@ mod tests {
         };
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg).unwrap();
-        assert_eq!(res.log[0], log("action", "send_from"));
+        assert_eq!(res.attributes[0], attr("action", "send_from"));
         assert_eq!(1, res.messages.len());
 
         // we record this as sent by the one who requested, not the one who was paying
@@ -735,7 +737,7 @@ mod tests {
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -758,7 +760,7 @@ mod tests {
         let env = mock_env(spender.clone(), &[]);
         let res = handle(&mut deps, env.clone(), msg);
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(msg, "Allowance is expired"),
+            ContractError::Expired {} => {}
             e => panic!("Unexpected error: {}", e),
         }
     }
