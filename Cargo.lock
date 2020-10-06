@@ -559,27 +559,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw721"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dca5605828fcd84f063ffb39bc4ac4d7a58b883250f8293b7b159c419993f0bb"
-dependencies = [
- "cosmwasm-std 0.10.1",
- "cw0 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "schemars",
- "serde",
-]
-
-[[package]]
 name = "cw721-base"
 version = "0.2.2"
 dependencies = [
  "cosmwasm-schema 0.10.1",
  "cosmwasm-std 0.10.1",
  "cosmwasm-storage 0.10.1",
- "cw0 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw2 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cw721 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw0 0.2.2",
+ "cw2 0.2.2",
+ "cw721",
  "schemars",
  "serde",
  "snafu",
