@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use cosmwasm_std::{
-    log, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
+    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 
@@ -132,11 +132,11 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "propose"),
-            log("sender", env.message.sender),
-            log("proposal_id", id),
-            log("status", format!("{:?}", prop.status)),
+        attributes: vec![
+            attr("action", "propose"),
+            attr("sender", env.message.sender),
+            attr("proposal_id", id),
+            attr("status", format!("{:?}", prop.status)),
         ],
         data: None,
     })
@@ -184,12 +184,12 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "vote"),
-            log("sender", env.message.sender),
-            log("proposal_id", proposal_id),
-            log("status", format!("{:?}", prop.status)),
-        ],
+        attributes: vec![
+            attr("action", "vote"),
+            attr("sender", env.message.sender),
+            attr("proposal_id", proposal_id),
+            attr("status", format!("{:?}", prop.status)),
+            ],
         data: None,
     })
 }
@@ -217,11 +217,11 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     // dispatch all proposed messages
     Ok(HandleResponse {
         messages: prop.msgs,
-        log: vec![
-            log("action", "execute"),
-            log("sender", env.message.sender),
-            log("proposal_id", proposal_id),
-        ],
+        attributes: vec![
+            attr("action", "execute"),
+            attr("sender", env.message.sender),
+            attr("proposal_id", proposal_id),
+            ],
         data: None,
     })
 }
@@ -254,11 +254,11 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "close"),
-            log("sender", env.message.sender),
-            log("proposal_id", proposal_id),
-        ],
+        attributes: vec![
+            attr("action", "close"),
+            attr("sender", env.message.sender),
+            attr("proposal_id", proposal_id),
+            ],
         data: None,
     })
 }
@@ -647,11 +647,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "propose"),
-                    log("sender", VOTER3),
-                    log("proposal_id", 1),
-                    log("status", "Open"),
+                attributes: vec![
+                    attr("action", "propose"),
+                    attr("sender", VOTER3),
+                    attr("proposal_id", 1),
+                    attr("status", "Open"),
                 ],
                 data: None,
             }
@@ -666,11 +666,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "propose"),
-                    log("sender", VOTER4),
-                    log("proposal_id", 2),
-                    log("status", "Passed"),
+                attributes: vec![
+                    attr("action", "propose"),
+                    attr("sender", VOTER4),
+                    attr("proposal_id", 2),
+                    attr("status", "Passed"),
                 ],
                 data: None,
             }
@@ -703,7 +703,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Owner cannot vote (again)
         let yes_vote = HandleMsg::Vote {
@@ -739,11 +739,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "vote"),
-                    log("sender", VOTER1),
-                    log("proposal_id", proposal_id),
-                    log("status", "Open"),
+                attributes: vec![
+                    attr("action", "vote"),
+                    attr("sender", VOTER1),
+                    attr("proposal_id", proposal_id),
+                    attr("status", "Open"),
                 ],
                 data: None,
             }
@@ -751,7 +751,7 @@ mod tests {
 
         // No/Veto votes have no effect on the tally
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Compute the current tally
         let tally = get_tally(&deps, proposal_id);
@@ -811,11 +811,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "vote"),
-                    log("sender", VOTER4),
-                    log("proposal_id", proposal_id),
-                    log("status", "Passed"),
+                attributes: vec![
+                    attr("action", "vote"),
+                    attr("sender", VOTER4),
+                    attr("proposal_id", proposal_id),
+                    attr("status", "Passed"),
                 ],
                 data: None,
             }
@@ -859,7 +859,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Only Passed can be executed
         let execution = HandleMsg::Execute { proposal_id };
@@ -887,11 +887,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "vote"),
-                    log("sender", VOTER3),
-                    log("proposal_id", proposal_id),
-                    log("status", "Passed"),
+                attributes: vec![
+                    attr("action", "vote"),
+                    attr("sender", VOTER3),
+                    attr("proposal_id", proposal_id),
+                    attr("status", "Passed"),
                 ],
                 data: None,
             }
@@ -919,10 +919,10 @@ mod tests {
             res,
             HandleResponse {
                 messages: msgs,
-                log: vec![
-                    log("action", "execute"),
-                    log("sender", SOMEBODY),
-                    log("proposal_id", proposal_id),
+                attributes: vec![
+                    attr("action", "execute"),
+                    attr("sender", SOMEBODY),
+                    attr("proposal_id", proposal_id),
                 ],
                 data: None,
             }
@@ -968,7 +968,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         let closing = HandleMsg::Close { proposal_id };
 
@@ -999,7 +999,7 @@ mod tests {
         let res = handle(&mut deps, env.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.log[2].value.parse().unwrap();
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         let closing = HandleMsg::Close { proposal_id };
 
@@ -1012,10 +1012,10 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "close"),
-                    log("sender", SOMEBODY),
-                    log("proposal_id", proposal_id),
+                attributes: vec![
+                    attr("action", "close"),
+                    attr("sender", SOMEBODY),
+                    attr("proposal_id", proposal_id),
                 ],
                 data: None,
             }
