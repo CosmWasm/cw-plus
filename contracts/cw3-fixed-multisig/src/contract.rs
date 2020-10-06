@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use cosmwasm_std::{
     attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Order, Querier, StdError, StdResult, Storage,
+    HumanAddr, InitResponse, Order, Querier, StdResult, Storage,
 };
 
 use cw0::{calc_range_start_human, Expiration};
@@ -12,6 +12,7 @@ use cw3::{
     VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
 };
 
+use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
     ballots, ballots_read, config, config_read, next_id, parse_id, proposal, proposal_read, voters,
@@ -26,19 +27,17 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     msg: InitMsg,
-) -> StdResult<InitResponse> {
+) -> Result<InitResponse, ContractError> {
     if msg.required_weight == 0 {
-        return Err(StdError::generic_err("Required weight cannot be zero"));
+        return Err(ContractError::ZeroWeight {});
     }
     if msg.voters.is_empty() {
-        return Err(StdError::generic_err("No voters"));
+        return Err(ContractError::NoVoters {});
     }
     let total_weight = msg.voters.iter().map(|v| v.weight).sum();
 
     if total_weight < msg.required_weight {
-        return Err(StdError::generic_err(
-            "Not possible to reach required (passing) weight",
-        ));
+        return Err(ContractError::UnreachableWeight {});
     }
 
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -63,7 +62,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse<Empty>, ContractError> {
     match msg {
         HandleMsg::Propose {
             title,
@@ -85,12 +84,12 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     msgs: Vec<CosmosMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&env.message.sender)?;
     let vote_power = voters_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
-        .ok_or_else(StdError::unauthorized)?;
+        .ok_or_else(|| ContractError::Unauthorized {})?;
 
     let cfg = config_read(&deps.storage).load()?;
 
@@ -101,7 +100,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     if let Some(Ordering::Greater) = comp {
         expires = max_expires;
     } else if comp.is_none() {
-        return Err(StdError::generic_err("Wrong expiration option"));
+        return Err(ContractError::WrongExpiration {});
     }
 
     let status = if vote_power < cfg.required_weight {
@@ -147,25 +146,25 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     env: Env,
     proposal_id: u64,
     vote: Vote,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&env.message.sender)?;
     let vote_power = voters_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
-        .ok_or_else(StdError::unauthorized)?;
+        .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
     if prop.status != Status::Open {
-        return Err(StdError::generic_err("Proposal is not open"));
+        return Err(ContractError::NotOpen {});
     }
     if prop.expires.is_expired(&env.block) {
-        return Err(StdError::generic_err("Proposal voting period has expired"));
+        return Err(ContractError::Expired {});
     }
 
     // cast vote if no vote previously cast
     ballots(&mut deps.storage, proposal_id).update(raw_sender.as_slice(), |bal| match bal {
-        Some(_) => Err(StdError::generic_err("Already voted on this proposal")),
+        Some(_) => Err(ContractError::AlreadyVoted {}),
         None => Ok(Ballot {
             weight: vote_power,
             vote,
@@ -189,7 +188,7 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
             attr("sender", env.message.sender),
             attr("proposal_id", proposal_id),
             attr("status", format!("{:?}", prop.status)),
-            ],
+        ],
         data: None,
     })
 }
@@ -198,16 +197,14 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     proposal_id: u64,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
     if prop.status != Status::Passed {
-        return Err(StdError::generic_err(
-            "Proposal must have passed and not yet been executed",
-        ));
+        return Err(ContractError::WrongExecuteStatus {});
     }
 
     // set it to executed
@@ -221,7 +218,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
             attr("action", "execute"),
             attr("sender", env.message.sender),
             attr("proposal_id", proposal_id),
-            ],
+        ],
         data: None,
     })
 }
@@ -230,7 +227,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     proposal_id: u64,
-) -> StdResult<HandleResponse<Empty>> {
+) -> Result<HandleResponse<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
@@ -238,14 +235,10 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
         .iter()
         .any(|x| *x == prop.status)
     {
-        return Err(StdError::generic_err(
-            "Cannot close completed or passed proposals",
-        ));
+        return Err(ContractError::WrongCloseStatus {});
     }
     if !prop.expires.is_expired(&env.block) {
-        return Err(StdError::generic_err(
-            "Proposal must expire before you can close it",
-        ));
+        return Err(ContractError::NotExpired {});
     }
 
     // set it to failed
@@ -258,7 +251,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
             attr("action", "close"),
             attr("sender", env.message.sender),
             attr("proposal_id", proposal_id),
-            ],
+        ],
         data: None,
     })
 }
@@ -485,7 +478,7 @@ mod tests {
         env: Env,
         required_weight: u64,
         max_voting_period: Duration,
-    ) -> StdResult<InitResponse<Empty>> {
+    ) -> Result<InitResponse<Empty>, ContractError> {
         // Init a contract with voters
         let voters = vec![
             voter(&env.message.sender, 0),
@@ -539,7 +532,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "No voters"),
+            ContractError::NoVoters {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -554,7 +547,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Required weight cannot be zero"),
+            ContractError::ZeroWeight {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -565,9 +558,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Not possible to reach required (passing) weight")
-            }
+            ContractError::UnreachableWeight {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -617,7 +608,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -634,7 +625,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!("Wrong expiration option", &msg),
+            ContractError::WrongExpiration {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -715,7 +706,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Already voted on this proposal"),
+            ContractError::AlreadyVoted {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -726,7 +717,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -781,7 +772,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Already voted on this proposal"),
+            ContractError::AlreadyVoted {} => {}
             e => panic!("unexpected error: {}", e),
         }
         assert_eq!(tally, get_tally(&deps, proposal_id));
@@ -796,9 +787,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Proposal voting period has expired")
-            }
+            ContractError::Expired {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -828,7 +817,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Proposal is not open"),
+            ContractError::NotOpen {} => {}
             e => panic!("unexpected error: {}", e),
         }
     }
@@ -868,9 +857,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Proposal must have passed and not yet been executed")
-            }
+            ContractError::WrongExecuteStatus {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -904,9 +891,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Cannot close completed or passed proposals");
-            }
+            ContractError::WrongCloseStatus {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -935,9 +920,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Cannot close completed or passed proposals");
-            }
+            ContractError::WrongCloseStatus {} => {}
             e => panic!("unexpected error: {}", e),
         }
     }
@@ -981,9 +964,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Proposal must expire before you can close it");
-            }
+            ContractError::NotExpired {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -1027,9 +1008,7 @@ mod tests {
         // Verify
         assert!(res.is_err());
         match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(&msg, "Cannot close completed or passed proposals");
-            }
+            ContractError::WrongCloseStatus {} => {}
             e => panic!("unexpected error: {}", e),
         }
     }
