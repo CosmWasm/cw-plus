@@ -76,23 +76,23 @@ pub fn increment_tokens<S: Storage>(storage: &mut S) -> StdResult<u64> {
 }
 
 pub fn tokens<S: Storage>(storage: &mut S) -> Bucket<S, TokenInfo> {
-    bucket(TOKEN_PREFIX, storage)
+    bucket(storage, TOKEN_PREFIX)
 }
 
 pub fn tokens_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, TokenInfo> {
-    bucket_read(TOKEN_PREFIX, storage)
+    bucket_read(storage, TOKEN_PREFIX)
 }
 
 pub fn operators<'a, S: Storage>(
     storage: &'a mut S,
     owner: &CanonicalAddr,
 ) -> Bucket<'a, S, Expiration> {
-    Bucket::multilevel(&[OPERATOR_PREFIX, owner.as_slice()], storage)
+    Bucket::multilevel(storage, &[OPERATOR_PREFIX, owner.as_slice()])
 }
 
 pub fn operators_read<'a, S: ReadonlyStorage>(
     storage: &'a S,
     owner: &CanonicalAddr,
 ) -> ReadonlyBucket<'a, S, Expiration> {
-    ReadonlyBucket::multilevel(&[OPERATOR_PREFIX, owner.as_slice()], storage)
+    ReadonlyBucket::multilevel(storage, &[OPERATOR_PREFIX, owner.as_slice()])
 }
