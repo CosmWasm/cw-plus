@@ -18,14 +18,14 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cosmwasm-std = { version = "0.11.0-alpha4", features = ["iterator"] }
-cosmwasm-storage = { version = "0.11.0-alpha4", features = ["iterator"] }
+cosmwasm-std = { version = "=0.11.0-alpha3", features = ["iterator"] }
+cosmwasm-storage = { version = "=0.11.0-alpha3", features = ["iterator"] }
 cw0 = { path = "../../packages/cw0", version = "0.2.2" }
 cw2 = { path = "../../packages/cw2", version = "0.2.2" }
 cw3 = { path = "../../packages/cw3", version = "0.2.2" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-snafu = { version = "0.6.3" }
+thiserror = { version = "1.0.20" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.11.0-alpha4" }
+cosmwasm-schema = { version = "=0.11.0-alpha3" }
