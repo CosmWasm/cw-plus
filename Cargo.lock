@@ -514,7 +514,7 @@ dependencies = [
  "cw721",
  "schemars",
  "serde",
- "snafu",
+ "thiserror",
 ]
 
 [[package]]

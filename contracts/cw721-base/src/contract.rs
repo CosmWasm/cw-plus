@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Order, Querier, StdError, StdResult, Storage,
+    InitResponse, Order, Querier, StdResult, Storage,
 };
 
 use cw0::{calc_range_start_human, calc_range_start_string};
@@ -10,6 +10,7 @@ use cw721::{
     NumTokensResponse, OwnerOfResponse, TokensResponse,
 };
 
+use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
 use crate::state::{
     contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, operators,
@@ -41,7 +42,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Mint {
             token_id,
@@ -80,12 +81,12 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     name: String,
     description: Option<String>,
     image: Option<String>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let minter = mint(&mut deps.storage).load()?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
 
     if sender_raw != minter {
-        return Err(StdError::unauthorized());
+        return Err(ContractError::Unauthorized {});
     }
 
     // create the token
@@ -97,7 +98,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         image,
     };
     tokens(&mut deps.storage).update(token_id.as_bytes(), |old| match old {
-        Some(_) => Err(StdError::generic_err("token_id already claimed")),
+        Some(_) => Err(ContractError::Claimed {}),
         None => Ok(token),
     })?;
 
@@ -119,7 +120,7 @@ pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
     env: Env,
     recipient: HumanAddr,
     token_id: String,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     _transfer_nft(deps, &env, &recipient, &token_id)?;
 
     Ok(HandleResponse {
@@ -140,7 +141,7 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     contract: HumanAddr,
     token_id: String,
     msg: Option<Binary>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // Unwrap message first
     let msgs: Vec<CosmosMsg> = match &msg {
         None => vec![],
@@ -168,7 +169,7 @@ pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
     env: &Env,
     recipient: &HumanAddr,
     token_id: &str,
-) -> StdResult<TokenInfo> {
+) -> Result<TokenInfo, ContractError> {
     let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
     // ensure we have permissions
     check_can_send(&deps, env, &token)?;
@@ -185,7 +186,7 @@ pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
     spender: HumanAddr,
     token_id: String,
     expires: Option<Expiration>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     _update_approvals(deps, &env, &spender, &token_id, true, expires)?;
 
     Ok(HandleResponse {
@@ -205,7 +206,7 @@ pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
     env: Env,
     spender: HumanAddr,
     token_id: String,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     _update_approvals(deps, &env, &spender, &token_id, false, None)?;
 
     Ok(HandleResponse {
@@ -228,7 +229,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
     // if add == false, remove. if add == true, remove then set with this expiration
     add: bool,
     expires: Option<Expiration>,
-) -> StdResult<TokenInfo> {
+) -> Result<TokenInfo, ContractError> {
     let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
     // ensure we have permissions
     check_can_approve(&deps, &env, &token)?;
@@ -246,9 +247,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
         // reject expired data as invalid
         let expires = expires.unwrap_or_default();
         if expires.is_expired(&env.block) {
-            return Err(StdError::generic_err(
-                "Cannot set approval that is already expired",
-            ));
+            return Err(ContractError::Expired {});
         }
         let approval = Approval {
             spender: spender_raw,
@@ -267,13 +266,11 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
     env: Env,
     operator: HumanAddr,
     expires: Option<Expiration>,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     // reject expired data as invalid
     let expires = expires.unwrap_or_default();
     if expires.is_expired(&env.block) {
-        return Err(StdError::generic_err(
-            "Cannot set approval that is already expired",
-        ));
+        return Err(ContractError::Expired {});
     }
 
     // set the operator for us
@@ -296,7 +293,7 @@ pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     operator: HumanAddr,
-) -> StdResult<HandleResponse> {
+) -> Result<HandleResponse, ContractError> {
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let operator_raw = deps.api.canonical_address(&operator)?;
     operators(&mut deps.storage, &sender_raw).remove(operator_raw.as_slice());
@@ -317,7 +314,7 @@ fn check_can_approve<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
     token: &TokenInfo,
-) -> StdResult<()> {
+) -> Result<(), ContractError> {
     // owner can approve
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     if token.owner == sender_raw {
@@ -328,12 +325,12 @@ fn check_can_approve<S: Storage, A: Api, Q: Querier>(
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
-                Err(StdError::unauthorized())
+                Err(ContractError::Unauthorized {})
             } else {
                 Ok(())
             }
         }
-        None => Err(StdError::unauthorized()),
+        None => Err(ContractError::Unauthorized {}),
     }
 }
 
@@ -342,7 +339,7 @@ fn check_can_send<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
     token: &TokenInfo,
-) -> StdResult<()> {
+) -> Result<(), ContractError> {
     // owner can send
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     if token.owner == sender_raw {
@@ -363,12 +360,12 @@ fn check_can_send<S: Storage, A: Api, Q: Querier>(
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
-                Err(StdError::unauthorized())
+                Err(ContractError::Unauthorized {})
             } else {
                 Ok(())
             }
         }
-        None => Err(StdError::unauthorized()),
+        None => Err(ContractError::Unauthorized {}),
     }
 }
 
@@ -517,7 +514,7 @@ fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Ap
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{StdError, WasmMsg};
+    use cosmwasm_std::WasmMsg;
 
     use super::*;
     use cw721::ApprovedForAllResponse;
@@ -593,7 +590,7 @@ mod tests {
         let random = mock_env("random", &[]);
         let err = handle(&mut deps, random, mint_msg.clone()).unwrap_err();
         match err {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -641,9 +638,7 @@ mod tests {
         let allowed = mock_env(MINTER, &[]);
         let err = handle(&mut deps, allowed, mint_msg2).unwrap_err();
         match err {
-            StdError::GenericErr { msg, .. } => {
-                assert_eq!(msg.as_str(), "token_id already claimed")
-            }
+            ContractError::Claimed {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -684,7 +679,7 @@ mod tests {
         let err = handle(&mut deps, random, transfer_msg.clone()).unwrap_err();
 
         match err {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
@@ -750,7 +745,7 @@ mod tests {
         let random = mock_env("random", &[]);
         let err = handle(&mut deps, random, send_msg.clone()).unwrap_err();
         match err {
-            StdError::Unauthorized { .. } => {}
+            ContractError::Unauthorized {} => {}
             e => panic!("unexpected error: {}", e),
         }
 
