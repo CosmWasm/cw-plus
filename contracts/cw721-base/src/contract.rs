@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    from_binary, log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
+    attr, from_binary, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
     InitResponse, Order, Querier, StdError, StdResult, Storage,
 };
 
@@ -105,10 +105,10 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "mint"),
-            log("minter", env.message.sender),
-            log("token_id", token_id),
+        attributes: vec![
+            attr("action", "mint"),
+            attr("minter", env.message.sender),
+            attr("token_id", token_id),
         ],
         data: None,
     })
@@ -124,11 +124,11 @@ pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "transfer_nft"),
-            log("sender", env.message.sender),
-            log("recipient", recipient),
-            log("token_id", token_id),
+        attributes: vec![
+            attr("action", "transfer_nft"),
+            attr("sender", env.message.sender),
+            attr("recipient", recipient),
+            attr("token_id", token_id),
         ],
         data: None,
     })
@@ -153,11 +153,11 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     // Send message
     Ok(HandleResponse {
         messages: msgs,
-        log: vec![
-            log("action", "send_nft"),
-            log("sender", env.message.sender),
-            log("recipient", contract),
-            log("token_id", token_id),
+        attributes: vec![
+            attr("action", "send_nft"),
+            attr("sender", env.message.sender),
+            attr("recipient", contract),
+            attr("token_id", token_id),
         ],
         data: None,
     })
@@ -190,11 +190,11 @@ pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "approve"),
-            log("sender", env.message.sender),
-            log("spender", spender),
-            log("token_id", token_id),
+        attributes: vec![
+            attr("action", "approve"),
+            attr("sender", env.message.sender),
+            attr("spender", spender),
+            attr("token_id", token_id),
         ],
         data: None,
     })
@@ -210,11 +210,11 @@ pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "revoke"),
-            log("sender", env.message.sender),
-            log("spender", spender),
-            log("token_id", token_id),
+        attributes: vec![
+            attr("action", "revoke"),
+            attr("sender", env.message.sender),
+            attr("spender", spender),
+            attr("token_id", token_id),
         ],
         data: None,
     })
@@ -283,10 +283,10 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "approve_all"),
-            log("sender", env.message.sender),
-            log("operator", operator),
+        attributes: vec![
+            attr("action", "approve_all"),
+            attr("sender", env.message.sender),
+            attr("operator", operator),
         ],
         data: None,
     })
@@ -303,10 +303,10 @@ pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![
-            log("action", "revoke_all"),
-            log("sender", env.message.sender),
-            log("operator", operator),
+        attributes: vec![
+            attr("action", "revoke_all"),
+            attr("sender", env.message.sender),
+            attr("operator", operator),
         ],
         data: None,
     })
@@ -701,11 +701,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "transfer_nft"),
-                    log("sender", "venus"),
-                    log("recipient", "random"),
-                    log("token_id", token_id),
+                attributes: vec![
+                    attr("action", "transfer_nft"),
+                    attr("sender", "venus"),
+                    attr("recipient", "random"),
+                    attr("token_id", token_id),
                 ],
                 data: None,
             }
@@ -761,11 +761,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![msg],
-                log: vec![
-                    log("action", "send_nft"),
-                    log("sender", "venus"),
-                    log("recipient", "another_contract"),
-                    log("token_id", token_id),
+                attributes: vec![
+                    attr("action", "send_nft"),
+                    attr("sender", "venus"),
+                    attr("recipient", "another_contract"),
+                    attr("token_id", token_id),
                 ],
                 data: None,
             }
@@ -805,11 +805,11 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "approve"),
-                    log("sender", "demeter"),
-                    log("spender", "random"),
-                    log("token_id", token_id.clone()),
+                attributes: vec![
+                    attr("action", "approve"),
+                    attr("sender", "demeter"),
+                    attr("spender", "random"),
+                    attr("token_id", token_id.clone()),
                 ],
                 data: None,
             }
@@ -915,10 +915,10 @@ mod tests {
             res,
             HandleResponse {
                 messages: vec![],
-                log: vec![
-                    log("action", "approve_all"),
-                    log("sender", "demeter"),
-                    log("operator", "random"),
+                attributes: vec![
+                    attr("action", "approve_all"),
+                    attr("sender", "demeter"),
+                    attr("operator", "random"),
                 ],
                 data: None,
             }
