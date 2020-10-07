@@ -4,8 +4,8 @@ use std::ops::{AddAssign, Sub};
 
 use cosmwasm_std::{
     attr, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Empty, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, Order, Querier, StakingMsg, StdError, StdResult,
-    Storage,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StakingMsg, StdError,
+    StdResult, Storage,
 };
 use cw0::{calc_range_start_human, Expiration};
 use cw1::CanSendResponse;
@@ -32,9 +32,10 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let result = whitelist_init(deps, env, msg)?;
+    let result = whitelist_init(deps, env, info, msg)?;
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(result)
 }
@@ -42,46 +43,48 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => handle_execute(deps, env, msgs),
-        HandleMsg::Freeze {} => Ok(handle_freeze(deps, env)?),
-        HandleMsg::UpdateAdmins { admins } => Ok(handle_update_admins(deps, env, admins)?),
+        HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
+        HandleMsg::Freeze {} => Ok(handle_freeze(deps, env, info)?),
+        HandleMsg::UpdateAdmins { admins } => Ok(handle_update_admins(deps, env, info, admins)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_increase_allowance(deps, env, spender, amount, expires),
+        } => handle_increase_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_decrease_allowance(deps, env, spender, amount, expires),
+        } => handle_decrease_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::SetPermissions {
             spender,
             permissions,
-        } => handle_set_permissions(deps, env, spender, permissions),
+        } => handle_set_permissions(deps, env, info, spender, permissions),
     }
 }
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     msgs: Vec<CosmosMsg<T>>,
 ) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = admin_list_read(&deps.storage).load()?;
-    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
+    let owner_raw = &deps.api.canonical_address(&info.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(owner_raw) {
         let mut res = HandleResponse::default();
         res.messages = msgs;
-        res.attributes = vec![attr("action", "execute"), attr("owner", env.message.sender)];
+        res.attributes = vec![attr("action", "execute"), attr("owner", info.sender)];
         Ok(res)
     } else {
         for msg in &msgs {
@@ -113,7 +116,7 @@ where
         // Relay messages
         let res = HandleResponse {
             messages: msgs,
-            attributes: vec![attr("action", "execute"), attr("owner", env.message.sender)],
+            attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
             data: None,
         };
         Ok(res)
@@ -151,7 +154,8 @@ pub fn check_staking_permissions(
 
 pub fn handle_increase_allowance<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     spender: HumanAddr,
     amount: Coin,
     expires: Option<Expiration>,
@@ -161,7 +165,7 @@ where
 {
     let cfg = admin_list_read(&deps.storage).load()?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
+    let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
     if !cfg.is_admin(&owner_raw) {
         return Err(ContractError::Unauthorized {});
@@ -183,7 +187,7 @@ where
         messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
-            attr("owner", env.message.sender),
+            attr("owner", info.sender),
             attr("spender", spender),
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
@@ -195,7 +199,8 @@ where
 
 pub fn handle_decrease_allowance<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     spender: HumanAddr,
     amount: Coin,
     expires: Option<Expiration>,
@@ -205,7 +210,7 @@ where
 {
     let cfg = admin_list_read(&deps.storage).load()?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
+    let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
     if !cfg.is_admin(&owner_raw) {
         return Err(ContractError::Unauthorized {});
@@ -246,7 +251,8 @@ where
 
 pub fn handle_set_permissions<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     spender: HumanAddr,
     perm: Permissions,
 ) -> Result<HandleResponse<T>, ContractError>
@@ -255,7 +261,7 @@ where
 {
     let cfg = admin_list_read(&deps.storage).load()?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&env.message.sender)?;
+    let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
     if !cfg.is_admin(&owner_raw) {
         return Err(ContractError::Unauthorized {});
