@@ -157,11 +157,9 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
 
-    const CANONICAL_LENGTH: usize = 20;
-
     #[test]
     fn init_and_modify_config() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let alice = HumanAddr::from("alice");
         let bob = HumanAddr::from("bob");
@@ -240,7 +238,7 @@ mod tests {
 
     #[test]
     fn execute_messages_has_proper_permissions() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let alice = HumanAddr::from("alice");
         let bob = HumanAddr::from("bob");
@@ -290,7 +288,7 @@ mod tests {
 
     #[test]
     fn can_send_query_works() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let alice = HumanAddr::from("alice");
         let bob = HumanAddr::from("bob");
