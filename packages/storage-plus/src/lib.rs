@@ -1,4 +1,5 @@
 mod length_prefixed;
+mod map;
 mod namespace_helpers;
 mod path;
 mod type_helpers;
