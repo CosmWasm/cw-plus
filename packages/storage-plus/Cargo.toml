@@ -9,7 +9,6 @@ repository = "https://github.com/CosmWasm/cosmwasm-plus"
 homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 iterator = ["cosmwasm-std/iterator"]
 
