@@ -1,17 +1,13 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
-#![allow(dead_code)]
-#![allow(unused_imports)]
 
-use cosmwasm_std::{from_slice, to_vec, Binary, Order, StdError, StdResult, Storage, KV};
+use cosmwasm_std::{Order, StdResult, Storage, KV};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::iter_helpers::range_with_prefix;
-use crate::keys::PrimaryKey;
-use crate::map::Map;
-use crate::OwnedMap;
+use crate::map::OwnedMap;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: &[u8] = b"1";
@@ -35,7 +31,7 @@ pub fn index_i32(data: i32) -> Vec<u8> {
 //  * store (namespace, index_name, idx_value) -> {key, value} - allows one and copies pk and data
 //  // this would be the primary key - we abstract that too???
 //  * store (namespace, index_name, pk) -> value - allows one with data
-pub(crate) trait Index<T>
+pub trait Index<T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
@@ -65,7 +61,7 @@ where
     // TODO: range over secondary index values? (eg. all results with 30 < age < 40)
 }
 
-pub(crate) struct MultiIndex<'a, T>
+pub struct MultiIndex<'a, T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
@@ -140,31 +136,31 @@ where
     }
 }
 
-#[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct UniqueRef<T: Clone> {
-    pk: Binary,
-    value: T,
-}
-
-pub(crate) struct UniqueIndex<'a, T>
-where
-    T: Serialize + DeserializeOwned + Clone,
-{
-    idx_fn: fn(&T) -> Vec<u8>,
-    _name: &'a str,
-}
-
-impl<'a, T> UniqueIndex<'a, T>
-where
-    T: Serialize + DeserializeOwned + Clone,
-{
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, name: &'a str) -> Self {
-        UniqueIndex {
-            idx_fn,
-            _name: name,
-        }
-    }
-}
+// #[derive(Deserialize, Serialize, Clone)]
+// pub(crate) struct UniqueRef<T: Clone> {
+//     pk: Binary,
+//     value: T,
+// }
+//
+// pub(crate) struct UniqueIndex<'a, T>
+// where
+//     T: Serialize + DeserializeOwned + Clone,
+// {
+//     idx_fn: fn(&T) -> Vec<u8>,
+//     _name: &'a str,
+// }
+//
+// impl<'a, T> UniqueIndex<'a, T>
+// where
+//     T: Serialize + DeserializeOwned + Clone,
+// {
+//     pub fn new(idx_fn: fn(&T) -> Vec<u8>, name: &'a str) -> Self {
+//         UniqueIndex {
+//             idx_fn,
+//             _name: name,
+//         }
+//     }
+// }
 
 // impl<'a, S, T> Index<S, T> for UniqueIndex<'a, S, T>
 // where
