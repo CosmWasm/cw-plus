@@ -27,7 +27,7 @@ impl<'a, K, T> OwnedMap<'a, K, T> {
         }
     }
 
-    pub fn to_map<'b>(&'b self) -> Map<'b, K, T> {
+    pub fn to_map(&'_ self) -> Map<'_, K, T> {
         Map {
             namespaces: &self.namespaces,
             key_type: self.key_type,
@@ -239,7 +239,7 @@ mod test {
     fn owned_map_pass_through() {
         let mut store = MockStorage::new();
 
-        // TODO: make to_map() automatic
+        // FIXME: make to_map() automatic - this needs Deref and lost hours trying to get this to work
         let owned = OwnedMap::<&[u8], u32>::new(vec![b"top", b"level"]);
         owned.to_map().save(&mut store, b"foo", &1234).unwrap();
         owned.to_map().save(&mut store, b"bar", &4321).unwrap();

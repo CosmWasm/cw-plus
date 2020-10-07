@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::iter_helpers::range_with_prefix;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
+use crate::OwnedMap;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: &[u8] = b"1";
@@ -42,36 +43,22 @@ where
     fn name(&self) -> String;
     fn index(&self, data: &T) -> Vec<u8>;
 
-    // TODO: move map into index
+    // TODO: pk: PrimaryKey not just &[u8] ???
 
-    fn insert<S: Storage>(
-        &self,
-        store: &mut S,
-        map: &mut Map<&[u8], T>,
-        pk: &[u8],
-        data: &T,
-    ) -> StdResult<()>;
-    fn remove<S: Storage>(
-        &self,
-        store: &mut S,
-        map: &mut Map<&[u8], T>,
-        pk: &[u8],
-        old_data: &T,
-    ) -> StdResult<()>;
+    fn save<S: Storage>(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
+    fn remove<S: Storage>(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
 
     // these should be implemented by all
     fn pks_by_index<'c, S: Storage>(
         &self,
         store: &'c S,
-        map: &'c Map<&[u8], T>,
         idx: &[u8],
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>;
 
     /// returns all items that match this secondary index, always by pk Ascending
     fn items_by_index<'c, S: Storage>(
-        &self,
+        &'c self,
         store: &'c S,
-        map: &'c Map<&[u8], T>,
         idx: &[u8],
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>;
 
@@ -84,70 +71,74 @@ where
 {
     idx_fn: fn(&T) -> Vec<u8>,
     _name: &'a str,
+    idx_map: OwnedMap<'a, (&'a [u8], &'a [u8]), Vec<u8>>,
+    pk_map: OwnedMap<'a, &'a [u8], T>,
 }
 
 impl<'a, T> MultiIndex<'a, T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, name: &'a str) -> Self {
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, namespace: &'a [u8], name: &'a str) -> Self {
         MultiIndex {
             idx_fn,
+            idx_map: OwnedMap::new(vec![namespace, name.as_bytes()]),
+            pk_map: OwnedMap::new(vec![namespace, b"_pk"]),
             _name: name,
         }
     }
 }
 
-// impl<'a, T> Index<T> for MultiIndex<'a, T>
-// where
-//     T: Serialize + DeserializeOwned + Clone,
-// {
-//     fn name(&self) -> String {
-//         self._name.to_string()
-//     }
-//
-//     fn index(&self, data: &T) -> Vec<u8> {
-//         (self.idx_fn)(data)
-//     }
-//
-//     fn insert(&self, map: &mut Map<K, T>, pk: &[u8], data: &T) -> StdResult<()> {
-//         let idx = self.index(data);
-//         let key = map.build_secondary_key(&[self._name.as_bytes(), &idx], pk);
-//         map.storage.set(&key, MARKER);
-//         Ok(())
-//     }
-//
-//     fn remove(&self, map: &mut Map<K, T>, pk: &[u8], old_data: &T) -> StdResult<()> {
-//         let idx = self.index(old_data);
-//         let key = map.build_secondary_key(&[self._name.as_bytes(), &idx], pk);
-//         map.storage.remove(&key);
-//         Ok(())
-//     }
-//
-//     fn pks_by_index<'c>(
-//         &self,
-//         map: &'c Map<K, T>,
-//         idx: &[u8],
-//     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-//         let namespace = map.build_secondary_key(&[self._name.as_bytes(), &idx], b"");
-//         let mapped = range_with_prefix(map.storage, &namespace, None, None, Order::Ascending)
-//             .map(|(k, _)| k);
-//         Box::new(mapped)
-//     }
-//
-//     /// returns all items that match this secondary index, always by pk Ascending
-//     fn items_by_index<'c>(
-//         &self,
-//         map: &'c Map<K, T>,
-//         idx: &[u8],
-//     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-//         let mapped = self.pks_by_index(map, idx).map(move |pk| {
-//             let v = map.load(&pk)?;
-//             Ok((pk, v))
-//         });
-//         Box::new(mapped)
-//     }
-// }
+impl<'a, T> Index<T> for MultiIndex<'a, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
+    fn name(&self) -> String {
+        self._name.to_string()
+    }
+
+    fn index(&self, data: &T) -> Vec<u8> {
+        (self.idx_fn)(data)
+    }
+
+    fn save<S: Storage>(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
+        let idx = self.index(data);
+        let path = self.idx_map.to_map().key((&idx, &pk)).storage_key;
+        store.set(&path, MARKER);
+        Ok(())
+    }
+
+    fn remove<S: Storage>(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
+        let idx = self.index(old_data);
+        let path = self.idx_map.to_map().key((&idx, &pk)).storage_key;
+        store.remove(&path);
+        Ok(())
+    }
+
+    fn pks_by_index<'c, S: Storage>(
+        &self,
+        store: &'c S,
+        idx: &[u8],
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        let prefix = self.idx_map.to_map().prefix(idx).storage_prefix;
+        let mapped =
+            range_with_prefix(store, &prefix, None, None, Order::Ascending).map(|(k, _)| k);
+        Box::new(mapped)
+    }
+
+    /// returns all items that match this secondary index, always by pk Ascending
+    fn items_by_index<'c, S: Storage>(
+        &'c self,
+        store: &'c S,
+        idx: &[u8],
+    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
+        let mapped = self.pks_by_index(store, idx).map(move |pk| {
+            let v = self.pk_map.to_map().load(store, &pk)?;
+            Ok((pk, v))
+        });
+        Box::new(mapped)
+    }
+}
 
 #[derive(Deserialize, Serialize, Clone)]
 pub(crate) struct UniqueRef<T: Clone> {
