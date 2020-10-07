@@ -6,8 +6,7 @@ use crate::length_prefixed::namespaces_with_key;
 use crate::type_helpers::{may_deserialize, must_deserialize};
 use cosmwasm_std::{to_vec, StdResult, Storage};
 
-// TODO: where to add PREFIX_PK????
-
+// TODO: build the final storage key (build_storage_key()) in the constructor, so cheap when we reuse
 pub struct Path<'a, T>
 where
     T: Serialize + DeserializeOwned,

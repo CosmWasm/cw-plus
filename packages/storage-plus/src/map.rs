@@ -4,6 +4,8 @@ use std::marker::PhantomData;
 
 use crate::path::Path;
 
+// TODO: where to add PREFIX_PK???? Only in an Indexed Map?
+
 pub struct Map<'a, K, T> {
     namespaces: &'a [&'a [u8]],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
@@ -30,6 +32,8 @@ where
         let (namespaces, key) = k.namespaced(self.namespaces);
         Path::new(namespaces, key)
     }
+
+    // TODO: how to do range queries on the prefix...
 }
 
 pub trait PrimaryKey<'a> {
@@ -51,6 +55,15 @@ impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
         spaces.push(self.0);
         // move the first part into the namespace, second part as key
         (spaces, self.1.to_vec())
+    }
+}
+
+impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
+    fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
+        let mut spaces = namespaces.to_vec();
+        spaces.extend_from_slice(&[self.0, self.1]);
+        // move the first parts into the namespace, last as key
+        (spaces, self.2.to_vec())
     }
 }
 
