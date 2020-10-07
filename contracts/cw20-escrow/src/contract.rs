@@ -2,7 +2,6 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
     HumanAddr, InitResponse, Querier, StdResult, Storage, WasmMsg,
 };
-use cosmwasm_storage::prefixed;
 
 use cw2::set_contract_version;
 use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
@@ -12,7 +11,7 @@ use crate::error::ContractError;
 use crate::msg::{
     CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
-use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, GenericBalance, PREFIX_ESCROW};
+use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, GenericBalance};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
@@ -157,8 +156,8 @@ pub fn try_approve<S: Storage, A: Api, Q: Querier>(
     } else if escrow.is_expired(&env) {
         Err(ContractError::Expired {})
     } else {
-        // we delete the escrow (TODO: expose this in Bucket for simpler API)
-        prefixed(&mut deps.storage, PREFIX_ESCROW).remove(id.as_bytes());
+        // we delete the escrow
+        escrows(&mut deps.storage).remove(id.as_bytes());
 
         let rcpt = deps.api.human_address(&escrow.recipient)?;
 
@@ -188,8 +187,8 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     {
         Err(ContractError::Unauthorized {})
     } else {
-        // we delete the escrow (TODO: expose this in Bucket for simpler API)
-        prefixed(&mut deps.storage, PREFIX_ESCROW).remove(id.as_bytes());
+        // we delete the escrow
+        escrows(&mut deps.storage).remove(id.as_bytes());
 
         let rcpt = deps.api.human_address(&escrow.source)?;
 

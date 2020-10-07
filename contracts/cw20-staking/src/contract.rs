@@ -35,7 +35,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     // ensure the validator is registered
     let vals = deps.querier.query_validators()?;
     if !vals.iter().any(|v| v.address == msg.validator) {
-        return Err(ContractError::NotInValidatorSet(msg.validator.to_string()));
+        return Err(ContractError::NotInValidatorSet {
+            validator: msg.validator.to_string(),
+        });
     }
 
     // store token info using cw20-base format
@@ -131,10 +133,10 @@ fn get_bonded<Q: Querier>(querier: &Q, contract: &HumanAddr) -> Result<Uint128, 
     bonds.iter().fold(Ok(Uint128(0)), |racc, d| {
         let acc = racc?;
         if d.amount.denom.as_str() != denom {
-            Err(ContractError::DifferentBondDenom(
-                denom.into(),
-                d.amount.denom.to_string(),
-            ))
+            Err(ContractError::DifferentBondDenom {
+                denom1: denom.into(),
+                denom2: d.amount.denom.to_string(),
+            })
         } else {
             Ok(acc + d.amount.amount)
         }
@@ -143,7 +145,10 @@ fn get_bonded<Q: Querier>(querier: &Q, contract: &HumanAddr) -> Result<Uint128, 
 
 fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
     if supply.bonded != bonded {
-        Err(ContractError::BondedMismatch(supply.bonded, bonded))
+        Err(ContractError::BondedMismatch {
+            stored: supply.bonded,
+            queried: bonded,
+        })
     } else {
         Ok(())
     }
@@ -161,7 +166,9 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
         .sent_funds
         .iter()
         .find(|x| x.denom == invest.bond_denom)
-        .ok_or_else(|| ContractError::EmptyBalance(invest.bond_denom.clone()))?;
+        .ok_or_else(|| ContractError::EmptyBalance {
+            denom: invest.bond_denom.clone(),
+        })?;
 
     // bonded is the total number of tokens we have delegated from this address
     let bonded = get_bonded(&deps.querier, &env.contract.address)?;
@@ -215,10 +222,10 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     let invest = invest_info_read(&deps.storage).load()?;
     // ensure it is big enough to care
     if amount < invest.min_withdrawal {
-        return Err(ContractError::UnbondTooSmall(
-            invest.min_withdrawal,
-            invest.bond_denom,
-        ));
+        return Err(ContractError::UnbondTooSmall {
+            min_bonded: invest.min_withdrawal,
+            denom: invest.bond_denom,
+        });
     }
     // calculate tax and remainer to unbond
     let tax = amount * invest.exit_tax;
