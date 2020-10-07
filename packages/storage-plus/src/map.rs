@@ -3,6 +3,8 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::path::Path;
+#[cfg(feature = "iterator")]
+use crate::prefix::Prefix;
 
 // TODO: where to add PREFIX_PK???? Only in an Indexed Map?
 
@@ -29,28 +31,40 @@ where
     K: PrimaryKey<'a>,
 {
     pub fn key(&self, k: K) -> Path<'a, T> {
-        let (namespaces, key) = k.namespaced(self.namespaces);
+        let (namespaces, key) = k.namespaced_key(self.namespaces);
         Path::new(namespaces, key)
     }
 
-    // TODO: how to do range queries on the prefix...
+    #[cfg(feature = "iterator")]
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<'a, T> {
+        let namespaces = p.namespace(self.namespaces);
+        Prefix::new(namespaces)
+    }
 }
 
+// TODO: move these types and traits into a separate file???
+
 pub trait PrimaryKey<'a> {
+    type Prefix: Prefixer<'a>;
+
     // TODO: get this cheaper...
     // fn namespaced(&self, namespaces: &'a[&'a[u8]]) -> (Vec<&'a[u8]>, &'a [u8]);
-    fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>);
+    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>);
 }
 
 impl<'a> PrimaryKey<'a> for &'a [u8] {
-    fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
+    type Prefix = ();
+
+    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
         // this is simple, we don't add more prefixes
         (namespaces.to_vec(), self.to_vec())
     }
 }
 
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
-    fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
+    type Prefix = &'a [u8];
+
+    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
         let mut spaces = namespaces.to_vec();
         spaces.push(self.0);
         // move the first part into the namespace, second part as key
@@ -59,7 +73,9 @@ impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
 }
 
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
-    fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
+    type Prefix = (&'a [u8], &'a [u8]);
+
+    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
         let mut spaces = namespaces.to_vec();
         spaces.extend_from_slice(&[self.0, self.1]);
         // move the first parts into the namespace, last as key
@@ -67,12 +83,40 @@ impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
     }
 }
 
+pub trait Prefixer<'a> {
+    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]>;
+}
+
+impl<'a> Prefixer<'a> for () {
+    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]> {
+        namespaces.to_vec()
+    }
+}
+
+impl<'a> Prefixer<'a> for &'a [u8] {
+    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]> {
+        let mut spaces = namespaces.to_vec();
+        spaces.push(self);
+        spaces
+    }
+}
+
+impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
+    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]> {
+        let mut spaces = namespaces.to_vec();
+        spaces.extend_from_slice(&[self.0, self.1]);
+        spaces
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     use cosmwasm_std::testing::MockStorage;
-    use serde::{Deserialize, Serialize};
+    #[cfg(feature = "iterator")]
+    use cosmwasm_std::{Order, StdResult};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
@@ -138,5 +182,68 @@ mod test {
         // matches under a copy
         let same = ALLOWANCE.key((b"owner", b"spender")).load(&store).unwrap();
         assert_eq!(1234, same);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_simple_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.key(b"john").save(&mut store, &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE.key(b"jim").save(&mut store, &data2).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = PEOPLE
+            .prefix(())
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data)]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_composite_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys, one under different owner
+        ALLOWANCE
+            .key((b"owner", b"spender"))
+            .save(&mut store, &1000)
+            .unwrap();
+        ALLOWANCE
+            .key((b"owner", b"spender2"))
+            .save(&mut store, &3000)
+            .unwrap();
+        ALLOWANCE
+            .key((b"owner2", b"spender"))
+            .save(&mut store, &5000)
+            .unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix(b"owner")
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        );
     }
 }
