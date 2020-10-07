@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+use crate::helpers::nested_namespaces_with_key;
 use crate::keys::PrimaryKey;
 #[cfg(feature = "iterator")]
 use crate::keys::{EmptyPrefix, Prefixer};
@@ -11,18 +12,20 @@ use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
-pub struct OwnedMap<'a, K, T> {
-    namespaces: Vec<&'a [u8]>,
+pub struct OwnedMap<K, T> {
+    namespace: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     key_type: PhantomData<K>,
     data_type: PhantomData<T>,
 }
 
 // TODO: figure out if I can use AsRef, Deref, or Borrow to do this automatically
-impl<'a, K, T> OwnedMap<'a, K, T> {
-    pub fn new(namespaces: Vec<&'a [u8]>) -> Self {
+impl<K, T> OwnedMap<K, T> {
+    pub fn new(namespace: &[&[u8]]) -> Self {
+        // TODO: remove this... now combine them
+        let namespace = nested_namespaces_with_key(namespace, &[], b"");
         OwnedMap {
-            namespaces,
+            namespace,
             data_type: PhantomData,
             key_type: PhantomData,
         }
@@ -30,7 +33,7 @@ impl<'a, K, T> OwnedMap<'a, K, T> {
 
     pub fn to_map(&'_ self) -> Map<'_, K, T> {
         Map {
-            namespaces: &self.namespaces,
+            namespace: &self.namespace,
             key_type: self.key_type,
             data_type: self.data_type,
         }
@@ -130,6 +133,7 @@ where
 mod test {
     use super::*;
     use serde::{Deserialize, Serialize};
+    use std::ops::Deref;
 
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
@@ -148,14 +152,14 @@ mod test {
     #[test]
     fn create_path() {
         let path = PEOPLE.key(b"john");
-        let key = path.storage_key;
+        let key = path.deref();
         // this should be prefixed(people) || john
         assert_eq!("people".len() + "john".len() + 2, key.len());
         assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
         assert_eq!(b"john".to_vec().as_slice(), &key[8..]);
 
         let path = ALLOWANCE.key((b"john", b"maria"));
-        let key = path.storage_key;
+        let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!("allow".len() + "john".len() + "maria".len() + 4, key.len());
         assert_eq!(b"allow".to_vec().as_slice(), &key[2..7]);
@@ -242,11 +246,11 @@ mod test {
         let mut store = MockStorage::new();
 
         // FIXME: make to_map() automatic - this needs Deref and lost hours trying to get this to work
-        let owned = OwnedMap::<&[u8], u32>::new(vec![b"top", b"level"]);
+        let owned = OwnedMap::<&[u8], u32>::new(&[b"top", b"level"]);
         owned.to_map().save(&mut store, b"foo", &1234).unwrap();
         owned.to_map().save(&mut store, b"bar", &4321).unwrap();
 
-        let map = Map::<&[u8], u32>::new(&[b"top", b"level"]);
+        let map = Map::<&[u8], u32>::new(b"\x00\x03top\x00\x05level");
         let count = map.load(&store, b"foo").unwrap();
         assert_eq!(count, 1234);
     }

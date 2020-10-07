@@ -66,8 +66,8 @@ where
 {
     idx_fn: fn(&T) -> Vec<u8>,
     _name: &'a str,
-    idx_map: OwnedMap<'a, (&'a [u8], &'a [u8]), Vec<u8>>,
-    pk_map: OwnedMap<'a, &'a [u8], T>,
+    idx_map: OwnedMap<(&'a [u8], &'a [u8]), Vec<u8>>,
+    pk_map: OwnedMap<&'a [u8], T>,
 }
 
 impl<'a, T> MultiIndex<'a, T>
@@ -78,8 +78,8 @@ where
     pub fn new(idx_fn: fn(&T) -> Vec<u8>, namespace: &'a [u8], name: &'a str) -> Self {
         MultiIndex {
             idx_fn,
-            idx_map: OwnedMap::new(vec![namespace, name.as_bytes()]),
-            pk_map: OwnedMap::new(vec![namespace, b"_pk"]),
+            idx_map: OwnedMap::new(&[namespace, name.as_bytes()]),
+            pk_map: OwnedMap::new(&[namespace, b"_pk"]),
             _name: name,
         }
     }
