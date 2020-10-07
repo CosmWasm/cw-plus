@@ -4,6 +4,7 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use cosmwasm_std::{Order, StdResult, Storage, KV};
+use std::ops::Deref;
 
 use crate::helpers::nested_namespaces_with_key;
 use crate::iter_helpers::{concat, deserialize_kv, trim};
@@ -25,9 +26,20 @@ where
     T: Serialize + DeserializeOwned,
 {
     /// all namespaces prefixes and concatenated with the key
-    pub(crate) storage_prefix: Vec<u8>,
+    storage_prefix: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
+}
+
+impl<T> Deref for Prefix<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.storage_prefix
+    }
 }
 
 impl<T> Prefix<T>

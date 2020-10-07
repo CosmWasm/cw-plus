@@ -99,15 +99,15 @@ where
 
     fn save<S: Storage>(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = self.index(data);
-        let path = self.idx_map.to_map().key((&idx, &pk)).storage_key;
-        store.set(&path, MARKER);
+        let key = self.idx_map.to_map().key((&idx, &pk));
+        store.set(&key, MARKER);
         Ok(())
     }
 
     fn remove<S: Storage>(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = self.index(old_data);
-        let path = self.idx_map.to_map().key((&idx, &pk)).storage_key;
-        store.remove(&path);
+        let key = self.idx_map.to_map().key((&idx, &pk));
+        store.remove(&key);
         Ok(())
     }
 
@@ -116,7 +116,7 @@ where
         store: &'c S,
         idx: &[u8],
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let prefix = self.idx_map.to_map().prefix(idx).storage_prefix;
+        let prefix = self.idx_map.to_map().prefix(idx);
         let mapped =
             range_with_prefix(store, &prefix, None, None, Order::Ascending).map(|(k, _)| k);
         Box::new(mapped)
