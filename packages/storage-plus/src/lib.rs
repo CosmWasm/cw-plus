@@ -4,6 +4,7 @@ mod namespace_helpers;
 mod path;
 mod type_helpers;
 
+pub use map::Map;
 pub use path::Path;
 
 #[cfg(test)]

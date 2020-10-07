@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
 use cosmwasm_std::{ReadonlyStorage, Storage};

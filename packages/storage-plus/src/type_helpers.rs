@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use serde::de::DeserializeOwned;
 use std::any::type_name;
 

@@ -4,6 +4,8 @@
 //! Everything in this file is only responsible for building such keys
 //! and is in no way specific to any kind of storage.
 
+#![allow(dead_code)]
+
 /// Calculates the raw key prefix for a given namespace as documented
 /// in https://github.com/webmaster128/key-namespacing#length-prefixed-keys
 pub fn to_length_prefixed(namespace: &[u8]) -> Vec<u8> {

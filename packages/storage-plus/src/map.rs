@@ -68,4 +68,29 @@ mod test {
         assert_eq!("people".len() + "_pk".len() + "john".len() + 4, key.len());
         assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
     }
+
+    #[test]
+    fn save_and_load() {
+        let mut store = MockStorage::new();
+
+        // save and load on one key
+        let john = PEOPLE.key(b"john");
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        assert_eq!(None, john.may_load(&store).unwrap());
+        john.save(&mut store, &data).unwrap();
+        assert_eq!(data, john.load(&store).unwrap());
+
+        // nothing on another key
+        assert_eq!(None, PEOPLE.key(b"jack").may_load(&store).unwrap());
+
+        // same named path gets the data
+        assert_eq!(data, PEOPLE.key(b"john").load(&store).unwrap());
+
+        // removing leaves us empty
+        john.remove(&mut store);
+        assert_eq!(None, john.may_load(&store).unwrap());
+    }
 }
