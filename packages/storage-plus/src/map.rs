@@ -5,6 +5,8 @@ use std::marker::PhantomData;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::Prefix;
+// #[cfg(feature = "iterator")]
+// use cosmwasm_std::{Storage, Order, StdResult, KV};
 
 // TODO: where to add PREFIX_PK???? Only in an Indexed Map?
 
@@ -30,82 +32,89 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn key(&self, k: K) -> Path<'a, T> {
-        let (namespaces, key) = k.namespaced_key(self.namespaces);
-        Path::new(namespaces, key)
+    pub fn key(&self, k: K) -> Path<T> {
+        Path::new(self.namespaces, &k.key())
     }
 
     #[cfg(feature = "iterator")]
     pub fn prefix(&self, p: K::Prefix) -> Prefix<'a, T> {
-        let namespaces = p.namespace(self.namespaces);
+        let namespaces = p.prefix(self.namespaces);
         Prefix::new(namespaces)
     }
 }
+
+// // short-cut for simple keys
+// #[cfg(feature = "iterator")]
+// impl<'a, T> Map<'a, &'a [u8], T>
+//     where
+//         T: Serialize + DeserializeOwned,
+// {
+//     pub fn range<'c, S: Storage>(
+//         &'c self,
+//         store: &'c S,
+//         start: Option<&[u8]>,
+//         end: Option<&[u8]>,
+//         order: Order,
+//     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
+//         let namespaces = ().namespace(self.namespaces);
+//         Prefix::new(namespaces).range(store, start, end, order)
+//     }
+// }
 
 // TODO: move these types and traits into a separate file???
 
 pub trait PrimaryKey<'a> {
     type Prefix: Prefixer<'a>;
 
-    // TODO: get this cheaper...
-    // fn namespaced(&self, namespaces: &'a[&'a[u8]]) -> (Vec<&'a[u8]>, &'a [u8]);
-    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>);
+    /// returns a slice of key steps, which can be optionally combined
+    fn key(&self) -> Vec<&'a [u8]>;
 }
 
 impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Prefix = ();
 
-    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
+    fn key(&self) -> Vec<&'a [u8]> {
         // this is simple, we don't add more prefixes
-        (namespaces.to_vec(), self.to_vec())
+        vec![self]
     }
 }
 
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
     type Prefix = &'a [u8];
 
-    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
-        let mut spaces = namespaces.to_vec();
-        spaces.push(self.0);
-        // move the first part into the namespace, second part as key
-        (spaces, self.1.to_vec())
+    fn key(&self) -> Vec<&'a [u8]> {
+        vec![self.0, self.1]
     }
 }
 
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
     type Prefix = (&'a [u8], &'a [u8]);
 
-    fn namespaced_key(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
-        let mut spaces = namespaces.to_vec();
-        spaces.extend_from_slice(&[self.0, self.1]);
-        // move the first parts into the namespace, last as key
-        (spaces, self.2.to_vec())
+    fn key(&self) -> Vec<&'a [u8]> {
+        vec![self.0, self.1, self.2]
     }
 }
 
 pub trait Prefixer<'a> {
-    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]>;
+    /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
+    fn prefix(&self) -> Vec<&'a [u8]>;
 }
 
 impl<'a> Prefixer<'a> for () {
-    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]> {
-        namespaces.to_vec()
+    fn prefix(&self) -> Vec<&'a [u8]> {
+        vec![]
     }
 }
 
 impl<'a> Prefixer<'a> for &'a [u8] {
-    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]> {
-        let mut spaces = namespaces.to_vec();
-        spaces.push(self);
-        spaces
+    fn prefix(&self) -> Vec<&'a [u8]> {
+        vec![self]
     }
 }
 
 impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
-    fn namespace(&self, namespaces: &'a [&'a [u8]]) -> Vec<&'a [u8]> {
-        let mut spaces = namespaces.to_vec();
-        spaces.extend_from_slice(&[self.0, self.1]);
-        spaces
+    fn prefix(&self) -> Vec<&'a [u8]> {
+        vec![self.0, self.1]
     }
 }
 
@@ -131,7 +140,7 @@ mod test {
     #[test]
     fn create_path() {
         let path = PEOPLE.key(b"john");
-        let key = path.build_storage_key();
+        let key = path.storage_key;
         // this should be prefixed(people) || prefixed(_pk) || john
         assert_eq!("people".len() + "_pk".len() + "john".len() + 4, key.len());
         assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
