@@ -2,8 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use crate::length_prefixed::nested_namespaces_with_key;
-use crate::type_helpers::{may_deserialize, must_deserialize};
+use crate::helpers::{may_deserialize, must_deserialize, nested_namespaces_with_key};
 use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 
 pub struct Path<T>

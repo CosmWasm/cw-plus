@@ -87,10 +87,8 @@ where
         end: Option<&[u8]>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
-        // but the imports here, so we don't have to feature flag them above
-        use crate::length_prefixed::to_length_prefixed_nested;
-        use crate::namespace_helpers::range_with_prefix;
-        use crate::type_helpers::deserialize_kv;
+        // put the imports here, so we don't have to feature flag them above
+        use crate::helpers::{deserialize_kv, range_with_prefix, to_length_prefixed_nested};
 
         let prefix = to_length_prefixed_nested(self.namespaces);
         let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
