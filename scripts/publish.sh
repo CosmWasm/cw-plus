@@ -3,7 +3,7 @@ set -o errexit -o nounset -o pipefail
 command -v shellcheck > /dev/null && shellcheck "$0"
 
 # these are imported by other packages
-BASE_PACKAGES="cw0"
+BASE_PACKAGES="cw0 storage-plus"
 ALL_PACKAGES="cw1 cw2 cw3 cw20 cw721"
 
 # these are imported by other contracts

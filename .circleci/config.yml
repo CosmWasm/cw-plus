@@ -17,6 +17,7 @@ workflows:
       - package_cw3
       - package_cw20
       - package_cw721
+      - package_storage_plus
       - lint
       - wasm-build
   deploy:
@@ -568,6 +569,32 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-wasm-rust:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+
+
+  package_storage_plus:
+    docker:
+      - image: rust:1.44.1
+    working_directory: ~/project/packages/storage-plus
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
+      - restore_cache:
+          keys:
+            - cargocache-v2-storage-plus:1.44.1-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Build library for native target
+          command: cargo build --locked
+      - run:
+          name: Run unit tests
+          command: cargo test --locked
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-v2-storage-plus:1.44.1-{{ checksum "~/project/Cargo.lock" }}
 
   # This job roughly follows the instructions from https://circleci.com/blog/publishing-to-github-releases-via-circleci/
   build_and_upload_contracts:
