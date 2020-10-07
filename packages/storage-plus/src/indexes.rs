@@ -42,6 +42,8 @@ where
     fn name(&self) -> String;
     fn index(&self, data: &T) -> Vec<u8>;
 
+    // TODO: move map into index
+
     fn insert<S: Storage>(
         &self,
         store: &mut S,

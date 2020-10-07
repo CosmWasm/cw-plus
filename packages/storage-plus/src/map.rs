@@ -10,6 +10,32 @@ use crate::path::Path;
 use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+pub struct OwnedMap<'a, K, T> {
+    namespaces: Vec<&'a [u8]>,
+    // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
+    key_type: PhantomData<K>,
+    data_type: PhantomData<T>,
+}
+
+// TODO: figure out if I can use AsRef, Deref, or Borrow to do this automatically
+impl<'a, K, T> OwnedMap<'a, K, T> {
+    pub fn new(namespaces: Vec<&'a [u8]>) -> Self {
+        OwnedMap {
+            namespaces,
+            data_type: PhantomData,
+            key_type: PhantomData,
+        }
+    }
+
+    pub fn to_map<'b>(&'b self) -> Map<'b, K, T> {
+        Map {
+            namespaces: &self.namespaces,
+            key_type: self.key_type,
+            data_type: self.data_type,
+        }
+    }
+}
+
 pub struct Map<'a, K, T> {
     namespace: &'a [u8],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
@@ -207,6 +233,20 @@ mod test {
             all,
             vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data)]
         );
+    }
+
+    #[test]
+    fn owned_map_pass_through() {
+        let mut store = MockStorage::new();
+
+        // TODO: make to_map() automatic
+        let owned = OwnedMap::<&[u8], u32>::new(vec![b"top", b"level"]);
+        owned.to_map().save(&mut store, b"foo", &1234).unwrap();
+        owned.to_map().save(&mut store, b"bar", &4321).unwrap();
+
+        let map = Map::<&[u8], u32>::new(&[b"top", b"level"]);
+        let count = map.load(&store, b"foo").unwrap();
+        assert_eq!(count, 1234);
     }
 
     #[test]

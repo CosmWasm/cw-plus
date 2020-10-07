@@ -11,7 +11,7 @@ mod prefix;
 pub use endian::Endian;
 pub use item::Item;
 pub use keys::{PkOwned, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key};
-pub use map::Map;
+pub use map::{Map, OwnedMap};
 pub use path::Path;
 #[cfg(feature = "iterator")]
 pub use prefix::{Bound, OwnedBound, Prefix};
