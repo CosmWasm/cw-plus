@@ -3,7 +3,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use crate::helpers::{deserialize_kv, nested_namespaces_with_key, range_with_prefix};
+use crate::helpers::nested_namespaces_with_key;
+use crate::iter_helpers::{deserialize_kv, range_with_prefix};
 use cosmwasm_std::{Order, StdResult, Storage, KV};
 
 pub struct Prefix<T>

@@ -88,7 +88,7 @@ where
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
         // put the imports here, so we don't have to feature flag them above
-        use crate::helpers::{deserialize_kv, range_with_prefix, to_length_prefixed_nested};
+        use crate::iter_helpers::{deserialize_kv, range_with_prefix, to_length_prefixed_nested};
 
         let prefix = to_length_prefixed_nested(self.namespaces);
         let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
