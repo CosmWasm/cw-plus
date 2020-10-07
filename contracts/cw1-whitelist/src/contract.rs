@@ -19,6 +19,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -154,7 +155,7 @@ pub fn query_can_send<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
 
     #[test]
@@ -172,8 +173,8 @@ mod tests {
             admins: vec![alice.clone(), bob.clone(), carl.clone()],
             mutable: true,
         };
-        let env = mock_env(&anyone, &[]);
-        init(&mut deps, env, init_msg).unwrap();
+        let info = mock_info(&anyone, &[]);
+        init(&mut deps, mock_env(), info, init_msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -186,8 +187,8 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![anyone.clone()],
         };
-        let env = mock_env(&anyone, &[]);
-        let res = handle(&mut deps, env, msg);
+        let info = mock_info(&anyone, &[]);
+        let res = handle(&mut deps, mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -197,8 +198,8 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![alice.clone(), bob.clone()],
         };
-        let env = mock_env(&alice, &[]);
-        handle(&mut deps, env, msg).unwrap();
+        let info = mock_info(&alice, &[]);
+        handle(&mut deps, mock_env(), info, msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -208,16 +209,16 @@ mod tests {
         assert_eq!(query_admin_list(&deps).unwrap(), expected);
 
         // carl cannot freeze it
-        let env = mock_env(&carl, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Freeze {});
+        let info = mock_info(&carl, &[]);
+        let res = handle(&mut deps, mock_env(), info, HandleMsg::Freeze {});
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
         // but bob can
-        let env = mock_env(&bob, &[]);
-        handle(&mut deps, env, HandleMsg::Freeze {}).unwrap();
+        let info = mock_info(&bob, &[]);
+        handle(&mut deps, mock_env(), info, HandleMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
@@ -228,8 +229,8 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![alice.clone()],
         };
-        let env = mock_env(&alice, &[]);
-        let res = handle(&mut deps, env, msg);
+        let info = mock_info(&alice, &[]);
+        let res = handle(&mut deps, mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -249,8 +250,8 @@ mod tests {
             admins: vec![alice.clone(), carl.clone()],
             mutable: false,
         };
-        let env = mock_env(&bob, &[]);
-        init(&mut deps, env, init_msg).unwrap();
+        let info = mock_info(&bob, &[]);
+        init(&mut deps, mock_env(), info, init_msg).unwrap();
 
         let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
         let msgs = vec![
@@ -272,16 +273,16 @@ mod tests {
         let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
-        let env = mock_env(&bob, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone());
+        let info = mock_info(&bob, &[]);
+        let res = handle(&mut deps, mock_env(), info, handle_msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
         }
 
         // but carl can
-        let env = mock_env(&carl, &[]);
-        let res = handle(&mut deps, env, handle_msg.clone()).unwrap();
+        let info = mock_info(&carl, &[]);
+        let res = handle(&mut deps, mock_env(), info, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }
@@ -300,8 +301,8 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
         };
-        let env = mock_env(&anyone, &[]);
-        init(&mut deps, env, init_msg).unwrap();
+        let info = mock_info(&anyone, &[]);
+        init(&mut deps, mock_env(), info, init_msg).unwrap();
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
