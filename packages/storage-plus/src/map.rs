@@ -141,10 +141,10 @@ mod test {
         assert_eq!(data, john.load(&store).unwrap());
 
         // nothing on another key
-        assert_eq!(None, PEOPLE.key(b"jack").may_load(&store).unwrap());
+        assert_eq!(None, PEOPLE.may_load(&store, b"jack").unwrap());
 
         // same named path gets the data
-        assert_eq!(data, PEOPLE.key(b"john").load(&store).unwrap());
+        assert_eq!(data, PEOPLE.load(&store, b"john").unwrap());
 
         // removing leaves us empty
         john.remove(&mut store);
@@ -162,14 +162,11 @@ mod test {
         assert_eq!(1234, allow.load(&store).unwrap());
 
         // not under other key
-        let different = ALLOWANCE
-            .key((b"owners", b"pender"))
-            .may_load(&store)
-            .unwrap();
+        let different = ALLOWANCE.may_load(&store, (b"owners", b"pender")).unwrap();
         assert_eq!(None, different);
 
-        // matches under a copy
-        let same = ALLOWANCE.key((b"owner", b"spender")).load(&store).unwrap();
+        // matches under a proper copy
+        let same = ALLOWANCE.load(&store, (b"owner", b"spender")).unwrap();
         assert_eq!(1234, same);
     }
 
@@ -183,13 +180,13 @@ mod test {
             name: "John".to_string(),
             age: 32,
         };
-        PEOPLE.key(b"john").save(&mut store, &data).unwrap();
+        PEOPLE.save(&mut store, b"john", &data).unwrap();
 
         let data2 = Data {
             name: "Jim".to_string(),
             age: 44,
         };
-        PEOPLE.key(b"jim").save(&mut store, &data2).unwrap();
+        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
@@ -208,16 +205,13 @@ mod test {
 
         // save and load on three keys, one under different owner
         ALLOWANCE
-            .key((b"owner", b"spender"))
-            .save(&mut store, &1000)
+            .save(&mut store, (b"owner", b"spender"), &1000)
             .unwrap();
         ALLOWANCE
-            .key((b"owner", b"spender2"))
-            .save(&mut store, &3000)
+            .save(&mut store, (b"owner", b"spender2"), &3000)
             .unwrap();
         ALLOWANCE
-            .key((b"owner2", b"spender"))
-            .save(&mut store, &5000)
+            .save(&mut store, (b"owner2", b"spender"), &5000)
             .unwrap();
 
         // let's try to iterate!
