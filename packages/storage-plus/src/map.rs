@@ -37,9 +37,8 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<'a, T> {
-        let namespaces = p.prefix(self.namespaces);
-        Prefix::new(namespaces)
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+        Prefix::new(self.namespaces, &p.prefix())
     }
 }
 
