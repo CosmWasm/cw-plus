@@ -226,4 +226,19 @@ mod test {
             vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
         );
     }
+
+    #[test]
+    fn basic_update() {
+        let mut store = MockStorage::new();
+
+        let add_ten = |a: Option<u64>| -> StdResult<_> { Ok(a.unwrap_or_default() + 10) };
+
+        // save and load on three keys, one under different owner
+        let key: (&[u8], &[u8]) = (b"owner", b"spender");
+        ALLOWANCE.update(&mut store, key, add_ten).unwrap();
+        let twenty = ALLOWANCE.update(&mut store, key, add_ten).unwrap();
+        assert_eq!(20, twenty);
+        let loaded = ALLOWANCE.load(&store, key).unwrap();
+        assert_eq!(20, loaded);
+    }
 }
