@@ -2,10 +2,11 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use crate::keys::{Prefixer, PrimaryKey};
+use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::prefix::Prefix;
+use crate::{Prefix, Prefixer};
+use cosmwasm_std::{StdError, StdResult, Storage};
 
 pub struct Map<'a, K, T> {
     namespaces: &'a [&'a [u8]],
@@ -37,6 +38,38 @@ where
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.namespaces, &p.prefix())
     }
+
+    pub fn save<S: Storage>(&self, store: &mut S, k: K, data: &T) -> StdResult<()> {
+        self.key(k).save(store, data)
+    }
+
+    pub fn remove<S: Storage>(&self, store: &mut S, k: K) {
+        self.key(k).remove(store)
+    }
+
+    /// load will return an error if no data is set at the given key, or on parse error
+    pub fn load<S: Storage>(&self, store: &S, k: K) -> StdResult<T> {
+        self.key(k).load(store)
+    }
+
+    /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
+    /// returns an error on issues parsing
+    pub fn may_load<S: Storage>(&self, store: &S, k: K) -> StdResult<Option<T>> {
+        self.key(k).may_load(store)
+    }
+
+    /// Loads the data, perform the specified action, and store the result
+    /// in the database. This is shorthand for some common sequences, which may be useful.
+    ///
+    /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
+    pub fn update<A, E, S>(&mut self, store: &mut S, k: K, action: A) -> Result<T, E>
+    where
+        A: FnOnce(Option<T>) -> Result<T, E>,
+        E: From<StdError>,
+        S: Storage,
+    {
+        self.key(k).update(store, action)
+    }
 }
 
 /// short-cut for simple keys, rather than .prefix(()).range(...)
@@ -47,13 +80,13 @@ where
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range<'c, S: cosmwasm_std::Storage>(
+    pub fn range<'c, S: Storage>(
         &'c self,
         store: &'c S,
         start: Option<&[u8]>,
         end: Option<&[u8]>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = cosmwasm_std::StdResult<cosmwasm_std::KV<T>>> + 'c> {
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
         // but the imports here, so we don't have to feature flag them above
         use crate::length_prefixed::to_length_prefixed_nested;
         use crate::namespace_helpers::range_with_prefix;
@@ -159,10 +192,7 @@ mod test {
         PEOPLE.key(b"jim").save(&mut store, &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE
-            .prefix(())
-            .range(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
