@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn get_contract_version_works() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -510,7 +510,7 @@ mod tests {
 
     #[test]
     fn query_allowance_works() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -565,7 +565,7 @@ mod tests {
 
     #[test]
     fn query_all_allowances_works() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -633,7 +633,7 @@ mod tests {
 
     #[test]
     fn query_permissions_works() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone()];
@@ -704,7 +704,7 @@ mod tests {
 
     #[test]
     fn query_all_permissions_works() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -790,7 +790,7 @@ mod tests {
 
     #[test]
     fn update_admins_and_query() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admin2 = HumanAddr::from("admin0002");
@@ -876,7 +876,7 @@ mod tests {
 
     #[test]
     fn increase_allowances() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -991,7 +991,7 @@ mod tests {
 
     #[test]
     fn decrease_allowances() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -1132,7 +1132,7 @@ mod tests {
 
     #[test]
     fn execute_checks() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -1227,7 +1227,7 @@ mod tests {
 
     #[test]
     fn staking_permission_checks() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone()];
@@ -1363,7 +1363,7 @@ mod tests {
     // tests permissions and allowances are independent features and does not affect each other
     #[test]
     fn permissions_allowances_independent() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone()];
@@ -1435,7 +1435,7 @@ mod tests {
 
     #[test]
     fn can_send_query_works() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin007");
         let spender = HumanAddr::from("spender808");
