@@ -38,10 +38,19 @@ pub trait PrimaryKey<'a> {
     fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>);
 }
 
-impl<'a> PrimaryKey<'a> for &[u8] {
+impl<'a> PrimaryKey<'a> for &'a [u8] {
     fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
         // this is simple, we don't add more prefixes
         (namespaces.to_vec(), self.to_vec())
+    }
+}
+
+impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
+    fn namespaced(&self, namespaces: &'a [&'a [u8]]) -> (Vec<&'a [u8]>, Vec<u8>) {
+        let mut spaces = namespaces.to_vec();
+        spaces.push(self.0);
+        // move the first part into the namespace, second part as key
+        (spaces, self.1.to_vec())
     }
 }
 
@@ -59,6 +68,8 @@ mod test {
     }
 
     const PEOPLE: Map<&[u8], Data> = Map::new(&[b"people", b"_pk"]);
+
+    const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(&[b"allow", b"_pk"]);
 
     #[test]
     fn create_path() {
@@ -92,5 +103,27 @@ mod test {
         // removing leaves us empty
         john.remove(&mut store);
         assert_eq!(None, john.may_load(&store).unwrap());
+    }
+
+    #[test]
+    fn composite_keys() {
+        let mut store = MockStorage::new();
+
+        // save and load on a composite key
+        let allow = ALLOWANCE.key((b"owner", b"spender"));
+        assert_eq!(None, allow.may_load(&store).unwrap());
+        allow.save(&mut store, &1234).unwrap();
+        assert_eq!(1234, allow.load(&store).unwrap());
+
+        // not under other key
+        let different = ALLOWANCE
+            .key((b"owners", b"pender"))
+            .may_load(&store)
+            .unwrap();
+        assert_eq!(None, different);
+
+        // matches under a copy
+        let same = ALLOWANCE.key((b"owner", b"spender")).load(&store).unwrap();
+        assert_eq!(1234, same);
     }
 }
