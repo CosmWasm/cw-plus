@@ -21,6 +21,7 @@ pub enum Bound<'a> {
     None,
 }
 
+#[derive(Debug, Clone)]
 pub struct Prefix<T>
 where
     T: Serialize + DeserializeOwned,

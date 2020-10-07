@@ -1,7 +1,6 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
-
 use cosmwasm_std::{Order, StdResult, Storage, KV};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -75,6 +74,7 @@ impl<'a, T> MultiIndex<'a, T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
+    // TODO: review this constructor and how to build the pk_map
     pub fn new(idx_fn: fn(&T) -> Vec<u8>, namespace: &'a [u8], name: &'a str) -> Self {
         MultiIndex {
             idx_fn,

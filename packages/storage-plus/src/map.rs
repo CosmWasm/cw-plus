@@ -10,6 +10,7 @@ use crate::path::Path;
 use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+#[derive(Debug, Clone)]
 pub struct OwnedMap<'a, K, T> {
     namespaces: Vec<&'a [u8]>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
@@ -36,6 +37,7 @@ impl<'a, K, T> OwnedMap<'a, K, T> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Map<'a, K, T> {
     namespace: &'a [u8],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed

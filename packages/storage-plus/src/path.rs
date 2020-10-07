@@ -6,6 +6,7 @@ use crate::helpers::{may_deserialize, must_deserialize, nested_namespaces_with_k
 use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 use std::ops::Deref;
 
+#[derive(Debug, Clone)]
 pub struct Path<T>
 where
     T: Serialize + DeserializeOwned,
