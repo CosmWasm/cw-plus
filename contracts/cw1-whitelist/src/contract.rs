@@ -3,7 +3,7 @@ use std::fmt;
 
 use cosmwasm_std::{
     attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdResult, Storage,
+    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage,
 };
 use cw1::CanSendResponse;
 use cw2::set_contract_version;
@@ -44,26 +44,28 @@ fn map_human<A: Api>(api: &A, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAd
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => handle_execute(deps, env, msgs),
-        HandleMsg::Freeze {} => handle_freeze(deps, env),
-        HandleMsg::UpdateAdmins { admins } => handle_update_admins(deps, env, admins),
+        HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
+        HandleMsg::Freeze {} => handle_freeze(deps, env, info),
+        HandleMsg::UpdateAdmins { admins } => handle_update_admins(deps, env, info, admins),
     }
 }
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     msgs: Vec<CosmosMsg<T>>,
 ) -> Result<HandleResponse<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    if !can_send(&deps, &env.message.sender)? {
+    if !can_send(&deps, &info.sender)? {
         Err(ContractError::Unauthorized {})
     } else {
         let mut res = HandleResponse::default();
@@ -75,10 +77,11 @@ where
 
 pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     let mut cfg = admin_list_read(&deps.storage).load()?;
-    if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
+    if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.mutable = false;
@@ -92,11 +95,12 @@ pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
 
 pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     admins: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
     let mut cfg = admin_list_read(&deps.storage).load()?;
-    if !cfg.can_modify(&deps.api.canonical_address(&env.message.sender)?) {
+    if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.admins = map_canonical(&deps.api, &admins)?;
