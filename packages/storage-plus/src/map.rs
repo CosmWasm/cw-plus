@@ -44,3 +44,28 @@ impl<'a> PrimaryKey<'a> for &[u8] {
         (namespaces.to_vec(), self.to_vec())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use cosmwasm_std::testing::MockStorage;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+    struct Data {
+        pub name: String,
+        pub age: i32,
+    }
+
+    const PEOPLE: Map<&[u8], Data> = Map::new(&[b"people", b"_pk"]);
+
+    #[test]
+    fn create_path() {
+        let path = PEOPLE.key(b"john");
+        let key = path.build_storage_key();
+        // this should be prefixed(people) || prefixed(_pk) || john
+        assert_eq!("people".len() + "_pk".len() + "john".len() + 4, key.len());
+        assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
+    }
+}

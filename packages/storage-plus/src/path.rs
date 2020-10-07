@@ -13,10 +13,10 @@ where
     T: Serialize + DeserializeOwned,
 {
     // these are not prefixed
-    pub namespaces: Vec<&'a [u8]>,
+    namespaces: Vec<&'a [u8]>,
     // TODO: get this cheaper...
     // pub key: &'b [u8],
-    pub key: Vec<u8>,
+    key: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
 }
