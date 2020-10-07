@@ -2,13 +2,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+use crate::keys::{Prefixer, PrimaryKey};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::Prefix;
-// #[cfg(feature = "iterator")]
-// use cosmwasm_std::{Storage, Order, StdResult, KV};
-
-// TODO: where to add PREFIX_PK???? Only in an Indexed Map?
 
 pub struct Map<'a, K, T> {
     namespaces: &'a [&'a [u8]],
@@ -42,78 +39,29 @@ where
     }
 }
 
-// // short-cut for simple keys
-// #[cfg(feature = "iterator")]
-// impl<'a, T> Map<'a, &'a [u8], T>
-//     where
-//         T: Serialize + DeserializeOwned,
-// {
-//     pub fn range<'c, S: Storage>(
-//         &'c self,
-//         store: &'c S,
-//         start: Option<&[u8]>,
-//         end: Option<&[u8]>,
-//         order: Order,
-//     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-//         let namespaces = ().namespace(self.namespaces);
-//         Prefix::new(namespaces).range(store, start, end, order)
-//     }
-// }
+/// short-cut for simple keys, rather than .prefix(()).range(...)
+#[cfg(feature = "iterator")]
+impl<'a, T> Map<'a, &'a [u8], T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    // I would prefer not to copy code from Prefix, but no other way
+    // with lifetimes (create Prefix inside function and return ref = no no)
+    pub fn range<'c, S: cosmwasm_std::Storage>(
+        &'c self,
+        store: &'c S,
+        start: Option<&[u8]>,
+        end: Option<&[u8]>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = cosmwasm_std::StdResult<cosmwasm_std::KV<T>>> + 'c> {
+        // but the imports here, so we don't have to feature flag them above
+        use crate::length_prefixed::to_length_prefixed_nested;
+        use crate::namespace_helpers::range_with_prefix;
+        use crate::type_helpers::deserialize_kv;
 
-// TODO: move these types and traits into a separate file???
-
-pub trait PrimaryKey<'a> {
-    type Prefix: Prefixer<'a>;
-
-    /// returns a slice of key steps, which can be optionally combined
-    fn key(&self) -> Vec<&'a [u8]>;
-}
-
-impl<'a> PrimaryKey<'a> for &'a [u8] {
-    type Prefix = ();
-
-    fn key(&self) -> Vec<&'a [u8]> {
-        // this is simple, we don't add more prefixes
-        vec![self]
-    }
-}
-
-impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
-    type Prefix = &'a [u8];
-
-    fn key(&self) -> Vec<&'a [u8]> {
-        vec![self.0, self.1]
-    }
-}
-
-impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
-    type Prefix = (&'a [u8], &'a [u8]);
-
-    fn key(&self) -> Vec<&'a [u8]> {
-        vec![self.0, self.1, self.2]
-    }
-}
-
-pub trait Prefixer<'a> {
-    /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
-    fn prefix(&self) -> Vec<&'a [u8]>;
-}
-
-impl<'a> Prefixer<'a> for () {
-    fn prefix(&self) -> Vec<&'a [u8]> {
-        vec![]
-    }
-}
-
-impl<'a> Prefixer<'a> for &'a [u8] {
-    fn prefix(&self) -> Vec<&'a [u8]> {
-        vec![self]
-    }
-}
-
-impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
-    fn prefix(&self) -> Vec<&'a [u8]> {
-        vec![self.0, self.1]
+        let prefix = to_length_prefixed_nested(self.namespaces);
+        let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
+        Box::new(mapped)
     }
 }
 
