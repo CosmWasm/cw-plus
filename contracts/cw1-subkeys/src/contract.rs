@@ -602,7 +602,7 @@ mod tests {
         assert_eq!(
             allowances[0],
             AllowanceInfo {
-                spender: spender1,
+                spender: spender2,
                 balance: NativeBalance(initial_allowances.clone()),
                 expires: Expiration::Never {},
             }
@@ -610,23 +610,23 @@ mod tests {
         assert_eq!(
             allowances[1],
             AllowanceInfo {
-                spender: spender2.clone(),
+                spender: spender3.clone(),
                 balance: NativeBalance(initial_allowances.clone()),
-                expires: Expiration::Never {},
+                expires: expires_later,
             }
         );
 
         // now continue from after the last one
-        let allowances = query_all_allowances(&deps, Some(spender2), Some(2))
+        let allowances = query_all_allowances(&deps, Some(spender3), Some(2))
             .unwrap()
             .allowances;
         assert_eq!(1, allowances.len());
         assert_eq!(
             allowances[0],
             AllowanceInfo {
-                spender: spender3,
+                spender: spender1,
                 balance: NativeBalance(initial_allowances.clone()),
-                expires: expires_later,
+                expires: Expiration::Never {},
             }
         );
     }
@@ -762,28 +762,28 @@ mod tests {
         assert_eq!(
             permissions[0],
             PermissionsInfo {
-                spender: spender1,
-                permissions: god_mode,
+                spender: spender2,
+                permissions: noob_mode,
             }
         );
         assert_eq!(
             permissions[1],
             PermissionsInfo {
-                spender: spender2.clone(),
+                spender: spender3.clone(),
                 permissions: noob_mode,
             }
         );
 
         // now continue from after the last one
-        let permissions = query_all_permissions(&deps, Some(spender2), Some(2))
+        let permissions = query_all_permissions(&deps, Some(spender3), Some(2))
             .unwrap()
             .permissions;
         assert_eq!(1, permissions.len());
         assert_eq!(
             permissions[0],
             PermissionsInfo {
-                spender: spender3,
-                permissions: noob_mode,
+                spender: spender1,
+                permissions: god_mode,
             }
         );
     }
