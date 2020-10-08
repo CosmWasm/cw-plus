@@ -1,5 +1,6 @@
 mod endian;
 mod helpers;
+mod indexed_map;
 mod indexes;
 mod item;
 mod iter_helpers;
@@ -9,6 +10,8 @@ mod path;
 mod prefix;
 
 pub use endian::Endian;
+#[cfg(feature = "iterator")]
+pub use indexed_map::IndexedMap;
 #[cfg(feature = "iterator")]
 pub use indexes::{index_i32, index_string, index_u64, Index, MultiIndex};
 pub use item::Item;

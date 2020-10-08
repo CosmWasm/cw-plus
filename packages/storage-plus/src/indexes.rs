@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::iter_helpers::range_with_prefix;
 use crate::map::OwnedMap;
+use serde::export::PhantomData;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: &[u8] = b"1";
@@ -30,8 +31,12 @@ pub fn index_i32(data: i32) -> Vec<u8> {
 //  * store (namespace, index_name, idx_value) -> {key, value} - allows one and copies pk and data
 //  // this would be the primary key - we abstract that too???
 //  * store (namespace, index_name, pk) -> value - allows one with data
-pub trait Index<T>
+//
+// Note: we cannot store traits with generic functions inside `Box<dyn Index>`,
+// so I pull S: Storage to a top-level
+pub trait Index<S, T>
 where
+    S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
     // TODO: do we make this any Vec<u8> ?
@@ -40,18 +45,14 @@ where
 
     // TODO: pk: PrimaryKey not just &[u8] ???
 
-    fn save<S: Storage>(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
-    fn remove<S: Storage>(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
+    fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
+    fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
 
     // these should be implemented by all
-    fn pks_by_index<'c, S: Storage>(
-        &self,
-        store: &'c S,
-        idx: &[u8],
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>;
+    fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>;
 
     /// returns all items that match this secondary index, always by pk Ascending
-    fn items_by_index<'c, S: Storage>(
+    fn items_by_index<'c>(
         &'c self,
         store: &'c S,
         idx: &[u8],
@@ -60,7 +61,7 @@ where
     // TODO: range over secondary index values? (eg. all results with 30 < age < 40)
 }
 
-pub struct MultiIndex<'a, T>
+pub struct MultiIndex<'a, S, T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
@@ -68,10 +69,12 @@ where
     _name: &'a str,
     idx_map: OwnedMap<(&'a [u8], &'a [u8]), Vec<u8>>,
     pk_map: OwnedMap<&'a [u8], T>,
+    typed: PhantomData<S>,
 }
 
-impl<'a, T> MultiIndex<'a, T>
+impl<'a, S, T> MultiIndex<'a, S, T>
 where
+    S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
     // TODO: review this constructor and how to build the pk_map
@@ -81,12 +84,14 @@ where
             idx_map: OwnedMap::new(&[namespace, name.as_bytes()]),
             pk_map: OwnedMap::new(&[namespace, b"_pk"]),
             _name: name,
+            typed: PhantomData,
         }
     }
 }
 
-impl<'a, T> Index<T> for MultiIndex<'a, T>
+impl<'a, S, T> Index<S, T> for MultiIndex<'a, S, T>
 where
+    S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
     fn name(&self) -> String {
@@ -97,25 +102,21 @@ where
         (self.idx_fn)(data)
     }
 
-    fn save<S: Storage>(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
+    fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = self.index(data);
         let key = self.idx_map.to_map().key((&idx, &pk));
         store.set(&key, MARKER);
         Ok(())
     }
 
-    fn remove<S: Storage>(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
+    fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = self.index(old_data);
         let key = self.idx_map.to_map().key((&idx, &pk));
         store.remove(&key);
         Ok(())
     }
 
-    fn pks_by_index<'c, S: Storage>(
-        &self,
-        store: &'c S,
-        idx: &[u8],
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+    fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         let prefix = self.idx_map.to_map().prefix(idx);
         let mapped =
             range_with_prefix(store, &prefix, None, None, Order::Ascending).map(|(k, _)| k);
@@ -123,7 +124,7 @@ where
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    fn items_by_index<'c, S: Storage>(
+    fn items_by_index<'c>(
         &'c self,
         store: &'c S,
         idx: &[u8],

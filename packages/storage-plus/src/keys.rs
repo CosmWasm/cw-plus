@@ -1,7 +1,7 @@
 use crate::Endian;
 use std::marker::PhantomData;
 
-pub trait PrimaryKey<'a> {
+pub trait PrimaryKey<'a>: Copy {
     type Prefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
@@ -31,7 +31,7 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
 // Future work: add more types - 3 or more or slices?
 // Right now 3 could be done via ((a, b), c)
 
-pub trait Prefixer<'a> {
+pub trait Prefixer<'a>: Copy {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]>;
 }
