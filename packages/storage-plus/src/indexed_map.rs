@@ -39,6 +39,7 @@ where
     T: Serialize + DeserializeOwned + Clone + 'x,
     S: Storage + 'x,
 {
+    // TODO: figure out a better constructor
     pub fn new(namespace: &'a [u8]) -> Self {
         IndexedMap {
             root: namespace,
