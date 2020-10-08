@@ -5,6 +5,7 @@ use cosmwasm_std::{Order, StdResult, Storage, KV};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::helpers::must_deserialize;
 use crate::iter_helpers::range_with_prefix;
 use crate::map::OwnedMap;
 use serde::export::PhantomData;
@@ -130,7 +131,10 @@ where
         idx: &[u8],
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
         let mapped = self.pks_by_index(store, idx).map(move |pk| {
-            let v = self.pk_map.to_map().load(store, &pk)?;
+            println!("load: {:?}", pk);
+            let v = must_deserialize(&store.get(&pk))?;
+            // let v = self.pk_map.to_map().load(store, &pk)?;
+            // TODO: trim them down??
             Ok((pk, v))
         });
         Box::new(mapped)

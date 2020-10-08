@@ -44,6 +44,7 @@ where
 
     /// save will serialize the model and store, returns an error on serialization issues
     pub fn save<S: Storage>(&self, store: &mut S, data: &T) -> StdResult<()> {
+        println!("save: {:?}", self.storage_key);
         store.set(&self.storage_key, &to_vec(data)?);
         Ok(())
     }

@@ -271,14 +271,24 @@ mod test {
         let loaded = map.load(&store, pk).unwrap();
         assert_eq!(data, loaded);
 
+        let count = map
+            .items_by_index(&store, "name", &index_string("Maria"))
+            .unwrap()
+            .count();
+        assert_eq!(1, count);
+
+        // TODO: we load by wrong keys - get full storage key!
+
         // load it by secondary index (we must know how to compute this)
-        let marias: StdResult<Vec<_>> = map
+        // let marias: StdResult<Vec<_>> = map
+        let marias: Vec<StdResult<_>> = map
             .items_by_index(&store, "name", &index_string("Maria"))
             .unwrap()
             .collect();
-        let marias = marias.unwrap();
+        // let marias = marias.unwrap();
         assert_eq!(1, marias.len());
-        let (k, v) = &marias[0];
+        assert!(marias[0].is_ok());
+        let (k, v) = marias[0].as_ref().unwrap();
         assert_eq!(pk, k.as_slice());
         assert_eq!(&data, v);
 
