@@ -482,19 +482,12 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = calc_range_start_human(deps.api, start_after)?;
 
-    let reader = operators_read(&deps.storage, &owner_raw);
-    let iter = reader.range(start.as_deref(), None, Order::Ascending);
-    // I have to make different cases as assigning to filter or not cannot be set to the same variable
-    let res: StdResult<Vec<_>> = if !include_expired {
-        iter.filter(|r| r.is_ok() && !r.as_ref().unwrap().1.is_expired(&env.block))
-            .map(|item| parse_approval(deps.api, item))
-            .take(limit)
-            .collect()
-    } else {
-        iter.map(|item| parse_approval(deps.api, item))
-            .take(limit)
-            .collect()
-    };
+    let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
+        .range(start.as_deref(), None, Order::Ascending)
+        .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
+        .take(limit)
+        .map(|item| parse_approval(deps.api, item))
+        .collect();
     Ok(ApprovedForAllResponse { operators: res? })
 }
 
@@ -548,13 +541,9 @@ fn humanize_approvals<A: Api>(
     include_expired: bool,
 ) -> StdResult<Vec<cw721::Approval>> {
     let iter = info.approvals.iter();
-    if include_expired {
-        iter.map(|apr| humanize_approval(api, apr)).collect()
-    } else {
-        iter.filter(|apr| !apr.expires.is_expired(block))
-            .map(|apr| humanize_approval(api, apr))
-            .collect()
-    }
+    iter.filter(|apr| include_expired || !apr.expires.is_expired(block))
+        .map(|apr| humanize_approval(api, apr))
+        .collect()
 }
 
 fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Approval> {
