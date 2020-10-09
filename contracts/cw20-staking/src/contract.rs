@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, coin, to_binary, Api, BankMsg, Binary, Decimal, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
+    InitResponse, MessageInfo, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw20_base::allowances::{
@@ -28,6 +28,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -56,7 +57,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     let denom = deps.querier.query_bonded_denom()?;
     let invest = InvestmentInfo {
-        owner: deps.api.canonical_address(&env.message.sender)?,
+        owner: deps.api.canonical_address(&info.sender)?,
         exit_tax: msg.exit_tax,
         bond_denom: denom,
         validator: msg.validator,
@@ -74,51 +75,58 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Bond {} => bond(deps, env),
-        HandleMsg::Unbond { amount } => unbond(deps, env, amount),
-        HandleMsg::Claim {} => claim(deps, env),
-        HandleMsg::Reinvest {} => reinvest(deps, env),
-        HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env),
+        HandleMsg::Bond {} => bond(deps, env, info),
+        HandleMsg::Unbond { amount } => unbond(deps, env, info, amount),
+        HandleMsg::Claim {} => claim(deps, env, info),
+        HandleMsg::Reinvest {} => reinvest(deps, env, info),
+        HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env, info),
 
         // these all come from cw20-base to implement the cw20 standard
         HandleMsg::Transfer { recipient, amount } => {
-            Ok(handle_transfer(deps, env, recipient, amount)?)
+            Ok(handle_transfer(deps, env, info, recipient, amount)?)
         }
-        HandleMsg::Burn { amount } => Ok(handle_burn(deps, env, amount)?),
+        HandleMsg::Burn { amount } => Ok(handle_burn(deps, env, info, amount)?),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => Ok(handle_send(deps, env, contract, amount, msg)?),
+        } => Ok(handle_send(deps, env, info, contract, amount, msg)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
         } => Ok(handle_increase_allowance(
-            deps, env, spender, amount, expires,
+            deps, env, info, spender, amount, expires,
         )?),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
         } => Ok(handle_decrease_allowance(
-            deps, env, spender, amount, expires,
+            deps, env, info, spender, amount, expires,
         )?),
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => Ok(handle_transfer_from(deps, env, owner, recipient, amount)?),
-        HandleMsg::BurnFrom { owner, amount } => Ok(handle_burn_from(deps, env, owner, amount)?),
+        } => Ok(handle_transfer_from(
+            deps, env, info, owner, recipient, amount,
+        )?),
+        HandleMsg::BurnFrom { owner, amount } => {
+            Ok(handle_burn_from(deps, env, info, owner, amount)?)
+        }
         HandleMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => Ok(handle_send_from(deps, env, owner, contract, amount, msg)?),
+        } => Ok(handle_send_from(
+            deps, env, info, owner, contract, amount, msg,
+        )?),
     }
 }
 
@@ -157,12 +165,12 @@ fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
 pub fn bond<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     // ensure we have the proper denom
     let invest = invest_info_read(&deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
-    let payment = env
-        .message
+    let payment = info
         .sent_funds
         .iter()
         .find(|x| x.denom == invest.bond_denom)
@@ -190,9 +198,11 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
     totals.save(&supply)?;
 
     // call into cw20-base to mint the token, call as self as no one else is allowed
-    let mut sub_env = env.clone();
-    sub_env.message.sender = env.contract.address.clone();
-    handle_mint(deps, sub_env, env.message.sender.clone(), to_mint)?;
+    let sub_info = MessageInfo {
+        sender: env.contract.address.clone(),
+        sent_funds: vec![],
+    };
+    handle_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
 
     // bond them to the validator
     let res = HandleResponse {
@@ -203,7 +213,7 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
         .into()],
         attributes: vec![
             attr("action", "bond"),
-            attr("from", env.message.sender),
+            attr("from", info.sender),
             attr("bonded", payment.amount),
             attr("minted", to_mint),
         ],
@@ -215,9 +225,10 @@ pub fn bond<S: Storage, A: Api, Q: Querier>(
 pub fn unbond<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     let invest = invest_info_read(&deps.storage).load()?;
     // ensure it is big enough to care
@@ -231,13 +242,15 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     let tax = amount * invest.exit_tax;
 
     // burn from the original caller
-    handle_burn(deps, env.clone(), amount)?;
+    handle_burn(deps, env.clone(), info.clone(), amount)?;
     if tax > Uint128(0) {
-        let mut sub_env = env.clone();
-        sub_env.message.sender = env.contract.address.clone();
+        let sub_info = MessageInfo {
+            sender: env.contract.address.clone(),
+            sent_funds: vec![],
+        };
         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
         let human_owner = deps.api.human_address(&invest.owner)?;
-        handle_mint(deps, sub_env, human_owner, tax)?;
+        handle_mint(deps, env.clone(), sub_info, human_owner, tax)?;
     }
 
     // re-calculate bonded to ensure we have real values
@@ -272,7 +285,7 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
         .into()],
         attributes: vec![
             attr("action", "unbond"),
-            attr("to", env.message.sender),
+            attr("to", info.sender),
             attr("unbonded", unbond),
             attr("burnt", amount),
         ],
@@ -284,6 +297,7 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
 pub fn claim<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     // find how many tokens the contract has
     let invest = invest_info_read(&deps.storage).load()?;
@@ -295,7 +309,7 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
     }
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
     let mut to_send = balance.amount;
     claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| -> StdResult<_> {
         let claim = claim.ok_or_else(|| StdError::generic_err("no claim for this address"))?;
@@ -314,13 +328,13 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
     let res = HandleResponse {
         messages: vec![BankMsg::Send {
             from_address: env.contract.address,
-            to_address: env.message.sender.clone(),
+            to_address: info.sender.clone(),
             amount: vec![balance],
         }
         .into()],
         attributes: vec![
             attr("action", "claim"),
-            attr("from", env.message.sender),
+            attr("from", info.sender),
             attr("amount", to_send),
         ],
         data: None,
@@ -334,6 +348,7 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
 pub fn reinvest<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    _info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     let contract_addr = env.contract.address;
     let invest = invest_info_read(&deps.storage).load()?;
@@ -363,9 +378,10 @@ pub fn reinvest<S: Storage, A: Api, Q: Querier>(
 pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     // this is just meant as a call-back to ourself
-    if env.message.sender != env.contract.address {
+    if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -405,6 +421,7 @@ pub fn _bond_all_tokens<S: Storage, A: Api, Q: Querier>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
