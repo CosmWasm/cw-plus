@@ -10,10 +10,7 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["cranelift"]
-backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
-cranelift = ["cosmwasm-vm/default-cranelift"]
-singlepass = ["cosmwasm-vm/default-singlepass"]
+backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all init/handle/query exports
 library = []
 
@@ -30,5 +27,4 @@ hex = "0.3.1"
 sha2 = "0.8.0"
 
 [dev-dependencies]
-cosmwasm-vm = { version = "0.11.0-alpha3", default-features = false, features = ["iterator"] }
 cosmwasm-schema = { version = "0.11.0-alpha3" }
