@@ -58,8 +58,10 @@ as well as anyone with approval on this particular token.
 If the token is unknown, returns an error. Return type is
 `OwnerResponse{owner}`.
 
-`ApprovedForAll{owner}` - List all operators that can access all of 
-the owner's tokens. Return type is `ApprovedForAllResponse`
+`ApprovedForAll{owner, include_expired}` - List all operators that can
+access all of  the owner's tokens. Return type is `ApprovedForAllResponse`.
+If `include_expired` is set, show expired owners in the results, otherwise,
+ignore them.
 
 `NumTokens{}` - Total number of tokens issued
 

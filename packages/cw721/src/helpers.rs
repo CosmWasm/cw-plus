@@ -68,11 +68,13 @@ impl Cw721Contract {
         &self,
         querier: &Q,
         owner: T,
+        include_expired: bool,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     ) -> StdResult<Vec<Approval>> {
         let req = Cw721QueryMsg::ApprovedForAll {
             owner: owner.into(),
+            include_expired: Some(include_expired),
             start_after,
             limit,
         };

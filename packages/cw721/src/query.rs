@@ -14,6 +14,8 @@ pub enum Cw721QueryMsg {
     /// Return type: `ApprovedForAllResponse`
     ApprovedForAll {
         owner: HumanAddr,
+        /// unset or false will filter out expired items, you must set to true to see them
+        include_expired: Option<bool>,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },

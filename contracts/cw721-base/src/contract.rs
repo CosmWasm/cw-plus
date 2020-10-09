@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, Binary, BlockInfo, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
+    HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, KV,
 };
 
 use cw0::{calc_range_start_human, calc_range_start_string};
@@ -387,9 +387,17 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::AllNftInfo { token_id } => to_binary(&query_all_nft_info(deps, env, token_id)?),
         QueryMsg::ApprovedForAll {
             owner,
+            include_expired,
             start_after,
             limit,
-        } => to_binary(&query_all_approvals(deps, env, owner, start_after, limit)?),
+        } => to_binary(&query_all_approvals(
+            deps,
+            env,
+            owner,
+            include_expired.unwrap_or(false),
+            start_after,
+            limit,
+        )?),
         QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
         QueryMsg::AllTokens { start_after, limit } => {
             to_binary(&query_all_tokens(deps, start_after, limit)?)
@@ -449,6 +457,7 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: Env,
     owner: HumanAddr,
+    include_expired: bool,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
@@ -456,26 +465,27 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = calc_range_start_human(deps.api, start_after)?;
 
-    let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
-        .range(start.as_deref(), None, Order::Ascending)
-        .filter_map(|item| match item {
-            Ok((k, expires)) => {
-                // we remove all expired operators from the result
-                if expires.is_expired(&env.block) {
-                    None
-                } else {
-                    match deps.api.human_address(&k.into()) {
-                        Ok(spender) => Some(Ok(cw721::Approval { spender, expires })),
-                        Err(e) => Some(Err(e)),
-                    }
-                }
-            }
-            Err(e) => Some(Err(e)),
-        })
-        // FIXME: decide: take before (fix gas costs) or after (fix return value size)?
-        .take(limit)
-        .collect();
+    let reader = operators_read(&deps.storage, &owner_raw);
+    let iter = reader.range(start.as_deref(), None, Order::Ascending);
+    // I have to make different cases as assigning to filter or not cannot be set to the same variable
+    let res: StdResult<Vec<_>> = if !include_expired {
+        iter.filter(|r| r.is_ok() && !r.as_ref().unwrap().1.is_expired(&env.block))
+            .map(|item| parse_approval(deps.api, item))
+            .take(limit)
+            .collect()
+    } else {
+        iter.map(|item| parse_approval(deps.api, item))
+            .take(limit)
+            .collect()
+    };
     Ok(ApprovedForAllResponse { operators: res? })
+}
+
+fn parse_approval<A: Api>(api: A, item: StdResult<KV<Expiration>>) -> StdResult<cw721::Approval> {
+    item.and_then(|(k, expires)| {
+        let spender = api.human_address(&k.into())?;
+        Ok(cw721::Approval { spender, expires })
+    })
 }
 
 fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
@@ -974,7 +984,8 @@ mod tests {
         let owner = mock_info("person", &[]);
         handle(&mut deps, mock_env(), owner.clone(), approve_all_msg).unwrap();
 
-        let res = query_all_approvals(&deps, mock_env(), "person".into(), None, None).unwrap();
+        let res =
+            query_all_approvals(&deps, mock_env(), "person".into(), true, None, None).unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
@@ -995,7 +1006,8 @@ mod tests {
         handle(&mut deps, mock_env(), owner.clone(), approve_all_msg).unwrap();
 
         // and paginate queries
-        let res = query_all_approvals(&deps, mock_env(), "person".into(), None, Some(1)).unwrap();
+        let res =
+            query_all_approvals(&deps, mock_env(), "person".into(), true, None, Some(1)).unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
@@ -1009,6 +1021,7 @@ mod tests {
             &deps,
             mock_env(),
             "person".into(),
+            true,
             Some("buddy".into()),
             Some(2),
         )
@@ -1029,7 +1042,8 @@ mod tests {
         handle(&mut deps, mock_env(), owner, revoke_all_msg).unwrap();
 
         // Approvals are removed / cleared without affecting others
-        let res = query_all_approvals(&deps, mock_env(), "person".into(), None, None).unwrap();
+        let res =
+            query_all_approvals(&deps, mock_env(), "person".into(), false, None, None).unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
@@ -1039,5 +1053,11 @@ mod tests {
                 }]
             }
         );
+
+        // ensure the filter works (nothing should be here
+        let mut late_env = mock_env();
+        late_env.block.height = 1234568; //expired
+        let res = query_all_approvals(&deps, late_env, "person".into(), false, None, None).unwrap();
+        assert_eq!(0, res.operators.len());
     }
 }
