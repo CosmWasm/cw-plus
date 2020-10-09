@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdResult, Storage, WasmMsg,
+    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -20,6 +20,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -30,25 +31,23 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Create(msg) => try_create(
-            deps,
-            msg,
-            Balance::from(env.message.sent_funds),
-            &env.message.sender,
-        ),
-        HandleMsg::Approve { id } => try_approve(deps, env, id),
-        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(env.message.sent_funds)),
-        HandleMsg::Refund { id } => try_refund(deps, env, id),
-        HandleMsg::Receive(msg) => try_receive(deps, env, msg),
+        HandleMsg::Create(msg) => {
+            try_create(deps, msg, Balance::from(info.sent_funds), &info.sender)
+        }
+        HandleMsg::Approve { id } => try_approve(deps, env, info, id),
+        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(info.sent_funds)),
+        HandleMsg::Refund { id } => try_refund(deps, env, info, id),
+        HandleMsg::Receive(msg) => try_receive(deps, info, msg),
     }
 }
 
 pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<HandleResponse, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
@@ -56,7 +55,7 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
         None => Err(ContractError::NoData {}),
     }?;
     let balance = Balance::Cw20(Cw20Coin {
-        address: deps.api.canonical_address(&env.message.sender)?,
+        address: deps.api.canonical_address(&info.sender)?,
         amount: wrapper.amount,
     });
     match msg {
@@ -146,12 +145,13 @@ pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
 pub fn try_approve<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     id: String,
 ) -> Result<HandleResponse, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
-    if deps.api.canonical_address(&env.message.sender)? != escrow.arbiter {
+    if deps.api.canonical_address(&info.sender)? != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else if escrow.is_expired(&env) {
         Err(ContractError::Expired {})
@@ -176,15 +176,14 @@ pub fn try_approve<S: Storage, A: Api, Q: Querier>(
 pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     id: String,
 ) -> Result<HandleResponse, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
     // the arbiter can send anytime OR anyone can send after expiration
-    if !escrow.is_expired(&env)
-        && deps.api.canonical_address(&env.message.sender)? != escrow.arbiter
-    {
+    if !escrow.is_expired(&env) && deps.api.canonical_address(&info.sender)? != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else {
         // we delete the escrow
@@ -244,6 +243,7 @@ fn send_tokens<A: Api>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
