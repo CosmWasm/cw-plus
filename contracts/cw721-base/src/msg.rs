@@ -80,6 +80,8 @@ pub enum QueryMsg {
     /// Return type: OwnerOfResponse
     OwnerOf {
         token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
     },
     /// List all operators that can access all of the owner's tokens
     /// Return type: `ApprovedForAllResponse`
@@ -107,6 +109,8 @@ pub enum QueryMsg {
     /// for clients: `AllNftInfo`
     AllNftInfo {
         token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
     },
 
     /// With Enumerable extension.

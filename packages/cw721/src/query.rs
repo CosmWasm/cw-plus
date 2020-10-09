@@ -9,12 +9,16 @@ use cw0::Expiration;
 pub enum Cw721QueryMsg {
     /// Return the owner of the given token, error if token does not exist
     /// Return type: OwnerOfResponse
-    OwnerOf { token_id: String },
+    OwnerOf {
+        token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
+    },
     /// List all operators that can access all of the owner's tokens.
     /// Return type: `ApprovedForAllResponse`
     ApprovedForAll {
         owner: HumanAddr,
-        /// unset or false will filter out expired items, you must set to true to see them
+        /// unset or false will filter out expired approvals, you must set to true to see them
         include_expired: Option<bool>,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
@@ -32,7 +36,11 @@ pub enum Cw721QueryMsg {
     /// With MetaData Extension.
     /// Returns the result of both `NftInfo` and `OwnerOf` as one query as an optimization
     /// for clients: `AllNftInfo`
-    AllNftInfo { token_id: String },
+    AllNftInfo {
+        token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
+    },
 
     /// With Enumerable extension.
     /// Returns all tokens owned by the given address, [] if unset.

@@ -57,9 +57,11 @@ impl Cw721Contract {
         &self,
         querier: &Q,
         token_id: T,
+        include_expired: bool,
     ) -> StdResult<OwnerOfResponse> {
         let req = Cw721QueryMsg::OwnerOf {
             token_id: token_id.into(),
+            include_expired: Some(include_expired),
         };
         self.query(querier, req)
     }
@@ -111,9 +113,11 @@ impl Cw721Contract {
         &self,
         querier: &Q,
         token_id: T,
+        include_expired: bool,
     ) -> StdResult<AllNftInfoResponse> {
         let req = Cw721QueryMsg::AllNftInfo {
             token_id: token_id.into(),
+            include_expired: Some(include_expired),
         };
         self.query(querier, req)
     }

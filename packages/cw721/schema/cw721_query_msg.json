@@ -15,6 +15,13 @@
             "token_id"
           ],
           "properties": {
+            "include_expired": {
+              "description": "unset or false will filter out expired approvals, you must set to true to see them",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
             "token_id": {
               "type": "string"
             }
@@ -36,7 +43,7 @@
           ],
           "properties": {
             "include_expired": {
-              "description": "unset or false will filter out expired items, you must set to true to see them",
+              "description": "unset or false will filter out expired approvals, you must set to true to see them",
               "type": [
                 "boolean",
                 "null"
@@ -124,6 +131,13 @@
             "token_id"
           ],
           "properties": {
+            "include_expired": {
+              "description": "unset or false will filter out expired approvals, you must set to true to see them",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
             "token_id": {
               "type": "string"
             }

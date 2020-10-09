@@ -383,8 +383,24 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
         QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
         QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info(deps, token_id)?),
-        QueryMsg::OwnerOf { token_id } => to_binary(&query_owner_of(deps, env, token_id)?),
-        QueryMsg::AllNftInfo { token_id } => to_binary(&query_all_nft_info(deps, env, token_id)?),
+        QueryMsg::OwnerOf {
+            token_id,
+            include_expired,
+        } => to_binary(&query_owner_of(
+            deps,
+            env,
+            token_id,
+            include_expired.unwrap_or(false),
+        )?),
+        QueryMsg::AllNftInfo {
+            token_id,
+            include_expired,
+        } => to_binary(&query_all_nft_info(
+            deps,
+            env,
+            token_id,
+            include_expired.unwrap_or(false),
+        )?),
         QueryMsg::ApprovedForAll {
             owner,
             include_expired,
@@ -442,11 +458,12 @@ fn query_owner_of<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: Env,
     token_id: String,
+    include_expired: bool,
 ) -> StdResult<OwnerOfResponse> {
     let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
     Ok(OwnerOfResponse {
         owner: deps.api.human_address(&info.owner)?,
-        approvals: humanize_approvals(deps.api, &env.block, &info)?,
+        approvals: humanize_approvals(deps.api, &env.block, &info, include_expired)?,
     })
 }
 
@@ -508,12 +525,13 @@ fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: Env,
     token_id: String,
+    include_expired: bool,
 ) -> StdResult<AllNftInfoResponse> {
     let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
     Ok(AllNftInfoResponse {
         access: OwnerOfResponse {
             owner: deps.api.human_address(&info.owner)?,
-            approvals: humanize_approvals(deps.api, &env.block, &info)?,
+            approvals: humanize_approvals(deps.api, &env.block, &info, include_expired)?,
         },
         info: NftInfoResponse {
             name: info.name,
@@ -527,12 +545,16 @@ fn humanize_approvals<A: Api>(
     api: A,
     block: &BlockInfo,
     info: &TokenInfo,
+    include_expired: bool,
 ) -> StdResult<Vec<cw721::Approval>> {
-    info.approvals
-        .iter()
-        .filter(|apr| !apr.expires.is_expired(block))
-        .map(|apr| humanize_approval(api, apr))
-        .collect()
+    let iter = info.approvals.iter();
+    if include_expired {
+        iter.map(|apr| humanize_approval(api, apr)).collect()
+    } else {
+        iter.filter(|apr| !apr.expires.is_expired(block))
+            .map(|apr| humanize_approval(api, apr))
+            .collect()
+    }
 }
 
 fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Approval> {
@@ -648,7 +670,7 @@ mod tests {
         );
 
         // owner info is correct
-        let owner = query_owner_of(&deps, mock_env(), token_id.clone()).unwrap();
+        let owner = query_owner_of(&deps, mock_env(), token_id.clone(), true).unwrap();
         assert_eq!(
             owner,
             OwnerOfResponse {
@@ -852,6 +874,7 @@ mod tests {
         // Approvals are removed / cleared
         let query_msg = QueryMsg::OwnerOf {
             token_id: token_id.clone(),
+            include_expired: None,
         };
         let res: OwnerOfResponse =
             from_binary(&query(&deps, mock_env(), query_msg.clone()).unwrap()).unwrap();
