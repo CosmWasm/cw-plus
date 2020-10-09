@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdResult, Storage, WasmMsg,
+    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
 };
 use sha2::{Digest, Sha256};
 
@@ -23,6 +23,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -33,22 +34,24 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Create(msg) => {
-            let sent_funds = env.message.sent_funds.clone();
-            try_create(deps, env, msg, Balance::from(sent_funds))
+            let sent_funds = info.sent_funds.clone();
+            try_create(deps, env, info, msg, Balance::from(sent_funds))
         }
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
         HandleMsg::Refund { id } => try_refund(deps, env, id),
-        HandleMsg::Receive(msg) => try_receive(deps, env, msg),
+        HandleMsg::Receive(msg) => try_receive(deps, env, info, msg),
     }
 }
 
 pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<HandleResponse, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
@@ -56,17 +59,25 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
         None => Err(ContractError::NoData {}),
     }?;
     let token = Cw20Coin {
-        address: deps.api.canonical_address(&env.message.sender)?,
+        address: deps.api.canonical_address(&info.sender)?,
         amount: wrapper.amount,
     };
+    // we need to update the info... so the original sender is the one authorizing with these tokens
+    let orig_info = MessageInfo {
+        sender: wrapper.sender,
+        sent_funds: info.sent_funds,
+    };
     match msg {
-        ReceiveMsg::Create(create) => try_create(deps, env, create, Balance::Cw20(token)),
+        ReceiveMsg::Create(create) => {
+            try_create(deps, env, orig_info, create, Balance::Cw20(token))
+        }
     }
 }
 
 pub fn try_create<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: CreateMsg,
     balance: Balance,
 ) -> Result<HandleResponse, ContractError> {
@@ -91,7 +102,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     let swap = AtomicSwap {
         hash: Binary(hash),
         recipient: recipient_raw,
-        source: deps.api.canonical_address(&env.message.sender)?,
+        source: deps.api.canonical_address(&info.sender)?,
         expires: msg.expires,
         balance,
     };
