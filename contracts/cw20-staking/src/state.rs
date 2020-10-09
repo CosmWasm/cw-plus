@@ -6,6 +6,7 @@ use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
 };
+use cw0::Duration;
 
 pub const KEY_INVESTMENT: &[u8] = b"invest";
 pub const KEY_TOTAL_SUPPLY: &[u8] = b"total_supply";
@@ -28,6 +29,9 @@ pub struct InvestmentInfo {
     pub owner: CanonicalAddr,
     /// this is the denomination we can stake (and only one we accept for payments)
     pub bond_denom: String,
+    /// This is the unbonding period of the native staking module
+    /// We need this to only allow claims to be redeemed after the money has arrived
+    pub unbonding_period: Duration,
     /// this is how much the owner takes as a cut when someone unbonds
     pub exit_tax: Decimal,
     /// All tokens are bonded to this validator

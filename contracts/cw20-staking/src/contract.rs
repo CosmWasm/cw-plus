@@ -58,6 +58,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let invest = InvestmentInfo {
         owner: deps.api.canonical_address(&env.message.sender)?,
         exit_tax: msg.exit_tax,
+        unbonding_period: msg.unbonding_period,
         bond_denom: denom,
         validator: msg.validator,
         min_withdrawal: msg.min_withdrawal,
@@ -452,6 +453,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MockQuerier, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coins, Coin, CosmosMsg, Decimal, FullDelegation, Validator};
+    use cw0::{DAY, HOUR, WEEK};
     use std::str::FromStr;
 
     fn sample_validator<U: Into<HumanAddr>>(addr: U) -> Validator {
@@ -495,6 +497,7 @@ mod tests {
             symbol: "DRV".to_string(),
             decimals: 9,
             validator: HumanAddr::from(DEFAULT_VALIDATOR),
+            unbonding_period: DAY * 3,
             exit_tax: Decimal::percent(tax_percent),
             min_withdrawal: Uint128(min_withdrawal),
         }
@@ -526,6 +529,7 @@ mod tests {
             symbol: "DRV".to_string(),
             decimals: 9,
             validator: HumanAddr::from("my-validator"),
+            unbonding_period: WEEK,
             exit_tax: Decimal::percent(2),
             min_withdrawal: Uint128(50),
         };
@@ -560,6 +564,7 @@ mod tests {
             symbol: "DRV".to_string(),
             decimals: 0,
             validator: HumanAddr::from("my-validator"),
+            unbonding_period: HOUR * 12,
             exit_tax: Decimal::percent(2),
             min_withdrawal: Uint128(50),
         };

@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Coin, Decimal, HumanAddr, Uint128};
+use cw0::Duration;
 use cw20::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -15,6 +16,9 @@ pub struct InitMsg {
 
     /// This is the validator that all tokens will be bonded to
     pub validator: HumanAddr,
+    /// This is the unbonding period of the native staking module
+    /// We need this to only allow claims to be redeemed after the money has arrived
+    pub unbonding_period: Duration,
 
     /// this is how much the owner takes as a cut when someone unbonds
     pub exit_tax: Decimal,

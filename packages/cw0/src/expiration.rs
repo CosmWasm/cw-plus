@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{BlockInfo, StdError, StdResult};
 use std::cmp::Ordering;
 use std::fmt;
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -79,6 +79,10 @@ impl PartialOrd for Expiration {
     }
 }
 
+pub const HOUR: Duration = Duration::Time(60 * 60);
+pub const DAY: Duration = Duration::Time(24 * 60 * 60);
+pub const WEEK: Duration = Duration::Time(7 * 24 * 60 * 60);
+
 /// Duration is a delta of time. You can add it to a BlockInfo or Expiration to
 /// move that further in the future. Note that an height-based Duration and
 /// a time-based Expiration cannot be combined
@@ -116,6 +120,17 @@ impl Add<Duration> for Duration {
             (Duration::Time(t), Duration::Time(t2)) => Ok(Duration::Time(t + t2)),
             (Duration::Height(h), Duration::Height(h2)) => Ok(Duration::Height(h + h2)),
             _ => Err(StdError::generic_err("Cannot add height and time")),
+        }
+    }
+}
+
+impl Mul<u64> for Duration {
+    type Output = Duration;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        match self {
+            Duration::Time(t) => Duration::Time(t * rhs),
+            Duration::Height(h) => Duration::Height(h * rhs),
         }
     }
 }
@@ -183,9 +198,14 @@ mod test {
 
         let end = Duration::Time(1212).after(&block);
         assert_eq!(Expiration::AtTime(8989), end);
+    }
 
+    #[test]
+    fn duration_math() {
         let long = (Duration::Height(444) + Duration::Height(555)).unwrap();
-        let end = long.after(&block);
-        assert_eq!(Expiration::AtHeight(1999), end);
+        assert_eq!(Duration::Height(999), long);
+
+        let days = DAY * 3;
+        assert_eq!(Duration::Time(3 * 24 * 60 * 60), days);
     }
 }
