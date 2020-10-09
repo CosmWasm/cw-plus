@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, Order, Querier, StdResult, Storage,
+    InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
 };
 
 use cw0::{calc_range_start_human, calc_range_start_string};
@@ -24,6 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -41,6 +42,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
@@ -50,32 +52,35 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             name,
             description,
             image,
-        } => handle_mint(deps, env, token_id, owner, name, description, image),
+        } => handle_mint(deps, env, info, token_id, owner, name, description, image),
         HandleMsg::Approve {
             spender,
             token_id,
             expires,
-        } => handle_approve(deps, env, spender, token_id, expires),
-        HandleMsg::Revoke { spender, token_id } => handle_revoke(deps, env, spender, token_id),
-        HandleMsg::ApproveAll { operator, expires } => {
-            handle_approve_all(deps, env, operator, expires)
+        } => handle_approve(deps, env, info, spender, token_id, expires),
+        HandleMsg::Revoke { spender, token_id } => {
+            handle_revoke(deps, env, info, spender, token_id)
         }
-        HandleMsg::RevokeAll { operator } => handle_revoke_all(deps, env, operator),
+        HandleMsg::ApproveAll { operator, expires } => {
+            handle_approve_all(deps, env, info, operator, expires)
+        }
+        HandleMsg::RevokeAll { operator } => handle_revoke_all(deps, env, info, operator),
         HandleMsg::TransferNft {
             recipient,
             token_id,
-        } => handle_transfer_nft(deps, env, recipient, token_id),
+        } => handle_transfer_nft(deps, env, info, recipient, token_id),
         HandleMsg::SendNft {
             contract,
             token_id,
             msg,
-        } => handle_send_nft(deps, env, contract, token_id, msg),
+        } => handle_send_nft(deps, env, info, contract, token_id, msg),
     }
 }
 
 pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     token_id: String,
     owner: HumanAddr,
     name: String,
@@ -83,7 +88,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     image: Option<String>,
 ) -> Result<HandleResponse, ContractError> {
     let minter = mint(&mut deps.storage).load()?;
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     if sender_raw != minter {
         return Err(ContractError::Unauthorized {});
@@ -108,7 +113,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         attributes: vec![
             attr("action", "mint"),
-            attr("minter", env.message.sender),
+            attr("minter", info.sender),
             attr("token_id", token_id),
         ],
         data: None,
@@ -118,16 +123,17 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     recipient: HumanAddr,
     token_id: String,
 ) -> Result<HandleResponse, ContractError> {
-    _transfer_nft(deps, &env, &recipient, &token_id)?;
+    _transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
             attr("action", "transfer_nft"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("recipient", recipient),
             attr("token_id", token_id),
         ],
@@ -138,6 +144,7 @@ pub fn handle_transfer_nft<S: Storage, A: Api, Q: Querier>(
 pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     contract: HumanAddr,
     token_id: String,
     msg: Option<Binary>,
@@ -149,14 +156,14 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
     };
 
     // Transfer token
-    _transfer_nft(deps, &env, &contract, &token_id)?;
+    _transfer_nft(deps, &env, &info, &contract, &token_id)?;
 
     // Send message
     Ok(HandleResponse {
         messages: msgs,
         attributes: vec![
             attr("action", "send_nft"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("recipient", contract),
             attr("token_id", token_id),
         ],
@@ -167,12 +174,13 @@ pub fn handle_send_nft<S: Storage, A: Api, Q: Querier>(
 pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: &Env,
+    info: &MessageInfo,
     recipient: &HumanAddr,
     token_id: &str,
 ) -> Result<TokenInfo, ContractError> {
     let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
     // ensure we have permissions
-    check_can_send(&deps, env, &token)?;
+    check_can_send(&deps, env, info, &token)?;
     // set owner and remove existing approvals
     token.owner = deps.api.canonical_address(recipient)?;
     token.approvals = vec![];
@@ -183,17 +191,18 @@ pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
 pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     spender: HumanAddr,
     token_id: String,
     expires: Option<Expiration>,
 ) -> Result<HandleResponse, ContractError> {
-    _update_approvals(deps, &env, &spender, &token_id, true, expires)?;
+    _update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
             attr("action", "approve"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("spender", spender),
             attr("token_id", token_id),
         ],
@@ -204,16 +213,17 @@ pub fn handle_approve<S: Storage, A: Api, Q: Querier>(
 pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     spender: HumanAddr,
     token_id: String,
 ) -> Result<HandleResponse, ContractError> {
-    _update_approvals(deps, &env, &spender, &token_id, false, None)?;
+    _update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
     Ok(HandleResponse {
         messages: vec![],
         attributes: vec![
             attr("action", "revoke"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("spender", spender),
             attr("token_id", token_id),
         ],
@@ -224,6 +234,7 @@ pub fn handle_revoke<S: Storage, A: Api, Q: Querier>(
 pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: &Env,
+    info: &MessageInfo,
     spender: &HumanAddr,
     token_id: &str,
     // if add == false, remove. if add == true, remove then set with this expiration
@@ -232,7 +243,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
 ) -> Result<TokenInfo, ContractError> {
     let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
     // ensure we have permissions
-    check_can_approve(&deps, &env, &token)?;
+    check_can_approve(&deps, env, info, &token)?;
 
     // update the approval list (remove any for the same spender before adding)
     let spender_raw = deps.api.canonical_address(&spender)?;
@@ -264,6 +275,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
 pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     operator: HumanAddr,
     expires: Option<Expiration>,
 ) -> Result<HandleResponse, ContractError> {
@@ -274,7 +286,7 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
     }
 
     // set the operator for us
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
     let operator_raw = deps.api.canonical_address(&operator)?;
     operators(&mut deps.storage, &sender_raw).save(operator_raw.as_slice(), &expires)?;
 
@@ -282,7 +294,7 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         attributes: vec![
             attr("action", "approve_all"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("operator", operator),
         ],
         data: None,
@@ -291,10 +303,11 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
 
 pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     operator: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
     let operator_raw = deps.api.canonical_address(&operator)?;
     operators(&mut deps.storage, &sender_raw).remove(operator_raw.as_slice());
 
@@ -302,7 +315,7 @@ pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         attributes: vec![
             attr("action", "revoke_all"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("operator", operator),
         ],
         data: None,
@@ -313,10 +326,11 @@ pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
 fn check_can_approve<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
+    info: &MessageInfo,
     token: &TokenInfo,
 ) -> Result<(), ContractError> {
     // owner can approve
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
     if token.owner == sender_raw {
         return Ok(());
     }
@@ -338,10 +352,11 @@ fn check_can_approve<S: Storage, A: Api, Q: Querier>(
 fn check_can_send<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     env: &Env,
+    info: &MessageInfo,
     token: &TokenInfo,
 ) -> Result<(), ContractError> {
     // owner can send
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
     if token.owner == sender_raw {
         return Ok(());
     }
@@ -371,6 +386,7 @@ fn check_can_send<S: Storage, A: Api, Q: Querier>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
