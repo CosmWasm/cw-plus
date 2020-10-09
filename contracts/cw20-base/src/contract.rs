@@ -344,6 +344,7 @@ pub fn query_minter<S: Storage, A: Api, Q: Querier>(
 pub fn migrate<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     _msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
     let old_version = get_contract_version(&deps.storage)?;
@@ -357,13 +358,18 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
     // more recent versions do not have the v prefix
     if old_version.version.starts_with("v0.1.") {
         migrate_v01_to_v02(&mut deps.storage)?;
-        set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-        return Ok(MigrateResponse::default());
+    } else if old_version.version.starts_with("0.2") {
+        // no migration between 0.2 and 0.3, correct?
+    } else {
+        return Err(StdError::generic_err(format!(
+            "Unknown version {}",
+            old_version.version
+        )));
     }
-    Err(StdError::generic_err(format!(
-        "Unknown version {}",
-        old_version.version
-    )))
+
+    // once we have "migrated", set the new version and return success
+    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    return Ok(MigrateResponse::default());
 }
 
 #[cfg(test)]
@@ -917,8 +923,8 @@ mod tests {
         );
 
         // run the migration
-        let (env, _info) = mock_env_info(HumanAddr::from("admin"), &[]);
-        migrate(&mut deps, env, MigrateMsg {}).unwrap();
+        let (env, info) = mock_env_info(HumanAddr::from("admin"), &[]);
+        migrate(&mut deps, env, info, MigrateMsg {}).unwrap();
 
         // make sure the version is updated
         assert_eq!(
