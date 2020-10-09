@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{CosmosMsg, Empty, ReadonlyStorage, StdError, StdResult, Storage};
+use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, ReadonlyStorage, StdError, StdResult, Storage};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
@@ -32,12 +32,15 @@ pub struct Proposal {
 
 impl Proposal {
     /// TODO: we should get the current BlockInfo and then we can determine this a bit better
-    pub fn current_status(&self) -> Status {
+    pub fn current_status(&self, block: &BlockInfo) -> Status {
         let mut status = self.status;
 
-        // if open, check if voting is passed on timed out
+        // if open, check if voting is passed or timed out
         if status == Status::Open && self.yes_weight >= self.required_weight {
-            status = Status::Passed
+            status = Status::Passed;
+        }
+        if status == Status::Open && self.expires.is_expired(block) {
+            status = Status::Rejected;
         }
 
         status

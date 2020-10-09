@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Order, Querier, StdResult, Storage,
+    attr, to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Empty, Env, Extern,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
 };
 
 use cw0::{calc_range_start_human, Expiration};
@@ -26,6 +26,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
     if msg.required_weight == 0 {
@@ -61,6 +62,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     match msg {
@@ -69,16 +71,17 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             description,
             msgs,
             latest,
-        } => handle_propose(deps, env, title, description, msgs, latest),
-        HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, proposal_id, vote),
-        HandleMsg::Execute { proposal_id } => handle_execute(deps, env, proposal_id),
-        HandleMsg::Close { proposal_id } => handle_close(deps, env, proposal_id),
+        } => handle_propose(deps, env, info, title, description, msgs, latest),
+        HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, info, proposal_id, vote),
+        HandleMsg::Execute { proposal_id } => handle_execute(deps, env, info, proposal_id),
+        HandleMsg::Close { proposal_id } => handle_close(deps, env, info, proposal_id),
     }
 }
 
 pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     title: String,
     description: String,
     msgs: Vec<CosmosMsg>,
@@ -86,7 +89,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     latest: Option<Expiration>,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can create a proposal
-    let raw_sender = deps.api.canonical_address(&env.message.sender)?;
+    let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = voters_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
         .ok_or_else(|| ContractError::Unauthorized {})?;
@@ -133,7 +136,7 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("proposal_id", id),
             attr("status", format!("{:?}", prop.status)),
         ],
@@ -144,11 +147,12 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
 pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     proposal_id: u64,
     vote: Vote,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can vote
-    let raw_sender = deps.api.canonical_address(&env.message.sender)?;
+    let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = voters_read(&deps.storage)
         .may_load(raw_sender.as_slice())?
         .ok_or_else(|| ContractError::Unauthorized {})?;
@@ -185,7 +189,7 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("proposal_id", proposal_id),
             attr("status", format!("{:?}", prop.status)),
         ],
@@ -195,7 +199,8 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _env: Env,
+    info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse, ContractError> {
     // anyone can trigger this if the vote passed
@@ -216,7 +221,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
         messages: prop.msgs,
         attributes: vec![
             attr("action", "execute"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
         data: None,
@@ -226,6 +231,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
 pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
@@ -249,7 +255,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
-            attr("sender", env.message.sender),
+            attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
         data: None,
@@ -258,19 +264,20 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
-        QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, proposal_id)?),
+        QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, env, proposal_id)?),
         QueryMsg::Vote { proposal_id, voter } => to_binary(&query_vote(deps, proposal_id, voter)?),
         QueryMsg::ListProposals { start_after, limit } => {
-            to_binary(&list_proposals(deps, start_after, limit)?)
+            to_binary(&list_proposals(deps, env, start_after, limit)?)
         }
         QueryMsg::ReverseProposals {
             start_before,
             limit,
-        } => to_binary(&reverse_proposals(deps, start_before, limit)?),
+        } => to_binary(&reverse_proposals(deps, env, start_before, limit)?),
         QueryMsg::ListVotes {
             proposal_id,
             start_after,
@@ -295,16 +302,18 @@ fn query_threshold<S: Storage, A: Api, Q: Querier>(
 
 fn query_proposal<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    env: Env,
     id: u64,
 ) -> StdResult<ProposalResponse> {
     let prop = proposal_read(&deps.storage).load(&id.to_be_bytes())?;
-    let status = prop.current_status();
+    let status = prop.current_status(&env.block);
     Ok(ProposalResponse {
         id,
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
         expires: prop.expires,
+        // TODO: check
         status,
     })
 }
@@ -315,6 +324,7 @@ const DEFAULT_LIMIT: u32 = 10;
 
 fn list_proposals<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    env: Env,
     start_after: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
@@ -323,7 +333,7 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     let props: StdResult<Vec<_>> = proposal_read(&deps.storage)
         .range(start.as_deref(), None, Order::Ascending)
         .take(limit)
-        .map(map_proposal)
+        .map(|p| map_proposal(&env.block, p))
         .collect();
 
     Ok(ProposalListResponse { proposals: props? })
@@ -331,6 +341,7 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
 
 fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    env: Env,
     start_before: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
@@ -339,15 +350,18 @@ fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
     let props: StdResult<Vec<_>> = proposal_read(&deps.storage)
         .range(None, end.as_deref(), Order::Descending)
         .take(limit)
-        .map(map_proposal)
+        .map(|p| map_proposal(&env.block, p))
         .collect();
 
     Ok(ProposalListResponse { proposals: props? })
 }
 
-fn map_proposal(item: StdResult<(Vec<u8>, Proposal)>) -> StdResult<ProposalResponse> {
+fn map_proposal(
+    block: &BlockInfo,
+    item: StdResult<(Vec<u8>, Proposal)>,
+) -> StdResult<ProposalResponse> {
     let (key, prop) = item?;
-    let status = prop.current_status();
+    let status = prop.current_status(block);
     Ok(ProposalResponse {
         id: parse_id(&key)?,
         title: prop.title,
@@ -475,13 +489,13 @@ mod tests {
     // this will set up the init for other tests
     fn setup_test_case<S: Storage, A: Api, Q: Querier>(
         mut deps: &mut Extern<S, A, Q>,
-        env: Env,
+        info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
     ) -> Result<InitResponse<Empty>, ContractError> {
         // Init a contract with voters
         let voters = vec![
-            voter(&env.message.sender, 0),
+            voter(&info.sender, 0),
             voter(VOTER1, 1),
             voter(VOTER2, 2),
             voter(VOTER3, 3),
@@ -494,7 +508,7 @@ mod tests {
             required_weight,
             max_voting_period,
         };
-        init(&mut deps, env, init_msg)
+        init(&mut deps, env, info, init_msg)
     }
 
     fn get_tally<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, proposal_id: u64) -> u64 {
