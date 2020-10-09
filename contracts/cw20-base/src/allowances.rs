@@ -1,4 +1,7 @@
-use cosmwasm_std::{attr, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, Querier, StdResult, Storage, Uint128, MessageInfo};
+use cosmwasm_std::{
+    attr, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    MessageInfo, Querier, StdResult, Storage, Uint128,
+};
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
@@ -273,7 +276,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg, Coin};
+    use cosmwasm_std::{coins, Coin, CosmosMsg, StdError, WasmMsg};
     use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_balance, query_token_info};

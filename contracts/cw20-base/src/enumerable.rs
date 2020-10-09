@@ -63,7 +63,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Uint128, MessageInfo, Env, Coin};
+    use cosmwasm_std::{coins, Coin, Env, MessageInfo, Uint128};
     use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_token_info};
@@ -85,8 +85,8 @@ mod tests {
             }],
             mint: None,
         };
-        let (env,info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
-        init(deps, env, info,init_msg).unwrap();
+        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        init(deps, env, info, init_msg).unwrap();
         query_token_info(&deps).unwrap()
     }
 
@@ -103,7 +103,7 @@ mod tests {
         let spender1 = HumanAddr::from("later");
         let spender2 = HumanAddr::from("earlier");
 
-        let (env,info) = mock_env_info(owner.clone(), &[]);
+        let (env, info) = mock_env_info(owner.clone(), &[]);
         do_init(&mut deps, &owner, Uint128(12340000));
 
         // no allowance to start
@@ -127,7 +127,7 @@ mod tests {
             amount: allow2,
             expires: None,
         };
-        handle(&mut deps, env.clone(),info.clone(), msg).unwrap();
+        handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
 
         // query list gets 2
         let allowances = query_all_allowances(&deps, owner.clone(), None, None).unwrap();
@@ -168,11 +168,12 @@ mod tests {
         do_init(&mut deps, &acct1, Uint128(12340000));
 
         // put money everywhere (to create balanaces)
-        let (env,info) = mock_env_info(acct1.clone(), &[]);
+        let (env, info) = mock_env_info(acct1.clone(), &[]);
         handle(
             &mut deps,
             env.clone(),
-            info.clone(),HandleMsg::Transfer {
+            info.clone(),
+            HandleMsg::Transfer {
                 recipient: acct2,
                 amount: Uint128(222222),
             },
@@ -188,7 +189,7 @@ mod tests {
             },
         )
         .unwrap();
-         handle(
+        handle(
             &mut deps,
             env.clone(),
             info.clone(),

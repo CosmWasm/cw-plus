@@ -1,4 +1,7 @@
-use cosmwasm_std::{attr, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, MigrateResponse, Querier, StdError, StdResult, Storage, Uint128, MessageInfo};
+use cosmwasm_std::{
+    attr, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
+};
 
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20CoinHuman, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
@@ -76,7 +79,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Transfer { recipient, amount } => handle_transfer(deps, env, info, recipient, amount),
+        HandleMsg::Transfer { recipient, amount } => {
+            handle_transfer(deps, env, info, recipient, amount)
+        }
         HandleMsg::Burn { amount } => handle_burn(deps, env, info, amount),
         HandleMsg::Send {
             contract,
@@ -98,14 +103,14 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             owner,
             recipient,
             amount,
-        } => handle_transfer_from(deps, env,info,  owner, recipient, amount),
+        } => handle_transfer_from(deps, env, info, owner, recipient, amount),
         HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, info, owner, amount),
         HandleMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => handle_send_from(deps, env,info,  owner, contract, amount, msg),
+        } => handle_send_from(deps, env, info, owner, contract, amount, msg),
     }
 }
 
@@ -193,8 +198,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 
     let mut config = token_info_read(&deps.storage).load()?;
     if config.mint.is_none()
-        || config.mint.as_ref().unwrap().minter
-            != deps.api.canonical_address(&info.sender)?
+        || config.mint.as_ref().unwrap().minter != deps.api.canonical_address(&info.sender)?
     {
         return Err(ContractError::Unauthorized {});
     }
@@ -365,7 +369,9 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, Order, StdError, WasmMsg, Coin, MessageInfo};
+    use cosmwasm_std::{
+        coins, from_binary, Coin, CosmosMsg, MessageInfo, Order, StdError, WasmMsg,
+    };
 
     use cw2::ContractVersion;
     use cw20::{AllowanceResponse, Expiration};
@@ -381,8 +387,8 @@ mod tests {
     ) -> Uint128 {
         query_balance(&deps, address.into()).unwrap().balance
     }
-    
-   fn mock_env_info<U: Into<HumanAddr>>(sender: U, sent: &[Coin]) -> (Env, MessageInfo) {
+
+    fn mock_env_info<U: Into<HumanAddr>>(sender: U, sent: &[Coin]) -> (Env, MessageInfo) {
         (mock_env(), mock_info(sender, sent))
     }
 
@@ -432,7 +438,7 @@ mod tests {
             mint: mint.clone(),
         };
         let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
-        let res = init(deps, env, info,  init_msg).unwrap();
+        let res = init(deps, env, info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let meta = query_token_info(&deps).unwrap();
@@ -705,7 +711,7 @@ mod tests {
         assert_eq!(loaded.balance, amount1);
 
         // check balance query (empty)
-       let data = query(
+        let data = query(
             &deps,
             env.clone(),
             QueryMsg::Balance {
@@ -861,7 +867,7 @@ mod tests {
         }
 
         // valid transfer
-        let (env,info) = mock_env_info(addr1.clone(), &[]);
+        let (env, info) = mock_env_info(addr1.clone(), &[]);
         let msg = HandleMsg::Send {
             contract: contract.clone(),
             amount: transfer,
@@ -898,7 +904,7 @@ mod tests {
 
     #[test]
     fn migrate_from_v01() {
-        let mut deps = mock_dependencies( &[]);
+        let mut deps = mock_dependencies(&[]);
 
         generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
         // make sure this really is 0.1.0
