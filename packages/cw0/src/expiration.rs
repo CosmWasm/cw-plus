@@ -108,6 +108,18 @@ impl Duration {
     }
 }
 
+impl Add<Duration> for Duration {
+    type Output = StdResult<Duration>;
+
+    fn add(self, rhs: Duration) -> StdResult<Duration> {
+        match (self, rhs) {
+            (Duration::Time(t), Duration::Time(t2)) => Ok(Duration::Time(t + t2)),
+            (Duration::Height(h), Duration::Height(h2)) => Ok(Duration::Height(h + h2)),
+            _ => Err(StdError::generic_err("Cannot add height and time")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -133,5 +145,47 @@ mod test {
         assert_eq!(false, Expiration::AtTime(1000) < Expiration::AtHeight(230));
         assert_eq!(false, Expiration::AtTime(1000) > Expiration::AtHeight(230));
         assert_eq!(false, Expiration::AtTime(1000) == Expiration::AtHeight(230));
+    }
+
+    #[test]
+    fn expiration_addition() {
+        // height
+        let end = Expiration::AtHeight(12345) + Duration::Height(400);
+        assert_eq!(end.unwrap(), Expiration::AtHeight(12745));
+
+        // time
+        let end = Expiration::AtTime(55544433) + Duration::Time(40300);
+        assert_eq!(end.unwrap(), Expiration::AtTime(55584733));
+
+        // never
+        let end = Expiration::Never {} + Duration::Time(40300);
+        assert_eq!(end.unwrap(), Expiration::Never {});
+
+        // mismatched
+        let end = Expiration::AtHeight(12345) + Duration::Time(1500);
+        end.unwrap_err();
+
+        // // not possible other way
+        // let end = Duration::Time(1000) + Expiration::AtTime(50000);
+        // assert_eq!(end.unwrap(), Expiration::AtTime(51000));
+    }
+
+    #[test]
+    fn block_plus_duration() {
+        let block = BlockInfo {
+            height: 1000,
+            time: 7777,
+            chain_id: "foo".to_string(),
+        };
+
+        let end = Duration::Height(456).after(&block);
+        assert_eq!(Expiration::AtHeight(1456), end);
+
+        let end = Duration::Time(1212).after(&block);
+        assert_eq!(Expiration::AtTime(8989), end);
+
+        let long = (Duration::Height(444) + Duration::Height(555)).unwrap();
+        let end = long.after(&block);
+        assert_eq!(Expiration::AtHeight(1999), end);
     }
 }
