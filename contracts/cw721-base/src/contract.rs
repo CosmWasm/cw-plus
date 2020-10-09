@@ -76,11 +76,6 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     _env: Env,
     info: MessageInfo,
     msg: MintMsg,
-    // token_id: String,
-    // owner: HumanAddr,
-    // name: String,
-    // description: Option<String>,
-    // image: Option<String>,
 ) -> Result<HandleResponse, ContractError> {
     let minter = mint(&mut deps.storage).load()?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
