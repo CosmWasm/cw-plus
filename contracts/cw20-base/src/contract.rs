@@ -369,7 +369,7 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
 
     // once we have "migrated", set the new version and return success
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    return Ok(MigrateResponse::default());
+    Ok(MigrateResponse::default())
 }
 
 #[cfg(test)]

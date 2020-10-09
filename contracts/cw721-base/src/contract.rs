@@ -11,7 +11,7 @@ use cw721::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, MinterResponse, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
     contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, operators,
     operators_read, tokens, tokens_read, Approval, TokenInfo,
@@ -46,13 +46,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Mint {
-            token_id,
-            owner,
-            name,
-            description,
-            image,
-        } => handle_mint(deps, env, info, token_id, owner, name, description, image),
+        HandleMsg::Mint(msg) => handle_mint(deps, env, info, msg),
         HandleMsg::Approve {
             spender,
             token_id,
@@ -81,11 +75,12 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     info: MessageInfo,
-    token_id: String,
-    owner: HumanAddr,
-    name: String,
-    description: Option<String>,
-    image: Option<String>,
+    msg: MintMsg,
+    // token_id: String,
+    // owner: HumanAddr,
+    // name: String,
+    // description: Option<String>,
+    // image: Option<String>,
 ) -> Result<HandleResponse, ContractError> {
     let minter = mint(&mut deps.storage).load()?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
@@ -96,13 +91,13 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
 
     // create the token
     let token = TokenInfo {
-        owner: deps.api.canonical_address(&owner)?,
+        owner: deps.api.canonical_address(&msg.owner)?,
         approvals: vec![],
-        name,
-        description: description.unwrap_or_default(),
-        image,
+        name: msg.name,
+        description: msg.description.unwrap_or_default(),
+        image: msg.image,
     };
-    tokens(&mut deps.storage).update(token_id.as_bytes(), |old| match old {
+    tokens(&mut deps.storage).update(msg.token_id.as_bytes(), |old| match old {
         Some(_) => Err(ContractError::Claimed {}),
         None => Ok(token),
     })?;
@@ -114,7 +109,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         attributes: vec![
             attr("action", "mint"),
             attr("minter", info.sender),
-            attr("token_id", token_id),
+            attr("token_id", msg.token_id),
         ],
         data: None,
     })
@@ -609,13 +604,13 @@ mod tests {
         let name = "Petrify with Gaze".to_string();
         let description = "Allows the owner to petrify anyone looking at him or her".to_string();
 
-        let mint_msg = HandleMsg::Mint {
+        let mint_msg = HandleMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: "medusa".into(),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
-        };
+        });
 
         // random cannot mint
         let random = mock_info("random", &[]);
@@ -658,13 +653,13 @@ mod tests {
         );
 
         // Cannot mint same token_id again
-        let mint_msg2 = HandleMsg::Mint {
+        let mint_msg2 = HandleMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: "hercules".into(),
             name: "copy cat".into(),
             description: None,
             image: None,
-        };
+        });
 
         let allowed = mock_info(MINTER, &[]);
         let err = handle(&mut deps, mock_env(), allowed, mint_msg2).unwrap_err();
@@ -689,13 +684,13 @@ mod tests {
         let name = "Melting power".to_string();
         let description = "Allows the owner to melt anyone looking at him or her".to_string();
 
-        let mint_msg = HandleMsg::Mint {
+        let mint_msg = HandleMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: "venus".into(),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
-        };
+        });
 
         let minter = mock_info(MINTER, &[]);
         handle(&mut deps, mock_env(), minter, mint_msg).unwrap();
@@ -748,13 +743,13 @@ mod tests {
         let name = "Melting power".to_string();
         let description = "Allows the owner to melt anyone looking at him or her".to_string();
 
-        let mint_msg = HandleMsg::Mint {
+        let mint_msg = HandleMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: "venus".into(),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
-        };
+        });
 
         let minter = mock_info(MINTER, &[]);
         handle(&mut deps, mock_env(), minter, mint_msg).unwrap();
@@ -808,13 +803,13 @@ mod tests {
         let name = "Growing power".to_string();
         let description = "Allows the owner to grow anything".to_string();
 
-        let mint_msg = HandleMsg::Mint {
+        let mint_msg = HandleMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: "demeter".into(),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
-        };
+        });
 
         let minter = mock_info(MINTER, &[]);
         handle(&mut deps, mock_env(), minter, mint_msg).unwrap();
@@ -903,24 +898,24 @@ mod tests {
         let name2 = "More growing power".to_string();
         let description2 = "Allows the owner the power to grow anything even faster".to_string();
 
-        let mint_msg1 = HandleMsg::Mint {
+        let mint_msg1 = HandleMsg::Mint(MintMsg {
             token_id: token_id1.clone(),
             owner: "demeter".into(),
             name: name1.clone(),
             description: Some(description1.clone()),
             image: None,
-        };
+        });
 
         let minter = mock_info(MINTER, &[]);
         handle(&mut deps, mock_env(), minter.clone(), mint_msg1).unwrap();
 
-        let mint_msg2 = HandleMsg::Mint {
+        let mint_msg2 = HandleMsg::Mint(MintMsg {
             token_id: token_id2.clone(),
             owner: "demeter".into(),
             name: name2.clone(),
             description: Some(description2.clone()),
             image: None,
-        };
+        });
 
         handle(&mut deps, mock_env(), minter, mint_msg2).unwrap();
 
