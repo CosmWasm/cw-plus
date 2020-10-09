@@ -133,25 +133,27 @@ mod tests {
         let allowances = query_all_allowances(&deps, owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
-        /*
-        // first one is spender2 ("earlier")
+        // first one is spender1 (order of CanonicalAddr uncorrelated with HumanAddr)
         let allowances = query_all_allowances(&deps, owner.clone(), None, Some(1)).unwrap();
-        assert_eq!(allowances.allowances.len(), 1);
-        let allow = &allowances.allowances[0];
-        assert_eq!(&allow.spender, &spender2);
-        assert_eq!(&allow.expires, &Expiration::Never {});
-        assert_eq!(&allow.allowance, &allow2);
-
-         */
-
-        // next one is spender1 ("later")
-        let allowances =
-            query_all_allowances(&deps, owner.clone(), Some(spender2), Some(10000)).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.spender, &spender1);
         assert_eq!(&allow.expires, &expires);
         assert_eq!(&allow.allowance, &allow1);
+
+        // next one is spender2
+        let allowances = query_all_allowances(
+            &deps,
+            owner.clone(),
+            Some(allow.spender.clone()),
+            Some(10000),
+        )
+        .unwrap();
+        assert_eq!(allowances.allowances.len(), 1);
+        let allow = &allowances.allowances[0];
+        assert_eq!(&allow.spender, &spender2);
+        assert_eq!(&allow.expires, &Expiration::Never {});
+        assert_eq!(&allow.allowance, &allow2);
     }
 
     #[test]
