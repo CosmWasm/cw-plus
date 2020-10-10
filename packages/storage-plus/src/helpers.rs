@@ -30,6 +30,23 @@ pub(crate) fn must_deserialize<T: DeserializeOwned>(value: &Option<Vec<u8>>) -> 
     }
 }
 
+/// This is equivalent concat(to_length_prefixed_nested(namespaces), key)
+/// But more efficient when the intermediate namespaces often must be recalculated
+pub(crate) fn namespaces_with_key(namespaces: &[&[u8]], key: &[u8]) -> Vec<u8> {
+    let mut size = key.len();
+    for &namespace in namespaces {
+        size += namespace.len() + 2;
+    }
+
+    let mut out = Vec::with_capacity(size);
+    for &namespace in namespaces {
+        out.extend_from_slice(&encode_length(namespace));
+        out.extend_from_slice(namespace);
+    }
+    out.extend_from_slice(key);
+    out
+}
+
 /// Customization of namespaces_with_key for when
 /// there are multiple sets we do not want to combine just to call this
 pub(crate) fn nested_namespaces_with_key(

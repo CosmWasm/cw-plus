@@ -1,11 +1,18 @@
 use crate::Endian;
 use std::marker::PhantomData;
+use crate::helpers::namespaces_with_key;
 
 pub trait PrimaryKey<'a>: Copy {
     type Prefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
     fn key<'b>(&'b self) -> Vec<&'b [u8]>;
+
+    fn joined_key(&self) -> Vec<u8> {
+        let keys = self.key();
+        let l = keys.len();
+        namespaces_with_key(&keys[0..l - 1], &keys[l - 1])
+    }
 }
 
 impl<'a> PrimaryKey<'a> for &'a [u8] {

@@ -106,9 +106,6 @@ where
         None
     }
 
-    // TODO: try AsRef<PrimaryKey>
-    // TODO: revisit map as well
-
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
@@ -132,7 +129,8 @@ where
         data: Option<&T>,
         old_data: Option<&T>,
     ) -> StdResult<()> {
-        let pk = self.primary.key(key);
+        // this is the key *relative* to the primary map namespace
+        let pk = key.joined_key();
         if let Some(old) = old_data {
             for index in self.indexes.iter() {
                 index.remove(store, &pk, old)?;
