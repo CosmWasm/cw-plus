@@ -1,0 +1,58 @@
+[package]
+name = "substrate_client"
+version = "0.1.1"
+authors = ["Chorus One"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kvdb = "0.5.0"
+finality-grandpa = {version = "0.12.3", features = ["derive-codec"] }
+sp-runtime = "2.0.0-rc3"
+sp-application-crypto = "2.0.0-rc3"
+parity-scale-codec = "1.3.0"
+parity-scale-codec-derive = "1.2.0"
+parity-util-mem = "0.6.1"
+parking_lot = "0.10.2"
+sp-api = "2.0.0-rc3"
+sp-core = "2.0.0-rc3"
+sp-finality-grandpa = "2.0.0-rc3"
+cosmwasm-std = "0.8.1"
+cosmwasm-storage = "0.8.1"
+schemars = "0.7.6"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+hex = "*"
+# Just to build on wasm
+clear_on_drop = { version = "0.2.3", features = ["no_cc"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
+
+[features]
+default = ["cranelift"]
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
+cranelift = ["cosmwasm-vm/default-cranelift"]
+singlepass = ["cosmwasm-vm/default-singlepass"]
+
+[dev-dependencies]
+rand = "0.7.3"
+ed25519-dalek = "1.0.0-pre.3"
+termcolor = "1.1.0"
+sp-keyring = "=2.0.0-alpha.6"
+cosmwasm-vm = { version = "0.7.2", default-features = false }
+serde_json = "1.0.55"
+
