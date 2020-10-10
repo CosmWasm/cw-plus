@@ -301,4 +301,37 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn readme_works_with_path() -> StdResult<()> {
+        let mut store = MockStorage::new();
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+
+        // create a Path one time to use below
+        let john = PEOPLE.key(b"john");
+
+        // Use this just like an Item above
+        let empty = john.may_load(&store)?;
+        assert_eq!(None, empty);
+        john.save(&mut store, &data)?;
+        let loaded = john.load(&store)?;
+        assert_eq!(data, loaded);
+        john.remove(&mut store);
+        let empty = john.may_load(&store)?;
+        assert_eq!(None, empty);
+
+        // same for composite keys, just use both parts in key()
+        let allow = ALLOWANCE.key((b"owner", b"spender"));
+        allow.save(&mut store, &1234)?;
+        let loaded = allow.load(&store)?;
+        assert_eq!(1234, loaded);
+        allow.update(&mut store, |x| Ok(x.unwrap_or_default() * 2))?;
+        let loaded = allow.load(&store)?;
+        assert_eq!(2468, loaded);
+
+        Ok(())
+    }
 }
