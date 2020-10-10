@@ -524,7 +524,7 @@ mod tests {
     fn get_claims<S: Storage, A: Api, Q: Querier, U: Into<HumanAddr>>(
         deps: &Extern<S, A, Q>,
         addr: U,
-    ) -> Uint128 {
+    ) -> Vec<Claim> {
         query_claims(&deps, addr.into()).unwrap().claims
     }
 
@@ -595,7 +595,7 @@ mod tests {
         // no balance
         assert_eq!(get_balance(&deps, &creator), Uint128(0));
         // no claims
-        assert_eq!(get_claims(&deps, &creator), Uint128(0));
+        assert_eq!(get_claims(&deps, &creator), vec![]);
 
         // investment info correct
         let invest = query_investment(&deps).unwrap();
@@ -796,7 +796,7 @@ mod tests {
         let bobs_claim = Uint128(810);
         let bobs_balance = Uint128(400);
         let env = mock_env(&bob, &[]);
-        let res = handle(&mut deps, env, unbond_msg).unwrap();
+        let res = handle(&mut deps, env.clone(), unbond_msg).unwrap();
         assert_eq!(1, res.messages.len());
         let delegate = &res.messages[0];
         match delegate {
@@ -814,7 +814,11 @@ mod tests {
         assert_eq!(get_balance(&deps, &bob), bobs_balance);
         assert_eq!(get_balance(&deps, &creator), owner_cut);
         // proper claims
-        assert_eq!(get_claims(&deps, &bob), bobs_claim);
+        let expected_claims = vec![Claim {
+            amount: bobs_claim,
+            released: (DAY * 3).after(&env.block),
+        }];
+        assert_eq!(expected_claims, get_claims(&deps, &bob));
 
         // supplies updated, ratio the same (1.5)
         let ratio = Decimal::from_str("1.5").unwrap();
