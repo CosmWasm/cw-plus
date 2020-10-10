@@ -1,6 +1,6 @@
 [package]
 name = "cw2"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Definition and types for the CosmWasm-2 interface"

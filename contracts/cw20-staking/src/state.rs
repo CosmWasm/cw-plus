@@ -6,18 +6,25 @@ use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
 };
+use cw0::{Duration, Expiration};
 
 pub const KEY_INVESTMENT: &[u8] = b"invest";
 pub const KEY_TOTAL_SUPPLY: &[u8] = b"total_supply";
 
 pub const PREFIX_CLAIMS: &[u8] = b"claim";
 
-/// claims are the claims to money being unbonded
-pub fn claims<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Claim {
+    pub amount: Uint128,
+    pub released: Expiration,
+}
+
+/// claims are the claims to money being unbonded, index by claimer address
+pub fn claims<S: Storage>(storage: &mut S) -> Bucket<S, Vec<Claim>> {
     bucket(storage, PREFIX_CLAIMS)
 }
 
-pub fn claims_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
+pub fn claims_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Vec<Claim>> {
     bucket_read(storage, PREFIX_CLAIMS)
 }
 
@@ -28,6 +35,9 @@ pub struct InvestmentInfo {
     pub owner: CanonicalAddr,
     /// this is the denomination we can stake (and only one we accept for payments)
     pub bond_denom: String,
+    /// This is the unbonding period of the native staking module
+    /// We need this to only allow claims to be redeemed after the money has arrived
+    pub unbonding_period: Duration,
     /// this is how much the owner takes as a cut when someone unbonds
     pub exit_tax: Decimal,
     /// All tokens are bonded to this validator

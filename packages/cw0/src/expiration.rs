@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{BlockInfo, StdError, StdResult};
 use std::cmp::Ordering;
 use std::fmt;
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -79,6 +79,10 @@ impl PartialOrd for Expiration {
     }
 }
 
+pub const HOUR: Duration = Duration::Time(60 * 60);
+pub const DAY: Duration = Duration::Time(24 * 60 * 60);
+pub const WEEK: Duration = Duration::Time(7 * 24 * 60 * 60);
+
 /// Duration is a delta of time. You can add it to a BlockInfo or Expiration to
 /// move that further in the future. Note that an height-based Duration and
 /// a time-based Expiration cannot be combined
@@ -104,6 +108,37 @@ impl Duration {
         match self {
             Duration::Height(h) => Expiration::AtHeight(block.height + h),
             Duration::Time(t) => Expiration::AtTime(block.time + t),
+        }
+    }
+
+    // creates a number just a little bigger, so we can use it to pass expiration point
+    pub fn plus_one(&self) -> Duration {
+        match self {
+            Duration::Height(h) => Duration::Height(h + 1),
+            Duration::Time(t) => Duration::Time(t + 1),
+        }
+    }
+}
+
+impl Add<Duration> for Duration {
+    type Output = StdResult<Duration>;
+
+    fn add(self, rhs: Duration) -> StdResult<Duration> {
+        match (self, rhs) {
+            (Duration::Time(t), Duration::Time(t2)) => Ok(Duration::Time(t + t2)),
+            (Duration::Height(h), Duration::Height(h2)) => Ok(Duration::Height(h + h2)),
+            _ => Err(StdError::generic_err("Cannot add height and time")),
+        }
+    }
+}
+
+impl Mul<u64> for Duration {
+    type Output = Duration;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        match self {
+            Duration::Time(t) => Duration::Time(t * rhs),
+            Duration::Height(h) => Duration::Height(h * rhs),
         }
     }
 }
@@ -133,5 +168,53 @@ mod test {
         assert_eq!(false, Expiration::AtTime(1000) < Expiration::AtHeight(230));
         assert_eq!(false, Expiration::AtTime(1000) > Expiration::AtHeight(230));
         assert_eq!(false, Expiration::AtTime(1000) == Expiration::AtHeight(230));
+    }
+
+    #[test]
+    fn expiration_addition() {
+        // height
+        let end = Expiration::AtHeight(12345) + Duration::Height(400);
+        assert_eq!(end.unwrap(), Expiration::AtHeight(12745));
+
+        // time
+        let end = Expiration::AtTime(55544433) + Duration::Time(40300);
+        assert_eq!(end.unwrap(), Expiration::AtTime(55584733));
+
+        // never
+        let end = Expiration::Never {} + Duration::Time(40300);
+        assert_eq!(end.unwrap(), Expiration::Never {});
+
+        // mismatched
+        let end = Expiration::AtHeight(12345) + Duration::Time(1500);
+        end.unwrap_err();
+
+        // // not possible other way
+        // let end = Duration::Time(1000) + Expiration::AtTime(50000);
+        // assert_eq!(end.unwrap(), Expiration::AtTime(51000));
+    }
+
+    #[test]
+    fn block_plus_duration() {
+        let block = BlockInfo {
+            height: 1000,
+            time: 7777,
+            time_nanos: 123456789,
+            chain_id: "foo".to_string(),
+        };
+
+        let end = Duration::Height(456).after(&block);
+        assert_eq!(Expiration::AtHeight(1456), end);
+
+        let end = Duration::Time(1212).after(&block);
+        assert_eq!(Expiration::AtTime(8989), end);
+    }
+
+    #[test]
+    fn duration_math() {
+        let long = (Duration::Height(444) + Duration::Height(555)).unwrap();
+        assert_eq!(Duration::Height(999), long);
+
+        let days = DAY * 3;
+        assert_eq!(Duration::Time(3 * 24 * 60 * 60), days);
     }
 }

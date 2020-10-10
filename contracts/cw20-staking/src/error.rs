@@ -27,6 +27,9 @@ pub enum ContractError {
     #[error("Insufficient balance in contract to process claim")]
     BalanceTooSmall {},
 
+    #[error("No claims that can be released currently")]
+    NothingToClaim {},
+
     #[error("Cannot set to own account")]
     CannotSetOwnAccount {},
 
