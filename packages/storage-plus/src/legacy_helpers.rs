@@ -25,12 +25,6 @@ pub(crate) fn length_prefixed_with_key(namespace: &[u8], key: &[u8]) -> Vec<u8> 
     out
 }
 
-// pub(crate) fn decode_length(prefix: [u8; 2]) -> usize {
-pub(crate) fn decode_length(prefix: &[u8]) -> usize {
-    // TODO: enforce exactly 2 bytes somehow, but usable with slices
-    (prefix[0] as usize) * 256 + (prefix[1] as usize)
-}
-
 pub(crate) fn get_with_prefix<S: ReadonlyStorage>(
     storage: &S,
     namespace: &[u8],

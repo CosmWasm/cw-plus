@@ -1,6 +1,6 @@
+use crate::helpers::{decode_length, namespaces_with_key};
 use crate::Endian;
 use std::marker::PhantomData;
-use crate::helpers::namespaces_with_key;
 
 pub trait PrimaryKey<'a>: Copy {
     type Prefix: Prefixer<'a>;
@@ -13,14 +13,27 @@ pub trait PrimaryKey<'a>: Copy {
         let l = keys.len();
         namespaces_with_key(&keys[0..l - 1], &keys[l - 1])
     }
+
+    /// extracts a single or composite key from a joined key,
+    /// only lives as long as the original bytes
+    fn parse_key(serialized: &'a [u8]) -> Self;
 }
 
-impl<'a> PrimaryKey<'a> for &'a [u8] {
-    type Prefix = ();
+// optional type aliases to refer to them easier
+type Pk0 = ();
+type Pk1<'a> = &'a [u8];
+type Pk2<'a> = (&'a [u8], &'a [u8]);
+
+impl<'a> PrimaryKey<'a> for Pk1<'a> {
+    type Prefix = Pk0;
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         // this is simple, we don't add more prefixes
         vec![self]
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        serialized
     }
 }
 
@@ -33,6 +46,13 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
         keys.extend(&self.1.key());
         keys
     }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        let l = decode_length(&serialized[0..2]);
+        let first = &serialized[2..l + 2];
+        let second = &serialized[l + 2..];
+        (T::parse_key(first), U::parse_key(second))
+    }
 }
 
 // Future work: add more types - 3 or more or slices?
@@ -43,19 +63,19 @@ pub trait Prefixer<'a>: Copy {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]>;
 }
 
-impl<'a> Prefixer<'a> for () {
+impl<'a> Prefixer<'a> for Pk0 {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![]
     }
 }
 
-impl<'a> Prefixer<'a> for &'a [u8] {
+impl<'a> Prefixer<'a> for Pk1<'a> {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self]
     }
 }
 
-impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
+impl<'a> Prefixer<'a> for Pk2<'a> {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self.0, self.1]
     }
@@ -196,4 +216,24 @@ mod test {
         assert_eq!(2, dir.len());
         assert_eq!(dir, vec![foo, b"bar"]);
     }
+
+    #[test]
+    fn parse_joined_keys_pk1() {
+        let key: Pk1 = b"four";
+        let joined = key.joined_key();
+        assert_eq!(key, joined.as_slice());
+        let parsed = Pk1::parse_key(&joined);
+        assert_eq!(key, parsed);
+    }
+
+    #[test]
+    fn parse_joined_keys_pk2() {
+        let key: Pk2 = (b"four", b"square");
+        let joined = key.joined_key();
+        assert_eq!(4 + 6 + 2, joined.len());
+        let parsed = Pk2::parse_key(&joined);
+        assert_eq!(key, parsed);
+    }
+
+    // TODO: parse joined with int/owned keys
 }
