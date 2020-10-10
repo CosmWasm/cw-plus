@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, Querier, StdResult, Storage, WasmMsg,
+    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -20,6 +20,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
+    _info: MessageInfo,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -30,25 +31,23 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Create(msg) => try_create(
-            deps,
-            msg,
-            Balance::from(env.message.sent_funds),
-            &env.message.sender,
-        ),
-        HandleMsg::Approve { id } => try_approve(deps, env, id),
-        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(env.message.sent_funds)),
-        HandleMsg::Refund { id } => try_refund(deps, env, id),
-        HandleMsg::Receive(msg) => try_receive(deps, env, msg),
+        HandleMsg::Create(msg) => {
+            try_create(deps, msg, Balance::from(info.sent_funds), &info.sender)
+        }
+        HandleMsg::Approve { id } => try_approve(deps, env, info, id),
+        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(info.sent_funds)),
+        HandleMsg::Refund { id } => try_refund(deps, env, info, id),
+        HandleMsg::Receive(msg) => try_receive(deps, info, msg),
     }
 }
 
 pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    env: Env,
+    info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<HandleResponse, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
@@ -56,7 +55,7 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
         None => Err(ContractError::NoData {}),
     }?;
     let balance = Balance::Cw20(Cw20Coin {
-        address: deps.api.canonical_address(&env.message.sender)?,
+        address: deps.api.canonical_address(&info.sender)?,
         amount: wrapper.amount,
     });
     match msg {
@@ -146,12 +145,13 @@ pub fn try_top_up<S: Storage, A: Api, Q: Querier>(
 pub fn try_approve<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     id: String,
 ) -> Result<HandleResponse, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
-    if deps.api.canonical_address(&env.message.sender)? != escrow.arbiter {
+    if deps.api.canonical_address(&info.sender)? != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else if escrow.is_expired(&env) {
         Err(ContractError::Expired {})
@@ -176,15 +176,14 @@ pub fn try_approve<S: Storage, A: Api, Q: Querier>(
 pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
+    info: MessageInfo,
     id: String,
 ) -> Result<HandleResponse, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(&deps.storage).load(id.as_bytes())?;
 
     // the arbiter can send anytime OR anyone can send after expiration
-    if !escrow.is_expired(&env)
-        && deps.api.canonical_address(&env.message.sender)? != escrow.arbiter
-    {
+    if !escrow.is_expired(&env) && deps.api.canonical_address(&info.sender)? != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else {
         // we delete the escrow
@@ -244,6 +243,7 @@ fn send_tokens<A: Api>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
@@ -297,23 +297,21 @@ fn query_list<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResu
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
 
     use crate::msg::HandleMsg::TopUp;
 
     use super::*;
 
-    const CANONICAL_LENGTH: usize = 20;
-
     #[test]
     fn happy_path_native() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         // init an empty contract
         let init_msg = InitMsg {};
-        let env = mock_env(&HumanAddr::from("anyone"), &[]);
-        let res = init(&mut deps, env, init_msg).unwrap();
+        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let res = init(&mut deps, mock_env(), info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // create an escrow
@@ -327,8 +325,14 @@ mod tests {
         };
         let sender = HumanAddr::from("source");
         let balance = coins(100, "tokens");
-        let env = mock_env(&sender, &balance);
-        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
+        let info = mock_info(&sender, &balance);
+        let res = handle(
+            &mut deps,
+            mock_env(),
+            info,
+            HandleMsg::Create(create.clone()),
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -351,8 +355,8 @@ mod tests {
 
         // approve it
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+        let info = mock_info(&create.arbiter, &[]);
+        let res = handle(&mut deps, mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(
@@ -366,8 +370,8 @@ mod tests {
 
         // second attempt fails (not found)
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id });
+        let info = mock_info(&create.arbiter, &[]);
+        let res = handle(&mut deps, mock_env(), info, HandleMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -376,12 +380,12 @@ mod tests {
 
     #[test]
     fn happy_path_cw20() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         // init an empty contract
         let init_msg = InitMsg {};
-        let env = mock_env(&HumanAddr::from("anyone"), &[]);
-        let res = init(&mut deps, env, init_msg).unwrap();
+        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let res = init(&mut deps, mock_env(), info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // create an escrow
@@ -399,8 +403,14 @@ mod tests {
             msg: Some(to_binary(&HandleMsg::Create(create.clone())).unwrap()),
         };
         let token_contract = HumanAddr::from("my-cw20-token");
-        let env = mock_env(&token_contract, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Receive(receive.clone())).unwrap();
+        let info = mock_info(&token_contract, &[]);
+        let res = handle(
+            &mut deps,
+            mock_env(),
+            info,
+            HandleMsg::Receive(receive.clone()),
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -429,8 +439,8 @@ mod tests {
 
         // approve it
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+        let info = mock_info(&create.arbiter, &[]);
+        let res = handle(&mut deps, mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         let send_msg = Cw20HandleMsg::Transfer {
@@ -448,8 +458,8 @@ mod tests {
 
         // second attempt fails (not found)
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id });
+        let info = mock_info(&create.arbiter, &[]);
+        let res = handle(&mut deps, mock_env(), info, HandleMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -501,12 +511,12 @@ mod tests {
 
     #[test]
     fn top_up_mixed_tokens() {
-        let mut deps = mock_dependencies(CANONICAL_LENGTH, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         // init an empty contract
         let init_msg = InitMsg {};
-        let env = mock_env(&HumanAddr::from("anyone"), &[]);
-        let res = init(&mut deps, env, init_msg).unwrap();
+        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let res = init(&mut deps, mock_env(), info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // only accept these tokens
@@ -523,18 +533,24 @@ mod tests {
         };
         let sender = HumanAddr::from("source");
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
-        let env = mock_env(&sender, &balance);
-        let res = handle(&mut deps, env, HandleMsg::Create(create.clone())).unwrap();
+        let info = mock_info(&sender, &balance);
+        let res = handle(
+            &mut deps,
+            mock_env(),
+            info,
+            HandleMsg::Create(create.clone()),
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
         // top it up with 2 more native tokens
         let extra_native = vec![coin(250, "random"), coin(300, "stake")];
-        let env = mock_env(&sender, &extra_native);
+        let info = mock_info(&sender, &extra_native);
         let top_up = HandleMsg::TopUp {
             id: create.id.clone(),
         };
-        let res = handle(&mut deps, env, top_up).unwrap();
+        let res = handle(&mut deps, mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
@@ -548,8 +564,8 @@ mod tests {
             amount: Uint128(7890),
             msg: Some(to_binary(&base).unwrap()),
         });
-        let env = mock_env(&bar_token, &[]);
-        let res = handle(&mut deps, env, top_up).unwrap();
+        let info = mock_info(&bar_token, &[]);
+        let res = handle(&mut deps, mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
@@ -564,8 +580,8 @@ mod tests {
             amount: Uint128(7890),
             msg: Some(to_binary(&base).unwrap()),
         });
-        let env = mock_env(&baz_token, &[]);
-        let res = handle(&mut deps, env, top_up);
+        let info = mock_info(&baz_token, &[]);
+        let res = handle(&mut deps, mock_env(), info, top_up);
         match res.unwrap_err() {
             ContractError::NotInWhitelist {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -581,15 +597,15 @@ mod tests {
             amount: Uint128(888),
             msg: Some(to_binary(&base).unwrap()),
         });
-        let env = mock_env(&foo_token, &[]);
-        let res = handle(&mut deps, env, top_up).unwrap();
+        let info = mock_info(&foo_token, &[]);
+        let res = handle(&mut deps, mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
         // approve it
         let id = create.id.clone();
-        let env = mock_env(&create.arbiter, &[]);
-        let res = handle(&mut deps, env, HandleMsg::Approve { id }).unwrap();
+        let info = mock_info(&create.arbiter, &[]);
+        let res = handle(&mut deps, mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(3, res.messages.len());
 
