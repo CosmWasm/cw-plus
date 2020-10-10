@@ -9,16 +9,16 @@ use crate::{Prefix, Prefixer};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
 pub struct Map<'a, K, T> {
-    namespaces: &'a [&'a [u8]],
+    namespace: &'a [u8],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     key_type: PhantomData<K>,
     data_type: PhantomData<T>,
 }
 
 impl<'a, K, T> Map<'a, K, T> {
-    pub const fn new(namespaces: &'a [&'a [u8]]) -> Self {
+    pub const fn new(namespace: &'a [u8]) -> Self {
         Map {
-            namespaces,
+            namespace,
             data_type: PhantomData,
             key_type: PhantomData,
         }
@@ -31,12 +31,12 @@ where
     K: PrimaryKey<'a>,
 {
     pub fn key(&self, k: K) -> Path<T> {
-        Path::new(self.namespaces, &k.key())
+        Path::new(self.namespace, &k.key())
     }
 
     #[cfg(feature = "iterator")]
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new(self.namespaces, &p.prefix())
+        Prefix::new(self.namespace, &p.prefix())
     }
 
     pub fn save<S: Storage>(&self, store: &mut S, k: K, data: &T) -> StdResult<()> {
@@ -111,17 +111,26 @@ mod test {
         pub age: i32,
     }
 
-    const PEOPLE: Map<&[u8], Data> = Map::new(&[b"people", b"_pk"]);
+    const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
 
-    const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(&[b"allow", b"_pk"]);
+    const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
 
     #[test]
     fn create_path() {
         let path = PEOPLE.key(b"john");
         let key = path.storage_key;
-        // this should be prefixed(people) || prefixed(_pk) || john
-        assert_eq!("people".len() + "_pk".len() + "john".len() + 4, key.len());
+        // this should be prefixed(people) || john
+        assert_eq!("people".len() + "john".len() + 2, key.len());
         assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
+        assert_eq!(b"john".to_vec().as_slice(), &key[8..]);
+
+        let path = ALLOWANCE.key((b"john", b"maria"));
+        let key = path.storage_key;
+        // this should be prefixed(allow) || prefixed(john) || maria
+        assert_eq!("allow".len() + "john".len() + "maria".len() + 4, key.len());
+        assert_eq!(b"allow".to_vec().as_slice(), &key[2..7]);
+        assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
+        assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
     }
 
     #[test]
@@ -238,5 +247,58 @@ mod test {
         assert_eq!(20, twenty);
         let loaded = ALLOWANCE.load(&store, key).unwrap();
         assert_eq!(20, loaded);
+    }
+
+    #[test]
+    fn readme_works() -> StdResult<()> {
+        let mut store = MockStorage::new();
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+
+        // load and save with extra key argument
+        let empty = PEOPLE.may_load(&store, b"john")?;
+        assert_eq!(None, empty);
+        PEOPLE.save(&mut store, b"john", &data)?;
+        let loaded = PEOPLE.load(&store, b"john")?;
+        assert_eq!(data, loaded);
+
+        // nothing on another key
+        let missing = PEOPLE.may_load(&store, b"jack")?;
+        assert_eq!(None, missing);
+
+        // update function for new or existing keys
+        let birthday = |d: Option<Data>| -> StdResult<Data> {
+            match d {
+                Some(one) => Ok(Data {
+                    name: one.name,
+                    age: one.age + 1,
+                }),
+                None => Ok(Data {
+                    name: "Newborn".to_string(),
+                    age: 0,
+                }),
+            }
+        };
+
+        let old_john = PEOPLE.update(&mut store, b"john", birthday)?;
+        assert_eq!(33, old_john.age);
+        assert_eq!("John", old_john.name.as_str());
+
+        let new_jack = PEOPLE.update(&mut store, b"jack", birthday)?;
+        assert_eq!(0, new_jack.age);
+        assert_eq!("Newborn", new_jack.name.as_str());
+
+        // update also changes the store
+        assert_eq!(old_john, PEOPLE.load(&store, b"john")?);
+        assert_eq!(new_jack, PEOPLE.load(&store, b"jack")?);
+
+        // removing leaves us empty
+        PEOPLE.remove(&mut store, b"john");
+        let empty = PEOPLE.may_load(&store, b"john")?;
+        assert_eq!(None, empty);
+
+        Ok(())
     }
 }

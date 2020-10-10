@@ -21,8 +21,9 @@ impl<T> Prefix<T>
 where
     T: Serialize + DeserializeOwned,
 {
-    pub fn new(top_names: &[&[u8]], sub_names: &[&[u8]]) -> Self {
-        let storage_prefix = nested_namespaces_with_key(top_names, sub_names, b"");
+    pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
+        // FIXME: we can use a custom function here, probably make this cleaner
+        let storage_prefix = nested_namespaces_with_key(&[top_names], sub_names, b"");
         Prefix {
             storage_prefix,
             data: PhantomData,

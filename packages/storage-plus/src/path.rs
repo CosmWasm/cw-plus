@@ -19,9 +19,10 @@ impl<T> Path<T>
 where
     T: Serialize + DeserializeOwned,
 {
-    pub fn new(namespaces: &[&[u8]], keys: &[&[u8]]) -> Self {
+    pub fn new(namespace: &[u8], keys: &[&[u8]]) -> Self {
         let l = keys.len();
-        let storage_key = nested_namespaces_with_key(namespaces, &keys[0..l - 1], keys[l - 1]);
+        // FIXME: make this more efficient
+        let storage_key = nested_namespaces_with_key(&[namespace], &keys[0..l - 1], keys[l - 1]);
         Path {
             storage_key,
             data: PhantomData,

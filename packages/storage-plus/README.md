@@ -60,13 +60,13 @@ fn demo() -> StdResult<()> {
     let empty = CONFIG.may_load(&store)?;
     assert_eq!(None, empty);
     let cfg = Config {
-                owner: "admin".to_string(),
-                max_tokens: 1234,
-            };
-    CONFIG.save(&mut store, &cfg);
+        owner: "admin".to_string(),
+        max_tokens: 1234,
+    };
+    CONFIG.save(&mut store, &cfg)?;
     let loaded = CONFIG.load(&store)?;
-    assert_eq!(cfg, loaded); 
-  
+    assert_eq!(cfg, loaded);
+
     // update an item with a closure (includes read and write)
     // returns the newly saved value
     let output = CONFIG.update(&mut store, |mut c| -> StdResult<_> {
@@ -76,7 +76,7 @@ fn demo() -> StdResult<()> {
     assert_eq!(2468, output.max_tokens);
 
     // you can error in an update and nothing is saved
-    let failed = CONFIG.update(&mut store, |mut c| -> StdResult<_> {
+    let failed = CONFIG.update(&mut store, |_| -> StdResult<_> {
         Err(StdError::generic_err("failure mode"))
     });
     assert!(failed.is_err());
@@ -84,21 +84,116 @@ fn demo() -> StdResult<()> {
     // loading data will show the first update was saved
     let loaded = CONFIG.load(&store)?;
     let expected = Config {
-        owner: "admin".to_string,
+        owner: "admin".to_string(),
         max_tokens: 2468,
     };
     assert_eq!(expected, loaded);
-    
+
     // we can remove data as well
     CONFIG.remove(&mut store);
     let empty = CONFIG.may_load(&store)?;
     assert_eq!(None, empty);
+
+    Ok(())
 }
 ```
 
 ## Map
 
-**TODO**
+The usage of an [`Map`](./src/item.rs) is a little more complex, but
+is still pretty straight-forward. You can imagine it as a storage-backed
+`BTreeMap`, allowing key-value lookups with typed values. In addition,
+we support not only simple binary keys (`&[u8]`), but tuples, which are
+combined. This allows us to store allowances as composite keys 
+eg. `(owner, spender)` to look up the balance.
+
+Beyond direct lookups, we have a super power not found in Ethereum -
+iteration. That's right, you can list all items in a `Map`, or only
+part of them. We can efficiently allow pagination over these items as
+well, starting after the last query ended at low, low gas costs.
+This requires the `iterator` feature to be enabled in `cw-storage-plus`
+(which automatically enables it in `cosmwasm-std` as well).
+
+If you are coming from using `Bucket`, the biggest change is that
+we no longer store `Storage` inside, meaning we don't need read and write
+variants of the object, just one type. Furthermore, we use `const fn` 
+to create the `Bucket`, allowing it to be defined as a global compile-time
+constant rather than a function that must be constructed each time,
+which saves gas as well as typing. In addition, the composite indexes
+(tuples) is more ergonomic and expressive of intention, and the range
+interface has been improved.
+
+Here is an example with normal (simple) keys:
+
+```rust
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct Data {
+    pub name: String,
+    pub age: i32,
+}
+
+const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
+
+fn demo() -> StdResult<()> {
+    let mut store = MockStorage::new();
+    let data = Data {
+        name: "John".to_string(),
+        age: 32,
+    };
+
+    // load and save with extra key argument
+    let empty = PEOPLE.may_load(&store, b"john")?;
+    assert_eq!(None, empty);
+    PEOPLE.save(&mut store, b"john", &data)?;
+    let loaded = PEOPLE.load(&store, b"john")?;
+    assert_eq!(data, loaded);
+
+    // nothing on another key
+    let missing = PEOPLE.may_load(&store, b"jack")?;
+    assert_eq!(None, missing);
+
+    // update function for new or existing keys
+    let birthday = |d: Option<Data>| -> StdResult<Data> {
+        match d {
+            Some(one) => Ok(Data {
+                name: one.name,
+                age: one.age + 1,
+            }),
+            None => Ok(Data {
+                name: "Newborn".to_string(),
+                age: 0,
+            }),
+        }
+    };
+
+    let old_john = PEOPLE.update(&mut store, b"john", birthday)?;
+    assert_eq!(33, old_john.age);
+    assert_eq!("John", old_john.name.as_str());
+
+    let new_jack = PEOPLE.update(&mut store, b"jack", birthday)?;
+    assert_eq!(0, new_jack.age);
+    assert_eq!("Newborn", new_jack.name.as_str());
+
+    // update also changes the store
+    assert_eq!(old_john, PEOPLE.load(&store, b"john")?);
+    assert_eq!(new_jack, PEOPLE.load(&store, b"jack")?);
+
+    // removing leaves us empty
+    PEOPLE.remove(&mut store, b"john");
+    let empty = PEOPLE.may_load(&store, b"john")?;
+    assert_eq!(None, empty);
+
+    Ok(())
+}
+```
+
+And here how we use it with composite keys:
+
+```rust
+// Note the tuple for primary key. We support one slice, or a 2 or 3-tuple
+// adding longer tuples is quite easy but unlikely to be needed.
+const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+```
 
 ### Path
 
