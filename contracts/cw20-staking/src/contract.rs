@@ -14,7 +14,7 @@ use cw20_base::state::{token_info, MinterData, TokenInfo};
 
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
-    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read,
+    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read, Claim,
     InvestmentInfo, Supply,
 };
 
@@ -252,8 +252,13 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     totals.save(&supply)?;
 
     // add a claim to this user to get their tokens after the unbonding period
-    claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
-        Ok(claim.unwrap_or_default() + unbond)
+    claims(&mut deps.storage).update(sender_raw.as_slice(), |old| {
+        let mut claims = old.unwrap_or_default();
+        claims.push(Claim {
+            amount: unbond,
+            released: invest.unbonding_period.after(&env.block),
+        });
+        Ok(claims)
     })?;
 
     // unbond them
@@ -291,11 +296,17 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let mut to_send = balance.amount;
+    // FIXME: ensure we have enough balance to cover this and only partially remove claims
+    // if to_send is > balance? (This should never happen, unless incorrect unbonding period)
+    let mut to_send = Uint128(0);
     claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
-        let claim = claim.ok_or_else(|| StdError::generic_err("no claim for this address"))?;
-        to_send = to_send.min(claim);
-        claim - to_send
+        let (ready, waiting): (Vec<_>, _) = claim
+            .unwrap_or_default()
+            .iter()
+            .cloned()
+            .partition(|c| c.released.is_expired(&env.block));
+        to_send = ready.iter().fold(Uint128(0), |acc, x| acc + x.amount);
+        Ok(waiting)
     })?;
 
     // update total supply (lower claim)

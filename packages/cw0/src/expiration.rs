@@ -110,6 +110,14 @@ impl Duration {
             Duration::Time(t) => Expiration::AtTime(block.time + t),
         }
     }
+
+    // creates a number just a little bigger, so we can use it to pass expiration point
+    pub fn plus_one(&self) -> Duration {
+        match self {
+            Duration::Height(h) => Duration::Height(h + 1),
+            Duration::Time(t) => Duration::Time(t + 1),
+        }
+    }
 }
 
 impl Add<Duration> for Duration {

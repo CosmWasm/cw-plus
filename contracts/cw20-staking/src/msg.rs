@@ -5,6 +5,8 @@ use cosmwasm_std::{Binary, Coin, Decimal, HumanAddr, Uint128};
 use cw0::Duration;
 use cw20::Expiration;
 
+use crate::state::Claim;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
     /// name of the derivative token
@@ -118,7 +120,7 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ClaimsResponse {
-    pub claims: Uint128,
+    pub claims: Vec<Claim>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
