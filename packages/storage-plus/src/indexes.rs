@@ -1,14 +1,14 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
-use cosmwasm_std::{Order, StdResult, Storage, KV};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::marker::PhantomData;
 
-use crate::helpers::must_deserialize;
+use cosmwasm_std::{Order, StdResult, Storage, KV};
+
 use crate::iter_helpers::range_with_prefix;
-use crate::map::OwnedMap;
-use serde::export::PhantomData;
+use crate::map::Map;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: &[u8] = b"1";
@@ -66,10 +66,11 @@ pub struct MultiIndex<'a, S, T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
-    idx_fn: fn(&T) -> Vec<u8>,
     _name: &'a str,
-    idx_map: OwnedMap<(&'a [u8], &'a [u8]), Vec<u8>>,
-    pk_map: OwnedMap<&'a [u8], T>,
+    idx_fn: fn(&T) -> Vec<u8>,
+    idx_map: Map<'a, (&'a [u8], &'a [u8]), Vec<u8>>,
+    // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
+    pk_map: Map<'a, &'a [u8], T>,
     typed: PhantomData<S>,
 }
 
@@ -78,13 +79,18 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    // TODO: review this constructor and how to build the pk_map
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, namespace: &'a [u8], name: &'a str) -> Self {
+    // TODO: can we do this as a const function??
+    pub fn new(
+        idx_fn: fn(&T) -> Vec<u8>,
+        pk_namespace: &'a [u8],
+        idx_namespace: &'a [u8],
+        name: &'a str,
+    ) -> Self {
         MultiIndex {
-            idx_fn,
-            idx_map: OwnedMap::new(&[namespace, name.as_bytes()]),
-            pk_map: OwnedMap::new(&[namespace, b"_pk"]),
             _name: name,
+            idx_fn,
+            pk_map: Map::new(pk_namespace),
+            idx_map: Map::new(idx_namespace),
             typed: PhantomData,
         }
     }
@@ -105,20 +111,20 @@ where
 
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = self.index(data);
-        let key = self.idx_map.to_map().key((&idx, &pk));
+        let key = self.idx_map.key((&idx, &pk));
         store.set(&key, MARKER);
         Ok(())
     }
 
     fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = self.index(old_data);
-        let key = self.idx_map.to_map().key((&idx, &pk));
+        let key = self.idx_map.key((&idx, &pk));
         store.remove(&key);
         Ok(())
     }
 
     fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let prefix = self.idx_map.to_map().prefix(idx);
+        let prefix = self.idx_map.prefix(idx);
         let mapped =
             range_with_prefix(store, &prefix, None, None, Order::Ascending).map(|(k, _)| k);
         Box::new(mapped)
@@ -132,9 +138,8 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
         let mapped = self.pks_by_index(store, idx).map(move |pk| {
             println!("load: {:?}", pk);
-            let v = must_deserialize(&store.get(&pk))?;
-            // let v = self.pk_map.to_map().load(store, &pk)?;
             // TODO: trim them down??
+            let v = self.pk_map.load(store, &pk)?;
             Ok((pk, v))
         });
         Box::new(mapped)

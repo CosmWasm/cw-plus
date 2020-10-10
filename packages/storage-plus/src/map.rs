@@ -2,7 +2,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use crate::helpers::nested_namespaces_with_key;
 use crate::keys::PrimaryKey;
 #[cfg(feature = "iterator")]
 use crate::keys::{EmptyPrefix, Prefixer};
@@ -10,35 +9,6 @@ use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
-
-#[derive(Debug, Clone)]
-pub struct OwnedMap<K, T> {
-    namespace: Vec<u8>,
-    // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
-    key_type: PhantomData<K>,
-    data_type: PhantomData<T>,
-}
-
-// TODO: figure out if I can use AsRef, Deref, or Borrow to do this automatically
-impl<K, T> OwnedMap<K, T> {
-    pub fn new(namespace: &[&[u8]]) -> Self {
-        // TODO: remove this... now combine them
-        let namespace = nested_namespaces_with_key(namespace, &[], b"");
-        OwnedMap {
-            namespace,
-            data_type: PhantomData,
-            key_type: PhantomData,
-        }
-    }
-
-    pub fn to_map(&'_ self) -> Map<'_, K, T> {
-        Map {
-            namespace: &self.namespace,
-            key_type: self.key_type,
-            data_type: self.data_type,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Map<'a, K, T> {
@@ -63,6 +33,10 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
+    pub fn root(&'a self) -> &'a [u8] {
+        self.namespace
+    }
+
     pub fn key(&self, k: K) -> Path<T> {
         Path::new(self.namespace, &k.key())
     }
@@ -239,20 +213,6 @@ mod test {
             all,
             vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data)]
         );
-    }
-
-    #[test]
-    fn owned_map_pass_through() {
-        let mut store = MockStorage::new();
-
-        // FIXME: make to_map() automatic - this needs Deref and lost hours trying to get this to work
-        let owned = OwnedMap::<&[u8], u32>::new(&[b"top", b"level"]);
-        owned.to_map().save(&mut store, b"foo", &1234).unwrap();
-        owned.to_map().save(&mut store, b"bar", &4321).unwrap();
-
-        let map = Map::<&[u8], u32>::new(b"\x00\x03top\x00\x05level");
-        let count = map.load(&store, b"foo").unwrap();
-        assert_eq!(count, 1234);
     }
 
     #[test]

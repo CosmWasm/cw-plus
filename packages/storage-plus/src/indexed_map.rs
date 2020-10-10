@@ -28,7 +28,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     S: Storage,
 {
-    root: &'a [u8],
+    pk_namespace: &'a [u8],
     primary: Map<'a, K, T>,
     indexes: Vec<Box<dyn Index<S, T> + 'x>>,
 }
@@ -39,11 +39,10 @@ where
     T: Serialize + DeserializeOwned + Clone + 'x,
     S: Storage + 'x,
 {
-    // TODO: figure out a better constructor
-    pub fn new(namespace: &'a [u8]) -> Self {
+    pub fn new(pk_namespace: &'a [u8]) -> Self {
         IndexedMap {
-            root: namespace,
-            primary: Map::new(namespace),
+            pk_namespace,
+            primary: Map::new(pk_namespace),
             indexes: vec![],
         }
     }
@@ -52,9 +51,18 @@ where
     /// let mut bucket = IndexedBucket::new(&mut storeage, b"foobar")
     ///                     .with_unique_index("name", |x| x.name.clone())?
     ///                     .with_index("age", by_age)?;
-    pub fn with_index(mut self, name: &'x str, indexer: fn(&T) -> Vec<u8>) -> StdResult<Self> {
+    pub fn with_index(
+        mut self,
+        name: &'x str,
+        idx_namespace: &'x [u8],
+        indexer: fn(&T) -> Vec<u8>,
+    ) -> StdResult<Self>
+    where
+        'x: 'a,
+    {
         self.can_add_index(name)?;
-        let index: MultiIndex<'x, S, T> = MultiIndex::new(indexer, self.root, name);
+        let index: MultiIndex<'x, S, T> =
+            MultiIndex::new(indexer, self.pk_namespace, idx_namespace, name);
         self.indexes.push(Box::new(index));
         Ok(self)
     }
@@ -173,7 +181,7 @@ where
 
     // use prefix to scan -> range
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new(self.root, &p.prefix())
+        Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // /// iterates over the items in pk order
@@ -247,10 +255,10 @@ mod test {
 
     fn build_bucket() -> IndexedMap<'static, 'static, &'static [u8], Data, MemoryStorage> {
         IndexedMap::<&[u8], Data, MemoryStorage>::new(b"data")
-            .with_index("name", |d| index_string(&d.name))
+            .with_index("name", b"data__name", |d| index_string(&d.name))
             .unwrap()
             // .with_unique_index("age", |d| index_i32(d.age))
-            .with_index("age", |d| index_i32(d.age))
+            .with_index("age", b"data__age", |d| index_i32(d.age))
             .unwrap()
     }
 
@@ -391,12 +399,14 @@ mod test {
         let mut store = MockStorage::new();
         let mut map = build_bucket();
 
-        let name_count =
-            |map: &IndexedMap<&[u8], Data, MemoryStorage>, store: &MemoryStorage, name: &str| -> usize {
-                map.items_by_index(store, "name", &index_string(name))
-                    .unwrap()
-                    .count()
-            };
+        let name_count = |map: &IndexedMap<&[u8], Data, MemoryStorage>,
+                          store: &MemoryStorage,
+                          name: &str|
+         -> usize {
+            map.items_by_index(store, "name", &index_string(name))
+                .unwrap()
+                .count()
+        };
 
         // set up some data
         let data1 = Data {

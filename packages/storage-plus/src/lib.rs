@@ -16,7 +16,7 @@ pub use indexed_map::IndexedMap;
 pub use indexes::{index_i32, index_string, index_u64, Index, MultiIndex};
 pub use item::Item;
 pub use keys::{PkOwned, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key};
-pub use map::{Map, OwnedMap};
+pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
 pub use prefix::{Bound, OwnedBound, Prefix};
