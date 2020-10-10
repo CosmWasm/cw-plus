@@ -90,8 +90,8 @@ mod test {
     fn save_and_load() {
         let mut store = MockStorage::new();
 
-        assert!(CONFIG.load(&store,).is_err());
-        assert_eq!(CONFIG.may_load(&store,).unwrap(), None);
+        assert!(CONFIG.load(&store).is_err());
+        assert_eq!(CONFIG.may_load(&store).unwrap(), None);
 
         let cfg = Config {
             owner: "admin".to_string(),
@@ -112,15 +112,15 @@ mod test {
             max_tokens: 1234,
         };
         CONFIG.save(&mut store, &cfg).unwrap();
-        assert_eq!(cfg, CONFIG.load(&store,).unwrap());
+        assert_eq!(cfg, CONFIG.load(&store).unwrap());
 
         // remove it and loads None
         CONFIG.remove(&mut store);
-        assert_eq!(None, CONFIG.may_load(&store,).unwrap());
+        assert_eq!(None, CONFIG.may_load(&store).unwrap());
 
         // safe to remove 2 times
         CONFIG.remove(&mut store);
-        assert_eq!(None, CONFIG.may_load(&store,).unwrap());
+        assert_eq!(None, CONFIG.may_load(&store).unwrap());
     }
 
     #[test]
@@ -159,7 +159,7 @@ mod test {
             max_tokens: 2468,
         };
         assert_eq!(output.unwrap(), expected);
-        assert_eq!(CONFIG.load(&store,).unwrap(), expected);
+        assert_eq!(CONFIG.load(&store).unwrap(), expected);
     }
 
     #[test]
@@ -197,7 +197,7 @@ mod test {
             StdError::Underflow { .. } => {}
             err => panic!("Unexpected error: {:?}", err),
         }
-        assert_eq!(CONFIG.load(&store,).unwrap(), cfg);
+        assert_eq!(CONFIG.load(&store).unwrap(), cfg);
     }
 
     #[test]
@@ -239,6 +239,6 @@ mod test {
             MyError::Std(StdError::GenericErr { .. }) => {}
             err => panic!("Unexpected error: {:?}", err),
         }
-        assert_eq!(CONFIG.load(&store,).unwrap(), cfg);
+        assert_eq!(CONFIG.load(&store).unwrap(), cfg);
     }
 }
