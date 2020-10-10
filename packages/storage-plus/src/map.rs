@@ -72,7 +72,7 @@ where
     }
 }
 
-/// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range(...)
 #[cfg(feature = "iterator")]
 impl<'a, T> Map<'a, &'a [u8], T>
 where
@@ -83,12 +83,13 @@ where
     pub fn range<'c, S: Storage>(
         &'c self,
         store: &'c S,
-        start: Option<&[u8]>,
-        end: Option<&[u8]>,
+        start: crate::prefix::Bound<'_>,
+        end: crate::prefix::Bound<'_>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
         // put the imports here, so we don't have to feature flag them above
-        use crate::iter_helpers::{deserialize_kv, range_with_prefix, to_length_prefixed};
+        use crate::iter_helpers::{deserialize_kv, to_length_prefixed};
+        use crate::prefix::range_with_prefix;
 
         let prefix = to_length_prefixed(self.namespace);
         let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
@@ -101,6 +102,7 @@ mod test {
     use super::*;
     use serde::{Deserialize, Serialize};
 
+    use crate::prefix::Bound;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -196,7 +198,9 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
@@ -224,7 +228,7 @@ mod test {
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
