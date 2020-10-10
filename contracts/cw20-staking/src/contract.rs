@@ -14,7 +14,7 @@ use cw20_base::state::{token_info, MinterData, TokenInfo};
 
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
-    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read,
+    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read, Claim,
     InvestmentInfo, Supply,
 };
 
@@ -58,6 +58,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let invest = InvestmentInfo {
         owner: deps.api.canonical_address(&env.message.sender)?,
         exit_tax: msg.exit_tax,
+        unbonding_period: msg.unbonding_period,
         bond_denom: denom,
         validator: msg.validator,
         min_withdrawal: msg.min_withdrawal,
@@ -251,8 +252,13 @@ pub fn unbond<S: Storage, A: Api, Q: Querier>(
     totals.save(&supply)?;
 
     // add a claim to this user to get their tokens after the unbonding period
-    claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
-        Ok(claim.unwrap_or_default() + unbond)
+    claims(&mut deps.storage).update(sender_raw.as_slice(), |old| {
+        let mut claims = old.unwrap_or_default();
+        claims.push(Claim {
+            amount: unbond,
+            released: invest.unbonding_period.after(&env.block),
+        });
+        Ok(claims)
     })?;
 
     // unbond them
@@ -290,12 +296,28 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let mut to_send = balance.amount;
+    // Ensure we have enough balance to cover this and
+    // only send some claims if that is all we can cover
+    let cap = balance.amount;
+    let mut to_send = Uint128(0);
     claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
-        let claim = claim.ok_or_else(|| StdError::generic_err("no claim for this address"))?;
-        to_send = to_send.min(claim);
-        claim - to_send
+        let (_send, waiting): (Vec<_>, _) =
+            claim.unwrap_or_default().iter().cloned().partition(|c| {
+                // if mature and we can pay, then include in _send
+                if c.released.is_expired(&env.block) && to_send + c.amount <= cap {
+                    to_send += c.amount;
+                    true
+                } else {
+                    // not to send, leave in waiting and save again
+                    false
+                }
+            });
+        Ok(waiting)
     })?;
+
+    if to_send == Uint128(0) {
+        return Err(StdError::generic_err("No claims to release"));
+    }
 
     // update total supply (lower claim)
     total_supply(&mut deps.storage).update(|mut supply| {
@@ -452,6 +474,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, MockQuerier, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coins, Coin, CosmosMsg, Decimal, FullDelegation, Validator};
+    use cw0::{Duration, DAY, HOUR, WEEK};
     use std::str::FromStr;
 
     fn sample_validator<U: Into<HumanAddr>>(addr: U) -> Validator {
@@ -487,6 +510,17 @@ mod tests {
         );
     }
 
+    // just a test helper, forgive the panic
+    fn later(env: &Env, delta: Duration) -> Env {
+        let time_delta = match delta {
+            Duration::Time(t) => t,
+            _ => panic!("Must provide duration in time"),
+        };
+        let mut res = env.clone();
+        res.block.time += time_delta;
+        res
+    }
+
     const DEFAULT_VALIDATOR: &str = "default-validator";
 
     fn default_init(tax_percent: u64, min_withdrawal: u128) -> InitMsg {
@@ -495,6 +529,7 @@ mod tests {
             symbol: "DRV".to_string(),
             decimals: 9,
             validator: HumanAddr::from(DEFAULT_VALIDATOR),
+            unbonding_period: DAY * 3,
             exit_tax: Decimal::percent(tax_percent),
             min_withdrawal: Uint128(min_withdrawal),
         }
@@ -510,7 +545,7 @@ mod tests {
     fn get_claims<S: Storage, A: Api, Q: Querier, U: Into<HumanAddr>>(
         deps: &Extern<S, A, Q>,
         addr: U,
-    ) -> Uint128 {
+    ) -> Vec<Claim> {
         query_claims(&deps, addr.into()).unwrap().claims
     }
 
@@ -526,6 +561,7 @@ mod tests {
             symbol: "DRV".to_string(),
             decimals: 9,
             validator: HumanAddr::from("my-validator"),
+            unbonding_period: WEEK,
             exit_tax: Decimal::percent(2),
             min_withdrawal: Uint128(50),
         };
@@ -560,6 +596,7 @@ mod tests {
             symbol: "DRV".to_string(),
             decimals: 0,
             validator: HumanAddr::from("my-validator"),
+            unbonding_period: HOUR * 12,
             exit_tax: Decimal::percent(2),
             min_withdrawal: Uint128(50),
         };
@@ -579,7 +616,7 @@ mod tests {
         // no balance
         assert_eq!(get_balance(&deps, &creator), Uint128(0));
         // no claims
-        assert_eq!(get_claims(&deps, &creator), Uint128(0));
+        assert_eq!(get_claims(&deps, &creator), vec![]);
 
         // investment info correct
         let invest = query_investment(&deps).unwrap();
@@ -780,7 +817,7 @@ mod tests {
         let bobs_claim = Uint128(810);
         let bobs_balance = Uint128(400);
         let env = mock_env(&bob, &[]);
-        let res = handle(&mut deps, env, unbond_msg).unwrap();
+        let res = handle(&mut deps, env.clone(), unbond_msg).unwrap();
         assert_eq!(1, res.messages.len());
         let delegate = &res.messages[0];
         match delegate {
@@ -798,7 +835,11 @@ mod tests {
         assert_eq!(get_balance(&deps, &bob), bobs_balance);
         assert_eq!(get_balance(&deps, &creator), owner_cut);
         // proper claims
-        assert_eq!(get_claims(&deps, &bob), bobs_claim);
+        let expected_claims = vec![Claim {
+            amount: bobs_claim,
+            released: (DAY * 3).after(&env.block),
+        }];
+        assert_eq!(expected_claims, get_claims(&deps, &bob));
 
         // supplies updated, ratio the same (1.5)
         let ratio = Decimal::from_str("1.5").unwrap();
@@ -807,6 +848,72 @@ mod tests {
         assert_eq!(invest.token_supply, bobs_balance + owner_cut);
         assert_eq!(invest.staked_tokens, coin(690, "ustake")); // 1500 - 810
         assert_eq!(invest.nominal_value, ratio);
+    }
+
+    #[test]
+    fn claims_paid_out_properly() {
+        let mut deps = mock_dependencies(20, &[]);
+        set_validator(&mut deps.querier);
+
+        // create contract
+        let creator = HumanAddr::from("creator");
+        let init_msg = default_init(10, 50);
+        let env = mock_env(&creator, &[]);
+        init(&mut deps, env, init_msg).unwrap();
+
+        // bond some tokens
+        let bob = HumanAddr::from("bob");
+        let env = mock_env(&bob, &coins(1000, "ustake"));
+        handle(&mut deps, env, HandleMsg::Bond {}).unwrap();
+        set_delegation(&mut deps.querier, 1000, "ustake");
+
+        // unbond part of them
+        let unbond_msg = HandleMsg::Unbond {
+            amount: Uint128(600),
+        };
+        let env = mock_env(&bob, &[]);
+        handle(&mut deps, env.clone(), unbond_msg).unwrap();
+        set_delegation(&mut deps.querier, 460, "ustake");
+
+        // ensure claims are proper
+        let bobs_claim = Uint128(540);
+        let original_claims = vec![Claim {
+            amount: bobs_claim,
+            released: (DAY * 3).after(&env.block),
+        }];
+        assert_eq!(original_claims, get_claims(&deps, &bob));
+
+        // bob cannot exercise claims without enough balance
+        let claim_ready = later(&env, (DAY * 3 + HOUR).unwrap());
+        let too_soon = later(&env, DAY);
+        let fail = handle(&mut deps, claim_ready.clone(), HandleMsg::Claim {});
+        assert!(fail.is_err(), "{:?}", fail);
+
+        // provide the balance, but claim not yet mature - also prohibited
+        deps.querier
+            .update_balance(MOCK_CONTRACT_ADDR, coins(540, "ustake"));
+        let fail = handle(&mut deps, too_soon, HandleMsg::Claim {});
+        assert!(fail.is_err(), "{:?}", fail);
+
+        // this should work with cash and claims ready
+        let res = handle(&mut deps, claim_ready, HandleMsg::Claim {}).unwrap();
+        assert_eq!(1, res.messages.len());
+        let payout = &res.messages[0];
+        match payout {
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address,
+                to_address,
+                amount,
+            }) => {
+                assert_eq!(amount, &coins(540, "ustake"));
+                assert_eq!(from_address.as_str(), MOCK_CONTRACT_ADDR);
+                assert_eq!(to_address, &bob);
+            }
+            _ => panic!("Unexpected message: {:?}", payout),
+        }
+
+        // claims have been removed
+        assert_eq!(get_claims(&deps, &bob), vec![]);
     }
 
     #[test]
