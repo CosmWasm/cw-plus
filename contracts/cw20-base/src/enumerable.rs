@@ -63,7 +63,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Coin, Env, MessageInfo, Uint128};
+    use cosmwasm_std::{coins, Uint128};
     use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_token_info};
@@ -85,13 +85,10 @@ mod tests {
             }],
             mint: None,
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         init(deps, env, info, init_msg).unwrap();
         query_token_info(&deps).unwrap()
-    }
-
-    fn mock_env_info<U: Into<HumanAddr>>(sender: U, sent: &[Coin]) -> (Env, MessageInfo) {
-        (mock_env(), mock_info(sender, sent))
     }
 
     #[test]
@@ -103,7 +100,8 @@ mod tests {
         let spender1 = HumanAddr::from("later");
         let spender2 = HumanAddr::from("earlier");
 
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         do_init(&mut deps, &owner, Uint128(12340000));
 
         // no allowance to start
@@ -170,7 +168,8 @@ mod tests {
         do_init(&mut deps, &acct1, Uint128(12340000));
 
         // put money everywhere (to create balanaces)
-        let (env, info) = mock_env_info(acct1.clone(), &[]);
+        let info = mock_info(acct1.clone(), &[]);
+        let env = mock_env();
         handle(
             &mut deps,
             env.clone(),

@@ -276,7 +276,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Coin, CosmosMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
     use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_balance, query_token_info};
@@ -287,10 +287,6 @@ mod tests {
         address: T,
     ) -> Uint128 {
         query_balance(&deps, address.into()).unwrap().balance
-    }
-
-    fn mock_env_info<U: Into<HumanAddr>>(sender: U, sent: &[Coin]) -> (Env, MessageInfo) {
-        (mock_env(), mock_info(sender, sent))
     }
 
     // this will set up the init for other tests
@@ -309,7 +305,8 @@ mod tests {
             }],
             mint: None,
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         init(deps, env, info, init_msg).unwrap();
         query_token_info(&deps).unwrap()
     }
@@ -320,7 +317,8 @@ mod tests {
 
         let owner = HumanAddr::from("addr0001");
         let spender = HumanAddr::from("addr0002");
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         do_init(&mut deps, &owner, Uint128(12340000));
 
         // no allowance to start
@@ -402,7 +400,8 @@ mod tests {
         let owner = HumanAddr::from("addr0001");
         let spender = HumanAddr::from("addr0002");
         let spender2 = HumanAddr::from("addr0003");
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         do_init(&mut deps, &owner, Uint128(12340000));
 
         // no allowance to start
@@ -461,7 +460,8 @@ mod tests {
         );
 
         // also allow spender -> spender2 with no interference
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let allow3 = Uint128(1821);
         let expires3 = Expiration::AtTime(3767626296);
         let msg = HandleMsg::IncreaseAllowance {
@@ -493,7 +493,8 @@ mod tests {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         let owner = HumanAddr::from("addr0001");
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         do_init(&mut deps, &owner, Uint128(12340000));
 
         // self-allowance
@@ -538,7 +539,8 @@ mod tests {
             amount: allow1,
             expires: None,
         };
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
 
         // valid transfer of part of the allowance
@@ -548,7 +550,8 @@ mod tests {
             recipient: rcpt.clone(),
             amount: transfer,
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
         assert_eq!(res.attributes[0], attr("action", "transfer_from"));
 
@@ -570,7 +573,8 @@ mod tests {
             recipient: rcpt.clone(),
             amount: Uint128(33443),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
@@ -578,7 +582,8 @@ mod tests {
         }
 
         // let us increase limit, but set the expiration (default env height is 12_345)
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
@@ -592,7 +597,8 @@ mod tests {
             recipient: rcpt.clone(),
             amount: Uint128(33443),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg);
         match res.unwrap_err() {
             ContractError::Expired {} => {}
@@ -616,7 +622,8 @@ mod tests {
             amount: allow1,
             expires: None,
         };
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
 
         // valid burn of part of the allowance
@@ -625,7 +632,8 @@ mod tests {
             owner: owner.clone(),
             amount: transfer,
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
         assert_eq!(res.attributes[0], attr("action", "burn_from"));
 
@@ -645,7 +653,8 @@ mod tests {
             owner: owner.clone(),
             amount: Uint128(33443),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
@@ -653,7 +662,8 @@ mod tests {
         }
 
         // let us increase limit, but set the expiration (default env height is 12_345)
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
@@ -666,7 +676,8 @@ mod tests {
             owner: owner.clone(),
             amount: Uint128(33443),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg);
         match res.unwrap_err() {
             ContractError::Expired {} => {}
@@ -692,7 +703,8 @@ mod tests {
             amount: allow1,
             expires: None,
         };
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
 
         // valid send of part of the allowance
@@ -703,7 +715,8 @@ mod tests {
             contract: contract.clone(),
             msg: Some(send_msg.clone()),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
         assert_eq!(res.attributes[0], attr("action", "send_from"));
         assert_eq!(1, res.messages.len());
@@ -744,7 +757,8 @@ mod tests {
             contract: contract.clone(),
             msg: Some(send_msg.clone()),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
@@ -752,7 +766,8 @@ mod tests {
         }
 
         // let us increase limit, but set the expiration to current block (expired)
-        let (env, info) = mock_env_info(owner.clone(), &[]);
+        let info = mock_info(owner.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
@@ -767,7 +782,8 @@ mod tests {
             contract: contract.clone(),
             msg: Some(send_msg.clone()),
         };
-        let (env, info) = mock_env_info(spender.clone(), &[]);
+        let info = mock_info(spender.clone(), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env.clone(), info.clone(), msg);
         match res.unwrap_err() {
             ContractError::Expired {} => {}

@@ -375,9 +375,7 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{
-        coins, from_binary, Coin, CosmosMsg, MessageInfo, Order, StdError, WasmMsg,
-    };
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, Order, StdError, WasmMsg};
 
     use cw2::ContractVersion;
     use cw20::{AllowanceResponse, Expiration};
@@ -392,10 +390,6 @@ mod tests {
         address: T,
     ) -> Uint128 {
         query_balance(&deps, address.into()).unwrap().balance
-    }
-
-    fn mock_env_info<U: Into<HumanAddr>>(sender: U, sent: &[Coin]) -> (Env, MessageInfo) {
-        (mock_env(), mock_info(sender, sent))
     }
 
     // this will set up the init for other tests
@@ -443,7 +437,8 @@ mod tests {
             }],
             mint: mint.clone(),
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         let res = init(deps, env, info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -476,7 +471,8 @@ mod tests {
             }],
             mint: None,
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         let res = init(&mut deps, env.clone(), info.clone(), init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -511,7 +507,8 @@ mod tests {
                 cap: Some(limit),
             }),
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         let res = init(&mut deps, env.clone(), info.clone(), init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -553,7 +550,8 @@ mod tests {
                 cap: Some(limit),
             }),
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         let res = init(&mut deps, env.clone(), info.clone(), init_msg);
         match res.unwrap_err() {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Initial supply greater than cap"),
@@ -579,7 +577,8 @@ mod tests {
             amount: prize,
         };
 
-        let (env, info) = mock_env_info(&minter, &[]);
+        let info = mock_info(&minter, &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env, info, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(get_balance(&deps, &genesis), amount);
@@ -590,7 +589,8 @@ mod tests {
             recipient: winner.clone(),
             amount: Uint128::zero(),
         };
-        let (env, info) = mock_env_info(&minter, &[]);
+        let info = mock_info(&minter, &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
@@ -603,7 +603,8 @@ mod tests {
             recipient: winner.clone(),
             amount: Uint128(333_222_222),
         };
-        let (env, info) = mock_env_info(&minter, &[]);
+        let info = mock_info(&minter, &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::CannotExceedCap {} => {}
@@ -626,7 +627,8 @@ mod tests {
             recipient: HumanAddr::from("lucky"),
             amount: Uint128(222),
         };
-        let (env, info) = mock_env_info(&HumanAddr::from("anyone else"), &[]);
+        let info = mock_info(&HumanAddr::from("anyone else"), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
@@ -643,7 +645,8 @@ mod tests {
             recipient: HumanAddr::from("lucky"),
             amount: Uint128(222),
         };
-        let (env, info) = mock_env_info(&HumanAddr::from("genesis"), &[]);
+        let info = mock_info(&HumanAddr::from("genesis"), &[]);
+        let env = mock_env();
         let res = handle(&mut deps, env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
@@ -674,7 +677,8 @@ mod tests {
             ],
             mint: None,
         };
-        let (env, info) = mock_env_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let env = mock_env();
         let res = init(&mut deps, env.clone(), info.clone(), init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -703,7 +707,8 @@ mod tests {
         let loaded = query_token_info(&deps).unwrap();
         assert_eq!(expected, loaded);
 
-        let (env, _info) = mock_env_info("test", &[]);
+        let _info = mock_info("test", &[]);
+        let env = mock_env();
         // check balance query (full)
         let data = query(
             &deps,
@@ -741,7 +746,8 @@ mod tests {
         do_init(&mut deps, &addr1, amount1);
 
         // cannot transfer nothing
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Transfer {
             recipient: addr2.clone(),
             amount: Uint128::zero(),
@@ -753,7 +759,8 @@ mod tests {
         }
 
         // cannot send more than we have
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Transfer {
             recipient: addr2.clone(),
             amount: too_much,
@@ -765,7 +772,8 @@ mod tests {
         }
 
         // cannot send from empty account
-        let (env, info) = mock_env_info(addr2.clone(), &[]);
+        let info = mock_info(addr2.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Transfer {
             recipient: addr1.clone(),
             amount: transfer,
@@ -777,7 +785,8 @@ mod tests {
         }
 
         // valid transfer
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Transfer {
             recipient: addr2.clone(),
             amount: transfer,
@@ -802,7 +811,8 @@ mod tests {
         do_init(&mut deps, &addr1, amount1);
 
         // cannot burn nothing
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Burn {
             amount: Uint128::zero(),
         };
@@ -814,7 +824,8 @@ mod tests {
         assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
 
         // cannot burn more than we have
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Burn { amount: too_much };
         let res = handle(&mut deps, env, info, msg);
         match res.unwrap_err() {
@@ -824,7 +835,8 @@ mod tests {
         assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
 
         // valid burn reduces total supply
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Burn { amount: burn };
         let res = handle(&mut deps, env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
@@ -847,7 +859,8 @@ mod tests {
         do_init(&mut deps, &addr1, amount1);
 
         // cannot send nothing
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Send {
             contract: contract.clone(),
             amount: Uint128::zero(),
@@ -860,7 +873,8 @@ mod tests {
         }
 
         // cannot send more than we have
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Send {
             contract: contract.clone(),
             amount: too_much,
@@ -873,7 +887,8 @@ mod tests {
         }
 
         // valid transfer
-        let (env, info) = mock_env_info(addr1.clone(), &[]);
+        let info = mock_info(addr1.clone(), &[]);
+        let env = mock_env();
         let msg = HandleMsg::Send {
             contract: contract.clone(),
             amount: transfer,
@@ -923,7 +938,8 @@ mod tests {
         );
 
         // run the migration
-        let (env, info) = mock_env_info(HumanAddr::from("admin"), &[]);
+        let info = mock_info(HumanAddr::from("admin"), &[]);
+        let env = mock_env();
         migrate(&mut deps, env, info, MigrateMsg {}).unwrap();
 
         // make sure the version is updated
