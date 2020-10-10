@@ -303,6 +303,31 @@ mod test {
     }
 
     #[test]
+    fn readme_works_composite_keys() -> StdResult<()> {
+        let mut store = MockStorage::new();
+
+        // save and load on a composite key
+        let empty = ALLOWANCE.may_load(&store, (b"owner", b"spender"))?;
+        assert_eq!(None, empty);
+        ALLOWANCE.save(&mut store, (b"owner", b"spender"), &777)?;
+        let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+        assert_eq!(777, loaded);
+
+        // doesn't appear under other key (even if a concat would be the same)
+        let different = ALLOWANCE.may_load(&store, (b"owners", b"pender")).unwrap();
+        assert_eq!(None, different);
+
+        // simple update
+        ALLOWANCE.update(&mut store, (b"owner", b"spender"), |v| {
+            Ok(v.unwrap_or_default() + 222)
+        })?;
+        let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+        assert_eq!(999, loaded);
+
+        Ok(())
+    }
+
+    #[test]
     fn readme_works_with_path() -> StdResult<()> {
         let mut store = MockStorage::new();
         let data = Data {

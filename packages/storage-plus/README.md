@@ -187,12 +187,47 @@ fn demo() -> StdResult<()> {
 }
 ```
 
-And here how we use it with composite keys:
+### Composite Keys
+
+There are times when we want to use multiple items as a key, for example, when
+storing allowances based on account owner and spender. We could try to manually
+concatenate them before calling, but that can lead ot overlap, and is a bit
+low-level for us. Also, by explicitly separating the keys, we can easily provide
+helpers to do range queries over a prefix, such as "show me all allowances for
+one owner" (first part of the composite key). Just like you'd expect from your
+favorite database.
+
+Here how we use it with composite keys. Just define a tuple as a key and use that
+everywhere you used a byte slice above.
 
 ```rust
 // Note the tuple for primary key. We support one slice, or a 2 or 3-tuple
 // adding longer tuples is quite easy but unlikely to be needed.
 const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+
+fn demo() -> StdResult<()> {
+    let mut store = MockStorage::new();
+
+    // save and load on a composite key
+    let empty = ALLOWANCE.may_load(&store, (b"owner", b"spender"))?;
+    assert_eq!(None, empty);
+    ALLOWANCE.save(&mut store, (b"owner", b"spender"), &777)?;
+    let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+    assert_eq!(777, loaded);
+
+    // doesn't appear under other key (even if a concat would be the same)
+    let different = ALLOWANCE.may_load(&store, (b"owners", b"pender")).unwrap();
+    assert_eq!(None, different);
+
+    // simple update
+    ALLOWANCE.update(&mut store, (b"owner", b"spender"), |v| {
+        Ok(v.unwrap_or_default() + 222)
+    })?;
+    let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+    assert_eq!(999, loaded);
+
+    Ok(())
+}
 ```
 
 ### Path
@@ -200,10 +235,12 @@ const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
 Under the scenes, we create a `Path` from the `Map` when accessing a key.
 `PEOPLE.load(&store, b"jack") == PEOPLE.key(b"jack").load()`.
 `Map.key()` returns a `Path`, which has the same interface as `Item`,
-reusing the calculated path to this key. 
+reusing the calculated path to this key.
 
-This is a bit less typing and a bit more efficient if you use the
-same key for many calls:
+For simple keys, this is just a bit less typing and a bit less gas if you 
+use the same key for many calls. However, for composite keys, like 
+`(b"owner", b"spender")` it is **much** less typing. And highly recommended anywhere 
+you will use the a composite key even twice:
 
 ```rust
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -235,7 +272,8 @@ fn demo() -> StdResult<()> {
     let empty = john.may_load(&store)?;
     assert_eq!(None, empty);
 
-    // same for composite keys, just use both parts in key()
+    // Same for composite keys, just use both parts in key().
+    // Notice how much less verbose than the above example.
     let allow = ALLOWANCE.key((b"owner", b"spender"));
     allow.save(&mut store, &1234)?;
     let loaded = allow.load(&store)?;
@@ -249,6 +287,8 @@ fn demo() -> StdResult<()> {
 ```
 
 ### Prefix 
+
+We
 
 **TODO**
 
