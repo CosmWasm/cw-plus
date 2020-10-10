@@ -326,13 +326,8 @@ mod tests {
         let sender = HumanAddr::from("source");
         let balance = coins(100, "tokens");
         let info = mock_info(&sender, &balance);
-        let res = handle(
-            &mut deps,
-            mock_env(),
-            info,
-            HandleMsg::Create(create.clone()),
-        )
-        .unwrap();
+        let msg = HandleMsg::Create(create.clone());
+        let res = handle(&mut deps, mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -404,13 +399,8 @@ mod tests {
         };
         let token_contract = HumanAddr::from("my-cw20-token");
         let info = mock_info(&token_contract, &[]);
-        let res = handle(
-            &mut deps,
-            mock_env(),
-            info,
-            HandleMsg::Receive(receive.clone()),
-        )
-        .unwrap();
+        let msg = HandleMsg::Receive(receive.clone());
+        let res = handle(&mut deps, mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -534,13 +524,8 @@ mod tests {
         let sender = HumanAddr::from("source");
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
         let info = mock_info(&sender, &balance);
-        let res = handle(
-            &mut deps,
-            mock_env(),
-            info,
-            HandleMsg::Create(create.clone()),
-        )
-        .unwrap();
+        let msg = HandleMsg::Create(create.clone());
+        let res = handle(&mut deps, mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 

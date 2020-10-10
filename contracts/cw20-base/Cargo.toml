@@ -28,6 +28,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
 
 [dev-dependencies]
-# we only need to enable this if we use integration tests
-#cosmwasm-vm = { version = "0.11.0", default-features = false }
 cosmwasm-schema = { version = "0.11.0" }
