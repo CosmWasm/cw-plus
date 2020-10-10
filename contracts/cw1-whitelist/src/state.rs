@@ -41,7 +41,7 @@ mod tests {
 
     #[test]
     fn is_admin() {
-        let api = MockApi::new(20);
+        let api = MockApi::default();
         let admins: Vec<_> = vec!["bob", "paul", "john"]
             .into_iter()
             .map(|name| api.canonical_address(&HumanAddr::from(name)).unwrap())
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn can_modify() {
-        let api = MockApi::new(20);
+        let api = MockApi::default();
         let alice = api.canonical_address(&HumanAddr::from("alice")).unwrap();
         let bob = api.canonical_address(&HumanAddr::from("bob")).unwrap();
 

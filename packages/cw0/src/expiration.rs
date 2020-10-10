@@ -198,6 +198,7 @@ mod test {
         let block = BlockInfo {
             height: 1000,
             time: 7777,
+            time_nanos: 123456789,
             chain_id: "foo".to_string(),
         };
 
