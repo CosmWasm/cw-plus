@@ -29,13 +29,13 @@ pub const PREFIX_SWAP: &[u8] = b"atomic_swap";
 
 /// Returns a bucket with all swaps (query by id)
 pub fn atomic_swaps<S: Storage>(storage: &mut S) -> Bucket<S, AtomicSwap> {
-    bucket(PREFIX_SWAP, storage)
+    bucket(storage, PREFIX_SWAP)
 }
 
 /// Returns a bucket with all swaps (query by id)
 /// (read-only version for queries)
 pub fn atomic_swaps_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, AtomicSwap> {
-    bucket_read(PREFIX_SWAP, storage)
+    bucket_read(storage, PREFIX_SWAP)
 }
 
 /// This returns the list of ids for all active swaps
@@ -44,7 +44,7 @@ pub fn all_swap_ids<S: ReadonlyStorage>(
     start: Option<Vec<u8>>,
     limit: usize,
 ) -> StdResult<Vec<String>> {
-    prefixed_read(PREFIX_SWAP, storage)
+    prefixed_read(storage, PREFIX_SWAP)
         .range(start.as_deref(), None, Order::Ascending)
         .take(limit)
         .map(|(k, _)| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("Parsing swap id")))

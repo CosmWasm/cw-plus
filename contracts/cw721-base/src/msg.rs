@@ -56,18 +56,21 @@ pub enum HandleMsg {
     RevokeAll { operator: HumanAddr },
 
     /// Mint a new NFT, can only be called by the contract minter
-    Mint {
-        /// Unique ID of the NFT
-        token_id: String,
-        /// The owner of the newly minter NFT
-        owner: HumanAddr,
-        /// Identifies the asset to which this NFT represents
-        name: String,
-        /// Describes the asset to which this NFT represents (may be empty)
-        description: Option<String>,
-        /// A URI pointing to an image representing the asset
-        image: Option<String>,
-    },
+    Mint(MintMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MintMsg {
+    /// Unique ID of the NFT
+    pub token_id: String,
+    /// The owner of the newly minter NFT
+    pub owner: HumanAddr,
+    /// Identifies the asset to which this NFT represents
+    pub name: String,
+    /// Describes the asset to which this NFT represents (may be empty)
+    pub description: Option<String>,
+    /// A URI pointing to an image representing the asset
+    pub image: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -77,11 +80,15 @@ pub enum QueryMsg {
     /// Return type: OwnerOfResponse
     OwnerOf {
         token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
     },
     /// List all operators that can access all of the owner's tokens
     /// Return type: `ApprovedForAllResponse`
     ApprovedForAll {
         owner: HumanAddr,
+        /// unset or false will filter out expired items, you must set to true to see them
+        include_expired: Option<bool>,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
@@ -102,6 +109,8 @@ pub enum QueryMsg {
     /// for clients: `AllNftInfo`
     AllNftInfo {
         token_id: String,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
     },
 
     /// With Enumerable extension.

@@ -39,12 +39,12 @@ pub fn migrate_v01_to_v02<S: Storage>(storage: &mut S) -> StdResult<()> {
 
 /// this read the allowances bucket in the old format
 fn old_allowances<S: Storage>(storage: &mut S) -> Bucket<S, OldAllowanceResponse> {
-    Bucket::new(PREFIX_ALLOWANCE, storage)
+    Bucket::new(storage, PREFIX_ALLOWANCE)
 }
 
 /// This allows us to write in the new format
 fn new_allowances<S: Storage>(storage: &mut S) -> Bucket<S, AllowanceResponse> {
-    Bucket::new(PREFIX_ALLOWANCE, storage)
+    Bucket::new(storage, PREFIX_ALLOWANCE)
 }
 
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";
@@ -161,7 +161,7 @@ pub mod testing {
         storage: &'a mut S,
         owner: &CanonicalAddr,
     ) -> Bucket<'a, S, OldAllowanceResponse> {
-        Bucket::multilevel(&[PREFIX_ALLOWANCE, owner.as_slice()], storage)
+        Bucket::multilevel(storage, &[PREFIX_ALLOWANCE, owner.as_slice()])
     }
 }
 
@@ -173,7 +173,7 @@ mod test {
 
     #[test]
     fn sanity_test_migration() {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies(&[]);
 
         generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
         migrate_v01_to_v02(&mut deps.storage).unwrap();

@@ -21,11 +21,11 @@ pub struct Claim {
 
 /// claims are the claims to money being unbonded, index by claimer address
 pub fn claims<S: Storage>(storage: &mut S) -> Bucket<S, Vec<Claim>> {
-    bucket(PREFIX_CLAIMS, storage)
+    bucket(storage, PREFIX_CLAIMS)
 }
 
 pub fn claims_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Vec<Claim>> {
-    bucket_read(PREFIX_CLAIMS, storage)
+    bucket_read(storage, PREFIX_CLAIMS)
 }
 
 /// Investment info is fixed at initialization, and is used to control the function of the contract

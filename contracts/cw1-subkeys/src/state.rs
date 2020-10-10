@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, StdError, Storage};
+use cosmwasm_std::{ReadonlyStorage, Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::{Expiration, NativeBalance};
 
@@ -33,38 +33,13 @@ const PREFIX_PERMISSIONS: &[u8] = b"permissions";
 
 /// returns a bucket with all permissions (query by subkey)
 pub fn permissions<S: Storage>(storage: &mut S) -> Bucket<S, Permissions> {
-    bucket(PREFIX_PERMISSIONS, storage)
+    bucket(storage, PREFIX_PERMISSIONS)
 }
 
 /// returns a bucket with all permissionsk (query by subkey)
 /// (read-only version for queries)
 pub fn permissions_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Permissions> {
-    bucket_read(PREFIX_PERMISSIONS, storage)
-}
-
-pub enum PermissionErr {
-    Delegate {},
-    Redelegate {},
-    Undelegate {},
-    Withdraw {},
-}
-
-impl Into<String> for PermissionErr {
-    fn into(self) -> String {
-        String::from(match self {
-            PermissionErr::Redelegate {} => "Redelegate is not allowed",
-            PermissionErr::Delegate {} => "Delegate is not allowed",
-            PermissionErr::Undelegate {} => "Undelegate is not allowed",
-            PermissionErr::Withdraw {} => "Withdraw is not allowed",
-        })
-    }
-}
-
-impl From<PermissionErr> for StdError {
-    fn from(err: PermissionErr) -> Self {
-        let msg: String = err.into();
-        StdError::generic_err(msg)
-    }
+    bucket_read(storage, PREFIX_PERMISSIONS)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
@@ -77,11 +52,11 @@ const PREFIX_ALLOWANCE: &[u8] = b"allowance";
 
 /// returns a bucket with all allowances (query by subkey)
 pub fn allowances<S: Storage>(storage: &mut S) -> Bucket<S, Allowance> {
-    bucket(PREFIX_ALLOWANCE, storage)
+    bucket(storage, PREFIX_ALLOWANCE)
 }
 
 /// returns a bucket with all allowances (query by subkey)
 /// (read-only version for queries)
 pub fn allowances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Allowance> {
-    bucket_read(PREFIX_ALLOWANCE, storage)
+    bucket_read(storage, PREFIX_ALLOWANCE)
 }
