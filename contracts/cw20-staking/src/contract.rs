@@ -296,16 +296,23 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    // FIXME: ensure we have enough balance to cover this and only partially remove claims
-    // if to_send is > balance? (This should never happen, unless incorrect unbonding period)
+    // Ensure we have enough balance to cover this and
+    // only send some claims if that is all we can cover
+    let cap = balance.amount;
     let mut to_send = Uint128(0);
     claims(&mut deps.storage).update(sender_raw.as_slice(), |claim| {
-        let (ready, waiting): (Vec<_>, _) = claim
-            .unwrap_or_default()
-            .iter()
-            .cloned()
-            .partition(|c| c.released.is_expired(&env.block));
-        to_send = ready.iter().fold(Uint128(0), |acc, x| acc + x.amount);
+        let (_send, waiting): (Vec<_>, _) =
+            claim.unwrap_or_default().iter().cloned().partition(|c| {
+                // true for those we cannot accept
+                if c.released.is_expired(&env.block) {
+                    true
+                } else if to_send + c.amount > cap {
+                    true
+                } else {
+                    to_send += c.amount;
+                    false
+                }
+            });
         Ok(waiting)
     })?;
 
