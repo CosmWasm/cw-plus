@@ -2,10 +2,12 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+#[cfg(feature = "iterator")]
+use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::{Prefix, Prefixer};
+use crate::prefix::{range_with_prefix, Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
 pub struct Map<'a, K, T> {
@@ -83,13 +85,12 @@ where
     pub fn range<'c, S: Storage>(
         &'c self,
         store: &'c S,
-        start: crate::prefix::Bound<'_>,
-        end: crate::prefix::Bound<'_>,
+        start: Bound<'_>,
+        end: Bound<'_>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
         // put the imports here, so we don't have to feature flag them above
         use crate::iter_helpers::{deserialize_kv, to_length_prefixed};
-        use crate::prefix::range_with_prefix;
 
         let prefix = to_length_prefixed(self.namespace);
         let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
@@ -102,7 +103,6 @@ mod test {
     use super::*;
     use serde::{Deserialize, Serialize};
 
-    use crate::prefix::Bound;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
