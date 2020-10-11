@@ -3,9 +3,21 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+use cosmwasm_std::{Order, StdResult, Storage, KV};
+
 use crate::helpers::nested_namespaces_with_key;
 use crate::iter_helpers::{concat, deserialize_kv, trim};
-use cosmwasm_std::{Order, StdResult, Storage, KV};
+
+/// Bound is used to defines the two ends of a range, more explicit than Option<u8>
+/// None means that we don't limit that side of the range at all.
+/// Include means we use the given bytes as a limit and *include* anything at that exact key
+/// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
+#[derive(Copy, Clone, Debug)]
+pub enum Bound<'a> {
+    Include(&'a [u8]),
+    Exclude(&'a [u8]),
+    None,
+}
 
 pub struct Prefix<T>
 where
@@ -30,7 +42,6 @@ where
         }
     }
 
-    // TODO: parse out composite key prefix???
     pub fn range<'a, S: Storage>(
         &'a self,
         store: &'a S,
@@ -42,17 +53,6 @@ where
             .map(deserialize_kv::<T>);
         Box::new(mapped)
     }
-}
-
-/// Bound is used to defines the two ends of a range, more explicit than Option<u8>
-/// None means that we don't limit that side of the range at all.
-/// Include means we use the given bytes as a limit and *include* anything at that exact key
-/// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
-#[derive(Copy, Clone, Debug)]
-pub enum Bound<'a> {
-    Include(&'a [u8]),
-    Exclude(&'a [u8]),
-    None,
 }
 
 pub(crate) fn range_with_prefix<'a, S: Storage>(
@@ -115,4 +115,147 @@ fn namespace_upper_bound(input: &[u8]) -> Vec<u8> {
         }
     }
     copy
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use cosmwasm_std::testing::MockStorage;
+
+    fn ensure_proper_range_bounds() {
+        let mut store = MockStorage::new();
+        // manually create this - not testing nested prefixes here
+        let prefix = Prefix {
+            storage_prefix: b"foo".to_vec(),
+            data: PhantomData::<u64>,
+        };
+
+        // set some data, we care about "foo" prefix
+        store.set(b"foobar", b"1");
+        store.set(b"foora", b"2");
+        store.set(b"foozi", b"3");
+        // these shouldn't match
+        store.set(b"foply", b"100");
+        store.set(b"font", b"200");
+
+        let expected = vec![
+            (b"foobar".to_vec(), 1u64),
+            (b"foora".to_vec(), 2u64),
+            (b"foozi".to_vec(), 3u64),
+        ];
+        let expected_reversed: Vec<(Vec<u8>, u64)> = expected.iter().clone().rev().collect();
+
+        // let's do the basic sanity check
+        let res: StdResult<Vec<_>> = prefix
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
+        assert_eq!(&expected, &res.unwrap());
+        let res: StdResult<Vec<_>> = prefix
+            .range(&store, Bound::None, Bound::None, Order::Descending)
+            .collect();
+        assert_eq!(&expected_reversed, &res.unwrap());
+
+        // now let's check some ascending ranges
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Include(b"foora"),
+                Bound::None,
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(&expected[1..], &res.unwrap());
+        // skip excluded
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Exclude(b"foora"),
+                Bound::None,
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(&expected[2..], &res.unwrap());
+        // if we exclude something a little lower, we get matched
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Exclude(b"foor"),
+                Bound::None,
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(&expected[1..], &res.unwrap());
+
+        // now let's check some descending ranges
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::None,
+                Bound::Include(b"foora"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(&expected_reversed[1..], &res.unwrap());
+        // skip excluded
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::None,
+                Bound::Exclude(b"foora"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(&expected_reversed[2..], &res.unwrap());
+        // if we exclude something a little higher, we get matched
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::None,
+                Bound::Exclude(b"foorb"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(&expected_reversed[1..], &res.unwrap());
+
+        // now test when both sides are set
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Include(b"foora"),
+                Bound::Exclude(b"foozi"),
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(&expected[1..2], &res.unwrap());
+        // and descending
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Include(b"foora"),
+                Bound::Exclude(b"foozi"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(&expected[1..2], &res.unwrap());
+        // Include both sides
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Include(b"foora"),
+                Bound::Include(b"foozi"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(&expected_reversed[..2], &res.unwrap());
+        // Exclude both sides
+        let res: StdResult<Vec<_>> = prefix
+            .range(
+                &store,
+                Bound::Exclude(b"foora"),
+                Bound::Exclude(b"foozi"),
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(&[], &res.unwrap());
+    }
 }
