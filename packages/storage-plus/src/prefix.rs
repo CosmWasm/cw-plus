@@ -122,6 +122,7 @@ mod test {
     use super::*;
     use cosmwasm_std::testing::MockStorage;
 
+    #[test]
     fn ensure_proper_range_bounds() {
         let mut store = MockStorage::new();
         // manually create this - not testing nested prefixes here
@@ -139,11 +140,11 @@ mod test {
         store.set(b"font", b"200");
 
         let expected = vec![
-            (b"foobar".to_vec(), 1u64),
-            (b"foora".to_vec(), 2u64),
-            (b"foozi".to_vec(), 3u64),
+            (b"bar".to_vec(), 1u64),
+            (b"ra".to_vec(), 2u64),
+            (b"zi".to_vec(), 3u64),
         ];
-        let expected_reversed: Vec<(Vec<u8>, u64)> = expected.iter().clone().rev().collect();
+        let expected_reversed: Vec<(Vec<u8>, u64)> = expected.iter().rev().cloned().collect();
 
         // let's do the basic sanity check
         let res: StdResult<Vec<_>> = prefix
@@ -157,105 +158,90 @@ mod test {
 
         // now let's check some ascending ranges
         let res: StdResult<Vec<_>> = prefix
-            .range(
-                &store,
-                Bound::Include(b"foora"),
-                Bound::None,
-                Order::Ascending,
-            )
+            .range(&store, Bound::Include(b"ra"), Bound::None, Order::Ascending)
             .collect();
-        assert_eq!(&expected[1..], &res.unwrap());
+        assert_eq!(&expected[1..], res.unwrap().as_slice());
         // skip excluded
         let res: StdResult<Vec<_>> = prefix
-            .range(
-                &store,
-                Bound::Exclude(b"foora"),
-                Bound::None,
-                Order::Ascending,
-            )
+            .range(&store, Bound::Exclude(b"ra"), Bound::None, Order::Ascending)
             .collect();
-        assert_eq!(&expected[2..], &res.unwrap());
+        assert_eq!(&expected[2..], res.unwrap().as_slice());
         // if we exclude something a little lower, we get matched
         let res: StdResult<Vec<_>> = prefix
-            .range(
-                &store,
-                Bound::Exclude(b"foor"),
-                Bound::None,
-                Order::Ascending,
-            )
+            .range(&store, Bound::Exclude(b"r"), Bound::None, Order::Ascending)
             .collect();
-        assert_eq!(&expected[1..], &res.unwrap());
+        assert_eq!(&expected[1..], res.unwrap().as_slice());
 
         // now let's check some descending ranges
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
                 Bound::None,
-                Bound::Include(b"foora"),
+                Bound::Include(b"ra"),
                 Order::Descending,
             )
             .collect();
-        assert_eq!(&expected_reversed[1..], &res.unwrap());
+        assert_eq!(&expected_reversed[1..], res.unwrap().as_slice());
         // skip excluded
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
                 Bound::None,
-                Bound::Exclude(b"foora"),
+                Bound::Exclude(b"ra"),
                 Order::Descending,
             )
             .collect();
-        assert_eq!(&expected_reversed[2..], &res.unwrap());
+        assert_eq!(&expected_reversed[2..], res.unwrap().as_slice());
         // if we exclude something a little higher, we get matched
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
                 Bound::None,
-                Bound::Exclude(b"foorb"),
+                Bound::Exclude(b"rb"),
                 Order::Descending,
             )
             .collect();
-        assert_eq!(&expected_reversed[1..], &res.unwrap());
+        assert_eq!(&expected_reversed[1..], res.unwrap().as_slice());
 
         // now test when both sides are set
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Include(b"foora"),
-                Bound::Exclude(b"foozi"),
+                Bound::Include(b"ra"),
+                Bound::Exclude(b"zi"),
                 Order::Ascending,
             )
             .collect();
-        assert_eq!(&expected[1..2], &res.unwrap());
+        assert_eq!(&expected[1..2], res.unwrap().as_slice());
         // and descending
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Include(b"foora"),
-                Bound::Exclude(b"foozi"),
+                Bound::Include(b"ra"),
+                Bound::Exclude(b"zi"),
                 Order::Descending,
             )
             .collect();
-        assert_eq!(&expected[1..2], &res.unwrap());
+        assert_eq!(&expected[1..2], res.unwrap().as_slice());
         // Include both sides
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Include(b"foora"),
-                Bound::Include(b"foozi"),
+                Bound::Include(b"ra"),
+                Bound::Include(b"zi"),
                 Order::Descending,
             )
             .collect();
-        assert_eq!(&expected_reversed[..2], &res.unwrap());
+        assert_eq!(&expected_reversed[..2], res.unwrap().as_slice());
         // Exclude both sides
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Exclude(b"foora"),
-                Bound::Exclude(b"foozi"),
+                Bound::Exclude(b"ra"),
+                Bound::Exclude(b"zi"),
                 Order::Ascending,
             )
             .collect();
-        assert_eq!(&[], &res.unwrap());
+        assert_eq!(res.unwrap().as_slice(), &[]);
     }
 }
