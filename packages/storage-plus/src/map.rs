@@ -2,10 +2,12 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+#[cfg(feature = "iterator")]
+use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::{Prefix, Prefixer};
+use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
 pub struct Map<'a, K, T> {
@@ -72,7 +74,7 @@ where
     }
 }
 
-/// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range(...)
 #[cfg(feature = "iterator")]
 impl<'a, T> Map<'a, &'a [u8], T>
 where
@@ -81,18 +83,16 @@ where
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
     pub fn range<'c, S: Storage>(
-        &'c self,
+        &self,
         store: &'c S,
-        start: Option<&[u8]>,
-        end: Option<&[u8]>,
+        min: Bound<'_>,
+        max: Bound<'_>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
-        // put the imports here, so we don't have to feature flag them above
-        use crate::iter_helpers::{deserialize_kv, range_with_prefix, to_length_prefixed};
-
-        let prefix = to_length_prefixed(self.namespace);
-        let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
-        Box::new(mapped)
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(()).range(store, min, max, order)
     }
 }
 
@@ -196,7 +196,9 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
@@ -224,7 +226,7 @@ mod test {
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -356,6 +358,73 @@ mod test {
         allow.update(&mut store, |x| Ok(x.unwrap_or_default() * 2))?;
         let loaded = allow.load(&store)?;
         assert_eq!(2468, loaded);
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn readme_with_range() -> StdResult<()> {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.save(&mut store, b"john", &data)?;
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE.save(&mut store, b"jim", &data2)?;
+
+        // iterate over them all
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
+        assert_eq!(
+            all?,
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        );
+
+        // or just show what is after jim
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(
+                &store,
+                Bound::Exclusive(b"jim"),
+                Bound::None,
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(all?, vec![(b"john".to_vec(), data)]);
+
+        // save and load on three keys, one under different owner
+        ALLOWANCE.save(&mut store, (b"owner", b"spender"), &1000)?;
+        ALLOWANCE.save(&mut store, (b"owner", b"spender2"), &3000)?;
+        ALLOWANCE.save(&mut store, (b"owner2", b"spender"), &5000)?;
+
+        // get all under one key
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix(b"owner")
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
+        assert_eq!(
+            all?,
+            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        );
+
+        // Or ranges between two items (even reverse)
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix(b"owner")
+            .range(
+                &store,
+                Bound::Exclusive(b"spender1"),
+                Bound::Inclusive(b"spender2"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(all?, vec![(b"spender2".to_vec(), 3000)]);
 
         Ok(())
     }

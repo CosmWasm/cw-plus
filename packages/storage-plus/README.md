@@ -288,9 +288,100 @@ fn demo() -> StdResult<()> {
 
 ### Prefix 
 
-We
+In addition to getting one particular item out of a map, we can iterate over the map
+(or a subset of the map). This let's us answer questions like "show me all tokens",
+and we provide some nice `Bound`s helpers to easily allow pagination or custom ranges.
 
-**TODO**
+The general format is to get a `Prefix` by calling `map.prefix(k)`, where `k` is exactly
+one less item than the normal key (If `map.key()` took `(&[u8], &[u8])`, then `map.prefix()` takes `&[u8]`.
+If `map.key()` took `&[u8]`, `map.prefix()` takes `()`). Once we have a prefix space, we can iterate
+over all items with `range(store, min, max, order)`. It supports `Order::Ascending` or `Order::Descending`.
+`min` is the lower bound and `max` is the higher bound.
+
+```rust
+#[derive(Copy, Clone, Debug)]
+pub enum Bound<'a> {
+    Inclusive(&'a [u8]),
+    Exclusive(&'a [u8]),
+    None,
+}
+```
+
+If the `min` and `max` bounds, it will return all items under this prefix. You can use `.take(n)` to
+limit the results to `n` items and start doing pagination. You can also set the `min` bound to
+eg. `Bound::Exclusive(last_value)` to start iterating over all items *after* the last value. Combined with
+`take`, we easily have pagination support. You can also use `Bound::Inclusive(x)` when you want to include any
+perfect matches. To better understand the API, please read the following example:
+
+```rust
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct Data {
+    pub name: String,
+    pub age: i32,
+}
+
+const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
+const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+
+fn demo() -> StdResult<()> {
+    let mut store = MockStorage::new();
+
+    // save and load on two keys
+    let data = Data { name: "John".to_string(), age: 32 };
+    PEOPLE.save(&mut store, b"john", &data)?;
+    let data2 = Data { name: "Jim".to_string(), age: 44 };
+    PEOPLE.save(&mut store, b"jim", &data2)?;
+
+    // iterate over them all
+    let all: StdResult<Vec<_>> = PEOPLE
+        .range(&store, Bound::None, Bound::None, Order::Ascending)
+        .collect();
+    assert_eq!(
+        all?,
+        vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+    );
+
+    // or just show what is after jim
+    let all: StdResult<Vec<_>> = PEOPLE
+        .range(
+            &store,
+            Bound::Exclusive(b"jim"),
+            Bound::None,
+            Order::Ascending,
+        )
+        .collect();
+    assert_eq!(all?, vec![(b"john".to_vec(), data)]);
+
+    // save and load on three keys, one under different owner
+    ALLOWANCE.save(&mut store, (b"owner", b"spender"), &1000)?;
+    ALLOWANCE.save(&mut store, (b"owner", b"spender2"), &3000)?;
+    ALLOWANCE.save(&mut store, (b"owner2", b"spender"), &5000)?;
+
+    // get all under one key
+    let all: StdResult<Vec<_>> = ALLOWANCE
+        .prefix(b"owner")
+        .range(&store, Bound::None, Bound::None, Order::Ascending)
+        .collect();
+    assert_eq!(
+        all?,
+        vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+    );
+
+    // Or ranges between two items (even reverse)
+    let all: StdResult<Vec<_>> = ALLOWANCE
+        .prefix(b"owner")
+        .range(
+            &store,
+            Bound::Exclusive(b"spender1"),
+            Bound::Inclusive(b"spender2"),
+            Order::Descending,
+        )
+        .collect();
+    assert_eq!(all?, vec![(b"spender2".to_vec(), 3000)]);
+
+    Ok(())
+}
+```
 
 ## Indexed Map
 

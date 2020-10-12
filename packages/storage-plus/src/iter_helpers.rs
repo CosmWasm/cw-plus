@@ -2,8 +2,8 @@
 
 use serde::de::DeserializeOwned;
 
+use cosmwasm_std::KV;
 use cosmwasm_std::{from_slice, StdResult};
-use cosmwasm_std::{Order, Storage, KV};
 
 use crate::helpers::encode_length;
 
@@ -15,6 +15,7 @@ pub(crate) fn deserialize_kv<T: DeserializeOwned>(kv: KV) -> StdResult<KV<T>> {
 
 /// Calculates the raw key prefix for a given namespace as documented
 /// in https://github.com/webmaster128/key-namespacing#length-prefixed-keys
+#[allow(dead_code)]
 pub(crate) fn to_length_prefixed(namespace: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(namespace.len() + 2);
     out.extend_from_slice(&encode_length(namespace));
@@ -22,60 +23,16 @@ pub(crate) fn to_length_prefixed(namespace: &[u8]) -> Vec<u8> {
     out
 }
 
-pub(crate) fn range_with_prefix<'a, S: Storage>(
-    storage: &'a S,
-    namespace: &[u8],
-    start: Option<&[u8]>,
-    end: Option<&[u8]>,
-    order: Order,
-) -> Box<dyn Iterator<Item = KV> + 'a> {
-    // prepare start, end with prefix
-    let start = match start {
-        Some(s) => concat(namespace, s),
-        None => namespace.to_vec(),
-    };
-    let end = match end {
-        Some(e) => concat(namespace, e),
-        // end is updating last byte by one
-        None => namespace_upper_bound(namespace),
-    };
-
-    // get iterator from storage
-    let base_iterator = storage.range(Some(&start), Some(&end), order);
-
-    // make a copy for the closure to handle lifetimes safely
-    let prefix = namespace.to_vec();
-    let mapped = base_iterator.map(move |(k, v)| (trim(&prefix, &k), v));
-    Box::new(mapped)
-}
-
 #[inline]
-fn trim(namespace: &[u8], key: &[u8]) -> Vec<u8> {
+pub(crate) fn trim(namespace: &[u8], key: &[u8]) -> Vec<u8> {
     key[namespace.len()..].to_vec()
 }
 
 #[inline]
-fn concat(namespace: &[u8], key: &[u8]) -> Vec<u8> {
+pub(crate) fn concat(namespace: &[u8], key: &[u8]) -> Vec<u8> {
     let mut k = namespace.to_vec();
     k.extend_from_slice(key);
     k
-}
-
-/// Returns a new vec of same length and last byte incremented by one
-/// If last bytes are 255, we handle overflow up the chain.
-/// If all bytes are 255, this returns wrong data - but that is never possible as a namespace
-fn namespace_upper_bound(input: &[u8]) -> Vec<u8> {
-    let mut copy = input.to_vec();
-    // zero out all trailing 255, increment first that is not such
-    for i in (0..input.len()).rev() {
-        if copy[i] == 255 {
-            copy[i] = 0;
-        } else {
-            copy[i] += 1;
-            break;
-        }
-    }
-    copy
 }
 
 #[cfg(test)]
