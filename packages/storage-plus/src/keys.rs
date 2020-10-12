@@ -60,6 +60,17 @@ impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
     }
 }
 
+// this is a marker for the Map.range() helper, so we can detect () in Generic bounds
+pub trait EmptyPrefix {
+    fn new() -> Self;
+}
+
+impl EmptyPrefix for () {
+    fn new() -> Self {
+        ()
+    }
+}
+
 // Add support for an dynamic keys - constructor functions below
 pub struct PkOwned(pub Vec<u8>);
 
