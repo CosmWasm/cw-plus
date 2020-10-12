@@ -9,10 +9,10 @@ use cosmwasm_std::{Order, StdResult, Storage, KV};
 
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::Bound;
+use crate::{Bound, Endian};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
-const MARKER: &[u8] = b"1";
+const MARKER: u32 = 1;
 
 pub fn index_string(data: &str) -> Vec<u8> {
     data.as_bytes().to_vec()
@@ -20,11 +20,7 @@ pub fn index_string(data: &str) -> Vec<u8> {
 
 // Look at https://docs.rs/endiannezz/0.4.1/endiannezz/trait.Primitive.html
 // if you want to make this generic over all ints
-pub fn index_u64(data: u64) -> Vec<u8> {
-    data.to_be_bytes().into()
-}
-
-pub fn index_i32(data: i32) -> Vec<u8> {
+pub fn index_int<T: Endian>(data: T) -> Vec<u8> {
     data.to_be_bytes().into()
 }
 
@@ -46,7 +42,6 @@ where
     fn index(&self, data: &T) -> Vec<u8>;
 
     // TODO: pk: PrimaryKey not just &[u8] ???
-
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
     fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
 
@@ -69,7 +64,7 @@ where
 {
     _name: &'a str,
     idx_fn: fn(&T) -> Vec<u8>,
-    idx_map: Map<'a, (&'a [u8], &'a [u8]), Vec<u8>>,
+    idx_map: Map<'a, (&'a [u8], &'a [u8]), u32>,
     // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
     pk_map: Map<'a, &'a [u8], T>,
     typed: PhantomData<S>,
@@ -80,7 +75,8 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    // TODO: can we do this as a const function??
+    // Question: can we do this as a const function??
+    // Answer: Only if we remove trait guards and just enforce them with Index implementation
     pub fn new(
         idx_fn: fn(&T) -> Vec<u8>,
         pk_namespace: &'a [u8],
@@ -112,15 +108,12 @@ where
 
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = self.index(data);
-        let key = self.idx_map.key((&idx, &pk));
-        store.set(&key, MARKER);
-        Ok(())
+        self.idx_map.save(store, (&idx, &pk), &MARKER)
     }
 
     fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = self.index(old_data);
-        let key = self.idx_map.key((&idx, &pk));
-        store.remove(&key);
+        self.idx_map.remove(store, (&idx, &pk));
         Ok(())
     }
 
@@ -138,8 +131,6 @@ where
         idx: &[u8],
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
         let mapped = self.pks_by_index(store, idx).map(move |pk| {
-            println!("load: {:?}", pk);
-            // TODO: trim them down??
             let v = self.pk_map.load(store, &pk)?;
             Ok((pk, v))
         });

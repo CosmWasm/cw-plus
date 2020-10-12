@@ -10,9 +10,6 @@ use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::Prefix;
 
-/// reserved name, no index may register
-const PREFIX_PK: &[u8] = b"_pk";
-
 /// IndexedBucket works like a bucket but has a secondary index
 /// This is a WIP.
 /// Step 1 - allow exactly 1 secondary index, no multi-prefix on primary key
@@ -83,11 +80,6 @@ where
     // }
 
     fn can_add_index(&self, name: &str) -> StdResult<()> {
-        if name.as_bytes() == PREFIX_PK {
-            return Err(StdError::generic_err(
-                "Index _pk is reserved for the primary key",
-            ));
-        }
         match self.get_index(name) {
             Some(_) => Err(StdError::generic_err(format!(
                 "Attempt to write index {} 2 times",
@@ -240,7 +232,7 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_i32, index_string};
+    use crate::indexes::{index_int, index_string};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::MemoryStorage;
     use serde::{Deserialize, Serialize};
@@ -255,8 +247,8 @@ mod test {
         IndexedMap::<&[u8], Data, MemoryStorage>::new(b"data")
             .with_index("name", b"data__name", |d| index_string(&d.name))
             .unwrap()
-            // .with_unique_index("age", |d| index_i32(d.age))
-            .with_index("age", b"data__age", |d| index_i32(d.age))
+            // .with_unique_index("age", |d| index_int(d.age))
+            .with_index("age", b"data__age", |d| index_int(d.age))
             .unwrap()
     }
 
@@ -320,7 +312,7 @@ mod test {
         assert_eq!(0, marias.unwrap().len());
 
         // match on proper age
-        let proper = index_i32(42);
+        let proper = index_int(42);
         let marias: StdResult<Vec<_>> = map
             .items_by_index(&store, "age", &proper)
             .unwrap()
@@ -329,7 +321,7 @@ mod test {
         assert_eq!(1, marias.len());
 
         // no match on wrong age
-        let too_old = index_i32(43);
+        let too_old = index_int(43);
         let marias: StdResult<Vec<_>> = map
             .items_by_index(&store, "age", &too_old)
             .unwrap()
@@ -369,14 +361,14 @@ mod test {
     //
     //     // query by unique key
     //     // match on proper age
-    //     let age42 = index_i32(42);
+    //     let age42 = index_int(42);
     //     let (k, v) = bucket.load_unique_index("age", &age42).unwrap().unwrap();
     //     assert_eq!(k.as_slice(), pk1);
     //     assert_eq!(&v.name, "Maria");
     //     assert_eq!(v.age, 42);
     //
     //     // match on other age
-    //     let age23 = index_i32(23);
+    //     let age23 = index_int(23);
     //     let (k, v) = bucket.load_unique_index("age", &age23).unwrap().unwrap();
     //     assert_eq!(k.as_slice(), pk2);
     //     assert_eq!(&v.name, "Maria");
