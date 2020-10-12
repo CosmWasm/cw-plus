@@ -361,4 +361,71 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn readme_with_range() -> StdResult<()> {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.save(&mut store, b"john", &data)?;
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE.save(&mut store, b"jim", &data2)?;
+
+        // iterate over them all
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
+        assert_eq!(
+            all?,
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        );
+
+        // or just show what is after jim
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(
+                &store,
+                Bound::Exclude(b"jim"),
+                Bound::None,
+                Order::Ascending,
+            )
+            .collect();
+        assert_eq!(all?, vec![(b"john".to_vec(), data)]);
+
+        // save and load on three keys, one under different owner
+        ALLOWANCE.save(&mut store, (b"owner", b"spender"), &1000)?;
+        ALLOWANCE.save(&mut store, (b"owner", b"spender2"), &3000)?;
+        ALLOWANCE.save(&mut store, (b"owner2", b"spender"), &5000)?;
+
+        // get all under one key
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix(b"owner")
+            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .collect();
+        assert_eq!(
+            all?,
+            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        );
+
+        // Or ranges between two items (even reverse)
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix(b"owner")
+            .range(
+                &store,
+                Bound::Exclude(b"spender1"),
+                Bound::Include(b"spender2"),
+                Order::Descending,
+            )
+            .collect();
+        assert_eq!(all?, vec![(b"spender2".to_vec(), 3000)]);
+
+        Ok(())
+    }
 }
