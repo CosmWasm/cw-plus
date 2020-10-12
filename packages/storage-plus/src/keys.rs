@@ -17,14 +17,18 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
     }
 }
 
-impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
-    type Prefix = &'a [u8];
+// use generics for combining there - so we can use &[u8], PkOwned, or IntKey
+impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U) {
+    type Prefix = T;
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
-        vec![self.0, self.1]
+        let mut keys = self.0.key();
+        keys.extend(&self.1.key());
+        keys
     }
 }
 
+// TODO: make this fully generic as above - this involved more work on prefix traits as well
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
     type Prefix = (&'a [u8], &'a [u8]);
 
@@ -35,31 +39,31 @@ impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
 
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
-    fn prefix(&self) -> Vec<&'a [u8]>;
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]>;
 }
 
 impl<'a> Prefixer<'a> for () {
-    fn prefix(&self) -> Vec<&'a [u8]> {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![]
     }
 }
 
 impl<'a> Prefixer<'a> for &'a [u8] {
-    fn prefix(&self) -> Vec<&'a [u8]> {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self]
     }
 }
 
 impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
-    fn prefix(&self) -> Vec<&'a [u8]> {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self.0, self.1]
     }
 }
 
 // Add support for an dynamic keys - constructor functions below
-pub struct Pk1Owned(pub Vec<u8>);
+pub struct PkOwned(pub Vec<u8>);
 
-impl<'a> PrimaryKey<'a> for Pk1Owned {
+impl<'a> PrimaryKey<'a> for PkOwned {
     type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
@@ -68,11 +72,24 @@ impl<'a> PrimaryKey<'a> for Pk1Owned {
 }
 
 // this auto-implements PrimaryKey for all the IntKey types (and more!)
-impl<'a, T: AsRef<Pk1Owned>> PrimaryKey<'a> for T {
+impl<'a, T: AsRef<PkOwned>> PrimaryKey<'a> for T {
     type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         self.as_ref().key()
+    }
+}
+
+impl<'a> Prefixer<'a> for PkOwned {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+        vec![&self.0]
+    }
+}
+
+// this auto-implements Prefixer for all the IntKey types (and more!)
+impl<'a, T: AsRef<PkOwned>> Prefixer<'a> for T {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+        self.as_ref().prefix()
     }
 }
 
@@ -83,14 +100,14 @@ pub type U128Key = IntKey<u128>;
 
 // this reuses Pk1Owned logic with a particular type
 pub struct IntKey<T: Endian> {
-    pub wrapped: Pk1Owned,
+    pub wrapped: PkOwned,
     pub data: PhantomData<T>,
 }
 
 impl<T: Endian> IntKey<T> {
     pub fn new(val: T) -> Self {
         IntKey {
-            wrapped: Pk1Owned(val.to_be_bytes().as_ref().to_vec()),
+            wrapped: PkOwned(val.to_be_bytes().as_ref().to_vec()),
             data: PhantomData,
         }
     }
@@ -102,8 +119,8 @@ impl<T: Endian> From<T> for IntKey<T> {
     }
 }
 
-impl<T: Endian> AsRef<Pk1Owned> for IntKey<T> {
-    fn as_ref(&self) -> &Pk1Owned {
+impl<T: Endian> AsRef<PkOwned> for IntKey<T> {
+    fn as_ref(&self) -> &PkOwned {
         &self.wrapped
     }
 }
@@ -126,5 +143,24 @@ mod test {
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].to_vec());
+    }
+
+    #[test]
+    fn composite_byte_key() {
+        let k: (&[u8], &[u8]) = (b"foo", b"bar");
+        let path = k.key();
+        assert_eq!(2, path.len());
+        assert_eq!(path, vec![b"foo", b"bar"]);
+    }
+
+    #[test]
+    fn composite_int_key() {
+        let k: (U32Key, U64Key) = (123.into(), 87654.into());
+        let path = k.key();
+        assert_eq!(2, path.len());
+        assert_eq!(4, path[0].len());
+        assert_eq!(8, path[1].len());
+        assert_eq!(path[0].to_vec(), 123u32.to_be_bytes().to_vec());
+        assert_eq!(path[1].to_vec(), 87654u64.to_be_bytes().to_vec());
     }
 }
