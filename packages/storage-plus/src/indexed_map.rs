@@ -110,12 +110,12 @@ where
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
     pub fn save(&mut self, store: &mut S, key: K, data: &T) -> StdResult<()> {
-        let old_data = self.may_load(store, key)?;
+        let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, Some(data), old_data.as_ref())
     }
 
     pub fn remove(&mut self, store: &mut S, key: K) -> StdResult<()> {
-        let old_data = self.may_load(store, key)?;
+        let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, None, old_data.as_ref())
     }
 
@@ -156,7 +156,7 @@ where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
     {
-        let input = self.may_load(store, key)?;
+        let input = self.may_load(store, key.clone())?;
         let old_val = input.clone();
         let output = action(input)?;
         self.replace(store, key, Some(&output), old_val.as_ref())?;

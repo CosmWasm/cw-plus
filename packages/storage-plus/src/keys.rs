@@ -3,7 +3,7 @@ use crate::Endian;
 use std::marker::PhantomData;
 
 // pub trait PrimaryKey<'a>: Copy {
-pub trait PrimaryKey<'a> {
+pub trait PrimaryKey<'a>: Clone {
     type Prefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
@@ -23,7 +23,7 @@ pub trait PrimaryKey<'a> {
 // optional type aliases to refer to them easier
 type Pk0 = ();
 type Pk1<'a> = &'a [u8];
-type Pk2<'a> = (&'a [u8], &'a [u8]);
+type Pk2<'a, T = &'a [u8], U = &'a [u8]> = (T, U);
 
 impl<'a> PrimaryKey<'a> for Pk1<'a> {
     type Prefix = Pk0;
@@ -90,6 +90,7 @@ impl EmptyPrefix for () {
 }
 
 // Add support for an dynamic keys - constructor functions below
+#[derive(Clone, Debug)]
 pub struct PkOwned(pub Vec<u8>);
 
 impl<'a> PrimaryKey<'a> for PkOwned {
@@ -111,7 +112,7 @@ impl<'a> Prefixer<'a> for PkOwned {
 }
 
 // this auto-implements PrimaryKey for all the IntKey types (and more!)
-impl<'a, T: AsRef<PkOwned> + From<PkOwned>> PrimaryKey<'a> for T {
+impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
     type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
@@ -141,6 +142,7 @@ pub type U128Key = IntKey<u128>;
 ///   let k = U64Key::new(12345);
 ///   let k = U32Key::from(12345);
 ///   let k: U16Key = 12345.into();
+#[derive(Clone, Debug)]
 pub struct IntKey<T: Endian> {
     pub wrapped: PkOwned,
     pub data: PhantomData<T>,
