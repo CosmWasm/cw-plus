@@ -30,7 +30,7 @@ pub enum OwnedBound {
 }
 
 impl OwnedBound {
-    pub fn bound<'a>(&'a self) -> Bound<'a> {
+    pub fn bound(&self) -> Bound<'_> {
         match self {
             OwnedBound::Inclusive(limit) => Bound::Inclusive(&limit),
             OwnedBound::Exclusive(limit) => Bound::Exclusive(&limit),

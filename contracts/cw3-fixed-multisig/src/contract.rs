@@ -386,6 +386,7 @@ fn query_vote<S: Storage, A: Api, Q: Querier>(
     Ok(VoteResponse { vote })
 }
 
+// TODO: pull this out into a helper - one for Canonical as well
 fn make_exclusive_bound<A: Api>(api: A, limit: Option<HumanAddr>) -> StdResult<OwnedBound> {
     let canon: Option<CanonicalAddr> = limit.map(|x| api.canonical_address(&x)).transpose()?;
     let start = match canon {

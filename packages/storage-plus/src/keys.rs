@@ -66,9 +66,7 @@ pub trait EmptyPrefix {
 }
 
 impl EmptyPrefix for () {
-    fn new() -> Self {
-        ()
-    }
+    fn new() {}
 }
 
 // Add support for an dynamic keys - constructor functions below
