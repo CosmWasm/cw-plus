@@ -5,7 +5,7 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
 };
 
-use cw0::Expiration;
+use cw0::{maybe_canonical, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
@@ -332,7 +332,7 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = OwnedBound::exclusive_or_none(start_after);
+    let start = OwnedBound::exclusive_int(start_after);
     let props: StdResult<Vec<_>> = PROPOSALS
         .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .take(limit)
@@ -349,7 +349,7 @@ fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let end = OwnedBound::exclusive_or_none(start_before);
+    let end = OwnedBound::exclusive_int(start_before);
     let props: StdResult<Vec<_>> = PROPOSALS
         .range(&deps.storage, Bound::None, end.bound(), Order::Descending)
         .take(limit)
@@ -386,16 +386,6 @@ fn query_vote<S: Storage, A: Api, Q: Querier>(
     Ok(VoteResponse { vote })
 }
 
-// TODO: pull this out into a helper - one for Canonical as well
-fn make_exclusive_bound<A: Api>(api: A, limit: Option<HumanAddr>) -> StdResult<OwnedBound> {
-    let canon: Option<CanonicalAddr> = limit.map(|x| api.canonical_address(&x)).transpose()?;
-    let start = match canon {
-        Some(x) => OwnedBound::Exclusive(x.into()),
-        None => OwnedBound::None,
-    };
-    Ok(start)
-}
-
 fn list_votes<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     proposal_id: u64,
@@ -403,7 +393,8 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<VoteListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = make_exclusive_bound(deps.api, start_after)?;
+    let canon = maybe_canonical(deps.api, start_after)?;
+    let start = OwnedBound::exclusive(canon);
 
     let api = &deps.api;
     let votes: StdResult<Vec<_>> = BALLOTS
@@ -443,7 +434,8 @@ fn list_voters<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = make_exclusive_bound(deps.api, start_after)?;
+    let canon = maybe_canonical(deps.api, start_after)?;
+    let start = OwnedBound::exclusive(canon);
 
     let api = &deps.api;
     let voters: StdResult<Vec<_>> = VOTERS
