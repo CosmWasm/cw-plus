@@ -14,8 +14,8 @@ use crate::iter_helpers::{concat, deserialize_kv, trim};
 /// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
 #[derive(Copy, Clone, Debug)]
 pub enum Bound<'a> {
-    Include(&'a [u8]),
-    Exclude(&'a [u8]),
+    Inclusive(&'a [u8]),
+    Exclusive(&'a [u8]),
     None,
 }
 
@@ -45,14 +45,14 @@ where
     pub fn range<'a, S: Storage>(
         &self,
         store: &'a S,
-        start: Bound<'_>,
-        end: Bound<'_>,
+        min: Bound<'_>,
+        max: Bound<'_>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'a>
     where
         T: 'a,
     {
-        let mapped = range_with_prefix(store, &self.storage_prefix, start, end, order)
+        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
             .map(deserialize_kv::<T>);
         Box::new(mapped)
     }
@@ -82,8 +82,8 @@ fn calc_start_bound(namespace: &[u8], bound: Bound<'_>, _order: Order) -> Vec<u8
     match bound {
         Bound::None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
-        Bound::Include(limit) => concat(namespace, limit),
-        Bound::Exclude(limit) => concat(namespace, &one_byte_higher(limit)),
+        Bound::Inclusive(limit) => concat(namespace, limit),
+        Bound::Exclusive(limit) => concat(namespace, &one_byte_higher(limit)),
     }
 }
 
@@ -92,8 +92,8 @@ fn calc_end_bound(namespace: &[u8], bound: Bound<'_>, _order: Order) -> Vec<u8> 
     match bound {
         Bound::None => namespace_upper_bound(namespace),
         // this is the natural limits of the underlying Storage
-        Bound::Exclude(limit) => concat(namespace, limit),
-        Bound::Include(limit) => concat(namespace, &one_byte_higher(limit)),
+        Bound::Exclusive(limit) => concat(namespace, limit),
+        Bound::Inclusive(limit) => concat(namespace, &one_byte_higher(limit)),
     }
 }
 
@@ -161,17 +161,32 @@ mod test {
 
         // now let's check some ascending ranges
         let res: StdResult<Vec<_>> = prefix
-            .range(&store, Bound::Include(b"ra"), Bound::None, Order::Ascending)
+            .range(
+                &store,
+                Bound::Inclusive(b"ra"),
+                Bound::None,
+                Order::Ascending,
+            )
             .collect();
         assert_eq!(&expected[1..], res.unwrap().as_slice());
         // skip excluded
         let res: StdResult<Vec<_>> = prefix
-            .range(&store, Bound::Exclude(b"ra"), Bound::None, Order::Ascending)
+            .range(
+                &store,
+                Bound::Exclusive(b"ra"),
+                Bound::None,
+                Order::Ascending,
+            )
             .collect();
         assert_eq!(&expected[2..], res.unwrap().as_slice());
         // if we exclude something a little lower, we get matched
         let res: StdResult<Vec<_>> = prefix
-            .range(&store, Bound::Exclude(b"r"), Bound::None, Order::Ascending)
+            .range(
+                &store,
+                Bound::Exclusive(b"r"),
+                Bound::None,
+                Order::Ascending,
+            )
             .collect();
         assert_eq!(&expected[1..], res.unwrap().as_slice());
 
@@ -180,7 +195,7 @@ mod test {
             .range(
                 &store,
                 Bound::None,
-                Bound::Include(b"ra"),
+                Bound::Inclusive(b"ra"),
                 Order::Descending,
             )
             .collect();
@@ -190,7 +205,7 @@ mod test {
             .range(
                 &store,
                 Bound::None,
-                Bound::Exclude(b"ra"),
+                Bound::Exclusive(b"ra"),
                 Order::Descending,
             )
             .collect();
@@ -200,7 +215,7 @@ mod test {
             .range(
                 &store,
                 Bound::None,
-                Bound::Exclude(b"rb"),
+                Bound::Exclusive(b"rb"),
                 Order::Descending,
             )
             .collect();
@@ -210,8 +225,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Include(b"ra"),
-                Bound::Exclude(b"zi"),
+                Bound::Inclusive(b"ra"),
+                Bound::Exclusive(b"zi"),
                 Order::Ascending,
             )
             .collect();
@@ -220,8 +235,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Include(b"ra"),
-                Bound::Exclude(b"zi"),
+                Bound::Inclusive(b"ra"),
+                Bound::Exclusive(b"zi"),
                 Order::Descending,
             )
             .collect();
@@ -230,8 +245,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Include(b"ra"),
-                Bound::Include(b"zi"),
+                Bound::Inclusive(b"ra"),
+                Bound::Inclusive(b"zi"),
                 Order::Descending,
             )
             .collect();
@@ -240,8 +255,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Exclude(b"ra"),
-                Bound::Exclude(b"zi"),
+                Bound::Exclusive(b"ra"),
+                Bound::Exclusive(b"zi"),
                 Order::Ascending,
             )
             .collect();

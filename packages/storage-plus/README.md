@@ -299,6 +299,21 @@ over all items with `range(store, min, max, order)`. It supports `Order::Ascendi
 `min` is the lower bound and `max` is the higher bound.
 
 ```rust
+#[derive(Copy, Clone, Debug)]
+pub enum Bound<'a> {
+    Inclusive(&'a [u8]),
+    Exclusive(&'a [u8]),
+    None,
+}
+```
+
+If the `min` and `max` bounds, it will return all items under this prefix. You can use `.take(n)` to
+limit the results to `n` items and start doing pagination. You can also set the `min` bound to
+eg. `Bound::Exclusive(last_value)` to start iterating over all items *after* the last value. Combined with
+`take`, we easily have pagination support. You can also use `Bound::Inclusive(x)` when you want to include any
+perfect matches. To better understand the API, please read the following example:
+
+```rust
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct Data {
     pub name: String,
@@ -330,7 +345,7 @@ fn demo() -> StdResult<()> {
     let all: StdResult<Vec<_>> = PEOPLE
         .range(
             &store,
-            Bound::Exclude(b"jim"),
+            Bound::Exclusive(b"jim"),
             Bound::None,
             Order::Ascending,
         )
@@ -357,8 +372,8 @@ fn demo() -> StdResult<()> {
         .prefix(b"owner")
         .range(
             &store,
-            Bound::Exclude(b"spender1"),
-            Bound::Include(b"spender2"),
+            Bound::Exclusive(b"spender1"),
+            Bound::Inclusive(b"spender2"),
             Order::Descending,
         )
         .collect();

@@ -85,14 +85,14 @@ where
     pub fn range<'c, S: Storage>(
         &self,
         store: &'c S,
-        start: Bound<'_>,
-        end: Bound<'_>,
+        min: Bound<'_>,
+        max: Bound<'_>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
     where
         T: 'c,
     {
-        self.prefix(()).range(store, start, end, order)
+        self.prefix(()).range(store, min, max, order)
     }
 }
 
@@ -392,7 +392,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Bound::Exclude(b"jim"),
+                Bound::Exclusive(b"jim"),
                 Bound::None,
                 Order::Ascending,
             )
@@ -419,8 +419,8 @@ mod test {
             .prefix(b"owner")
             .range(
                 &store,
-                Bound::Exclude(b"spender1"),
-                Bound::Include(b"spender2"),
+                Bound::Exclusive(b"spender1"),
+                Bound::Inclusive(b"spender2"),
                 Order::Descending,
             )
             .collect();
