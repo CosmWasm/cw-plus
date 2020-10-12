@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "cw-storage-plus"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "cosmwasm-std",
  "schemars",
@@ -177,7 +177,7 @@ name = "cw2"
 version = "0.2.3"
 dependencies = [
  "cosmwasm-std",
- "cosmwasm-storage",
+ "cw-storage-plus",
  "schemars",
  "serde",
 ]
@@ -273,7 +273,7 @@ version = "0.2.3"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
+ "cw-storage-plus",
  "cw0",
  "cw2",
  "cw3",

@@ -1,4 +1,12 @@
-use cosmwasm_std::{Api, HumanAddr, StdResult};
+use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, StdResult};
+
+// this is used for pagination. Maybe we move it into the std lib one day?
+pub fn maybe_canonical<A: Api>(
+    api: A,
+    human: Option<HumanAddr>,
+) -> StdResult<Option<CanonicalAddr>> {
+    human.map(|x| api.canonical_address(&x)).transpose()
+}
 
 // this will set the first key after the provided key, by appending a 0 byte
 pub fn calc_range_start_human<A: Api>(

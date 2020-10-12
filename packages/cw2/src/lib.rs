@@ -1,12 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{
-    HumanAddr, Querier, QueryRequest, ReadonlyStorage, StdResult, Storage, WasmQuery,
-};
-use cosmwasm_storage::{to_length_prefixed, ReadonlySingleton, Singleton};
+use cosmwasm_std::{HumanAddr, Querier, QueryRequest, StdResult, Storage, WasmQuery};
+use cw_storage_plus::Item;
 
-pub const PREFIX_INFO: &[u8] = b"contract_info";
+pub const CONTRACT: Item<ContractVersion> = Item::new(b"contract_info");
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ContractVersion {
@@ -21,21 +19,22 @@ pub struct ContractVersion {
 }
 
 /// get_contract_version can be use in migrate to read the previous version of this contract
-pub fn get_contract_version<S: ReadonlyStorage>(storage: &S) -> StdResult<ContractVersion> {
-    ReadonlySingleton::new(storage, PREFIX_INFO).load()
+pub fn get_contract_version<S: Storage>(store: &S) -> StdResult<ContractVersion> {
+    CONTRACT.load(store)
 }
 
 /// set_contract_version should be used in init to store the original version, and after a successful
 /// migrate to update it
 pub fn set_contract_version<S: Storage, T: Into<String>, U: Into<String>>(
-    storage: &mut S,
+    store: &mut S,
     name: T,
     version: U,
 ) -> StdResult<()> {
-    Singleton::new(storage, PREFIX_INFO).save(&ContractVersion {
+    let val = ContractVersion {
         contract: name.into(),
         version: version.into(),
-    })
+    };
+    CONTRACT.save(store, &val)
 }
 
 /// This will make a raw_query to another contract to determine the current version it
@@ -49,7 +48,7 @@ pub fn query_contract_info<Q: Querier, T: Into<HumanAddr>>(
 ) -> StdResult<ContractVersion> {
     let req = QueryRequest::Wasm(WasmQuery::Raw {
         contract_addr: contract_addr.into(),
-        key: to_length_prefixed(PREFIX_INFO).into(),
+        key: CONTRACT.as_slice().into(),
     });
     querier.query(&req)
 }

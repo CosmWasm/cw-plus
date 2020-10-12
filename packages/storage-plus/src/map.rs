@@ -2,9 +2,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-#[cfg(feature = "iterator")]
-use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
+#[cfg(feature = "iterator")]
+use crate::keys::{EmptyPrefix, Prefixer};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
@@ -76,9 +76,11 @@ where
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
 #[cfg(feature = "iterator")]
-impl<'a, T> Map<'a, &'a [u8], T>
+impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a>,
+    K::Prefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -92,7 +94,7 @@ where
     where
         T: 'c,
     {
-        self.prefix(()).range(store, min, max, order)
+        self.prefix(K::Prefix::new()).range(store, min, max, order)
     }
 }
 

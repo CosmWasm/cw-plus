@@ -7,6 +7,7 @@ use cosmwasm_std::{Order, StdResult, Storage, KV};
 
 use crate::helpers::nested_namespaces_with_key;
 use crate::iter_helpers::{concat, deserialize_kv, trim};
+use crate::Endian;
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
 /// None means that we don't limit that side of the range at all.
@@ -55,6 +56,59 @@ where
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
             .map(deserialize_kv::<T>);
         Box::new(mapped)
+    }
+}
+
+/// OwnedBound is like bound, but owns the data (as a Vec<u8>) inside.
+/// It is much easier to use if you dynamically construct the content, and can be passed into range as well.
+/// We provide lots of helpers to create these bounds from other data-types
+#[derive(Clone, Debug)]
+pub enum OwnedBound {
+    Inclusive(Vec<u8>),
+    Exclusive(Vec<u8>),
+    None,
+}
+
+impl OwnedBound {
+    /// Returns a bound that borrows the owned data, to pass into range()
+    pub fn bound(&self) -> Bound<'_> {
+        match self {
+            OwnedBound::Inclusive(limit) => Bound::Inclusive(&limit),
+            OwnedBound::Exclusive(limit) => Bound::Exclusive(&limit),
+            OwnedBound::None => Bound::None,
+        }
+    }
+
+    /// Turns optional binary, like Option<CanonicalAddr> into an inclusive bound
+    pub fn inclusive<T: Into<Vec<u8>>>(maybe: Option<T>) -> Self {
+        match maybe {
+            Some(bytes) => OwnedBound::Inclusive(bytes.into()),
+            None => OwnedBound::None,
+        }
+    }
+
+    /// Turns optional binary, like Option<CanonicalAddr> into an exclusive bound
+    pub fn exclusive<T: Into<Vec<u8>>>(maybe: Option<T>) -> Self {
+        match maybe {
+            Some(bytes) => OwnedBound::Exclusive(bytes.into()),
+            None => OwnedBound::None,
+        }
+    }
+
+    /// Turns an int, like Option<u32> into an inclusive bound
+    pub fn inclusive_int<T: Endian>(limit: Option<T>) -> Self {
+        match limit {
+            Some(t) => Self::Inclusive(t.to_be_bytes().into()),
+            None => OwnedBound::None,
+        }
+    }
+
+    /// Turns an int, like Option<u64> into an exclusive bound
+    pub fn exclusive_int<T: Endian>(limit: Option<T>) -> Self {
+        match limit {
+            Some(t) => Self::Exclusive(t.to_be_bytes().into()),
+            None => OwnedBound::None,
+        }
     }
 }
 
