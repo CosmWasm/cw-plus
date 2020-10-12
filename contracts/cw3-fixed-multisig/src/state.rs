@@ -2,13 +2,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, ReadonlyStorage, StdError, StdResult, Storage};
-use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
-    Singleton,
-};
+use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
+
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
+use cw_storage_plus::{Item, Map, U64Key};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
@@ -55,41 +53,18 @@ pub struct Ballot {
     pub vote: Vote,
 }
 
-pub const CONFIG_KEY: &[u8] = b"config";
-pub const PROPOSAL_COUNTER: &[u8] = b"proposal_count";
+// unique items
+pub const CONFIG: Item<Config> = Item::new(b"config");
+pub const PROPOSAL_COUNT: Item<u64> = Item::new(b"proposal_count");
 
-pub const PREFIX_PROPOSAL: &[u8] = b"proposals";
-pub const PREFIX_VOTERS: &[u8] = b"voters";
-pub const PREFIX_VOTES: &[u8] = b"votes";
+// multiple-item maps
+pub const VOTERS: Map<&[u8], u64> = Map::new(b"voters");
+pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposals");
+pub const BALLOTS: Map<(U64Key, &[u8]), Ballot> = Map::new(b"votes");
 
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, Config> {
-    singleton(storage, CONFIG_KEY)
-}
-
-pub fn config_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Config> {
-    singleton_read(storage, CONFIG_KEY)
-}
-
-pub fn voters<S: Storage>(storage: &mut S) -> Bucket<S, u64> {
-    bucket(storage, PREFIX_VOTERS)
-}
-
-pub fn voters_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, u64> {
-    bucket_read(storage, PREFIX_VOTERS)
-}
-
-pub fn proposal<S: Storage>(storage: &mut S) -> Bucket<S, Proposal> {
-    bucket(storage, PREFIX_PROPOSAL)
-}
-
-pub fn proposal_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Proposal> {
-    bucket_read(storage, PREFIX_PROPOSAL)
-}
-
-pub fn next_id<S: Storage>(storage: &mut S) -> StdResult<u64> {
-    let mut s = singleton(storage, PROPOSAL_COUNTER);
-    let id: u64 = s.may_load()?.unwrap_or_default() + 1;
-    s.save(&id)?;
+pub fn next_id<S: Storage>(store: &mut S) -> StdResult<u64> {
+    let id: u64 = PROPOSAL_COUNT.may_load(store)?.unwrap_or_default() + 1;
+    PROPOSAL_COUNT.save(store, &id)?;
     Ok(id)
 }
 
@@ -100,15 +75,4 @@ pub fn parse_id(data: &[u8]) -> StdResult<u64> {
             "Corrupted data found. 8 byte expected.",
         )),
     }
-}
-
-pub fn ballots<S: Storage>(storage: &mut S, proposal_id: u64) -> Bucket<S, Ballot> {
-    Bucket::multilevel(storage, &[PREFIX_VOTES, &proposal_id.to_be_bytes()])
-}
-
-pub fn ballots_read<S: ReadonlyStorage>(
-    storage: &S,
-    proposal_id: u64,
-) -> ReadonlyBucket<S, Ballot> {
-    ReadonlyBucket::multilevel(storage, &[PREFIX_VOTES, &proposal_id.to_be_bytes()])
 }

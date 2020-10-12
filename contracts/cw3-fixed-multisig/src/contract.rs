@@ -15,8 +15,7 @@ use cw3::{
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{
-    ballots, ballots_read, config, config_read, next_id, parse_id, proposal, proposal_read, voters,
-    voters_read, Ballot, Config, Proposal,
+    next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS, VOTERS,
 };
 
 // version info for migration info
@@ -48,13 +47,12 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         total_weight,
         max_voting_period: msg.max_voting_period,
     };
-    config(&mut deps.storage).save(&cfg)?;
+    CONFIG.save(&mut deps.storage, &cfg)?;
 
     // add all voters
-    let mut bucket = voters(&mut deps.storage);
     for voter in msg.voters.iter() {
         let key = deps.api.canonical_address(&voter.addr)?;
-        bucket.save(key.as_slice(), &voter.weight)?;
+        VOTERS.save(&mut deps.storage, &key, &voter.weight)?;
     }
     Ok(InitResponse::default())
 }
@@ -90,11 +88,11 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&info.sender)?;
-    let vote_power = voters_read(&deps.storage)
-        .may_load(raw_sender.as_slice())?
+    let vote_power = VOTERS
+        .may_load(&deps.storage, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
-    let cfg = config_read(&deps.storage).load()?;
+    let cfg = CONFIG.load(&deps.storage)?;
 
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
@@ -123,14 +121,14 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         required_weight: cfg.required_weight,
     };
     let id = next_id(&mut deps.storage)?;
-    proposal(&mut deps.storage).save(&id.to_be_bytes(), &prop)?;
+    PROPOSALS.save(&mut deps.storage, id.into(), &prop)?;
 
     // add the first yes vote from voter
     let ballot = Ballot {
         weight: vote_power,
         vote: Vote::Yes,
     };
-    ballots(&mut deps.storage, id).save(raw_sender.as_slice(), &ballot)?;
+    BALLOTS.save(&mut deps.storage, (id.into(), &raw_sender), &ballot)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -153,12 +151,12 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&info.sender)?;
-    let vote_power = voters_read(&deps.storage)
-        .may_load(raw_sender.as_slice())?
+    let vote_power = VOTERS
+        .may_load(&deps.storage, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
-    let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
+    let mut prop = PROPOSALS.load(&deps.storage, proposal_id.into())?;
     if prop.status != Status::Open {
         return Err(ContractError::NotOpen {});
     }
@@ -167,13 +165,17 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     }
 
     // cast vote if no vote previously cast
-    ballots(&mut deps.storage, proposal_id).update(raw_sender.as_slice(), |bal| match bal {
-        Some(_) => Err(ContractError::AlreadyVoted {}),
-        None => Ok(Ballot {
-            weight: vote_power,
-            vote,
-        }),
-    })?;
+    BALLOTS.update(
+        &mut deps.storage,
+        (proposal_id.into(), &raw_sender),
+        |bal| match bal {
+            Some(_) => Err(ContractError::AlreadyVoted {}),
+            None => Ok(Ballot {
+                weight: vote_power,
+                vote,
+            }),
+        },
+    )?;
 
     // if yes vote, update tally
     if vote == Vote::Yes {
@@ -182,7 +184,7 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
         if prop.yes_weight >= prop.required_weight {
             prop.status = Status::Passed;
         }
-        proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
+        PROPOSALS.save(&mut deps.storage, proposal_id.into(), &prop)?;
     }
 
     Ok(HandleResponse {
@@ -205,7 +207,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
+    let mut prop = PROPOSALS.load(&deps.storage, proposal_id.into())?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
     if prop.status != Status::Passed {
@@ -214,7 +216,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
 
     // set it to executed
     prop.status = Status::Executed;
-    proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
+    PROPOSALS.save(&mut deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
     Ok(HandleResponse {
@@ -236,7 +238,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = proposal_read(&deps.storage).load(&proposal_id.to_be_bytes())?;
+    let mut prop = PROPOSALS.load(&deps.storage, proposal_id.into())?;
     if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
         .any(|x| *x == prop.status)
@@ -249,7 +251,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
 
     // set it to failed
     prop.status = Status::Rejected;
-    proposal(&mut deps.storage).save(&proposal_id.to_be_bytes(), &prop)?;
+    PROPOSALS.save(&mut deps.storage, proposal_id.into(), &prop)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -293,7 +295,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 fn query_threshold<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<ThresholdResponse> {
-    let cfg = config_read(&deps.storage).load()?;
+    let cfg = CONFIG.load(&deps.storage)?;
     Ok(ThresholdResponse::AbsoluteCount {
         weight_needed: cfg.required_weight,
         total_weight: cfg.total_weight,
@@ -305,7 +307,7 @@ fn query_proposal<S: Storage, A: Api, Q: Querier>(
     env: Env,
     id: u64,
 ) -> StdResult<ProposalResponse> {
-    let prop = proposal_read(&deps.storage).load(&id.to_be_bytes())?;
+    let prop = PROPOSALS.load(&deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
     Ok(ProposalResponse {
         id,
@@ -329,9 +331,9 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(|id| (id + 1).to_be_bytes().to_vec());
-    let props: StdResult<Vec<_>> = proposal_read(&deps.storage)
-        .range(start.as_deref(), None, Order::Ascending)
+    let start = start_after.map(|id| id.to_be_bytes().to_vec());
+    let props: StdResult<Vec<_>> = PROPOSALS
+        .range(&deps.storage, start.as_deref(), None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -378,7 +380,7 @@ fn query_vote<S: Storage, A: Api, Q: Querier>(
     voter: HumanAddr,
 ) -> StdResult<VoteResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let prop = ballots_read(&deps.storage, proposal_id).may_load(voter_raw.as_slice())?;
+    let prop = BALLOTS.may_load(&deps.storage, (proposal_id.into(), &voter_raw))?;
     let vote = prop.map(|b| b.vote);
     Ok(VoteResponse { vote })
 }
@@ -414,8 +416,8 @@ fn query_voter<S: Storage, A: Api, Q: Querier>(
     voter: HumanAddr,
 ) -> StdResult<VoterResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let weight = voters_read(&deps.storage)
-        .may_load(voter_raw.as_slice())?
+    let weight = VOTERS
+        .may_load(&deps.storage, &voter_raw)?
         .unwrap_or_default();
     Ok(VoterResponse {
         addr: voter,

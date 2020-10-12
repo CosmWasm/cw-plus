@@ -67,10 +67,6 @@ impl<'a> Prefixer<'a> for (&'a [u8], &'a [u8]) {
 // Add support for an dynamic keys - constructor functions below
 pub struct Pk1Owned(pub Vec<u8>);
 
-pub fn u64_key(val: u64) -> Pk1Owned {
-    Pk1Owned(val.to_be_bytes().into())
-}
-
 impl<'a> PrimaryKey<'a> for Pk1Owned {
     type Prefix = ();
 
@@ -79,6 +75,38 @@ impl<'a> PrimaryKey<'a> for Pk1Owned {
         'a: 'b,
     {
         vec![&self.0]
+    }
+}
+
+impl<'a, T: AsRef<Pk1Owned>> PrimaryKey<'a> for T {
+    type Prefix = ();
+
+    fn key<'b>(&'b self) -> Vec<&'b [u8]>
+    where
+        'a: 'b,
+    {
+        self.as_ref().key()
+    }
+}
+
+// this reuses Pk1Owned logic with a particular type
+pub struct U64Key(pub Pk1Owned);
+
+impl U64Key {
+    pub fn new(val: u64) -> Self {
+        U64Key(Pk1Owned(val.to_be_bytes().to_vec()))
+    }
+}
+
+impl From<u64> for U64Key {
+    fn from(val: u64) -> Self {
+        U64Key::new(val)
+    }
+}
+
+impl AsRef<Pk1Owned> for U64Key {
+    fn as_ref(&self) -> &Pk1Owned {
+        &self.0
     }
 }
 

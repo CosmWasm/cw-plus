@@ -273,7 +273,7 @@ version = "0.2.3"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
+ "cw-storage-plus",
  "cw0",
  "cw2",
  "cw3",
