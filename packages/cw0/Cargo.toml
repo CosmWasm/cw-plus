@@ -1,6 +1,6 @@
 [package]
 name = "cw0"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Common helpers for other cw specs"
