@@ -5,12 +5,13 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
 };
 
-use cw0::{calc_range_start_human, Expiration};
+use cw0::Expiration;
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
 };
+use cw_storage_plus::{Bound, OwnedBound};
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
@@ -331,9 +332,9 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(|id| id.to_be_bytes().to_vec());
+    let start = OwnedBound::exclusive_or_none(start_after);
     let props: StdResult<Vec<_>> = PROPOSALS
-        .range(&deps.storage, start.as_deref(), None, Order::Ascending)
+        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -348,9 +349,9 @@ fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let end = start_before.map(|id| id.to_be_bytes().to_vec());
-    let props: StdResult<Vec<_>> = proposal_read(&deps.storage)
-        .range(None, end.as_deref(), Order::Descending)
+    let end = OwnedBound::exclusive_or_none(start_before);
+    let props: StdResult<Vec<_>> = PROPOSALS
+        .range(&deps.storage, Bound::None, end.bound(), Order::Descending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -385,6 +386,15 @@ fn query_vote<S: Storage, A: Api, Q: Querier>(
     Ok(VoteResponse { vote })
 }
 
+fn make_exclusive_bound<A: Api>(api: A, limit: Option<HumanAddr>) -> StdResult<OwnedBound> {
+    let canon: Option<CanonicalAddr> = limit.map(|x| api.canonical_address(&x)).transpose()?;
+    let start = match canon {
+        Some(x) => OwnedBound::Exclusive(x.into()),
+        None => OwnedBound::None,
+    };
+    Ok(start)
+}
+
 fn list_votes<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     proposal_id: u64,
@@ -392,11 +402,12 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<VoteListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start_human(deps.api, start_after)?;
-    let api = &deps.api;
+    let start = make_exclusive_bound(deps.api, start_after)?;
 
-    let votes: StdResult<Vec<_>> = ballots_read(&deps.storage, proposal_id)
-        .range(start.as_deref(), None, Order::Ascending)
+    let api = &deps.api;
+    let votes: StdResult<Vec<_>> = BALLOTS
+        .prefix(proposal_id.into())
+        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, ballot) = item?;
@@ -431,11 +442,11 @@ fn list_voters<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start_human(deps.api, start_after)?;
-    let api = &deps.api;
+    let start = make_exclusive_bound(deps.api, start_after)?;
 
-    let voters: StdResult<Vec<_>> = voters_read(&deps.storage)
-        .range(start.as_deref(), None, Order::Ascending)
+    let api = &deps.api;
+    let voters: StdResult<Vec<_>> = VOTERS
+        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
