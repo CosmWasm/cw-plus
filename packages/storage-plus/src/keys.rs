@@ -1,3 +1,6 @@
+use crate::Endian;
+use std::marker::PhantomData;
+
 pub trait PrimaryKey<'a> {
     type Prefix: Prefixer<'a>;
 
@@ -78,6 +81,7 @@ impl<'a> PrimaryKey<'a> for Pk1Owned {
     }
 }
 
+// this auto-implements PrimaryKey for all the IntKey types (and more!)
 impl<'a, T: AsRef<Pk1Owned>> PrimaryKey<'a> for T {
     type Prefix = ();
 
@@ -89,24 +93,35 @@ impl<'a, T: AsRef<Pk1Owned>> PrimaryKey<'a> for T {
     }
 }
 
+pub type U16Key = IntKey<u16>;
+pub type U32Key = IntKey<u32>;
+pub type U64Key = IntKey<u64>;
+pub type U128Key = IntKey<u128>;
+
 // this reuses Pk1Owned logic with a particular type
-pub struct U64Key(pub Pk1Owned);
+pub struct IntKey<T: Endian> {
+    pub wrapped: Pk1Owned,
+    pub data: PhantomData<T>,
+}
 
-impl U64Key {
-    pub fn new(val: u64) -> Self {
-        U64Key(Pk1Owned(val.to_be_bytes().to_vec()))
+impl<T: Endian> IntKey<T> {
+    pub fn new(val: T) -> Self {
+        IntKey {
+            wrapped: Pk1Owned(val.to_be_bytes().as_ref().to_vec()),
+            data: PhantomData,
+        }
     }
 }
 
-impl From<u64> for U64Key {
-    fn from(val: u64) -> Self {
-        U64Key::new(val)
+impl<T: Endian> From<T> for IntKey<T> {
+    fn from(val: T) -> Self {
+        IntKey::new(val)
     }
 }
 
-impl AsRef<Pk1Owned> for U64Key {
+impl<T: Endian> AsRef<Pk1Owned> for IntKey<T> {
     fn as_ref(&self) -> &Pk1Owned {
-        &self.0
+        &self.wrapped
     }
 }
 
@@ -116,9 +131,17 @@ mod test {
 
     #[test]
     fn u64key_works() {
-        let k = u64_key(134);
+        let k: U64Key = 134u64.into();
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!(134u64.to_be_bytes().to_vec(), path[0].to_vec());
+    }
+
+    #[test]
+    fn u32key_works() {
+        let k: U32Key = 4242u32.into();
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].to_vec());
     }
 }
