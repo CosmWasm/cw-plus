@@ -5,18 +5,13 @@ pub trait PrimaryKey<'a> {
     type Prefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>
-    where
-        'a: 'b;
+    fn key<'b>(&'b self) -> Vec<&'b [u8]>;
 }
 
 impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Prefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>
-    where
-        'a: 'b,
-    {
+    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         // this is simple, we don't add more prefixes
         vec![self]
     }
@@ -25,10 +20,7 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
     type Prefix = &'a [u8];
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>
-    where
-        'a: 'b,
-    {
+    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self.0, self.1]
     }
 }
@@ -36,10 +28,7 @@ impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8]) {
 impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
     type Prefix = (&'a [u8], &'a [u8]);
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>
-    where
-        'a: 'b,
-    {
+    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self.0, self.1, self.2]
     }
 }
@@ -73,10 +62,7 @@ pub struct Pk1Owned(pub Vec<u8>);
 impl<'a> PrimaryKey<'a> for Pk1Owned {
     type Prefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>
-    where
-        'a: 'b,
-    {
+    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![&self.0]
     }
 }
@@ -85,10 +71,7 @@ impl<'a> PrimaryKey<'a> for Pk1Owned {
 impl<'a, T: AsRef<Pk1Owned>> PrimaryKey<'a> for T {
     type Prefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>
-    where
-        'a: 'b,
-    {
+    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         self.as_ref().key()
     }
 }
