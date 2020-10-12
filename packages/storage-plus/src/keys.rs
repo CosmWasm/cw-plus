@@ -28,14 +28,8 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
     }
 }
 
-// TODO: make this fully generic as above - this involved more work on prefix traits as well
-impl<'a> PrimaryKey<'a> for (&'a [u8], &'a [u8], &'a [u8]) {
-    type Prefix = (&'a [u8], &'a [u8]);
-
-    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
-        vec![self.0, self.1, self.2]
-    }
-}
+// Future work: add more types - 3 or more or slices?
+// Right now 3 could be done via ((a, b), c)
 
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
@@ -72,13 +66,16 @@ impl EmptyPrefix for () {
 // Add support for an dynamic keys - constructor functions below
 pub struct PkOwned(pub Vec<u8>);
 
-// FIXME: simplify all this - I think we can just implement generic for AsRef<&[u8]> and most of the rest falls awayy?
-// But then I hit lifetime issues....
-
 impl<'a> PrimaryKey<'a> for PkOwned {
     type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+        vec![&self.0]
+    }
+}
+
+impl<'a> Prefixer<'a> for PkOwned {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![&self.0]
     }
 }
@@ -89,12 +86,6 @@ impl<'a, T: AsRef<PkOwned>> PrimaryKey<'a> for T {
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         self.as_ref().key()
-    }
-}
-
-impl<'a> Prefixer<'a> for PkOwned {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
-        vec![&self.0]
     }
 }
 
@@ -110,7 +101,12 @@ pub type U32Key = IntKey<u32>;
 pub type U64Key = IntKey<u64>;
 pub type U128Key = IntKey<u128>;
 
-// this reuses Pk1Owned logic with a particular type
+/// It will cast one-particular int type into a Key via PkOwned, ensuring you don't mix up u32 and u64
+/// You can use new or the from/into pair to build a key from an int:
+///
+///   let k = U64Key::new(12345);
+///   let k = U32Key::from(12345);
+///   let k: U16Key = 12345.into();
 pub struct IntKey<T: Endian> {
     pub wrapped: PkOwned,
     pub data: PhantomData<T>,
@@ -167,6 +163,8 @@ mod test {
 
     #[test]
     fn composite_int_key() {
+        // Note we don't spec the int types (u32, u64) on the right,
+        // just the keys they convert into
         let k: (U32Key, U64Key) = (123.into(), 87654.into());
         let path = k.key();
         assert_eq!(2, path.len());
@@ -174,5 +172,21 @@ mod test {
         assert_eq!(8, path[1].len());
         assert_eq!(path[0].to_vec(), 123u32.to_be_bytes().to_vec());
         assert_eq!(path[1].to_vec(), 87654u64.to_be_bytes().to_vec());
+    }
+
+    #[test]
+    fn nested_composite_keys() {
+        // use this to ensure proper type-casts below
+        let foo: &[u8] = b"foo";
+        // this function tests how well the generics extend to "edge cases"
+        let k: ((&[u8], &[u8]), &[u8]) = ((foo, b"bar"), b"zoom");
+        let path = k.key();
+        assert_eq!(3, path.len());
+        assert_eq!(path, vec![foo, b"bar", b"zoom"]);
+
+        // ensure prefix also works
+        let dir = k.0.prefix();
+        assert_eq!(2, dir.len());
+        assert_eq!(dir, vec![foo, b"bar"]);
     }
 }
