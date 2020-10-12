@@ -6,8 +6,7 @@ use cosmwasm_std::{
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
-use cw20::Cw20Coin;
-use cw20_atomic_swap::balance::Balance;
+use cw20::{Balance, Cw20Coin};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct GenericBalance {

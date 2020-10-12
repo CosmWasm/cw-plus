@@ -18,7 +18,6 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw20-atomic-swap = { path = "../cw20-atomic-swap", version = "0.2.3", default-features=false, features = ["library"] }
 cw0 = { path = "../../packages/cw0", version = "0.2.3" }
 cw2 = { path = "../../packages/cw2", version = "0.2.3" }
 cw20 = { path = "../../packages/cw20", version = "0.2.3" }

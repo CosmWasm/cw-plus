@@ -4,8 +4,7 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
-use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
-use cw20_atomic_swap::balance::Balance;
+use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{

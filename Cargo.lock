@@ -235,7 +235,6 @@ dependencies = [
  "cw0",
  "cw2",
  "cw20",
- "cw20-atomic-swap",
  "schemars",
  "serde",
  "thiserror",

@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::Coin;
 use cw0::NativeBalance;
-use cw20::Cw20Coin;
+
+use crate::Cw20Coin;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]

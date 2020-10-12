@@ -1,12 +1,11 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::balance::Balance;
 use cosmwasm_std::{
     Binary, BlockInfo, CanonicalAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
-use cw20::Expiration;
+use cw20::{Balance, Expiration};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AtomicSwap {
