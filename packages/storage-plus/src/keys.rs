@@ -2,7 +2,8 @@ use crate::helpers::{decode_length, namespaces_with_key};
 use crate::Endian;
 use std::marker::PhantomData;
 
-pub trait PrimaryKey<'a>: Copy {
+// pub trait PrimaryKey<'a>: Copy {
+pub trait PrimaryKey<'a> {
     type Prefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
@@ -55,10 +56,8 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
     }
 }
 
-// Future work: add more types - 3 or more or slices?
-// Right now 3 could be done via ((a, b), c)
-
-pub trait Prefixer<'a>: Copy {
+// pub trait Prefixer<'a>: Copy {
+pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]>;
 }
@@ -99,6 +98,10 @@ impl<'a> PrimaryKey<'a> for PkOwned {
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![&self.0]
     }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        PkOwned(serialized.to_vec())
+    }
 }
 
 impl<'a> Prefixer<'a> for PkOwned {
@@ -108,11 +111,15 @@ impl<'a> Prefixer<'a> for PkOwned {
 }
 
 // this auto-implements PrimaryKey for all the IntKey types (and more!)
-impl<'a, T: AsRef<PkOwned>> PrimaryKey<'a> for T {
+impl<'a, T: AsRef<PkOwned> + From<PkOwned>> PrimaryKey<'a> for T {
     type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         self.as_ref().key()
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        PkOwned::parse_key(serialized).into()
     }
 }
 
@@ -151,6 +158,15 @@ impl<T: Endian> IntKey<T> {
 impl<T: Endian> From<T> for IntKey<T> {
     fn from(val: T) -> Self {
         IntKey::new(val)
+    }
+}
+
+impl<T: Endian> From<PkOwned> for IntKey<T> {
+    fn from(wrap: PkOwned) -> Self {
+        IntKey {
+            wrapped: wrap,
+            data: PhantomData,
+        }
     }
 }
 
