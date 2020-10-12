@@ -6,9 +6,8 @@ use sha2::{Digest, Sha256};
 
 use cw0::calc_range_start_string;
 use cw2::set_contract_version;
-use cw20::{Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
-use crate::balance::Balance;
 use crate::error::ContractError;
 use crate::msg::{
     is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse,

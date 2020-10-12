@@ -1,3 +1,4 @@
+mod balance;
 mod coin;
 mod helpers;
 mod msg;
@@ -6,6 +7,7 @@ mod receiver;
 
 pub use cw0::Expiration;
 
+pub use crate::balance::Balance;
 pub use crate::coin::{Cw20Coin, Cw20CoinHuman};
 pub use crate::helpers::{Cw20CanonicalContract, Cw20Contract};
 pub use crate::msg::Cw20HandleMsg;
