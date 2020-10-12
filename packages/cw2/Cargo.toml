@@ -11,6 +11,6 @@ documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
 cosmwasm-std = { version = "0.11.0" }
-cosmwasm-storage = { version = "0.11.0" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.2.3" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

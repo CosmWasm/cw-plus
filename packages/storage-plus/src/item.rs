@@ -29,6 +29,11 @@ impl<'a, T> Item<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
+    // this gets the path of the data to use elsewhere
+    pub fn as_slice(&self) -> &[u8] {
+        self.storage_key
+    }
+
     /// save will serialize the model and store, returns an error on serialization issues
     pub fn save<S: Storage>(&self, store: &mut S, data: &T) -> StdResult<()> {
         store.set(self.storage_key, &to_vec(data)?);
