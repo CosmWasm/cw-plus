@@ -7,7 +7,7 @@
 use std::mem;
 
 pub trait Endian: Sized + Copy {
-    type Buf: AsRef<[u8]> + AsMut<[u8]> + Default;
+    type Buf: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> + Default;
 
     fn to_le_bytes(self) -> Self::Buf;
     fn to_be_bytes(self) -> Self::Buf;

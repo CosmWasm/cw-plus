@@ -74,6 +74,9 @@ impl EmptyPrefix for () {
 // Add support for an dynamic keys - constructor functions below
 pub struct PkOwned(pub Vec<u8>);
 
+// FIXME: simplify all this - I think we can just implement generic for AsRef<&[u8]> and most of the rest falls awayy?
+// But then I hit lifetime issues....
+
 impl<'a> PrimaryKey<'a> for PkOwned {
     type Prefix = ();
 
@@ -118,7 +121,7 @@ pub struct IntKey<T: Endian> {
 impl<T: Endian> IntKey<T> {
     pub fn new(val: T) -> Self {
         IntKey {
-            wrapped: PkOwned(val.to_be_bytes().as_ref().to_vec()),
+            wrapped: PkOwned(val.to_be_bytes().into()),
             data: PhantomData,
         }
     }

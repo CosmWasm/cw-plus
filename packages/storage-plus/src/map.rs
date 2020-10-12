@@ -2,9 +2,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+use crate::keys::PrimaryKey;
 #[cfg(feature = "iterator")]
-use crate::keys::Prefixer;
-use crate::keys::{EmptyPrefix, PrimaryKey};
+use crate::keys::{EmptyPrefix, Prefixer};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};

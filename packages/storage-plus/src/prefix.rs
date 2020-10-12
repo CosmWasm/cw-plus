@@ -7,6 +7,7 @@ use cosmwasm_std::{Order, StdResult, Storage, KV};
 
 use crate::helpers::nested_namespaces_with_key;
 use crate::iter_helpers::{concat, deserialize_kv, trim};
+use crate::Endian;
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
 /// None means that we don't limit that side of the range at all.
@@ -17,6 +18,47 @@ pub enum Bound<'a> {
     Inclusive(&'a [u8]),
     Exclusive(&'a [u8]),
     None,
+}
+
+/// OwnedBound is like bound, but owns the data (as a Vec<u8>) inside.
+/// It is much easier to use if you dynamically construct the content, and can be passed into range as well.
+#[derive(Clone, Debug)]
+pub enum OwnedBound {
+    Inclusive(Vec<u8>),
+    Exclusive(Vec<u8>),
+    None,
+}
+
+impl OwnedBound {
+    pub fn bound<'a>(&'a self) -> Bound<'a> {
+        match self {
+            OwnedBound::Inclusive(limit) => Bound::Inclusive(&limit),
+            OwnedBound::Exclusive(limit) => Bound::Exclusive(&limit),
+            OwnedBound::None => Bound::None,
+        }
+    }
+
+    pub fn inclusive<T: Endian>(limit: T) -> Self {
+        OwnedBound::Inclusive(limit.to_be_bytes().into())
+    }
+
+    pub fn exclusive<T: Endian>(limit: T) -> Self {
+        OwnedBound::Exclusive(limit.to_be_bytes().into())
+    }
+
+    pub fn inclusive_or_none<T: Endian>(limit: Option<T>) -> Self {
+        match limit {
+            Some(t) => Self::inclusive(t),
+            None => OwnedBound::None,
+        }
+    }
+
+    pub fn exclusive_or_none<T: Endian>(limit: Option<T>) -> Self {
+        match limit {
+            Some(t) => Self::exclusive(t),
+            None => OwnedBound::None,
+        }
+    }
 }
 
 pub struct Prefix<T>
