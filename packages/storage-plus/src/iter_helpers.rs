@@ -15,6 +15,7 @@ pub(crate) fn deserialize_kv<T: DeserializeOwned>(kv: KV) -> StdResult<KV<T>> {
 
 /// Calculates the raw key prefix for a given namespace as documented
 /// in https://github.com/webmaster128/key-namespacing#length-prefixed-keys
+#[allow(dead_code)]
 pub(crate) fn to_length_prefixed(namespace: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(namespace.len() + 2);
     out.extend_from_slice(&encode_length(namespace));

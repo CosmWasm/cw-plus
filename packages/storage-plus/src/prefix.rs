@@ -43,12 +43,15 @@ where
     }
 
     pub fn range<'a, S: Storage>(
-        &'a self,
+        &self,
         store: &'a S,
         start: Bound<'_>,
         end: Bound<'_>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'a> {
+    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'a>
+    where
+        T: 'a,
+    {
         let mapped = range_with_prefix(store, &self.storage_prefix, start, end, order)
             .map(deserialize_kv::<T>);
         Box::new(mapped)

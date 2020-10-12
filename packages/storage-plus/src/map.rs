@@ -7,7 +7,7 @@ use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::prefix::{range_with_prefix, Bound, Prefix};
+use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
 pub struct Map<'a, K, T> {
@@ -83,18 +83,16 @@ where
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
     pub fn range<'c, S: Storage>(
-        &'c self,
+        &self,
         store: &'c S,
         start: Bound<'_>,
         end: Bound<'_>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c> {
-        // put the imports here, so we don't have to feature flag them above
-        use crate::iter_helpers::{deserialize_kv, to_length_prefixed};
-
-        let prefix = to_length_prefixed(self.namespace);
-        let mapped = range_with_prefix(store, &prefix, start, end, order).map(deserialize_kv::<T>);
-        Box::new(mapped)
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(()).range(store, start, end, order)
     }
 }
 
