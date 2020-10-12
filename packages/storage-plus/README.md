@@ -2,7 +2,7 @@
 
 The ideas in here are based on the `cosmwasm-storage` crate. However,
 after much usage, we decided a complete rewrite could allow us to add
-more powerful and easy touse interfaces. Here are those interfaces.
+more powerful and easy to use interfaces. Here are those interfaces.
 
 **Status: experimental**
 
@@ -11,7 +11,8 @@ repo. This is a first draft of many types. We will update the status
 after they have been used more heavily and the interfaces stabilized.
 
 The ideas/desired functionality in here should be more or final, 
-just the form to express them which will keep changing.
+just the form to express them that is not final. As we add new functionality,
+we will continue to refine the foundations, but maintain semver.
 
 ## Usage Overview
 
@@ -19,7 +20,7 @@ We introduce two main classes to provide a productive abstraction
 on top of `cosmwasm_std::Storage`. They are `Item`, which is
 a typed wrapper around one database key, providing some helper functions
 for interacting with it without dealing with raw bytes. And `Map`,
-which allows you to store multiple typed objects under a prefix,
+which allows you to store multiple unique typed objects under a prefix,
 indexed by a simple (`&[u8]`) or compound (eg. `(&[u8], &[u8])`) primary key.
 
 These correspond to the concepts represented in `cosmwasm_storage` by
@@ -110,7 +111,7 @@ eg. `(owner, spender)` to look up the balance.
 Beyond direct lookups, we have a super power not found in Ethereum -
 iteration. That's right, you can list all items in a `Map`, or only
 part of them. We can efficiently allow pagination over these items as
-well, starting after the last query ended at low, low gas costs.
+well, starting at the point the last query ended, with low gas costs.
 This requires the `iterator` feature to be enabled in `cw-storage-plus`
 (which automatically enables it in `cosmwasm-std` as well).
 
@@ -191,7 +192,7 @@ fn demo() -> StdResult<()> {
 
 There are times when we want to use multiple items as a key, for example, when
 storing allowances based on account owner and spender. We could try to manually
-concatenate them before calling, but that can lead ot overlap, and is a bit
+concatenate them before calling, but that can lead to overlap, and is a bit
 low-level for us. Also, by explicitly separating the keys, we can easily provide
 helpers to do range queries over a prefix, such as "show me all allowances for
 one owner" (first part of the composite key). Just like you'd expect from your
