@@ -45,9 +45,11 @@ pub fn increment_tokens<S: Storage>(storage: &mut S) -> StdResult<u64> {
     Ok(val)
 }
 
+pub const IDX_OWNER: &str = "owner";
+
 // indexed map needs function, not const (for now at least)
 pub fn tokens<'a, S: Storage + 'a>() -> IndexedMap<'a, 'a, &'a str, TokenInfo, S> {
     IndexedMap::<&str, TokenInfo, S>::new(b"tokens")
-        .with_index("owner", b"tokens__owner", |d| d.owner.to_vec())
+        .with_index(IDX_OWNER, b"tokens__owner", |d| d.owner.to_vec())
         .unwrap()
 }

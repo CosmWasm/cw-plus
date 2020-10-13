@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, Binary, BlockInfo, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, KV,
+    HumanAddr, InitResponse, MessageInfo, Order, Querier, StdError, StdResult, Storage, KV,
 };
 
 use cw0::maybe_canonical;
@@ -13,7 +13,8 @@ use cw721::{
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS,
+    increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, IDX_OWNER, MINTER,
+    OPERATORS,
 };
 use cw_storage_plus::{Bound, OwnedBound};
 
@@ -415,6 +416,11 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
             limit,
         )?),
         QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
+        QueryMsg::Tokens {
+            owner,
+            start_after,
+            limit,
+        } => to_binary(&query_tokens(deps, owner, start_after, limit)?),
         QueryMsg::AllTokens { start_after, limit } => {
             to_binary(&query_all_tokens(deps, start_after, limit)?)
         }
@@ -498,6 +504,28 @@ fn parse_approval<A: Api>(api: A, item: StdResult<KV<Expiration>>) -> StdResult<
         let spender = api.human_address(&k.into())?;
         Ok(cw721::Approval { spender, expires })
     })
+}
+
+fn query_tokens<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    owner: HumanAddr,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<TokensResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    // TODO: get pagination working on second indexes
+    let _start = OwnedBound::exclusive(start_after.map(Vec::from));
+
+    let owner_raw = deps.api.canonical_address(&owner)?;
+    let tokens: Result<Vec<String>, _> = tokens::<S>()
+        .pks_by_index(&deps.storage, IDX_OWNER, &owner_raw)?
+        // .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .take(limit)
+        .map(String::from_utf8)
+        .collect();
+    // TODO: make issue on CosmWasm to add impl From<FromUtf8Error> for StdError
+    let tokens = tokens.map_err(StdError::invalid_utf8)?;
+    Ok(TokensResponse { tokens })
 }
 
 fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
