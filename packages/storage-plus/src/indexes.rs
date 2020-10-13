@@ -2,10 +2,10 @@
 #![cfg(feature = "iterator")]
 
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Order, StdResult, Storage, KV};
+use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
@@ -138,100 +138,97 @@ where
     }
 }
 
-// #[derive(Deserialize, Serialize, Clone)]
-// pub(crate) struct UniqueRef<T: Clone> {
-//     pk: Binary,
-//     value: T,
-// }
-//
-// pub(crate) struct UniqueIndex<'a, T>
-// where
-//     T: Serialize + DeserializeOwned + Clone,
-// {
-//     idx_fn: fn(&T) -> Vec<u8>,
-//     _name: &'a str,
-// }
-//
-// impl<'a, T> UniqueIndex<'a, T>
-// where
-//     T: Serialize + DeserializeOwned + Clone,
-// {
-//     pub fn new(idx_fn: fn(&T) -> Vec<u8>, name: &'a str) -> Self {
-//         UniqueIndex {
-//             idx_fn,
-//             _name: name,
-//         }
-//     }
-// }
+#[derive(Deserialize, Serialize, Clone)]
+pub(crate) struct UniqueRef<T: Clone> {
+    // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
+    pk: Binary,
+    value: T,
+}
 
-// impl<'a, S, T> Index<S, T> for UniqueIndex<'a, S, T>
-// where
-//     S: Storage,
-//     T: Serialize + DeserializeOwned + Clone,
-// {
-//     fn name(&self) -> String {
-//         self._name.to_string()
-//     }
-//
-//     fn index(&self, data: &T) -> Vec<u8> {
-//         (self.idx_fn)(data)
-//     }
-//
-//     // we store (namespace, index_name, idx_value) -> { pk, value }
-//     fn insert(&self, map: &mut Map<K, T>, pk: &[u8], data: &T) -> StdResult<()> {
-//         let idx = self.index(data);
-//         let key = map.build_secondary_key(&[self._name.as_bytes()], &idx);
-//         // error if this is already set
-//         if map.storage.get(&key).is_some() {
-//             return Err(StdError::generic_err(format!(
-//                 "Violates unique constraint on index `{}`",
-//                 self._name
-//             )));
-//         }
-//
-//         let reference = UniqueRef::<T> {
-//             pk: pk.into(),
-//             value: data.clone(),
-//         };
-//         map.storage.set(&key, &to_vec(&reference)?);
-//         Ok(())
-//     }
-//
-//     // we store (namespace, index_name, idx_value) -> { pk, value }
-//     fn remove(&self, map: &mut Map<K, T>, _pk: &[u8], old_data: &T) -> StdResult<()> {
-//         let idx = self.index(old_data);
-//         let key = map.build_secondary_key(&[self._name.as_bytes()], &idx);
-//         map.storage.remove(&key);
-//         Ok(())
-//     }
-//
-//     // there is exactly 0 or 1 here...
-//     fn pks_by_index<'c>(
-//         &self,
-//         map: &'c Map<K, T>,
-//         idx: &[u8],
-//     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-//         // TODO: update types to return StdResult<Vec<u8>> ?
-//         // should never really happen, but I dislike unwrap
-//         let mapped = self.items_by_index(map, idx).map(|res| res.unwrap().0);
-//         Box::new(mapped)
-//     }
-//
-//     /// returns all items that match this secondary index, always by pk Ascending
-//     fn items_by_index<'c>(
-//         &self,
-//         map: &'c Map<K, T>,
-//         idx: &[u8],
-//     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-//         let key = map.build_secondary_key(&[self._name.as_bytes()], &idx);
-//         let data = match map.storage.get(&key) {
-//             Some(bin) => vec![bin],
-//             None => vec![],
-//         };
-//         let mapped = data.into_iter().map(|bin| {
-//             let parsed: UniqueRef<T> = from_slice(&bin)?;
-//             Ok((parsed.pk.into_vec(), parsed.value))
-//         });
-//         Box::new(mapped)
-//     }
-// }
+pub struct UniqueIndex<'a, S, T>
+where
+    S: Storage,
+    T: Serialize + DeserializeOwned + Clone,
+{
+    _name: &'a str,
+    idx_fn: fn(&T) -> Vec<u8>,
+    idx_map: Map<'a, &'a [u8], UniqueRef<T>>,
+    typed: PhantomData<S>,
+}
+
+impl<'a, S, T> UniqueIndex<'a, S, T>
+where
+    S: Storage,
+    T: Serialize + DeserializeOwned + Clone,
+{
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8], name: &'a str) -> Self {
+        UniqueIndex {
+            idx_fn,
+            idx_map: Map::new(idx_namespace),
+            _name: name,
+            typed: PhantomData,
+        }
+    }
+}
+
+impl<'a, S, T> Index<S, T> for UniqueIndex<'a, S, T>
+where
+    S: Storage,
+    T: Serialize + DeserializeOwned + Clone,
+{
+    fn name(&self) -> String {
+        self._name.to_string()
+    }
+
+    fn index(&self, data: &T) -> Vec<u8> {
+        (self.idx_fn)(data)
+    }
+
+    fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
+        let idx = self.index(data);
+        // error if this is already set
+        self.idx_map
+            .update(store, &idx, |existing| -> StdResult<_> {
+                match existing {
+                    Some(_) => Err(StdError::generic_err(format!(
+                        "Violates unique constraint on index `{}`",
+                        self._name
+                    ))),
+                    None => Ok(UniqueRef::<T> {
+                        pk: pk.into(),
+                        value: data.clone(),
+                    }),
+                }
+            })?;
+        Ok(())
+    }
+
+    fn remove(&self, store: &mut S, _pk: &[u8], old_data: &T) -> StdResult<()> {
+        let idx = self.index(old_data);
+        self.idx_map.remove(store, &idx);
+        Ok(())
+    }
+
+    fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        let data = match self.idx_map.may_load(store, &idx) {
+            Ok(Some(item)) => vec![item.pk.to_vec()],
+            Ok(None) => vec![],
+            Err(_) => unimplemented!(),
+        };
+        Box::new(data.into_iter())
+    }
+
+    /// returns all items that match this secondary index, always by pk Ascending
+    fn items_by_index<'c>(
+        &'c self,
+        store: &'c S,
+        idx: &[u8],
+    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
+        let data = match self.idx_map.may_load(store, &idx) {
+            Ok(Some(item)) => vec![Ok((item.pk.to_vec(), item.value))],
+            Ok(None) => vec![],
+            Err(e) => vec![Err(e)],
+        };
+        Box::new(data.into_iter())
+    }
+}
