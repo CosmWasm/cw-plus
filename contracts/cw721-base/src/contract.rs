@@ -3,7 +3,7 @@ use cosmwasm_std::{
     HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage, KV,
 };
 
-use cw0::{calc_range_start_human, calc_range_start_string};
+use cw0::maybe_canonical;
 use cw2::set_contract_version;
 use cw721::{
     AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Expiration, NftInfoResponse,
@@ -13,9 +13,9 @@ use cw721::{
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    contract_info, contract_info_read, increment_tokens, mint, mint_read, num_tokens, operators,
-    operators_read, tokens, tokens_read, Approval, TokenInfo,
+    increment_tokens, num_tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS, TOKENS,
 };
+use cw_storage_plus::{Bound, OwnedBound};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -33,9 +33,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         name: msg.name,
         symbol: msg.symbol,
     };
-    contract_info(&mut deps.storage).save(&info)?;
+    CONTRACT_INFO.save(&mut deps.storage, &info)?;
     let minter = deps.api.canonical_address(&msg.minter)?;
-    mint(&mut deps.storage).save(&minter)?;
+    MINTER.save(&mut deps.storage, &minter)?;
     Ok(InitResponse::default())
 }
 
@@ -77,7 +77,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     info: MessageInfo,
     msg: MintMsg,
 ) -> Result<HandleResponse, ContractError> {
-    let minter = mint(&mut deps.storage).load()?;
+    let minter = MINTER.load(&deps.storage)?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     if sender_raw != minter {
@@ -92,10 +92,14 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         description: msg.description.unwrap_or_default(),
         image: msg.image,
     };
-    tokens(&mut deps.storage).update(msg.token_id.as_bytes(), |old| match old {
-        Some(_) => Err(ContractError::Claimed {}),
-        None => Ok(token),
-    })?;
+    TOKENS.update(
+        &mut deps.storage,
+        msg.token_id.as_bytes(),
+        |old| match old {
+            Some(_) => Err(ContractError::Claimed {}),
+            None => Ok(token),
+        },
+    )?;
 
     increment_tokens(&mut deps.storage)?;
 
@@ -168,13 +172,13 @@ pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
     recipient: &HumanAddr,
     token_id: &str,
 ) -> Result<TokenInfo, ContractError> {
-    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    let mut token = TOKENS.load(&mut deps.storage, token_id.as_bytes())?;
     // ensure we have permissions
     check_can_send(&deps, env, info, &token)?;
     // set owner and remove existing approvals
     token.owner = deps.api.canonical_address(recipient)?;
     token.approvals = vec![];
-    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    TOKENS.save(&mut deps.storage, token_id.as_bytes(), &token)?;
     Ok(token)
 }
 
@@ -231,7 +235,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
     add: bool,
     expires: Option<Expiration>,
 ) -> Result<TokenInfo, ContractError> {
-    let mut token = tokens(&mut deps.storage).load(token_id.as_bytes())?;
+    let mut token = TOKENS.load(&mut deps.storage, token_id.as_bytes())?;
     // ensure we have permissions
     check_can_approve(&deps, env, info, &token)?;
 
@@ -257,7 +261,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
         token.approvals.push(approval);
     }
 
-    tokens(&mut deps.storage).save(token_id.as_bytes(), &token)?;
+    TOKENS.save(&mut deps.storage, token_id.as_bytes(), &token)?;
 
     Ok(token)
 }
@@ -278,7 +282,7 @@ pub fn handle_approve_all<S: Storage, A: Api, Q: Querier>(
     // set the operator for us
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let operator_raw = deps.api.canonical_address(&operator)?;
-    operators(&mut deps.storage, &sender_raw).save(operator_raw.as_slice(), &expires)?;
+    OPERATORS.save(&mut deps.storage, (&sender_raw, &operator_raw), &expires)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -299,7 +303,7 @@ pub fn handle_revoke_all<S: Storage, A: Api, Q: Querier>(
 ) -> Result<HandleResponse, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let operator_raw = deps.api.canonical_address(&operator)?;
-    operators(&mut deps.storage, &sender_raw).remove(operator_raw.as_slice());
+    OPERATORS.remove(&mut deps.storage, (&sender_raw, &operator_raw));
 
     Ok(HandleResponse {
         messages: vec![],
@@ -325,7 +329,7 @@ fn check_can_approve<S: Storage, A: Api, Q: Querier>(
         return Ok(());
     }
     // operator can approve
-    let op = operators_read(&deps.storage, &token.owner).may_load(sender_raw.as_slice())?;
+    let op = OPERATORS.may_load(&deps.storage, (&token.owner, &sender_raw))?;
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
@@ -361,7 +365,7 @@ fn check_can_send<S: Storage, A: Api, Q: Querier>(
     }
 
     // operator can send
-    let op = operators_read(&deps.storage, &token.owner).may_load(sender_raw.as_slice())?;
+    let op = OPERATORS.may_load(&deps.storage, (&token.owner, &sender_raw))?;
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
@@ -424,7 +428,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 fn query_minter<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<MinterResponse> {
-    let minter_raw = mint_read(&deps.storage).load()?;
+    let minter_raw = MINTER.load(&deps.storage)?;
     let minter = deps.api.human_address(&minter_raw)?;
     Ok(MinterResponse { minter })
 }
@@ -432,7 +436,7 @@ fn query_minter<S: Storage, A: Api, Q: Querier>(
 fn query_contract_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<ContractInfoResponse> {
-    contract_info_read(&deps.storage).load()
+    CONTRACT_INFO.load(&deps.storage)
 }
 
 fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
@@ -446,7 +450,7 @@ fn query_nft_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: String,
 ) -> StdResult<NftInfoResponse> {
-    let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
+    let info = TOKENS.load(&deps.storage, token_id.as_bytes())?;
     Ok(NftInfoResponse {
         name: info.name,
         description: info.description,
@@ -460,7 +464,7 @@ fn query_owner_of<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     include_expired: bool,
 ) -> StdResult<OwnerOfResponse> {
-    let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
+    let info = TOKENS.load(&deps.storage, token_id.as_bytes())?;
     Ok(OwnerOfResponse {
         owner: deps.api.human_address(&info.owner)?,
         approvals: humanize_approvals(deps.api, &env.block, &info, include_expired)?,
@@ -478,12 +482,14 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
-    let owner_raw = deps.api.canonical_address(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start_human(deps.api, start_after)?;
+    let start_canon = maybe_canonical(deps.api, start_after)?;
+    let start = OwnedBound::exclusive(start_canon);
 
-    let res: StdResult<Vec<_>> = operators_read(&deps.storage, &owner_raw)
-        .range(start.as_deref(), None, Order::Ascending)
+    let owner_raw = deps.api.canonical_address(&owner)?;
+    let res: StdResult<Vec<_>> = OPERATORS
+        .prefix(&owner_raw)
+        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
         .map(|item| parse_approval(deps.api, item))
@@ -504,10 +510,10 @@ fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start_string(start_after);
+    let start = OwnedBound::exclusive(start_after.map(Vec::from));
 
-    let tokens: StdResult<Vec<String>> = tokens_read(&deps.storage)
-        .range(start.as_deref(), None, Order::Ascending)
+    let tokens: StdResult<Vec<String>> = TOKENS
+        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
         .collect();
@@ -520,7 +526,7 @@ fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     include_expired: bool,
 ) -> StdResult<AllNftInfoResponse> {
-    let info = tokens_read(&deps.storage).load(token_id.as_bytes())?;
+    let info = TOKENS.load(&deps.storage, token_id.as_bytes())?;
     Ok(AllNftInfoResponse {
         access: OwnerOfResponse {
             owner: deps.api.human_address(&info.owner)?,

@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, StdResult, Storage};
+use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
 use cw721::{ContractInfoResponse, Expiration};
 use cw_storage_plus::{Item, Map};
 
@@ -35,7 +35,7 @@ pub const TOKEN_COUNT: Item<u64> = Item::new(b"num_tokens");
 pub const TOKENS: Map<&[u8], TokenInfo> = Map::new(b"tokens");
 pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new(b"operators");
 
-pub fn num_tokens<S: ReadonlyStorage>(storage: &S) -> StdResult<u64> {
+pub fn num_tokens<S: Storage>(storage: &S) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
