@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
 use cw721::{ContractInfoResponse, Expiration};
-use cw_storage_plus::{Item, Map};
+use cw_storage_plus::{IndexedMap, Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {
@@ -32,7 +32,7 @@ pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new(b"nft_info");
 pub const MINTER: Item<CanonicalAddr> = Item::new(b"minter");
 pub const TOKEN_COUNT: Item<u64> = Item::new(b"num_tokens");
 
-pub const TOKENS: Map<&str, TokenInfo> = Map::new(b"tokens");
+// pub const TOKENS: Map<&str, TokenInfo> = Map::new(b"tokens");
 pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new(b"operators");
 
 pub fn num_tokens<S: Storage>(storage: &S) -> StdResult<u64> {
@@ -43,4 +43,11 @@ pub fn increment_tokens<S: Storage>(storage: &mut S) -> StdResult<u64> {
     let val = num_tokens(storage)? + 1;
     TOKEN_COUNT.save(storage, &val)?;
     Ok(val)
+}
+
+// indexed map needs function, not const (for now at least)
+pub fn tokens<'a, S: Storage + 'a>() -> IndexedMap<'a, 'a, &'a str, TokenInfo, S> {
+    IndexedMap::<&str, TokenInfo, S>::new(b"tokens")
+        .with_index("owner", b"tokens__owner", |d| d.owner.to_vec())
+        .unwrap()
 }
