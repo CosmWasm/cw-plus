@@ -9,6 +9,7 @@ use crate::indexes::{Index, MultiIndex};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::Prefix;
+use crate::UniqueIndex;
 
 /// IndexedBucket works like a bucket but has a secondary index
 /// This is a WIP.
@@ -68,16 +69,17 @@ where
     /// let mut bucket = IndexedBucket::new(&mut storeage, b"foobar")
     ///                     .with_unique_index("name", |x| x.name.clone())?
     ///                     .with_index("age", by_age)?;
-    // pub fn with_unique_index(
-    //     mut self,
-    //     name: &'x str,
-    //     indexer: fn(&T) -> Vec<u8>,
-    // ) -> StdResult<Self> {
-    //     self.can_add_index(name)?;
-    //     let index = UniqueIndex::new(indexer, name);
-    //     self.indexes.push(Box::new(index));
-    //     Ok(self)
-    // }
+    pub fn with_unique_index(
+        mut self,
+        name: &'x str,
+        idx_namespace: &'x [u8],
+        indexer: fn(&T) -> Vec<u8>,
+    ) -> StdResult<Self> {
+        self.can_add_index(name)?;
+        let index = UniqueIndex::new(indexer, idx_namespace, name);
+        self.indexes.push(Box::new(index));
+        Ok(self)
+    }
 
     fn can_add_index(&self, name: &str) -> StdResult<()> {
         match self.get_index(name) {
@@ -212,20 +214,25 @@ where
         Ok(index.items_by_index(&store, idx))
     }
 
-    // // this will return None for 0 items, Some(x) for 1 item,
-    // // and an error for > 1 item. Only meant to be called on unique
-    // // indexes that can return 0 or 1 item
-    // pub fn load_unique_index(&self, index_name: &str, idx: &[u8]) -> StdResult<Option<KV<T>>> {
-    //     let mut it = self.items_by_index(index_name, idx)?;
-    //     let first = it.next().transpose()?;
-    //     match first {
-    //         None => Ok(None),
-    //         Some(one) => match it.next() {
-    //             None => Ok(Some(one)),
-    //             Some(_) => Err(StdError::generic_err("Unique Index returned 2 matches")),
-    //         },
-    //     }
-    // }
+    // this will return None for 0 items, Some(x) for 1 item,
+    // and an error for > 1 item. Only meant to be called on unique
+    // indexes that can return 0 or 1 item
+    pub fn load_unique_index(
+        &self,
+        store: &S,
+        index_name: &str,
+        idx: &[u8],
+    ) -> StdResult<Option<KV<T>>> {
+        let mut it = self.items_by_index(store, index_name, idx)?;
+        let first = it.next().transpose()?;
+        match first {
+            None => Ok(None),
+            Some(one) => match it.next() {
+                None => Ok(Some(one)),
+                Some(_) => Err(StdError::generic_err("Unique Index returned 2 matches")),
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -243,19 +250,18 @@ mod test {
         pub age: i32,
     }
 
-    fn build_bucket() -> IndexedMap<'static, 'static, &'static [u8], Data, MemoryStorage> {
+    fn build_map() -> IndexedMap<'static, 'static, &'static [u8], Data, MemoryStorage> {
         IndexedMap::<&[u8], Data, MemoryStorage>::new(b"data")
             .with_index("name", b"data__name", |d| index_string(&d.name))
             .unwrap()
-            // .with_unique_index("age", |d| index_int(d.age))
-            .with_index("age", b"data__age", |d| index_int(d.age))
+            .with_unique_index("age", b"data__age", |d| index_int(d.age))
             .unwrap()
     }
 
     #[test]
     fn store_and_load_by_index() {
         let mut store = MockStorage::new();
-        let mut map = build_bucket();
+        let mut map = build_map();
 
         // save data
         let data = Data {
@@ -329,65 +335,74 @@ mod test {
         assert_eq!(0, marias.unwrap().len());
     }
 
-    // #[test]
-    // fn unique_index_enforced() {
-    //     let mut store = MockStorage::new();
-    //     let mut bucket = build_bucket(&mut store);
-    //
-    //     // first data
-    //     let data1 = Data {
-    //         name: "Maria".to_string(),
-    //         age: 42,
-    //     };
-    //     let pk1: &[u8] = b"5627";
-    //     bucket.save(pk1, &data1).unwrap();
-    //
-    //     // same name (multi-index), different age => ok
-    //     let data2 = Data {
-    //         name: "Maria".to_string(),
-    //         age: 23,
-    //     };
-    //     let pk2: &[u8] = b"7326";
-    //     bucket.save(pk2, &data2).unwrap();
-    //
-    //     // different name, same age => error
-    //     let data3 = Data {
-    //         name: "Marta".to_string(),
-    //         age: 42,
-    //     };
-    //     let pk3: &[u8] = b"8263";
-    //     // enforce this returns some error
-    //     bucket.save(pk3, &data3).unwrap_err();
-    //
-    //     // query by unique key
-    //     // match on proper age
-    //     let age42 = index_int(42);
-    //     let (k, v) = bucket.load_unique_index("age", &age42).unwrap().unwrap();
-    //     assert_eq!(k.as_slice(), pk1);
-    //     assert_eq!(&v.name, "Maria");
-    //     assert_eq!(v.age, 42);
-    //
-    //     // match on other age
-    //     let age23 = index_int(23);
-    //     let (k, v) = bucket.load_unique_index("age", &age23).unwrap().unwrap();
-    //     assert_eq!(k.as_slice(), pk2);
-    //     assert_eq!(&v.name, "Maria");
-    //     assert_eq!(v.age, 23);
-    //
-    //     // if we delete the first one, we can add the blocked one
-    //     bucket.remove(pk1).unwrap();
-    //     bucket.save(pk3, &data3).unwrap();
-    //     // now 42 is the new owner
-    //     let (k, v) = bucket.load_unique_index("age", &age42).unwrap().unwrap();
-    //     assert_eq!(k.as_slice(), pk3);
-    //     assert_eq!(&v.name, "Marta");
-    //     assert_eq!(v.age, 42);
-    // }
+    #[test]
+    fn unique_index_enforced() {
+        let mut store = MockStorage::new();
+        let mut map = build_map();
+
+        // first data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            age: 42,
+        };
+        let pk1: &[u8] = b"5627";
+        map.save(&mut store, pk1, &data1).unwrap();
+
+        // same name (multi-index), different age => ok
+        let data2 = Data {
+            name: "Maria".to_string(),
+            age: 23,
+        };
+        let pk2: &[u8] = b"7326";
+        map.save(&mut store, pk2, &data2).unwrap();
+
+        // different name, same age => error
+        let data3 = Data {
+            name: "Marta".to_string(),
+            age: 42,
+        };
+        let pk3: &[u8] = b"8263";
+        // enforce this returns some error
+        map.save(&mut store, pk3, &data3).unwrap_err();
+
+        // query by unique key
+        // match on proper age
+        let age42 = index_int(42);
+        let (k, v) = map
+            .load_unique_index(&store, "age", &age42)
+            .unwrap()
+            .unwrap();
+        assert_eq!(k.as_slice(), pk1);
+        assert_eq!(&v.name, "Maria");
+        assert_eq!(v.age, 42);
+
+        // match on other age
+        let age23 = index_int(23);
+        let (k, v) = map
+            .load_unique_index(&store, "age", &age23)
+            .unwrap()
+            .unwrap();
+        assert_eq!(k.as_slice(), pk2);
+        assert_eq!(&v.name, "Maria");
+        assert_eq!(v.age, 23);
+
+        // if we delete the first one, we can add the blocked one
+        map.remove(&mut store, pk1).unwrap();
+        map.save(&mut store, pk3, &data3).unwrap();
+        // now 42 is the new owner
+        let (k, v) = map
+            .load_unique_index(&store, "age", &age42)
+            .unwrap()
+            .unwrap();
+        assert_eq!(k.as_slice(), pk3);
+        assert_eq!(&v.name, "Marta");
+        assert_eq!(v.age, 42);
+    }
 
     #[test]
     fn remove_and_update_reflected_on_indexes() {
         let mut store = MockStorage::new();
-        let mut map = build_bucket();
+        let mut map = build_map();
 
         let name_count = |map: &IndexedMap<&[u8], Data, MemoryStorage>,
                           store: &MemoryStorage,
