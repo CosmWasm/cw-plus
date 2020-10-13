@@ -508,9 +508,7 @@ fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = OwnedBound::exclusive(start_after.map(Vec::from));
 
-    // TODO: make range top-level
     let tokens: StdResult<Vec<String>> = tokens::<S>()
-        .prefix(())
         .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
