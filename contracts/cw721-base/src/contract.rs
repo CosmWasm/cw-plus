@@ -92,14 +92,10 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         description: msg.description.unwrap_or_default(),
         image: msg.image,
     };
-    TOKENS.update(
-        &mut deps.storage,
-        msg.token_id.as_bytes(),
-        |old| match old {
-            Some(_) => Err(ContractError::Claimed {}),
-            None => Ok(token),
-        },
-    )?;
+    TOKENS.update(&mut deps.storage, &msg.token_id, |old| match old {
+        Some(_) => Err(ContractError::Claimed {}),
+        None => Ok(token),
+    })?;
 
     increment_tokens(&mut deps.storage)?;
 
@@ -172,13 +168,13 @@ pub fn _transfer_nft<S: Storage, A: Api, Q: Querier>(
     recipient: &HumanAddr,
     token_id: &str,
 ) -> Result<TokenInfo, ContractError> {
-    let mut token = TOKENS.load(&mut deps.storage, token_id.as_bytes())?;
+    let mut token = TOKENS.load(&deps.storage, &token_id)?;
     // ensure we have permissions
     check_can_send(&deps, env, info, &token)?;
     // set owner and remove existing approvals
     token.owner = deps.api.canonical_address(recipient)?;
     token.approvals = vec![];
-    TOKENS.save(&mut deps.storage, token_id.as_bytes(), &token)?;
+    TOKENS.save(&mut deps.storage, &token_id, &token)?;
     Ok(token)
 }
 
@@ -235,7 +231,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
     add: bool,
     expires: Option<Expiration>,
 ) -> Result<TokenInfo, ContractError> {
-    let mut token = TOKENS.load(&mut deps.storage, token_id.as_bytes())?;
+    let mut token = TOKENS.load(&deps.storage, &token_id)?;
     // ensure we have permissions
     check_can_approve(&deps, env, info, &token)?;
 
@@ -261,7 +257,7 @@ pub fn _update_approvals<S: Storage, A: Api, Q: Querier>(
         token.approvals.push(approval);
     }
 
-    TOKENS.save(&mut deps.storage, token_id.as_bytes(), &token)?;
+    TOKENS.save(&mut deps.storage, &token_id, &token)?;
 
     Ok(token)
 }
@@ -450,7 +446,7 @@ fn query_nft_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: String,
 ) -> StdResult<NftInfoResponse> {
-    let info = TOKENS.load(&deps.storage, token_id.as_bytes())?;
+    let info = TOKENS.load(&deps.storage, &token_id)?;
     Ok(NftInfoResponse {
         name: info.name,
         description: info.description,
@@ -464,7 +460,7 @@ fn query_owner_of<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     include_expired: bool,
 ) -> StdResult<OwnerOfResponse> {
-    let info = TOKENS.load(&deps.storage, token_id.as_bytes())?;
+    let info = TOKENS.load(&deps.storage, &token_id)?;
     Ok(OwnerOfResponse {
         owner: deps.api.human_address(&info.owner)?,
         approvals: humanize_approvals(deps.api, &env.block, &info, include_expired)?,
@@ -526,7 +522,7 @@ fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
     token_id: String,
     include_expired: bool,
 ) -> StdResult<AllNftInfoResponse> {
-    let info = TOKENS.load(&deps.storage, token_id.as_bytes())?;
+    let info = TOKENS.load(&deps.storage, &token_id)?;
     Ok(AllNftInfoResponse {
         access: OwnerOfResponse {
             owner: deps.api.human_address(&info.owner)?,

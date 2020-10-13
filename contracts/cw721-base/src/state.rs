@@ -32,7 +32,7 @@ pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new(b"nft_info");
 pub const MINTER: Item<CanonicalAddr> = Item::new(b"minter");
 pub const TOKEN_COUNT: Item<u64> = Item::new(b"num_tokens");
 
-pub const TOKENS: Map<&[u8], TokenInfo> = Map::new(b"tokens");
+pub const TOKENS: Map<&str, TokenInfo> = Map::new(b"tokens");
 pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new(b"operators");
 
 pub fn num_tokens<S: Storage>(storage: &S) -> StdResult<u64> {
