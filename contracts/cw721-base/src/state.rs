@@ -2,19 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, StdResult, Storage};
-use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
-    Singleton,
-};
 use cw721::{ContractInfoResponse, Expiration};
-
-pub const CONFIG_KEY: &[u8] = b"config";
-pub const MINTER_KEY: &[u8] = b"minter";
-pub const CONTRACT_INFO_KEY: &[u8] = b"nft_info";
-pub const NUM_TOKENS_KEY: &[u8] = b"num_tokens";
-
-pub const TOKEN_PREFIX: &[u8] = b"tokens";
-pub const OPERATOR_PREFIX: &[u8] = b"operators";
+use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {
@@ -39,60 +28,19 @@ pub struct Approval {
     pub expires: Expiration,
 }
 
-pub fn contract_info<S: Storage>(storage: &mut S) -> Singleton<S, ContractInfoResponse> {
-    singleton(storage, CONTRACT_INFO_KEY)
-}
+pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new(b"nft_info");
+pub const MINTER: Item<CanonicalAddr> = Item::new(b"minter");
+pub const TOKEN_COUNT: Item<u64> = Item::new(b"num_tokens");
 
-pub fn contract_info_read<S: ReadonlyStorage>(
-    storage: &S,
-) -> ReadonlySingleton<S, ContractInfoResponse> {
-    singleton_read(storage, CONTRACT_INFO_KEY)
-}
-
-pub fn mint<S: Storage>(storage: &mut S) -> Singleton<S, CanonicalAddr> {
-    singleton(storage, MINTER_KEY)
-}
-
-pub fn mint_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, CanonicalAddr> {
-    singleton_read(storage, MINTER_KEY)
-}
-
-fn token_count<S: Storage>(storage: &mut S) -> Singleton<S, u64> {
-    singleton(storage, NUM_TOKENS_KEY)
-}
-
-fn token_count_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, u64> {
-    singleton_read(storage, NUM_TOKENS_KEY)
-}
+pub const TOKENS: Map<&[u8], TokenInfo> = Map::new(b"tokens");
+pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new(b"operators");
 
 pub fn num_tokens<S: ReadonlyStorage>(storage: &S) -> StdResult<u64> {
-    Ok(token_count_read(storage).may_load()?.unwrap_or_default())
+    Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
 pub fn increment_tokens<S: Storage>(storage: &mut S) -> StdResult<u64> {
     let val = num_tokens(storage)? + 1;
-    token_count(storage).save(&val)?;
+    TOKEN_COUNT.save(storage, &val)?;
     Ok(val)
-}
-
-pub fn tokens<S: Storage>(storage: &mut S) -> Bucket<S, TokenInfo> {
-    bucket(storage, TOKEN_PREFIX)
-}
-
-pub fn tokens_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, TokenInfo> {
-    bucket_read(storage, TOKEN_PREFIX)
-}
-
-pub fn operators<'a, S: Storage>(
-    storage: &'a mut S,
-    owner: &CanonicalAddr,
-) -> Bucket<'a, S, Expiration> {
-    Bucket::multilevel(storage, &[OPERATOR_PREFIX, owner.as_slice()])
-}
-
-pub fn operators_read<'a, S: ReadonlyStorage>(
-    storage: &'a S,
-    owner: &CanonicalAddr,
-) -> ReadonlyBucket<'a, S, Expiration> {
-    ReadonlyBucket::multilevel(storage, &[OPERATOR_PREFIX, owner.as_slice()])
 }
