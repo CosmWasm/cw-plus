@@ -210,10 +210,9 @@ where
     }
 
     fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let data = match self.idx_map.may_load(store, &idx) {
-            Ok(Some(item)) => vec![item.pk.to_vec()],
-            Ok(None) => vec![],
-            Err(_) => unimplemented!(),
+        let data = match self.idx_map.may_load(store, &idx).unwrap() {
+            Some(item) => vec![item.pk.to_vec()],
+            None => vec![],
         };
         Box::new(data.into_iter())
     }
