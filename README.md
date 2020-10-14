@@ -100,7 +100,7 @@ cw20 tokens.
 
 ## Compiling
 
-To compile all the contracts, run the following:
+To compile all the contracts, run the following in the repo root:
 
 ```
 docker run --rm -v "$(pwd)":/code \
