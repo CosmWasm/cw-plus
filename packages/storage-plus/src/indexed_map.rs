@@ -12,7 +12,7 @@ use crate::map::Map;
 use crate::prefix::Prefix;
 
 pub trait IndexList<S, T> {
-    fn get_indexes(&self) -> Box<dyn Iterator<Item = &dyn Index<S, T>>>;
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, T>> + '_>;
 }
 
 /// IndexedBucket works like a bucket but has a secondary index
@@ -149,12 +149,25 @@ mod test {
         pub age: i32,
     }
 
-    fn build_map() -> IndexedMap<'static, 'static, &'static [u8], Data, MemoryStorage> {
-        IndexedMap::<&[u8], Data, MemoryStorage>::new(b"data")
-            .with_index("name", b"data__name", |d| index_string(&d.name))
-            .unwrap()
-            .with_unique_index("age", b"data__age", |d| index_int(d.age))
-            .unwrap()
+    struct DataIndexes<'a, S: Storage> {
+        pub name: MultiIndex<'a, S, Data>,
+        pub age: UniqueIndex<'a, S, Data>,
+    }
+
+    impl<'a, S: Storage> IndexList<S, Data> for DataIndexes<'a, S> {
+        fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, Data>> + '_> {
+            let v: Vec<&dyn Index<S, Data>> = vec![&self.name, &self.age];
+            Box::new(v.into_iter())
+        }
+    }
+
+    fn build_map<S: Storage>(
+    ) -> IndexedMap<'static, &'static [u8], Data, S, DataIndexes<'static, S>> {
+        let indexes = DataIndexes {
+            name: MultiIndex::new(|d| index_string(&d.name), b"data", b"data__name"),
+            age: UniqueIndex::new(|d| index_int(d.age), b"data__age"),
+        };
+        IndexedMap::new(b"data", indexes)
     }
 
     #[test]
@@ -174,21 +187,15 @@ mod test {
         let loaded = map.load(&store, pk).unwrap();
         assert_eq!(data, loaded);
 
-        let count = map
-            .items_by_index(&store, "name", &index_string("Maria"))
-            .unwrap()
-            .count();
+        let count = map.idx.name.items(&store, &index_string("Maria")).count();
         assert_eq!(1, count);
 
         // TODO: we load by wrong keys - get full storage key!
 
         // load it by secondary index (we must know how to compute this)
         // let marias: StdResult<Vec<_>> = map
-        let marias: Vec<StdResult<_>> = map
-            .items_by_index(&store, "name", &index_string("Maria"))
-            .unwrap()
-            .collect();
-        // let marias = marias.unwrap();
+        let marias: Vec<StdResult<_>> =
+            map.idx.name.items(&store, &index_string("Maria")).collect();
         assert_eq!(1, marias.len());
         assert!(marias[0].is_ok());
         let (k, v) = marias[0].as_ref().unwrap();
@@ -196,42 +203,27 @@ mod test {
         assert_eq!(&data, v);
 
         // other index doesn't match (1 byte after)
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "name", &index_string("Marib"))
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let marias = map.idx.name.items(&store, &index_string("Marib")).count();
+        assert_eq!(0, marias);
 
         // other index doesn't match (1 byte before)
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "name", &index_string("Mari`"))
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let marias = map.idx.name.items(&store, &index_string("Mari`")).count();
+        assert_eq!(0, marias);
 
         // other index doesn't match (longer)
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "name", &index_string("Maria5"))
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let marias = map.idx.name.items(&store, &index_string("Maria5")).count();
+        assert_eq!(0, marias);
 
         // match on proper age
         let proper = index_int(42);
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "age", &proper)
-            .unwrap()
-            .collect();
-        let marias = marias.unwrap();
-        assert_eq!(1, marias.len());
+        let aged = map.idx.age.item(&store, &proper).unwrap().unwrap();
+        assert_eq!(pk.to_vec(), aged.0);
+        assert_eq!(data, aged.1);
 
         // no match on wrong age
         let too_old = index_int(43);
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "age", &too_old)
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let aged = map.idx.age.item(&store, &too_old).unwrap();
+        assert_eq!(None, aged);
     }
 
     #[test]
@@ -267,20 +259,14 @@ mod test {
         // query by unique key
         // match on proper age
         let age42 = index_int(42);
-        let (k, v) = map
-            .load_unique_index(&store, "age", &age42)
-            .unwrap()
-            .unwrap();
+        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk1);
         assert_eq!(&v.name, "Maria");
         assert_eq!(v.age, 42);
 
         // match on other age
         let age23 = index_int(23);
-        let (k, v) = map
-            .load_unique_index(&store, "age", &age23)
-            .unwrap()
-            .unwrap();
+        let (k, v) = map.idx.age.item(&store, &age23).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk2);
         assert_eq!(&v.name, "Maria");
         assert_eq!(v.age, 23);
@@ -289,10 +275,7 @@ mod test {
         map.remove(&mut store, pk1).unwrap();
         map.save(&mut store, pk3, &data3).unwrap();
         // now 42 is the new owner
-        let (k, v) = map
-            .load_unique_index(&store, "age", &age42)
-            .unwrap()
-            .unwrap();
+        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk3);
         assert_eq!(&v.name, "Marta");
         assert_eq!(v.age, 42);
@@ -303,14 +286,11 @@ mod test {
         let mut store = MockStorage::new();
         let mut map = build_map();
 
-        let name_count = |map: &IndexedMap<&[u8], Data, MemoryStorage>,
-                          store: &MemoryStorage,
-                          name: &str|
-         -> usize {
-            map.items_by_index(store, "name", &index_string(name))
-                .unwrap()
-                .count()
-        };
+        let name_count =
+            |map: &IndexedMap<&[u8], Data, MemoryStorage, DataIndexes<MemoryStorage>>,
+             store: &MemoryStorage,
+             name: &str|
+             -> usize { map.idx.name.pks(store, &index_string(name)).count() };
 
         // set up some data
         let data1 = Data {
