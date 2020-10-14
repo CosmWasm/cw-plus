@@ -4,6 +4,9 @@
 //! confidence, and I wanted a different return value, so I just took the code
 //! to modify slightly.
 
+// TODO: figure out these macros and let us replace (self: Self) with self
+#![allow(clippy::needless_arbitrary_self_type)]
+
 use std::mem;
 
 pub trait Endian: Sized + Copy {
