@@ -1,105 +1,62 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
-use cosmwasm_std::{StdError, StdResult, Storage, KV};
+use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::marker::PhantomData;
 
-use crate::indexes::{Index, MultiIndex};
+use crate::indexes::Index;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::Prefix;
-use crate::UniqueIndex;
+
+pub trait IndexList<S, T> {
+    fn get_indexes(&self) -> Box<dyn Iterator<Item = &dyn Index<S, T>>>;
+}
 
 /// IndexedBucket works like a bucket but has a secondary index
-/// This is a WIP.
-/// Step 1 - allow exactly 1 secondary index, no multi-prefix on primary key
-/// Step 2 - allow multiple named secondary indexes, no multi-prefix on primary key
-/// Step 3 - allow unique indexes - They store {pk: Vec<u8>, value: T} so we don't need to re-lookup
-/// Step 4 - allow multiple named secondary indexes, clean composite key support
-///
-/// Current Status: 2
-pub struct IndexedMap<'a, 'x, K, T, S>
+/// TODO: remove traits here and make this const fn new
+pub struct IndexedMap<'a, K, T, S, I>
 where
-    'a: 'x,
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
+    I: IndexList<S, T>,
     S: Storage,
 {
     pk_namespace: &'a [u8],
     primary: Map<'a, K, T>,
-    indexes: Vec<Box<dyn Index<S, T> + 'x>>,
+    /// This is meant to be read directly to get the proper types, like:
+    /// map.idx.owner.items(...)
+    pub idx: I,
+    typed_store: PhantomData<S>,
 }
 
-impl<'a, 'x, K, T, S> IndexedMap<'a, 'x, K, T, S>
+impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
 where
     K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone + 'x,
-    S: Storage + 'x,
+    T: Serialize + DeserializeOwned + Clone,
+    S: Storage,
+    I: IndexList<S, T>,
 {
-    pub fn new(pk_namespace: &'a [u8]) -> Self {
+    /// TODO: remove traits here and make this const fn new
+    pub fn new(pk_namespace: &'a [u8], indexes: I) -> Self {
         IndexedMap {
             pk_namespace,
             primary: Map::new(pk_namespace),
-            indexes: vec![],
+            idx: indexes,
+            typed_store: PhantomData,
         }
     }
+}
 
-    /// Usage:
-    /// let mut bucket = IndexedBucket::new(&mut storeage, b"foobar")
-    ///                     .with_unique_index("name", |x| x.name.clone())?
-    ///                     .with_index("age", by_age)?;
-    pub fn with_index(
-        mut self,
-        name: &'x str,
-        idx_namespace: &'x [u8],
-        indexer: fn(&T) -> Vec<u8>,
-    ) -> StdResult<Self>
-    where
-        'x: 'a,
-    {
-        self.can_add_index(name)?;
-        let index: MultiIndex<'x, S, T> =
-            MultiIndex::new(indexer, self.pk_namespace, idx_namespace, name);
-        self.indexes.push(Box::new(index));
-        Ok(self)
-    }
-
-    /// Usage:
-    /// let mut bucket = IndexedBucket::new(&mut storeage, b"foobar")
-    ///                     .with_unique_index("name", |x| x.name.clone())?
-    ///                     .with_index("age", by_age)?;
-    pub fn with_unique_index(
-        mut self,
-        name: &'x str,
-        idx_namespace: &'x [u8],
-        indexer: fn(&T) -> Vec<u8>,
-    ) -> StdResult<Self> {
-        self.can_add_index(name)?;
-        let index = UniqueIndex::new(indexer, idx_namespace, name);
-        self.indexes.push(Box::new(index));
-        Ok(self)
-    }
-
-    fn can_add_index(&self, name: &str) -> StdResult<()> {
-        match self.get_index(name) {
-            Some(_) => Err(StdError::generic_err(format!(
-                "Attempt to write index {} 2 times",
-                name
-            ))),
-            None => Ok(()),
-        }
-    }
-
-    fn get_index(&self, name: &str) -> Option<&dyn Index<S, T>> {
-        for existing in self.indexes.iter() {
-            if existing.name() == name {
-                return Some(existing.as_ref());
-            }
-        }
-        None
-    }
-
+impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned + Clone,
+    S: Storage,
+    I: IndexList<S, T>,
+{
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
@@ -126,12 +83,12 @@ where
         // this is the key *relative* to the primary map namespace
         let pk = key.joined_key();
         if let Some(old) = old_data {
-            for index in self.indexes.iter() {
+            for index in self.idx.get_indexes() {
                 index.remove(store, &pk, old)?;
             }
         }
         if let Some(updated) = data {
-            for index in self.indexes.iter() {
+            for index in self.idx.get_indexes() {
                 index.save(store, &pk, updated)?;
             }
             self.primary.save(store, key, updated)?;
@@ -175,71 +132,13 @@ where
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
-
-    // /// iterates over the items in pk order
-    // pub fn range<'c, S: Storage>(
-    //     &'c self,
-    //     store: &'c S,
-    //     start: Option<&[u8]>,
-    //     end: Option<&[u8]>,
-    //     order: Order,
-    // ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-    //     self.primary.range(start, end, order)
-    // }
-
-    /// returns all pks that where stored under this secondary index, always Ascending
-    /// this is mainly an internal function, but can be used direcly if you just want to list ids cheaply
-    pub fn pks_by_index<'c>(
-        &'c self,
-        store: &'c S,
-        index_name: &str,
-        idx: &[u8],
-    ) -> StdResult<Box<dyn Iterator<Item = Vec<u8>> + 'c>> {
-        let index = self
-            .get_index(index_name)
-            .ok_or_else(|| StdError::not_found(index_name))?;
-        Ok(index.pks_by_index(&store, idx))
-    }
-
-    /// returns all items that match this secondary index, always by pk Ascending
-    pub fn items_by_index<'c>(
-        &'c self,
-        store: &'c S,
-        index_name: &str,
-        idx: &[u8],
-    ) -> StdResult<Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>> {
-        let index = self
-            .get_index(index_name)
-            .ok_or_else(|| StdError::not_found(index_name))?;
-        Ok(index.items_by_index(&store, idx))
-    }
-
-    // this will return None for 0 items, Some(x) for 1 item,
-    // and an error for > 1 item. Only meant to be called on unique
-    // indexes that can return 0 or 1 item
-    pub fn load_unique_index(
-        &self,
-        store: &S,
-        index_name: &str,
-        idx: &[u8],
-    ) -> StdResult<Option<KV<T>>> {
-        let mut it = self.items_by_index(store, index_name, idx)?;
-        let first = it.next().transpose()?;
-        match first {
-            None => Ok(None),
-            Some(one) => match it.next() {
-                None => Ok(Some(one)),
-                Some(_) => Err(StdError::generic_err("Unique Index returned 2 matches")),
-            },
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use crate::indexes::{index_int, index_string};
+    use crate::indexes::{index_int, index_string, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::MemoryStorage;
     use serde::{Deserialize, Serialize};

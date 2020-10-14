@@ -51,13 +51,8 @@ pub struct MultiIndex<'a, S, T> {
 }
 
 impl<'a, S, T> MultiIndex<'a, S, T> {
-    // Question: can we do this as a const function??
-    // Answer: Only if we remove trait guards and just enforce them with Index implementation
-    pub const fn new(
-        idx_fn: fn(&T) -> Vec<u8>,
-        pk_namespace: &'a [u8],
-        idx_namespace: &'a [u8],
-    ) -> Self {
+    // TODO: make this a const fn
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a [u8], idx_namespace: &'a [u8]) -> Self {
         MultiIndex {
             index: idx_fn,
             pk_map: Map::new(pk_namespace),
@@ -89,7 +84,7 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn pks<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+    pub fn pks<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         let prefix = self.idx_map.prefix(idx);
         let mapped = range_with_prefix(store, &prefix, Bound::None, Bound::None, Order::Ascending)
             .map(|(k, _)| k);
@@ -97,7 +92,7 @@ where
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    fn items<'c>(
+    pub fn items<'c>(
         &'c self,
         store: &'c S,
         idx: &[u8],
@@ -124,7 +119,8 @@ pub struct UniqueIndex<'a, S, T> {
 }
 
 impl<'a, S, T> UniqueIndex<'a, S, T> {
-    pub const fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8]) -> Self {
+    // TODO: make this a const fn
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8]) -> Self {
         UniqueIndex {
             index: idx_fn,
             idx_map: Map::new(idx_namespace),
@@ -167,7 +163,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
 {
     /// returns all items that match this secondary index, always by pk Ascending
-    fn item<'c>(&self, store: &S, idx: &[u8]) -> StdResult<Option<KV<T>>> {
+    pub fn item(&self, store: &S, idx: &[u8]) -> StdResult<Option<KV<T>>> {
         let data = self
             .idx_map
             .may_load(store, &idx)?
