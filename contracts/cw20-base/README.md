@@ -28,17 +28,8 @@ ls -l cw20_base.wasm
 sha256sum cw20_base.wasm
 ```
 
-Or for a production-ready (compressed) build, run the following from the
-repository root:
-
-```
-docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="cosmwasm_plus_cache",target=/code/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.10.3
-```
-
-The optimized contracts are generated in the `artifacts/` directory.
+Or for a production-ready (optimized) build, run a build command in the
+the repository root: https://github.com/CosmWasm/cosmwasm-plus#compiling.
 
 ## Importing this contract
 
