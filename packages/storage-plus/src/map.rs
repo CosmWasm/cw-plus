@@ -88,8 +88,8 @@ where
     pub fn range<'c, S: Storage>(
         &self,
         store: &'c S,
-        min: Bound<'_>,
-        max: Bound<'_>,
+        min: Option<Bound>,
+        max: Option<Bound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
     where
@@ -200,9 +200,7 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
@@ -230,7 +228,7 @@ mod test {
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -384,9 +382,7 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2)?;
 
         // iterate over them all
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         assert_eq!(
             all?,
             vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
@@ -396,8 +392,8 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Bound::Exclusive(b"jim"),
-                Bound::None,
+                Some(Bound::Exclusive(b"jim".to_vec())),
+                None,
                 Order::Ascending,
             )
             .collect();
@@ -411,7 +407,7 @@ mod test {
         // get all under one key
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         assert_eq!(
             all?,
@@ -423,8 +419,8 @@ mod test {
             .prefix(b"owner")
             .range(
                 &store,
-                Bound::Exclusive(b"spender1"),
-                Bound::Inclusive(b"spender2"),
+                Some(Bound::Exclusive(b"spender1".to_vec())),
+                Some(Bound::Inclusive(b"spender2".to_vec())),
                 Order::Descending,
             )
             .collect();

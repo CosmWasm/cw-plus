@@ -11,7 +11,7 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
 };
-use cw_storage_plus::{Bound, OwnedBound};
+use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
@@ -332,9 +332,9 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = OwnedBound::exclusive_int(start_after);
+    let start = start_after.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
-        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .range(&deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -349,9 +349,9 @@ fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let end = OwnedBound::exclusive_int(start_before);
+    let end = start_before.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
-        .range(&deps.storage, Bound::None, end.bound(), Order::Descending)
+        .range(&deps.storage, None, end, Order::Descending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -394,12 +394,12 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<VoteListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let canon = maybe_canonical(deps.api, start_after)?;
-    let start = OwnedBound::exclusive(canon);
+    let start = canon.map(Bound::exclusive);
 
     let api = &deps.api;
     let votes: StdResult<Vec<_>> = BALLOTS
         .prefix(proposal_id.into())
-        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .range(&deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, ballot) = item?;
@@ -435,11 +435,11 @@ fn list_voters<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<VoterListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let canon = maybe_canonical(deps.api, start_after)?;
-    let start = OwnedBound::exclusive(canon);
+    let start = canon.map(Bound::exclusive);
 
     let api = &deps.api;
     let voters: StdResult<Vec<_>> = VOTERS
-        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .range(&deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
