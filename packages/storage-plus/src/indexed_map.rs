@@ -154,6 +154,7 @@ mod test {
         pub age: UniqueIndex<'a, S, Data>,
     }
 
+    // Future Note: this can likely be macro-derived
     impl<'a, S: Storage> IndexList<S, Data> for DataIndexes<'a, S> {
         fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, Data>> + '_> {
             let v: Vec<&dyn Index<S, Data>> = vec![&self.name, &self.age];
@@ -161,8 +162,8 @@ mod test {
         }
     }
 
-    fn build_map<S: Storage>(
-    ) -> IndexedMap<'static, &'static [u8], Data, S, DataIndexes<'static, S>> {
+    // Can we make it easier to define this? (less wordy generic)
+    fn build_map<'a, S: Storage>() -> IndexedMap<'a, &'a [u8], Data, S, DataIndexes<'a, S>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d| index_string(&d.name), b"data", b"data__name"),
             age: UniqueIndex::new(|d| index_int(d.age), b"data__age"),
