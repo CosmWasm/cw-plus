@@ -37,55 +37,24 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    // TODO: do we make this any Vec<u8> ?
-    fn name(&self) -> String;
-    fn index(&self, data: &T) -> Vec<u8>;
-
     // TODO: pk: PrimaryKey not just &[u8] ???
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
     fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
-
-    // these should be implemented by all
-    fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>;
-
-    /// returns all items that match this secondary index, always by pk Ascending
-    fn items_by_index<'c>(
-        &'c self,
-        store: &'c S,
-        idx: &[u8],
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>;
-
-    // TODO: range over secondary index values? (eg. all results with 30 < age < 40)
 }
 
-pub struct MultiIndex<'a, S, T>
-where
-    T: Serialize + DeserializeOwned + Clone,
-{
-    _name: &'a str,
-    idx_fn: fn(&T) -> Vec<u8>,
+pub struct MultiIndex<'a, S, T> {
+    index: fn(&T) -> Vec<u8>,
     idx_map: Map<'a, (&'a [u8], &'a [u8]), u32>,
     // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
     pk_map: Map<'a, &'a [u8], T>,
     typed: PhantomData<S>,
 }
 
-impl<'a, S, T> MultiIndex<'a, S, T>
-where
-    S: Storage,
-    T: Serialize + DeserializeOwned + Clone,
-{
-    // Question: can we do this as a const function??
-    // Answer: Only if we remove trait guards and just enforce them with Index implementation
-    pub fn new(
-        idx_fn: fn(&T) -> Vec<u8>,
-        pk_namespace: &'a [u8],
-        idx_namespace: &'a [u8],
-        name: &'a str,
-    ) -> Self {
+impl<'a, S, T> MultiIndex<'a, S, T> {
+    // TODO: make this a const fn
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a [u8], idx_namespace: &'a [u8]) -> Self {
         MultiIndex {
-            _name: name,
-            idx_fn,
+            index: idx_fn,
             pk_map: Map::new(pk_namespace),
             idx_map: Map::new(idx_namespace),
             typed: PhantomData,
@@ -98,26 +67,24 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn name(&self) -> String {
-        self._name.to_string()
-    }
-
-    fn index(&self, data: &T) -> Vec<u8> {
-        (self.idx_fn)(data)
-    }
-
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = self.index(data);
+        let idx = (self.index)(data);
         self.idx_map.save(store, (&idx, &pk), &MARKER)
     }
 
     fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = self.index(old_data);
+        let idx = (self.index)(old_data);
         self.idx_map.remove(store, (&idx, &pk));
         Ok(())
     }
+}
 
-    fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+impl<'a, S, T> MultiIndex<'a, S, T>
+where
+    S: Storage,
+    T: Serialize + DeserializeOwned + Clone,
+{
+    pub fn pks<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         let prefix = self.idx_map.prefix(idx);
         let mapped = range_with_prefix(store, &prefix, Bound::None, Bound::None, Order::Ascending)
             .map(|(k, _)| k);
@@ -125,12 +92,12 @@ where
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    fn items_by_index<'c>(
+    pub fn items<'c>(
         &'c self,
         store: &'c S,
         idx: &[u8],
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-        let mapped = self.pks_by_index(store, idx).map(move |pk| {
+        let mapped = self.pks(store, idx).map(move |pk| {
             let v = self.pk_map.load(store, &pk)?;
             Ok((pk, v))
         });
@@ -138,34 +105,25 @@ where
     }
 }
 
-#[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct UniqueRef<T: Clone> {
+#[derive(Deserialize, Serialize)]
+pub(crate) struct UniqueRef<T> {
     // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
     pk: Binary,
     value: T,
 }
 
-pub struct UniqueIndex<'a, S, T>
-where
-    S: Storage,
-    T: Serialize + DeserializeOwned + Clone,
-{
-    _name: &'a str,
-    idx_fn: fn(&T) -> Vec<u8>,
+pub struct UniqueIndex<'a, S, T> {
+    index: fn(&T) -> Vec<u8>,
     idx_map: Map<'a, &'a [u8], UniqueRef<T>>,
     typed: PhantomData<S>,
 }
 
-impl<'a, S, T> UniqueIndex<'a, S, T>
-where
-    S: Storage,
-    T: Serialize + DeserializeOwned + Clone,
-{
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8], name: &'a str) -> Self {
+impl<'a, S, T> UniqueIndex<'a, S, T> {
+    // TODO: make this a const fn
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8]) -> Self {
         UniqueIndex {
-            idx_fn,
+            index: idx_fn,
             idx_map: Map::new(idx_namespace),
-            _name: name,
             typed: PhantomData,
         }
     }
@@ -176,24 +134,13 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn name(&self) -> String {
-        self._name.to_string()
-    }
-
-    fn index(&self, data: &T) -> Vec<u8> {
-        (self.idx_fn)(data)
-    }
-
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = self.index(data);
+        let idx = (self.index)(data);
         // error if this is already set
         self.idx_map
             .update(store, &idx, |existing| -> StdResult<_> {
                 match existing {
-                    Some(_) => Err(StdError::generic_err(format!(
-                        "Violates unique constraint on index `{}`",
-                        self._name
-                    ))),
+                    Some(_) => Err(StdError::generic_err("Violates unique constraint on index")),
                     None => Ok(UniqueRef::<T> {
                         pk: pk.into(),
                         value: data.clone(),
@@ -204,30 +151,23 @@ where
     }
 
     fn remove(&self, store: &mut S, _pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = self.index(old_data);
+        let idx = (self.index)(old_data);
         self.idx_map.remove(store, &idx);
         Ok(())
     }
+}
 
-    fn pks_by_index<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let data = match self.idx_map.may_load(store, &idx).unwrap() {
-            Some(item) => vec![item.pk.to_vec()],
-            None => vec![],
-        };
-        Box::new(data.into_iter())
-    }
-
+impl<'a, S, T> UniqueIndex<'a, S, T>
+where
+    S: Storage,
+    T: Serialize + DeserializeOwned + Clone,
+{
     /// returns all items that match this secondary index, always by pk Ascending
-    fn items_by_index<'c>(
-        &'c self,
-        store: &'c S,
-        idx: &[u8],
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-        let data = match self.idx_map.may_load(store, &idx) {
-            Ok(Some(item)) => vec![Ok((item.pk.to_vec(), item.value))],
-            Ok(None) => vec![],
-            Err(e) => vec![Err(e)],
-        };
-        Box::new(data.into_iter())
+    pub fn item(&self, store: &S, idx: &[u8]) -> StdResult<Option<KV<T>>> {
+        let data = self
+            .idx_map
+            .may_load(store, &idx)?
+            .map(|i| (i.pk.into(), i.value));
+        Ok(data)
     }
 }

@@ -1,105 +1,62 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
-use cosmwasm_std::{StdError, StdResult, Storage, KV};
+use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::marker::PhantomData;
 
-use crate::indexes::{Index, MultiIndex};
+use crate::indexes::Index;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::Prefix;
-use crate::UniqueIndex;
+
+pub trait IndexList<S, T> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, T>> + '_>;
+}
 
 /// IndexedBucket works like a bucket but has a secondary index
-/// This is a WIP.
-/// Step 1 - allow exactly 1 secondary index, no multi-prefix on primary key
-/// Step 2 - allow multiple named secondary indexes, no multi-prefix on primary key
-/// Step 3 - allow unique indexes - They store {pk: Vec<u8>, value: T} so we don't need to re-lookup
-/// Step 4 - allow multiple named secondary indexes, clean composite key support
-///
-/// Current Status: 2
-pub struct IndexedMap<'a, 'x, K, T, S>
+/// TODO: remove traits here and make this const fn new
+pub struct IndexedMap<'a, K, T, S, I>
 where
-    'a: 'x,
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
+    I: IndexList<S, T>,
     S: Storage,
 {
     pk_namespace: &'a [u8],
     primary: Map<'a, K, T>,
-    indexes: Vec<Box<dyn Index<S, T> + 'x>>,
+    /// This is meant to be read directly to get the proper types, like:
+    /// map.idx.owner.items(...)
+    pub idx: I,
+    typed_store: PhantomData<S>,
 }
 
-impl<'a, 'x, K, T, S> IndexedMap<'a, 'x, K, T, S>
+impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
 where
     K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone + 'x,
-    S: Storage + 'x,
+    T: Serialize + DeserializeOwned + Clone,
+    S: Storage,
+    I: IndexList<S, T>,
 {
-    pub fn new(pk_namespace: &'a [u8]) -> Self {
+    /// TODO: remove traits here and make this const fn new
+    pub fn new(pk_namespace: &'a [u8], indexes: I) -> Self {
         IndexedMap {
             pk_namespace,
             primary: Map::new(pk_namespace),
-            indexes: vec![],
+            idx: indexes,
+            typed_store: PhantomData,
         }
     }
+}
 
-    /// Usage:
-    /// let mut bucket = IndexedBucket::new(&mut storeage, b"foobar")
-    ///                     .with_unique_index("name", |x| x.name.clone())?
-    ///                     .with_index("age", by_age)?;
-    pub fn with_index(
-        mut self,
-        name: &'x str,
-        idx_namespace: &'x [u8],
-        indexer: fn(&T) -> Vec<u8>,
-    ) -> StdResult<Self>
-    where
-        'x: 'a,
-    {
-        self.can_add_index(name)?;
-        let index: MultiIndex<'x, S, T> =
-            MultiIndex::new(indexer, self.pk_namespace, idx_namespace, name);
-        self.indexes.push(Box::new(index));
-        Ok(self)
-    }
-
-    /// Usage:
-    /// let mut bucket = IndexedBucket::new(&mut storeage, b"foobar")
-    ///                     .with_unique_index("name", |x| x.name.clone())?
-    ///                     .with_index("age", by_age)?;
-    pub fn with_unique_index(
-        mut self,
-        name: &'x str,
-        idx_namespace: &'x [u8],
-        indexer: fn(&T) -> Vec<u8>,
-    ) -> StdResult<Self> {
-        self.can_add_index(name)?;
-        let index = UniqueIndex::new(indexer, idx_namespace, name);
-        self.indexes.push(Box::new(index));
-        Ok(self)
-    }
-
-    fn can_add_index(&self, name: &str) -> StdResult<()> {
-        match self.get_index(name) {
-            Some(_) => Err(StdError::generic_err(format!(
-                "Attempt to write index {} 2 times",
-                name
-            ))),
-            None => Ok(()),
-        }
-    }
-
-    fn get_index(&self, name: &str) -> Option<&dyn Index<S, T>> {
-        for existing in self.indexes.iter() {
-            if existing.name() == name {
-                return Some(existing.as_ref());
-            }
-        }
-        None
-    }
-
+impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned + Clone,
+    S: Storage,
+    I: IndexList<S, T>,
+{
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
@@ -126,12 +83,12 @@ where
         // this is the key *relative* to the primary map namespace
         let pk = key.joined_key();
         if let Some(old) = old_data {
-            for index in self.indexes.iter() {
+            for index in self.idx.get_indexes() {
                 index.remove(store, &pk, old)?;
             }
         }
         if let Some(updated) = data {
-            for index in self.indexes.iter() {
+            for index in self.idx.get_indexes() {
                 index.save(store, &pk, updated)?;
             }
             self.primary.save(store, key, updated)?;
@@ -175,71 +132,13 @@ where
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
-
-    // /// iterates over the items in pk order
-    // pub fn range<'c, S: Storage>(
-    //     &'c self,
-    //     store: &'c S,
-    //     start: Option<&[u8]>,
-    //     end: Option<&[u8]>,
-    //     order: Order,
-    // ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-    //     self.primary.range(start, end, order)
-    // }
-
-    /// returns all pks that where stored under this secondary index, always Ascending
-    /// this is mainly an internal function, but can be used direcly if you just want to list ids cheaply
-    pub fn pks_by_index<'c>(
-        &'c self,
-        store: &'c S,
-        index_name: &str,
-        idx: &[u8],
-    ) -> StdResult<Box<dyn Iterator<Item = Vec<u8>> + 'c>> {
-        let index = self
-            .get_index(index_name)
-            .ok_or_else(|| StdError::not_found(index_name))?;
-        Ok(index.pks_by_index(&store, idx))
-    }
-
-    /// returns all items that match this secondary index, always by pk Ascending
-    pub fn items_by_index<'c>(
-        &'c self,
-        store: &'c S,
-        index_name: &str,
-        idx: &[u8],
-    ) -> StdResult<Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>> {
-        let index = self
-            .get_index(index_name)
-            .ok_or_else(|| StdError::not_found(index_name))?;
-        Ok(index.items_by_index(&store, idx))
-    }
-
-    // this will return None for 0 items, Some(x) for 1 item,
-    // and an error for > 1 item. Only meant to be called on unique
-    // indexes that can return 0 or 1 item
-    pub fn load_unique_index(
-        &self,
-        store: &S,
-        index_name: &str,
-        idx: &[u8],
-    ) -> StdResult<Option<KV<T>>> {
-        let mut it = self.items_by_index(store, index_name, idx)?;
-        let first = it.next().transpose()?;
-        match first {
-            None => Ok(None),
-            Some(one) => match it.next() {
-                None => Ok(Some(one)),
-                Some(_) => Err(StdError::generic_err("Unique Index returned 2 matches")),
-            },
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use crate::indexes::{index_int, index_string};
+    use crate::indexes::{index_int, index_string, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::MemoryStorage;
     use serde::{Deserialize, Serialize};
@@ -250,12 +149,26 @@ mod test {
         pub age: i32,
     }
 
-    fn build_map() -> IndexedMap<'static, 'static, &'static [u8], Data, MemoryStorage> {
-        IndexedMap::<&[u8], Data, MemoryStorage>::new(b"data")
-            .with_index("name", b"data__name", |d| index_string(&d.name))
-            .unwrap()
-            .with_unique_index("age", b"data__age", |d| index_int(d.age))
-            .unwrap()
+    struct DataIndexes<'a, S: Storage> {
+        pub name: MultiIndex<'a, S, Data>,
+        pub age: UniqueIndex<'a, S, Data>,
+    }
+
+    // Future Note: this can likely be macro-derived
+    impl<'a, S: Storage> IndexList<S, Data> for DataIndexes<'a, S> {
+        fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, Data>> + '_> {
+            let v: Vec<&dyn Index<S, Data>> = vec![&self.name, &self.age];
+            Box::new(v.into_iter())
+        }
+    }
+
+    // Can we make it easier to define this? (less wordy generic)
+    fn build_map<'a, S: Storage>() -> IndexedMap<'a, &'a [u8], Data, S, DataIndexes<'a, S>> {
+        let indexes = DataIndexes {
+            name: MultiIndex::new(|d| index_string(&d.name), b"data", b"data__name"),
+            age: UniqueIndex::new(|d| index_int(d.age), b"data__age"),
+        };
+        IndexedMap::new(b"data", indexes)
     }
 
     #[test]
@@ -275,21 +188,15 @@ mod test {
         let loaded = map.load(&store, pk).unwrap();
         assert_eq!(data, loaded);
 
-        let count = map
-            .items_by_index(&store, "name", &index_string("Maria"))
-            .unwrap()
-            .count();
+        let count = map.idx.name.items(&store, &index_string("Maria")).count();
         assert_eq!(1, count);
 
         // TODO: we load by wrong keys - get full storage key!
 
         // load it by secondary index (we must know how to compute this)
         // let marias: StdResult<Vec<_>> = map
-        let marias: Vec<StdResult<_>> = map
-            .items_by_index(&store, "name", &index_string("Maria"))
-            .unwrap()
-            .collect();
-        // let marias = marias.unwrap();
+        let marias: Vec<StdResult<_>> =
+            map.idx.name.items(&store, &index_string("Maria")).collect();
         assert_eq!(1, marias.len());
         assert!(marias[0].is_ok());
         let (k, v) = marias[0].as_ref().unwrap();
@@ -297,42 +204,27 @@ mod test {
         assert_eq!(&data, v);
 
         // other index doesn't match (1 byte after)
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "name", &index_string("Marib"))
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let marias = map.idx.name.items(&store, &index_string("Marib")).count();
+        assert_eq!(0, marias);
 
         // other index doesn't match (1 byte before)
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "name", &index_string("Mari`"))
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let marias = map.idx.name.items(&store, &index_string("Mari`")).count();
+        assert_eq!(0, marias);
 
         // other index doesn't match (longer)
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "name", &index_string("Maria5"))
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let marias = map.idx.name.items(&store, &index_string("Maria5")).count();
+        assert_eq!(0, marias);
 
         // match on proper age
         let proper = index_int(42);
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "age", &proper)
-            .unwrap()
-            .collect();
-        let marias = marias.unwrap();
-        assert_eq!(1, marias.len());
+        let aged = map.idx.age.item(&store, &proper).unwrap().unwrap();
+        assert_eq!(pk.to_vec(), aged.0);
+        assert_eq!(data, aged.1);
 
         // no match on wrong age
         let too_old = index_int(43);
-        let marias: StdResult<Vec<_>> = map
-            .items_by_index(&store, "age", &too_old)
-            .unwrap()
-            .collect();
-        assert_eq!(0, marias.unwrap().len());
+        let aged = map.idx.age.item(&store, &too_old).unwrap();
+        assert_eq!(None, aged);
     }
 
     #[test]
@@ -368,20 +260,14 @@ mod test {
         // query by unique key
         // match on proper age
         let age42 = index_int(42);
-        let (k, v) = map
-            .load_unique_index(&store, "age", &age42)
-            .unwrap()
-            .unwrap();
+        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk1);
         assert_eq!(&v.name, "Maria");
         assert_eq!(v.age, 42);
 
         // match on other age
         let age23 = index_int(23);
-        let (k, v) = map
-            .load_unique_index(&store, "age", &age23)
-            .unwrap()
-            .unwrap();
+        let (k, v) = map.idx.age.item(&store, &age23).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk2);
         assert_eq!(&v.name, "Maria");
         assert_eq!(v.age, 23);
@@ -390,10 +276,7 @@ mod test {
         map.remove(&mut store, pk1).unwrap();
         map.save(&mut store, pk3, &data3).unwrap();
         // now 42 is the new owner
-        let (k, v) = map
-            .load_unique_index(&store, "age", &age42)
-            .unwrap()
-            .unwrap();
+        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk3);
         assert_eq!(&v.name, "Marta");
         assert_eq!(v.age, 42);
@@ -404,14 +287,11 @@ mod test {
         let mut store = MockStorage::new();
         let mut map = build_map();
 
-        let name_count = |map: &IndexedMap<&[u8], Data, MemoryStorage>,
-                          store: &MemoryStorage,
-                          name: &str|
-         -> usize {
-            map.items_by_index(store, "name", &index_string(name))
-                .unwrap()
-                .count()
-        };
+        let name_count =
+            |map: &IndexedMap<&[u8], Data, MemoryStorage, DataIndexes<MemoryStorage>>,
+             store: &MemoryStorage,
+             name: &str|
+             -> usize { map.idx.name.pks(store, &index_string(name)).count() };
 
         // set up some data
         let data1 = Data {
