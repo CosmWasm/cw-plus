@@ -1100,4 +1100,73 @@ mod tests {
         let res = query_all_approvals(&deps, late_env, "person".into(), false, None, None).unwrap();
         assert_eq!(0, res.operators.len());
     }
+
+    #[test]
+    fn query_tokens_by_owner() {
+        let mut deps = mock_dependencies(&[]);
+        setup_contract(&mut deps);
+        let minter = mock_info(MINTER, &[]);
+
+        // Mint a couple tokens (from the same owner)
+        let token_id1 = "grow1".to_string();
+        let demeter = HumanAddr::from("Demeter");
+        let token_id2 = "grow2".to_string();
+        let ceres = HumanAddr::from("Ceres");
+        let token_id3 = "sing".to_string();
+
+        let mint_msg = HandleMsg::Mint(MintMsg {
+            token_id: token_id1.clone(),
+            owner: demeter.clone(),
+            name: "Growing power".to_string(),
+            description: Some("Allows the owner the power to grow anything".to_string()),
+            image: None,
+        });
+        handle(&mut deps, mock_env(), minter.clone(), mint_msg).unwrap();
+
+        let mint_msg = HandleMsg::Mint(MintMsg {
+            token_id: token_id2.clone(),
+            owner: ceres.clone(),
+            name: "More growing power".to_string(),
+            description: Some(
+                "Allows the owner the power to grow anything even faster".to_string(),
+            ),
+            image: None,
+        });
+        handle(&mut deps, mock_env(), minter.clone(), mint_msg).unwrap();
+
+        let mint_msg = HandleMsg::Mint(MintMsg {
+            token_id: token_id3.clone(),
+            owner: demeter.clone(),
+            name: "Sing a lullaby".to_string(),
+            description: Some("Calm even the most excited children".to_string()),
+            image: None,
+        });
+        handle(&mut deps, mock_env(), minter.clone(), mint_msg).unwrap();
+
+        // get all tokens in order:
+        let expected = vec![token_id1.clone(), token_id2.clone(), token_id3.clone()];
+        let tokens = query_all_tokens(&deps, None, None).unwrap();
+        assert_eq!(&expected, &tokens.tokens);
+        // paginate
+        let tokens = query_all_tokens(&deps, None, Some(2)).unwrap();
+        assert_eq!(&expected[..2], &tokens.tokens[..]);
+        let tokens = query_all_tokens(&deps, Some(expected[1].clone()), None).unwrap();
+        assert_eq!(&expected[2..], &tokens.tokens[..]);
+
+        // get by owner
+        let by_ceres = vec![token_id2.clone()];
+        let by_demeter = vec![token_id1.clone(), token_id3.clone()];
+        // all tokens by owner
+        let tokens = query_tokens(&deps, demeter.clone(), None, None).unwrap();
+        assert_eq!(&by_demeter, &tokens.tokens);
+        let tokens = query_tokens(&deps, ceres.clone(), None, None).unwrap();
+        assert_eq!(&by_ceres, &tokens.tokens);
+
+        // paginate for demeter
+        let tokens = query_tokens(&deps, demeter.clone(), None, Some(1)).unwrap();
+        assert_eq!(&by_demeter[..1], &tokens.tokens[..]);
+        let tokens =
+            query_tokens(&deps, demeter.clone(), Some(by_demeter[0].clone()), Some(3)).unwrap();
+        assert_eq!(&by_demeter[1..], &tokens.tokens[..]);
+    }
 }
