@@ -114,6 +114,14 @@ pub enum QueryMsg {
     },
 
     /// With Enumerable extension.
+    /// Returns all tokens owned by the given address, [] if unset.
+    /// Return type: TokensResponse.
+    Tokens {
+        owner: HumanAddr,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// With Enumerable extension.
     /// Requires pagination. Lists all token_ids controlled by the contract.
     /// Return type: TokensResponse.
     AllTokens {

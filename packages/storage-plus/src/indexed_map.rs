@@ -7,9 +7,9 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::indexes::Index;
-use crate::keys::{Prefixer, PrimaryKey};
+use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::Prefix;
+use crate::prefix::{Bound, Prefix};
 
 pub trait IndexList<S, T> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, T>> + '_>;
@@ -131,6 +131,31 @@ where
     // use prefix to scan -> range
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
+    }
+}
+
+// short-cut for simple keys, rather than .prefix(()).range(...)
+impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned + Clone,
+    S: Storage,
+    I: IndexList<S, T>,
+    K::Prefix: EmptyPrefix,
+{
+    // I would prefer not to copy code from Prefix, but no other way
+    // with lifetimes (create Prefix inside function and return ref = no no)
+    pub fn range<'c>(
+        &self,
+        store: &'c S,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(K::Prefix::new()).range(store, min, max, order)
     }
 }
 

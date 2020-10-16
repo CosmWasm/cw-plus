@@ -1,6 +1,8 @@
+use std::marker::PhantomData;
+use std::str::from_utf8;
+
 use crate::helpers::{decode_length, namespaces_with_key};
 use crate::Endian;
-use std::marker::PhantomData;
 
 // pub trait PrimaryKey<'a>: Copy {
 pub trait PrimaryKey<'a>: Clone {
@@ -25,6 +27,8 @@ type Pk0 = ();
 type Pk1<'a> = &'a [u8];
 type Pk2<'a, T = &'a [u8], U = &'a [u8]> = (T, U);
 
+type PkStr<'a> = &'a str;
+
 impl<'a> PrimaryKey<'a> for Pk1<'a> {
     type Prefix = Pk0;
 
@@ -35,6 +39,20 @@ impl<'a> PrimaryKey<'a> for Pk1<'a> {
 
     fn parse_key(serialized: &'a [u8]) -> Self {
         serialized
+    }
+}
+
+// Provide a string version of this to raw encode strings
+impl<'a> PrimaryKey<'a> for PkStr<'a> {
+    type Prefix = Pk0;
+
+    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_bytes()]
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        from_utf8(serialized).unwrap()
     }
 }
 
@@ -80,6 +98,13 @@ impl<'a> Prefixer<'a> for Pk2<'a> {
     }
 }
 
+// Provide a string version of this to raw encode strings
+impl<'a> Prefixer<'a> for PkStr<'a> {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+        vec![self.as_bytes()]
+    }
+}
+
 // this is a marker for the Map.range() helper, so we can detect () in Generic bounds
 pub trait EmptyPrefix {
     fn new() -> Self;
@@ -90,7 +115,7 @@ impl EmptyPrefix for () {
 }
 
 // Add support for an dynamic keys - constructor functions below
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PkOwned(pub Vec<u8>);
 
 impl<'a> PrimaryKey<'a> for PkOwned {
@@ -142,7 +167,7 @@ pub type U128Key = IntKey<u128>;
 ///   let k = U64Key::new(12345);
 ///   let k = U32Key::from(12345);
 ///   let k: U16Key = 12345.into();
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IntKey<T: Endian> {
     pub wrapped: PkOwned,
     pub data: PhantomData<T>,
@@ -196,6 +221,27 @@ mod test {
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].to_vec());
+    }
+
+    #[test]
+    fn str_key_works() {
+        let k: &str = "hello";
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!("hello".as_bytes(), path[0]);
+
+        let joined = k.joined_key();
+        let parsed = PkStr::parse_key(&joined);
+        assert_eq!(parsed, "hello");
+    }
+
+    #[test]
+    fn nested_str_key_works() {
+        let k: (&str, &[u8]) = ("hello", b"world");
+        let path = k.key();
+        assert_eq!(2, path.len());
+        assert_eq!("hello".as_bytes(), path[0]);
+        assert_eq!("world".as_bytes(), path[1]);
     }
 
     #[test]
@@ -253,5 +299,22 @@ mod test {
         assert_eq!(key, parsed);
     }
 
-    // TODO: parse joined with int/owned keys
+    #[test]
+    fn parse_joined_keys_int() {
+        let key: U64Key = 12345678.into();
+        let joined = key.joined_key();
+        assert_eq!(8, joined.len());
+        let parsed = U64Key::parse_key(&joined);
+        assert_eq!(key, parsed);
+    }
+
+    #[test]
+    fn parse_joined_keys_string_int() {
+        let key: (U32Key, &str) = (54321.into(), "random");
+        let joined = key.joined_key();
+        assert_eq!(2 + 4 + 6, joined.len());
+        let parsed = <(U32Key, &str)>::parse_key(&joined);
+        assert_eq!(key, parsed);
+        assert_eq!("random", parsed.1);
+    }
 }

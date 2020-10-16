@@ -11,7 +11,7 @@ mod prefix;
 
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
-pub use indexed_map::IndexedMap;
+pub use indexed_map::{IndexList, IndexedMap};
 #[cfg(feature = "iterator")]
 pub use indexes::{index_int, index_string, Index, MultiIndex, UniqueIndex};
 pub use item::Item;
