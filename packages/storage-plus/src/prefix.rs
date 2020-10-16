@@ -14,11 +14,32 @@ use crate::Endian;
 /// None means that we don't limit that side of the range at all.
 /// Include means we use the given bytes as a limit and *include* anything at that exact key
 /// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
-#[derive(Copy, Clone, Debug)]
-pub enum Bound<'a> {
-    Inclusive(&'a [u8]),
-    Exclusive(&'a [u8]),
-    None,
+#[derive(Clone, Debug)]
+pub enum Bound {
+    Inclusive(Vec<u8>),
+    Exclusive(Vec<u8>),
+}
+
+impl Bound {
+    /// Turns optional binary, like Option<CanonicalAddr> into an inclusive bound
+    pub fn inclusive<T: Into<Vec<u8>>>(limit: T) -> Self {
+        Bound::Inclusive(limit.into())
+    }
+
+    /// Turns optional binary, like Option<CanonicalAddr> into an exclusive bound
+    pub fn exclusive<T: Into<Vec<u8>>>(limit: T) -> Self {
+        Bound::Exclusive(limit.into())
+    }
+
+    /// Turns an int, like Option<u32> into an inclusive bound
+    pub fn inclusive_int<T: Endian>(limit: T) -> Self {
+        Bound::Inclusive(limit.to_be_bytes().into())
+    }
+
+    /// Turns an int, like Option<u64> into an exclusive bound
+    pub fn exclusive_int<T: Endian>(limit: T) -> Self {
+        Bound::Exclusive(limit.to_be_bytes().into())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -59,8 +80,8 @@ where
     pub fn range<'a, S: Storage>(
         &self,
         store: &'a S,
-        min: Bound<'_>,
-        max: Bound<'_>,
+        min: Option<Bound>,
+        max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'a>
     where
@@ -72,68 +93,15 @@ where
     }
 }
 
-/// OwnedBound is like bound, but owns the data (as a Vec<u8>) inside.
-/// It is much easier to use if you dynamically construct the content, and can be passed into range as well.
-/// We provide lots of helpers to create these bounds from other data-types
-#[derive(Clone, Debug)]
-pub enum OwnedBound {
-    Inclusive(Vec<u8>),
-    Exclusive(Vec<u8>),
-    None,
-}
-
-impl OwnedBound {
-    /// Returns a bound that borrows the owned data, to pass into range()
-    pub fn bound(&self) -> Bound<'_> {
-        match self {
-            OwnedBound::Inclusive(limit) => Bound::Inclusive(&limit),
-            OwnedBound::Exclusive(limit) => Bound::Exclusive(&limit),
-            OwnedBound::None => Bound::None,
-        }
-    }
-
-    /// Turns optional binary, like Option<CanonicalAddr> into an inclusive bound
-    pub fn inclusive<T: Into<Vec<u8>>>(maybe: Option<T>) -> Self {
-        match maybe {
-            Some(bytes) => OwnedBound::Inclusive(bytes.into()),
-            None => OwnedBound::None,
-        }
-    }
-
-    /// Turns optional binary, like Option<CanonicalAddr> into an exclusive bound
-    pub fn exclusive<T: Into<Vec<u8>>>(maybe: Option<T>) -> Self {
-        match maybe {
-            Some(bytes) => OwnedBound::Exclusive(bytes.into()),
-            None => OwnedBound::None,
-        }
-    }
-
-    /// Turns an int, like Option<u32> into an inclusive bound
-    pub fn inclusive_int<T: Endian>(limit: Option<T>) -> Self {
-        match limit {
-            Some(t) => Self::Inclusive(t.to_be_bytes().into()),
-            None => OwnedBound::None,
-        }
-    }
-
-    /// Turns an int, like Option<u64> into an exclusive bound
-    pub fn exclusive_int<T: Endian>(limit: Option<T>) -> Self {
-        match limit {
-            Some(t) => Self::Exclusive(t.to_be_bytes().into()),
-            None => OwnedBound::None,
-        }
-    }
-}
-
 pub(crate) fn range_with_prefix<'a, S: Storage>(
     storage: &'a S,
     namespace: &[u8],
-    start: Bound<'_>,
-    end: Bound<'_>,
+    start: Option<Bound>,
+    end: Option<Bound>,
     order: Order,
 ) -> Box<dyn Iterator<Item = KV> + 'a> {
-    let start = calc_start_bound(namespace, start, order);
-    let end = calc_end_bound(namespace, end, order);
+    let start = calc_start_bound(namespace, start);
+    let end = calc_end_bound(namespace, end);
 
     // get iterator from storage
     let base_iterator = storage.range(Some(&start), Some(&end), order);
@@ -144,23 +112,21 @@ pub(crate) fn range_with_prefix<'a, S: Storage>(
     Box::new(mapped)
 }
 
-// TODO: does order matter here?
-fn calc_start_bound(namespace: &[u8], bound: Bound<'_>, _order: Order) -> Vec<u8> {
+fn calc_start_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
     match bound {
-        Bound::None => namespace.to_vec(),
+        None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
-        Bound::Inclusive(limit) => concat(namespace, limit),
-        Bound::Exclusive(limit) => concat(namespace, &one_byte_higher(limit)),
+        Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
+        Some(Bound::Exclusive(limit)) => concat(namespace, &one_byte_higher(&limit)),
     }
 }
 
-// TODO: does order matter here?
-fn calc_end_bound(namespace: &[u8], bound: Bound<'_>, _order: Order) -> Vec<u8> {
+fn calc_end_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
     match bound {
-        Bound::None => namespace_upper_bound(namespace),
+        None => namespace_upper_bound(namespace),
         // this is the natural limits of the underlying Storage
-        Bound::Exclusive(limit) => concat(namespace, limit),
-        Bound::Inclusive(limit) => concat(namespace, &one_byte_higher(limit)),
+        Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
+        Some(Bound::Inclusive(limit)) => concat(namespace, &one_byte_higher(&limit)),
     }
 }
 
@@ -217,12 +183,10 @@ mod test {
         let expected_reversed: Vec<(Vec<u8>, u64)> = expected.iter().rev().cloned().collect();
 
         // let's do the basic sanity check
-        let res: StdResult<Vec<_>> = prefix
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
-            .collect();
+        let res: StdResult<Vec<_>> = prefix.range(&store, None, None, Order::Ascending).collect();
         assert_eq!(&expected, &res.unwrap());
         let res: StdResult<Vec<_>> = prefix
-            .range(&store, Bound::None, Bound::None, Order::Descending)
+            .range(&store, None, None, Order::Descending)
             .collect();
         assert_eq!(&expected_reversed, &res.unwrap());
 
@@ -230,8 +194,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Inclusive(b"ra"),
-                Bound::None,
+                Some(Bound::Inclusive(b"ra".to_vec())),
+                None,
                 Order::Ascending,
             )
             .collect();
@@ -240,8 +204,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Exclusive(b"ra"),
-                Bound::None,
+                Some(Bound::Exclusive(b"ra".to_vec())),
+                None,
                 Order::Ascending,
             )
             .collect();
@@ -250,8 +214,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Exclusive(b"r"),
-                Bound::None,
+                Some(Bound::Exclusive(b"r".to_vec())),
+                None,
                 Order::Ascending,
             )
             .collect();
@@ -261,8 +225,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::None,
-                Bound::Inclusive(b"ra"),
+                None,
+                Some(Bound::Inclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -271,8 +235,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::None,
-                Bound::Exclusive(b"ra"),
+                None,
+                Some(Bound::Exclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -281,8 +245,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::None,
-                Bound::Exclusive(b"rb"),
+                None,
+                Some(Bound::Exclusive(b"rb".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -292,8 +256,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Inclusive(b"ra"),
-                Bound::Exclusive(b"zi"),
+                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(Bound::Exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();
@@ -302,8 +266,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Inclusive(b"ra"),
-                Bound::Exclusive(b"zi"),
+                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(Bound::Exclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -312,8 +276,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Inclusive(b"ra"),
-                Bound::Inclusive(b"zi"),
+                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(Bound::Inclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -322,8 +286,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range(
                 &store,
-                Bound::Exclusive(b"ra"),
-                Bound::Exclusive(b"zi"),
+                Some(Bound::Exclusive(b"ra".to_vec())),
+                Some(Bound::Exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();

@@ -19,4 +19,4 @@ pub use keys::{PkOwned, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key};
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
-pub use prefix::{Bound, OwnedBound, Prefix};
+pub use prefix::{Bound, Prefix};

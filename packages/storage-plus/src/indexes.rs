@@ -9,7 +9,7 @@ use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, Endian};
+use crate::Endian;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
@@ -86,8 +86,8 @@ where
 {
     pub fn pks<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         let prefix = self.idx_map.prefix(idx);
-        let mapped = range_with_prefix(store, &prefix, Bound::None, Bound::None, Order::Ascending)
-            .map(|(k, _)| k);
+        let mapped =
+            range_with_prefix(store, &prefix, None, None, Order::Ascending).map(|(k, _)| k);
         Box::new(mapped)
     }
 
