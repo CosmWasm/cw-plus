@@ -140,7 +140,7 @@ mod test {
 
     use crate::indexes::{index_int, index_string, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::MemoryStorage;
+    use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -188,32 +188,54 @@ mod test {
         let loaded = map.load(&store, pk).unwrap();
         assert_eq!(data, loaded);
 
-        let count = map.idx.name.items(&store, &index_string("Maria")).count();
+        let count = map
+            .idx
+            .name
+            .all_items(&store, &index_string("Maria"))
+            .unwrap()
+            .len();
         assert_eq!(1, count);
 
         // TODO: we load by wrong keys - get full storage key!
 
         // load it by secondary index (we must know how to compute this)
         // let marias: StdResult<Vec<_>> = map
-        let marias: Vec<StdResult<_>> =
-            map.idx.name.items(&store, &index_string("Maria")).collect();
+        let marias = map
+            .idx
+            .name
+            .all_items(&store, &index_string("Maria"))
+            .unwrap();
         assert_eq!(1, marias.len());
-        assert!(marias[0].is_ok());
-        let (k, v) = marias[0].as_ref().unwrap();
+        let (k, v) = &marias[0];
         assert_eq!(pk, k.as_slice());
         assert_eq!(&data, v);
 
         // other index doesn't match (1 byte after)
-        let marias = map.idx.name.items(&store, &index_string("Marib")).count();
-        assert_eq!(0, marias);
+        let count = map
+            .idx
+            .name
+            .all_items(&store, &index_string("Marib"))
+            .unwrap()
+            .len();
+        assert_eq!(0, count);
 
         // other index doesn't match (1 byte before)
-        let marias = map.idx.name.items(&store, &index_string("Mari`")).count();
-        assert_eq!(0, marias);
+        let count = map
+            .idx
+            .name
+            .all_items(&store, &index_string("Mari`"))
+            .unwrap()
+            .len();
+        assert_eq!(0, count);
 
         // other index doesn't match (longer)
-        let marias = map.idx.name.items(&store, &index_string("Maria5")).count();
-        assert_eq!(0, marias);
+        let count = map
+            .idx
+            .name
+            .all_items(&store, &index_string("Maria5"))
+            .unwrap()
+            .len();
+        assert_eq!(0, count);
 
         // match on proper age
         let proper = index_int(42);
@@ -291,7 +313,12 @@ mod test {
             |map: &IndexedMap<&[u8], Data, MemoryStorage, DataIndexes<MemoryStorage>>,
              store: &MemoryStorage,
              name: &str|
-             -> usize { map.idx.name.pks(store, &index_string(name)).count() };
+             -> usize {
+                map.idx
+                    .name
+                    .pks(store, &index_string(name), None, None, Order::Ascending)
+                    .count()
+            };
 
         // set up some data
         let data1 = Data {

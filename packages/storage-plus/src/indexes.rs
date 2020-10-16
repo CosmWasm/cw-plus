@@ -9,7 +9,7 @@ use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::Endian;
+use crate::{Bound, Endian};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
@@ -84,10 +84,16 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    pub fn pks<'c>(&self, store: &'c S, idx: &[u8]) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+    pub fn pks<'c>(
+        &self,
+        store: &'c S,
+        idx: &[u8],
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         let prefix = self.idx_map.prefix(idx);
-        let mapped =
-            range_with_prefix(store, &prefix, None, None, Order::Ascending).map(|(k, _)| k);
+        let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
         Box::new(mapped)
     }
 
@@ -96,12 +102,31 @@ where
         &'c self,
         store: &'c S,
         idx: &[u8],
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-        let mapped = self.pks(store, idx).map(move |pk| {
+        let mapped = self.pks(store, idx, min, max, order).map(move |pk| {
             let v = self.pk_map.load(store, &pk)?;
             Ok((pk, v))
         });
         Box::new(mapped)
+    }
+
+    #[cfg(test)]
+    pub fn count<'c>(&self, store: &'c S, idx: &[u8]) -> usize {
+        self.pks(store, idx, None, None, Order::Ascending).count()
+    }
+
+    #[cfg(test)]
+    pub fn all_pks<'c>(&self, store: &'c S, idx: &[u8]) -> Vec<Vec<u8>> {
+        self.pks(store, idx, None, None, Order::Ascending).collect()
+    }
+
+    #[cfg(test)]
+    pub fn all_items<'c>(&self, store: &'c S, idx: &[u8]) -> StdResult<Vec<KV<T>>> {
+        self.items(store, idx, None, None, Order::Ascending)
+            .collect()
     }
 }
 
