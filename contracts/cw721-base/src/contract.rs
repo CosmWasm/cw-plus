@@ -512,15 +512,13 @@ fn query_tokens<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    // TODO: get pagination working on second indexes
-    let _start = start_after.map(Bound::exclusive);
+    let start = start_after.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
     let tokens: Result<Vec<String>, _> = tokens::<S>()
         .idx
         .owner
-        .pks(&deps.storage, &owner_raw)
-        // .range(&deps.storage, start.bound(), None, Order::Ascending)
+        .pks(&deps.storage, &owner_raw, start, None, Order::Ascending)
         .take(limit)
         .map(String::from_utf8)
         .collect();
