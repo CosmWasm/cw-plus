@@ -13,10 +13,9 @@ use cw721::{
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, IDX_OWNER, MINTER,
-    OPERATORS,
+    increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS,
 };
-use cw_storage_plus::{Bound, OwnedBound};
+use cw_storage_plus::Bound;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -486,12 +485,12 @@ fn query_all_approvals<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<ApprovedForAllResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_canon = maybe_canonical(deps.api, start_after)?;
-    let start = OwnedBound::exclusive(start_canon);
+    let start = start_canon.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
     let res: StdResult<Vec<_>> = OPERATORS
         .prefix(&owner_raw)
-        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .range(&deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
         .map(|item| parse_approval(deps.api, item))
@@ -514,12 +513,14 @@ fn query_tokens<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     // TODO: get pagination working on second indexes
-    let _start = OwnedBound::exclusive(start_after.map(Vec::from));
+    let _start = start_after.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
     let tokens: Result<Vec<String>, _> = tokens::<S>()
-        .pks_by_index(&deps.storage, IDX_OWNER, &owner_raw)?
-        // .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .idx
+        .owner
+        .pks(&deps.storage, &owner_raw)
+        // .range(&deps.storage, start.bound(), None, Order::Ascending)
         .take(limit)
         .map(String::from_utf8)
         .collect();
@@ -534,10 +535,10 @@ fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = OwnedBound::exclusive(start_after.map(Vec::from));
+    let start = start_after.map(Bound::exclusive);
 
     let tokens: StdResult<Vec<String>> = tokens::<S>()
-        .range(&deps.storage, start.bound(), Bound::None, Order::Ascending)
+        .range(&deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
         .collect();

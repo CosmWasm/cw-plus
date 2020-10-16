@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
 use cw721::{ContractInfoResponse, Expiration};
-use cw_storage_plus::{IndexedMap, Item, Map};
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {
@@ -45,11 +45,20 @@ pub fn increment_tokens<S: Storage>(storage: &mut S) -> StdResult<u64> {
     Ok(val)
 }
 
-pub const IDX_OWNER: &str = "owner";
+pub struct TokenIndexes<'a, S: Storage> {
+    pub owner: MultiIndex<'a, S, TokenInfo>,
+}
 
-// indexed map needs function, not const (for now at least)
-pub fn tokens<'a, S: Storage + 'a>() -> IndexedMap<'a, 'a, &'a str, TokenInfo, S> {
-    IndexedMap::<&str, TokenInfo, S>::new(b"tokens")
-        .with_index(IDX_OWNER, b"tokens__owner", |d| d.owner.to_vec())
-        .unwrap()
+impl<'a, S: Storage> IndexList<S, TokenInfo> for TokenIndexes<'a, S> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, TokenInfo>> + '_> {
+        let v: Vec<&dyn Index<S, TokenInfo>> = vec![&self.owner];
+        Box::new(v.into_iter())
+    }
+}
+
+pub fn tokens<'a, S: Storage>() -> IndexedMap<'a, &'a str, TokenInfo, S, TokenIndexes<'a, S>> {
+    let indexes = TokenIndexes {
+        owner: MultiIndex::new(|d| d.owner.to_vec(), b"tokens", b"tokens__owner"),
+    };
+    IndexedMap::new(b"tokens", indexes)
 }
