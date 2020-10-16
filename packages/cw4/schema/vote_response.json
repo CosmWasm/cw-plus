@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VoteResponse",
+  "type": "object",
+  "properties": {
+    "vote": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Vote"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "Vote": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "abstain",
+        "veto"
+      ]
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VoteListResponse",
+  "type": "object",
+  "required": [
+    "votes"
+  ],
+  "properties": {
+    "votes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/VoteInfo"
+      }
+    }
+  },
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Vote": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "abstain",
+        "veto"
+      ]
+    },
+    "VoteInfo": {
+      "type": "object",
+      "required": [
+        "vote",
+        "voter",
+        "weight"
+      ],
+      "properties": {
+        "vote": {
+          "$ref": "#/definitions/Vote"
+        },
+        "voter": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "weight": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    }
+  }
+}
