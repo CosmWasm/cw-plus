@@ -135,11 +135,12 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-impl<'a, 'x, K, T, S> IndexedMap<'a, 'x, K, T, S>
+impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
 where
     K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone + 'x,
-    S: Storage + 'x,
+    T: Serialize + DeserializeOwned + Clone,
+    S: Storage,
+    I: IndexList<S, T>,
     K::Prefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
@@ -147,8 +148,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c S,
-        min: Bound<'_>,
-        max: Bound<'_>,
+        min: Option<Bound>,
+        max: Option<Bound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
     where
