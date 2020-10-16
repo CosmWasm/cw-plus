@@ -37,7 +37,6 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    // TODO: pk: PrimaryKey not just &[u8] ???
     fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
     fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
 }

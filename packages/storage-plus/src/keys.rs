@@ -115,7 +115,7 @@ impl EmptyPrefix for () {
 }
 
 // Add support for an dynamic keys - constructor functions below
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PkOwned(pub Vec<u8>);
 
 impl<'a> PrimaryKey<'a> for PkOwned {
@@ -167,7 +167,7 @@ pub type U128Key = IntKey<u128>;
 ///   let k = U64Key::new(12345);
 ///   let k = U32Key::from(12345);
 ///   let k: U16Key = 12345.into();
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IntKey<T: Endian> {
     pub wrapped: PkOwned,
     pub data: PhantomData<T>,
@@ -299,5 +299,22 @@ mod test {
         assert_eq!(key, parsed);
     }
 
-    // TODO: parse joined with int/owned keys
+    #[test]
+    fn parse_joined_keys_int() {
+        let key: U64Key = 12345678.into();
+        let joined = key.joined_key();
+        assert_eq!(8, joined.len());
+        let parsed = U64Key::parse_key(&joined);
+        assert_eq!(key, parsed);
+    }
+
+    #[test]
+    fn parse_joined_keys_string_int() {
+        let key: (U32Key, &str) = (54321.into(), "random");
+        let joined = key.joined_key();
+        assert_eq!(2 + 4 + 6, joined.len());
+        let parsed = <(U32Key, &str)>::parse_key(&joined);
+        assert_eq!(key, parsed);
+        assert_eq!("random", parsed.1);
+    }
 }

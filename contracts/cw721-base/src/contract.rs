@@ -522,7 +522,6 @@ fn query_tokens<S: Storage, A: Api, Q: Querier>(
         .take(limit)
         .map(String::from_utf8)
         .collect();
-    // TODO: make issue on CosmWasm to add impl From<FromUtf8Error> for StdError
     let tokens = tokens.map_err(StdError::invalid_utf8)?;
     Ok(TokensResponse { tokens })
 }
