@@ -4,15 +4,28 @@ use std::marker::PhantomData;
 
 use crate::helpers::{may_deserialize, must_deserialize, nested_namespaces_with_key};
 use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
+use std::ops::Deref;
 
+#[derive(Debug, Clone)]
 pub struct Path<T>
 where
     T: Serialize + DeserializeOwned,
 {
     /// all namespaces prefixes and concatenated with the key
-    pub(crate) storage_key: Vec<u8>,
+    storage_key: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
+}
+
+impl<T> Deref for Path<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.storage_key
+    }
 }
 
 impl<T> Path<T>

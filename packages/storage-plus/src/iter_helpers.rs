@@ -23,6 +23,7 @@ pub(crate) fn to_length_prefixed(namespace: &[u8]) -> Vec<u8> {
     out
 }
 
+// TODO: add a check here that it is the real prefix?
 #[inline]
 pub(crate) fn trim(namespace: &[u8], key: &[u8]) -> Vec<u8> {
     key[namespace.len()..].to_vec()

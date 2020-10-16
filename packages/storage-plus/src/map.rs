@@ -10,6 +10,7 @@ use crate::path::Path;
 use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+#[derive(Debug, Clone)]
 pub struct Map<'a, K, T> {
     namespace: &'a [u8],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
@@ -64,7 +65,7 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E, S>(&mut self, store: &mut S, k: K, action: A) -> Result<T, E>
+    pub fn update<A, E, S>(&self, store: &mut S, k: K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
@@ -87,8 +88,8 @@ where
     pub fn range<'c, S: Storage>(
         &self,
         store: &'c S,
-        min: Bound<'_>,
-        max: Bound<'_>,
+        min: Option<Bound>,
+        max: Option<Bound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
     where
@@ -102,6 +103,7 @@ where
 mod test {
     use super::*;
     use serde::{Deserialize, Serialize};
+    use std::ops::Deref;
 
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
@@ -120,14 +122,14 @@ mod test {
     #[test]
     fn create_path() {
         let path = PEOPLE.key(b"john");
-        let key = path.storage_key;
+        let key = path.deref();
         // this should be prefixed(people) || john
         assert_eq!("people".len() + "john".len() + 2, key.len());
         assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
         assert_eq!(b"john".to_vec().as_slice(), &key[8..]);
 
         let path = ALLOWANCE.key((b"john", b"maria"));
-        let key = path.storage_key;
+        let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!("allow".len() + "john".len() + "maria".len() + 4, key.len());
         assert_eq!(b"allow".to_vec().as_slice(), &key[2..7]);
@@ -198,9 +200,7 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
@@ -228,7 +228,7 @@ mod test {
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -382,9 +382,7 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2)?;
 
         // iterate over them all
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         assert_eq!(
             all?,
             vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
@@ -394,8 +392,8 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Bound::Exclusive(b"jim"),
-                Bound::None,
+                Some(Bound::Exclusive(b"jim".to_vec())),
+                None,
                 Order::Ascending,
             )
             .collect();
@@ -409,7 +407,7 @@ mod test {
         // get all under one key
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, Bound::None, Bound::None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         assert_eq!(
             all?,
@@ -421,8 +419,8 @@ mod test {
             .prefix(b"owner")
             .range(
                 &store,
-                Bound::Exclusive(b"spender1"),
-                Bound::Inclusive(b"spender2"),
+                Some(Bound::Exclusive(b"spender1".to_vec())),
+                Some(Bound::Inclusive(b"spender2".to_vec())),
                 Order::Descending,
             )
             .collect();
