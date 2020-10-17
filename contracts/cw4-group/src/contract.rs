@@ -213,56 +213,89 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies(&[]);
+    const ADMIN: &str = "juan";
+    const USER1: &str = "somebody";
+    const USER2: &str = "else";
+    const USER3: &str = "funny";
 
-        let admin = HumanAddr::from("juan");
-        let user1 = HumanAddr::from("somebody");
-        let user2 = HumanAddr::from("else");
-
+    fn do_init<S: Storage, A: Api, Q: Querier>(deps: &mut Extern<S, A, Q>) {
         let msg = InitMsg {
-            admin: Some(admin.clone()),
+            admin: Some(ADMIN.into()),
             members: vec![
                 Member {
-                    addr: user1.clone(),
+                    addr: USER1.into(),
                     weight: 11,
                 },
                 Member {
-                    addr: user2.clone(),
+                    addr: USER2.into(),
                     weight: 6,
                 },
             ],
         };
         let info = mock_info("creator", &[]);
-        init(&mut deps, mock_env(), info, msg).unwrap();
+        init(deps, mock_env(), info, msg).unwrap();
+    }
+
+    #[test]
+    fn proper_initialization() {
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
 
         // it worked, let's query the state
         let res = query_admin(&deps).unwrap();
-        assert_eq!(Some(admin), res.admin);
+        assert_eq!(Some(HumanAddr::from(ADMIN)), res.admin);
 
         let res = query_total_weight(&deps).unwrap();
         assert_eq!(17, res.weight);
     }
 
-    // #[test]
-    // fn increment() {
-    //     let mut deps = mock_dependencies(&coins(2, "token"));
-    //
-    //     let msg = InitMsg { count: 17 };
-    //     let info = mock_info("creator", &coins(2, "token"));
-    //     let _res = init(&mut deps, mock_env(), info, msg).unwrap();
-    //
-    //     // beneficiary can release it
-    //     let info = mock_info("anyone", &coins(2, "token"));
-    //     let msg = HandleMsg::Increment {};
-    //     let _res = handle(&mut deps, mock_env(), info, msg).unwrap();
-    //
-    //     // should increase counter by 1
-    //     let res = query(&deps, mock_env(), QueryMsg::GetCount {}).unwrap();
-    //     let value: CountResponse = from_binary(&res).unwrap();
-    //     assert_eq!(18, value.count);
-    // }
+    #[test]
+    fn try_update_admin() {
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
+
+        // a member cannot update admin
+        let err = update_admin(&mut deps, USER1.into(), Some(USER3.into())).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // admin can change it
+        update_admin(&mut deps, ADMIN.into(), Some(USER3.into())).unwrap();
+        assert_eq!(query_admin(&deps).unwrap().admin, Some(USER3.into()));
+
+        // and unset it
+        update_admin(&mut deps, USER3.into(), None).unwrap();
+        assert_eq!(query_admin(&deps).unwrap().admin, None);
+
+        // no one can change it now
+        let err = update_admin(&mut deps, USER3.into(), Some(USER1.into())).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn try_member_queries() {
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
+
+        let member1 = query_member(&deps, USER1.into()).unwrap();
+        assert_eq!(member1.weight, Some(11));
+
+        let member2 = query_member(&deps, USER2.into()).unwrap();
+        assert_eq!(member2.weight, Some(6));
+
+        let member3 = query_member(&deps, USER3.into()).unwrap();
+        assert_eq!(member3.weight, None);
+
+        let members = list_members(&deps, None, None).unwrap();
+        assert_eq!(members.members.len(), 2);
+        // TODO: assert the set is proper
+    }
+
     //
     // #[test]
     // fn reset() {
