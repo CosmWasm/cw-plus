@@ -1,14 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "CountResponse",
+  "title": "TotalWeightResponse",
   "type": "object",
   "required": [
-    "count"
+    "weight"
   ],
   "properties": {
-    "count": {
+    "weight": {
       "type": "integer",
-      "format": "int32"
+      "format": "uint64",
+      "minimum": 0.0
     }
   }
 }

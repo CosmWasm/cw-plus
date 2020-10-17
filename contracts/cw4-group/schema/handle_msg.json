@@ -3,35 +3,81 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "description": "Change the admin",
       "type": "object",
       "required": [
-        "increment"
+        "update_admin"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "update_admin": {
+          "type": "object",
+          "properties": {
+            "admin": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
         }
       }
     },
     {
+      "description": "apply a diff to the existing members. remove is applied after add, so if an address is in both, it is removed",
       "type": "object",
       "required": [
-        "reset"
+        "update_members"
       ],
       "properties": {
-        "reset": {
+        "update_members": {
           "type": "object",
           "required": [
-            "count"
+            "add",
+            "remove"
           ],
           "properties": {
-            "count": {
-              "type": "integer",
-              "format": "int32"
+            "add": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Member"
+              }
+            },
+            "remove": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
             }
           }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Member": {
+      "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
+      "type": "object",
+      "required": [
+        "addr",
+        "weight"
+      ],
+      "properties": {
+        "addr": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "weight": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    }
+  }
 }
