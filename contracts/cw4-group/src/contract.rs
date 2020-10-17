@@ -123,6 +123,8 @@ pub fn update_members<S: Storage, A: Api, Q: Querier>(
         MEMBERS.remove(&mut deps.storage, &raw);
     }
 
+    TOTAL.save(&mut deps.storage, &total)?;
+
     Ok(())
 }
 
@@ -296,32 +298,97 @@ mod tests {
         // TODO: assert the set is proper
     }
 
-    //
-    // #[test]
-    // fn reset() {
-    //     let mut deps = mock_dependencies(&coins(2, "token"));
-    //
-    //     let msg = InitMsg { count: 17 };
-    //     let info = mock_info("creator", &coins(2, "token"));
-    //     let _res = init(&mut deps, mock_env(), info, msg).unwrap();
-    //
-    //     // beneficiary can release it
-    //     let unauth_info = mock_info("anyone", &coins(2, "token"));
-    //     let msg = HandleMsg::Reset { count: 5 };
-    //     let res = handle(&mut deps, mock_env(), unauth_info, msg);
-    //     match res {
-    //         Err(ContractError::Unauthorized {}) => {}
-    //         _ => panic!("Must return unauthorized error"),
-    //     }
-    //
-    //     // only the original creator can reset the counter
-    //     let auth_info = mock_info("creator", &coins(2, "token"));
-    //     let msg = HandleMsg::Reset { count: 5 };
-    //     let _res = handle(&mut deps, mock_env(), auth_info, msg).unwrap();
-    //
-    //     // should now be 5
-    //     let res = query(&deps, mock_env(), QueryMsg::GetCount {}).unwrap();
-    //     let value: CountResponse = from_binary(&res).unwrap();
-    //     assert_eq!(5, value.count);
-    // }
+    fn assert_users<S: Storage, A: Api, Q: Querier>(
+        deps: &Extern<S, A, Q>,
+        user1_weight: Option<u64>,
+        user2_weight: Option<u64>,
+        user3_weight: Option<u64>,
+    ) {
+        let member1 = query_member(&deps, USER1.into()).unwrap();
+        assert_eq!(member1.weight, user1_weight);
+
+        let member2 = query_member(&deps, USER2.into()).unwrap();
+        assert_eq!(member2.weight, user2_weight);
+
+        let member3 = query_member(&deps, USER3.into()).unwrap();
+        assert_eq!(member3.weight, user3_weight);
+
+        // compute expected metrics
+        let weights = vec![user1_weight, user2_weight, user3_weight];
+        let sum: u64 = weights.iter().map(|x| x.unwrap_or_default()).sum();
+        let count = weights.iter().filter(|x| x.is_some()).count();
+
+        // TODO: more detailed compare?
+        let members = list_members(&deps, None, None).unwrap();
+        assert_eq!(count, members.members.len());
+
+        let total = query_total_weight(&deps).unwrap();
+        assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
+    }
+
+    #[test]
+    fn add_new_remove_old_member() {
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
+
+        // add a new one and remove existing one
+        let add = vec![Member {
+            addr: USER3.into(),
+            weight: 15,
+        }];
+        let remove = vec![USER1.into()];
+
+        // non-admin cannot update
+        let err = update_members(&mut deps, USER1.into(), add.clone(), remove.clone()).unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // admin updates properly
+        update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
+        assert_users(&deps, None, Some(6), Some(15));
+    }
+
+    #[test]
+    fn add_old_remove_new_member() {
+        // add will over-write and remove have no effect
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
+
+        // add a new one and remove existing one
+        let add = vec![Member {
+            addr: USER1.into(),
+            weight: 4,
+        }];
+        let remove = vec![USER3.into()];
+
+        // admin updates properly
+        update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
+        assert_users(&deps, Some(4), Some(6), None);
+    }
+
+    #[test]
+    fn add_and_remove_same_member() {
+        // add will over-write and remove have no effect
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
+
+        // USER1 is updated and remove in the same line, we should remove this an add member3
+        let add = vec![
+            Member {
+                addr: USER1.into(),
+                weight: 20,
+            },
+            Member {
+                addr: USER3.into(),
+                weight: 5,
+            },
+        ];
+        let remove = vec![USER1.into()];
+
+        // admin updates properly
+        update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
+        assert_users(&deps, None, Some(6), Some(5));
+    }
 }
