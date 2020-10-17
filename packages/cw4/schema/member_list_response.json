@@ -3,10 +3,10 @@
   "title": "MemberListResponse",
   "type": "object",
   "required": [
-    "member"
+    "members"
   ],
   "properties": {
-    "member": {
+    "members": {
       "type": "array",
       "items": {
         "$ref": "#/definitions/Member"
