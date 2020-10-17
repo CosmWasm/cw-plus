@@ -1,33 +1,35 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, StdResult, WasmMsg};
+use cosmwasm_std::{
+    to_binary, Api, CanonicalAddr, CosmosMsg, Empty, HumanAddr, Querier, QueryRequest, StdResult,
+    WasmMsg, WasmQuery,
+};
 
-use crate::msg::{Cw3HandleMsg, Vote};
-use cw0::Expiration;
+use crate::msg::Cw4HandleMsg;
+use crate::{
+    AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TotalWeightResponse,
+};
 
-/// Cw3Contract is a wrapper around HumanAddr that provides a lot of helpers
-/// for working with this.
+/// Cw4Contract is a wrapper around HumanAddr that provides a lot of helpers
+/// for working with cw4 contracts
 ///
-/// If you wish to persist this, convert to Cw3CanonicalContract via .canonical()
-///
-/// FIXME: Cw3Contract currently only supports CosmosMsg<Empty>. When we actually
-/// use this in some consuming code, we should make it generic over CosmosMsg<T>.
+/// If you wish to persist this, convert to Cw4CanonicalContract via .canonical()
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw3Contract(pub HumanAddr);
+pub struct Cw4Contract(pub HumanAddr);
 
-impl Cw3Contract {
+impl Cw4Contract {
     pub fn addr(&self) -> HumanAddr {
         self.0.clone()
     }
 
     /// Convert this address to a form fit for storage
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw3CanonicalContract> {
+    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw4CanonicalContract> {
         let canon = api.canonical_address(&self.0)?;
-        Ok(Cw3CanonicalContract(canon))
+        Ok(Cw4CanonicalContract(canon))
     }
 
-    pub fn encode_msg(&self, msg: Cw3HandleMsg) -> StdResult<CosmosMsg> {
+    fn encode_msg(&self, msg: Cw4HandleMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),
             msg: to_binary(&msg)?,
@@ -36,50 +38,76 @@ impl Cw3Contract {
         .into())
     }
 
-    /// helper doesn't support custom messages now
-    pub fn proposal<T: Into<String>, U: Into<String>>(
+    pub fn update_admin<T: Into<HumanAddr>>(
         &self,
-        title: T,
-        description: U,
-        msgs: Vec<CosmosMsg>,
-        earliest: Option<Expiration>,
-        latest: Option<Expiration>,
+        admin: Option<HumanAddr>,
     ) -> StdResult<CosmosMsg> {
-        let msg = Cw3HandleMsg::Propose {
-            title: title.into(),
-            description: description.into(),
-            msgs,
-            earliest,
-            latest,
-        };
+        let msg = Cw4HandleMsg::UpdateAdmin { admin };
         self.encode_msg(msg)
     }
 
-    pub fn vote(&self, proposal_id: u64, vote: Vote) -> StdResult<CosmosMsg> {
-        let msg = Cw3HandleMsg::Vote { proposal_id, vote };
+    pub fn update_members(&self, remove: Vec<HumanAddr>, add: Vec<Member>) -> StdResult<CosmosMsg> {
+        let msg = Cw4HandleMsg::UpdateMembers { remove, add };
         self.encode_msg(msg)
     }
 
-    pub fn execute(&self, proposal_id: u64) -> StdResult<CosmosMsg> {
-        let msg = Cw3HandleMsg::Execute { proposal_id };
-        self.encode_msg(msg)
+    fn encode_smart_query(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Empty>> {
+        Ok(WasmQuery::Smart {
+            contract_addr: self.addr(),
+            msg: to_binary(&msg)?,
+        }
+        .into())
     }
 
-    pub fn close(&self, proposal_id: u64) -> StdResult<CosmosMsg> {
-        let msg = Cw3HandleMsg::Close { proposal_id };
-        self.encode_msg(msg)
+    /// Read the admin
+    pub fn admin<Q: Querier>(&self, querier: &Q) -> StdResult<Option<HumanAddr>> {
+        let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
+        let res: AdminResponse = querier.query(&query)?;
+        Ok(res.admin)
+    }
+
+    // TODO: implement with raw queries
+    /// Read the total weight
+    pub fn total_weight<Q: Querier>(&self, querier: &Q) -> StdResult<u64> {
+        let query = self.encode_smart_query(Cw4QueryMsg::TotalWeight {})?;
+        let res: TotalWeightResponse = querier.query(&query)?;
+        Ok(res.weight)
+    }
+
+    // TODO: implement with raw queries
+    /// Check if this address is a member, and if so, with which weight
+    pub fn is_member<Q: Querier, T: Into<HumanAddr>>(
+        &self,
+        querier: &Q,
+        addr: T,
+    ) -> StdResult<Option<u64>> {
+        let msg = Cw4QueryMsg::Member { addr: addr.into() };
+        let query = self.encode_smart_query(msg)?;
+        let res: MemberResponse = querier.query(&query)?;
+        Ok(res.weight)
+    }
+
+    pub fn list_members<Q: Querier>(
+        &self,
+        querier: &Q,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
+    ) -> StdResult<Vec<Member>> {
+        let query = self.encode_smart_query(Cw4QueryMsg::ListMembers { start_after, limit })?;
+        let res: MemberListResponse = querier.query(&query)?;
+        Ok(res.members)
     }
 }
 
-/// This is a respresentation of Cw3Contract for storage.
-/// Don't use it directly, just translate to the Cw3Contract when needed.
+/// This is a respresentation of Cw4Contract for storage.
+/// Don't use it directly, just translate to the Cw4Contract when needed.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw3CanonicalContract(pub CanonicalAddr);
+pub struct Cw4CanonicalContract(pub CanonicalAddr);
 
-impl Cw3CanonicalContract {
+impl Cw4CanonicalContract {
     /// Convert this address to a form fit for usage in messages and queries
-    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw3Contract> {
+    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw4Contract> {
         let human = api.human_address(&self.0)?;
-        Ok(Cw3Contract(human))
+        Ok(Cw4Contract(human))
     }
 }

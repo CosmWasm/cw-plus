@@ -15,7 +15,7 @@ pub enum Cw4QueryMsg {
     TotalWeight {},
     /// Returns MembersListResponse
     ListMembers {
-        start_after: Option<u64>,
+        start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
     // TODO: this also needs raw query access
@@ -25,7 +25,7 @@ pub enum Cw4QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MemberListResponse {
-    pub member: Vec<Member>,
+    pub members: Vec<Member>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
