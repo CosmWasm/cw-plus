@@ -10,19 +10,27 @@ use crate::msg::Member;
 pub enum Cw4QueryMsg {
     /// Return AdminResponse
     Admin {},
+    // TODO: this also needs raw query access
     /// Return TotalWeightResponse
     TotalWeight {},
-    // TODO: this also needs raw query access
     /// Returns MembersListResponse
     ListMembers {
         start_after: Option<u64>,
         limit: Option<u32>,
     },
+    // TODO: this also needs raw query access
+    /// Returns MemberResponse
+    Member { addr: HumanAddr },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MemberListResponse {
     pub member: Vec<Member>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct MemberResponse {
+    pub weight: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -34,5 +42,3 @@ pub struct AdminResponse {
 pub struct TotalWeightResponse {
     pub weight: u64,
 }
-
-// TODO: define raw keys - look up member by CanonicalAddr, look up weight by a fixed addr

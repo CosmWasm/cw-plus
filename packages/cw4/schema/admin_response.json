@@ -1,12 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "VoteResponse",
+  "title": "AdminResponse",
   "type": "object",
   "properties": {
-    "vote": {
+    "admin": {
       "anyOf": [
         {
-          "$ref": "#/definitions/Vote"
+          "$ref": "#/definitions/HumanAddr"
         },
         {
           "type": "null"
@@ -15,14 +15,8 @@
     }
   },
   "definitions": {
-    "Vote": {
-      "type": "string",
-      "enum": [
-        "yes",
-        "no",
-        "abstain",
-        "veto"
-      ]
+    "HumanAddr": {
+      "type": "string"
     }
   }
 }

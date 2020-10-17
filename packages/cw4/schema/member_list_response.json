@@ -1,15 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "VoterListResponse",
+  "title": "MemberListResponse",
   "type": "object",
   "required": [
-    "voters"
+    "member"
   ],
   "properties": {
-    "voters": {
+    "member": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/VoterResponse"
+        "$ref": "#/definitions/Member"
       }
     }
   },
@@ -17,7 +17,8 @@
     "HumanAddr": {
       "type": "string"
     },
-    "VoterResponse": {
+    "Member": {
+      "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
       "type": "object",
       "required": [
         "addr",

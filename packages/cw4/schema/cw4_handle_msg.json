@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cw4HandleMsg",
+  "anyOf": [
+    {
+      "description": "Change the admin",
+      "type": "object",
+      "required": [
+        "update_admin"
+      ],
+      "properties": {
+        "update_admin": {
+          "type": "object",
+          "properties": {
+            "admin": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "apply a diff to the existing members. remove is applied after add, so if an address is in both, it is removed",
+      "type": "object",
+      "required": [
+        "update_members"
+      ],
+      "properties": {
+        "update_members": {
+          "type": "object",
+          "required": [
+            "add",
+            "remove"
+          ],
+          "properties": {
+            "add": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Member"
+              }
+            },
+            "remove": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Member": {
+      "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
+      "type": "object",
+      "required": [
+        "addr",
+        "weight"
+      ],
+      "properties": {
+        "addr": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "weight": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    }
+  }
+}
