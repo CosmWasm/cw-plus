@@ -2,58 +2,38 @@
 members = ["packages/*", "contracts/*"]
 
 [profile.release.package.cw1-subkeys]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw1-whitelist]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw3-fixed-multisig]
-opt-level = 3
-debug = false
-debug-assertions = false
+codegen-units = 1
+incremental = false
+
+[profile.release.package.cw4-group]
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw20-atomic-swap]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw20-base]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw20-escrow]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw20-staking]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw721-base]
-opt-level = 3
-debug = false
-debug-assertions = false
 codegen-units = 1
 incremental = false
 
@@ -61,3 +41,6 @@ incremental = false
 rpath = false
 lto = true
 overflow-checks = true
+opt-level = 3
+debug = false
+debug-assertions = false

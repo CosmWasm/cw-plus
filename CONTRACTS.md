@@ -29,7 +29,7 @@ to `workflows.test.jobs`)
 1. Add to the `ALL_CONTRACTS` variable in `scripts/publish.sh`
 
 1. Set the `version` variable in `Cargo.toml` to the same version as `packages/cw20`.
-For example, "0.2.1" rather than the default "0.1.0" 
+For example, "0.3.1" rather than the default "0.1.0" 
 
 1. Edit the root `Cargo.toml` file and add a `profile.release.package.CONTRACT_NAME` 
 section, just like `profile.release.package.cw1-subkeys`, but with your
