@@ -10,7 +10,6 @@ homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.3.1" }
 cosmwasm-std = { version = "0.11.1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

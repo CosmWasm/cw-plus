@@ -1,12 +1,14 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, MessageInfo, Querier,
-    StdResult, Storage,
+    to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, Querier, StdResult, Storage,
 };
+use cw0::maybe_canonical;
 use cw2::set_contract_version;
+use cw4::{AdminResponse, Member, MemberListResponse, MemberResponse, TotalWeightResponse};
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{State, CONFIG};
+use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::state::{ADMIN, MEMBERS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -17,18 +19,33 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
     set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let state = State {
-        count: msg.count,
-        owner: deps.api.canonical_address(&info.sender)?,
-    };
-    CONFIG.save(&mut deps.storage, &state)?;
-
+    create(deps, msg.admin, msg.members)?;
     Ok(InitResponse::default())
+}
+
+// create is the init logic with set_contract_version removed so it can more
+// easily be imported in other contracts
+pub fn create<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    admin: Option<HumanAddr>,
+    members: Vec<Member>,
+) -> StdResult<()> {
+    let admin_raw = maybe_canonical(deps.api, admin)?;
+    ADMIN.save(&mut deps.storage, &admin_raw)?;
+
+    let mut total = 0u64;
+    for member in members.into_iter() {
+        total += member.weight;
+        let raw = deps.api.canonical_address(&member.addr)?;
+        MEMBERS.save(&mut deps.storage, &raw, &member.weight)?;
+    }
+    TOTAL.save(&mut deps.storage, &total)?;
+
+    Ok(())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -39,36 +56,39 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Increment {} => try_increment(deps),
-        HandleMsg::Reset { count } => try_reset(deps, info, count),
+        HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
+        HandleMsg::UpdateMembers { remove, add } => unimplemented!(),
+        // HandleMsg::UpdateMembers { remove, add } => handle_update_members(deps, info, remove, add),
     }
 }
 
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
+pub fn handle_update_admin<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
+    info: MessageInfo,
+    new_admin: Option<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
-    CONFIG.update(&mut deps.storage, |mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
-
+    update_admin(deps, info.sender, new_admin)?;
     Ok(HandleResponse::default())
 }
 
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
+// the logic from handle_update_admin extracted for easier import
+pub fn update_admin<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    info: MessageInfo,
-    count: i32,
-) -> Result<HandleResponse, ContractError> {
-    let api = &deps.api;
-    CONFIG.update(&mut deps.storage, |mut state| -> Result<_, ContractError> {
-        if api.canonical_address(&info.sender)? != state.owner {
+    sender: HumanAddr,
+    new_admin: Option<HumanAddr>,
+) -> Result<Option<CanonicalAddr>, ContractError> {
+    let api = deps.api;
+    ADMIN.update(&mut deps.storage, |state| -> Result<_, ContractError> {
+        let owner = match state {
+            Some(x) => x,
+            None => return Err(ContractError::Unauthorized {}),
+        };
+        if api.canonical_address(&sender)? != owner {
             return Err(ContractError::Unauthorized {});
         }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(HandleResponse::default())
+        let new_admin = maybe_canonical(api, new_admin)?;
+        Ok(new_admin)
+    })
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -77,14 +97,15 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        _ => unimplemented!(),
+        // QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
     }
 }
-
-fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
-    let state = CONFIG.load(&deps.storage)?;
-    Ok(CountResponse { count: state.count })
-}
+//
+// fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
+//     let state = CONFIG.load(&deps.storage)?;
+//     Ok(CountResponse { count: state.count })
+// }
 
 #[cfg(test)]
 mod tests {

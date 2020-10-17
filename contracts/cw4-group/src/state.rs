@@ -1,13 +1,6 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_std::CanonicalAddr;
-use cw_storage_plus::Item;
+use cw_storage_plus::{Item, Map};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    pub count: i32,
-    pub owner: CanonicalAddr,
-}
-
-pub const CONFIG: Item<State> = Item::new(b"config");
+pub const ADMIN: Item<Option<CanonicalAddr>> = Item::new(b"admin");
+pub const TOTAL: Item<u64> = Item::new(b"total");
+pub const MEMBERS: Map<&[u8], u64> = Map::new(b"members");
