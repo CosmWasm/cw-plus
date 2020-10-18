@@ -177,8 +177,10 @@ where
         self.handlers.insert(idx, handler);
     }
 
-    // TODO: also run init here, and take InitMsg
-    pub fn init_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
+    /// This just creates an address and empty storage instance, returning the new address
+    /// You must call init after this to set up the contract properly.
+    /// These are separated into two steps to have cleaner return values.
+    pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
         if !self.handlers.contains_key(&code_id) {
             return Err("Cannot init contract with unregistered code id".to_string());
         }
@@ -189,14 +191,49 @@ where
         Ok(addr)
     }
 
-    // TODO: where do we create the querier?
-    fn handle(
+    pub fn handle(
         &self,
         address: HumanAddr,
         querier: Q,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<HandleResponse, String> {
+        self.with_storage(querier, address, |handler, deps, env| {
+            handler.handle(deps, env, info, msg)
+        })
+    }
+
+    pub fn init(
+        &self,
+        address: HumanAddr,
+        querier: Q,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<InitResponse, String> {
+        self.with_storage(querier, address, |handler, deps, env| {
+            handler.init(deps, env, info, msg)
+        })
+    }
+
+    pub fn query(&self, address: HumanAddr, querier: Q, msg: Vec<u8>) -> Result<Binary, String> {
+        self.with_storage(querier, address, |handler, deps, env| {
+            handler.query(deps, env, msg)
+        })
+    }
+
+    fn get_env<T: Into<HumanAddr>>(&self, address: T) -> Env {
+        Env {
+            block: self.block.clone(),
+            contract: ContractInfo {
+                address: address.into(),
+            },
+        }
+    }
+
+    fn with_storage<F, T>(&self, querier: Q, address: HumanAddr, action: F) -> Result<T, String>
+    where
+        F: FnOnce(&Box<dyn Contract<S, A, Q>>, &mut Extern<S, A, Q>, Env) -> Result<T, String>,
+    {
         let contract = self
             .contracts
             .get(&address)
@@ -205,19 +242,15 @@ where
             .handlers
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
+        let env = self.get_env(address);
 
-        // TODO: better way to recover here?
         let storage = contract.storage.take();
         let mut deps = Extern {
             storage,
             api: self.api,
             querier,
         };
-        let env = Env {
-            block: self.block.clone(),
-            contract: ContractInfo { address },
-        };
-        let res = handler.handle(&mut deps, env, info, msg);
+        let res = action(handler, &mut deps, env);
         contract.storage.replace(deps.storage);
         res
     }
