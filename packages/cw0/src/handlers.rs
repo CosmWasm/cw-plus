@@ -4,8 +4,9 @@ use std::cell::Cell;
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    from_slice, Api, Binary, BlockInfo, ContractInfo, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Querier, Storage,
+    from_slice, Api, Attribute, Binary, BlockInfo, ContractInfo, ContractResult, CosmosMsg, Empty,
+    Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, QuerierResult,
+    QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
 };
 
 /// Interface to call into a Contract
@@ -253,5 +254,77 @@ where
         let res = action(handler, &mut deps, env);
         contract.storage.replace(deps.storage);
         res
+    }
+}
+
+pub struct RouterResponse {
+    pub attributes: Vec<Attribute>,
+    pub data: Option<Binary>,
+}
+
+pub struct Router<S, A, Q>
+where
+    S: Storage + Default,
+    A: Api,
+    Q: Querier,
+{
+    wasm: WasmRouter<S, A, Q>,
+    // TODO: bank router
+    // LATER: staking router
+}
+
+impl<S, A, Q> Querier for Router<S, A, Q>
+where
+    S: Storage + Default,
+    A: Api,
+    Q: Querier,
+{
+    fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+        let request: QueryRequest<Empty> = match from_slice(bin_request) {
+            Ok(v) => v,
+            Err(e) => {
+                return SystemResult::Err(SystemError::InvalidRequest {
+                    error: format!("Parsing query request: {}", e),
+                    request: bin_request.into(),
+                })
+            }
+        };
+        let contract_result: ContractResult<Binary> = self.query(request).into();
+        SystemResult::Ok(contract_result)
+    }
+}
+
+impl<S, A, Q> Router<S, A, Q>
+where
+    S: Storage + Default,
+    A: Api,
+    Q: Querier,
+{
+    pub fn new(api: A, block: BlockInfo) -> Self {
+        unimplemented!();
+    }
+
+    pub fn handle(&self, msg: CosmosMsg<Empty>) -> Result<RouterResponse, String> {
+        match msg {
+            CosmosMsg::Wasm(msg) => self.handle_wasm(msg),
+            CosmosMsg::Bank(_) => unimplemented!(),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn handle_wasm(&self, msg: WasmMsg) -> Result<RouterResponse, String> {
+        unimplemented!();
+    }
+
+    pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
+        match request {
+            QueryRequest::Wasm(req) => self.query_wasm(req),
+            QueryRequest::Bank(_) => unimplemented!(),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn query_wasm(&self, msg: WasmQuery) -> Result<Binary, String> {
+        unimplemented!();
     }
 }
