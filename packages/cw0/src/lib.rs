@@ -1,5 +1,6 @@
 mod balance;
 mod expiration;
+mod handlers;
 mod pagination;
 
 pub use crate::balance::NativeBalance;
