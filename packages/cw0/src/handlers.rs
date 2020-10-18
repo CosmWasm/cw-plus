@@ -1,15 +1,15 @@
 #![allow(dead_code)]
-
-use cosmwasm_std::{
-    from_slice, Api, BlockInfo, ContractInfo, Env, Extern, HandleResponse, HumanAddr, MessageInfo,
-    Querier, Storage,
-};
 use serde::de::DeserializeOwned;
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
-pub trait Handler<S, A, Q>
+use cosmwasm_std::{
+    from_slice, Api, Binary, BlockInfo, ContractInfo, Env, Extern, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, Querier, Storage,
+};
+
+/// Interface to call into a Contract
+pub trait Contract<S, A, Q>
 where
     S: Storage,
     A: Api,
@@ -22,33 +22,72 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<HandleResponse, String>;
-}
 
-pub struct Contract<S, A, Q, T, E>
-where
-    S: Storage,
-    A: Api,
-    Q: Querier,
-    T: DeserializeOwned,
-    E: std::fmt::Display,
-{
-    handle_fn: fn(
+    fn init(
+        &self,
         deps: &mut Extern<S, A, Q>,
         env: Env,
         info: MessageInfo,
-        msg: T,
-    ) -> Result<HandleResponse, E>,
-    type_store: PhantomData<S>,
-    type_api: PhantomData<A>,
-    type_querier: PhantomData<Q>,
+        msg: Vec<u8>,
+    ) -> Result<InitResponse, String>;
+
+    fn query(&self, deps: &Extern<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
 }
 
-impl<S, A, Q, T, E> Handler<S, A, Q> for Contract<S, A, Q, T, E>
+type ContractFn<S, A, Q, T, R, E> =
+    fn(deps: &mut Extern<S, A, Q>, env: Env, info: MessageInfo, msg: T) -> Result<R, E>;
+
+type QueryFn<S, A, Q, T, E> = fn(deps: &Extern<S, A, Q>, env: Env, msg: T) -> Result<Binary, E>;
+
+/// Wraps the exported functions from a contract and provides the normalized format
+/// TODO: Allow to customize return values (CustomMsg beyond Empty)
+/// TODO: Allow different error types?
+pub struct ContractWrapper<S, A, Q, T1, T2, T3, E>
 where
     S: Storage,
     A: Api,
     Q: Querier,
-    T: DeserializeOwned,
+    T1: DeserializeOwned,
+    T2: DeserializeOwned,
+    T3: DeserializeOwned,
+    E: std::fmt::Display,
+{
+    handle_fn: ContractFn<S, A, Q, T1, HandleResponse, E>,
+    init_fn: ContractFn<S, A, Q, T2, InitResponse, E>,
+    query_fn: QueryFn<S, A, Q, T3, E>,
+}
+
+impl<S, A, Q, T1, T2, T3, E> ContractWrapper<S, A, Q, T1, T2, T3, E>
+where
+    S: Storage,
+    A: Api,
+    Q: Querier,
+    T1: DeserializeOwned,
+    T2: DeserializeOwned,
+    T3: DeserializeOwned,
+    E: std::fmt::Display,
+{
+    pub fn new(
+        handle_fn: ContractFn<S, A, Q, T1, HandleResponse, E>,
+        init_fn: ContractFn<S, A, Q, T2, InitResponse, E>,
+        query_fn: QueryFn<S, A, Q, T3, E>,
+    ) -> Self {
+        ContractWrapper {
+            handle_fn,
+            init_fn,
+            query_fn,
+        }
+    }
+}
+
+impl<S, A, Q, T1, T2, T3, E> Contract<S, A, Q> for ContractWrapper<S, A, Q, T1, T2, T3, E>
+where
+    S: Storage,
+    A: Api,
+    Q: Querier,
+    T1: DeserializeOwned,
+    T2: DeserializeOwned,
+    T3: DeserializeOwned,
     E: std::fmt::Display,
 {
     fn handle(
@@ -58,8 +97,26 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<HandleResponse, String> {
-        let msg: T = from_slice(&msg).map_err(|e| e.to_string())?;
+        let msg: T1 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.handle_fn)(deps, env, info, msg);
+        res.map_err(|e| e.to_string())
+    }
+
+    fn init(
+        &self,
+        deps: &mut Extern<S, A, Q>,
+        env: Env,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<InitResponse, String> {
+        let msg: T2 = from_slice(&msg).map_err(|e| e.to_string())?;
+        let res = (self.init_fn)(deps, env, info, msg);
+        res.map_err(|e| e.to_string())
+    }
+
+    fn query(&self, deps: &Extern<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
+        let msg: T3 = from_slice(&msg).map_err(|e| e.to_string())?;
+        let res = (self.query_fn)(deps, env, msg);
         res.map_err(|e| e.to_string())
     }
 }
@@ -78,19 +135,19 @@ impl<S: Storage + Default> ContractData<S> {
     }
 }
 
-pub struct Router<S, A, Q>
+pub struct WasmRouter<S, A, Q>
 where
     S: Storage + Default,
     A: Api,
     Q: Querier,
 {
-    handlers: HashMap<usize, Box<dyn Handler<S, A, Q>>>,
+    handlers: HashMap<usize, Box<dyn Contract<S, A, Q>>>,
     contracts: HashMap<HumanAddr, ContractData<S>>,
     block: BlockInfo,
     api: A,
 }
 
-impl<S, A, Q> Router<S, A, Q>
+impl<S, A, Q> WasmRouter<S, A, Q>
 where
     S: Storage + Default,
     A: Api,
@@ -98,7 +155,7 @@ where
 {
     // TODO: mock helper for the test defaults
     pub fn new(api: A, block: BlockInfo) -> Self {
-        Router {
+        WasmRouter {
             handlers: HashMap::new(),
             contracts: HashMap::new(),
             block,
@@ -115,7 +172,7 @@ where
         action(&mut self.block);
     }
 
-    pub fn add_handler(&mut self, handler: Box<dyn Handler<S, A, Q>>) {
+    pub fn add_handler(&mut self, handler: Box<dyn Contract<S, A, Q>>) {
         let idx = self.handlers.len() + 1;
         self.handlers.insert(idx, handler);
     }
@@ -149,7 +206,7 @@ where
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
 
-        // TODO: better way to recover here
+        // TODO: better way to recover here?
         let storage = contract.storage.take();
         let mut deps = Extern {
             storage,
