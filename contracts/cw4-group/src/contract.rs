@@ -213,7 +213,9 @@ fn list_members<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::{member_path, TOTAL_KEY};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{from_slice, ReadonlyStorage};
 
     const ADMIN: &str = "juan";
     const USER1: &str = "somebody";
@@ -390,5 +392,28 @@ mod tests {
         // admin updates properly
         update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(5));
+    }
+
+    #[test]
+    fn raw_queries_work() {
+        // add will over-write and remove have no effect
+        let mut deps = mock_dependencies(&[]);
+        do_init(&mut deps);
+
+        // get total from raw key
+        let total_raw = deps.storage.get(TOTAL_KEY).unwrap();
+        let total: u64 = from_slice(&total_raw).unwrap();
+        assert_eq!(17, total);
+
+        // get member votes from raw key
+        let member2_canon = deps.api.canonical_address(&USER2.into()).unwrap();
+        let member2_raw = deps.storage.get(&member_path(&member2_canon)).unwrap();
+        let member2: u64 = from_slice(&member2_raw).unwrap();
+        assert_eq!(6, member2);
+
+        // and handle misses
+        let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
+        let member3_raw = deps.storage.get(&member_path(&member3_canon));
+        assert_eq!(None, member3_raw);
     }
 }
