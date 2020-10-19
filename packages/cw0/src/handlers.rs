@@ -286,6 +286,16 @@ impl From<HandleResponse<Empty>> for ActionResponse {
     }
 }
 
+impl ActionResponse {
+    fn init(input: InitResponse<Empty>, address: HumanAddr) -> Self {
+        ActionResponse {
+            messages: input.messages,
+            attributes: input.attributes,
+            data: Some(address.as_bytes().into()),
+        }
+    }
+}
+
 pub struct Router<S, A>
 where
     S: Storage + Default,
@@ -321,21 +331,26 @@ where
     S: Storage + Default,
     A: Api,
 {
+    // TODO: store BlockInfo in Router to change easier?
     pub fn new(api: A, block: BlockInfo) -> Self {
-        unimplemented!();
+        Router {
+            wasm: WasmRouter::new(api, block),
+        }
     }
 
     pub fn execute(
-        &self,
+        &mut self,
         sender: HumanAddr,
         msg: CosmosMsg<Empty>,
     ) -> Result<RouterResponse, String> {
-        // TODO: we need to do some caching of storage here, once on the entry point
+        // TODO: we need to do some caching of storage here, once in the entry point
+        // meaning, wrap current state.. all writes go to a cache... only when execute
+        // returns a success do we flush it (otherwise drop it)
         self._execute(&sender, msg)
     }
 
     pub fn _execute(
-        &self,
+        &mut self,
         sender: &HumanAddr,
         msg: CosmosMsg<Empty>,
     ) -> Result<RouterResponse, String> {
@@ -355,12 +370,12 @@ where
                     data: res.data,
                 })
             }
-            CosmosMsg::Bank(_) => unimplemented!(),
+            CosmosMsg::Bank(msg) => self.handle_bank(sender, msg),
             _ => unimplemented!(),
         }
     }
 
-    fn handle_wasm(&self, sender: &HumanAddr, msg: WasmMsg) -> Result<ActionResponse, String> {
+    fn handle_wasm(&mut self, sender: &HumanAddr, msg: WasmMsg) -> Result<ActionResponse, String> {
         match msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -386,7 +401,33 @@ where
                 let res = self.wasm.handle(contract_addr, self, info, msg.to_vec())?;
                 Ok(res.into())
             }
-            WasmMsg::Instantiate { .. } => unimplemented!(),
+            WasmMsg::Instantiate {
+                code_id,
+                msg,
+                send,
+                label: _,
+            } => {
+                // register the contract
+                let contract_addr = self.wasm.register_contract(code_id as usize)?;
+                // move the cash
+                if !send.is_empty() {
+                    self.handle_bank(
+                        sender,
+                        BankMsg::Send {
+                            from_address: sender.clone(),
+                            to_address: contract_addr.clone(),
+                            amount: send.clone(),
+                        },
+                    )?;
+                }
+                let info = MessageInfo {
+                    sender: sender.clone(),
+                    sent_funds: send,
+                };
+                // then call the contract
+                let res = self.wasm.init(contract_addr.clone(), self, info, msg.to_vec())?;
+                Ok(ActionResponse::init(res, contract_addr))
+            }
         }
     }
 
@@ -403,7 +444,7 @@ where
         }
     }
 
-    fn query_wasm(&self, msg: WasmQuery) -> Result<Binary, String> {
+    fn query_wasm(&self, request: WasmQuery) -> Result<Binary, String> {
         unimplemented!();
     }
 }
