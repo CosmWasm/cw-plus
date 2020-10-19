@@ -1,13 +1,15 @@
 #![allow(dead_code)]
 use serde::de::DeserializeOwned;
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
+use crate::new_std::{ExternMut, ExternRef};
 use cosmwasm_std::{
     from_slice, Api, Attribute, BankMsg, Binary, BlockInfo, ContractInfo, ContractResult,
-    CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
+    CosmosMsg, Empty, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
     QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
 };
+use std::ops::DerefMut;
 
 /// Interface to call into a Contract
 pub trait Contract<S, A, Q>
@@ -18,7 +20,7 @@ where
 {
     fn handle(
         &self,
-        deps: &mut Extern<S, A, Q>,
+        deps: ExternMut<S, A, Q>,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -26,19 +28,19 @@ where
 
     fn init(
         &self,
-        deps: &mut Extern<S, A, Q>,
+        deps: ExternMut<S, A, Q>,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<InitResponse, String>;
 
-    fn query(&self, deps: &Extern<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
+    fn query(&self, deps: ExternRef<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
 }
 
 type ContractFn<S, A, Q, T, R, E> =
-    fn(deps: &mut Extern<S, A, Q>, env: Env, info: MessageInfo, msg: T) -> Result<R, E>;
+    fn(deps: ExternMut<S, A, Q>, env: Env, info: MessageInfo, msg: T) -> Result<R, E>;
 
-type QueryFn<S, A, Q, T, E> = fn(deps: &Extern<S, A, Q>, env: Env, msg: T) -> Result<Binary, E>;
+type QueryFn<S, A, Q, T, E> = fn(deps: ExternRef<S, A, Q>, env: Env, msg: T) -> Result<Binary, E>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// TODO: Allow to customize return values (CustomMsg beyond Empty)
@@ -93,7 +95,7 @@ where
 {
     fn handle(
         &self,
-        deps: &mut Extern<S, A, Q>,
+        deps: ExternMut<S, A, Q>,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -105,7 +107,7 @@ where
 
     fn init(
         &self,
-        deps: &mut Extern<S, A, Q>,
+        deps: ExternMut<S, A, Q>,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -115,7 +117,7 @@ where
         res.map_err(|e| e.to_string())
     }
 
-    fn query(&self, deps: &Extern<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
+    fn query(&self, deps: ExternRef<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
         let msg: T3 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.query_fn)(deps, env, msg);
         res.map_err(|e| e.to_string())
@@ -124,14 +126,14 @@ where
 
 struct ContractData<S: Storage + Default> {
     code_id: usize,
-    storage: Cell<S>,
+    storage: RefCell<S>,
 }
 
 impl<S: Storage + Default> ContractData<S> {
     fn new(code_id: usize) -> Self {
         ContractData {
             code_id,
-            storage: Cell::new(S::default()),
+            storage: RefCell::new(S::default()),
         }
     }
 }
@@ -195,7 +197,7 @@ where
     pub fn handle(
         &self,
         address: HumanAddr,
-        querier: Q,
+        querier: &Q,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<HandleResponse, String> {
@@ -207,7 +209,7 @@ where
     pub fn init(
         &self,
         address: HumanAddr,
-        querier: Q,
+        querier: &Q,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<InitResponse, String> {
@@ -216,9 +218,9 @@ where
         })
     }
 
-    pub fn query(&self, address: HumanAddr, querier: Q, msg: Vec<u8>) -> Result<Binary, String> {
+    pub fn query(&self, address: HumanAddr, querier: &Q, msg: Vec<u8>) -> Result<Binary, String> {
         self.with_storage(querier, address, |handler, deps, env| {
-            handler.query(deps, env, msg)
+            handler.query(deps.as_ref(), env, msg)
         })
     }
 
@@ -231,9 +233,9 @@ where
         }
     }
 
-    fn with_storage<F, T>(&self, querier: Q, address: HumanAddr, action: F) -> Result<T, String>
+    fn with_storage<F, T>(&self, querier: &Q, address: HumanAddr, action: F) -> Result<T, String>
     where
-        F: FnOnce(&Box<dyn Contract<S, A, Q>>, &mut Extern<S, A, Q>, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract<S, A, Q>>, ExternMut<S, A, Q>, Env) -> Result<T, String>,
     {
         let contract = self
             .contracts
@@ -245,14 +247,16 @@ where
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.get_env(address);
 
-        let storage = contract.storage.take();
-        let mut deps = Extern {
-            storage,
-            api: self.api,
+        let mut storage = contract
+            .storage
+            .try_borrow_mut()
+            .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
+        let deps = ExternMut {
+            storage: storage.deref_mut(),
+            api: &self.api,
             querier,
         };
-        let res = action(handler, &mut deps, env);
-        contract.storage.replace(deps.storage);
+        let res = action(handler, deps, env);
         res
     }
 }
