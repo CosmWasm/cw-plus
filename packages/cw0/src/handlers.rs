@@ -4,9 +4,9 @@ use std::cell::Cell;
 use std::collections::HashMap;
 
 use cosmwasm_std::{
-    from_slice, Api, Attribute, Binary, BlockInfo, ContractInfo, ContractResult, CosmosMsg, Empty,
-    Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, QuerierResult,
-    QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
+    from_slice, Api, Attribute, BankMsg, Binary, BlockInfo, ContractInfo, ContractResult,
+    CosmosMsg, Empty, Env, Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
+    QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
 };
 
 /// Interface to call into a Contract
@@ -257,27 +257,46 @@ where
     }
 }
 
+#[derive(Default, Clone)]
 pub struct RouterResponse {
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
 }
 
-pub struct Router<S, A, Q>
+// This can be InitResponse, HandleResponse, MigrationResponse
+#[derive(Default, Clone)]
+pub struct ActionResponse {
+    // TODO: allow T != Empty
+    pub messages: Vec<CosmosMsg<Empty>>,
+    pub attributes: Vec<Attribute>,
+    pub data: Option<Binary>,
+}
+
+impl From<HandleResponse<Empty>> for ActionResponse {
+    fn from(input: HandleResponse<Empty>) -> Self {
+        ActionResponse {
+            messages: input.messages,
+            attributes: input.attributes,
+            data: input.data,
+        }
+    }
+}
+
+pub struct Router<'a, 'b, S, A>
 where
     S: Storage + Default,
     A: Api,
-    Q: Querier,
+    'a: 'b
 {
-    wasm: WasmRouter<S, A, Q>,
+    wasm: WasmRouter<S, A, &'b Router<'a, 'b, S, A>>,
     // TODO: bank router
     // LATER: staking router
 }
 
-impl<S, A, Q> Querier for Router<S, A, Q>
+impl<'a, 'b, S, A> Querier for &Router<'a, 'b, S, A>
 where
     S: Storage + Default,
     A: Api,
-    Q: Querier,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         let request: QueryRequest<Empty> = match from_slice(bin_request) {
@@ -289,31 +308,88 @@ where
                 })
             }
         };
-        let contract_result: ContractResult<Binary> = self.query(request).into();
+        let contract_result: ContractResult<Binary> = self.query(&request).into();
         SystemResult::Ok(contract_result)
     }
 }
 
-impl<S, A, Q> Router<S, A, Q>
+impl<'a, 'b, S, A> Router<'a, 'b, S, A>
 where
     S: Storage + Default,
     A: Api,
-    Q: Querier,
 {
     pub fn new(api: A, block: BlockInfo) -> Self {
         unimplemented!();
     }
 
-    pub fn handle(&self, msg: CosmosMsg<Empty>) -> Result<RouterResponse, String> {
+    pub fn execute(
+        &self,
+        sender: HumanAddr,
+        msg: CosmosMsg<Empty>,
+    ) -> Result<RouterResponse, String> {
+        // TODO: we need to do some caching of storage here, once on the entry point
+        self._execute(&sender, msg)
+    }
+
+    pub fn _execute(
+        &self,
+        sender: &HumanAddr,
+        msg: CosmosMsg<Empty>,
+    ) -> Result<RouterResponse, String> {
         match msg {
-            CosmosMsg::Wasm(msg) => self.handle_wasm(msg),
+            CosmosMsg::Wasm(msg) => {
+                let res = self.handle_wasm(sender, msg)?;
+                let mut attributes = res.attributes;
+                // recurse in all messages
+                for resend in res.messages {
+                    let subres = self._execute(sender, resend)?;
+                    // ignore the data now, just like in wasmd
+                    // append the events
+                    attributes.extend_from_slice(&subres.attributes);
+                }
+                Ok(RouterResponse {
+                    attributes,
+                    data: res.data,
+                })
+            }
             CosmosMsg::Bank(_) => unimplemented!(),
             _ => unimplemented!(),
         }
     }
 
-    fn handle_wasm(&self, msg: WasmMsg) -> Result<RouterResponse, String> {
-        unimplemented!();
+    fn handle_wasm(&self, sender: &HumanAddr, msg: WasmMsg) -> Result<ActionResponse, String> {
+        match msg {
+            WasmMsg::Execute {
+                contract_addr,
+                msg,
+                send,
+            } => {
+                // first move the cash
+                if !send.is_empty() {
+                    self.handle_bank(
+                        sender,
+                        BankMsg::Send {
+                            from_address: sender.clone(),
+                            to_address: contract_addr.clone(),
+                            amount: send.clone(),
+                        },
+                    )?;
+                }
+                let info = MessageInfo {
+                    sender: sender.clone(),
+                    sent_funds: send,
+                };
+                // then call the contract
+                let res = self.wasm.handle(contract_addr, self, info, msg.to_vec())?;
+                Ok(res.into())
+            }
+            WasmMsg::Instantiate { .. } => unimplemented!(),
+        }
+    }
+
+    // Returns empty router response, just here for the same function signatures
+    pub fn handle_bank(&self, sender: &HumanAddr, msg: BankMsg) -> Result<RouterResponse, String> {
+        unimplemented!()
     }
 
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
