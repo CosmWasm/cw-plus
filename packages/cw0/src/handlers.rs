@@ -20,6 +20,14 @@ pub trait Bank<S: Storage> {
     fn handle(&self, storage: &mut S, sender: HumanAddr, msg: BankMsg) -> Result<(), String>;
 
     fn query(&self, storage: &S, request: BankQuery) -> Result<Binary, String>;
+
+    // this is an "admin" function to let us adjust bank accounts
+    fn set_balance(
+        &self,
+        storage: &mut S,
+        account: HumanAddr,
+        amount: Vec<Coin>,
+    ) -> Result<(), String>;
 }
 
 /// Interface to call into a Contract
@@ -371,6 +379,15 @@ where
             bank: Box::new(bank),
             bank_store: RefCell::new(S::default()),
         }
+    }
+
+    // this is an "admin" function to let us adjust bank accounts
+    pub fn set_bank_balance(&self, account: HumanAddr, amount: Vec<Coin>) -> Result<(), String> {
+        let mut store = self
+            .bank_store
+            .try_borrow_mut()
+            .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
+        self.bank.set_balance(&mut store, account, amount)
     }
 
     pub fn execute(
