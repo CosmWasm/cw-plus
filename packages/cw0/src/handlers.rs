@@ -4,12 +4,21 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::new_std::{ExternMut, ExternRef};
+use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
-    CosmosMsg, Empty, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
-    QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
+    from_slice, Api, Attribute, BankMsg, BankQuery, Binary, BlockInfo, Coin, ContractInfo,
+    ContractResult, CosmosMsg, Empty, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo,
+    Querier, QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
 };
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
+
+/// Bank is a minimal contract-like interface that implements a bank module
+/// It is initialized outside of the trait
+pub trait Bank<S: Storage> {
+    fn handle(&self, storage: &mut S, sender: HumanAddr, msg: BankMsg) -> Result<(), String>;
+
+    fn query(&self, storage: &S, request: BankQuery) -> Result<Binary, String>;
+}
 
 /// Interface to call into a Contract
 pub trait Contract<S, A, Q>
@@ -156,7 +165,6 @@ where
     A: Api,
     Q: Querier,
 {
-    // TODO: mock helper for the test defaults
     pub fn new(api: A, block: BlockInfo) -> Self {
         WasmRouter {
             handlers: HashMap::new(),
@@ -315,7 +323,9 @@ where
     A: Api,
 {
     wasm: WasmRouter<S, A, Router<S, A>>,
-    // TODO: bank router
+    // TODO: revisit this, if we want to make Bank a type parameter
+    bank: Box<dyn Bank<S>>,
+    bank_store: RefCell<S>,
     // LATER: staking router
 }
 
@@ -339,15 +349,25 @@ where
     }
 }
 
+impl<S: Storage + Default> Router<S, MockApi> {
+    /// mock is a shortcut for tests, always returns A = MockApi
+    pub fn mock<B: Bank<S> + 'static>(bank: B) -> Self {
+        let env = mock_env();
+        Self::new(MockApi::default(), env.block, bank)
+    }
+}
+
 impl<S, A> Router<S, A>
 where
     S: Storage + Default,
     A: Api,
 {
     // TODO: store BlockInfo in Router to change easier?
-    pub fn new(api: A, block: BlockInfo) -> Self {
+    pub fn new<B: Bank<S> + 'static>(api: A, block: BlockInfo, bank: B) -> Self {
         Router {
             wasm: WasmRouter::new(api, block),
+            bank: Box::new(bank),
+            bank_store: RefCell::new(S::default()),
         }
     }
 
@@ -362,7 +382,7 @@ where
         self._execute(&sender, msg)
     }
 
-    pub fn _execute(
+    fn _execute(
         &mut self,
         sender: &HumanAddr,
         msg: CosmosMsg<Empty>,
@@ -386,26 +406,6 @@ where
             CosmosMsg::Bank(msg) => self.handle_bank(sender, msg),
             _ => unimplemented!(),
         }
-    }
-
-    fn send<T: Into<HumanAddr>, U: Into<HumanAddr>>(
-        &self,
-        sender: T,
-        recipient: U,
-        amount: &[Coin],
-    ) -> Result<RouterResponse, String> {
-        if !amount.is_empty() {
-            let sender: HumanAddr = sender.into();
-            self.handle_bank(
-                &sender,
-                BankMsg::Send {
-                    from_address: sender.clone(),
-                    to_address: recipient.into(),
-                    amount: amount.to_vec(),
-                },
-            )?;
-        }
-        Ok(RouterResponse::default())
     }
 
     fn handle_wasm(&mut self, sender: &HumanAddr, msg: WasmMsg) -> Result<ActionResponse, String> {
@@ -449,14 +449,38 @@ where
     }
 
     // Returns empty router response, just here for the same function signatures
-    pub fn handle_bank(&self, sender: &HumanAddr, msg: BankMsg) -> Result<RouterResponse, String> {
-        unimplemented!()
+    fn handle_bank(&self, sender: &HumanAddr, msg: BankMsg) -> Result<RouterResponse, String> {
+        let mut store = self
+            .bank_store
+            .try_borrow_mut()
+            .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
+        self.bank.handle(&mut store, sender.into(), msg)?;
+        Ok(RouterResponse::default())
     }
 
+    fn send<T: Into<HumanAddr>, U: Into<HumanAddr>>(
+        &self,
+        sender: T,
+        recipient: U,
+        amount: &[Coin],
+    ) -> Result<RouterResponse, String> {
+        if !amount.is_empty() {
+            let sender: HumanAddr = sender.into();
+            self.handle_bank(
+                &sender,
+                BankMsg::Send {
+                    from_address: sender.clone(),
+                    to_address: recipient.into(),
+                    amount: amount.to_vec(),
+                },
+            )?;
+        }
+        Ok(RouterResponse::default())
+    }
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
         match request {
             QueryRequest::Wasm(req) => self.query_wasm(req),
-            QueryRequest::Bank(_) => unimplemented!(),
+            QueryRequest::Bank(req) => self.query_bank(req),
             _ => unimplemented!(),
         }
     }
@@ -468,5 +492,13 @@ where
             }
             WasmQuery::Raw { contract_addr, key } => self.wasm.query_raw(contract_addr, &key),
         }
+    }
+
+    fn query_bank(&self, request: BankQuery) -> Result<Binary, String> {
+        let store = self
+            .bank_store
+            .try_borrow()
+            .map_err(|e| format!("Immutable storage borrow failed - re-entrancy?: {}", e))?;
+        self.bank.query(store.deref(), request)
     }
 }
