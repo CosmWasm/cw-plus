@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::new_std::{ExternMut, ExternRef};
 use cosmwasm_std::{
-    from_slice, Api, Attribute, BankMsg, Binary, BlockInfo, ContractInfo, ContractResult,
+    from_slice, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
     CosmosMsg, Empty, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier,
     QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
 };
@@ -224,6 +224,19 @@ where
         })
     }
 
+    pub fn query_raw(&self, address: HumanAddr, key: &[u8]) -> Result<Binary, String> {
+        let contract = self
+            .contracts
+            .get(&address)
+            .ok_or_else(|| "Unregistered contract address".to_string())?;
+        let storage = contract
+            .storage
+            .try_borrow()
+            .map_err(|e| format!("Immutable borrowing failed - re-entrancy?: {}", e))?;
+        let data = storage.get(&key).unwrap_or(vec![]);
+        Ok(data.into())
+    }
+
     fn get_env<T: Into<HumanAddr>>(&self, address: T) -> Env {
         Env {
             block: self.block.clone(),
@@ -375,6 +388,26 @@ where
         }
     }
 
+    fn send<T: Into<HumanAddr>, U: Into<HumanAddr>>(
+        &self,
+        sender: T,
+        recipient: U,
+        amount: &[Coin],
+    ) -> Result<RouterResponse, String> {
+        if !amount.is_empty() {
+            let sender: HumanAddr = sender.into();
+            self.handle_bank(
+                &sender,
+                BankMsg::Send {
+                    from_address: sender.clone(),
+                    to_address: recipient.into(),
+                    amount: amount.to_vec(),
+                },
+            )?;
+        }
+        Ok(RouterResponse::default())
+    }
+
     fn handle_wasm(&mut self, sender: &HumanAddr, msg: WasmMsg) -> Result<ActionResponse, String> {
         match msg {
             WasmMsg::Execute {
@@ -383,21 +416,12 @@ where
                 send,
             } => {
                 // first move the cash
-                if !send.is_empty() {
-                    self.handle_bank(
-                        sender,
-                        BankMsg::Send {
-                            from_address: sender.clone(),
-                            to_address: contract_addr.clone(),
-                            amount: send.clone(),
-                        },
-                    )?;
-                }
+                self.send(sender, &contract_addr, &send)?;
+                // then call the contract
                 let info = MessageInfo {
                     sender: sender.clone(),
                     sent_funds: send,
                 };
-                // then call the contract
                 let res = self.wasm.handle(contract_addr, self, info, msg.to_vec())?;
                 Ok(res.into())
             }
@@ -410,22 +434,15 @@ where
                 // register the contract
                 let contract_addr = self.wasm.register_contract(code_id as usize)?;
                 // move the cash
-                if !send.is_empty() {
-                    self.handle_bank(
-                        sender,
-                        BankMsg::Send {
-                            from_address: sender.clone(),
-                            to_address: contract_addr.clone(),
-                            amount: send.clone(),
-                        },
-                    )?;
-                }
+                self.send(sender, &contract_addr, &send)?;
+                // then call the contract
                 let info = MessageInfo {
                     sender: sender.clone(),
                     sent_funds: send,
                 };
-                // then call the contract
-                let res = self.wasm.init(contract_addr.clone(), self, info, msg.to_vec())?;
+                let res = self
+                    .wasm
+                    .init(contract_addr.clone(), self, info, msg.to_vec())?;
                 Ok(ActionResponse::init(res, contract_addr))
             }
         }
@@ -445,6 +462,11 @@ where
     }
 
     fn query_wasm(&self, request: WasmQuery) -> Result<Binary, String> {
-        unimplemented!();
+        match request {
+            WasmQuery::Smart { contract_addr, msg } => {
+                self.wasm.query(contract_addr, self, msg.into())
+            }
+            WasmQuery::Raw { contract_addr, key } => self.wasm.query_raw(contract_addr, &key),
+        }
     }
 }
