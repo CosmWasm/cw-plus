@@ -1,0 +1,34 @@
+[package]
+name = "cw4-group"
+version = "0.3.1"
+authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
+edition = "2018"
+
+exclude = [
+  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+  "artifacts/*",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all init/handle/query exports
+library = []
+
+[dependencies]
+cw0 = { path = "../../packages/cw0", version = "0.3.1" }
+cw2 = { path = "../../packages/cw2", version = "0.3.1" }
+cw4 = { path = "../../packages/cw4", version = "0.3.1" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.3.1", features = ["iterator"] }
+cosmwasm-std = { version = "0.11.1" }
+schemars = "0.7"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.21" }
+
+[dev-dependencies]
+cosmwasm-schema = { version = "0.11.1" }
