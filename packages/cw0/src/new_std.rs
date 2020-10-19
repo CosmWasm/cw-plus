@@ -14,12 +14,12 @@ pub struct ExternRef<'a, S: Storage, A: Api, Q: Querier> {
     pub querier: &'a Q,
 }
 
-impl<'a, S: Storage, A: Api, Q: Querier> ExternMut<'a, S, A, Q> {
-    pub fn as_ref(self) -> ExternRef<'a, S, A, Q> {
+impl<'a, S: Storage, A: Api, Q: Querier> From<ExternMut<'a, S, A, Q>> for ExternRef<'a, S, A, Q> {
+    fn from(other: ExternMut<'a, S, A, Q>) -> Self {
         ExternRef {
-            storage: self.storage,
-            api: self.api,
-            querier: self.querier,
+            storage: other.storage,
+            api: other.api,
+            querier: other.querier,
         }
     }
 }

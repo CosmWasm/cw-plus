@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::new_std::{ExternMut, ExternRef};
+#[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, Api, Attribute, BankMsg, BankQuery, Binary, BlockInfo, Coin, ContractInfo,
@@ -12,6 +13,7 @@ use cosmwasm_std::{
 };
 use std::ops::{Deref, DerefMut};
 
+// TODO: build a simple implementation
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
 pub trait Bank<S: Storage> {
@@ -228,7 +230,7 @@ where
 
     pub fn query(&self, address: HumanAddr, querier: &Q, msg: Vec<u8>) -> Result<Binary, String> {
         self.with_storage(querier, address, |handler, deps, env| {
-            handler.query(deps.as_ref(), env, msg)
+            handler.query(deps.into(), env, msg)
         })
     }
 
@@ -241,7 +243,7 @@ where
             .storage
             .try_borrow()
             .map_err(|e| format!("Immutable borrowing failed - re-entrancy?: {}", e))?;
-        let data = storage.get(&key).unwrap_or(vec![]);
+        let data = storage.get(&key).unwrap_or_default();
         Ok(data.into())
     }
 
@@ -277,8 +279,7 @@ where
             api: &self.api,
             querier,
         };
-        let res = action(handler, deps, env);
-        res
+        action(handler, deps, env)
     }
 }
 
@@ -349,6 +350,7 @@ where
     }
 }
 
+#[cfg(test)]
 impl<S: Storage + Default> Router<S, MockApi> {
     /// mock is a shortcut for tests, always returns A = MockApi
     pub fn mock<B: Bank<S> + 'static>(bank: B) -> Self {
