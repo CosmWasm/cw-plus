@@ -282,18 +282,17 @@ impl From<HandleResponse<Empty>> for ActionResponse {
     }
 }
 
-pub struct Router<'a, 'b, S, A>
+pub struct Router<S, A>
 where
     S: Storage + Default,
     A: Api,
-    'a: 'b
 {
-    wasm: WasmRouter<S, A, &'b Router<'a, 'b, S, A>>,
+    wasm: WasmRouter<S, A, Router<S, A>>,
     // TODO: bank router
     // LATER: staking router
 }
 
-impl<'a, 'b, S, A> Querier for &Router<'a, 'b, S, A>
+impl<S, A> Querier for Router<S, A>
 where
     S: Storage + Default,
     A: Api,
@@ -308,12 +307,12 @@ where
                 })
             }
         };
-        let contract_result: ContractResult<Binary> = self.query(&request).into();
+        let contract_result: ContractResult<Binary> = self.query(request).into();
         SystemResult::Ok(contract_result)
     }
 }
 
-impl<'a, 'b, S, A> Router<'a, 'b, S, A>
+impl<S, A> Router<S, A>
 where
     S: Storage + Default,
     A: Api,
