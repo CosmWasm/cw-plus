@@ -213,9 +213,9 @@ fn list_members<S: Storage, A: Api, Q: Querier>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{member_path, TOTAL_KEY};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, ReadonlyStorage};
+    use cw4::{member_key, TOTAL_KEY};
 
     const ADMIN: &str = "juan";
     const USER1: &str = "somebody";
@@ -407,13 +407,13 @@ mod tests {
 
         // get member votes from raw key
         let member2_canon = deps.api.canonical_address(&USER2.into()).unwrap();
-        let member2_raw = deps.storage.get(&member_path(&member2_canon)).unwrap();
+        let member2_raw = deps.storage.get(&member_key(&member2_canon)).unwrap();
         let member2: u64 = from_slice(&member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and handle misses
         let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
-        let member3_raw = deps.storage.get(&member_path(&member3_canon));
+        let member3_raw = deps.storage.get(&member_key(&member3_canon));
         assert_eq!(None, member3_raw);
     }
 }

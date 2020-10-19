@@ -42,3 +42,16 @@ pub struct AdminResponse {
 pub struct TotalWeightResponse {
     pub weight: u64,
 }
+
+/// TOTAL_KEY is meant for raw queries
+pub const TOTAL_KEY: &[u8] = b"total";
+pub const MEMBERS_KEY: &[u8] = b"members";
+
+/// member_key is meant for raw queries for one member, given canonical address
+pub fn member_key(address: &[u8]) -> Vec<u8> {
+    // length encoded members key (update if you change MEMBERS_KEY)
+    // inlined here to avoid storage-plus import
+    let mut key = b"\x00\x07members".to_vec();
+    key.extend_from_slice(address);
+    key
+}
