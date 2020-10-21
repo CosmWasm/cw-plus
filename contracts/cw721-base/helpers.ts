@@ -224,19 +224,19 @@ interface CW721Instance {
   allAllowances: (owner: string, startAfter?: string, limit?: number) => Promise<AllAllowancesResponse>
   allAccounts: (startAfter?: string, limit?: number) => Promise<readonly string[]>
   contractInfo: () => Promise<any>
-  ownerOf: (tokenId: string) => Promise<any>
-  nftInfo: (tokenId: string) => Promise<any>
-  allNftInfo: (tokenId: string) => Promise<any>
+  ownerOf: (tokenId: TokenId) => Promise<any>
+  nftInfo: (tokenId: TokenId) => Promise<any>
+  allNftInfo: (tokenId: TokenId) => Promise<any>
   // tokenInfo: () => Promise<any>
   minter: () => Promise<any>
   numTokens: () => Promise<any>
-  tokens: (owner:string, start_after?: string, limit?: number ) => Promise<TokensResponse>
-  allTokens: (start_after?: string, limit?: number ) => Promise<TokensResponse>
+  tokens: (owner:string, startAfter?: string, limit?: number ) => Promise<TokensResponse>
+  allTokens: (startAfter?: string, limit?: number ) => Promise<TokensResponse>
 
   // actions
-  mint: (tokenId: string, owner:string, name:string, description?: string, image?: string) => Promise<string>
-  transferNft: (recipient: string, token_id: string) => Promise<string>
-  approve: (spender: string, token_id: string, expires?: Expiration) => Promise<string>
+  mint: (tokenId: TokenId, owner:string, name:string, description?: string, image?: string) => Promise<string>
+  transferNft: (recipient: string, tokenId: TokenId) => Promise<string>
+  approve: (spender: string, tokenId: TokenId, expires?: Expiration) => Promise<string>
   // burn: (amount: string) => Promise<string>
   // increaseAllowance: (recipient: string, amount: string) => Promise<string>
   // decreaseAllowance: (recipient: string, amount: string) => Promise<string>
@@ -308,7 +308,7 @@ const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
 */
     // mints tokens, returns ?
     const mint = async (token_id: string, owner: string, name:string, description?:string, image?:string): Promise<string> => {
-      const result = await client.execute(contractAddress, { mint: { token_id, owner, name, description }});
+      const result = await client.execute(contractAddress, { mint: { token_id, owner, name, description, image }});
       return result.transactionHash;
     }
    
