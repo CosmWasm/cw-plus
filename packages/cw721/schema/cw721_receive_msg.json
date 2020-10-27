@@ -4,13 +4,10 @@
   "description": "Cw721ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg",
   "type": "object",
   "required": [
-    "amount",
-    "sender"
+    "sender",
+    "token_id"
   ],
   "properties": {
-    "amount": {
-      "$ref": "#/definitions/Uint128"
-    },
     "msg": {
       "anyOf": [
         {
@@ -23,6 +20,9 @@
     },
     "sender": {
       "$ref": "#/definitions/HumanAddr"
+    },
+    "token_id": {
+      "type": "string"
     }
   },
   "definitions": {
@@ -31,9 +31,6 @@
       "type": "string"
     },
     "HumanAddr": {
-      "type": "string"
-    },
-    "Uint128": {
       "type": "string"
     }
   }
