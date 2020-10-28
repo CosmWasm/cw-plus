@@ -1,6 +1,6 @@
 [package]
 name = "cw20-staking"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Implement simple staking derivatives as a cw20 token"
@@ -20,10 +20,10 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.3.1" }
-cw2 = { path = "../../packages/cw2", version = "0.3.1" }
-cw20 = { path = "../../packages/cw20", version = "0.3.1" }
-cw20-base = { path = "../../contracts/cw20-base", version = "0.3.1", features = ["library"] }
+cw0 = { path = "../../packages/cw0", version = "0.3.2" }
+cw2 = { path = "../../packages/cw2", version = "0.3.2" }
+cw20 = { path = "../../packages/cw20", version = "0.3.2" }
+cw20-base = { path = "../../contracts/cw20-base", version = "0.3.2", features = ["library"] }
 cosmwasm-std = { version = "0.11.1", features = ["staking"] }
 cosmwasm-storage = { version = "0.11.1" }
 schemars = "0.7"
