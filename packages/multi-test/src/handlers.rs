@@ -2,6 +2,7 @@
 use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
@@ -11,29 +12,8 @@ use cosmwasm_std::{
     MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
     SystemResult, WasmMsg, WasmQuery,
 };
-use std::ops::{Deref, DerefMut};
 
-// TODO: build a simple implementation
-/// Bank is a minimal contract-like interface that implements a bank module
-/// It is initialized outside of the trait
-pub trait Bank {
-    fn handle(
-        &self,
-        storage: &mut dyn Storage,
-        sender: HumanAddr,
-        msg: BankMsg,
-    ) -> Result<(), String>;
-
-    fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String>;
-
-    // this is an "admin" function to let us adjust bank accounts
-    fn set_balance(
-        &self,
-        storage: &mut dyn Storage,
-        account: HumanAddr,
-        amount: Vec<Coin>,
-    ) -> Result<(), String>;
-}
+use crate::bank::Bank;
 
 /// Interface to call into a Contract
 pub trait Contract {
