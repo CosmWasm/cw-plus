@@ -3,43 +3,43 @@ use serde::de::DeserializeOwned;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use crate::new_std::{ExternMut, ExternRef};
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, Api, Attribute, BankMsg, BankQuery, Binary, BlockInfo, Coin, ContractInfo,
-    ContractResult, CosmosMsg, Empty, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo,
-    Querier, QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
+    ContractResult, CosmosMsg, Deps, DepsMut, Empty, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
+    SystemResult, WasmMsg, WasmQuery,
 };
 use std::ops::{Deref, DerefMut};
 
 // TODO: build a simple implementation
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
-pub trait Bank<S: Storage> {
-    fn handle(&self, storage: &mut S, sender: HumanAddr, msg: BankMsg) -> Result<(), String>;
+pub trait Bank {
+    fn handle(
+        &self,
+        storage: &mut dyn Storage,
+        sender: HumanAddr,
+        msg: BankMsg,
+    ) -> Result<(), String>;
 
-    fn query(&self, storage: &S, request: BankQuery) -> Result<Binary, String>;
+    fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String>;
 
     // this is an "admin" function to let us adjust bank accounts
     fn set_balance(
         &self,
-        storage: &mut S,
+        storage: &mut dyn Storage,
         account: HumanAddr,
         amount: Vec<Coin>,
     ) -> Result<(), String>;
 }
 
 /// Interface to call into a Contract
-pub trait Contract<S, A, Q>
-where
-    S: Storage,
-    A: Api,
-    Q: Querier,
-{
+pub trait Contract {
     fn handle(
         &self,
-        deps: ExternMut<S, A, Q>,
+        deps: DepsMut,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -47,52 +47,45 @@ where
 
     fn init(
         &self,
-        deps: ExternMut<S, A, Q>,
+        deps: DepsMut,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<InitResponse, String>;
 
-    fn query(&self, deps: ExternRef<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
+    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
 }
 
-type ContractFn<S, A, Q, T, R, E> =
-    fn(deps: ExternMut<S, A, Q>, env: Env, info: MessageInfo, msg: T) -> Result<R, E>;
+type ContractFn<T, R, E> = fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<R, E>;
 
-type QueryFn<S, A, Q, T, E> = fn(deps: ExternRef<S, A, Q>, env: Env, msg: T) -> Result<Binary, E>;
+type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// TODO: Allow to customize return values (CustomMsg beyond Empty)
 /// TODO: Allow different error types?
-pub struct ContractWrapper<S, A, Q, T1, T2, T3, E>
+pub struct ContractWrapper<T1, T2, T3, E>
 where
-    S: Storage,
-    A: Api,
-    Q: Querier,
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     E: std::fmt::Display,
 {
-    handle_fn: ContractFn<S, A, Q, T1, HandleResponse, E>,
-    init_fn: ContractFn<S, A, Q, T2, InitResponse, E>,
-    query_fn: QueryFn<S, A, Q, T3, E>,
+    handle_fn: ContractFn<T1, HandleResponse, E>,
+    init_fn: ContractFn<T2, InitResponse, E>,
+    query_fn: QueryFn<T3, E>,
 }
 
-impl<S, A, Q, T1, T2, T3, E> ContractWrapper<S, A, Q, T1, T2, T3, E>
+impl<T1, T2, T3, E> ContractWrapper<T1, T2, T3, E>
 where
-    S: Storage,
-    A: Api,
-    Q: Querier,
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     E: std::fmt::Display,
 {
     pub fn new(
-        handle_fn: ContractFn<S, A, Q, T1, HandleResponse, E>,
-        init_fn: ContractFn<S, A, Q, T2, InitResponse, E>,
-        query_fn: QueryFn<S, A, Q, T3, E>,
+        handle_fn: ContractFn<T1, HandleResponse, E>,
+        init_fn: ContractFn<T2, InitResponse, E>,
+        query_fn: QueryFn<T3, E>,
     ) -> Self {
         ContractWrapper {
             handle_fn,
@@ -102,11 +95,8 @@ where
     }
 }
 
-impl<S, A, Q, T1, T2, T3, E> Contract<S, A, Q> for ContractWrapper<S, A, Q, T1, T2, T3, E>
+impl<T1, T2, T3, E> Contract for ContractWrapper<T1, T2, T3, E>
 where
-    S: Storage,
-    A: Api,
-    Q: Querier,
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
@@ -114,7 +104,7 @@ where
 {
     fn handle(
         &self,
-        deps: ExternMut<S, A, Q>,
+        deps: DepsMut,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -126,7 +116,7 @@ where
 
     fn init(
         &self,
-        deps: ExternMut<S, A, Q>,
+        deps: DepsMut,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -136,7 +126,7 @@ where
         res.map_err(|e| e.to_string())
     }
 
-    fn query(&self, deps: ExternRef<S, A, Q>, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
+    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
         let msg: T3 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.query_fn)(deps, env, msg);
         res.map_err(|e| e.to_string())
@@ -157,25 +147,21 @@ impl<S: Storage + Default> ContractData<S> {
     }
 }
 
-pub struct WasmRouter<S, A, Q>
+pub struct WasmRouter<S>
 where
     S: Storage + Default,
-    A: Api,
-    Q: Querier,
 {
-    handlers: HashMap<usize, Box<dyn Contract<S, A, Q>>>,
+    handlers: HashMap<usize, Box<dyn Contract>>,
     contracts: HashMap<HumanAddr, ContractData<S>>,
     block: BlockInfo,
-    api: A,
+    api: Box<dyn Api>,
 }
 
-impl<S, A, Q> WasmRouter<S, A, Q>
+impl<S> WasmRouter<S>
 where
     S: Storage + Default,
-    A: Api,
-    Q: Querier,
 {
-    pub fn new(api: A, block: BlockInfo) -> Self {
+    pub fn new(api: Box<dyn Api>, block: BlockInfo) -> Self {
         WasmRouter {
             handlers: HashMap::new(),
             contracts: HashMap::new(),
@@ -193,7 +179,7 @@ where
         action(&mut self.block);
     }
 
-    pub fn add_handler(&mut self, handler: Box<dyn Contract<S, A, Q>>) {
+    pub fn add_handler(&mut self, handler: Box<dyn Contract>) {
         let idx = self.handlers.len() + 1;
         self.handlers.insert(idx, handler);
     }
@@ -215,7 +201,7 @@ where
     pub fn handle(
         &self,
         address: HumanAddr,
-        querier: &Q,
+        querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<HandleResponse, String> {
@@ -227,7 +213,7 @@ where
     pub fn init(
         &self,
         address: HumanAddr,
-        querier: &Q,
+        querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<InitResponse, String> {
@@ -236,9 +222,14 @@ where
         })
     }
 
-    pub fn query(&self, address: HumanAddr, querier: &Q, msg: Vec<u8>) -> Result<Binary, String> {
+    pub fn query(
+        &self,
+        address: HumanAddr,
+        querier: &dyn Querier,
+        msg: Vec<u8>,
+    ) -> Result<Binary, String> {
         self.with_storage(querier, address, |handler, deps, env| {
-            handler.query(deps.into(), env, msg)
+            handler.query(deps.as_ref(), env, msg)
         })
     }
 
@@ -264,9 +255,14 @@ where
         }
     }
 
-    fn with_storage<F, T>(&self, querier: &Q, address: HumanAddr, action: F) -> Result<T, String>
+    fn with_storage<F, T>(
+        &self,
+        querier: &dyn Querier,
+        address: HumanAddr,
+        action: F,
+    ) -> Result<T, String>
     where
-        F: FnOnce(&Box<dyn Contract<S, A, Q>>, ExternMut<S, A, Q>, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
     {
         let contract = self
             .contracts
@@ -282,10 +278,10 @@ where
             .storage
             .try_borrow_mut()
             .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
-        let deps = ExternMut {
+        let deps = DepsMut {
             storage: storage.deref_mut(),
-            api: &self.api,
-            querier,
+            api: self.api.deref(),
+            querier: QuerierWrapper::new(querier),
         };
         action(handler, deps, env)
     }
@@ -326,29 +322,27 @@ impl ActionResponse {
     }
 }
 
-pub struct Router<S, A>
+pub struct Router<S>
 where
     S: Storage + Default,
-    A: Api,
 {
-    wasm: WasmRouter<S, A, Router<S, A>>,
+    wasm: WasmRouter<S>,
     // TODO: revisit this, if we want to make Bank a type parameter
-    bank: Box<dyn Bank<S>>,
+    bank: Box<dyn Bank>,
     bank_store: RefCell<S>,
     // LATER: staking router
 }
 
-impl<S, A> Querier for Router<S, A>
+impl<S> Querier for Router<S>
 where
     S: Storage + Default,
-    A: Api,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
-                    error: format!("Parsing query request: {}", e),
+                    error: format!("Parsing query request: {}", e.to_string()),
                     request: bin_request.into(),
                 })
             }
@@ -359,21 +353,20 @@ where
 }
 
 #[cfg(test)]
-impl<S: Storage + Default> Router<S, MockApi> {
+impl<S: Storage + Default> Router<S> {
     /// mock is a shortcut for tests, always returns A = MockApi
-    pub fn mock<B: Bank<S> + 'static>(bank: B) -> Self {
+    pub fn mock<B: Bank + 'static>(bank: B) -> Self {
         let env = mock_env();
-        Self::new(MockApi::default(), env.block, bank)
+        Self::new(Box::new(MockApi::default()), env.block, bank)
     }
 }
 
-impl<S, A> Router<S, A>
+impl<S> Router<S>
 where
     S: Storage + Default,
-    A: Api,
 {
     // TODO: store BlockInfo in Router to change easier?
-    pub fn new<B: Bank<S> + 'static>(api: A, block: BlockInfo, bank: B) -> Self {
+    pub fn new<B: Bank + 'static>(api: Box<dyn Api>, block: BlockInfo, bank: B) -> Self {
         Router {
             wasm: WasmRouter::new(api, block),
             bank: Box::new(bank),
@@ -387,7 +380,7 @@ where
             .bank_store
             .try_borrow_mut()
             .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
-        self.bank.set_balance(&mut store, account, amount)
+        self.bank.set_balance(store.deref_mut(), account, amount)
     }
 
     pub fn execute(
@@ -473,7 +466,7 @@ where
             .bank_store
             .try_borrow_mut()
             .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
-        self.bank.handle(&mut store, sender.into(), msg)?;
+        self.bank.handle(store.deref_mut(), sender.into(), msg)?;
         Ok(RouterResponse::default())
     }
 
