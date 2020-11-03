@@ -86,7 +86,6 @@ impl Bank for SimpleBank {
                     Err("Sender must equal from_address".into())
                 } else {
                     self.send(storage, from_address, to_address, amount)
-                        .map_err(|e| e.to_string())
                 }
             }
         }

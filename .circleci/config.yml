@@ -664,12 +664,6 @@ jobs:
       - run:
           name: Run unit tests
           command: cargo test --locked
-      - run:
-          name: Build library for native target (with iterator)
-          command: cargo build --locked --features iterator
-      - run:
-          name: Run unit tests (with iterator)
-          command: cargo test --locked --features iterator
       - save_cache:
           paths:
             - /usr/local/cargo/registry
