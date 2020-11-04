@@ -475,4 +475,76 @@ mod test {
         let funds = get_balance(&router, &reflect_addr);
         assert_eq!(funds, coins(5, "eth"));
     }
+
+    #[test]
+    fn reflect_error() {
+        let mut router = mock_router();
+
+        // set personal balance
+        let owner = HumanAddr::from("owner");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        router
+            .set_bank_balance(owner.clone(), init_funds.clone())
+            .unwrap();
+
+        // set up reflect contract
+        let reflect_id = router.store_code(contract_reflect());
+        let reflect_addr = router
+            .instantiate_contract(
+                reflect_id,
+                &owner,
+                &EmptyMsg {},
+                &coins(40, "eth"),
+                "Reflect",
+            )
+            .unwrap();
+
+        // reflect has 40 eth
+        let funds = get_balance(&router, &reflect_addr);
+        assert_eq!(funds, coins(40, "eth"));
+        let random = HumanAddr::from("random");
+
+        // sending 7 eth works
+        let msg = BankMsg::Send {
+            from_address: reflect_addr.clone(),
+            to_address: random.clone(),
+            amount: coins(7, "eth"),
+        }
+        .into();
+        let msgs = ReflectMessage {
+            messages: vec![msg],
+        };
+        let res = router
+            .execute_contract(&reflect_addr, &random, &msgs, &[])
+            .unwrap();
+        assert_eq!(0, res.attributes.len());
+        // ensure random got paid
+        let funds = get_balance(&router, &random);
+        assert_eq!(funds, coins(7, "eth"));
+
+        // sending 8 eth, then 3 btc should fail both
+        let msg = BankMsg::Send {
+            from_address: reflect_addr.clone(),
+            to_address: random.clone(),
+            amount: coins(8, "eth"),
+        }
+        .into();
+        let msg2 = BankMsg::Send {
+            from_address: reflect_addr.clone(),
+            to_address: random.clone(),
+            amount: coins(3, "btc"),
+        }
+        .into();
+        let msgs = ReflectMessage {
+            messages: vec![msg, msg2],
+        };
+        let err = router
+            .execute_contract(&reflect_addr, &random, &msgs, &[])
+            .unwrap_err();
+        assert_eq!("Cannot subtract 3 from 0", err.as_str());
+
+        // first one should have been rolled-back on error (no second payment)
+        let funds = get_balance(&router, &random);
+        assert_eq!(funds, coins(7, "eth"));
+    }
 }
