@@ -4,14 +4,15 @@ use std::ops::{Deref, DerefMut};
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, Api, Attribute, BankMsg, BankQuery, Binary, BlockInfo, Coin, ContractResult,
-    CosmosMsg, Empty, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, QuerierResult,
-    QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
+    from_slice, to_binary, Api, Attribute, BankMsg, BankQuery, Binary, BlockInfo, Coin,
+    ContractResult, CosmosMsg, Empty, HandleResponse, HumanAddr, InitResponse, MessageInfo,
+    Querier, QuerierResult, QueryRequest, Storage, SystemError, SystemResult, WasmMsg, WasmQuery,
 };
 
 use crate::bank::Bank;
 use crate::wasm::WasmRouter;
 use crate::Contract;
+use serde::Serialize;
 
 #[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
@@ -112,6 +113,45 @@ where
         self.wasm.store_code(code) as u64
     }
 
+    // create a contract and get the new address
+    pub fn instantiate_contract<T: Serialize, U: Into<String>, V: Into<HumanAddr>>(
+        &mut self,
+        code_id: u64,
+        sender: V,
+        init_msg: &T,
+        send_funds: &[Coin],
+        label: U,
+    ) -> Result<HumanAddr, String> {
+        // instantiate contract
+        let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
+        let msg: CosmosMsg = WasmMsg::Instantiate {
+            code_id,
+            msg: init_msg,
+            send: send_funds.to_vec(),
+            label: Some(label.into()),
+        }
+        .into();
+        let res = self.execute(sender.into(), msg)?;
+        parse_contract_addr(&res.data)
+    }
+
+    pub fn execute_contract<T: Serialize, U: Into<HumanAddr>>(
+        &mut self,
+        contract_addr: U,
+        sender: U,
+        msg: &T,
+        send_funds: &[Coin],
+    ) -> Result<RouterResponse, String> {
+        let msg = to_binary(msg).map_err(|e| e.to_string())?;
+        let msg = WasmMsg::Execute {
+            contract_addr: contract_addr.into(),
+            msg,
+            send: send_funds.to_vec(),
+        }
+        .into();
+        self.execute(sender.into(), msg)
+    }
+
     pub fn execute(
         &mut self,
         sender: HumanAddr,
@@ -149,6 +189,7 @@ where
         }
     }
 
+    // this returns the contract address as well, so we can properly resend the data
     fn handle_wasm(
         &mut self,
         sender: &HumanAddr,
@@ -267,10 +308,10 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<HumanAddr, String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helpers::{contract_payout, PayoutMessage};
+    use crate::test_helpers::{contract_payout, EmptyMsg, PayoutMessage};
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, to_binary, QuerierWrapper};
+    use cosmwasm_std::{attr, coin, coins, QuerierWrapper};
 
     fn mock_router() -> Router<MockStorage> {
         let env = mock_env();
@@ -336,7 +377,6 @@ mod test {
     #[test]
     fn simple_contract() {
         let mut router = mock_router();
-        let code_id = router.store_code(contract_payout());
 
         // set personal balance
         let owner = HumanAddr::from("owner");
@@ -345,41 +385,31 @@ mod test {
             .set_bank_balance(owner.clone(), init_funds.clone())
             .unwrap();
 
-        // TODO: add helper to router to set up contract
-        // instantiate contract
-        let init_msg = to_binary(&PayoutMessage {
+        // set up contract
+        let code_id = router.store_code(contract_payout());
+        let msg = PayoutMessage {
             payout: coin(5, "eth"),
-        })
-        .unwrap();
-        let msg: CosmosMsg = WasmMsg::Instantiate {
-            code_id,
-            msg: init_msg,
-            send: coins(23, "eth"),
-            label: Some("Payout".to_string()),
-        }
-        .into();
-        let res = router.execute(owner.clone(), msg).unwrap();
-        // deduct funds
+        };
+        let contract_addr = router
+            .instantiate_contract(code_id, &owner, &msg, &coins(23, "eth"), "Payout")
+            .unwrap();
+
+        // sender funds deducted
         let sender = get_balance(&router, &owner);
         assert_eq!(sender, vec![coin(20, "btc"), coin(77, "eth")]);
-
         // get contract address, has funds
-        let contract_addr = parse_contract_addr(&res.data).unwrap();
         let funds = get_balance(&router, &contract_addr);
         assert_eq!(funds, coins(23, "eth"));
 
-        // do one payout and see money coming in
+        // create empty account
         let random = HumanAddr::from("random");
         let funds = get_balance(&router, &random);
         assert_eq!(funds, vec![]);
 
-        let msg = WasmMsg::Execute {
-            contract_addr: contract_addr.clone(),
-            msg: b"{}".into(),
-            send: vec![],
-        }
-        .into();
-        let res = router.execute(random.clone(), msg).unwrap();
+        // do one payout and see money coming in
+        let res = router
+            .execute_contract(&contract_addr, &random, &EmptyMsg {}, &[])
+            .unwrap();
         assert_eq!(1, res.attributes.len());
         assert_eq!(&attr("action", "payout"), &res.attributes[0]);
 
