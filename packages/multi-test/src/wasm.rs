@@ -152,9 +152,10 @@ where
         action(&mut self.block);
     }
 
-    pub fn add_handler(&mut self, handler: Box<dyn Contract>) {
+    pub fn add_handler(&mut self, handler: Box<dyn Contract>) -> usize {
         let idx = self.handlers.len() + 1;
         self.handlers.insert(idx, handler);
+        idx
     }
 
     /// This just creates an address and empty storage instance, returning the new address
@@ -257,5 +258,46 @@ where
             querier: QuerierWrapper::new(querier),
         };
         action(handler, deps, env)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::test_helpers::contract_error;
+    use crate::WasmRouter;
+    use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
+    use cosmwasm_std::Empty;
+
+    #[test]
+    fn register_contract() {
+        // TODO: easier mock setup?
+        let env = mock_env();
+        let api = Box::new(MockApi::default());
+        let mut router = WasmRouter::<MockStorage>::new(api, env.block);
+
+        let code_id = router.add_handler(contract_error());
+
+        // cannot register contract with unregistered codeId
+        router.register_contract(code_id + 1).unwrap_err();
+
+        // we can register a new instance of this code
+        let contract_addr = router.register_contract(code_id).unwrap();
+
+        // now, we call this contract and see the error message from the contract
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let info = mock_info("foobar", &[]);
+        let err = router
+            .init(contract_addr, &querier, info, b"{}".to_vec())
+            .unwrap_err();
+        // StdError from contract_error auto-converted to string
+        assert_eq!(err, "Generic error: Init failed");
+
+        // and the error for calling an unregistered contract
+        let info = mock_info("foobar", &[]);
+        let err = router
+            .init("unregistered".into(), &querier, info, b"{}".to_vec())
+            .unwrap_err();
+        // Default error message from router when not found
+        assert_eq!(err, "Unregistered contract address");
     }
 }
