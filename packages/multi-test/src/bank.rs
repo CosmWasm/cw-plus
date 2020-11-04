@@ -128,6 +128,7 @@ impl Bank for SimpleBank {
 mod test {
     use super::*;
 
+    use cosmwasm_std::coins;
     use cosmwasm_std::testing::MockStorage;
 
     #[test]
@@ -188,5 +189,50 @@ mod test {
         let raw = bank.query(&store, req).unwrap();
         let res: BalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, coin(0, "eth"));
+    }
+
+    #[test]
+    fn send_coins() {
+        let mut store = MockStorage::new();
+
+        let owner = HumanAddr::from("owner");
+        let rcpt = HumanAddr::from("receiver");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        let rcpt_funds = vec![coin(5, "btc")];
+
+        // set money
+        let bank = SimpleBank {};
+        bank.set_balance(&mut store, owner.clone(), init_funds.clone())
+            .unwrap();
+        bank.set_balance(&mut store, rcpt.clone(), rcpt_funds.clone())
+            .unwrap();
+
+        // send both tokens
+        let to_send = vec![coin(30, "eth"), coin(5, "btc")];
+        let msg = BankMsg::Send {
+            from_address: owner.clone(),
+            to_address: rcpt.clone(),
+            amount: to_send.clone(),
+        };
+        bank.handle(&mut store, owner.clone(), msg.clone()).unwrap();
+        let rich = bank.get_balance(&store, owner.clone()).unwrap();
+        assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
+        let poor = bank.get_balance(&store, rcpt.clone()).unwrap();
+        assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
+
+        // cannot send from other account
+        bank.handle(&mut store, rcpt.clone(), msg).unwrap_err();
+
+        // cannot send too much
+        let msg = BankMsg::Send {
+            from_address: owner.clone(),
+            to_address: rcpt.clone(),
+            amount: coins(20, "btc"),
+        };
+        bank.handle(&mut store, owner.clone(), msg.clone())
+            .unwrap_err();
+
+        let rich = bank.get_balance(&store, owner.clone()).unwrap();
+        assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
     }
 }
