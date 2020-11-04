@@ -3,8 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
-#[cfg(test)]
-use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
     HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage,

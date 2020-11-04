@@ -1,5 +1,3 @@
-#[cfg(test)]
-use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     coin, from_slice, to_binary, to_vec, AllBalanceResponse, BalanceResponse, BankMsg, BankQuery,
     Binary, Coin, HumanAddr, Storage,
@@ -123,5 +121,72 @@ impl Bank for SimpleBank {
         let value = to_vec(&balance).map_err(|e| e.to_string())?;
         storage.set(key, &value);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use cosmwasm_std::testing::MockStorage;
+
+    #[test]
+    fn get_set_balance() {
+        let mut store = MockStorage::new();
+
+        let owner = HumanAddr::from("owner");
+        let rcpt = HumanAddr::from("receiver");
+        let init_funds = vec![coin(100, "eth"), coin(20, "btc")];
+        let norm = vec![coin(20, "btc"), coin(100, "eth")];
+
+        // set money
+        let bank = SimpleBank {};
+        bank.set_balance(&mut store, owner.clone(), init_funds)
+            .unwrap();
+
+        // get balance work
+        let rich = bank.get_balance(&store, owner.clone()).unwrap();
+        assert_eq!(rich, norm);
+        let poor = bank.get_balance(&store, rcpt.clone()).unwrap();
+        assert_eq!(poor, vec![]);
+
+        // proper queries work
+        let req = BankQuery::AllBalances {
+            address: owner.clone(),
+        };
+        let raw = bank.query(&store, req).unwrap();
+        let res: AllBalanceResponse = from_slice(&raw).unwrap();
+        assert_eq!(res.amount, norm);
+
+        let req = BankQuery::AllBalances {
+            address: rcpt.clone(),
+        };
+        let raw = bank.query(&store, req).unwrap();
+        let res: AllBalanceResponse = from_slice(&raw).unwrap();
+        assert_eq!(res.amount, vec![]);
+
+        let req = BankQuery::Balance {
+            address: owner.clone(),
+            denom: "eth".into(),
+        };
+        let raw = bank.query(&store, req).unwrap();
+        let res: BalanceResponse = from_slice(&raw).unwrap();
+        assert_eq!(res.amount, coin(100, "eth"));
+
+        let req = BankQuery::Balance {
+            address: owner.clone(),
+            denom: "foobar".into(),
+        };
+        let raw = bank.query(&store, req).unwrap();
+        let res: BalanceResponse = from_slice(&raw).unwrap();
+        assert_eq!(res.amount, coin(0, "foobar"));
+
+        let req = BankQuery::Balance {
+            address: rcpt.clone(),
+            denom: "eth".into(),
+        };
+        let raw = bank.query(&store, req).unwrap();
+        let res: BalanceResponse = from_slice(&raw).unwrap();
+        assert_eq!(res.amount, coin(0, "eth"));
     }
 }
