@@ -308,7 +308,9 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<HumanAddr, String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_helpers::{contract_payout, EmptyMsg, PayoutMessage};
+    use crate::test_helpers::{
+        contract_payout, contract_reflect, EmptyMsg, PayoutMessage, ReflectMessage,
+    };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{attr, coin, coins, QuerierWrapper};
@@ -419,5 +421,58 @@ mod test {
         // contract lost it
         let funds = get_balance(&router, &contract_addr);
         assert_eq!(funds, coins(18, "eth"));
+    }
+
+    #[test]
+    fn reflect_success() {
+        let mut router = mock_router();
+
+        // set personal balance
+        let owner = HumanAddr::from("owner");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        router
+            .set_bank_balance(owner.clone(), init_funds.clone())
+            .unwrap();
+
+        // set up payout contract
+        let payout_id = router.store_code(contract_payout());
+        let msg = PayoutMessage {
+            payout: coin(5, "eth"),
+        };
+        let payout_addr = router
+            .instantiate_contract(payout_id, &owner, &msg, &coins(23, "eth"), "Payout")
+            .unwrap();
+
+        // set up reflect contract
+        let reflect_id = router.store_code(contract_reflect());
+        let reflect_addr = router
+            .instantiate_contract(reflect_id, &owner, &EmptyMsg {}, &[], "Reflect")
+            .unwrap();
+
+        // reflect account is empty
+        let funds = get_balance(&router, &reflect_addr);
+        assert_eq!(funds, vec![]);
+
+        // reflecting payout message pays reflect contract
+        let msg = WasmMsg::Execute {
+            contract_addr: payout_addr.clone(),
+            msg: b"{}".into(),
+            send: vec![],
+        }
+        .into();
+        let msgs = ReflectMessage {
+            messages: vec![msg],
+        };
+        let res = router
+            .execute_contract(&reflect_addr, &HumanAddr::from("random"), &msgs, &[])
+            .unwrap();
+
+        // ensure the attributes were relayed from the sub-message
+        assert_eq!(1, res.attributes.len());
+        assert_eq!(&attr("action", "payout"), &res.attributes[0]);
+
+        // ensure transfer was executed with reflect as sender
+        let funds = get_balance(&router, &reflect_addr);
+        assert_eq!(funds, coins(5, "eth"));
     }
 }

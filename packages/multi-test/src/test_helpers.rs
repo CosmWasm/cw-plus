@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::wasm::{Contract, ContractWrapper};
 use cosmwasm_std::{
-    attr, from_slice, to_vec, BankMsg, Binary, Coin, Deps, DepsMut, Env, HandleResponse,
-    InitResponse, MessageInfo, StdError,
+    attr, from_slice, to_vec, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
+    HandleResponse, InitResponse, MessageInfo, StdError,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -85,5 +85,42 @@ fn query_payout(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
 
 pub fn contract_payout() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(handle_payout, init_payout, query_payout);
+    Box::new(contract)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReflectMessage {
+    pub messages: Vec<CosmosMsg<Empty>>,
+}
+
+fn init_reflect(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: EmptyMsg,
+) -> Result<InitResponse, StdError> {
+    Ok(InitResponse::default())
+}
+
+fn handle_reflect(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: ReflectMessage,
+) -> Result<HandleResponse, StdError> {
+    let res = HandleResponse {
+        messages: msg.messages,
+        attributes: vec![],
+        data: None,
+    };
+    Ok(res)
+}
+
+fn query_reflect(_deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
+    Err(StdError::generic_err("Query not implemented"))
+}
+
+pub fn contract_reflect() -> Box<dyn Contract> {
+    let contract = ContractWrapper::new(handle_reflect, init_reflect, query_reflect);
     Box::new(contract)
 }
