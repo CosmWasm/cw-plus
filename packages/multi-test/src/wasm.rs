@@ -270,17 +270,19 @@ where
 mod test {
     use super::*;
 
-    use crate::test_helpers::contract_error;
+    use crate::test_helpers::{contract_error, contract_payout, PayoutMessage};
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::{BlockInfo, Empty};
+    use cosmwasm_std::{coin, to_vec, BankMsg, BlockInfo, CosmosMsg, Empty};
+
+    fn mock_router() -> WasmRouter<MockStorage> {
+        let env = mock_env();
+        let api = Box::new(MockApi::default());
+        WasmRouter::<MockStorage>::new(api, env.block)
+    }
 
     #[test]
     fn register_contract() {
-        // TODO: easier mock setup?
-        let env = mock_env();
-        let api = Box::new(MockApi::default());
-        let mut router = WasmRouter::<MockStorage>::new(api, env.block);
-
+        let mut router = mock_router();
         let code_id = router.add_handler(contract_error());
 
         // cannot register contract with unregistered codeId
@@ -309,10 +311,7 @@ mod test {
 
     #[test]
     fn update_block() {
-        // TODO: easier mock setup?
-        let env = mock_env();
-        let api = Box::new(MockApi::default());
-        let mut router = WasmRouter::<MockStorage>::new(api, env.block);
+        let mut router = mock_router();
 
         let BlockInfo { time, height, .. } = router.get_env("foo").block;
         router.update_block(next_block);
@@ -320,5 +319,52 @@ mod test {
 
         assert_eq!(time + 5, next.time);
         assert_eq!(height + 1, next.height);
+    }
+
+    #[test]
+    fn contract_send_coins() {
+        let mut router = mock_router();
+        let code_id = router.add_handler(contract_payout());
+        let contract_addr = router.register_contract(code_id).unwrap();
+
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let payout = coin(100, "TGD");
+
+        // init the contract
+        let info = mock_info("foobar", &[]);
+        let init_msg = to_vec(&PayoutMessage {
+            payout: payout.clone(),
+        })
+        .unwrap();
+        let res = router
+            .init(contract_addr.clone(), &querier, info, init_msg)
+            .unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // execute the contract
+        let info = mock_info("foobar", &[]);
+        let res = router
+            .handle(contract_addr.clone(), &querier, info, b"{}".to_vec())
+            .unwrap();
+        assert_eq!(1, res.messages.len());
+        match &res.messages[0] {
+            CosmosMsg::Bank(BankMsg::Send {
+                from_address,
+                to_address,
+                amount,
+            }) => {
+                assert_eq!(from_address, &contract_addr);
+                assert_eq!(to_address.as_str(), "foobar");
+                assert_eq!(amount.as_slice(), &[payout.clone()]);
+            }
+            m => panic!("Unexpected message {:?}", m),
+        }
+
+        // query the contract
+        let data = router
+            .query(contract_addr.clone(), &querier, b"{}".to_vec())
+            .unwrap();
+        let res: PayoutMessage = from_slice(&data).unwrap();
+        assert_eq!(res.payout, payout);
     }
 }
