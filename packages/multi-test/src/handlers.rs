@@ -13,6 +13,7 @@ use crate::bank::Bank;
 use crate::wasm::WasmRouter;
 use crate::Contract;
 use serde::Serialize;
+use cosmwasm_storage::StorageTransaction;
 
 #[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
@@ -51,7 +52,7 @@ impl ActionResponse {
 
 pub struct Router<S>
 where
-    S: Storage + Default,
+    S: Storage,
 {
     wasm: WasmRouter<S>,
     bank: Box<dyn Bank>,
@@ -61,7 +62,7 @@ where
 
 impl<S> Querier for Router<S>
 where
-    S: Storage + Default,
+    S: Storage,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         let request: QueryRequest<Empty> = match from_slice(bin_request) {
@@ -78,11 +79,21 @@ where
     }
 }
 
+impl<'a, S> Router<StorageTransaction<'a, S>>
+    where
+        S: Storage,
+{
+    // this should never fail, but do we want to make it Result?
+    fn flush(self, store: &RefCell<S>) {
+        let ops = self.bank_store.into_inner().prepare();
+        ops.commit(store.borrow_mut().deref_mut())
+    }
+}
+
 impl<S> Router<S>
 where
     S: Storage + Default,
 {
-    // TODO: store BlockInfo in Router not WasmRouter to change easier?
     pub fn new<B: Bank + 'static>(api: Box<dyn Api>, block: BlockInfo, bank: B) -> Self {
         Router {
             wasm: WasmRouter::new(api, block),
@@ -90,7 +101,12 @@ where
             bank_store: RefCell::new(S::default()),
         }
     }
+}
 
+impl<S> Router<S>
+    where
+        S: Storage,
+{
     pub fn set_block(&mut self, block: BlockInfo) {
         self.wasm.set_block(block);
     }
@@ -157,10 +173,28 @@ where
         sender: HumanAddr,
         msg: CosmosMsg<Empty>,
     ) -> Result<RouterResponse, String> {
-        // TODO: we need to do some caching of storage here, once in the entry point
-        // meaning, wrap current state.. all writes go to a cache... only when execute
+        // we need to do some caching of storage here, once in the entry point:
+        // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
-        self._execute(&sender, msg)
+        let mut cached = self.cache()?;
+        let res = cached._execute(&sender, msg);
+        // if succeeded, flush cache
+        if res.is_ok() {
+            // TODO: same sort of transactional checks for WasmRouter
+            cached.flush(&self.bank_store);
+        }
+        res
+    }
+
+    fn cache(&'_ self) -> Result<Router<StorageTransaction<'_, S>>, String> {
+        let bank_store = StorageTransaction::new(self.bank_store.try_borrow().map_err(|_| "cannot bottow for cache".to_string())?.deref());
+        let router = Router {
+            // TODO: same sort of transactional checks for WasmRouter
+            wasm: self.wasm.cache(),
+            bank: self.bank.clone(),
+            bank_store: RefCell::new(bank_store),
+        };
+        Ok(router)
     }
 
     fn _execute(
