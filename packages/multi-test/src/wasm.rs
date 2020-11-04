@@ -157,9 +157,9 @@ where
         action(&mut self.block);
     }
 
-    pub fn add_handler(&mut self, handler: Box<dyn Contract>) -> usize {
+    pub fn store_code(&mut self, code: Box<dyn Contract>) -> usize {
         let idx = self.handlers.len() + 1;
-        self.handlers.insert(idx, handler);
+        self.handlers.insert(idx, code);
         idx
     }
 
@@ -283,7 +283,7 @@ mod test {
     #[test]
     fn register_contract() {
         let mut router = mock_router();
-        let code_id = router.add_handler(contract_error());
+        let code_id = router.store_code(contract_error());
 
         // cannot register contract with unregistered codeId
         router.register_contract(code_id + 1).unwrap_err();
@@ -324,7 +324,7 @@ mod test {
     #[test]
     fn contract_send_coins() {
         let mut router = mock_router();
-        let code_id = router.add_handler(contract_payout());
+        let code_id = router.store_code(contract_payout());
         let contract_addr = router.register_contract(code_id).unwrap();
 
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
