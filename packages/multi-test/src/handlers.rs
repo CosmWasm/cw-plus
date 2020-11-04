@@ -12,7 +12,7 @@ use cosmwasm_std::{
 use crate::bank::Bank;
 use crate::wasm::WasmRouter;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
@@ -73,15 +73,6 @@ where
         };
         let contract_result: ContractResult<Binary> = self.query(request).into();
         SystemResult::Ok(contract_result)
-    }
-}
-
-#[cfg(test)]
-impl<S: Storage + Default> Router<S> {
-    /// mock is a shortcut for tests, always returns A = MockApi
-    pub fn mock<B: Bank + 'static>(bank: B) -> Self {
-        let env = mock_env();
-        Self::new(Box::new(MockApi::default()), env.block, bank)
     }
 }
 
@@ -222,6 +213,7 @@ where
         }
         Ok(RouterResponse::default())
     }
+
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
         match request {
             QueryRequest::Wasm(req) => self.query_wasm(req),
@@ -245,5 +237,74 @@ where
             .try_borrow()
             .map_err(|e| format!("Immutable storage borrow failed - re-entrancy?: {}", e))?;
         self.bank.query(store.deref(), request)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::SimpleBank;
+    use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::{coin, coins, QuerierWrapper};
+
+    fn mock_router() -> Router<MockStorage> {
+        let env = mock_env();
+        let api = Box::new(MockApi::default());
+        let bank = SimpleBank {};
+
+        Router::new(api, env.block, bank)
+    }
+
+    fn get_balance(router: &Router<MockStorage>, addr: &HumanAddr) -> Vec<Coin> {
+        QuerierWrapper::new(router)
+            .query_all_balances(addr)
+            .unwrap()
+    }
+
+    #[test]
+    fn send_tokens() {
+        let mut router = mock_router();
+
+        let owner = HumanAddr::from("owner");
+        let rcpt = HumanAddr::from("receiver");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        let rcpt_funds = vec![coin(5, "btc")];
+
+        // set money
+        router
+            .set_bank_balance(owner.clone(), init_funds.clone())
+            .unwrap();
+        router
+            .set_bank_balance(rcpt.clone(), rcpt_funds.clone())
+            .unwrap();
+
+        // send both tokens
+        let to_send = vec![coin(30, "eth"), coin(5, "btc")];
+        let msg: CosmosMsg = BankMsg::Send {
+            from_address: owner.clone(),
+            to_address: rcpt.clone(),
+            amount: to_send.clone(),
+        }
+        .into();
+        router.execute(owner.clone(), msg.clone()).unwrap();
+        let rich = get_balance(&router, &owner);
+        assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
+        let poor = get_balance(&router, &rcpt);
+        assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
+
+        // cannot send from other account
+        router.execute(rcpt.clone(), msg).unwrap_err();
+
+        // cannot send too much
+        let msg = BankMsg::Send {
+            from_address: owner.clone(),
+            to_address: rcpt.clone(),
+            amount: coins(20, "btc"),
+        }
+        .into();
+        router.execute(owner.clone(), msg).unwrap_err();
+
+        let rich = get_balance(&router, &owner);
+        assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
     }
 }
