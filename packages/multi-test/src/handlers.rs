@@ -89,13 +89,22 @@ impl<S> Router<S>
 where
     S: Storage + Default,
 {
-    // TODO: store BlockInfo in Router to change easier?
+    // TODO: store BlockInfo in Router not WasmRouter to change easier?
     pub fn new<B: Bank + 'static>(api: Box<dyn Api>, block: BlockInfo, bank: B) -> Self {
         Router {
             wasm: WasmRouter::new(api, block),
             bank: Box::new(bank),
             bank_store: RefCell::new(S::default()),
         }
+    }
+
+    pub fn set_block(&mut self, block: BlockInfo) {
+        self.wasm.set_block(block);
+    }
+
+    // this let's use use "next block" steps that add eg. one height and 5 seconds
+    pub fn update_block<F: Fn(&mut BlockInfo)>(&mut self, action: F) {
+        self.wasm.update_block(action);
     }
 
     // this is an "admin" function to let us adjust bank accounts

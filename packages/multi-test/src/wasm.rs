@@ -120,6 +120,11 @@ impl<S: Storage + Default> ContractData<S> {
     }
 }
 
+pub fn next_block(block: &mut BlockInfo) {
+    block.time += 5;
+    block.height += 1;
+}
+
 pub struct WasmRouter<S>
 where
     S: Storage + Default,
@@ -263,10 +268,11 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     use crate::test_helpers::contract_error;
-    use crate::WasmRouter;
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::Empty;
+    use cosmwasm_std::{BlockInfo, Empty};
 
     #[test]
     fn register_contract() {
@@ -299,5 +305,20 @@ mod test {
             .unwrap_err();
         // Default error message from router when not found
         assert_eq!(err, "Unregistered contract address");
+    }
+
+    #[test]
+    fn update_block() {
+        // TODO: easier mock setup?
+        let env = mock_env();
+        let api = Box::new(MockApi::default());
+        let mut router = WasmRouter::<MockStorage>::new(api, env.block);
+
+        let BlockInfo { time, height, .. } = router.get_env("foo").block;
+        router.update_block(next_block);
+        let next = router.get_env("foo").block;
+
+        assert_eq!(time + 5, next.time);
+        assert_eq!(height + 1, next.height);
     }
 }

@@ -6,4 +6,4 @@ mod wasm;
 
 pub use crate::bank::{Bank, SimpleBank};
 pub use crate::handlers::Router;
-pub use crate::wasm::{Contract, ContractWrapper, WasmRouter};
+pub use crate::wasm::{next_block, Contract, ContractWrapper, WasmRouter};
