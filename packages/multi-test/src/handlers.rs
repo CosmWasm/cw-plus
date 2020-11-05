@@ -12,8 +12,7 @@ use cosmwasm_std::{
 
 use crate::bank::Bank;
 use crate::transactions::StorageTransaction;
-use crate::wasm::{StorageFactory, WasmRouter};
-use crate::{Contract, SimpleBank};
+use crate::wasm::{Contract, StorageFactory, WasmRouter};
 
 #[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
@@ -54,10 +53,15 @@ pub struct Router<S>
 where
     S: Storage,
 {
+    // we need to be able to accept a BaseWasmRouter or CachedWasmRouter
     wasm: WasmRouter,
+
+    // same here Base = {bank, bank_store}, Cached = {&Base, cache}
+    // TODO: combine these in Bank and test it out there - few moving parts
+    // logic
     bank: Box<dyn Bank>,
+    // state - must be cached
     bank_store: RefCell<S>,
-    // LATER: staking router
 }
 
 impl<S> Querier for Router<S>
@@ -76,17 +80,6 @@ where
         };
         let contract_result: ContractResult<Binary> = self.query(request).into();
         SystemResult::Ok(contract_result)
-    }
-}
-
-impl<'a, S> Router<StorageTransaction<'a, S>>
-where
-    S: Storage,
-{
-    // this should never fail, but do we want to make it Result?
-    fn flush(self, store: &RefCell<S>) {
-        let ops = self.bank_store.into_inner().prepare();
-        ops.commit(store.borrow_mut().deref_mut())
     }
 }
 
@@ -182,52 +175,30 @@ where
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
 
-        // TODO: give up our wasm router temporarily... need to claim it back later
-        let mut placeholder = self.wasm.cache();
-        std::mem::swap(&mut self.wasm, &mut placeholder);
-        let mut cached = self.cache()?;
-        std::mem::swap(&mut cached.wasm, &mut placeholder);
+        let bank_ref = self.bank_store.try_borrow().map_err(|e| e.to_string())?;
+        let mut bank_cache = StorageTransaction::new(bank_ref);
 
-        let res = cached._execute(&sender, msg);
-        // if succeeded, flush cache
-        std::mem::swap(&mut cached.wasm, &mut placeholder);
+        let res = self._execute(&mut bank_cache, &sender, msg);
         if res.is_ok() {
-            // TODO: same sort of transactional checks for WasmRouter
-            cached.flush(&self.bank_store);
-        } else {
-            std::mem::drop(cached);
+            let ops = bank_cache.prepare();
+            ops.commit(self.bank_store.borrow_mut().deref_mut());
         }
-        // we need to recover the wasm router
-        std::mem::swap(&mut self.wasm, &mut placeholder);
         res
     }
 
-    fn cache(&'_ self) -> Result<Router<StorageTransaction<'_, S>>, String> {
-        let bank_ref = self.bank_store.try_borrow().map_err(|e| e.to_string())?;
-        let bank_store = StorageTransaction::new(bank_ref);
-
-        let router = Router {
-            // TODO: same sort of transactional checks for WasmRouter
-            wasm: self.wasm.cache(),
-            bank: Box::new(SimpleBank {}), // TODO: better
-            bank_store: RefCell::new(bank_store),
-        };
-
-        Ok(router)
-    }
-
     fn _execute(
-        &mut self,
+        &self,
+        bank_cache: &mut dyn Storage,
         sender: &HumanAddr,
         msg: CosmosMsg<Empty>,
     ) -> Result<RouterResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
-                let (resender, res) = self.handle_wasm(sender, msg)?;
+                let (resender, res) = self.handle_wasm(bank_cache, sender, msg)?;
                 let mut attributes = res.attributes;
                 // recurse in all messages
                 for resend in res.messages {
-                    let subres = self._execute(&resender, resend)?;
+                    let subres = self._execute(bank_cache, &resender, resend)?;
                     // ignore the data now, just like in wasmd
                     // append the events
                     attributes.extend_from_slice(&subres.attributes);
@@ -237,14 +208,18 @@ where
                     data: res.data,
                 })
             }
-            CosmosMsg::Bank(msg) => self.handle_bank(sender, msg),
+            CosmosMsg::Bank(msg) => {
+                self.bank.handle(bank_cache, sender.into(), msg)?;
+                Ok(RouterResponse::default())
+            }
             _ => unimplemented!(),
         }
     }
 
     // this returns the contract address as well, so we can properly resend the data
     fn handle_wasm(
-        &mut self,
+        &self,
+        bank_cache: &mut dyn Storage,
         sender: &HumanAddr,
         msg: WasmMsg,
     ) -> Result<(HumanAddr, ActionResponse), String> {
@@ -255,7 +230,7 @@ where
                 send,
             } => {
                 // first move the cash
-                self.send(sender, &contract_addr, &send)?;
+                self.send(bank_cache, sender, &contract_addr, &send)?;
                 // then call the contract
                 let info = MessageInfo {
                     sender: sender.clone(),
@@ -272,10 +247,9 @@ where
                 send,
                 label: _,
             } => {
-                // register the contract
                 let contract_addr = self.wasm.register_contract(code_id as usize)?;
                 // move the cash
-                self.send(sender, &contract_addr, &send)?;
+                self.send(bank_cache, sender, &contract_addr, &send)?;
                 // then call the contract
                 let info = MessageInfo {
                     sender: sender.clone(),
@@ -292,26 +266,17 @@ where
         }
     }
 
-    // Returns empty router response, just here for the same function signatures
-    fn handle_bank(&self, sender: &HumanAddr, msg: BankMsg) -> Result<RouterResponse, String> {
-        let mut store = self
-            .bank_store
-            .try_borrow_mut()
-            .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
-        self.bank.handle(store.deref_mut(), sender.into(), msg)?;
-        Ok(RouterResponse::default())
-    }
-
     fn send<T: Into<HumanAddr>, U: Into<HumanAddr>>(
         &self,
+        bank_cache: &mut dyn Storage,
         sender: T,
         recipient: U,
         amount: &[Coin],
     ) -> Result<RouterResponse, String> {
         if !amount.is_empty() {
             let sender: HumanAddr = sender.into();
-            self.handle_bank(
-                &sender,
+            self.bank.handle(bank_cache,
+                 sender.clone(),
                 BankMsg::Send {
                     from_address: sender.clone(),
                     to_address: recipient.into(),

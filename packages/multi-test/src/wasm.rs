@@ -128,8 +128,10 @@ pub fn next_block(block: &mut BlockInfo) {
 pub type StorageFactory = fn() -> Box<dyn Storage>;
 
 pub struct WasmRouter {
+    // WasmState - cache this, pass in separate?
     handlers: HashMap<usize, Box<dyn Contract>>,
     contracts: HashMap<HumanAddr, ContractData>,
+    // WasmConst
     block: BlockInfo,
     api: Box<dyn Api>,
     storage_factory: StorageFactory,
