@@ -559,6 +559,12 @@ mod test {
         let funds = get_balance(&router, &random);
         assert_eq!(funds, coins(7, "eth"));
 
+        // reflect count should be updated to 2
+        let qres: ReflectResponse = QuerierWrapper::new(&router)
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(2, qres.count);
+
         // sending 8 eth, then 3 btc should fail both
         let msg = BankMsg::Send {
             from_address: reflect_addr.clone(),
@@ -583,5 +589,11 @@ mod test {
         // first one should have been rolled-back on error (no second payment)
         let funds = get_balance(&router, &random);
         assert_eq!(funds, coins(7, "eth"));
+
+        // failure should not update reflect count
+        let qres: ReflectResponse = QuerierWrapper::new(&router)
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(2, qres.count);
     }
 }
