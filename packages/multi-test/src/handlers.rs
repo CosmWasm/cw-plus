@@ -184,7 +184,8 @@ where
 
         let res = self._execute(&mut bank_cache, &mut wasm_cache, &sender, msg);
         if res.is_ok() {
-            wasm_cache.flush();
+            let wasm_ops = wasm_cache.prepare();
+            wasm_ops.commit(&mut self.wasm);
 
             let ops = bank_cache.prepare();
             ops.commit(self.bank_store.borrow_mut().deref_mut());

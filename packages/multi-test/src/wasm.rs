@@ -164,7 +164,7 @@ impl WasmRouter {
     }
 
     // TODO: this should take &self and WasmCache should have a flush
-    pub fn cache(&'_ mut self) -> WasmCache<'_> {
+    pub fn cache(&'_ self) -> WasmCache<'_> {
         WasmCache::new(self)
     }
 
@@ -246,42 +246,57 @@ impl WasmRouter {
 // In Router, we use this exclusively in all the calls in execute (not self.wasm)
 // In Querier, we use self.wasm
 pub struct WasmCache<'a> {
-    router: &'a mut WasmRouter,
+    router: &'a WasmRouter,
     // WasmState - cache this, pass in separate?
-    // handlers: HashMap<usize, Box<dyn Contract>>,
-    // contracts: HashMap<HumanAddr, ContractData>,
+    contracts: HashMap<HumanAddr, ContractData>,
+}
+
+pub struct WasmOps(HashMap<HumanAddr, ContractData>);
+
+impl WasmOps {
+    pub fn commit(self, router: &mut WasmRouter) {
+        self.0.into_iter().for_each(|(k, v)| {
+            router.contracts.insert(k, v);
+        })
+    }
 }
 
 impl<'a> WasmCache<'a> {
-    fn new(router: &'a mut WasmRouter) -> Self {
+    fn new(router: &'a WasmRouter) -> Self {
         WasmCache {
             router,
-            // handlers: HashMap::new(),
-            // contracts: HashMap::new(),
+            contracts: HashMap::new(),
         }
     }
 
-    pub fn flush() {
-        // TODO: implement
+    pub fn prepare(self) -> WasmOps {
+        WasmOps(self.contracts)
     }
 
-    // TODO: use local cache also
-    fn has_handler(&self, code_id: usize) -> bool {
-        self.router.handlers.contains_key(&code_id)
+    // TODO: better addr generation
+    fn next_address(&self) -> HumanAddr {
+        let count = self.router.contracts.len() + self.contracts.len();
+        HumanAddr::from(count.to_string())
+    }
+
+    fn get_contract(&self, addr: &HumanAddr) -> Option<&ContractData> {
+        let here = self.contracts.get(addr);
+        match here {
+            Some(x) => Some(x),
+            None => self.router.contracts.get(addr),
+        }
     }
 
     /// This just creates an address and empty storage instance, returning the new address
     /// You must call init after this to set up the contract properly.
     /// These are separated into two steps to have cleaner return values.
     pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
-        if !self.has_handler(code_id) {
+        if !self.router.handlers.contains_key(&code_id) {
             return Err("Cannot init contract with unregistered code id".to_string());
         }
-        // TODO: better addr generation
-        let addr = HumanAddr::from(self.router.contracts.len().to_string());
+        let addr = self.next_address();
         let info = ContractData::new(code_id, (self.router.storage_factory)());
-        // TODO: local cache
-        self.router.contracts.insert(addr.clone(), info);
+        self.contracts.insert(addr.clone(), info);
         Ok(addr)
     }
 
@@ -318,11 +333,8 @@ impl<'a> WasmCache<'a> {
     where
         F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
     {
-        // TODO: use local cache also
         let contract = self
-            .router
-            .contracts
-            .get(&address)
+            .get_contract(&address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
         let handler = self
             .router
@@ -331,6 +343,7 @@ impl<'a> WasmCache<'a> {
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.router.get_env(address);
 
+        // TODO: one more level of wrapping the actual data written
         let mut storage = contract
             .storage
             .try_borrow_mut()
