@@ -12,7 +12,7 @@ use cosmwasm_std::{
 
 use crate::bank::Bank;
 use crate::transactions::StorageTransaction;
-use crate::wasm::{Contract, StorageFactory, WasmRouter};
+use crate::wasm::{Contract, StorageFactory, WasmCache, WasmRouter};
 
 #[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
@@ -166,6 +166,9 @@ where
         self.execute(sender.into(), msg)
     }
 
+    // TODO: do we make a "wasm cache" here that has all the mutating functions?
+    // not just the bank_cache but a wrapper object with all info?
+    // first look at WasmHandler and how to split it out there...
     pub fn execute(
         &mut self,
         sender: HumanAddr,
@@ -177,9 +180,12 @@ where
 
         let bank_ref = self.bank_store.try_borrow().map_err(|e| e.to_string())?;
         let mut bank_cache = StorageTransaction::new(bank_ref);
+        let mut wasm_cache = self.wasm.cache();
 
-        let res = self._execute(&mut bank_cache, &sender, msg);
+        let res = self._execute(&mut bank_cache, &mut wasm_cache, &sender, msg);
         if res.is_ok() {
+            wasm_cache.flush();
+
             let ops = bank_cache.prepare();
             ops.commit(self.bank_store.borrow_mut().deref_mut());
         }
@@ -189,16 +195,17 @@ where
     fn _execute(
         &self,
         bank_cache: &mut dyn Storage,
+        wasm_cache: &mut WasmCache,
         sender: &HumanAddr,
         msg: CosmosMsg<Empty>,
     ) -> Result<RouterResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
-                let (resender, res) = self.handle_wasm(bank_cache, sender, msg)?;
+                let (resender, res) = self.handle_wasm(bank_cache, wasm_cache, sender, msg)?;
                 let mut attributes = res.attributes;
                 // recurse in all messages
                 for resend in res.messages {
-                    let subres = self._execute(bank_cache, &resender, resend)?;
+                    let subres = self._execute(bank_cache, wasm_cache, &resender, resend)?;
                     // ignore the data now, just like in wasmd
                     // append the events
                     attributes.extend_from_slice(&subres.attributes);
@@ -220,6 +227,7 @@ where
     fn handle_wasm(
         &self,
         bank_cache: &mut dyn Storage,
+        wasm_cache: &mut WasmCache,
         sender: &HumanAddr,
         msg: WasmMsg,
     ) -> Result<(HumanAddr, ActionResponse), String> {
@@ -236,9 +244,7 @@ where
                     sender: sender.clone(),
                     sent_funds: send,
                 };
-                let res = self
-                    .wasm
-                    .handle(contract_addr.clone(), self, info, msg.to_vec())?;
+                let res = wasm_cache.handle(contract_addr.clone(), self, info, msg.to_vec())?;
                 Ok((contract_addr, res.into()))
             }
             WasmMsg::Instantiate {
@@ -247,7 +253,7 @@ where
                 send,
                 label: _,
             } => {
-                let contract_addr = self.wasm.register_contract(code_id as usize)?;
+                let contract_addr = wasm_cache.register_contract(code_id as usize)?;
                 // move the cash
                 self.send(bank_cache, sender, &contract_addr, &send)?;
                 // then call the contract
@@ -255,9 +261,7 @@ where
                     sender: sender.clone(),
                     sent_funds: send,
                 };
-                let res = self
-                    .wasm
-                    .init(contract_addr.clone(), self, info, msg.to_vec())?;
+                let res = wasm_cache.init(contract_addr.clone(), self, info, msg.to_vec())?;
                 Ok((
                     contract_addr.clone(),
                     ActionResponse::init(res, contract_addr),
@@ -275,8 +279,9 @@ where
     ) -> Result<RouterResponse, String> {
         if !amount.is_empty() {
             let sender: HumanAddr = sender.into();
-            self.bank.handle(bank_cache,
-                 sender.clone(),
+            self.bank.handle(
+                bank_cache,
+                sender.clone(),
                 BankMsg::Send {
                     from_address: sender.clone(),
                     to_address: recipient.into(),
