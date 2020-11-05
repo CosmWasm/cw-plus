@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 
@@ -12,8 +13,7 @@ use cosmwasm_std::{
 use crate::bank::Bank;
 use crate::transactions::StorageTransaction;
 use crate::wasm::{StorageFactory, WasmRouter};
-use crate::Contract;
-use serde::Serialize;
+use crate::{Contract, SimpleBank};
 
 #[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
@@ -181,25 +181,38 @@ where
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
+
+        // TODO: give up our wasm router temporarily... need to claim it back later
+        let mut placeholder = self.wasm.cache();
+        std::mem::swap(&mut self.wasm, &mut placeholder);
         let mut cached = self.cache()?;
+        std::mem::swap(&mut cached.wasm, &mut placeholder);
+
         let res = cached._execute(&sender, msg);
         // if succeeded, flush cache
+        std::mem::swap(&mut cached.wasm, &mut placeholder);
         if res.is_ok() {
             // TODO: same sort of transactional checks for WasmRouter
             cached.flush(&self.bank_store);
+        } else {
+            std::mem::drop(cached);
         }
+        // we need to recover the wasm router
+        std::mem::swap(&mut self.wasm, &mut placeholder);
         res
     }
 
     fn cache(&'_ self) -> Result<Router<StorageTransaction<'_, S>>, String> {
         let bank_ref = self.bank_store.try_borrow().map_err(|e| e.to_string())?;
         let bank_store = StorageTransaction::new(bank_ref);
+
         let router = Router {
             // TODO: same sort of transactional checks for WasmRouter
             wasm: self.wasm.cache(),
-            bank: self.bank.clone(),
+            bank: Box::new(SimpleBank {}), // TODO: better
             bank_store: RefCell::new(bank_store),
         };
+
         Ok(router)
     }
 
