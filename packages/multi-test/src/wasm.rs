@@ -148,12 +148,6 @@ impl WasmRouter {
         }
     }
 
-    // TODO: implement, this is total placeholder now
-    pub fn cache(&self) -> WasmRouter {
-        let api = Box::new(cosmwasm_std::testing::MockApi::default());
-        WasmRouter::new(api, self.block.clone(), self.storage_factory)
-    }
-
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
     }
@@ -169,42 +163,9 @@ impl WasmRouter {
         idx
     }
 
-    /// This just creates an address and empty storage instance, returning the new address
-    /// You must call init after this to set up the contract properly.
-    /// These are separated into two steps to have cleaner return values.
-    pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
-        if !self.handlers.contains_key(&code_id) {
-            return Err("Cannot init contract with unregistered code id".to_string());
-        }
-        // TODO: better addr generation
-        let addr = HumanAddr::from(self.contracts.len().to_string());
-        let info = ContractData::new(code_id, (self.storage_factory)());
-        self.contracts.insert(addr.clone(), info);
-        Ok(addr)
-    }
-
-    pub fn handle(
-        &self,
-        address: HumanAddr,
-        querier: &dyn Querier,
-        info: MessageInfo,
-        msg: Vec<u8>,
-    ) -> Result<HandleResponse, String> {
-        self.with_storage(querier, address, |handler, deps, env| {
-            handler.handle(deps, env, info, msg)
-        })
-    }
-
-    pub fn init(
-        &self,
-        address: HumanAddr,
-        querier: &dyn Querier,
-        info: MessageInfo,
-        msg: Vec<u8>,
-    ) -> Result<InitResponse, String> {
-        self.with_storage(querier, address, |handler, deps, env| {
-            handler.init(deps, env, info, msg)
-        })
+    // TODO: this should take &self and WasmCache should have a flush
+    pub fn cache(&'_ mut self) -> WasmCache<'_> {
+        WasmCache::new(self)
     }
 
     pub fn query(
@@ -214,7 +175,7 @@ impl WasmRouter {
         msg: Vec<u8>,
     ) -> Result<Binary, String> {
         self.with_storage(querier, address, |handler, deps, env| {
-            handler.query(deps.as_ref(), env, msg)
+            handler.query(deps, env, msg)
         })
     }
 
@@ -247,7 +208,7 @@ impl WasmRouter {
         action: F,
     ) -> Result<T, String>
     where
-        F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract>, Deps, Env) -> Result<T, String>,
     {
         let contract = self
             .contracts
@@ -259,13 +220,124 @@ impl WasmRouter {
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.get_env(address);
 
+        let storage = contract
+            .storage
+            .try_borrow()
+            .map_err(|e| format!("Double-borrowing query storage - re-entrancy?: {}", e))?;
+        let deps = Deps {
+            storage: storage.deref().deref(),
+            api: self.api.deref(),
+            querier: QuerierWrapper::new(querier),
+        };
+        action(handler, deps, env)
+    }
+}
+
+// TODO: how to add something like this as a transactional cache
+// reads hit local hashmap or then hit router
+// getting storage wraps the internal contract storage
+//  - adding handler
+//  - adding contract
+//  - writing existing contract
+// return op-log to flush, like transactional:
+//  - consume this struct (release router) and return list of ops to perform
+//  - pass ops &mut WasmRouter to update them
+//
+// In Router, we use this exclusively in all the calls in execute (not self.wasm)
+// In Querier, we use self.wasm
+pub struct WasmCache<'a> {
+    router: &'a mut WasmRouter,
+    // WasmState - cache this, pass in separate?
+    // handlers: HashMap<usize, Box<dyn Contract>>,
+    // contracts: HashMap<HumanAddr, ContractData>,
+}
+
+impl<'a> WasmCache<'a> {
+    fn new(router: &'a mut WasmRouter) -> Self {
+        WasmCache {
+            router,
+            // handlers: HashMap::new(),
+            // contracts: HashMap::new(),
+        }
+    }
+
+    pub fn flush() {
+        // TODO: implement
+    }
+
+    // TODO: use local cache also
+    fn has_handler(&self, code_id: usize) -> bool {
+        self.router.handlers.contains_key(&code_id)
+    }
+
+    /// This just creates an address and empty storage instance, returning the new address
+    /// You must call init after this to set up the contract properly.
+    /// These are separated into two steps to have cleaner return values.
+    pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
+        if !self.has_handler(code_id) {
+            return Err("Cannot init contract with unregistered code id".to_string());
+        }
+        // TODO: better addr generation
+        let addr = HumanAddr::from(self.router.contracts.len().to_string());
+        let info = ContractData::new(code_id, (self.router.storage_factory)());
+        // TODO: local cache
+        self.router.contracts.insert(addr.clone(), info);
+        Ok(addr)
+    }
+
+    pub fn handle(
+        &self,
+        address: HumanAddr,
+        querier: &dyn Querier,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<HandleResponse, String> {
+        self.with_storage(querier, address, |handler, deps, env| {
+            handler.handle(deps, env, info, msg)
+        })
+    }
+
+    pub fn init(
+        &self,
+        address: HumanAddr,
+        querier: &dyn Querier,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<InitResponse, String> {
+        self.with_storage(querier, address, |handler, deps, env| {
+            handler.init(deps, env, info, msg)
+        })
+    }
+
+    fn with_storage<F, T>(
+        &self,
+        querier: &dyn Querier,
+        address: HumanAddr,
+        action: F,
+    ) -> Result<T, String>
+    where
+        F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
+    {
+        // TODO: use local cache also
+        let contract = self
+            .router
+            .contracts
+            .get(&address)
+            .ok_or_else(|| "Unregistered contract address".to_string())?;
+        let handler = self
+            .router
+            .handlers
+            .get(&contract.code_id)
+            .ok_or_else(|| "Unregistered code id".to_string())?;
+        let env = self.router.get_env(address);
+
         let mut storage = contract
             .storage
             .try_borrow_mut()
             .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
         let deps = DepsMut {
             storage: storage.deref_mut().deref_mut(),
-            api: self.api.deref(),
+            api: self.router.api.deref(),
             querier: QuerierWrapper::new(querier),
         };
         action(handler, deps, env)
