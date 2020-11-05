@@ -343,7 +343,8 @@ impl<'a> WasmCache<'a> {
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.router.get_env(address);
 
-        // TODO: one more level of wrapping the actual data written
+        // TODO: we cannot let them actually change, we need to keep a diff here...
+        // TODO: make a test that triggers this with tx and rollback and all
         let mut storage = contract
             .storage
             .try_borrow_mut()
@@ -375,17 +376,18 @@ mod test {
     fn register_contract() {
         let mut router = mock_router();
         let code_id = router.store_code(contract_error());
+        let mut cache = router.cache();
 
         // cannot register contract with unregistered codeId
-        router.register_contract(code_id + 1).unwrap_err();
+        cache.register_contract(code_id + 1).unwrap_err();
 
         // we can register a new instance of this code
-        let contract_addr = router.register_contract(code_id).unwrap();
+        let contract_addr = cache.register_contract(code_id).unwrap();
 
         // now, we call this contract and see the error message from the contract
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let info = mock_info("foobar", &[]);
-        let err = router
+        let err = cache
             .init(contract_addr, &querier, info, b"{}".to_vec())
             .unwrap_err();
         // StdError from contract_error auto-converted to string
@@ -393,11 +395,14 @@ mod test {
 
         // and the error for calling an unregistered contract
         let info = mock_info("foobar", &[]);
-        let err = router
+        let err = cache
             .init("unregistered".into(), &querier, info, b"{}".to_vec())
             .unwrap_err();
         // Default error message from router when not found
         assert_eq!(err, "Unregistered contract address");
+
+        // and flush
+        cache.prepare().commit(&mut router);
     }
 
     #[test]
@@ -416,7 +421,9 @@ mod test {
     fn contract_send_coins() {
         let mut router = mock_router();
         let code_id = router.store_code(contract_payout());
-        let contract_addr = router.register_contract(code_id).unwrap();
+        let mut cache = router.cache();
+
+        let contract_addr = cache.register_contract(code_id).unwrap();
 
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let payout = coin(100, "TGD");
@@ -427,14 +434,14 @@ mod test {
             payout: payout.clone(),
         })
         .unwrap();
-        let res = router
+        let res = cache
             .init(contract_addr.clone(), &querier, info, init_msg)
             .unwrap();
         assert_eq!(0, res.messages.len());
 
         // execute the contract
         let info = mock_info("foobar", &[]);
-        let res = router
+        let res = cache
             .handle(contract_addr.clone(), &querier, info, b"{}".to_vec())
             .unwrap();
         assert_eq!(1, res.messages.len());
@@ -450,6 +457,9 @@ mod test {
             }
             m => panic!("Unexpected message {:?}", m),
         }
+
+        // and flush before query
+        cache.prepare().commit(&mut router);
 
         // query the contract
         let data = router
