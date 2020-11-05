@@ -15,28 +15,31 @@ use std::ops::{Bound, RangeBounds};
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
 use cosmwasm_std::{StdResult, Storage};
-use std::ops::DerefMut;
+use serde::export::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "iterator")]
 /// The BTreeMap specific key-value pair reference type, as returned by BTreeMap<Vec<u8>, T>::range.
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
-pub struct StorageTransaction<'a, S: Storage> {
+pub struct StorageTransaction<S: Storage, T: Deref<Target = S>> {
     /// read-only access to backing storage
-    storage: Ref<'a, S>,
+    storage: T,
     /// these are local changes not flushed to backing storage
     local_state: BTreeMap<Vec<u8>, Delta>,
     /// a log of local changes not yet flushed to backing storage
     rep_log: RepLog,
+    storage_type: PhantomData<S>,
 }
 
-impl<'a, S: Storage> StorageTransaction<'a, S> {
-    pub fn new(storage: Ref<'a, S>) -> Self {
+impl<S: Storage, T: Deref<Target = S>> StorageTransaction<S, T> {
+    pub fn new(storage: T) -> Self {
         StorageTransaction {
             storage,
             local_state: BTreeMap::new(),
             rep_log: RepLog::new(),
+            storage_type: PhantomData,
         }
     }
 
@@ -45,11 +48,12 @@ impl<'a, S: Storage> StorageTransaction<'a, S> {
         self.rep_log
     }
 
-    /// rollback will consume the checkpoint and drop all changes (no really needed, going out of scope does the same, but nice for clarity)
+    /// rollback will consume the checkpoint and drop all changes (not really needed, going out of scope does the same, but nice for clarity)
+    #[allow(dead_code)]
     pub fn rollback(self) {}
 }
 
-impl<'a, S: Storage> Storage for StorageTransaction<'a, S> {
+impl<S: Storage, T: Deref<Target = S>> Storage for StorageTransaction<S, T> {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         match self.local_state.get(key) {
             Some(val) => match val {
@@ -257,7 +261,7 @@ where
 pub fn transactional<S, C, T>(storage: RefCell<S>, callback: C) -> StdResult<T>
 where
     S: Storage,
-    C: FnOnce(&mut StorageTransaction<S>) -> StdResult<T>,
+    C: FnOnce(&mut StorageTransaction<S, Ref<S>>) -> StdResult<T>,
 {
     let mut stx = StorageTransaction::new(storage.borrow());
     let res = callback(&mut stx)?;
@@ -277,6 +281,28 @@ fn range_bounds(start: Option<&[u8]>, end: Option<&[u8]>) -> impl RangeBounds<Ve
 mod test {
     use super::*;
     use cosmwasm_std::MemoryStorage;
+
+    #[test]
+    fn wrap_ref() {
+        let mut store = MemoryStorage::new();
+        let mut wrap = StorageTransaction::new(&store);
+        wrap.set(b"foo", b"bar");
+
+        assert_eq!(None, store.get(b"foo"));
+        wrap.prepare().commit(&mut store);
+        assert_eq!(Some(b"bar".to_vec()), store.get(b"foo"));
+    }
+
+    #[test]
+    fn wrap_ref_cell() {
+        let store = RefCell::new(MemoryStorage::new());
+        let mut wrap = StorageTransaction::new(store.borrow());
+        wrap.set(b"foo", b"bar");
+
+        assert_eq!(None, store.borrow().get(b"foo"));
+        wrap.prepare().commit(store.borrow_mut().deref_mut());
+        assert_eq!(Some(b"bar".to_vec()), store.borrow().get(b"foo"));
+    }
 
     #[cfg(feature = "iterator")]
     // iterator_test_suite takes a storage, adds data and runs iterator tests
