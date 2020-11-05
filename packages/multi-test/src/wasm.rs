@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref, RefMut};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
@@ -7,6 +7,7 @@ use cosmwasm_std::{
     from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
     HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage,
 };
+use crate::transactions::StorageTransaction;
 
 /// Interface to call into a Contract
 pub trait Contract {
@@ -249,6 +250,8 @@ pub struct WasmCache<'a> {
     router: &'a WasmRouter,
     // WasmState - cache this, pass in separate?
     contracts: HashMap<HumanAddr, ContractData>,
+
+    // contract_diffs: HashMap<HumanAddr, StorageTransaction<Box<dyn Storage>, Ref<'a, Box<dyn Storage>>>>
 }
 
 pub struct WasmOps(HashMap<HumanAddr, ContractData>);
@@ -266,6 +269,7 @@ impl<'a> WasmCache<'a> {
         WasmCache {
             router,
             contracts: HashMap::new(),
+            // contract_diffs: HashMap::new(),
         }
     }
 
@@ -279,12 +283,26 @@ impl<'a> WasmCache<'a> {
         HumanAddr::from(count.to_string())
     }
 
-    fn get_contract(&self, addr: &HumanAddr) -> Option<&ContractData> {
+    fn get_contract(&'_ self, addr: &HumanAddr) -> Option<(usize, RefMut<'_, Box<dyn Storage>>)> {
         let here = self.contracts.get(addr);
-        match here {
-            Some(x) => Some(x),
-            None => self.router.contracts.get(addr),
+        if let Some(x) = here {
+            // let storage = storage
+            //     .try_borrow_mut()
+            //     .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
+            return Some((x.code_id, x.storage.borrow_mut()));
         }
+        // TODO: use contract diffs
+        let parent = self.router.contracts.get(addr);
+        if let Some(c) = parent {
+            let r = c.storage.borrow();
+            let wrap = StorageTransaction::new(r);
+            let cell = RefCell::new(Box::new(wrap));
+            let store: RefMut<Box<dyn Storage>> = cell.borrow_mut();
+            Some((c.code_id, store))
+        } else {
+            None
+        }
+
     }
 
     /// This just creates an address and empty storage instance, returning the new address
@@ -333,22 +351,18 @@ impl<'a> WasmCache<'a> {
     where
         F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
     {
-        let contract = self
+        let (code_id, mut storage) = self
             .get_contract(&address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
         let handler = self
             .router
             .handlers
-            .get(&contract.code_id)
+            .get(&code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.router.get_env(address);
 
         // TODO: we cannot let them actually change, we need to keep a diff here...
         // TODO: make a test that triggers this with tx and rollback and all
-        let mut storage = contract
-            .storage
-            .try_borrow_mut()
-            .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
         let deps = DepsMut {
             storage: storage.deref_mut().deref_mut(),
             api: self.router.api.deref(),
