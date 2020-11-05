@@ -126,7 +126,7 @@ impl Bank for SimpleBank {
     }
 
     fn clone(&self) -> Box<dyn Bank> {
-        Box::new(SimpleBank{})
+        Box::new(SimpleBank {})
     }
 }
 

@@ -7,7 +7,6 @@ use cosmwasm_std::{
     from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
     HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage,
 };
-use cosmwasm_storage::StorageTransaction;
 
 /// Interface to call into a Contract
 pub trait Contract {
@@ -107,16 +106,16 @@ where
     }
 }
 
-struct ContractData<S: Storage> {
+struct ContractData {
     code_id: usize,
-    storage: RefCell<S>,
+    storage: RefCell<Box<dyn Storage>>,
 }
 
-impl<S: Storage + Default> ContractData<S> {
-    fn new(code_id: usize) -> Self {
+impl ContractData {
+    fn new(code_id: usize, storage: Box<dyn Storage>) -> Self {
         ContractData {
             code_id,
-            storage: RefCell::new(S::default()),
+            storage: RefCell::new(storage),
         }
     }
 }
@@ -126,57 +125,31 @@ pub fn next_block(block: &mut BlockInfo) {
     block.height += 1;
 }
 
-pub struct WasmRouter<S>
-where
-    S: Storage,
-{
+pub type StorageFactory = fn() -> Box<dyn Storage>;
+
+pub struct WasmRouter {
     handlers: HashMap<usize, Box<dyn Contract>>,
-    contracts: HashMap<HumanAddr, ContractData<S>>,
+    contracts: HashMap<HumanAddr, ContractData>,
     block: BlockInfo,
     api: Box<dyn Api>,
+    storage_factory: StorageFactory,
 }
 
-
-impl<S: Storage+Default> WasmRouter<S> {
-    /// This just creates an address and empty storage instance, returning the new address
-/// You must call init after this to set up the contract properly.
-/// These are separated into two steps to have cleaner return values.
-    pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
-        if !self.handlers.contains_key(&code_id) {
-            return Err("Cannot init contract with unregistered code id".to_string());
-        }
-        // TODO: better addr generation
-        let addr = HumanAddr::from(self.contracts.len().to_string());
-        let info = ContractData::new(code_id);
-        self.contracts.insert(addr.clone(), info);
-        Ok(addr)
-    }
-}
-
-
-impl<S: Storage> WasmRouter<S> {
-    pub fn new(api: Box<dyn Api>, block: BlockInfo) -> Self {
+impl WasmRouter {
+    pub fn new(api: Box<dyn Api>, block: BlockInfo, storage_factory: StorageFactory) -> Self {
         WasmRouter {
             handlers: HashMap::new(),
             contracts: HashMap::new(),
             block,
             api,
+            storage_factory,
         }
     }
 
-    pub fn cache(&'_ self) -> WasmRouter<StorageTransaction<'_, S>> {
-        // TODO: really wrap the storage
-        let contracts = HashMap::new();
-        // TODO: really copy
-        let handlers = HashMap::new();
-
-        WasmRouter {
-            handlers,
-            contracts,
-            block: self.block.clone(),
-            // TODO
-            api: Box::new(cosmwasm_std::testing::MockApi::default()),
-        }
+    // TODO: implement, this is total placeholder now
+    pub fn cache(&self) -> WasmRouter {
+        let api = Box::new(cosmwasm_std::testing::MockApi::default());
+        WasmRouter::new(api, self.block.clone(), self.storage_factory)
     }
 
     pub fn set_block(&mut self, block: BlockInfo) {
@@ -192,6 +165,20 @@ impl<S: Storage> WasmRouter<S> {
         let idx = self.handlers.len() + 1;
         self.handlers.insert(idx, code);
         idx
+    }
+
+    /// This just creates an address and empty storage instance, returning the new address
+    /// You must call init after this to set up the contract properly.
+    /// These are separated into two steps to have cleaner return values.
+    pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
+        if !self.handlers.contains_key(&code_id) {
+            return Err("Cannot init contract with unregistered code id".to_string());
+        }
+        // TODO: better addr generation
+        let addr = HumanAddr::from(self.contracts.len().to_string());
+        let info = ContractData::new(code_id, (self.storage_factory)());
+        self.contracts.insert(addr.clone(), info);
+        Ok(addr)
     }
 
     pub fn handle(
@@ -275,7 +262,7 @@ impl<S: Storage> WasmRouter<S> {
             .try_borrow_mut()
             .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
         let deps = DepsMut {
-            storage: storage.deref_mut(),
+            storage: storage.deref_mut().deref_mut(),
             api: self.api.deref(),
             querier: QuerierWrapper::new(querier),
         };
@@ -291,10 +278,10 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, to_vec, BankMsg, BlockInfo, CosmosMsg, Empty};
 
-    fn mock_router() -> WasmRouter<MockStorage> {
+    fn mock_router() -> WasmRouter {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        WasmRouter::<MockStorage>::new(api, env.block)
+        WasmRouter::new(api, env.block, || Box::new(MockStorage::new()))
     }
 
     #[test]

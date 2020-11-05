@@ -10,10 +10,10 @@ use cosmwasm_std::{
 };
 
 use crate::bank::Bank;
-use crate::wasm::WasmRouter;
+use crate::transactions::StorageTransaction;
+use crate::wasm::{StorageFactory, WasmRouter};
 use crate::Contract;
 use serde::Serialize;
-use cosmwasm_storage::StorageTransaction;
 
 #[derive(Default, Clone, Debug)]
 pub struct RouterResponse {
@@ -54,7 +54,7 @@ pub struct Router<S>
 where
     S: Storage,
 {
-    wasm: WasmRouter<S>,
+    wasm: WasmRouter,
     bank: Box<dyn Bank>,
     bank_store: RefCell<S>,
     // LATER: staking router
@@ -80,8 +80,8 @@ where
 }
 
 impl<'a, S> Router<StorageTransaction<'a, S>>
-    where
-        S: Storage,
+where
+    S: Storage,
 {
     // this should never fail, but do we want to make it Result?
     fn flush(self, store: &RefCell<S>) {
@@ -94,9 +94,14 @@ impl<S> Router<S>
 where
     S: Storage + Default,
 {
-    pub fn new<B: Bank + 'static>(api: Box<dyn Api>, block: BlockInfo, bank: B) -> Self {
+    pub fn new<B: Bank + 'static>(
+        api: Box<dyn Api>,
+        block: BlockInfo,
+        bank: B,
+        storage_factory: StorageFactory,
+    ) -> Self {
         Router {
-            wasm: WasmRouter::new(api, block),
+            wasm: WasmRouter::new(api, block, storage_factory),
             bank: Box::new(bank),
             bank_store: RefCell::new(S::default()),
         }
@@ -104,8 +109,8 @@ where
 }
 
 impl<S> Router<S>
-    where
-        S: Storage,
+where
+    S: Storage,
 {
     pub fn set_block(&mut self, block: BlockInfo) {
         self.wasm.set_block(block);
@@ -187,7 +192,8 @@ impl<S> Router<S>
     }
 
     fn cache(&'_ self) -> Result<Router<StorageTransaction<'_, S>>, String> {
-        let bank_store = StorageTransaction::new(self.bank_store.try_borrow().map_err(|_| "cannot bottow for cache".to_string())?.deref());
+        let bank_ref = self.bank_store.try_borrow().map_err(|e| e.to_string())?;
+        let bank_store = StorageTransaction::new(bank_ref);
         let router = Router {
             // TODO: same sort of transactional checks for WasmRouter
             wasm: self.wasm.cache(),
@@ -354,7 +360,7 @@ mod test {
         let api = Box::new(MockApi::default());
         let bank = SimpleBank {};
 
-        Router::new(api, env.block, bank)
+        Router::new(api, env.block, bank, || Box::new(MockStorage::new()))
     }
 
     fn get_balance(router: &Router<MockStorage>, addr: &HumanAddr) -> Vec<Coin> {
