@@ -189,6 +189,8 @@ where
 
             let ops = bank_cache.prepare();
             ops.commit(self.bank_store.borrow_mut().deref_mut());
+        } else {
+            bank_cache.rollback()
         }
         res
     }
@@ -284,7 +286,7 @@ where
                 bank_cache,
                 sender.clone(),
                 BankMsg::Send {
-                    from_address: sender.clone(),
+                    from_address: sender,
                     to_address: recipient.into(),
                     amount: amount.to_vec(),
                 },
