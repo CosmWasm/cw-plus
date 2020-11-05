@@ -335,7 +335,7 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<HumanAddr, String> {
 mod test {
     use super::*;
     use crate::test_helpers::{
-        contract_payout, contract_reflect, EmptyMsg, PayoutMessage, ReflectMessage,
+        contract_payout, contract_reflect, EmptyMsg, PayoutMessage, ReflectMessage, ReflectResponse,
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
@@ -478,6 +478,11 @@ mod test {
         // reflect account is empty
         let funds = get_balance(&router, &reflect_addr);
         assert_eq!(funds, vec![]);
+        // reflect count is 1
+        let qres: ReflectResponse = QuerierWrapper::new(&router)
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(1, qres.count);
 
         // reflecting payout message pays reflect contract
         let msg = WasmMsg::Execute {
@@ -500,6 +505,12 @@ mod test {
         // ensure transfer was executed with reflect as sender
         let funds = get_balance(&router, &reflect_addr);
         assert_eq!(funds, coins(5, "eth"));
+
+        // reflect count updated
+        let qres: ReflectResponse = QuerierWrapper::new(&router)
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(2, qres.count);
     }
 
     #[test]
