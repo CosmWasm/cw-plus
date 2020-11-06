@@ -110,8 +110,6 @@ const useOptions = (options: Options): Network => {
     wallet: Secp256k1HdWallet,
     options: Options
   ): Promise<SigningCosmWasmClient> => {
-    // const feeTable = buildFeeTable(options);
-    // const feeTable = buildFeeTable(options.feeToken, options.gasPrice)
     const [{ address }] = await wallet.getAccounts();
 
     const client = new SigningCosmWasmClient(
