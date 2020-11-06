@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ Storage};
+use cosmwasm_std::Storage;
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::{Expiration, NativeBalance};
 

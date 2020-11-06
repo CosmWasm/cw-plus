@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, Deps, DepsMut,
+    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult,
 };
 use cw1::CanSendResponse;
 use cw2::set_contract_version;
@@ -16,29 +16,24 @@ use crate::state::{admin_list, admin_list_read, AdminList};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = AdminList {
-        admins: map_canonical(&deps.api, &msg.admins)?,
+        admins: map_canonical(deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
     admin_list(deps.storage).save(&cfg)?;
     Ok(InitResponse::default())
 }
 
-fn map_canonical<A: Api>(api: &A, admins: &[HumanAddr]) -> StdResult<Vec<CanonicalAddr>> {
+fn map_canonical(api: &dyn Api, admins: &[HumanAddr]) -> StdResult<Vec<CanonicalAddr>> {
     admins
         .iter()
         .map(|addr| api.canonical_address(addr))
         .collect()
 }
 
-fn map_human<A: Api>(api: &A, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr>> {
+fn map_human(api: &dyn Api, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr>> {
     admins.iter().map(|addr| api.human_address(addr)).collect()
 }
 
@@ -57,7 +52,7 @@ pub fn handle(
     }
 }
 
-pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
+pub fn handle_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -104,7 +99,7 @@ pub fn handle_update_admins(
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
-        cfg.admins = map_canonical(&deps.api, &admins)?;
+        cfg.admins = map_canonical(deps.api, &admins)?;
         admin_list(deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
@@ -113,32 +108,23 @@ pub fn handle_update_admins(
     }
 }
 
-fn can_send(
-    deps: Deps,
-    sender: &HumanAddr,
-) -> StdResult<bool> {
+fn can_send(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
     let cfg = admin_list_read(deps.storage).load()?;
     let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
     Ok(can)
 }
 
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
     }
 }
 
-pub fn query_admin_list(
-    deps: Deps,
-) -> StdResult<AdminListResponse> {
+pub fn query_admin_list(deps: Deps) -> StdResult<AdminListResponse> {
     let cfg = admin_list_read(deps.storage).load()?;
     Ok(AdminListResponse {
-        admins: map_human(&deps.api, &cfg.admins)?,
+        admins: map_human(deps.api, &cfg.admins)?,
         mutable: cfg.mutable,
     })
 }
@@ -149,7 +135,7 @@ pub fn query_can_send(
     _msg: CosmosMsg,
 ) -> StdResult<CanSendResponse> {
     Ok(CanSendResponse {
-        can_send: can_send(deps.as_ref(), &sender)?,
+        can_send: can_send(deps, &sender)?,
     })
 }
 
@@ -182,7 +168,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone(), carl.clone()],
             mutable: true,
         };
-        assert_eq!(query_admin_list(&deps).unwrap(), expected);
+        assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // anyone cannot modify the contract
         let msg = HandleMsg::UpdateAdmins {
@@ -207,7 +193,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
             mutable: true,
         };
-        assert_eq!(query_admin_list(&deps).unwrap(), expected);
+        assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
@@ -224,7 +210,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
         };
-        assert_eq!(query_admin_list(&deps).unwrap(), expected);
+        assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // and now alice cannot change it again
         let msg = HandleMsg::UpdateAdmins {
