@@ -1,7 +1,3 @@
-// TODO: this was copied from cosmwasm-storage - as we needed Ref not &S
-// let us figure a way to unify this
-use std::cell::{Ref, RefCell};
-
 #[cfg(feature = "iterator")]
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -12,18 +8,18 @@ use std::iter::Peekable;
 #[cfg(feature = "iterator")]
 use std::ops::{Bound, RangeBounds};
 
+use cosmwasm_std::Storage;
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
-use cosmwasm_std::{StdResult, Storage};
 use serde::export::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 #[cfg(feature = "iterator")]
 /// The BTreeMap specific key-value pair reference type, as returned by BTreeMap<Vec<u8>, T>::range.
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
-pub struct StorageTransaction<S: Storage, T: Deref<Target = S>> {
+pub struct StorageTransaction<S: Storage + ?Sized, T: Deref<Target = S>> {
     /// read-only access to backing storage
     storage: T,
     /// these are local changes not flushed to backing storage
@@ -33,7 +29,7 @@ pub struct StorageTransaction<S: Storage, T: Deref<Target = S>> {
     storage_type: PhantomData<S>,
 }
 
-impl<S: Storage, T: Deref<Target = S>> StorageTransaction<S, T> {
+impl<S: Storage + ?Sized, T: Deref<Target = S>> StorageTransaction<S, T> {
     pub fn new(storage: T) -> Self {
         StorageTransaction {
             storage,
@@ -53,7 +49,7 @@ impl<S: Storage, T: Deref<Target = S>> StorageTransaction<S, T> {
     pub fn rollback(self) {}
 }
 
-impl<S: Storage, T: Deref<Target = S>> Storage for StorageTransaction<S, T> {
+impl<S: Storage + ?Sized, T: Deref<Target = S>> Storage for StorageTransaction<S, T> {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         match self.local_state.get(key) {
             Some(val) => match val {
@@ -128,7 +124,7 @@ impl RepLog {
     }
 
     /// applies the stored list of `Op`s to the provided `Storage`
-    pub fn commit<S: Storage>(self, storage: &mut S) {
+    pub fn commit<S: Storage + ?Sized>(self, storage: &mut S) {
         for op in self.ops_log {
             op.apply(storage);
         }
@@ -150,7 +146,7 @@ enum Op {
 
 impl Op {
     /// applies this `Op` to the provided storage
-    pub fn apply<S: Storage>(&self, storage: &mut S) {
+    pub fn apply<S: Storage + ?Sized>(&self, storage: &mut S) {
         match self {
             Op::Set { key, value } => storage.set(&key, &value),
             Op::Delete { key } => storage.remove(&key),
@@ -257,18 +253,6 @@ where
     }
 }
 
-#[allow(dead_code)]
-pub fn transactional<S, C, T>(storage: RefCell<S>, callback: C) -> StdResult<T>
-where
-    S: Storage,
-    C: FnOnce(&mut StorageTransaction<S, Ref<S>>) -> StdResult<T>,
-{
-    let mut stx = StorageTransaction::new(storage.borrow());
-    let res = callback(&mut stx)?;
-    stx.prepare().commit(storage.borrow_mut().deref_mut());
-    Ok(res)
-}
-
 #[cfg(feature = "iterator")]
 fn range_bounds(start: Option<&[u8]>, end: Option<&[u8]>) -> impl RangeBounds<Vec<u8>> {
     (
@@ -280,10 +264,13 @@ fn range_bounds(start: Option<&[u8]>, end: Option<&[u8]>) -> impl RangeBounds<Ve
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::cell::RefCell;
+    use std::ops::DerefMut;
+
     use cosmwasm_std::MemoryStorage;
 
     #[test]
-    fn wrap_ref() {
+    fn wrap_storage() {
         let mut store = MemoryStorage::new();
         let mut wrap = StorageTransaction::new(&store);
         wrap.set(b"foo", b"bar");
@@ -301,6 +288,48 @@ mod test {
 
         assert_eq!(None, store.borrow().get(b"foo"));
         wrap.prepare().commit(store.borrow_mut().deref_mut());
+        assert_eq!(Some(b"bar".to_vec()), store.borrow().get(b"foo"));
+    }
+
+    #[test]
+    fn wrap_box_storage() {
+        let mut store: Box<MemoryStorage> = Box::new(MemoryStorage::new());
+        let mut wrap = StorageTransaction::new(store.as_ref());
+        wrap.set(b"foo", b"bar");
+
+        assert_eq!(None, store.get(b"foo"));
+        wrap.prepare().commit(store.as_mut());
+        assert_eq!(Some(b"bar".to_vec()), store.get(b"foo"));
+    }
+
+    #[test]
+    fn wrap_box_dyn_storage() {
+        let mut store: Box<dyn Storage> = Box::new(MemoryStorage::new());
+        let mut wrap = StorageTransaction::new(store.as_ref());
+        wrap.set(b"foo", b"bar");
+
+        assert_eq!(None, store.get(b"foo"));
+        wrap.prepare().commit(store.as_mut());
+        assert_eq!(Some(b"bar".to_vec()), store.get(b"foo"));
+    }
+
+    #[test]
+    fn wrap_ref_cell_dyn_storage() {
+        let inner: Box<dyn Storage> = Box::new(MemoryStorage::new());
+        let store = RefCell::new(inner);
+        // Tricky but working
+        // 1. we cannot inline StorageTransaction::new(store.borrow().as_ref()) as Ref must outlive StorageTransaction
+        // 2. we cannot call ops.commit() until refer is out of scope - borrow_mut() and borrow() on the same object
+        // This can work with some careful scoping, this provides a good reference
+        let ops = {
+            let refer = store.borrow();
+            let mut wrap = StorageTransaction::new(refer.as_ref());
+            wrap.set(b"foo", b"bar");
+
+            assert_eq!(None, store.borrow().get(b"foo"));
+            wrap.prepare()
+        };
+        ops.commit(store.borrow_mut().as_mut());
         assert_eq!(Some(b"bar".to_vec()), store.borrow().get(b"foo"));
     }
 
@@ -520,76 +549,47 @@ mod test {
         assert_eq!(base.borrow().get(b"subtx"), Some(b"works".to_vec()));
     }
 
-    // #[test]
-    // fn storage_remains_readable() {
-    //     let mut base = MemoryStorage::new();
-    //     base.set(b"foo", b"bar");
-    //
-    //     let mut stxn1 = StorageTransaction::new(&base);
-    //
-    //     assert_eq!(stxn1.get(b"foo"), Some(b"bar".to_vec()));
-    //
-    //     stxn1.set(b"subtx", b"works");
-    //     assert_eq!(stxn1.get(b"subtx"), Some(b"works".to_vec()));
-    //
-    //     // Can still read from base, txn is not yet committed
-    //     assert_eq!(base.get(b"subtx"), None);
-    //
-    //     stxn1.prepare().commit(&mut base);
-    //     assert_eq!(base.get(b"subtx"), Some(b"works".to_vec()));
-    // }
-    //
-    // #[test]
-    // fn rollback_has_no_effect() {
-    //     let mut base = MemoryStorage::new();
-    //     base.set(b"foo", b"bar");
-    //
-    //     let mut check = StorageTransaction::new(&base);
-    //     assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
-    //     check.set(b"subtx", b"works");
-    //     check.rollback();
-    //
-    //     assert_eq!(base.get(b"subtx"), None);
-    // }
-    //
-    // #[test]
-    // fn ignore_same_as_rollback() {
-    //     let mut base = MemoryStorage::new();
-    //     base.set(b"foo", b"bar");
-    //
-    //     let mut check = StorageTransaction::new(&base);
-    //     assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
-    //     check.set(b"subtx", b"works");
-    //
-    //     assert_eq!(base.get(b"subtx"), None);
-    // }
-    //
-    // #[test]
-    // fn transactional_works() {
-    //     let mut base = MemoryStorage::new();
-    //     base.set(b"foo", b"bar");
-    //
-    //     // writes on success
-    //     let res: StdResult<i32> = transactional(&mut base, |store| {
-    //         // ensure we can read from the backing store
-    //         assert_eq!(store.get(b"foo"), Some(b"bar".to_vec()));
-    //         // we write in the Ok case
-    //         store.set(b"good", b"one");
-    //         Ok(5)
-    //     });
-    //     assert_eq!(res.unwrap(), 5);
-    //     assert_eq!(base.get(b"good"), Some(b"one".to_vec()));
-    //
-    //     // rolls back on error
-    //     let res: StdResult<i32> = transactional(&mut base, |store| {
-    //         // ensure we can read from the backing store
-    //         assert_eq!(store.get(b"foo"), Some(b"bar".to_vec()));
-    //         assert_eq!(store.get(b"good"), Some(b"one".to_vec()));
-    //         // we write in the Error case
-    //         store.set(b"bad", b"value");
-    //         Err(StdError::underflow(8, 65))
-    //     });
-    //     assert!(res.is_err());
-    //     assert_eq!(base.get(b"bad"), None);
-    // }
+    #[test]
+    fn storage_remains_readable() {
+        let mut base = MemoryStorage::new();
+        base.set(b"foo", b"bar");
+
+        let mut stxn1 = StorageTransaction::new(&base);
+
+        assert_eq!(stxn1.get(b"foo"), Some(b"bar".to_vec()));
+
+        stxn1.set(b"subtx", b"works");
+        assert_eq!(stxn1.get(b"subtx"), Some(b"works".to_vec()));
+
+        // Can still read from base, txn is not yet committed
+        assert_eq!(base.get(b"subtx"), None);
+
+        stxn1.prepare().commit(&mut base);
+        assert_eq!(base.get(b"subtx"), Some(b"works".to_vec()));
+    }
+
+    #[test]
+    fn rollback_has_no_effect() {
+        let mut base = MemoryStorage::new();
+        base.set(b"foo", b"bar");
+
+        let mut check = StorageTransaction::new(&base);
+        assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
+        check.set(b"subtx", b"works");
+        check.rollback();
+
+        assert_eq!(base.get(b"subtx"), None);
+    }
+
+    #[test]
+    fn ignore_same_as_rollback() {
+        let mut base = MemoryStorage::new();
+        base.set(b"foo", b"bar");
+
+        let mut check = StorageTransaction::new(&base);
+        assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
+        check.set(b"subtx", b"works");
+
+        assert_eq!(base.get(b"subtx"), None);
+    }
 }
