@@ -237,9 +237,12 @@ impl WasmRouter {
 pub struct WasmCache<'a> {
     // and this into one with reference
     router: &'a WasmRouter,
+    state: WasmCacheState<'a>,
+}
+
+pub struct WasmCacheState<'a> {
     // WasmState - cache this, pass in separate?
     contracts: HashMap<HumanAddr, ContractData>,
-
     // TODO: pull this out into other struct with mut reference
     contract_diffs: HashMap<HumanAddr, StorageTransaction<dyn Storage + 'a, &'a dyn Storage>>,
 }
@@ -258,35 +261,15 @@ impl<'a> WasmCache<'a> {
     fn new(router: &'a WasmRouter) -> Self {
         WasmCache {
             router,
-            contracts: HashMap::new(),
-            contract_diffs: HashMap::new(),
+            state: WasmCacheState {
+                contracts: HashMap::new(),
+                contract_diffs: HashMap::new(),
+            },
         }
     }
 
     pub fn prepare(self) -> WasmOps {
-        WasmOps(self.contracts)
-    }
-
-    // TODO: better addr generation
-    fn next_address(&self) -> HumanAddr {
-        let count = self.router.contracts.len() + self.contracts.len();
-        HumanAddr::from(count.to_string())
-    }
-
-    fn get_contract<'b>(&'b mut self, addr: &HumanAddr) -> Option<(usize, &'b mut dyn Storage)> {
-        let here = self.contracts.get_mut(addr);
-        if let Some(x) = here {
-            return Some((x.code_id, x.storage.as_mut()));
-        }
-        // TODO: use contract diffs
-        let parent = self.router.contracts.get(addr);
-        if let Some(c) = parent {
-            let wrap = StorageTransaction::new(c.storage.as_ref());
-            self.contract_diffs.insert(addr.clone(), wrap);
-            Some((c.code_id, self.contract_diffs.get_mut(addr).unwrap()))
-        } else {
-            None
-        }
+        self.state.prepare()
     }
 
     /// This just creates an address and empty storage instance, returning the new address
@@ -298,8 +281,14 @@ impl<'a> WasmCache<'a> {
         }
         let addr = self.next_address();
         let info = ContractData::new(code_id, (self.router.storage_factory)());
-        self.contracts.insert(addr.clone(), info);
+        self.state.contracts.insert(addr.clone(), info);
         Ok(addr)
+    }
+
+    // TODO: better addr generation
+    fn next_address(&self) -> HumanAddr {
+        let count = self.router.contracts.len() + self.state.contracts.len();
+        HumanAddr::from(count.to_string())
     }
 
     pub fn handle(
@@ -309,9 +298,24 @@ impl<'a> WasmCache<'a> {
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<HandleResponse, String> {
-        self.with_storage(querier, address, |handler, deps, env| {
-            handler.handle(deps, env, info, msg)
-        })
+        let parent = &self.router.handlers;
+        let contracts = &self.router.contracts;
+        let env = self.router.get_env(address.clone());
+        let api = self.router.api.as_ref();
+
+        self.state.with_storage(
+            querier,
+            contracts,
+            address,
+            env,
+            api,
+            |code_id, deps, env| {
+                let handler = parent
+                    .get(&code_id)
+                    .ok_or_else(|| "Unregistered code id".to_string())?;
+                handler.handle(deps, env, info, msg)
+            },
+        )
     }
 
     pub fn init(
@@ -321,38 +325,78 @@ impl<'a> WasmCache<'a> {
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<InitResponse, String> {
-        self.with_storage(querier, address, |handler, deps, env| {
-            handler.init(deps, env, info, msg)
-        })
+        let parent = &self.router.handlers;
+        let contracts = &self.router.contracts;
+        let env = self.router.get_env(address.clone());
+        let api = self.router.api.as_ref();
+
+        self.state.with_storage(
+            querier,
+            contracts,
+            address,
+            env,
+            api,
+            |code_id, deps, env| {
+                let handler = parent
+                    .get(&code_id)
+                    .ok_or_else(|| "Unregistered code id".to_string())?;
+                handler.init(deps, env, info, msg)
+            },
+        )
+    }
+}
+
+impl<'a> WasmCacheState<'a> {
+    pub fn prepare(self) -> WasmOps {
+        WasmOps(self.contracts)
+    }
+
+    fn get_contract<'b>(
+        &'b mut self,
+        parent: &'b HashMap<HumanAddr, ContractData>,
+        addr: &HumanAddr,
+    ) -> Option<(usize, &'b mut dyn Storage)> {
+        // if we created this transaction
+        if let Some(x) = self.contracts.get_mut(addr) {
+            return Some((x.code_id, x.storage.as_mut()));
+        }
+        if let Some(c) = parent.get(addr) {
+            let code_id = c.code_id;
+            // if we already have a local transaction on top, use it
+            if let Some(x) = self.contract_diffs.get_mut(addr) {
+                return Some((code_id, x));
+            } else {
+                // else make a new transaction
+                let wrap = StorageTransaction::new(c.storage.as_ref());
+                self.contract_diffs.insert(addr.clone(), wrap);
+                Some((code_id, self.contract_diffs.get_mut(addr).unwrap()))
+            }
+        } else {
+            None
+        }
     }
 
     fn with_storage<F, T>(
         &mut self,
         querier: &dyn Querier,
+        parent: &HashMap<HumanAddr, ContractData>,
         address: HumanAddr,
+        env: Env,
+        api: &dyn Api,
         action: F,
     ) -> Result<T, String>
     where
-        F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
+        F: FnOnce(usize, DepsMut, Env) -> Result<T, String>,
     {
         let (code_id, storage) = self
-            .get_contract(&address)
+            .get_contract(parent, &address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
-        let handler = self
-            .router
-            .handlers
-            .get(&code_id)
-            .ok_or_else(|| "Unregistered code id".to_string())?;
-        let env = self.router.get_env(address);
-
-        // TODO: we cannot let them actually change, we need to keep a diff here...
-        // TODO: make a test that triggers this with tx and rollback and all
         let deps = DepsMut {
             storage: storage,
-            api: self.router.api.deref(),
+            api,
             querier: QuerierWrapper::new(querier),
         };
-        action(handler, deps, env)
+        action(code_id, deps, env)
     }
 }
 
