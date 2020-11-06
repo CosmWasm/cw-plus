@@ -219,7 +219,8 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse
     Ok(res)
 }
 
-// TODO: place in std
+// TODO: replace this with deps.dup()
+// after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
 fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
     DepsMut {
         storage: deps.storage,

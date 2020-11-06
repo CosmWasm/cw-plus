@@ -9,7 +9,7 @@ use cosmwasm_std::{
 use cw0::{calc_range_start_human, Expiration};
 use cw1::CanSendResponse;
 use cw1_whitelist::{
-    contract::{handle_freeze, handle_update_admins, query_admin_list},
+    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
     state::admin_list_read,
 };
@@ -23,21 +23,30 @@ use crate::msg::{
 use crate::state::{
     allowances, allowances_read, permissions, permissions_read, Allowance, Permissions,
 };
-use cw1_whitelist::contract::map_canonical;
-use cw1_whitelist::state::{admin_list, AdminList};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
-    let cfg = AdminList {
-        admins: map_canonical(deps.api, &msg.admins)?,
-        mutable: msg.mutable,
-    };
-    admin_list(deps.storage).save(&cfg)?;
+pub fn init(
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: InitMsg,
+) -> StdResult<InitResponse> {
+    let result = whitelist_init(dup(&mut deps), env, info, msg)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(InitResponse::default())
+    Ok(result)
+}
+
+// TODO: replace this with deps.dup()
+// after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
+fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
+    DepsMut {
+        storage: deps.storage,
+        api: deps.api,
+        querier: deps.querier,
+    }
 }
 
 pub fn handle(
@@ -410,7 +419,7 @@ pub fn query_all_permissions(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coin, coins, Api, OwnedDeps, Querier, StakingMsg, Storage};
+    use cosmwasm_std::{coin, coins, Api, StakingMsg};
 
     use cw0::NativeBalance;
     use cw1_whitelist::msg::AdminListResponse;
@@ -421,20 +430,20 @@ mod tests {
     use super::*;
 
     // this will set up the init for other tests
-    fn setup_test_case<S: Storage, A: Api, Q: Querier>(
-        mut deps: OwnedDeps<S, A, Q>,
+    fn setup_test_case(
+        mut deps: DepsMut,
         info: &MessageInfo,
         admins: &[HumanAddr],
         spenders: &[HumanAddr],
         allowances: &[Coin],
         expirations: &[Expiration],
-    ) -> OwnedDeps<S, A, Q> {
+    ) {
         // Init a contract with admins
         let init_msg = InitMsg {
             admins: admins.to_vec(),
             mutable: true,
         };
-        init(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+        init(dup(&mut deps), mock_env(), info.clone(), init_msg).unwrap();
 
         // Add subkeys with initial allowances
         for (spender, expiration) in spenders.iter().zip(expirations) {
@@ -444,16 +453,14 @@ mod tests {
                     amount: amount.clone(),
                     expires: Some(expiration.clone()),
                 };
-                handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+                handle(dup(&mut deps), mock_env(), info.clone(), msg).unwrap();
             }
         }
-
-        deps
     }
 
     #[test]
     fn get_contract_version_works() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -473,8 +480,8 @@ mod tests {
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
 
         let info = mock_info(owner, &[]);
-        let mut deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &admins,
             &initial_spenders,
@@ -493,7 +500,7 @@ mod tests {
 
     #[test]
     fn query_allowance_works() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -514,8 +521,8 @@ mod tests {
         let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
 
         let info = mock_info(owner, &[]);
-        let deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &admins,
             &initial_spenders,
@@ -548,7 +555,7 @@ mod tests {
 
     #[test]
     fn query_all_allowances_works() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -568,8 +575,8 @@ mod tests {
         ];
 
         let info = mock_info(owner, &[]);
-        let deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &admins,
             &initial_spenders,
@@ -773,7 +780,7 @@ mod tests {
 
     #[test]
     fn update_admins_and_query() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admin2 = HumanAddr::from("admin0002");
@@ -781,7 +788,14 @@ mod tests {
         let initial_admins = vec![owner.clone(), admin2.clone()];
 
         let info = mock_info(owner.clone(), &[]);
-        let mut deps = setup_test_case(deps, &info, &initial_admins, &vec![], &vec![], &vec![]);
+        setup_test_case(
+            deps.as_mut(),
+            &info,
+            &initial_admins,
+            &vec![],
+            &vec![],
+            &vec![],
+        );
 
         // Verify
         let config = query_admin_list(deps.as_ref()).unwrap();
@@ -859,7 +873,7 @@ mod tests {
 
     #[test]
     fn increase_allowances() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -890,8 +904,8 @@ mod tests {
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
         let info = mock_info(owner, &[]);
-        let mut deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &admins,
             &initial_spenders,
@@ -974,7 +988,7 @@ mod tests {
 
     #[test]
     fn decrease_allowances() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -1003,8 +1017,8 @@ mod tests {
         let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
 
         let info = mock_info(owner, &[]);
-        let mut deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &admins,
             &initial_spenders,
@@ -1115,7 +1129,7 @@ mod tests {
 
     #[test]
     fn execute_checks() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin0001");
         let admins = vec![owner.clone(), HumanAddr::from("admin0002")];
@@ -1133,8 +1147,8 @@ mod tests {
         let initial_expirations = vec![expires_never.clone()];
 
         let info = mock_info(owner.clone(), &[]);
-        let mut deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &admins,
             &initial_spenders,
@@ -1432,7 +1446,7 @@ mod tests {
 
     #[test]
     fn can_send_query_works() {
-        let deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin007");
         let spender = HumanAddr::from("spender808");
@@ -1440,8 +1454,8 @@ mod tests {
 
         let info = mock_info(owner.clone(), &[]);
         // spender has allowance of 55000 ushell
-        let mut deps = setup_test_case(
-            deps,
+        setup_test_case(
+            deps.as_mut(),
             &info,
             &[owner.clone()],
             &[spender.clone()],
