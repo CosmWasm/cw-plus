@@ -1,13 +1,12 @@
 use serde::de::DeserializeOwned;
-use std::cell::{RefCell, Ref, RefMut};
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
+use crate::transactions::StorageTransaction;
 use cosmwasm_std::{
     from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
     HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage,
 };
-use crate::transactions::StorageTransaction;
 
 /// Interface to call into a Contract
 pub trait Contract {
@@ -109,15 +108,12 @@ where
 
 struct ContractData {
     code_id: usize,
-    storage: RefCell<Box<dyn Storage>>,
+    storage: Box<dyn Storage>,
 }
 
 impl ContractData {
     fn new(code_id: usize, storage: Box<dyn Storage>) -> Self {
-        ContractData {
-            code_id,
-            storage: RefCell::new(storage),
-        }
+        ContractData { code_id, storage }
     }
 }
 
@@ -185,11 +181,7 @@ impl WasmRouter {
             .contracts
             .get(&address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
-        let storage = contract
-            .storage
-            .try_borrow()
-            .map_err(|e| format!("Immutable borrowing failed - re-entrancy?: {}", e))?;
-        let data = storage.get(&key).unwrap_or_default();
+        let data = contract.storage.get(&key).unwrap_or_default();
         Ok(data.into())
     }
 
@@ -221,12 +213,8 @@ impl WasmRouter {
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.get_env(address);
 
-        let storage = contract
-            .storage
-            .try_borrow()
-            .map_err(|e| format!("Double-borrowing query storage - re-entrancy?: {}", e))?;
         let deps = Deps {
-            storage: storage.deref().deref(),
+            storage: contract.storage.as_ref(),
             api: self.api.deref(),
             querier: QuerierWrapper::new(querier),
         };
@@ -247,11 +235,13 @@ impl WasmRouter {
 // In Router, we use this exclusively in all the calls in execute (not self.wasm)
 // In Querier, we use self.wasm
 pub struct WasmCache<'a> {
+    // and this into one with reference
     router: &'a WasmRouter,
     // WasmState - cache this, pass in separate?
     contracts: HashMap<HumanAddr, ContractData>,
 
-    // contract_diffs: HashMap<HumanAddr, StorageTransaction<Box<dyn Storage>, Ref<'a, Box<dyn Storage>>>>
+    // TODO: pull this out into other struct with mut reference
+    contract_diffs: HashMap<HumanAddr, StorageTransaction<dyn Storage + 'a, &'a dyn Storage>>,
 }
 
 pub struct WasmOps(HashMap<HumanAddr, ContractData>);
@@ -269,7 +259,7 @@ impl<'a> WasmCache<'a> {
         WasmCache {
             router,
             contracts: HashMap::new(),
-            // contract_diffs: HashMap::new(),
+            contract_diffs: HashMap::new(),
         }
     }
 
@@ -283,26 +273,20 @@ impl<'a> WasmCache<'a> {
         HumanAddr::from(count.to_string())
     }
 
-    fn get_contract(&'_ self, addr: &HumanAddr) -> Option<(usize, RefMut<'_, Box<dyn Storage>>)> {
-        let here = self.contracts.get(addr);
+    fn get_contract<'b>(&'b mut self, addr: &HumanAddr) -> Option<(usize, &'b mut dyn Storage)> {
+        let here = self.contracts.get_mut(addr);
         if let Some(x) = here {
-            // let storage = storage
-            //     .try_borrow_mut()
-            //     .map_err(|e| format!("Double-borrowing mutable storage - re-entrancy?: {}", e))?;
-            return Some((x.code_id, x.storage.borrow_mut()));
+            return Some((x.code_id, x.storage.as_mut()));
         }
         // TODO: use contract diffs
         let parent = self.router.contracts.get(addr);
         if let Some(c) = parent {
-            let r = c.storage.borrow();
-            let wrap = StorageTransaction::new(r);
-            let cell = RefCell::new(Box::new(wrap));
-            let store: RefMut<Box<dyn Storage>> = cell.borrow_mut();
-            Some((c.code_id, store))
+            let wrap = StorageTransaction::new(c.storage.as_ref());
+            self.contract_diffs.insert(addr.clone(), wrap);
+            Some((c.code_id, self.contract_diffs.get_mut(addr).unwrap()))
         } else {
             None
         }
-
     }
 
     /// This just creates an address and empty storage instance, returning the new address
@@ -319,7 +303,7 @@ impl<'a> WasmCache<'a> {
     }
 
     pub fn handle(
-        &self,
+        &mut self,
         address: HumanAddr,
         querier: &dyn Querier,
         info: MessageInfo,
@@ -331,7 +315,7 @@ impl<'a> WasmCache<'a> {
     }
 
     pub fn init(
-        &self,
+        &mut self,
         address: HumanAddr,
         querier: &dyn Querier,
         info: MessageInfo,
@@ -343,7 +327,7 @@ impl<'a> WasmCache<'a> {
     }
 
     fn with_storage<F, T>(
-        &self,
+        &mut self,
         querier: &dyn Querier,
         address: HumanAddr,
         action: F,
@@ -351,7 +335,7 @@ impl<'a> WasmCache<'a> {
     where
         F: FnOnce(&Box<dyn Contract>, DepsMut, Env) -> Result<T, String>,
     {
-        let (code_id, mut storage) = self
+        let (code_id, storage) = self
             .get_contract(&address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
         let handler = self
@@ -364,7 +348,7 @@ impl<'a> WasmCache<'a> {
         // TODO: we cannot let them actually change, we need to keep a diff here...
         // TODO: make a test that triggers this with tx and rollback and all
         let deps = DepsMut {
-            storage: storage.deref_mut().deref_mut(),
+            storage: storage,
             api: self.router.api.deref(),
             querier: QuerierWrapper::new(querier),
         };
