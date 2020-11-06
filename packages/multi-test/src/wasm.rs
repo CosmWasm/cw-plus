@@ -5,7 +5,7 @@ use std::ops::Deref;
 use crate::transactions::{RepLog, StorageTransaction};
 use cosmwasm_std::{
     from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage,
+    HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage, WasmQuery,
 };
 
 /// Interface to call into a Contract
@@ -165,7 +165,16 @@ impl WasmRouter {
         WasmCache::new(self)
     }
 
-    pub fn query(
+    pub fn query(&self, querier: &dyn Querier, request: WasmQuery) -> Result<Binary, String> {
+        match request {
+            WasmQuery::Smart { contract_addr, msg } => {
+                self.query_smart(contract_addr, querier, msg.into())
+            }
+            WasmQuery::Raw { contract_addr, key } => self.query_raw(contract_addr, &key),
+        }
+    }
+
+    pub fn query_smart(
         &self,
         address: HumanAddr,
         querier: &dyn Querier,
@@ -407,7 +416,7 @@ impl<'a> WasmCacheState<'a> {
             .get_contract(parent, &address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
         let deps = DepsMut {
-            storage: storage,
+            storage,
             api,
             querier: QuerierWrapper::new(querier),
         };
@@ -520,7 +529,7 @@ mod test {
 
         // query the contract
         let data = router
-            .query(contract_addr.clone(), &querier, b"{}".to_vec())
+            .query_smart(contract_addr.clone(), &querier, b"{}".to_vec())
             .unwrap();
         let res: PayoutMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
