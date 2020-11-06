@@ -204,7 +204,7 @@ mod tests {
     const USER2: &str = "else";
     const USER3: &str = "funny";
 
-    fn do_init<S: Storage, A: Api, Q: Querier>(deps: &mut OwnedDeps<S, A, Q>) {
+    fn do_init(deps: DepsMut) {
         let msg = InitMsg {
             admin: Some(ADMIN.into()),
             members: vec![
@@ -219,13 +219,13 @@ mod tests {
             ],
         };
         let info = mock_info("creator", &[]);
-        init(deps.as_mut(), mock_env(), info, msg).unwrap();
+        init(deps, mock_env(), info, msg).unwrap();
     }
 
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         // it worked, let's query the state
         let res = query_admin(deps.as_ref()).unwrap();
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn try_update_admin() {
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         // a member cannot update admin
         let err = update_admin(deps.as_mut(), USER1.into(), Some(USER3.into())).unwrap_err();
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn try_member_queries() {
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         let member1 = query_member(deps.as_ref(), USER1.into()).unwrap();
         assert_eq!(member1.weight, Some(11));
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn add_new_remove_old_member() {
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         // add a new one and remove existing one
         let add = vec![Member {
@@ -342,7 +342,7 @@ mod tests {
     fn add_old_remove_new_member() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         // add a new one and remove existing one
         let add = vec![Member {
@@ -360,7 +360,7 @@ mod tests {
     fn add_and_remove_same_member() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         // USER1 is updated and remove in the same line, we should remove this an add member3
         let add = vec![
@@ -384,7 +384,7 @@ mod tests {
     fn raw_queries_work() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps);
+        do_init(deps.as_mut());
 
         // get total from raw key
         let total_raw = deps.storage.get(TOTAL_KEY).unwrap();

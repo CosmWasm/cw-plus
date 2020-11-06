@@ -258,7 +258,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Api, CosmosMsg, OwnedDeps, Querier, StdError, WasmMsg};
+    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
     use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_balance, query_token_info};
@@ -269,11 +269,7 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut OwnedDeps<S, A, Q>,
-        addr: &HumanAddr,
-        amount: Uint128,
-    ) -> TokenInfoResponse {
+    fn do_init(mut deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -286,8 +282,18 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        init(deps.as_mut(), env, info, init_msg).unwrap();
+        init(dup(&mut deps), env, info, init_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
+    }
+
+    // TODO: replace this with deps.dup()
+    // after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
+    fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
+        DepsMut {
+            storage: deps.storage,
+            api: deps.api,
+            querier: deps.querier,
+        }
     }
 
     #[test]
@@ -298,7 +304,7 @@ mod tests {
         let spender = HumanAddr::from("addr0002");
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(&mut deps, &owner, Uint128(12340000));
+        do_init(deps.as_mut(), &owner, Uint128(12340000));
 
         // no allowance to start
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
@@ -381,7 +387,7 @@ mod tests {
         let spender2 = HumanAddr::from("addr0003");
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(&mut deps, &owner, Uint128(12340000));
+        do_init(deps.as_mut(), &owner, Uint128(12340000));
 
         // no allowance to start
         assert_eq!(
@@ -474,7 +480,7 @@ mod tests {
         let owner = HumanAddr::from("addr0001");
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(&mut deps, &owner, Uint128(12340000));
+        do_init(deps.as_mut(), &owner, Uint128(12340000));
 
         // self-allowance
         let msg = HandleMsg::IncreaseAllowance {
@@ -509,7 +515,7 @@ mod tests {
         let rcpt = HumanAddr::from("addr0003");
 
         let start = Uint128(999999);
-        do_init(&mut deps, &owner, start);
+        do_init(deps.as_mut(), &owner, start);
 
         // provide an allowance
         let allow1 = Uint128(77777);
@@ -595,7 +601,7 @@ mod tests {
         let spender = HumanAddr::from("addr0002");
 
         let start = Uint128(999999);
-        do_init(&mut deps, &owner, start);
+        do_init(deps.as_mut(), &owner, start);
 
         // provide an allowance
         let allow1 = Uint128(77777);
@@ -679,7 +685,7 @@ mod tests {
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
         let start = Uint128(999999);
-        do_init(&mut deps, &owner, start);
+        do_init(deps.as_mut(), &owner, start);
 
         // provide an allowance
         let allow1 = Uint128(77777);

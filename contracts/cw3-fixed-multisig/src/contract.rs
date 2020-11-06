@@ -439,7 +439,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, from_binary, Api, BankMsg, OwnedDeps, Querier, Storage};
+    use cosmwasm_std::{coin, from_binary, BankMsg};
 
     use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
@@ -476,8 +476,8 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn setup_test_case<S: Storage, A: Api, Q: Querier>(
-        deps: &mut OwnedDeps<S, A, Q>,
+    fn setup_test_case(
+        deps: DepsMut,
         info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
@@ -497,7 +497,7 @@ mod tests {
             required_weight,
             max_voting_period,
         };
-        init(deps.as_mut(), mock_env(), info, init_msg)
+        init(deps, mock_env(), info, init_msg)
     }
 
     fn get_tally(deps: Deps, proposal_id: u64) -> u64 {
@@ -557,7 +557,12 @@ mod tests {
 
         // Total weight less than required weight not allowed
         let required_weight = 100;
-        let res = setup_test_case(&mut deps, info.clone(), required_weight, max_voting_period);
+        let res = setup_test_case(
+            deps.as_mut(),
+            info.clone(),
+            required_weight,
+            max_voting_period,
+        );
 
         // Verify
         assert!(res.is_err());
@@ -568,7 +573,7 @@ mod tests {
 
         // All valid
         let required_weight = 1;
-        setup_test_case(&mut deps, info, required_weight, max_voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info, required_weight, max_voting_period).unwrap();
 
         // Verify
         assert_eq!(
@@ -590,7 +595,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
             from_address: OWNER.into(),
@@ -680,7 +685,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -834,7 +839,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -937,7 +942,7 @@ mod tests {
         let voting_period = Duration::Height(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {

@@ -61,18 +61,14 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Api, OwnedDeps, Querier, Storage, Uint128};
+    use cosmwasm_std::{coins, DepsMut, Uint128};
     use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_token_info};
     use crate::msg::{HandleMsg, InitMsg};
 
     // this will set up the init for other tests
-    fn do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut OwnedDeps<S, A, Q>,
-        addr: &HumanAddr,
-        amount: Uint128,
-    ) -> TokenInfoResponse {
+    fn do_init(mut deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -85,8 +81,18 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        init(deps.as_mut(), env, info, init_msg).unwrap();
+        init(dup(&mut deps), env, info, init_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
+    }
+
+    // TODO: replace this with deps.dup()
+    // after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
+    fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
+        DepsMut {
+            storage: deps.storage,
+            api: deps.api,
+            querier: deps.querier,
+        }
     }
 
     #[test]
@@ -100,7 +106,7 @@ mod tests {
 
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(&mut deps, &owner, Uint128(12340000));
+        do_init(deps.as_mut(), &owner, Uint128(12340000));
 
         // no allowance to start
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
@@ -163,7 +169,7 @@ mod tests {
         let acct4 = HumanAddr::from("aaaardvark");
         let expected_order = [acct2.clone(), acct1.clone(), acct3.clone(), acct4.clone()];
 
-        do_init(&mut deps, &acct1, Uint128(12340000));
+        do_init(deps.as_mut(), &acct1, Uint128(12340000));
 
         // put money everywhere (to create balanaces)
         let info = mock_info(acct1.clone(), &[]);

@@ -361,9 +361,7 @@ pub fn migrate(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{
-        coins, from_binary, Api, CosmosMsg, Order, OwnedDeps, Querier, StdError, Storage, WasmMsg,
-    };
+    use cosmwasm_std::{coins, from_binary, Api, CosmosMsg, Order, StdError, WasmMsg};
 
     use cw2::ContractVersion;
     use cw20::{AllowanceResponse, Expiration};
@@ -378,8 +376,8 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn do_init_with_minter<S: Storage, A: Api, Q: Querier>(
-        deps: &mut OwnedDeps<S, A, Q>,
+    fn do_init_with_minter(
+        deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
         minter: &HumanAddr,
@@ -397,17 +395,13 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut OwnedDeps<S, A, Q>,
-        addr: &HumanAddr,
-        amount: Uint128,
-    ) -> TokenInfoResponse {
+    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
         _do_init(deps, addr, amount, None)
     }
 
     // this will set up the init for other tests
-    fn _do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut OwnedDeps<S, A, Q>,
+    fn _do_init(
+        mut deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
         mint: Option<MinterResponse>,
@@ -424,7 +418,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps.as_mut(), env, info, init_msg).unwrap();
+        let res = init(dup(&mut deps), env, info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let meta = query_token_info(deps.as_ref()).unwrap();
@@ -440,6 +434,16 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), addr), amount);
         assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
         meta
+    }
+
+    // TODO: replace this with deps.dup()
+    // after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
+    fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
+        DepsMut {
+            storage: deps.storage,
+            api: deps.api,
+            querier: deps.querier,
+        }
     }
 
     #[test]
@@ -552,7 +556,7 @@ mod tests {
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
         let limit = Uint128(511223344);
-        do_init_with_minter(&mut deps, &genesis, amount, &minter, Some(limit));
+        do_init_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
         let winner = HumanAddr::from("lucky");
@@ -601,7 +605,7 @@ mod tests {
     fn others_cannot_mint() {
         let mut deps = mock_dependencies(&[]);
         do_init_with_minter(
-            &mut deps,
+            deps.as_mut(),
             &HumanAddr::from("genesis"),
             Uint128(1234),
             &HumanAddr::from("minter"),
@@ -624,7 +628,7 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps, &HumanAddr::from("genesis"), Uint128(1234));
+        do_init(deps.as_mut(), &HumanAddr::from("genesis"), Uint128(1234));
 
         let msg = HandleMsg::Mint {
             recipient: HumanAddr::from("lucky"),
@@ -686,7 +690,7 @@ mod tests {
         let addr1 = HumanAddr::from("addr0001");
         let amount1 = Uint128::from(12340000u128);
 
-        let expected = do_init(&mut deps, &addr1, amount1);
+        let expected = do_init(deps.as_mut(), &addr1, amount1);
 
         // check meta query
         let loaded = query_token_info(deps.as_ref()).unwrap();
@@ -728,7 +732,7 @@ mod tests {
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(&mut deps, &addr1, amount1);
+        do_init(deps.as_mut(), &addr1, amount1);
 
         // cannot transfer nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -796,7 +800,7 @@ mod tests {
         let burn = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(&mut deps, &addr1, amount1);
+        do_init(deps.as_mut(), &addr1, amount1);
 
         // cannot burn nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -853,7 +857,7 @@ mod tests {
         let too_much = Uint128::from(12340321u128);
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
-        do_init(&mut deps, &addr1, amount1);
+        do_init(deps.as_mut(), &addr1, amount1);
 
         // cannot send nothing
         let info = mock_info(addr1.clone(), &[]);
