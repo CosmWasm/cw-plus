@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, Api, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    MessageInfo, Querier, StdResult, Storage, Uint128,
+    attr, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    MessageInfo, StdResult, Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
@@ -90,8 +90,8 @@ pub fn handle_decrease_allowance(
 }
 
 // this can be used to update a lower allowance - call bucket.update with proper keys
-fn deduct_allowance<S: Storage>(
-    storage: &mut S,
+fn deduct_allowance(
+    storage: &mut dyn Storage,
     owner: &CanonicalAddr,
     spender: &CanonicalAddr,
     block: &BlockInfo,
@@ -258,23 +258,22 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coins, Api, CosmosMsg, OwnedDeps, Querier, StdError, WasmMsg};
     use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{handle, init, query_balance, query_token_info};
     use crate::msg::{HandleMsg, InitMsg};
 
-    fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
-        deps: Deps,
-        address: T,
-    ) -> Uint128 {
-        query_balance(deps.as_ref(), address.into())
-            .unwrap()
-            .balance
+    fn get_balance<T: Into<HumanAddr>>(deps: Deps, address: T) -> Uint128 {
+        query_balance(deps, address.into()).unwrap().balance
     }
 
     // this will set up the init for other tests
-    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
+    fn do_init<S: Storage, A: Api, Q: Querier>(
+        deps: &mut OwnedDeps<S, A, Q>,
+        addr: &HumanAddr,
+        amount: Uint128,
+    ) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -287,7 +286,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        init(deps, env, info, init_msg).unwrap();
+        init(deps.as_mut(), env, info, init_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
     }
 
@@ -299,7 +298,7 @@ mod tests {
         let spender = HumanAddr::from("addr0002");
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(deps.as_mut(), &owner, Uint128(12340000));
+        do_init(&mut deps, &owner, Uint128(12340000));
 
         // no allowance to start
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
@@ -382,7 +381,7 @@ mod tests {
         let spender2 = HumanAddr::from("addr0003");
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(deps.as_mut(), &owner, Uint128(12340000));
+        do_init(&mut deps, &owner, Uint128(12340000));
 
         // no allowance to start
         assert_eq!(
@@ -475,7 +474,7 @@ mod tests {
         let owner = HumanAddr::from("addr0001");
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(deps.as_mut(), &owner, Uint128(12340000));
+        do_init(&mut deps, &owner, Uint128(12340000));
 
         // self-allowance
         let msg = HandleMsg::IncreaseAllowance {
@@ -510,7 +509,7 @@ mod tests {
         let rcpt = HumanAddr::from("addr0003");
 
         let start = Uint128(999999);
-        do_init(deps.as_mut(), &owner, start);
+        do_init(&mut deps, &owner, start);
 
         // provide an allowance
         let allow1 = Uint128(77777);
@@ -596,7 +595,7 @@ mod tests {
         let spender = HumanAddr::from("addr0002");
 
         let start = Uint128(999999);
-        do_init(deps.as_mut(), &owner, start);
+        do_init(&mut deps, &owner, start);
 
         // provide an allowance
         let allow1 = Uint128(77777);
@@ -680,7 +679,7 @@ mod tests {
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
         let start = Uint128(999999);
-        do_init(deps.as_mut(), &owner, start);
+        do_init(&mut deps, &owner, start);
 
         // provide an allowance
         let allow1 = Uint128(77777);

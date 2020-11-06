@@ -54,23 +54,23 @@ pub fn balances_read(storage: &dyn Storage) -> ReadonlyBucket<Uint128> {
     bucket_read(storage, PREFIX_BALANCE)
 }
 
-pub fn balances_prefix_read(storage: &dyn Storage) -> ReadonlyPrefixedStorage<S> {
+pub fn balances_prefix_read(storage: &dyn Storage) -> ReadonlyPrefixedStorage {
     ReadonlyPrefixedStorage::new(storage, PREFIX_BALANCE)
 }
 
 /// returns a bucket with all allowances authorized by this owner (query it by spender)
-pub fn allowances<'a, S: Storage>(
-    storage: &'a mut S,
+pub fn allowances<'a>(
+    storage: &'a mut dyn Storage,
     owner: &CanonicalAddr,
-) -> Bucket<'a, S, AllowanceResponse> {
+) -> Bucket<'a, AllowanceResponse> {
     Bucket::multilevel(storage, &[PREFIX_ALLOWANCE, owner.as_slice()])
 }
 
 /// returns a bucket with all allowances authorized by this owner (query it by spender)
 /// (read-only version for queries)
-pub fn allowances_read<'a, S: ReadonlyStorage>(
-    storage: &'a S,
+pub fn allowances_read<'a>(
+    storage: &'a dyn Storage,
     owner: &CanonicalAddr,
-) -> ReadonlyBucket<'a, S, AllowanceResponse> {
+) -> ReadonlyBucket<'a, AllowanceResponse> {
     ReadonlyBucket::multilevel(storage, &[PREFIX_ALLOWANCE, owner.as_slice()])
 }

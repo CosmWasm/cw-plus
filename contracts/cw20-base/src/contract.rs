@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, MigrateResponse, Querier, StdError, StdResult, Storage, Uint128,
+    attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -20,12 +20,17 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    mut deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InitMsg,
+) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
     // create initial accounts
-    let total_supply = create_accounts(deps, &msg.initial_balances)?;
+    let total_supply = create_accounts(&mut deps, &msg.initial_balances)?;
 
     if let Some(limit) = msg.get_cap() {
         if total_supply > limit {
@@ -53,7 +58,7 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
     Ok(InitResponse::default())
 }
 
-pub fn create_accounts(deps: DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
+pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
     let mut total_supply = Uint128::zero();
     let mut store = balances(deps.storage);
     for row in accounts {
@@ -356,7 +361,9 @@ pub fn migrate(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, Order, StdError, WasmMsg};
+    use cosmwasm_std::{
+        coins, from_binary, Api, CosmosMsg, Order, OwnedDeps, Querier, StdError, Storage, WasmMsg,
+    };
 
     use cw2::ContractVersion;
     use cw20::{AllowanceResponse, Expiration};
@@ -366,18 +373,13 @@ mod tests {
 
     use super::*;
 
-    fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
-        deps: Deps,
-        address: T,
-    ) -> Uint128 {
-        query_balance(deps.as_ref(), address.into())
-            .unwrap()
-            .balance
+    fn get_balance<T: Into<HumanAddr>>(deps: Deps, address: T) -> Uint128 {
+        query_balance(deps, address.into()).unwrap().balance
     }
 
     // this will set up the init for other tests
-    fn do_init_with_minter(
-        deps: DepsMut,
+    fn do_init_with_minter<S: Storage, A: Api, Q: Querier>(
+        deps: &mut OwnedDeps<S, A, Q>,
         addr: &HumanAddr,
         amount: Uint128,
         minter: &HumanAddr,
@@ -395,13 +397,17 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
+    fn do_init<S: Storage, A: Api, Q: Querier>(
+        deps: &mut OwnedDeps<S, A, Q>,
+        addr: &HumanAddr,
+        amount: Uint128,
+    ) -> TokenInfoResponse {
         _do_init(deps, addr, amount, None)
     }
 
     // this will set up the init for other tests
-    fn _do_init(
-        deps: DepsMut,
+    fn _do_init<S: Storage, A: Api, Q: Querier>(
+        deps: &mut OwnedDeps<S, A, Q>,
         addr: &HumanAddr,
         amount: Uint128,
         mint: Option<MinterResponse>,
@@ -418,7 +424,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps, env, info, init_msg).unwrap();
+        let res = init(deps.as_mut(), env, info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let meta = query_token_info(deps.as_ref()).unwrap();
@@ -546,7 +552,7 @@ mod tests {
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
         let limit = Uint128(511223344);
-        do_init_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
+        do_init_with_minter(&mut deps, &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
         let winner = HumanAddr::from("lucky");
@@ -595,7 +601,7 @@ mod tests {
     fn others_cannot_mint() {
         let mut deps = mock_dependencies(&[]);
         do_init_with_minter(
-            deps.as_mut(),
+            &mut deps,
             &HumanAddr::from("genesis"),
             Uint128(1234),
             &HumanAddr::from("minter"),
@@ -618,7 +624,7 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut(), &HumanAddr::from("genesis"), Uint128(1234));
+        do_init(&mut deps, &HumanAddr::from("genesis"), Uint128(1234));
 
         let msg = HandleMsg::Mint {
             recipient: HumanAddr::from("lucky"),
@@ -680,7 +686,7 @@ mod tests {
         let addr1 = HumanAddr::from("addr0001");
         let amount1 = Uint128::from(12340000u128);
 
-        let expected = do_init(deps.as_mut(), &addr1, amount1);
+        let expected = do_init(&mut deps, &addr1, amount1);
 
         // check meta query
         let loaded = query_token_info(deps.as_ref()).unwrap();
@@ -722,7 +728,7 @@ mod tests {
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(deps.as_mut(), &addr1, amount1);
+        do_init(&mut deps, &addr1, amount1);
 
         // cannot transfer nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -790,7 +796,7 @@ mod tests {
         let burn = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(deps.as_mut(), &addr1, amount1);
+        do_init(&mut deps, &addr1, amount1);
 
         // cannot burn nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -847,7 +853,7 @@ mod tests {
         let too_much = Uint128::from(12340321u128);
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
-        do_init(deps.as_mut(), &addr1, amount1);
+        do_init(&mut deps, &addr1, amount1);
 
         // cannot send nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -921,10 +927,10 @@ mod tests {
     fn migrate_from_v01() {
         let mut deps = mock_dependencies(&[]);
 
-        generate_v01_test_data(deps.storage, &deps.api).unwrap();
+        generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
         // make sure this really is 0.1.0
         assert_eq!(
-            get_contract_version(deps.storage).unwrap(),
+            get_contract_version(&mut deps.storage).unwrap(),
             ContractVersion {
                 contract: CONTRACT_NAME.to_string(),
                 version: "v0.1.0".to_string(),
@@ -938,7 +944,7 @@ mod tests {
 
         // make sure the version is updated
         assert_eq!(
-            get_contract_version(deps.storage).unwrap(),
+            get_contract_version(&mut deps.storage).unwrap(),
             ContractVersion {
                 contract: CONTRACT_NAME.to_string(),
                 version: CONTRACT_VERSION.to_string(),
@@ -946,7 +952,7 @@ mod tests {
         );
 
         // check all the data (against the spec in generate_v01_test_data)
-        let info = token_info_read(deps.storage).load().unwrap();
+        let info = token_info_read(&mut deps.storage).load().unwrap();
         assert_eq!(
             info,
             TokenInfo {
@@ -968,7 +974,7 @@ mod tests {
             .canonical_address(&HumanAddr::from("user2"))
             .unwrap();
 
-        let bal = balances_read(deps.storage);
+        let bal = balances_read(&mut deps.storage);
         assert_eq!(2, bal.range(None, None, Order::Descending).count());
         assert_eq!(bal.load(user1.as_slice()).unwrap(), Uint128(123456));
         assert_eq!(bal.load(user2.as_slice()).unwrap(), Uint128(654321));
@@ -982,11 +988,11 @@ mod tests {
             .canonical_address(&HumanAddr::from("spender2"))
             .unwrap();
 
-        let num_allows = allowances_read(deps.storage, &user1)
+        let num_allows = allowances_read(&mut deps.storage, &user1)
             .range(None, None, Order::Ascending)
             .count();
         assert_eq!(num_allows, 1);
-        let allow = allowances_read(deps.storage, &user1)
+        let allow = allowances_read(&mut deps.storage, &user1)
             .load(spender1.as_slice())
             .unwrap();
         let expect = AllowanceResponse {
@@ -995,11 +1001,11 @@ mod tests {
         };
         assert_eq!(allow, expect);
 
-        let num_allows = allowances_read(deps.storage, &user2)
+        let num_allows = allowances_read(&mut deps.storage, &user2)
             .range(None, None, Order::Ascending)
             .count();
         assert_eq!(num_allows, 2);
-        let allow = allowances_read(deps.storage, &user2)
+        let allow = allowances_read(&mut deps.storage, &user2)
             .load(spender1.as_slice())
             .unwrap();
         let expect = AllowanceResponse {
@@ -1007,7 +1013,7 @@ mod tests {
             expires: Expiration::AtTime(1598647517),
         };
         assert_eq!(allow, expect);
-        let allow = allowances_read(deps.storage, &user2)
+        let allow = allowances_read(&mut deps.storage, &user2)
             .load(spender2.as_slice())
             .unwrap();
         let expect = AllowanceResponse {
