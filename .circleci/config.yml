@@ -664,6 +664,9 @@ jobs:
       - run:
           name: Run unit tests
           command: cargo test --locked
+      - run:
+          name: Run unit tests (with iterator)
+          command: cargo test --locked --features iterator
       - save_cache:
           paths:
             - /usr/local/cargo/registry

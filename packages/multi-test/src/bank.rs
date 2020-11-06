@@ -61,7 +61,7 @@ impl BankRouter {
 pub struct BankCache<'a> {
     // and this into one with reference
     router: &'a BankRouter,
-    state: StorageTransaction<dyn Storage + 'a, &'a dyn Storage>,
+    state: StorageTransaction<'a>,
 }
 
 pub struct BankOps(RepLog);
