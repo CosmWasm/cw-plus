@@ -5,7 +5,7 @@ use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractResult,
     CosmosMsg, Empty, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, QuerierResult,
-    QueryRequest, SystemError, SystemResult, WasmMsg,
+    QuerierWrapper, QueryRequest, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
@@ -105,6 +105,10 @@ impl Router {
 
     pub fn cache(&'_ self) -> RouterCache<'_> {
         RouterCache::new(self)
+    }
+
+    pub fn wrap(&self) -> QuerierWrapper {
+        QuerierWrapper::new(self)
     }
 
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
@@ -322,7 +326,7 @@ mod test {
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, QuerierWrapper};
+    use cosmwasm_std::{attr, coin, coins};
 
     fn mock_router() -> Router {
         let env = mock_env();
@@ -333,9 +337,7 @@ mod test {
     }
 
     fn get_balance(router: &Router, addr: &HumanAddr) -> Vec<Coin> {
-        QuerierWrapper::new(router)
-            .query_all_balances(addr)
-            .unwrap()
+        router.wrap().query_all_balances(addr).unwrap()
     }
 
     #[test]
@@ -462,7 +464,8 @@ mod test {
         let funds = get_balance(&router, &reflect_addr);
         assert_eq!(funds, vec![]);
         // reflect count is 1
-        let qres: ReflectResponse = QuerierWrapper::new(&router)
+        let qres: ReflectResponse = router
+            .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
         assert_eq!(1, qres.count);
@@ -490,7 +493,8 @@ mod test {
         assert_eq!(funds, coins(5, "eth"));
 
         // reflect count updated
-        let qres: ReflectResponse = QuerierWrapper::new(&router)
+        let qres: ReflectResponse = router
+            .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
         assert_eq!(2, qres.count);
@@ -543,7 +547,8 @@ mod test {
         assert_eq!(funds, coins(7, "eth"));
 
         // reflect count should be updated to 2
-        let qres: ReflectResponse = QuerierWrapper::new(&router)
+        let qres: ReflectResponse = router
+            .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
         assert_eq!(2, qres.count);
@@ -574,7 +579,8 @@ mod test {
         assert_eq!(funds, coins(7, "eth"));
 
         // failure should not update reflect count
-        let qres: ReflectResponse = QuerierWrapper::new(&router)
+        let qres: ReflectResponse = router
+            .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
         assert_eq!(2, qres.count);
