@@ -17,12 +17,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     create(deps, msg.admin, msg.members)?;
     Ok(InitResponse::default())
@@ -30,11 +25,7 @@ pub fn init(
 
 // create is the init logic with set_contract_version removed so it can more
 // easily be imported in other contracts
-pub fn create(
-    deps: DepsMut,
-    admin: Option<HumanAddr>,
-    members: Vec<Member>,
-) -> StdResult<()> {
+pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> StdResult<()> {
     let admin_raw = maybe_canonical(deps.api, admin)?;
     ADMIN.save(deps.storage, &admin_raw)?;
 
@@ -144,11 +135,7 @@ fn assert_admin<A: Api>(
     }
 }
 
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member { addr } => to_binary(&query_member(deps, addr)?),
         QueryMsg::ListMembers { start_after, limit } => {
@@ -165,17 +152,12 @@ fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
     Ok(AdminResponse { admin })
 }
 
-fn query_total_weight(
-    deps: Deps,
-) -> StdResult<TotalWeightResponse> {
+fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     let weight = TOTAL.load(deps.storage)?;
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member(
-    deps: Deps,
-    addr: HumanAddr,
-) -> StdResult<MemberResponse> {
+fn query_member(deps: Deps, addr: HumanAddr) -> StdResult<MemberResponse> {
     let raw = deps.api.canonical_address(&addr)?;
     let weight = MEMBERS.may_load(deps.storage, &raw)?;
     Ok(MemberResponse { weight })
@@ -246,10 +228,10 @@ mod tests {
         do_init(&mut deps);
 
         // it worked, let's query the state
-        let res = query_admin(&deps).unwrap();
+        let res = query_admin(deps.as_ref()).unwrap();
         assert_eq!(Some(HumanAddr::from(ADMIN)), res.admin);
 
-        let res = query_total_weight(&deps).unwrap();
+        let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(17, res.weight);
     }
 
@@ -267,11 +249,14 @@ mod tests {
 
         // admin can change it
         update_admin(deps.as_mut(), ADMIN.into(), Some(USER3.into())).unwrap();
-        assert_eq!(query_admin(&deps).unwrap().admin, Some(USER3.into()));
+        assert_eq!(
+            query_admin(deps.as_ref()).unwrap().admin,
+            Some(USER3.into())
+        );
 
         // and unset it
         update_admin(deps.as_mut(), USER3.into(), None).unwrap();
-        assert_eq!(query_admin(&deps).unwrap().admin, None);
+        assert_eq!(query_admin(deps.as_ref()).unwrap().admin, None);
 
         // no one can change it now
         let err = update_admin(deps.as_mut(), USER3.into(), Some(USER1.into())).unwrap_err();
@@ -324,7 +309,7 @@ mod tests {
         let members = list_members(deps.as_ref(), None, None).unwrap();
         assert_eq!(count, members.members.len());
 
-        let total = query_total_weight(&deps).unwrap();
+        let total = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
     }
 
@@ -341,7 +326,8 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // non-admin cannot update
-        let err = update_members(deps.as_mut(), USER1.into(), add.clone(), remove.clone()).unwrap_err();
+        let err =
+            update_members(deps.as_mut(), USER1.into(), add.clone(), remove.clone()).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),

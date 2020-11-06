@@ -157,11 +157,7 @@ pub fn try_release(
     })
 }
 
-pub fn try_refund(
-    deps: DepsMut,
-    env: Env,
-    id: String,
-) -> Result<HandleResponse, ContractError> {
+pub fn try_refund(deps: DepsMut, env: Env, id: String) -> Result<HandleResponse, ContractError> {
     let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
     // Anyone can try to refund, as long as the contract is expired
     if !swap.is_expired(&env.block) {
@@ -228,21 +224,14 @@ fn send_tokens<A: Api>(
     }
 }
 
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::List { start_after, limit } => to_binary(&query_list(deps, start_after, limit)?),
         QueryMsg::Details { id } => to_binary(&query_details(deps, id)?),
     }
 }
 
-fn query_details(
-    deps: Deps,
-    id: String,
-) -> StdResult<DetailsResponse> {
+fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
     let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
 
     // Convert balance to human balance

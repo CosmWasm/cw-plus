@@ -1,9 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{
-    Api, CanonicalAddr, Coin, Env, HumanAddr, Order,  StdError, StdResult, Storage,
-};
+use cosmwasm_std::{Api, CanonicalAddr, Coin, Env, HumanAddr, Order, StdError, StdResult, Storage};
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
 use cw20::{Balance, Cw20Coin};

@@ -20,12 +20,7 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -58,10 +53,7 @@ pub fn init(
     Ok(InitResponse::default())
 }
 
-pub fn create_accounts(
-    deps: DepsMut,
-    accounts: &[Cw20CoinHuman],
-) -> StdResult<Uint128> {
+pub fn create_accounts(deps: DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
     let mut total_supply = Uint128::zero();
     let mut store = balances(deps.storage);
     for row in accounts {
@@ -280,11 +272,7 @@ pub fn handle_send(
     Ok(res)
 }
 
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
@@ -303,10 +291,7 @@ pub fn query(
     }
 }
 
-pub fn query_balance(
-    deps: Deps,
-    address: HumanAddr,
-) -> StdResult<BalanceResponse> {
+pub fn query_balance(deps: Deps, address: HumanAddr) -> StdResult<BalanceResponse> {
     let addr_raw = deps.api.canonical_address(&address)?;
     let balance = balances_read(deps.storage)
         .may_load(addr_raw.as_slice())?
@@ -314,9 +299,7 @@ pub fn query_balance(
     Ok(BalanceResponse { balance })
 }
 
-pub fn query_token_info(
-    deps: Deps,
-) -> StdResult<TokenInfoResponse> {
+pub fn query_token_info(deps: Deps) -> StdResult<TokenInfoResponse> {
     let info = token_info_read(deps.storage).load()?;
     let res = TokenInfoResponse {
         name: info.name,
@@ -327,9 +310,7 @@ pub fn query_token_info(
     Ok(res)
 }
 
-pub fn query_minter(
-    deps: Deps,
-) -> StdResult<Option<MinterResponse>> {
+pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
     let meta = token_info_read(deps.storage).load()?;
     let minter = match meta.mint {
         Some(m) => Some(MinterResponse {
@@ -389,7 +370,9 @@ mod tests {
         deps: Deps,
         address: T,
     ) -> Uint128 {
-        query_balance(deps.as_ref(), address.into()).unwrap().balance
+        query_balance(deps.as_ref(), address.into())
+            .unwrap()
+            .balance
     }
 
     // this will set up the init for other tests
@@ -412,11 +395,7 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn do_init(
-        deps: DepsMut,
-        addr: &HumanAddr,
-        amount: Uint128,
-    ) -> TokenInfoResponse {
+    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
         _do_init(deps, addr, amount, None)
     }
 
@@ -442,7 +421,7 @@ mod tests {
         let res = init(deps, env, info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let meta = query_token_info(&deps).unwrap();
+        let meta = query_token_info(deps.as_ref()).unwrap();
         assert_eq!(
             meta,
             TokenInfoResponse {
@@ -453,7 +432,7 @@ mod tests {
             }
         );
         assert_eq!(get_balance(deps.as_ref(), addr), amount);
-        assert_eq!(query_minter(&deps).unwrap(), mint,);
+        assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
         meta
     }
 
@@ -477,7 +456,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            query_token_info(&deps).unwrap(),
+            query_token_info(deps.as_ref()).unwrap(),
             TokenInfoResponse {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -513,7 +492,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            query_token_info(&deps).unwrap(),
+            query_token_info(deps.as_ref()).unwrap(),
             TokenInfoResponse {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
@@ -523,7 +502,7 @@ mod tests {
         );
         assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
         assert_eq!(
-            query_minter(&deps).unwrap(),
+            query_minter(deps.as_ref()).unwrap(),
             Some(MinterResponse {
                 minter: minter.clone(),
                 cap: Some(limit),
@@ -683,7 +662,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
-            query_token_info(&deps).unwrap(),
+            query_token_info(deps.as_ref()).unwrap(),
             TokenInfoResponse {
                 name: "Bash Shell".to_string(),
                 symbol: "BASH".to_string(),
@@ -704,7 +683,7 @@ mod tests {
         let expected = do_init(deps.as_mut(), &addr1, amount1);
 
         // check meta query
-        let loaded = query_token_info(&deps).unwrap();
+        let loaded = query_token_info(deps.as_ref()).unwrap();
         assert_eq!(expected, loaded);
 
         let _info = mock_info("test", &[]);
@@ -797,7 +776,10 @@ mod tests {
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
         assert_eq!(get_balance(deps.as_ref(), &addr2), transfer);
-        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
+        assert_eq!(
+            query_token_info(deps.as_ref()).unwrap().total_supply,
+            amount1
+        );
     }
 
     #[test]
@@ -821,7 +803,10 @@ mod tests {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
         }
-        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
+        assert_eq!(
+            query_token_info(deps.as_ref()).unwrap().total_supply,
+            amount1
+        );
 
         // cannot burn more than we have
         let info = mock_info(addr1.clone(), &[]);
@@ -832,7 +817,10 @@ mod tests {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
         }
-        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
+        assert_eq!(
+            query_token_info(deps.as_ref()).unwrap().total_supply,
+            amount1
+        );
 
         // valid burn reduces total supply
         let info = mock_info(addr1.clone(), &[]);
@@ -843,7 +831,10 @@ mod tests {
 
         let remainder = (amount1 - burn).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
-        assert_eq!(query_token_info(&deps).unwrap().total_supply, remainder);
+        assert_eq!(
+            query_token_info(deps.as_ref()).unwrap().total_supply,
+            remainder
+        );
     }
 
     #[test]
@@ -920,7 +911,10 @@ mod tests {
         let remainder = (amount1 - transfer).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
         assert_eq!(get_balance(deps.as_ref(), &contract), transfer);
-        assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
+        assert_eq!(
+            query_token_info(deps.as_ref()).unwrap().total_supply,
+            amount1
+        );
     }
 
     #[test]

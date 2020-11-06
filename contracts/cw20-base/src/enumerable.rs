@@ -70,11 +70,7 @@ mod tests {
     use crate::msg::{HandleMsg, InitMsg};
 
     // this will set up the init for other tests
-    fn do_init(
-        deps: DepsMut,
-        addr: &HumanAddr,
-        amount: Uint128,
-    ) -> TokenInfoResponse {
+    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -88,7 +84,7 @@ mod tests {
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
         init(deps, env, info, init_msg).unwrap();
-        query_token_info(&deps).unwrap()
+        query_token_info(deps.as_ref()).unwrap()
     }
 
     #[test]
@@ -214,7 +210,8 @@ mod tests {
         assert_eq!(accounts.accounts, expected_order[2..3].to_vec());
 
         let accounts =
-            query_all_accounts(deps.as_ref(), Some(accounts.accounts[0].clone()), Some(777)).unwrap();
+            query_all_accounts(deps.as_ref(), Some(accounts.accounts[0].clone()), Some(777))
+                .unwrap();
         assert_eq!(accounts.accounts, expected_order[3..].to_vec());
     }
 }

@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Empty, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, Querier, StdResult, Storage,
+    attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult,
 };
 
 use cw0::{maybe_canonical, Expiration};
@@ -265,11 +265,7 @@ pub fn handle_close(
     })
 }
 
-pub fn query(
-    deps: Deps,
-    env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
         QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, env, proposal_id)?),
@@ -293,9 +289,7 @@ pub fn query(
     }
 }
 
-fn query_threshold(
-    deps: Deps,
-) -> StdResult<ThresholdResponse> {
+fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     Ok(ThresholdResponse::AbsoluteCount {
         weight_needed: cfg.required_weight,
@@ -303,11 +297,7 @@ fn query_threshold(
     })
 }
 
-fn query_proposal(
-    deps: Deps,
-    env: Env,
-    id: u64,
-) -> StdResult<ProposalResponse> {
+fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
     let prop = PROPOSALS.load(deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
     Ok(ProposalResponse {
@@ -375,11 +365,7 @@ fn map_proposal(
     })
 }
 
-fn query_vote(
-    deps: Deps,
-    proposal_id: u64,
-    voter: HumanAddr,
-) -> StdResult<VoteResponse> {
+fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
     let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
     let vote = prop.map(|b| b.vote);
@@ -414,10 +400,7 @@ fn list_votes(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter(
-    deps: Deps,
-    voter: HumanAddr,
-) -> StdResult<VoterResponse> {
+fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = VOTERS
         .may_load(deps.storage, &voter_raw)?
@@ -456,7 +439,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, from_binary, BankMsg};
+    use cosmwasm_std::{coin, from_binary, Api, BankMsg, OwnedDeps, Querier, Storage};
 
     use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
@@ -493,8 +476,8 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn setup_test_case(
-        mut deps: DepsMut,
+    fn setup_test_case<S: Storage, A: Api, Q: Querier>(
+        deps: &mut OwnedDeps<S, A, Q>,
         info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
@@ -525,7 +508,7 @@ mod tests {
             limit: None,
         };
         let votes: VoteListResponse =
-            from_binary(&query(deps.as_ref(), mock_env(), voters).unwrap()).unwrap();
+            from_binary(&query(deps, mock_env(), voters).unwrap()).unwrap();
         // Sum the weights of the Yes votes to get the tally
         votes
             .votes
@@ -574,7 +557,7 @@ mod tests {
 
         // Total weight less than required weight not allowed
         let required_weight = 100;
-        let res = setup_test_case(deps.as_mut(), info.clone(), required_weight, max_voting_period);
+        let res = setup_test_case(&mut deps, info.clone(), required_weight, max_voting_period);
 
         // Verify
         assert!(res.is_err());
@@ -585,7 +568,7 @@ mod tests {
 
         // All valid
         let required_weight = 1;
-        setup_test_case(deps.as_mut(), info, required_weight, max_voting_period).unwrap();
+        setup_test_case(&mut deps, info, required_weight, max_voting_period).unwrap();
 
         // Verify
         assert_eq!(
@@ -593,7 +576,7 @@ mod tests {
                 contract: CONTRACT_NAME.to_string(),
                 version: CONTRACT_VERSION.to_string(),
             },
-            get_contract_version(deps.storage).unwrap()
+            get_contract_version(&deps.storage).unwrap()
         )
     }
 
@@ -607,7 +590,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
             from_address: OWNER.into(),
@@ -697,7 +680,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -851,7 +834,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -954,7 +937,7 @@ mod tests {
         let voting_period = Duration::Height(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -1007,7 +990,13 @@ mod tests {
 
         // Close expired works
         let env = mock_env_height(1234567);
-        let res = handle(deps.as_mut(), env, mock_info(SOMEBODY, &[]), closing.clone()).unwrap();
+        let res = handle(
+            deps.as_mut(),
+            env,
+            mock_info(SOMEBODY, &[]),
+            closing.clone(),
+        )
+        .unwrap();
 
         // Verify
         assert_eq!(

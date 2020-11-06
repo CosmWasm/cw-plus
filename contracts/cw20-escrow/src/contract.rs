@@ -240,21 +240,14 @@ fn send_tokens<A: Api>(
     Ok(msgs)
 }
 
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::List {} => to_binary(&query_list(deps)?),
         QueryMsg::Details { id } => to_binary(&query_details(deps, id)?),
     }
 }
 
-fn query_details(
-    deps: Deps,
-    id: String,
-) -> StdResult<DetailsResponse> {
+fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
     let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
 
     let cw20_whitelist = escrow.human_whitelist(&deps.api)?;

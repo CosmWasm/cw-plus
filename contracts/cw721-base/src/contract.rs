@@ -21,12 +21,7 @@ use cw_storage_plus::Bound;
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let info = ContractInfoResponse {
@@ -374,11 +369,7 @@ fn check_can_send(
     }
 }
 
-pub fn query(
-    deps: Deps,
-    env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
         QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
@@ -426,31 +417,22 @@ pub fn query(
     }
 }
 
-fn query_minter(
-    deps: Deps,
-) -> StdResult<MinterResponse> {
+fn query_minter(deps: Deps) -> StdResult<MinterResponse> {
     let minter_raw = MINTER.load(deps.storage)?;
     let minter = deps.api.human_address(&minter_raw)?;
     Ok(MinterResponse { minter })
 }
 
-fn query_contract_info(
-    deps: Deps,
-) -> StdResult<ContractInfoResponse> {
+fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
     CONTRACT_INFO.load(deps.storage)
 }
 
-fn query_num_tokens(
-    deps: Deps,
-) -> StdResult<NumTokensResponse> {
+fn query_num_tokens(deps: Deps) -> StdResult<NumTokensResponse> {
     let count = num_tokens(deps.storage)?;
     Ok(NumTokensResponse { count })
 }
 
-fn query_nft_info(
-    deps: Deps,
-    token_id: String,
-) -> StdResult<NftInfoResponse> {
+fn query_nft_info(deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
     let info = tokens().load(deps.storage, &token_id)?;
     Ok(NftInfoResponse {
         name: info.name,
@@ -620,9 +602,9 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query_minter(&deps).unwrap();
+        let res = query_minter(deps.as_ref()).unwrap();
         assert_eq!(MINTER, res.minter.as_str());
-        let info = query_contract_info(&deps).unwrap();
+        let info = query_contract_info(deps.as_ref()).unwrap();
         assert_eq!(
             info,
             ContractInfoResponse {
@@ -631,7 +613,7 @@ mod tests {
             }
         );
 
-        let count = query_num_tokens(&deps).unwrap();
+        let count = query_num_tokens(deps.as_ref()).unwrap();
         assert_eq!(0, count.count);
 
         // list the token_ids
@@ -669,7 +651,7 @@ mod tests {
         let _ = handle(deps.as_mut(), mock_env(), allowed, mint_msg.clone()).unwrap();
 
         // ensure num tokens increases
-        let count = query_num_tokens(&deps).unwrap();
+        let count = query_num_tokens(deps.as_ref()).unwrap();
         assert_eq!(1, count.count);
 
         // unknown nft returns error
@@ -1033,8 +1015,8 @@ mod tests {
         let owner = mock_info("person", &[]);
         handle(deps.as_mut(), mock_env(), owner.clone(), approve_all_msg).unwrap();
 
-        let res =
-            query_all_approvals(deps.as_ref(), mock_env(), "person".into(), true, None, None).unwrap();
+        let res = query_all_approvals(deps.as_ref(), mock_env(), "person".into(), true, None, None)
+            .unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
@@ -1055,8 +1037,15 @@ mod tests {
         handle(deps.as_mut(), mock_env(), owner.clone(), approve_all_msg).unwrap();
 
         // and paginate queries
-        let res =
-            query_all_approvals(deps.as_ref(), mock_env(), "person".into(), true, None, Some(1)).unwrap();
+        let res = query_all_approvals(
+            deps.as_ref(),
+            mock_env(),
+            "person".into(),
+            true,
+            None,
+            Some(1),
+        )
+        .unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
@@ -1091,8 +1080,15 @@ mod tests {
         handle(deps.as_mut(), mock_env(), owner, revoke_all_msg).unwrap();
 
         // Approvals are removed / cleared without affecting others
-        let res =
-            query_all_approvals(deps.as_ref(), mock_env(), "person".into(), false, None, None).unwrap();
+        let res = query_all_approvals(
+            deps.as_ref(),
+            mock_env(),
+            "person".into(),
+            false,
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(
             res,
             ApprovedForAllResponse {
@@ -1106,7 +1102,8 @@ mod tests {
         // ensure the filter works (nothing should be here
         let mut late_env = mock_env();
         late_env.block.height = 1234568; //expired
-        let res = query_all_approvals(deps.as_ref(), late_env, "person".into(), false, None, None).unwrap();
+        let res = query_all_approvals(deps.as_ref(), late_env, "person".into(), false, None, None)
+            .unwrap();
         assert_eq!(0, res.operators.len());
     }
 
@@ -1174,8 +1171,13 @@ mod tests {
         // paginate for demeter
         let tokens = query_tokens(deps.as_ref(), demeter.clone(), None, Some(1)).unwrap();
         assert_eq!(&by_demeter[..1], &tokens.tokens[..]);
-        let tokens =
-            query_tokens(deps.as_ref(), demeter.clone(), Some(by_demeter[0].clone()), Some(3)).unwrap();
+        let tokens = query_tokens(
+            deps.as_ref(),
+            demeter.clone(),
+            Some(by_demeter[0].clone()),
+            Some(3),
+        )
+        .unwrap();
         assert_eq!(&by_demeter[1..], &tokens.tokens[..]);
     }
 }

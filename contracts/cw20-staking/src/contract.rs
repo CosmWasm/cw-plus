@@ -163,11 +163,7 @@ fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
     }
 }
 
-pub fn bond(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
     // ensure we have the proper denom
     let invest = invest_info_read(deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
@@ -300,11 +296,7 @@ pub fn unbond(
     Ok(res)
 }
 
-pub fn claim(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
     // find how many tokens the contract has
     let invest = invest_info_read(deps.storage).load()?;
     let mut balance = deps
@@ -320,23 +312,20 @@ pub fn claim(
     // only send some claims if that is all we can cover
     let cap = balance.amount;
     let mut to_send = Uint128(0);
-    claims(deps.storage).update(
-        sender_raw.as_slice(),
-        |claim| -> Result<_, ContractError> {
-            let (_send, waiting): (Vec<_>, _) =
-                claim.unwrap_or_default().iter().cloned().partition(|c| {
-                    // if mature and we can pay, then include in _send
-                    if c.released.is_expired(&env.block) && to_send + c.amount <= cap {
-                        to_send += c.amount;
-                        true
-                    } else {
-                        // not to send, leave in waiting and save again
-                        false
-                    }
-                });
-            Ok(waiting)
-        },
-    )?;
+    claims(deps.storage).update(sender_raw.as_slice(), |claim| -> Result<_, ContractError> {
+        let (_send, waiting): (Vec<_>, _) =
+            claim.unwrap_or_default().iter().cloned().partition(|c| {
+                // if mature and we can pay, then include in _send
+                if c.released.is_expired(&env.block) && to_send + c.amount <= cap {
+                    to_send += c.amount;
+                    true
+                } else {
+                    // not to send, leave in waiting and save again
+                    false
+                }
+            });
+        Ok(waiting)
+    })?;
 
     if to_send == Uint128(0) {
         return Err(ContractError::NothingToClaim {});
@@ -444,11 +433,7 @@ pub fn _bond_all_tokens(
     Ok(res)
 }
 
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // custom queries
         QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
@@ -462,10 +447,7 @@ pub fn query(
     }
 }
 
-pub fn query_claims(
-    deps: Deps,
-    address: HumanAddr,
-) -> StdResult<ClaimsResponse> {
+pub fn query_claims(deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
     let address_raw = deps.api.canonical_address(&address)?;
     let claims = claims_read(deps.storage)
         .may_load(address_raw.as_slice())?
@@ -473,9 +455,7 @@ pub fn query_claims(
     Ok(ClaimsResponse { claims })
 }
 
-pub fn query_investment(
-    deps: Deps,
-) -> StdResult<InvestmentResponse> {
+pub fn query_investment(deps: Deps) -> StdResult<InvestmentResponse> {
     let invest = invest_info_read(deps.storage).load()?;
     let supply = total_supply_read(deps.storage).load()?;
 
@@ -633,7 +613,7 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // token info is proper
-        let token = query_token_info(&deps).unwrap();
+        let token = query_token_info(deps.as_ref()).unwrap();
         assert_eq!(&token.name, &msg.name);
         assert_eq!(&token.symbol, &msg.symbol);
         assert_eq!(token.decimals, msg.decimals);
@@ -645,7 +625,7 @@ mod tests {
         assert_eq!(get_claims(deps.as_ref(), &creator), vec![]);
 
         // investment info correct
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(deps.as_ref()).unwrap();
         assert_eq!(&invest.owner, &creator);
         assert_eq!(&invest.validator, &msg.validator);
         assert_eq!(invest.exit_tax, msg.exit_tax);
@@ -690,13 +670,13 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(1000));
 
         // investment info correct (updated supply)
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(deps.as_ref()).unwrap();
         assert_eq!(invest.token_supply, Uint128(1000));
         assert_eq!(invest.staked_tokens, coin(1000, "ustake"));
         assert_eq!(invest.nominal_value, Decimal::one());
 
         // token info also properly updated
-        let token = query_token_info(&deps).unwrap();
+        let token = query_token_info(deps.as_ref()).unwrap();
         assert_eq!(token.total_supply, Uint128(1000));
     }
 
@@ -734,7 +714,7 @@ mod tests {
         set_delegation(&mut deps.querier, 1500, "ustake");
 
         // we should now see 1000 issues and 1500 bonded (and a price of 1.5)
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(deps.as_ref()).unwrap();
         assert_eq!(invest.token_supply, Uint128(1000));
         assert_eq!(invest.staked_tokens, coin(1500, "ustake"));
         let ratio = Decimal::from_str("1.5").unwrap();
@@ -753,7 +733,7 @@ mod tests {
         // alice should have gotten 2000 DRV for the 3000 stake, keeping the ratio at 1.5
         assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(2000));
 
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(deps.as_ref()).unwrap();
         assert_eq!(invest.token_supply, Uint128(3000));
         assert_eq!(invest.staked_tokens, coin(4500, "ustake"));
         assert_eq!(invest.nominal_value, ratio);
@@ -869,7 +849,7 @@ mod tests {
         // supplies updated, ratio the same (1.5)
         let ratio = Decimal::from_str("1.5").unwrap();
 
-        let invest = query_investment(&deps).unwrap();
+        let invest = query_investment(deps.as_ref()).unwrap();
         assert_eq!(invest.token_supply, bobs_balance + owner_cut);
         assert_eq!(invest.staked_tokens, coin(690, "ustake")); // 1500 - 810
         assert_eq!(invest.nominal_value, ratio);
@@ -927,7 +907,13 @@ mod tests {
         assert!(fail.is_err(), "{:?}", fail);
 
         // this should work with cash and claims ready
-        let res = handle(deps.as_mut(), claim_ready, info.clone(), HandleMsg::Claim {}).unwrap();
+        let res = handle(
+            deps.as_mut(),
+            claim_ready,
+            info.clone(),
+            HandleMsg::Claim {},
+        )
+        .unwrap();
         assert_eq!(1, res.messages.len());
         let payout = &res.messages[0];
         match payout {

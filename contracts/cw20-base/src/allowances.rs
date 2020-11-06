@@ -126,13 +126,7 @@ pub fn handle_transfer_from(
     let spender_raw = deps.api.canonical_address(&info.sender)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(
-        deps.storage,
-        &owner_raw,
-        &spender_raw,
-        &env.block,
-        amount,
-    )?;
+    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     let mut accounts = balances(deps.storage);
     accounts.update(owner_raw.as_slice(), |balance: Option<Uint128>| {
@@ -169,13 +163,7 @@ pub fn handle_burn_from(
     let spender_raw = deps.api.canonical_address(&info.sender)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(
-        deps.storage,
-        &owner_raw,
-        &spender_raw,
-        &env.block,
-        amount,
-    )?;
+    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     // lower balance
     let mut accounts = balances(deps.storage);
@@ -215,13 +203,7 @@ pub fn handle_send_from(
     let spender_raw = deps.api.canonical_address(&info.sender)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(
-        deps.storage,
-        &owner_raw,
-        &spender_raw,
-        &env.block,
-        amount,
-    )?;
+    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     // move the tokens to the contract
     let mut accounts = balances(deps.storage);
@@ -286,15 +268,13 @@ mod tests {
         deps: Deps,
         address: T,
     ) -> Uint128 {
-        query_balance(deps.as_ref(), address.into()).unwrap().balance
+        query_balance(deps.as_ref(), address.into())
+            .unwrap()
+            .balance
     }
 
     // this will set up the init for other tests
-    fn do_init(
-        deps: DepsMut,
-        addr: &HumanAddr,
-        amount: Uint128,
-    ) -> TokenInfoResponse {
+    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
         let init_msg = InitMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -308,7 +288,7 @@ mod tests {
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
         init(deps, env, info, init_msg).unwrap();
-        query_token_info(&deps).unwrap()
+        query_token_info(deps.as_ref()).unwrap()
     }
 
     #[test]
@@ -556,7 +536,10 @@ mod tests {
         assert_eq!(res.attributes[0], attr("action", "transfer_from"));
 
         // make sure money arrived
-        assert_eq!(get_balance(deps.as_ref(), &owner), (start - transfer).unwrap());
+        assert_eq!(
+            get_balance(deps.as_ref(), &owner),
+            (start - transfer).unwrap()
+        );
         assert_eq!(get_balance(deps.as_ref(), &rcpt), transfer);
 
         // ensure it looks good
@@ -638,7 +621,10 @@ mod tests {
         assert_eq!(res.attributes[0], attr("action", "burn_from"));
 
         // make sure money burnt
-        assert_eq!(get_balance(deps.as_ref(), &owner), (start - transfer).unwrap());
+        assert_eq!(
+            get_balance(deps.as_ref(), &owner),
+            (start - transfer).unwrap()
+        );
 
         // ensure it looks good
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
@@ -739,7 +725,10 @@ mod tests {
         );
 
         // make sure money sent
-        assert_eq!(get_balance(deps.as_ref(), &owner), (start - transfer).unwrap());
+        assert_eq!(
+            get_balance(deps.as_ref(), &owner),
+            (start - transfer).unwrap()
+        );
         assert_eq!(get_balance(deps.as_ref(), &contract), transfer);
 
         // ensure it looks good
