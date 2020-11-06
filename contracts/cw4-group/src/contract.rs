@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, Order, Querier, StdResult, Storage,
+    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, Order, StdResult,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
@@ -119,8 +119,8 @@ pub fn update_members(
     Ok(())
 }
 
-fn assert_admin<A: Api>(
-    api: A,
+fn assert_admin(
+    api: &dyn Api,
     sender: HumanAddr,
     admin: Option<CanonicalAddr>,
 ) -> Result<(), ContractError> {
@@ -196,7 +196,7 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, ReadonlyStorage};
+    use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
     use cw4::{member_key, TOTAL_KEY};
 
     const ADMIN: &str = "juan";
@@ -204,7 +204,7 @@ mod tests {
     const USER2: &str = "else";
     const USER3: &str = "funny";
 
-    fn do_init(deps: DepsMut) {
+    fn do_init<S: Storage, A: Api, Q: Querier>(deps: &mut OwnedDeps<S, A, Q>) {
         let msg = InitMsg {
             admin: Some(ADMIN.into()),
             members: vec![
@@ -219,7 +219,7 @@ mod tests {
             ],
         };
         let info = mock_info("creator", &[]);
-        init(deps, mock_env(), info, msg).unwrap();
+        init(deps.as_mut(), mock_env(), info, msg).unwrap();
     }
 
     #[test]
@@ -285,8 +285,8 @@ mod tests {
         // TODO: assert the set is proper
     }
 
-    fn assert_users(
-        deps: Deps,
+    fn assert_users<S: Storage, A: Api, Q: Querier>(
+        deps: &OwnedDeps<S, A, Q>,
         user1_weight: Option<u64>,
         user2_weight: Option<u64>,
         user3_weight: Option<u64>,
@@ -335,7 +335,7 @@ mod tests {
 
         // admin updates properly
         update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
-        assert_users(deps.as_ref(), None, Some(6), Some(15));
+        assert_users(&deps, None, Some(6), Some(15));
     }
 
     #[test]
@@ -353,7 +353,7 @@ mod tests {
 
         // admin updates properly
         update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
-        assert_users(deps.as_ref(), Some(4), Some(6), None);
+        assert_users(&deps, Some(4), Some(6), None);
     }
 
     #[test]
@@ -377,7 +377,7 @@ mod tests {
 
         // admin updates properly
         update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
-        assert_users(deps.as_ref(), None, Some(6), Some(5));
+        assert_users(&deps, None, Some(6), Some(5));
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    attr, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr,
+    attr, Api, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     MessageInfo, Querier, StdResult, Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};

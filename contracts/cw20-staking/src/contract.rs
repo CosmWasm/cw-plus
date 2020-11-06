@@ -1,6 +1,7 @@
 use cosmwasm_std::{
-    attr, coin, to_binary, Api, BankMsg, Binary, Decimal, Env, Extern, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Querier, StakingMsg, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, coin, to_binary, Api, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse,
+    HumanAddr, InitResponse, MessageInfo, Querier, StakingMsg, StdError, StdResult, Storage,
+    Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw20_base::allowances::{

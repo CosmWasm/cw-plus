@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
+    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
 };
 
 use cw2::set_contract_version;

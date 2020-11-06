@@ -1,5 +1,6 @@
 use cosmwasm_std::{
-    Api, CanonicalAddr, Extern, HumanAddr, Order, Querier, ReadonlyStorage, StdResult, Storage,
+    Api, CanonicalAddr, Deps, DepsMut, HumanAddr, Order, Querier, ReadonlyStorage, StdResult,
+    Storage,
 };
 use cw0::calc_range_start_human;
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};

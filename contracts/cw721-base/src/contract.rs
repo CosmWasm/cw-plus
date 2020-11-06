@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, BlockInfo, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, Order, Querier, StdError, StdResult, Storage, KV,
+    attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, Order, Querier, StdError, StdResult, Storage, KV,
 };
 
 use cw0::maybe_canonical;
