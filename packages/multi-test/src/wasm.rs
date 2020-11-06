@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use crate::transactions::StorageTransaction;
+use crate::transactions::{RepLog, StorageTransaction};
 use cosmwasm_std::{
     from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
     HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage,
@@ -247,13 +247,20 @@ pub struct WasmCacheState<'a> {
     contract_diffs: HashMap<HumanAddr, StorageTransaction<dyn Storage + 'a, &'a dyn Storage>>,
 }
 
-pub struct WasmOps(HashMap<HumanAddr, ContractData>);
+pub struct WasmOps {
+    new_contracts: HashMap<HumanAddr, ContractData>,
+    contract_diffs: Vec<(HumanAddr, RepLog)>,
+}
 
 impl WasmOps {
     pub fn commit(self, router: &mut WasmRouter) {
-        self.0.into_iter().for_each(|(k, v)| {
+        self.new_contracts.into_iter().for_each(|(k, v)| {
             router.contracts.insert(k, v);
-        })
+        });
+        self.contract_diffs.into_iter().for_each(|(k, ops)| {
+            let storage = router.contracts.get_mut(&k).unwrap().storage.as_mut();
+            ops.commit(storage);
+        });
     }
 }
 
@@ -348,7 +355,16 @@ impl<'a> WasmCache<'a> {
 
 impl<'a> WasmCacheState<'a> {
     pub fn prepare(self) -> WasmOps {
-        WasmOps(self.contracts)
+        let diffs: Vec<_> = self
+            .contract_diffs
+            .into_iter()
+            .map(|(k, store)| (k, store.prepare()))
+            .collect();
+
+        WasmOps {
+            new_contracts: self.contracts,
+            contract_diffs: diffs,
+        }
     }
 
     fn get_contract<'b>(
