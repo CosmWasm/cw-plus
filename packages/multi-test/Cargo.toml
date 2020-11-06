@@ -11,6 +11,7 @@ documentation = "https://docs.cosmwasm.com"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
+default = ["iterator"]
 iterator = ["cosmwasm-std/iterator"]
 
 [dependencies]
