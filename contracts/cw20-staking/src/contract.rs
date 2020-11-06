@@ -1,7 +1,6 @@
 use cosmwasm_std::{
-    attr, coin, to_binary, Api, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Querier, StakingMsg, StdError, StdResult, Storage,
-    Uint128, WasmMsg,
+    attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, QuerierWrapper, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw20_base::allowances::{
@@ -134,7 +133,7 @@ pub fn handle(
 
 // get_bonded returns the total amount of delegations from contract
 // it ensures they are all the same denom
-fn get_bonded<Q: Querier>(querier: &Q, contract: &HumanAddr) -> Result<Uint128, ContractError> {
+fn get_bonded(querier: &QuerierWrapper, contract: &HumanAddr) -> Result<Uint128, ContractError> {
     let bonds = querier.query_all_delegations(contract)?;
     if bonds.is_empty() {
         return Ok(Uint128(0));
@@ -220,8 +219,17 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse
     Ok(res)
 }
 
+// TODO: place in std
+fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
+    DepsMut {
+        storage: deps.storage,
+        api: deps.api,
+        querier: deps.querier,
+    }
+}
+
 pub fn unbond(
-    deps: DepsMut,
+    mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
     amount: Uint128,
@@ -240,7 +248,7 @@ pub fn unbond(
     let tax = amount * invest.exit_tax;
 
     // burn from the original caller
-    handle_burn(deps, env.clone(), info.clone(), amount)?;
+    handle_burn(dup(&mut deps), env.clone(), info.clone(), amount)?;
     if tax > Uint128(0) {
         let sub_info = MessageInfo {
             sender: env.contract.address.clone(),
@@ -248,7 +256,7 @@ pub fn unbond(
         };
         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
         let human_owner = deps.api.human_address(&invest.owner)?;
-        handle_mint(deps, env.clone(), sub_info, human_owner, tax)?;
+        handle_mint(dup(&mut deps), env.clone(), sub_info, human_owner, tax)?;
     }
 
     // re-calculate bonded to ensure we have real values
@@ -544,18 +552,12 @@ mod tests {
         }
     }
 
-    fn get_balance<S: Storage, A: Api, Q: Querier, U: Into<HumanAddr>>(
-        deps: Deps,
-        addr: U,
-    ) -> Uint128 {
-        query_balance(deps.as_ref(), addr.into()).unwrap().balance
+    fn get_balance<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Uint128 {
+        query_balance(deps, addr.into()).unwrap().balance
     }
 
-    fn get_claims<S: Storage, A: Api, Q: Querier, U: Into<HumanAddr>>(
-        deps: Deps,
-        addr: U,
-    ) -> Vec<Claim> {
-        query_claims(deps.as_ref(), addr.into()).unwrap().claims
+    fn get_claims<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Vec<Claim> {
+        query_claims(deps, addr.into()).unwrap().claims
     }
 
     #[test]
