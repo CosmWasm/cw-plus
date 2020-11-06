@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult, WasmMsg,
 };
 use sha2::{Digest, Sha256};
 
@@ -144,7 +144,7 @@ pub fn try_release(
     atomic_swaps(deps.storage).remove(id.as_bytes());
 
     // Send all tokens out
-    let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
+    let msgs = send_tokens(deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
         messages: msgs,
         attributes: vec![
@@ -169,7 +169,7 @@ pub fn try_refund(deps: DepsMut, env: Env, id: String) -> Result<HandleResponse,
     // We delete the swap
     atomic_swaps(deps.storage).remove(id.as_bytes());
 
-    let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
+    let msgs = send_tokens(deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
         messages: msgs,
         attributes: vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)],
@@ -190,8 +190,8 @@ fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
     }
 }
 
-fn send_tokens<A: Api>(
-    api: &A,
+fn send_tokens(
+    api: &dyn Api,
     from: &HumanAddr,
     to: &HumanAddr,
     amount: Balance,
@@ -677,7 +677,7 @@ mod tests {
             limit: None,
         };
         let ids: ListResponse =
-            from_binary(&query(deps.as_mut(), mock_env(), query_msg).unwrap()).unwrap();
+            from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(2, ids.swaps.len());
         assert_eq!(vec!["swap0001", "swap0002"], ids.swaps);
 
@@ -686,7 +686,7 @@ mod tests {
             id: ids.swaps[0].clone(),
         };
         let res: DetailsResponse =
-            from_binary(&query(deps.as_mut(), mock_env(), query_msg).unwrap()).unwrap();
+            from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(
             res,
             DetailsResponse {
@@ -704,7 +704,7 @@ mod tests {
             id: ids.swaps[1].clone(),
         };
         let res: DetailsResponse =
-            from_binary(&query(deps.as_mut(), mock_env(), query_msg).unwrap()).unwrap();
+            from_binary(&query(deps.as_ref(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(
             res,
             DetailsResponse {
