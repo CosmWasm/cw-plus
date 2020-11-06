@@ -5,6 +5,7 @@ use cosmwasm_std::{
 
 //*** TODO: remove this and import cw0::balance when we are both on 0.12 ***/
 use crate::balance::NativeBalance;
+use crate::transactions::{RepLog, StorageTransaction};
 
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
@@ -27,6 +28,65 @@ pub trait Bank {
     ) -> Result<(), String>;
 
     fn clone(&self) -> Box<dyn Bank>;
+}
+
+pub struct BankRouter {
+    bank: Box<dyn Bank>,
+    storage: Box<dyn Storage>,
+}
+
+impl BankRouter {
+    pub fn new<B: Bank + 'static>(bank: B, storage: Box<dyn Storage>) -> Self {
+        BankRouter {
+            bank: Box::new(bank),
+            storage,
+        }
+    }
+
+    // this is an "admin" function to let us adjust bank accounts
+    pub fn set_balance(&mut self, account: HumanAddr, amount: Vec<Coin>) -> Result<(), String> {
+        self.bank
+            .set_balance(self.storage.as_mut(), account, amount)
+    }
+
+    pub fn cache(&'_ self) -> BankCache<'_> {
+        BankCache::new(self)
+    }
+
+    pub fn query(&self, request: BankQuery) -> Result<Binary, String> {
+        self.bank.query(self.storage.as_ref(), request)
+    }
+}
+
+pub struct BankCache<'a> {
+    // and this into one with reference
+    router: &'a BankRouter,
+    state: StorageTransaction<dyn Storage + 'a, &'a dyn Storage>,
+}
+
+pub struct BankOps(RepLog);
+
+impl BankOps {
+    pub fn commit(self, router: &mut BankRouter) {
+        self.0.commit(router.storage.as_mut())
+    }
+}
+
+impl<'a> BankCache<'a> {
+    fn new(router: &'a BankRouter) -> Self {
+        BankCache {
+            router,
+            state: StorageTransaction::new(router.storage.as_ref()),
+        }
+    }
+
+    pub fn prepare(self) -> BankOps {
+        BankOps(self.state.prepare())
+    }
+
+    pub fn execute(&mut self, sender: HumanAddr, msg: BankMsg) -> Result<(), String> {
+        self.router.bank.handle(&mut self.state, sender, msg)
+    }
 }
 
 #[derive(Default)]
