@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    Binary, BlockInfo, CanonicalAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
+    Binary, BlockInfo, CanonicalAddr, Order,  StdError, StdResult, Storage,
 };
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 use cw20::{Balance, Expiration};
@@ -27,19 +27,19 @@ impl AtomicSwap {
 pub const PREFIX_SWAP: &[u8] = b"atomic_swap";
 
 /// Returns a bucket with all swaps (query by id)
-pub fn atomic_swaps<S: Storage>(storage: &mut S) -> Bucket<S, AtomicSwap> {
+pub fn atomic_swaps(storage: &mut dyn Storage) -> Bucket<AtomicSwap> {
     bucket(storage, PREFIX_SWAP)
 }
 
 /// Returns a bucket with all swaps (query by id)
 /// (read-only version for queries)
-pub fn atomic_swaps_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, AtomicSwap> {
+pub fn atomic_swaps_read(storage: &dyn Storage) -> ReadonlyBucket<AtomicSwap> {
     bucket_read(storage, PREFIX_SWAP)
 }
 
 /// This returns the list of ids for all active swaps
-pub fn all_swap_ids<S: ReadonlyStorage>(
-    storage: &S,
+pub fn all_swap_ids(
+    storage: &dyn Storage,
     start: Option<Vec<u8>>,
     limit: usize,
 ) -> StdResult<Vec<String>> {

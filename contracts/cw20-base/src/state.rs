@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr,  Storage, Uint128};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
     ReadonlyPrefixedStorage, ReadonlySingleton, Singleton,
@@ -36,25 +36,25 @@ const PREFIX_BALANCE: &[u8] = b"balance";
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";
 
 // meta is the token definition as well as the total_supply
-pub fn token_info<S: Storage>(storage: &mut S) -> Singleton<S, TokenInfo> {
+pub fn token_info(storage: &mut dyn Storage) -> Singleton<TokenInfo> {
     singleton(storage, TOKEN_INFO_KEY)
 }
 
-pub fn token_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, TokenInfo> {
+pub fn token_info_read(storage: &dyn Storage) -> ReadonlySingleton<TokenInfo> {
     singleton_read(storage, TOKEN_INFO_KEY)
 }
 
 /// balances are state of the erc20 tokens
-pub fn balances<S: Storage>(storage: &mut S) -> Bucket<S, Uint128> {
+pub fn balances(storage: &mut dyn Storage) -> Bucket<Uint128> {
     bucket(storage, PREFIX_BALANCE)
 }
 
 /// balances are state of the erc20 tokens (read-only version for queries)
-pub fn balances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Uint128> {
+pub fn balances_read(storage: &dyn Storage) -> ReadonlyBucket<Uint128> {
     bucket_read(storage, PREFIX_BALANCE)
 }
 
-pub fn balances_prefix_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyPrefixedStorage<S> {
+pub fn balances_prefix_read(storage: &dyn Storage) -> ReadonlyPrefixedStorage<S> {
     ReadonlyPrefixedStorage::new(storage, PREFIX_BALANCE)
 }
 

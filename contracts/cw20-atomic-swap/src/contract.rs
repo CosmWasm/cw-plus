@@ -19,19 +19,19 @@ use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn init(
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // No setup
     Ok(InitResponse::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
@@ -47,8 +47,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn try_receive<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn try_receive(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
@@ -73,8 +73,8 @@ pub fn try_receive<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn try_create<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn try_create(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: CreateMsg,
@@ -107,7 +107,7 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     };
 
     // Try to store it, fail if the id already exists (unmodifiable swaps)
-    atomic_swaps(&mut deps.storage).update(msg.id.as_bytes(), |existing| match existing {
+    atomic_swaps(deps.storage).update(msg.id.as_bytes(), |existing| match existing {
         None => Ok(swap),
         Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
@@ -122,13 +122,13 @@ pub fn try_create<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn try_release<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn try_release(
+    deps: DepsMut,
     env: Env,
     id: String,
     preimage: String,
 ) -> Result<HandleResponse, ContractError> {
-    let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
+    let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
     if swap.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
@@ -141,7 +141,7 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     let rcpt = deps.api.human_address(&swap.recipient)?;
 
     // Delete the swap
-    atomic_swaps(&mut deps.storage).remove(id.as_bytes());
+    atomic_swaps(deps.storage).remove(id.as_bytes());
 
     // Send all tokens out
     let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
@@ -157,12 +157,12 @@ pub fn try_release<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-pub fn try_refund<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn try_refund(
+    deps: DepsMut,
     env: Env,
     id: String,
 ) -> Result<HandleResponse, ContractError> {
-    let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
+    let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
     // Anyone can try to refund, as long as the contract is expired
     if !swap.is_expired(&env.block) {
         return Err(ContractError::NotExpired {});
@@ -171,7 +171,7 @@ pub fn try_refund<S: Storage, A: Api, Q: Querier>(
     let rcpt = deps.api.human_address(&swap.source)?;
 
     // We delete the swap
-    atomic_swaps(&mut deps.storage).remove(id.as_bytes());
+    atomic_swaps(deps.storage).remove(id.as_bytes());
 
     let msgs = send_tokens(&deps.api, &env.contract.address, &rcpt, swap.balance)?;
     Ok(HandleResponse {
@@ -228,8 +228,8 @@ fn send_tokens<A: Api>(
     }
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query(
+    deps: Deps,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -239,11 +239,11 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn query_details<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_details(
+    deps: Deps,
     id: String,
 ) -> StdResult<DetailsResponse> {
-    let swap = atomic_swaps_read(&deps.storage).load(id.as_bytes())?;
+    let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
 
     // Convert balance to human balance
     let balance_human = match swap.balance {
@@ -269,15 +269,15 @@ fn query_details<S: Storage, A: Api, Q: Querier>(
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-fn query_list<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_list(
+    deps: Deps,
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<ListResponse> {
     let start = calc_range_start_string(start_after);
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     Ok(ListResponse {
-        swaps: all_swap_ids(&deps.storage, start, limit)?,
+        swaps: all_swap_ids(deps.storage, start, limit)?,
     })
 }
 
@@ -319,7 +319,7 @@ mod tests {
         // Init an empty contract
         let init_msg = InitMsg {};
         let info = mock_info("anyone", &[]);
-        let res = init(&mut deps, mock_env(), info, init_msg).unwrap();
+        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
@@ -328,7 +328,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(&mut deps, mock_env(), info, InitMsg {}).unwrap();
+        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
 
         let sender = HumanAddr::from("sender0001");
         let balance = coins(100, "tokens");
@@ -343,7 +343,7 @@ mod tests {
                 expires: Expiration::AtHeight(123456),
             };
             let res = handle(
-                &mut deps,
+                deps.as_mut(),
                 mock_env(),
                 info.clone(),
                 HandleMsg::Create(create.clone()),
@@ -364,7 +364,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Create(create.clone()),
@@ -384,7 +384,7 @@ mod tests {
             expires: Expiration::AtTime(1),
         };
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Create(create.clone()),
@@ -404,7 +404,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Create(create.clone()),
@@ -426,7 +426,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Create(create.clone()),
@@ -445,7 +445,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Create(create.clone()),
@@ -462,7 +462,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(&mut deps, mock_env(), info, InitMsg {}).unwrap();
+        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
 
         let sender = HumanAddr::from("sender0001");
         let balance = coins(1000, "tokens");
@@ -475,7 +475,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info.clone(),
             HandleMsg::Create(create.clone()),
@@ -490,7 +490,7 @@ mod tests {
             id: "swap0002".to_string(),
             preimage: preimage(),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), release);
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::Std(StdError::NotFound { .. })) => {}
@@ -502,7 +502,7 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: "bu115h17".to_string(),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), release);
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::ParseError(msg)) => {
@@ -516,7 +516,7 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: hex::encode(b"This is 32 bytes, but incorrect."),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), release);
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), release);
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::InvalidPreimage {}) => {}
@@ -530,7 +530,7 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: preimage(),
         };
-        let res = handle(&mut deps, env, info, release);
+        let res = handle(deps.as_mut(), env, info, release);
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::Expired) => {}
@@ -543,7 +543,7 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: preimage(),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), release.clone()).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), release.clone()).unwrap();
         assert_eq!(attr("action", "release"), res.attributes[0]);
         assert_eq!(1, res.messages.len());
         assert_eq!(
@@ -556,7 +556,7 @@ mod tests {
         );
 
         // Cannot release again
-        let res = handle(&mut deps, mock_env(), info.clone(), release);
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), release);
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -568,7 +568,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(&mut deps, mock_env(), info, InitMsg {}).unwrap();
+        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
 
         let sender = HumanAddr::from("sender0001");
         let balance = coins(1000, "tokens");
@@ -581,7 +581,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info.clone(),
             HandleMsg::Create(create.clone()),
@@ -595,7 +595,7 @@ mod tests {
         let refund = HandleMsg::Refund {
             id: "swap0002".to_string(),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), refund);
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), refund);
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::Std(StdError::NotFound { .. })) => {}
@@ -606,7 +606,7 @@ mod tests {
         let refund = HandleMsg::Refund {
             id: "swap0001".to_string(),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), refund);
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), refund);
         match res {
             Ok(_) => panic!("expected error"),
             Err(ContractError::NotExpired {}) => {}
@@ -619,7 +619,7 @@ mod tests {
         let refund = HandleMsg::Refund {
             id: "swap0001".to_string(),
         };
-        let res = handle(&mut deps, env.clone(), info.clone(), refund.clone()).unwrap();
+        let res = handle(deps.as_mut(), env.clone(), info.clone(), refund.clone()).unwrap();
         assert_eq!(attr("action", "refund"), res.attributes[0]);
         assert_eq!(1, res.messages.len());
         assert_eq!(
@@ -632,7 +632,7 @@ mod tests {
         );
 
         // Cannot refund again
-        let res = handle(&mut deps, env, info, refund);
+        let res = handle(deps.as_mut(), env, info, refund);
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -644,7 +644,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(&mut deps, mock_env(), info, InitMsg {}).unwrap();
+        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
 
         let sender1 = HumanAddr::from("sender0001");
         let sender2 = HumanAddr::from("sender0002");
@@ -660,7 +660,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info.clone(),
             HandleMsg::Create(create1.clone()),
@@ -675,7 +675,7 @@ mod tests {
             expires: Expiration::AtTime(2_000_000_000),
         };
         handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info.clone(),
             HandleMsg::Create(create2.clone()),
@@ -688,7 +688,7 @@ mod tests {
             limit: None,
         };
         let ids: ListResponse =
-            from_binary(&query(&mut deps, mock_env(), query_msg).unwrap()).unwrap();
+            from_binary(&query(deps.as_mut(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(2, ids.swaps.len());
         assert_eq!(vec!["swap0001", "swap0002"], ids.swaps);
 
@@ -697,7 +697,7 @@ mod tests {
             id: ids.swaps[0].clone(),
         };
         let res: DetailsResponse =
-            from_binary(&query(&mut deps, mock_env(), query_msg).unwrap()).unwrap();
+            from_binary(&query(deps.as_mut(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(
             res,
             DetailsResponse {
@@ -715,7 +715,7 @@ mod tests {
             id: ids.swaps[1].clone(),
         };
         let res: DetailsResponse =
-            from_binary(&query(&mut deps, mock_env(), query_msg).unwrap()).unwrap();
+            from_binary(&query(deps.as_mut(), mock_env(), query_msg).unwrap()).unwrap();
         assert_eq!(
             res,
             DetailsResponse {
@@ -735,7 +735,7 @@ mod tests {
 
         // Create the contract
         let info = mock_info("anyone", &[]);
-        let res = init(&mut deps, mock_env(), info, InitMsg {}).unwrap();
+        let res = init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
         assert_eq!(0, res.messages.len());
 
         // Native side (offer)
@@ -752,7 +752,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         let info = mock_info(&native_sender, &native_coins);
-        let res = handle(&mut deps, mock_env(), info, HandleMsg::Create(create)).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Create(create)).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -780,7 +780,7 @@ mod tests {
         let token_contract = cw20_coin.address;
         let info = mock_info(&token_contract, &[]);
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Receive(receive.clone()),
@@ -793,7 +793,7 @@ mod tests {
         // using her knowledge of the preimage
         let info = mock_info("somebody", &[]);
         let res = handle(
-            &mut deps,
+            deps.as_mut(),
             mock_env(),
             info,
             HandleMsg::Release {
@@ -833,7 +833,7 @@ mod tests {
             id: native_swap_id.clone(),
             preimage,
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), release.clone()).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), release.clone()).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "release"), res.attributes[0]);
         assert_eq!(attr("id", native_swap_id), res.attributes[1]);

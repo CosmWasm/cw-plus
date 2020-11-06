@@ -175,7 +175,7 @@ mod test {
     fn sanity_test_migration() {
         let mut deps = mock_dependencies(&[]);
 
-        generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
-        migrate_v01_to_v02(&mut deps.storage).unwrap();
+        generate_v01_test_data(deps.storage, &deps.api).unwrap();
+        migrate_v01_to_v02(deps.storage).unwrap();
     }
 }

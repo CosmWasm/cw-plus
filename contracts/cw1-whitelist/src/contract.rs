@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, Extern, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage,
+    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Empty, Env, HandleResponse,
+    HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, Deps, DepsMut,
 };
 use cw1::CanSendResponse;
 use cw2::set_contract_version;
@@ -16,18 +16,18 @@ use crate::state::{admin_list, admin_list_read, AdminList};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn init(
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = AdminList {
         admins: map_canonical(&deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
-    admin_list(&mut deps.storage).save(&cfg)?;
+    admin_list(deps.storage).save(&cfg)?;
     Ok(InitResponse::default())
 }
 
@@ -42,8 +42,8 @@ fn map_human<A: Api>(api: &A, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAd
     admins.iter().map(|addr| api.human_address(addr)).collect()
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
@@ -58,7 +58,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 }
 
 pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
-    deps: &mut Extern<S, A, Q>,
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msgs: Vec<CosmosMsg<T>>,
@@ -66,7 +66,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier, T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    if !can_send(&deps, &info.sender)? {
+    if !can_send(deps.as_ref(), &info.sender)? {
         Err(ContractError::Unauthorized {})
     } else {
         let mut res = HandleResponse::default();
@@ -76,17 +76,17 @@ where
     }
 }
 
-pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_freeze(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
-    let mut cfg = admin_list_read(&deps.storage).load()?;
+    let mut cfg = admin_list_read(deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.mutable = false;
-        admin_list(&mut deps.storage).save(&cfg)?;
+        admin_list(deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
         res.attributes = vec![attr("action", "freeze")];
@@ -94,18 +94,18 @@ pub fn handle_freeze<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_update_admins(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     admins: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
-    let mut cfg = admin_list_read(&deps.storage).load()?;
+    let mut cfg = admin_list_read(deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.admins = map_canonical(&deps.api, &admins)?;
-        admin_list(&mut deps.storage).save(&cfg)?;
+        admin_list(deps.storage).save(&cfg)?;
 
         let mut res = HandleResponse::default();
         res.attributes = vec![attr("action", "update_admins")];
@@ -113,17 +113,17 @@ pub fn handle_update_admins<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn can_send<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn can_send(
+    deps: Deps,
     sender: &HumanAddr,
 ) -> StdResult<bool> {
-    let cfg = admin_list_read(&deps.storage).load()?;
+    let cfg = admin_list_read(deps.storage).load()?;
     let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
     Ok(can)
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query(
+    deps: Deps,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -133,23 +133,23 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn query_admin_list<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_admin_list(
+    deps: Deps,
 ) -> StdResult<AdminListResponse> {
-    let cfg = admin_list_read(&deps.storage).load()?;
+    let cfg = admin_list_read(deps.storage).load()?;
     Ok(AdminListResponse {
         admins: map_human(&deps.api, &cfg.admins)?,
         mutable: cfg.mutable,
     })
 }
 
-pub fn query_can_send<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_can_send(
+    deps: Deps,
     sender: HumanAddr,
     _msg: CosmosMsg,
 ) -> StdResult<CanSendResponse> {
     Ok(CanSendResponse {
-        can_send: can_send(&deps, &sender)?,
+        can_send: can_send(deps.as_ref(), &sender)?,
     })
 }
 
@@ -175,7 +175,7 @@ mod tests {
             mutable: true,
         };
         let info = mock_info(&anyone, &[]);
-        init(&mut deps, mock_env(), info, init_msg).unwrap();
+        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -189,7 +189,7 @@ mod tests {
             admins: vec![anyone.clone()],
         };
         let info = mock_info(&anyone, &[]);
-        let res = handle(&mut deps, mock_env(), info, msg);
+        let res = handle(deps.as_mut(), mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -200,7 +200,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
         };
         let info = mock_info(&alice, &[]);
-        handle(&mut deps, mock_env(), info, msg).unwrap();
+        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -211,7 +211,7 @@ mod tests {
 
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
-        let res = handle(&mut deps, mock_env(), info, HandleMsg::Freeze {});
+        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {});
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -219,7 +219,7 @@ mod tests {
 
         // but bob can
         let info = mock_info(&bob, &[]);
-        handle(&mut deps, mock_env(), info, HandleMsg::Freeze {}).unwrap();
+        handle(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
@@ -231,7 +231,7 @@ mod tests {
             admins: vec![alice.clone()],
         };
         let info = mock_info(&alice, &[]);
-        let res = handle(&mut deps, mock_env(), info, msg);
+        let res = handle(deps.as_mut(), mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -252,7 +252,7 @@ mod tests {
             mutable: false,
         };
         let info = mock_info(&bob, &[]);
-        init(&mut deps, mock_env(), info, init_msg).unwrap();
+        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
 
         let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
         let msgs = vec![
@@ -275,7 +275,7 @@ mod tests {
 
         // bob cannot execute them
         let info = mock_info(&bob, &[]);
-        let res = handle(&mut deps, mock_env(), info, handle_msg.clone());
+        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -283,7 +283,7 @@ mod tests {
 
         // but carl can
         let info = mock_info(&carl, &[]);
-        let res = handle(&mut deps, mock_env(), info, handle_msg.clone()).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }
@@ -303,7 +303,7 @@ mod tests {
             mutable: false,
         };
         let info = mock_info(&anyone, &[]);
-        init(&mut deps, mock_env(), info, init_msg).unwrap();
+        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
@@ -317,19 +317,19 @@ mod tests {
         });
 
         // owner can send
-        let res = query_can_send(&deps, alice.clone(), send_msg.clone()).unwrap();
+        let res = query_can_send(deps.as_ref(), alice.clone(), send_msg.clone()).unwrap();
         assert_eq!(res.can_send, true);
 
         // owner can stake
-        let res = query_can_send(&deps, bob.clone(), staking_msg.clone()).unwrap();
+        let res = query_can_send(deps.as_ref(), bob.clone(), staking_msg.clone()).unwrap();
         assert_eq!(res.can_send, true);
 
         // anyone cannot send
-        let res = query_can_send(&deps, anyone.clone(), send_msg.clone()).unwrap();
+        let res = query_can_send(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
         assert_eq!(res.can_send, false);
 
         // anyone cannot stake
-        let res = query_can_send(&deps, anyone.clone(), staking_msg.clone()).unwrap();
+        let res = query_can_send(deps.as_ref(), anyone.clone(), staking_msg.clone()).unwrap();
         assert_eq!(res.can_send, false);
     }
 }

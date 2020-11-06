@@ -10,8 +10,8 @@ use crate::state::{allowances_read, balances_prefix_read};
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_all_allowances(
+    deps: Deps,
     owner: HumanAddr,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
@@ -21,7 +21,7 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
     let start = calc_range_start_human(deps.api, start_after)?;
     let api = &deps.api;
 
-    let allowances: StdResult<Vec<AllowanceInfo>> = allowances_read(&deps.storage, &owner_raw)
+    let allowances: StdResult<Vec<AllowanceInfo>> = allowances_read(deps.storage, &owner_raw)
         .range(start.as_deref(), None, Order::Ascending)
         .take(limit)
         .map(|item| {
@@ -38,8 +38,8 @@ pub fn query_all_allowances<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-pub fn query_all_accounts<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_all_accounts(
+    deps: Deps,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
 ) -> StdResult<AllAccountsResponse> {
@@ -47,7 +47,7 @@ pub fn query_all_accounts<S: Storage, A: Api, Q: Querier>(
     let start = calc_range_start_human(deps.api, start_after)?;
     let api = &deps.api;
 
-    let accounts: StdResult<Vec<_>> = balances_prefix_read(&deps.storage)
+    let accounts: StdResult<Vec<_>> = balances_prefix_read(deps.storage)
         .range(start.as_deref(), None, Order::Ascending)
         .take(limit)
         .map(|(k, _)| api.human_address(&CanonicalAddr::from(k)))
@@ -70,8 +70,8 @@ mod tests {
     use crate::msg::{HandleMsg, InitMsg};
 
     // this will set up the init for other tests
-    fn do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut Extern<S, A, Q>,
+    fn do_init(
+        deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
     ) -> TokenInfoResponse {
@@ -102,10 +102,10 @@ mod tests {
 
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(&mut deps, &owner, Uint128(12340000));
+        do_init(deps.as_mut(), &owner, Uint128(12340000));
 
         // no allowance to start
-        let allowances = query_all_allowances(&deps, owner.clone(), None, None).unwrap();
+        let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances, vec![]);
 
         // set allowance with height expiration
@@ -116,7 +116,7 @@ mod tests {
             amount: allow1,
             expires: Some(expires.clone()),
         };
-        handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // set allowance with no expiration
         let allow2 = Uint128(54321);
@@ -125,14 +125,14 @@ mod tests {
             amount: allow2,
             expires: None,
         };
-        handle(&mut deps, env.clone(), info.clone(), msg).unwrap();
+        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // query list gets 2
-        let allowances = query_all_allowances(&deps, owner.clone(), None, None).unwrap();
+        let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
         // first one is spender1 (order of CanonicalAddr uncorrelated with HumanAddr)
-        let allowances = query_all_allowances(&deps, owner.clone(), None, Some(1)).unwrap();
+        let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, Some(1)).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.spender, &spender1);
@@ -141,7 +141,7 @@ mod tests {
 
         // next one is spender2
         let allowances = query_all_allowances(
-            &deps,
+            deps.as_ref(),
             owner.clone(),
             Some(allow.spender.clone()),
             Some(10000),
@@ -165,13 +165,13 @@ mod tests {
         let acct4 = HumanAddr::from("aaaardvark");
         let expected_order = [acct2.clone(), acct1.clone(), acct3.clone(), acct4.clone()];
 
-        do_init(&mut deps, &acct1, Uint128(12340000));
+        do_init(deps.as_mut(), &acct1, Uint128(12340000));
 
         // put money everywhere (to create balanaces)
         let info = mock_info(acct1.clone(), &[]);
         let env = mock_env();
         handle(
-            &mut deps,
+            deps.as_mut(),
             env.clone(),
             info.clone(),
             HandleMsg::Transfer {
@@ -181,7 +181,7 @@ mod tests {
         )
         .unwrap();
         handle(
-            &mut deps,
+            deps.as_mut(),
             env.clone(),
             info.clone(),
             HandleMsg::Transfer {
@@ -191,7 +191,7 @@ mod tests {
         )
         .unwrap();
         handle(
-            &mut deps,
+            deps.as_mut(),
             env.clone(),
             info.clone(),
             HandleMsg::Transfer {
@@ -202,19 +202,19 @@ mod tests {
         .unwrap();
 
         // make sure we get the proper results
-        let accounts = query_all_accounts(&deps, None, None).unwrap();
+        let accounts = query_all_accounts(deps.as_ref(), None, None).unwrap();
         assert_eq!(accounts.accounts, expected_order.clone());
 
         // let's do pagination
-        let accounts = query_all_accounts(&deps, None, Some(2)).unwrap();
+        let accounts = query_all_accounts(deps.as_ref(), None, Some(2)).unwrap();
         assert_eq!(accounts.accounts, expected_order[0..2].to_vec());
 
         let accounts =
-            query_all_accounts(&deps, Some(accounts.accounts[1].clone()), Some(1)).unwrap();
+            query_all_accounts(deps.as_ref(), Some(accounts.accounts[1].clone()), Some(1)).unwrap();
         assert_eq!(accounts.accounts, expected_order[2..3].to_vec());
 
         let accounts =
-            query_all_accounts(&deps, Some(accounts.accounts[0].clone()), Some(777)).unwrap();
+            query_all_accounts(deps.as_ref(), Some(accounts.accounts[0].clone()), Some(777)).unwrap();
         assert_eq!(accounts.accounts, expected_order[3..].to_vec());
     }
 }

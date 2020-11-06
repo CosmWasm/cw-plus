@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{ReadonlyStorage, Storage};
+use cosmwasm_std::{ Storage};
 use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
 use cw0::{Expiration, NativeBalance};
 
@@ -32,13 +32,13 @@ impl fmt::Display for Permissions {
 const PREFIX_PERMISSIONS: &[u8] = b"permissions";
 
 /// returns a bucket with all permissions (query by subkey)
-pub fn permissions<S: Storage>(storage: &mut S) -> Bucket<S, Permissions> {
+pub fn permissions(storage: &mut dyn Storage) -> Bucket<Permissions> {
     bucket(storage, PREFIX_PERMISSIONS)
 }
 
 /// returns a bucket with all permissionsk (query by subkey)
 /// (read-only version for queries)
-pub fn permissions_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Permissions> {
+pub fn permissions_read(storage: &dyn Storage) -> ReadonlyBucket<Permissions> {
     bucket_read(storage, PREFIX_PERMISSIONS)
 }
 
@@ -51,12 +51,12 @@ pub struct Allowance {
 const PREFIX_ALLOWANCE: &[u8] = b"allowance";
 
 /// returns a bucket with all allowances (query by subkey)
-pub fn allowances<S: Storage>(storage: &mut S) -> Bucket<S, Allowance> {
+pub fn allowances(storage: &mut dyn Storage) -> Bucket<Allowance> {
     bucket(storage, PREFIX_ALLOWANCE)
 }
 
 /// returns a bucket with all allowances (query by subkey)
 /// (read-only version for queries)
-pub fn allowances_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Allowance> {
+pub fn allowances_read(storage: &dyn Storage) -> ReadonlyBucket<Allowance> {
     bucket_read(storage, PREFIX_ALLOWANCE)
 }

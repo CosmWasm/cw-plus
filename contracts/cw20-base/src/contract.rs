@@ -20,13 +20,13 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn init(
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
     // create initial accounts
@@ -54,16 +54,16 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         total_supply,
         mint,
     };
-    token_info(&mut deps.storage).save(&data)?;
+    token_info(deps.storage).save(&data)?;
     Ok(InitResponse::default())
 }
 
-pub fn create_accounts<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn create_accounts(
+    deps: DepsMut,
     accounts: &[Cw20CoinHuman],
 ) -> StdResult<Uint128> {
     let mut total_supply = Uint128::zero();
-    let mut store = balances(&mut deps.storage);
+    let mut store = balances(deps.storage);
     for row in accounts {
         let raw_address = deps.api.canonical_address(&row.address)?;
         store.save(raw_address.as_slice(), &row.amount)?;
@@ -72,8 +72,8 @@ pub fn create_accounts<S: Storage, A: Api, Q: Querier>(
     Ok(total_supply)
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
@@ -114,8 +114,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_transfer(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     recipient: HumanAddr,
@@ -128,7 +128,7 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
-    let mut accounts = balances(&mut deps.storage);
+    let mut accounts = balances(deps.storage);
     accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
@@ -150,8 +150,8 @@ pub fn handle_transfer<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_burn(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     amount: Uint128,
@@ -163,12 +163,12 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // lower balance
-    let mut accounts = balances(&mut deps.storage);
+    let mut accounts = balances(deps.storage);
     accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    token_info(&mut deps.storage).update(|mut info| -> StdResult<_> {
+    token_info(deps.storage).update(|mut info| -> StdResult<_> {
         info.total_supply = (info.total_supply - amount)?;
         Ok(info)
     })?;
@@ -185,8 +185,8 @@ pub fn handle_burn<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_mint(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     recipient: HumanAddr,
@@ -196,7 +196,7 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let mut config = token_info_read(&deps.storage).load()?;
+    let mut config = token_info_read(deps.storage).load()?;
     if config.mint.is_none()
         || config.mint.as_ref().unwrap().minter != deps.api.canonical_address(&info.sender)?
     {
@@ -210,11 +210,11 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
             return Err(ContractError::CannotExceedCap {});
         }
     }
-    token_info(&mut deps.storage).save(&config)?;
+    token_info(deps.storage).save(&config)?;
 
     // add amount to recipient balance
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
-    balances(&mut deps.storage).update(
+    balances(deps.storage).update(
         rcpt_raw.as_slice(),
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
@@ -231,8 +231,8 @@ pub fn handle_mint<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn handle_send<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_send(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     contract: HumanAddr,
@@ -247,7 +247,7 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // move the tokens to the contract
-    let mut accounts = balances(&mut deps.storage);
+    let mut accounts = balances(deps.storage);
     accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
@@ -280,8 +280,8 @@ pub fn handle_send<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query(
+    deps: Deps,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -303,21 +303,21 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn query_balance<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_balance(
+    deps: Deps,
     address: HumanAddr,
 ) -> StdResult<BalanceResponse> {
     let addr_raw = deps.api.canonical_address(&address)?;
-    let balance = balances_read(&deps.storage)
+    let balance = balances_read(deps.storage)
         .may_load(addr_raw.as_slice())?
         .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }
 
-pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_token_info(
+    deps: Deps,
 ) -> StdResult<TokenInfoResponse> {
-    let info = token_info_read(&deps.storage).load()?;
+    let info = token_info_read(deps.storage).load()?;
     let res = TokenInfoResponse {
         name: info.name,
         symbol: info.symbol,
@@ -327,10 +327,10 @@ pub fn query_token_info<S: Storage, A: Api, Q: Querier>(
     Ok(res)
 }
 
-pub fn query_minter<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_minter(
+    deps: Deps,
 ) -> StdResult<Option<MinterResponse>> {
-    let meta = token_info_read(&deps.storage).load()?;
+    let meta = token_info_read(deps.storage).load()?;
     let minter = match meta.mint {
         Some(m) => Some(MinterResponse {
             minter: deps.api.human_address(&m.minter)?,
@@ -341,13 +341,13 @@ pub fn query_minter<S: Storage, A: Api, Q: Querier>(
     Ok(minter)
 }
 
-pub fn migrate<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn migrate(
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     _msg: MigrateMsg,
 ) -> StdResult<MigrateResponse> {
-    let old_version = get_contract_version(&deps.storage)?;
+    let old_version = get_contract_version(deps.storage)?;
     if old_version.contract != CONTRACT_NAME {
         return Err(StdError::generic_err(format!(
             "This is {}, cannot migrate from {}",
@@ -357,7 +357,7 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
     // note: v0.1.0 were not auto-generated and started with v0.
     // more recent versions do not have the v prefix
     if old_version.version.starts_with("v0.1.") {
-        migrate_v01_to_v02(&mut deps.storage)?;
+        migrate_v01_to_v02(deps.storage)?;
     } else if old_version.version.starts_with("0.2") {
         // no migration between 0.2 and 0.3, correct?
     } else {
@@ -368,7 +368,7 @@ pub fn migrate<S: Storage, A: Api, Q: Querier>(
     }
 
     // once we have "migrated", set the new version and return success
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(MigrateResponse::default())
 }
 
@@ -386,15 +386,15 @@ mod tests {
     use super::*;
 
     fn get_balance<S: Storage, A: Api, Q: Querier, T: Into<HumanAddr>>(
-        deps: &Extern<S, A, Q>,
+        deps: Deps,
         address: T,
     ) -> Uint128 {
-        query_balance(&deps, address.into()).unwrap().balance
+        query_balance(deps.as_ref(), address.into()).unwrap().balance
     }
 
     // this will set up the init for other tests
-    fn do_init_with_minter<S: Storage, A: Api, Q: Querier>(
-        deps: &mut Extern<S, A, Q>,
+    fn do_init_with_minter(
+        deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
         minter: &HumanAddr,
@@ -412,8 +412,8 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut Extern<S, A, Q>,
+    fn do_init(
+        deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
     ) -> TokenInfoResponse {
@@ -421,8 +421,8 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn _do_init<S: Storage, A: Api, Q: Querier>(
-        deps: &mut Extern<S, A, Q>,
+    fn _do_init(
+        deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
         mint: Option<MinterResponse>,
@@ -452,7 +452,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(&deps, addr), amount);
+        assert_eq!(get_balance(deps.as_ref(), addr), amount);
         assert_eq!(query_minter(&deps).unwrap(), mint,);
         meta
     }
@@ -473,7 +473,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(&mut deps, env.clone(), info.clone(), init_msg).unwrap();
+        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -485,7 +485,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(&deps, "addr0000"), Uint128(11223344));
+        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
     }
 
     #[test]
@@ -509,7 +509,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(&mut deps, env.clone(), info.clone(), init_msg).unwrap();
+        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -521,7 +521,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(&deps, "addr0000"), Uint128(11223344));
+        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
         assert_eq!(
             query_minter(&deps).unwrap(),
             Some(MinterResponse {
@@ -552,7 +552,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(&mut deps, env.clone(), info.clone(), init_msg);
+        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg);
         match res.unwrap_err() {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Initial supply greater than cap"),
             e => panic!("Unexpected error: {}", e),
@@ -567,7 +567,7 @@ mod tests {
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
         let limit = Uint128(511223344);
-        do_init_with_minter(&mut deps, &genesis, amount, &minter, Some(limit));
+        do_init_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
         let winner = HumanAddr::from("lucky");
@@ -579,10 +579,10 @@ mod tests {
 
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = handle(&mut deps, env, info, msg.clone()).unwrap();
+        let res = handle(deps.as_mut(), env, info, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(get_balance(&deps, &genesis), amount);
-        assert_eq!(get_balance(&deps, &winner), prize);
+        assert_eq!(get_balance(deps.as_ref(), &genesis), amount);
+        assert_eq!(get_balance(deps.as_ref(), &winner), prize);
 
         // but cannot mint nothing
         let msg = HandleMsg::Mint {
@@ -591,7 +591,7 @@ mod tests {
         };
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = handle(&mut deps, env, info, msg.clone());
+        let res = handle(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -605,7 +605,7 @@ mod tests {
         };
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = handle(&mut deps, env, info, msg.clone());
+        let res = handle(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::CannotExceedCap {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -616,7 +616,7 @@ mod tests {
     fn others_cannot_mint() {
         let mut deps = mock_dependencies(&[]);
         do_init_with_minter(
-            &mut deps,
+            deps.as_mut(),
             &HumanAddr::from("genesis"),
             Uint128(1234),
             &HumanAddr::from("minter"),
@@ -629,7 +629,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr::from("anyone else"), &[]);
         let env = mock_env();
-        let res = handle(&mut deps, env, info, msg.clone());
+        let res = handle(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("expected unauthorized error, got {}", e),
@@ -639,7 +639,7 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies(&[]);
-        do_init(&mut deps, &HumanAddr::from("genesis"), Uint128(1234));
+        do_init(deps.as_mut(), &HumanAddr::from("genesis"), Uint128(1234));
 
         let msg = HandleMsg::Mint {
             recipient: HumanAddr::from("lucky"),
@@ -647,7 +647,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr::from("genesis"), &[]);
         let env = mock_env();
-        let res = handle(&mut deps, env, info, msg.clone());
+        let res = handle(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("expected unauthorized error, got {}", e),
@@ -679,7 +679,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(&mut deps, env.clone(), info.clone(), init_msg).unwrap();
+        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -691,8 +691,8 @@ mod tests {
                 total_supply: amount1 + amount2,
             }
         );
-        assert_eq!(get_balance(&deps, &addr1), amount1);
-        assert_eq!(get_balance(&deps, &addr2), amount2);
+        assert_eq!(get_balance(deps.as_ref(), &addr1), amount1);
+        assert_eq!(get_balance(deps.as_ref(), &addr2), amount2);
     }
 
     #[test]
@@ -701,7 +701,7 @@ mod tests {
         let addr1 = HumanAddr::from("addr0001");
         let amount1 = Uint128::from(12340000u128);
 
-        let expected = do_init(&mut deps, &addr1, amount1);
+        let expected = do_init(deps.as_mut(), &addr1, amount1);
 
         // check meta query
         let loaded = query_token_info(&deps).unwrap();
@@ -711,7 +711,7 @@ mod tests {
         let env = mock_env();
         // check balance query (full)
         let data = query(
-            &deps,
+            deps.as_ref(),
             env.clone(),
             QueryMsg::Balance {
                 address: addr1.clone(),
@@ -723,7 +723,7 @@ mod tests {
 
         // check balance query (empty)
         let data = query(
-            &deps,
+            deps.as_ref(),
             env.clone(),
             QueryMsg::Balance {
                 address: HumanAddr::from("addr0002"),
@@ -743,7 +743,7 @@ mod tests {
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(&mut deps, &addr1, amount1);
+        do_init(deps.as_mut(), &addr1, amount1);
 
         // cannot transfer nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -752,7 +752,7 @@ mod tests {
             recipient: addr2.clone(),
             amount: Uint128::zero(),
         };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -765,7 +765,7 @@ mod tests {
             recipient: addr2.clone(),
             amount: too_much,
         };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -778,7 +778,7 @@ mod tests {
             recipient: addr1.clone(),
             amount: transfer,
         };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -791,12 +791,12 @@ mod tests {
             recipient: addr2.clone(),
             amount: transfer,
         };
-        let res = handle(&mut deps, env, info, msg).unwrap();
+        let res = handle(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
         let remainder = (amount1 - transfer).unwrap();
-        assert_eq!(get_balance(&deps, &addr1), remainder);
-        assert_eq!(get_balance(&deps, &addr2), transfer);
+        assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
+        assert_eq!(get_balance(deps.as_ref(), &addr2), transfer);
         assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
     }
 
@@ -808,7 +808,7 @@ mod tests {
         let burn = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(&mut deps, &addr1, amount1);
+        do_init(deps.as_mut(), &addr1, amount1);
 
         // cannot burn nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -816,7 +816,7 @@ mod tests {
         let msg = HandleMsg::Burn {
             amount: Uint128::zero(),
         };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -827,7 +827,7 @@ mod tests {
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
         let msg = HandleMsg::Burn { amount: too_much };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -838,11 +838,11 @@ mod tests {
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
         let msg = HandleMsg::Burn { amount: burn };
-        let res = handle(&mut deps, env, info, msg).unwrap();
+        let res = handle(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
         let remainder = (amount1 - burn).unwrap();
-        assert_eq!(get_balance(&deps, &addr1), remainder);
+        assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
         assert_eq!(query_token_info(&deps).unwrap().total_supply, remainder);
     }
 
@@ -856,7 +856,7 @@ mod tests {
         let too_much = Uint128::from(12340321u128);
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
-        do_init(&mut deps, &addr1, amount1);
+        do_init(deps.as_mut(), &addr1, amount1);
 
         // cannot send nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -866,7 +866,7 @@ mod tests {
             amount: Uint128::zero(),
             msg: Some(send_msg.clone()),
         };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -880,7 +880,7 @@ mod tests {
             amount: too_much,
             msg: Some(send_msg.clone()),
         };
-        let res = handle(&mut deps, env, info, msg);
+        let res = handle(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -894,7 +894,7 @@ mod tests {
             amount: transfer,
             msg: Some(send_msg.clone()),
         };
-        let res = handle(&mut deps, env, info, msg).unwrap();
+        let res = handle(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 1);
 
         // ensure proper send message sent
@@ -918,8 +918,8 @@ mod tests {
 
         // ensure balance is properly transferred
         let remainder = (amount1 - transfer).unwrap();
-        assert_eq!(get_balance(&deps, &addr1), remainder);
-        assert_eq!(get_balance(&deps, &contract), transfer);
+        assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
+        assert_eq!(get_balance(deps.as_ref(), &contract), transfer);
         assert_eq!(query_token_info(&deps).unwrap().total_supply, amount1);
     }
 
@@ -927,10 +927,10 @@ mod tests {
     fn migrate_from_v01() {
         let mut deps = mock_dependencies(&[]);
 
-        generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
+        generate_v01_test_data(deps.storage, &deps.api).unwrap();
         // make sure this really is 0.1.0
         assert_eq!(
-            get_contract_version(&deps.storage).unwrap(),
+            get_contract_version(deps.storage).unwrap(),
             ContractVersion {
                 contract: CONTRACT_NAME.to_string(),
                 version: "v0.1.0".to_string(),
@@ -940,11 +940,11 @@ mod tests {
         // run the migration
         let info = mock_info(HumanAddr::from("admin"), &[]);
         let env = mock_env();
-        migrate(&mut deps, env, info, MigrateMsg {}).unwrap();
+        migrate(deps.as_mut(), env, info, MigrateMsg {}).unwrap();
 
         // make sure the version is updated
         assert_eq!(
-            get_contract_version(&deps.storage).unwrap(),
+            get_contract_version(deps.storage).unwrap(),
             ContractVersion {
                 contract: CONTRACT_NAME.to_string(),
                 version: CONTRACT_VERSION.to_string(),
@@ -952,7 +952,7 @@ mod tests {
         );
 
         // check all the data (against the spec in generate_v01_test_data)
-        let info = token_info_read(&deps.storage).load().unwrap();
+        let info = token_info_read(deps.storage).load().unwrap();
         assert_eq!(
             info,
             TokenInfo {
@@ -974,7 +974,7 @@ mod tests {
             .canonical_address(&HumanAddr::from("user2"))
             .unwrap();
 
-        let bal = balances_read(&deps.storage);
+        let bal = balances_read(deps.storage);
         assert_eq!(2, bal.range(None, None, Order::Descending).count());
         assert_eq!(bal.load(user1.as_slice()).unwrap(), Uint128(123456));
         assert_eq!(bal.load(user2.as_slice()).unwrap(), Uint128(654321));
@@ -988,11 +988,11 @@ mod tests {
             .canonical_address(&HumanAddr::from("spender2"))
             .unwrap();
 
-        let num_allows = allowances_read(&deps.storage, &user1)
+        let num_allows = allowances_read(deps.storage, &user1)
             .range(None, None, Order::Ascending)
             .count();
         assert_eq!(num_allows, 1);
-        let allow = allowances_read(&deps.storage, &user1)
+        let allow = allowances_read(deps.storage, &user1)
             .load(spender1.as_slice())
             .unwrap();
         let expect = AllowanceResponse {
@@ -1001,11 +1001,11 @@ mod tests {
         };
         assert_eq!(allow, expect);
 
-        let num_allows = allowances_read(&deps.storage, &user2)
+        let num_allows = allowances_read(deps.storage, &user2)
             .range(None, None, Order::Ascending)
             .count();
         assert_eq!(num_allows, 2);
-        let allow = allowances_read(&deps.storage, &user2)
+        let allow = allowances_read(deps.storage, &user2)
             .load(spender1.as_slice())
             .unwrap();
         let expect = AllowanceResponse {
@@ -1013,7 +1013,7 @@ mod tests {
             expires: Expiration::AtTime(1598647517),
         };
         assert_eq!(allow, expect);
-        let allow = allowances_read(&deps.storage, &user2)
+        let allow = allowances_read(deps.storage, &user2)
             .load(spender2.as_slice())
             .unwrap();
         let expect = AllowanceResponse {

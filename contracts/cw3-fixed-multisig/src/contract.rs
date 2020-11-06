@@ -23,8 +23,8 @@ use crate::state::{
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn init(
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
@@ -41,25 +41,25 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         return Err(ContractError::UnreachableWeight {});
     }
 
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let cfg = Config {
         required_weight: msg.required_weight,
         total_weight,
         max_voting_period: msg.max_voting_period,
     };
-    CONFIG.save(&mut deps.storage, &cfg)?;
+    CONFIG.save(deps.storage, &cfg)?;
 
     // add all voters
     for voter in msg.voters.iter() {
         let key = deps.api.canonical_address(&voter.addr)?;
-        VOTERS.save(&mut deps.storage, &key, &voter.weight)?;
+        VOTERS.save(deps.storage, &key, &voter.weight)?;
     }
     Ok(InitResponse::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
@@ -77,8 +77,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_propose(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     title: String,
@@ -90,10 +90,10 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
-        .may_load(&deps.storage, &raw_sender)?
+        .may_load(deps.storage, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
-    let cfg = CONFIG.load(&deps.storage)?;
+    let cfg = CONFIG.load(deps.storage)?;
 
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
@@ -121,15 +121,15 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
         yes_weight: vote_power,
         required_weight: cfg.required_weight,
     };
-    let id = next_id(&mut deps.storage)?;
-    PROPOSALS.save(&mut deps.storage, id.into(), &prop)?;
+    let id = next_id(deps.storage)?;
+    PROPOSALS.save(deps.storage, id.into(), &prop)?;
 
     // add the first yes vote from voter
     let ballot = Ballot {
         weight: vote_power,
         vote: Vote::Yes,
     };
-    BALLOTS.save(&mut deps.storage, (id.into(), &raw_sender), &ballot)?;
+    BALLOTS.save(deps.storage, (id.into(), &raw_sender), &ballot)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -143,8 +143,8 @@ pub fn handle_propose<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_vote(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
@@ -153,11 +153,11 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
-        .may_load(&deps.storage, &raw_sender)?
+        .may_load(deps.storage, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
-    let mut prop = PROPOSALS.load(&deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
     if prop.status != Status::Open {
         return Err(ContractError::NotOpen {});
     }
@@ -167,7 +167,7 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
 
     // cast vote if no vote previously cast
     BALLOTS.update(
-        &mut deps.storage,
+        deps.storage,
         (proposal_id.into(), &raw_sender),
         |bal| match bal {
             Some(_) => Err(ContractError::AlreadyVoted {}),
@@ -185,7 +185,7 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
         if prop.yes_weight >= prop.required_weight {
             prop.status = Status::Passed;
         }
-        PROPOSALS.save(&mut deps.storage, proposal_id.into(), &prop)?;
+        PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
     }
 
     Ok(HandleResponse {
@@ -200,15 +200,15 @@ pub fn handle_vote<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_execute(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = PROPOSALS.load(&deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
     if prop.status != Status::Passed {
@@ -217,7 +217,7 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
 
     // set it to executed
     prop.status = Status::Executed;
-    PROPOSALS.save(&mut deps.storage, proposal_id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
     Ok(HandleResponse {
@@ -231,15 +231,15 @@ pub fn handle_execute<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-pub fn handle_close<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_close(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = PROPOSALS.load(&deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
     if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
         .any(|x| *x == prop.status)
@@ -252,7 +252,7 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
 
     // set it to failed
     prop.status = Status::Rejected;
-    PROPOSALS.save(&mut deps.storage, proposal_id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -265,8 +265,8 @@ pub fn handle_close<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query(
+    deps: Deps,
     env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -293,22 +293,22 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn query_threshold<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_threshold(
+    deps: Deps,
 ) -> StdResult<ThresholdResponse> {
-    let cfg = CONFIG.load(&deps.storage)?;
+    let cfg = CONFIG.load(deps.storage)?;
     Ok(ThresholdResponse::AbsoluteCount {
         weight_needed: cfg.required_weight,
         total_weight: cfg.total_weight,
     })
 }
 
-fn query_proposal<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_proposal(
+    deps: Deps,
     env: Env,
     id: u64,
 ) -> StdResult<ProposalResponse> {
-    let prop = PROPOSALS.load(&deps.storage, id.into())?;
+    let prop = PROPOSALS.load(deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
     Ok(ProposalResponse {
         id,
@@ -325,8 +325,8 @@ fn query_proposal<S: Storage, A: Api, Q: Querier>(
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-fn list_proposals<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn list_proposals(
+    deps: Deps,
     env: Env,
     start_after: Option<u64>,
     limit: Option<u32>,
@@ -334,7 +334,7 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
-        .range(&deps.storage, start, None, Order::Ascending)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -342,8 +342,8 @@ fn list_proposals<S: Storage, A: Api, Q: Querier>(
     Ok(ProposalListResponse { proposals: props? })
 }
 
-fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn reverse_proposals(
+    deps: Deps,
     env: Env,
     start_before: Option<u64>,
     limit: Option<u32>,
@@ -351,7 +351,7 @@ fn reverse_proposals<S: Storage, A: Api, Q: Querier>(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let end = start_before.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
-        .range(&deps.storage, None, end, Order::Descending)
+        .range(deps.storage, None, end, Order::Descending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -375,19 +375,19 @@ fn map_proposal(
     })
 }
 
-fn query_vote<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_vote(
+    deps: Deps,
     proposal_id: u64,
     voter: HumanAddr,
 ) -> StdResult<VoteResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let prop = BALLOTS.may_load(&deps.storage, (proposal_id.into(), &voter_raw))?;
+    let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
     let vote = prop.map(|b| b.vote);
     Ok(VoteResponse { vote })
 }
 
-fn list_votes<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn list_votes(
+    deps: Deps,
     proposal_id: u64,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
@@ -399,7 +399,7 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
     let api = &deps.api;
     let votes: StdResult<Vec<_>> = BALLOTS
         .prefix(proposal_id.into())
-        .range(&deps.storage, start, None, Order::Ascending)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, ballot) = item?;
@@ -414,13 +414,13 @@ fn list_votes<S: Storage, A: Api, Q: Querier>(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_voter(
+    deps: Deps,
     voter: HumanAddr,
 ) -> StdResult<VoterResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = VOTERS
-        .may_load(&deps.storage, &voter_raw)?
+        .may_load(deps.storage, &voter_raw)?
         .unwrap_or_default();
     Ok(VoterResponse {
         addr: voter,
@@ -428,8 +428,8 @@ fn query_voter<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-fn list_voters<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn list_voters(
+    deps: Deps,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
@@ -439,7 +439,7 @@ fn list_voters<S: Storage, A: Api, Q: Querier>(
 
     let api = &deps.api;
     let voters: StdResult<Vec<_>> = VOTERS
-        .range(&deps.storage, start, None, Order::Ascending)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
@@ -493,8 +493,8 @@ mod tests {
     }
 
     // this will set up the init for other tests
-    fn setup_test_case<S: Storage, A: Api, Q: Querier>(
-        mut deps: &mut Extern<S, A, Q>,
+    fn setup_test_case(
+        mut deps: DepsMut,
         info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
@@ -514,10 +514,10 @@ mod tests {
             required_weight,
             max_voting_period,
         };
-        init(&mut deps, mock_env(), info, init_msg)
+        init(deps.as_mut(), mock_env(), info, init_msg)
     }
 
-    fn get_tally<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, proposal_id: u64) -> u64 {
+    fn get_tally(deps: Deps, proposal_id: u64) -> u64 {
         // Get all the voters on the proposal
         let voters = QueryMsg::ListVotes {
             proposal_id,
@@ -525,7 +525,7 @@ mod tests {
             limit: None,
         };
         let votes: VoteListResponse =
-            from_binary(&query(&deps, mock_env(), voters).unwrap()).unwrap();
+            from_binary(&query(deps.as_ref(), mock_env(), voters).unwrap()).unwrap();
         // Sum the weights of the Yes votes to get the tally
         votes
             .votes
@@ -548,7 +548,7 @@ mod tests {
             required_weight: 1,
             max_voting_period,
         };
-        let res = init(&mut deps, mock_env(), info.clone(), init_msg);
+        let res = init(deps.as_mut(), mock_env(), info.clone(), init_msg);
 
         // Verify
         assert!(res.is_err());
@@ -563,7 +563,7 @@ mod tests {
             required_weight: 0,
             max_voting_period,
         };
-        let res = init(&mut deps, mock_env(), info.clone(), init_msg);
+        let res = init(deps.as_mut(), mock_env(), info.clone(), init_msg);
 
         // Verify
         assert!(res.is_err());
@@ -574,7 +574,7 @@ mod tests {
 
         // Total weight less than required weight not allowed
         let required_weight = 100;
-        let res = setup_test_case(&mut deps, info.clone(), required_weight, max_voting_period);
+        let res = setup_test_case(deps.as_mut(), info.clone(), required_weight, max_voting_period);
 
         // Verify
         assert!(res.is_err());
@@ -585,7 +585,7 @@ mod tests {
 
         // All valid
         let required_weight = 1;
-        setup_test_case(&mut deps, info, required_weight, max_voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info, required_weight, max_voting_period).unwrap();
 
         // Verify
         assert_eq!(
@@ -593,7 +593,7 @@ mod tests {
                 contract: CONTRACT_NAME.to_string(),
                 version: CONTRACT_VERSION.to_string(),
             },
-            get_contract_version(&deps.storage).unwrap()
+            get_contract_version(deps.storage).unwrap()
         )
     }
 
@@ -607,7 +607,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
             from_address: OWNER.into(),
@@ -624,7 +624,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(&mut deps, mock_env(), info, proposal.clone());
+        let res = handle(deps.as_mut(), mock_env(), info, proposal.clone());
 
         // Verify
         assert!(res.is_err());
@@ -641,7 +641,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = handle(&mut deps, mock_env(), info, proposal_wrong_exp);
+        let res = handle(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
 
         // Verify
         assert!(res.is_err());
@@ -652,7 +652,7 @@ mod tests {
 
         // Proposal from voter works
         let info = mock_info(VOTER3, &[]);
-        let res = handle(&mut deps, mock_env(), info, proposal.clone()).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -671,7 +671,7 @@ mod tests {
 
         // Proposal from voter with enough vote power directly passes
         let info = mock_info(VOTER4, &[]);
-        let res = handle(&mut deps, mock_env(), info, proposal).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info, proposal).unwrap();
 
         // Verify
         assert_eq!(
@@ -697,7 +697,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -712,7 +712,7 @@ mod tests {
             msgs,
             latest: None,
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), proposal).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -722,7 +722,7 @@ mod tests {
             proposal_id,
             vote: Vote::Yes,
         };
-        let res = handle(&mut deps, mock_env(), info, yes_vote.clone());
+        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -733,7 +733,7 @@ mod tests {
 
         // Only voters can vote
         let info = mock_info(SOMEBODY, &[]);
-        let res = handle(&mut deps, mock_env(), info, yes_vote.clone());
+        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -744,7 +744,7 @@ mod tests {
 
         // But voter1 can
         let info = mock_info(VOTER1, &[]);
-        let res = handle(&mut deps, mock_env(), info, yes_vote.clone()).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -766,7 +766,7 @@ mod tests {
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Compute the current tally
-        let tally = get_tally(&deps, proposal_id);
+        let tally = get_tally(deps.as_ref(), proposal_id);
 
         // Cast a No vote
         let no_vote = HandleMsg::Vote {
@@ -774,7 +774,7 @@ mod tests {
             vote: Vote::No,
         };
         let info = mock_info(VOTER2, &[]);
-        handle(&mut deps, mock_env(), info, no_vote.clone()).unwrap();
+        handle(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
 
         // Cast a Veto vote
         let veto_vote = HandleMsg::Vote {
@@ -782,13 +782,13 @@ mod tests {
             vote: Vote::Veto,
         };
         let info = mock_info(VOTER3, &[]);
-        handle(&mut deps, mock_env(), info.clone(), veto_vote).unwrap();
+        handle(deps.as_mut(), mock_env(), info.clone(), veto_vote).unwrap();
 
         // Verify
-        assert_eq!(tally, get_tally(&deps, proposal_id));
+        assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
 
         // Once voted, votes cannot be changed
-        let res = handle(&mut deps, mock_env(), info.clone(), yes_vote.clone());
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -796,14 +796,14 @@ mod tests {
             ContractError::AlreadyVoted {} => {}
             e => panic!("unexpected error: {}", e),
         }
-        assert_eq!(tally, get_tally(&deps, proposal_id));
+        assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
 
         // Expired proposals cannot be voted
         let env = match voting_period {
             Duration::Time(duration) => mock_env_time(duration + 1),
             Duration::Height(duration) => mock_env_height(duration + 1),
         };
-        let res = handle(&mut deps, env, info, no_vote);
+        let res = handle(deps.as_mut(), env, info, no_vote);
 
         // Verify
         assert!(res.is_err());
@@ -814,7 +814,7 @@ mod tests {
 
         // Vote it again, so it passes
         let info = mock_info(VOTER4, &[]);
-        let res = handle(&mut deps, mock_env(), info, yes_vote.clone()).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -833,7 +833,7 @@ mod tests {
 
         // non-Open proposals cannot be voted
         let info = mock_info(VOTER5, &[]);
-        let res = handle(&mut deps, mock_env(), info, yes_vote);
+        let res = handle(deps.as_mut(), mock_env(), info, yes_vote);
 
         // Verify
         assert!(res.is_err());
@@ -851,7 +851,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -866,14 +866,14 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), proposal).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Only Passed can be executed
         let execution = HandleMsg::Execute { proposal_id };
-        let res = handle(&mut deps, mock_env(), info.clone(), execution.clone());
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), execution.clone());
 
         // Verify
         assert!(res.is_err());
@@ -888,7 +888,7 @@ mod tests {
             vote: Vote::Yes,
         };
         let info = mock_info(VOTER3, &[]);
-        let res = handle(&mut deps, mock_env(), info.clone(), vote).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), vote).unwrap();
 
         // Verify
         assert_eq!(
@@ -907,7 +907,7 @@ mod tests {
 
         // In passing: Try to close Passed fails
         let closing = HandleMsg::Close { proposal_id };
-        let res = handle(&mut deps, mock_env(), info, closing);
+        let res = handle(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
@@ -918,7 +918,7 @@ mod tests {
 
         // Execute works. Anybody can execute Passed proposals
         let info = mock_info(SOMEBODY, &[]);
-        let res = handle(&mut deps, mock_env(), info.clone(), execution).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
 
         // Verify
         assert_eq!(
@@ -936,7 +936,7 @@ mod tests {
 
         // In passing: Try to close Executed fails
         let closing = HandleMsg::Close { proposal_id };
-        let res = handle(&mut deps, mock_env(), info, closing);
+        let res = handle(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
@@ -954,7 +954,7 @@ mod tests {
         let voting_period = Duration::Height(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(&mut deps, info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -969,7 +969,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), proposal).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -980,7 +980,7 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
 
         // Non-expired proposals cannot be closed
-        let res = handle(&mut deps, mock_env(), info.clone(), closing.clone());
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), closing.clone());
 
         // Verify
         assert!(res.is_err());
@@ -998,7 +998,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = handle(&mut deps, mock_env(), info.clone(), proposal).unwrap();
+        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -1007,7 +1007,7 @@ mod tests {
 
         // Close expired works
         let env = mock_env_height(1234567);
-        let res = handle(&mut deps, env, mock_info(SOMEBODY, &[]), closing.clone()).unwrap();
+        let res = handle(deps.as_mut(), env, mock_info(SOMEBODY, &[]), closing.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -1024,7 +1024,7 @@ mod tests {
         );
 
         // Trying to close it again fails
-        let res = handle(&mut deps, mock_env(), info, closing);
+        let res = handle(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());

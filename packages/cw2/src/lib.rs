@@ -21,14 +21,14 @@ pub struct ContractVersion {
 }
 
 /// get_contract_version can be use in migrate to read the previous version of this contract
-pub fn get_contract_version<S: Storage>(store: &S) -> StdResult<ContractVersion> {
+pub fn get_contract_version(store: &dyn Storage) -> StdResult<ContractVersion> {
     CONTRACT.load(store)
 }
 
 /// set_contract_version should be used in init to store the original version, and after a successful
 /// migrate to update it
-pub fn set_contract_version<S: Storage, T: Into<String>, U: Into<String>>(
-    store: &mut S,
+pub fn set_contract_version<T: Into<String>, U: Into<String>>(
+    store: &mut dyn Storage,
     name: T,
     version: U,
 ) -> StdResult<()> {

@@ -17,41 +17,41 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn init(
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    set_contract_version(&mut deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     create(deps, msg.admin, msg.members)?;
     Ok(InitResponse::default())
 }
 
 // create is the init logic with set_contract_version removed so it can more
 // easily be imported in other contracts
-pub fn create<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn create(
+    deps: DepsMut,
     admin: Option<HumanAddr>,
     members: Vec<Member>,
 ) -> StdResult<()> {
     let admin_raw = maybe_canonical(deps.api, admin)?;
-    ADMIN.save(&mut deps.storage, &admin_raw)?;
+    ADMIN.save(deps.storage, &admin_raw)?;
 
     let mut total = 0u64;
     for member in members.into_iter() {
         total += member.weight;
         let raw = deps.api.canonical_address(&member.addr)?;
-        MEMBERS.save(&mut deps.storage, &raw, &member.weight)?;
+        MEMBERS.save(deps.storage, &raw, &member.weight)?;
     }
-    TOTAL.save(&mut deps.storage, &total)?;
+    TOTAL.save(deps.storage, &total)?;
 
     Ok(())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle(
+    deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msg: HandleMsg,
@@ -62,8 +62,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn handle_update_admin<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_update_admin(
+    deps: DepsMut,
     info: MessageInfo,
     new_admin: Option<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
@@ -72,21 +72,21 @@ pub fn handle_update_admin<S: Storage, A: Api, Q: Querier>(
 }
 
 // the logic from handle_update_admin extracted for easier import
-pub fn update_admin<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn update_admin(
+    deps: DepsMut,
     sender: HumanAddr,
     new_admin: Option<HumanAddr>,
 ) -> Result<Option<CanonicalAddr>, ContractError> {
     let api = deps.api;
-    ADMIN.update(&mut deps.storage, |state| -> Result<_, ContractError> {
+    ADMIN.update(deps.storage, |state| -> Result<_, ContractError> {
         assert_admin(api, sender, state)?;
         let new_admin = maybe_canonical(api, new_admin)?;
         Ok(new_admin)
     })
 }
 
-pub fn handle_update_members<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn handle_update_members(
+    deps: DepsMut,
     info: MessageInfo,
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
@@ -96,21 +96,21 @@ pub fn handle_update_members<S: Storage, A: Api, Q: Querier>(
 }
 
 // the logic from handle_update_admin extracted for easier import
-pub fn update_members<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+pub fn update_members(
+    deps: DepsMut,
     sender: HumanAddr,
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
 ) -> Result<(), ContractError> {
-    let admin = ADMIN.load(&deps.storage)?;
+    let admin = ADMIN.load(deps.storage)?;
     assert_admin(deps.api, sender, admin)?;
 
-    let mut total = TOTAL.load(&deps.storage)?;
+    let mut total = TOTAL.load(deps.storage)?;
 
     // add all new members and update total
     for add in to_add.into_iter() {
         let raw = deps.api.canonical_address(&add.addr)?;
-        MEMBERS.update(&mut deps.storage, &raw, |old| -> StdResult<_> {
+        MEMBERS.update(deps.storage, &raw, |old| -> StdResult<_> {
             total -= old.unwrap_or_default();
             total += add.weight;
             Ok(add.weight)
@@ -119,11 +119,11 @@ pub fn update_members<S: Storage, A: Api, Q: Querier>(
 
     for remove in to_remove.into_iter() {
         let raw = deps.api.canonical_address(&remove)?;
-        total -= MEMBERS.may_load(&deps.storage, &raw)?.unwrap_or_default();
-        MEMBERS.remove(&mut deps.storage, &raw);
+        total -= MEMBERS.may_load(deps.storage, &raw)?.unwrap_or_default();
+        MEMBERS.remove(deps.storage, &raw);
     }
 
-    TOTAL.save(&mut deps.storage, &total)?;
+    TOTAL.save(deps.storage, &total)?;
 
     Ok(())
 }
@@ -144,8 +144,8 @@ fn assert_admin<A: Api>(
     }
 }
 
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query(
+    deps: Deps,
     _env: Env,
     msg: QueryMsg,
 ) -> StdResult<Binary> {
@@ -159,25 +159,25 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-fn query_admin<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<AdminResponse> {
-    let canon = ADMIN.load(&deps.storage)?;
+fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
+    let canon = ADMIN.load(deps.storage)?;
     let admin = canon.map(|c| deps.api.human_address(&c)).transpose()?;
     Ok(AdminResponse { admin })
 }
 
-fn query_total_weight<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_total_weight(
+    deps: Deps,
 ) -> StdResult<TotalWeightResponse> {
-    let weight = TOTAL.load(&deps.storage)?;
+    let weight = TOTAL.load(deps.storage)?;
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn query_member(
+    deps: Deps,
     addr: HumanAddr,
 ) -> StdResult<MemberResponse> {
     let raw = deps.api.canonical_address(&addr)?;
-    let weight = MEMBERS.may_load(&deps.storage, &raw)?;
+    let weight = MEMBERS.may_load(deps.storage, &raw)?;
     Ok(MemberResponse { weight })
 }
 
@@ -185,8 +185,8 @@ fn query_member<S: Storage, A: Api, Q: Querier>(
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-fn list_members<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+fn list_members(
+    deps: Deps,
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
 ) -> StdResult<MemberListResponse> {
@@ -196,7 +196,7 @@ fn list_members<S: Storage, A: Api, Q: Querier>(
 
     let api = &deps.api;
     let members: StdResult<Vec<_>> = MEMBERS
-        .range(&deps.storage, start, None, Order::Ascending)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
@@ -222,7 +222,7 @@ mod tests {
     const USER2: &str = "else";
     const USER3: &str = "funny";
 
-    fn do_init<S: Storage, A: Api, Q: Querier>(deps: &mut Extern<S, A, Q>) {
+    fn do_init(deps: DepsMut) {
         let msg = InitMsg {
             admin: Some(ADMIN.into()),
             members: vec![
@@ -259,22 +259,22 @@ mod tests {
         do_init(&mut deps);
 
         // a member cannot update admin
-        let err = update_admin(&mut deps, USER1.into(), Some(USER3.into())).unwrap_err();
+        let err = update_admin(deps.as_mut(), USER1.into(), Some(USER3.into())).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
         // admin can change it
-        update_admin(&mut deps, ADMIN.into(), Some(USER3.into())).unwrap();
+        update_admin(deps.as_mut(), ADMIN.into(), Some(USER3.into())).unwrap();
         assert_eq!(query_admin(&deps).unwrap().admin, Some(USER3.into()));
 
         // and unset it
-        update_admin(&mut deps, USER3.into(), None).unwrap();
+        update_admin(deps.as_mut(), USER3.into(), None).unwrap();
         assert_eq!(query_admin(&deps).unwrap().admin, None);
 
         // no one can change it now
-        let err = update_admin(&mut deps, USER3.into(), Some(USER1.into())).unwrap_err();
+        let err = update_admin(deps.as_mut(), USER3.into(), Some(USER1.into())).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -286,33 +286,33 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_init(&mut deps);
 
-        let member1 = query_member(&deps, USER1.into()).unwrap();
+        let member1 = query_member(deps.as_ref(), USER1.into()).unwrap();
         assert_eq!(member1.weight, Some(11));
 
-        let member2 = query_member(&deps, USER2.into()).unwrap();
+        let member2 = query_member(deps.as_ref(), USER2.into()).unwrap();
         assert_eq!(member2.weight, Some(6));
 
-        let member3 = query_member(&deps, USER3.into()).unwrap();
+        let member3 = query_member(deps.as_ref(), USER3.into()).unwrap();
         assert_eq!(member3.weight, None);
 
-        let members = list_members(&deps, None, None).unwrap();
+        let members = list_members(deps.as_ref(), None, None).unwrap();
         assert_eq!(members.members.len(), 2);
         // TODO: assert the set is proper
     }
 
-    fn assert_users<S: Storage, A: Api, Q: Querier>(
-        deps: &Extern<S, A, Q>,
+    fn assert_users(
+        deps: Deps,
         user1_weight: Option<u64>,
         user2_weight: Option<u64>,
         user3_weight: Option<u64>,
     ) {
-        let member1 = query_member(&deps, USER1.into()).unwrap();
+        let member1 = query_member(deps.as_ref(), USER1.into()).unwrap();
         assert_eq!(member1.weight, user1_weight);
 
-        let member2 = query_member(&deps, USER2.into()).unwrap();
+        let member2 = query_member(deps.as_ref(), USER2.into()).unwrap();
         assert_eq!(member2.weight, user2_weight);
 
-        let member3 = query_member(&deps, USER3.into()).unwrap();
+        let member3 = query_member(deps.as_ref(), USER3.into()).unwrap();
         assert_eq!(member3.weight, user3_weight);
 
         // compute expected metrics
@@ -321,7 +321,7 @@ mod tests {
         let count = weights.iter().filter(|x| x.is_some()).count();
 
         // TODO: more detailed compare?
-        let members = list_members(&deps, None, None).unwrap();
+        let members = list_members(deps.as_ref(), None, None).unwrap();
         assert_eq!(count, members.members.len());
 
         let total = query_total_weight(&deps).unwrap();
@@ -341,15 +341,15 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // non-admin cannot update
-        let err = update_members(&mut deps, USER1.into(), add.clone(), remove.clone()).unwrap_err();
+        let err = update_members(deps.as_mut(), USER1.into(), add.clone(), remove.clone()).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
         // admin updates properly
-        update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
-        assert_users(&deps, None, Some(6), Some(15));
+        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
+        assert_users(deps.as_ref(), None, Some(6), Some(15));
     }
 
     #[test]
@@ -366,8 +366,8 @@ mod tests {
         let remove = vec![USER3.into()];
 
         // admin updates properly
-        update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
-        assert_users(&deps, Some(4), Some(6), None);
+        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
+        assert_users(deps.as_ref(), Some(4), Some(6), None);
     }
 
     #[test]
@@ -390,8 +390,8 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // admin updates properly
-        update_members(&mut deps, ADMIN.into(), add, remove).unwrap();
-        assert_users(&deps, None, Some(6), Some(5));
+        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
+        assert_users(deps.as_ref(), None, Some(6), Some(5));
     }
 
     #[test]
