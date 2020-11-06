@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, StdResult, Storage, WasmMsg,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -73,7 +73,7 @@ pub fn try_create(
         return Err(ContractError::EmptyBalance {});
     }
 
-    let mut cw20_whitelist = msg.canonical_whitelist(&deps.api)?;
+    let mut cw20_whitelist = msg.canonical_whitelist(deps.api)?;
 
     let escrow_balance = match balance {
         Balance::Native(balance) => GenericBalance {
@@ -161,7 +161,7 @@ pub fn try_approve(
         let rcpt = deps.api.human_address(&escrow.recipient)?;
 
         // send all tokens out
-        let messages = send_tokens(&deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
+        let messages = send_tokens(deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
 
         let attributes = vec![attr("action", "approve"), attr("id", id), attr("to", rcpt)];
         Ok(HandleResponse {
@@ -191,7 +191,7 @@ pub fn try_refund(
         let rcpt = deps.api.human_address(&escrow.source)?;
 
         // send all tokens out
-        let messages = send_tokens(&deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
+        let messages = send_tokens(deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
 
         let attributes = vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)];
         Ok(HandleResponse {
@@ -202,8 +202,8 @@ pub fn try_refund(
     }
 }
 
-fn send_tokens<A: Api>(
-    api: &A,
+fn send_tokens(
+    api: &dyn Api,
     from: &HumanAddr,
     to: &HumanAddr,
     balance: &GenericBalance,
@@ -250,7 +250,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
     let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
 
-    let cw20_whitelist = escrow.human_whitelist(&deps.api)?;
+    let cw20_whitelist = escrow.human_whitelist(deps.api)?;
 
     // transform tokens
     let native_balance = escrow.balance.native;

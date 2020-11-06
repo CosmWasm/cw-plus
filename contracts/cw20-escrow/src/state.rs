@@ -85,7 +85,7 @@ impl Escrow {
         false
     }
 
-    pub fn human_whitelist<A: Api>(&self, api: &A) -> StdResult<Vec<HumanAddr>> {
+    pub fn human_whitelist(&self, api: &dyn Api) -> StdResult<Vec<HumanAddr>> {
         self.cw20_whitelist
             .iter()
             .map(|h| api.human_address(h))
