@@ -77,9 +77,9 @@ where
         }
     }
 
-    pub fn range<'a, S: Storage>(
+    pub fn range<'a>(
         &self,
-        store: &'a S,
+        store: &'a dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
@@ -93,8 +93,8 @@ where
     }
 }
 
-pub(crate) fn range_with_prefix<'a, S: Storage>(
-    storage: &'a S,
+pub(crate) fn range_with_prefix<'a>(
+    storage: &'a dyn Storage,
     namespace: &[u8],
     start: Option<Bound>,
     end: Option<Bound>,

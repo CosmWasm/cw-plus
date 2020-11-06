@@ -37,11 +37,11 @@ where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()>;
-    fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()>;
+    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()>;
+    fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()>;
 }
 
-pub struct MultiIndex<'a, S, T> {
+pub struct MultiIndex<'a, T> {
     index: fn(&T) -> Vec<u8>,
     idx_map: Map<'a, (&'a [u8], &'a [u8]), u32>,
     // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
@@ -49,7 +49,7 @@ pub struct MultiIndex<'a, S, T> {
     typed: PhantomData<S>,
 }
 
-impl<'a, S, T> MultiIndex<'a, S, T> {
+impl<'a, T> MultiIndex<'a, T> {
     // TODO: make this a const fn
     pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a [u8], idx_namespace: &'a [u8]) -> Self {
         MultiIndex {
@@ -61,24 +61,24 @@ impl<'a, S, T> MultiIndex<'a, S, T> {
     }
 }
 
-impl<'a, S, T> Index<S, T> for MultiIndex<'a, S, T>
+impl<'a, T> Index<S, T> for MultiIndex<'a, T>
 where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
+    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data);
         self.idx_map.save(store, (&idx, &pk), &MARKER)
     }
 
-    fn remove(&self, store: &mut S, pk: &[u8], old_data: &T) -> StdResult<()> {
+    fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = (self.index)(old_data);
         self.idx_map.remove(store, (&idx, &pk));
         Ok(())
     }
 }
 
-impl<'a, S, T> MultiIndex<'a, S, T>
+impl<'a, T> MultiIndex<'a, T>
 where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
@@ -136,13 +136,13 @@ pub(crate) struct UniqueRef<T> {
     value: T,
 }
 
-pub struct UniqueIndex<'a, S, T> {
+pub struct UniqueIndex<'a, T> {
     index: fn(&T) -> Vec<u8>,
     idx_map: Map<'a, &'a [u8], UniqueRef<T>>,
     typed: PhantomData<S>,
 }
 
-impl<'a, S, T> UniqueIndex<'a, S, T> {
+impl<'a, T> UniqueIndex<'a, T> {
     // TODO: make this a const fn
     pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8]) -> Self {
         UniqueIndex {
@@ -153,12 +153,12 @@ impl<'a, S, T> UniqueIndex<'a, S, T> {
     }
 }
 
-impl<'a, S, T> Index<S, T> for UniqueIndex<'a, S, T>
+impl<'a, T> Index<S, T> for UniqueIndex<'a, T>
 where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn save(&self, store: &mut S, pk: &[u8], data: &T) -> StdResult<()> {
+    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data);
         // error if this is already set
         self.idx_map
@@ -174,20 +174,20 @@ where
         Ok(())
     }
 
-    fn remove(&self, store: &mut S, _pk: &[u8], old_data: &T) -> StdResult<()> {
+    fn remove(&self, store: &mut dyn Storage, _pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = (self.index)(old_data);
         self.idx_map.remove(store, &idx);
         Ok(())
     }
 }
 
-impl<'a, S, T> UniqueIndex<'a, S, T>
+impl<'a, T> UniqueIndex<'a, T>
 where
     S: Storage,
     T: Serialize + DeserializeOwned + Clone,
 {
     /// returns all items that match this secondary index, always by pk Ascending
-    pub fn item(&self, store: &S, idx: &[u8]) -> StdResult<Option<KV<T>>> {
+    pub fn item(&self, store: &dyn Storage, idx: &[u8]) -> StdResult<Option<KV<T>>> {
         let data = self
             .idx_map
             .may_load(store, &idx)?

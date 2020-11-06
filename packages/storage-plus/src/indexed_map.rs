@@ -17,7 +17,7 @@ pub trait IndexList<S, T> {
 
 /// IndexedBucket works like a bucket but has a secondary index
 /// TODO: remove traits here and make this const fn new
-pub struct IndexedMap<'a, K, T, S, I>
+pub struct IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
@@ -32,7 +32,7 @@ where
     typed_store: PhantomData<S>,
 }
 
-impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
@@ -50,7 +50,7 @@ where
     }
 }
 
-impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
@@ -60,12 +60,12 @@ where
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
-    pub fn save(&mut self, store: &mut S, key: K, data: &T) -> StdResult<()> {
+    pub fn save(&mut self, store: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
         let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, Some(data), old_data.as_ref())
     }
 
-    pub fn remove(&mut self, store: &mut S, key: K) -> StdResult<()> {
+    pub fn remove(&mut self, store: &mut dyn Storage, key: K) -> StdResult<()> {
         let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, None, old_data.as_ref())
     }
@@ -75,7 +75,7 @@ where
     /// and can be called directly if you want to optimize
     pub fn replace(
         &mut self,
-        store: &mut S,
+        store: &mut dyn Storage,
         key: K,
         data: Option<&T>,
         old_data: Option<&T>,
@@ -102,7 +102,7 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&mut self, store: &mut S, key: K, action: A) -> Result<T, E>
+    pub fn update<A, E>(&mut self, store: &mut dyn Storage, key: K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
@@ -118,13 +118,13 @@ where
     // thus can be used from while iterating over indexes
 
     /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self, store: &S, key: K) -> StdResult<T> {
+    pub fn load(&self, store: &dyn Storage, key: K) -> StdResult<T> {
         self.primary.load(store, key)
     }
 
     /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
     /// returns an error on issues parsing
-    pub fn may_load(&self, store: &S, key: K) -> StdResult<Option<T>> {
+    pub fn may_load(&self, store: &dyn Storage, key: K) -> StdResult<Option<T>> {
         self.primary.may_load(store, key)
     }
 
@@ -135,7 +135,7 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-impl<'a, K, T, S, I> IndexedMap<'a, K, T, S, I>
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
@@ -174,13 +174,13 @@ mod test {
         pub age: i32,
     }
 
-    struct DataIndexes<'a, S: Storage> {
-        pub name: MultiIndex<'a, S, Data>,
-        pub age: UniqueIndex<'a, S, Data>,
+    struct DataIndexes<'a> {
+        pub name: MultiIndex<'a, Data>,
+        pub age: UniqueIndex<'a, Data>,
     }
 
     // Future Note: this can likely be macro-derived
-    impl<'a, S: Storage> IndexList<S, Data> for DataIndexes<'a, S> {
+    impl<'a> IndexList<S, Data> for DataIndexes<'a> {
         fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, Data>> + '_> {
             let v: Vec<&dyn Index<S, Data>> = vec![&self.name, &self.age];
             Box::new(v.into_iter())
@@ -188,7 +188,7 @@ mod test {
     }
 
     // Can we make it easier to define this? (less wordy generic)
-    fn build_map<'a, S: Storage>() -> IndexedMap<'a, &'a [u8], Data, S, DataIndexes<'a, S>> {
+    fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d| index_string(&d.name), b"data", b"data__name"),
             age: UniqueIndex::new(|d| index_int(d.age), b"data__age"),
