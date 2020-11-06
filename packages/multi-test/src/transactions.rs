@@ -11,31 +11,27 @@ use std::ops::{Bound, RangeBounds};
 use cosmwasm_std::Storage;
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, KV};
-use serde::export::PhantomData;
-use std::ops::Deref;
 
 #[cfg(feature = "iterator")]
 /// The BTreeMap specific key-value pair reference type, as returned by BTreeMap<Vec<u8>, T>::range.
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
-pub struct StorageTransaction<S: Storage + ?Sized, T: Deref<Target = S>> {
+pub struct StorageTransaction<'a> {
     /// read-only access to backing storage
-    storage: T,
+    storage: &'a dyn Storage,
     /// these are local changes not flushed to backing storage
     local_state: BTreeMap<Vec<u8>, Delta>,
     /// a log of local changes not yet flushed to backing storage
     rep_log: RepLog,
-    storage_type: PhantomData<S>,
 }
 
-impl<S: Storage + ?Sized, T: Deref<Target = S>> StorageTransaction<S, T> {
-    pub fn new(storage: T) -> Self {
+impl<'a> StorageTransaction<'a> {
+    pub fn new(storage: &'a dyn Storage) -> Self {
         StorageTransaction {
             storage,
             local_state: BTreeMap::new(),
             rep_log: RepLog::new(),
-            storage_type: PhantomData,
         }
     }
 
@@ -49,7 +45,7 @@ impl<S: Storage + ?Sized, T: Deref<Target = S>> StorageTransaction<S, T> {
     pub fn rollback(self) {}
 }
 
-impl<S: Storage + ?Sized, T: Deref<Target = S>> Storage for StorageTransaction<S, T> {
+impl<'a> Storage for StorageTransaction<'a> {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         match self.local_state.get(key) {
             Some(val) => match val {
@@ -265,7 +261,7 @@ fn range_bounds(start: Option<&[u8]>, end: Option<&[u8]>) -> impl RangeBounds<Ve
 mod test {
     use super::*;
     use std::cell::RefCell;
-    use std::ops::DerefMut;
+    use std::ops::{Deref, DerefMut};
 
     use cosmwasm_std::MemoryStorage;
 
@@ -283,11 +279,14 @@ mod test {
     #[test]
     fn wrap_ref_cell() {
         let store = RefCell::new(MemoryStorage::new());
-        let mut wrap = StorageTransaction::new(store.borrow());
-        wrap.set(b"foo", b"bar");
-
-        assert_eq!(None, store.borrow().get(b"foo"));
-        wrap.prepare().commit(store.borrow_mut().deref_mut());
+        let ops = {
+            let refer = store.borrow();
+            let mut wrap = StorageTransaction::new(refer.deref());
+            wrap.set(b"foo", b"bar");
+            assert_eq!(None, store.borrow().get(b"foo"));
+            wrap.prepare()
+        };
+        ops.commit(store.borrow_mut().deref_mut());
         assert_eq!(Some(b"bar".to_vec()), store.borrow().get(b"foo"));
     }
 
@@ -475,8 +474,8 @@ mod test {
 
     #[test]
     fn delete_local() {
-        let base = RefCell::new(MemoryStorage::new());
-        let mut check = StorageTransaction::new(base.borrow());
+        let mut base = Box::new(MemoryStorage::new());
+        let mut check = StorageTransaction::new(base.as_ref());
         check.set(b"foo", b"bar");
         check.set(b"food", b"bank");
         check.remove(b"foo");
@@ -485,16 +484,16 @@ mod test {
         assert_eq!(check.get(b"food"), Some(b"bank".to_vec()));
 
         // now commit to base and query there
-        check.prepare().commit(base.borrow_mut().deref_mut());
-        assert_eq!(base.borrow().get(b"foo"), None);
-        assert_eq!(base.borrow().get(b"food"), Some(b"bank".to_vec()));
+        check.prepare().commit(base.as_mut());
+        assert_eq!(base.get(b"foo"), None);
+        assert_eq!(base.get(b"food"), Some(b"bank".to_vec()));
     }
 
     #[test]
     fn delete_from_base() {
-        let base = RefCell::new(MemoryStorage::new());
-        base.borrow_mut().set(b"foo", b"bar");
-        let mut check = StorageTransaction::new(base.borrow());
+        let mut base = Box::new(MemoryStorage::new());
+        base.set(b"foo", b"bar");
+        let mut check = StorageTransaction::new(base.as_ref());
         check.set(b"food", b"bank");
         check.remove(b"foo");
 
@@ -502,16 +501,16 @@ mod test {
         assert_eq!(check.get(b"food"), Some(b"bank".to_vec()));
 
         // now commit to base and query there
-        check.prepare().commit(base.borrow_mut().deref_mut());
-        assert_eq!(base.borrow().get(b"foo"), None);
-        assert_eq!(base.borrow().get(b"food"), Some(b"bank".to_vec()));
+        check.prepare().commit(base.as_mut());
+        assert_eq!(base.get(b"foo"), None);
+        assert_eq!(base.get(b"food"), Some(b"bank".to_vec()));
     }
 
     #[test]
     #[cfg(feature = "iterator")]
     fn storage_transaction_iterator_empty_base() {
-        let base = RefCell::new(MemoryStorage::new());
-        let mut check = StorageTransaction::new(base.borrow());
+        let base = MemoryStorage::new();
+        let mut check = StorageTransaction::new(&base);
         check.set(b"foo", b"bar");
         iterator_test_suite(&mut check);
     }
@@ -519,34 +518,34 @@ mod test {
     #[test]
     #[cfg(feature = "iterator")]
     fn storage_transaction_iterator_with_base_data() {
-        let base = RefCell::new(MemoryStorage::new());
-        base.borrow_mut().set(b"foo", b"bar");
-        let mut check = StorageTransaction::new(base.borrow());
+        let mut base = MemoryStorage::new();
+        base.set(b"foo", b"bar");
+        let mut check = StorageTransaction::new(&base);
         iterator_test_suite(&mut check);
     }
 
     #[test]
     #[cfg(feature = "iterator")]
     fn storage_transaction_iterator_removed_items_from_base() {
-        let base = RefCell::new(MemoryStorage::new());
-        base.borrow_mut().set(b"foo", b"bar");
-        base.borrow_mut().set(b"food", b"bank");
-        let mut check = StorageTransaction::new(base.borrow());
+        let mut base = Box::new(MemoryStorage::new());
+        base.set(b"foo", b"bar");
+        base.set(b"food", b"bank");
+        let mut check = StorageTransaction::new(base.as_ref());
         check.remove(b"food");
         iterator_test_suite(&mut check);
     }
 
     #[test]
     fn commit_writes_through() {
-        let base = RefCell::new(MemoryStorage::new());
-        base.borrow_mut().set(b"foo", b"bar");
+        let mut base = Box::new(MemoryStorage::new());
+        base.set(b"foo", b"bar");
 
-        let mut check = StorageTransaction::new(base.borrow());
+        let mut check = StorageTransaction::new(base.as_ref());
         assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
         check.set(b"subtx", b"works");
-        check.prepare().commit(base.borrow_mut().deref_mut());
+        check.prepare().commit(base.as_mut());
 
-        assert_eq!(base.borrow().get(b"subtx"), Some(b"works".to_vec()));
+        assert_eq!(base.get(b"subtx"), Some(b"works".to_vec()));
     }
 
     #[test]

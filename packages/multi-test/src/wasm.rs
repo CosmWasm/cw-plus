@@ -253,7 +253,7 @@ pub struct WasmCacheState<'a> {
     // WasmState - cache this, pass in separate?
     contracts: HashMap<HumanAddr, ContractData>,
     // TODO: pull this out into other struct with mut reference
-    contract_diffs: HashMap<HumanAddr, StorageTransaction<dyn Storage + 'a, &'a dyn Storage>>,
+    contract_diffs: HashMap<HumanAddr, StorageTransaction<'a>>,
 }
 
 pub struct WasmOps {
