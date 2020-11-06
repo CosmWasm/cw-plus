@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::wasm::{Contract, ContractWrapper};
 use cosmwasm_std::{
-    attr, from_slice, to_vec, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, InitResponse, MessageInfo, StdError,
+    attr, from_slice, to_binary, to_vec, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty,
+    Env, HandleResponse, InitResponse, MessageInfo, StdError,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -93,21 +93,35 @@ pub struct ReflectMessage {
     pub messages: Vec<CosmosMsg<Empty>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReflectResponse {
+    pub count: u8,
+}
+
+const REFLECT_KEY: &[u8] = b"reflect";
+
 fn init_reflect(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
 ) -> Result<InitResponse, StdError> {
+    deps.storage.set(REFLECT_KEY, &[1]);
     Ok(InitResponse::default())
 }
 
 fn handle_reflect(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: ReflectMessage,
 ) -> Result<HandleResponse, StdError> {
+    let old = match deps.storage.get(REFLECT_KEY) {
+        Some(bz) => bz[0],
+        None => 0,
+    };
+    deps.storage.set(REFLECT_KEY, &[old + 1]);
+
     let res = HandleResponse {
         messages: msg.messages,
         attributes: vec![],
@@ -116,8 +130,13 @@ fn handle_reflect(
     Ok(res)
 }
 
-fn query_reflect(_deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
-    Err(StdError::generic_err("Query not implemented"))
+fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
+    let count = match deps.storage.get(REFLECT_KEY) {
+        Some(bz) => bz[0],
+        None => 0,
+    };
+    let res = ReflectResponse { count };
+    to_binary(&res)
 }
 
 pub fn contract_reflect() -> Box<dyn Contract> {
