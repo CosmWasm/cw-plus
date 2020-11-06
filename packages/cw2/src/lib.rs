@@ -1,7 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{HumanAddr, Querier, QueryRequest, StdResult, Storage, WasmQuery};
+use cosmwasm_std::{
+    HumanAddr, Querier, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery,
+};
 use cw_storage_plus::Item;
 
 pub const CONTRACT: Item<ContractVersion> = Item::new(b"contract_info");
@@ -19,14 +21,14 @@ pub struct ContractVersion {
 }
 
 /// get_contract_version can be use in migrate to read the previous version of this contract
-pub fn get_contract_version<S: Storage>(store: &S) -> StdResult<ContractVersion> {
+pub fn get_contract_version(store: &dyn Storage) -> StdResult<ContractVersion> {
     CONTRACT.load(store)
 }
 
 /// set_contract_version should be used in init to store the original version, and after a successful
 /// migrate to update it
-pub fn set_contract_version<S: Storage, T: Into<String>, U: Into<String>>(
-    store: &mut S,
+pub fn set_contract_version<T: Into<String>, U: Into<String>>(
+    store: &mut dyn Storage,
     name: T,
     version: U,
 ) -> StdResult<()> {
@@ -50,7 +52,7 @@ pub fn query_contract_info<Q: Querier, T: Into<HumanAddr>>(
         contract_addr: contract_addr.into(),
         key: CONTRACT.as_slice().into(),
     });
-    querier.query(&req)
+    QuerierWrapper::new(querier).query(&req)
 }
 
 #[cfg(test)]

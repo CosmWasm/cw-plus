@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, ReadonlyStorage, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, Storage, Uint128};
 use cosmwasm_storage::{
     bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket, ReadonlySingleton,
     Singleton,
@@ -20,11 +20,11 @@ pub struct Claim {
 }
 
 /// claims are the claims to money being unbonded, index by claimer address
-pub fn claims<S: Storage>(storage: &mut S) -> Bucket<S, Vec<Claim>> {
+pub fn claims(storage: &mut dyn Storage) -> Bucket<Vec<Claim>> {
     bucket(storage, PREFIX_CLAIMS)
 }
 
-pub fn claims_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Vec<Claim>> {
+pub fn claims_read(storage: &dyn Storage) -> ReadonlyBucket<Vec<Claim>> {
     bucket_read(storage, PREFIX_CLAIMS)
 }
 
@@ -59,18 +59,18 @@ pub struct Supply {
     pub claims: Uint128,
 }
 
-pub fn invest_info<S: Storage>(storage: &mut S) -> Singleton<S, InvestmentInfo> {
+pub fn invest_info(storage: &mut dyn Storage) -> Singleton<InvestmentInfo> {
     singleton(storage, KEY_INVESTMENT)
 }
 
-pub fn invest_info_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, InvestmentInfo> {
+pub fn invest_info_read(storage: &dyn Storage) -> ReadonlySingleton<InvestmentInfo> {
     singleton_read(storage, KEY_INVESTMENT)
 }
 
-pub fn total_supply<S: Storage>(storage: &mut S) -> Singleton<S, Supply> {
+pub fn total_supply(storage: &mut dyn Storage) -> Singleton<Supply> {
     singleton(storage, KEY_TOTAL_SUPPLY)
 }
 
-pub fn total_supply_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, Supply> {
+pub fn total_supply_read(storage: &dyn Storage) -> ReadonlySingleton<Supply> {
     singleton_read(storage, KEY_TOTAL_SUPPLY)
 }

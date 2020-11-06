@@ -62,7 +62,7 @@ pub const VOTERS: Map<&[u8], u64> = Map::new(b"voters");
 pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposals");
 pub const BALLOTS: Map<(U64Key, &[u8]), Ballot> = Map::new(b"votes");
 
-pub fn next_id<S: Storage>(store: &mut S) -> StdResult<u64> {
+pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
     let id: u64 = PROPOSAL_COUNT.may_load(store)?.unwrap_or_default() + 1;
     PROPOSAL_COUNT.save(store, &id)?;
     Ok(id)

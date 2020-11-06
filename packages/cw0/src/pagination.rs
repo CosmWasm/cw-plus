@@ -1,16 +1,16 @@
 use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, StdResult};
 
 // this is used for pagination. Maybe we move it into the std lib one day?
-pub fn maybe_canonical<A: Api>(
-    api: A,
+pub fn maybe_canonical(
+    api: &dyn Api,
     human: Option<HumanAddr>,
 ) -> StdResult<Option<CanonicalAddr>> {
     human.map(|x| api.canonical_address(&x)).transpose()
 }
 
 // this will set the first key after the provided key, by appending a 0 byte
-pub fn calc_range_start_human<A: Api>(
-    api: A,
+pub fn calc_range_start_human(
+    api: &dyn Api,
     start_after: Option<HumanAddr>,
 ) -> StdResult<Option<Vec<u8>>> {
     match start_after {
@@ -24,8 +24,8 @@ pub fn calc_range_start_human<A: Api>(
 }
 
 // set the end to the canonicalized format (used for Order::Descending)
-pub fn calc_range_end_human<A: Api>(
-    api: A,
+pub fn calc_range_end_human(
+    api: &dyn Api,
     end_before: Option<HumanAddr>,
 ) -> StdResult<Option<Vec<u8>>> {
     match end_before {

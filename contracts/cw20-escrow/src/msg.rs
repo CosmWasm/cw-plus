@@ -65,7 +65,7 @@ pub struct CreateMsg {
 }
 
 impl CreateMsg {
-    pub fn canonical_whitelist<A: Api>(&self, api: &A) -> StdResult<Vec<CanonicalAddr>> {
+    pub fn canonical_whitelist(&self, api: &dyn Api) -> StdResult<Vec<CanonicalAddr>> {
         match self.cw20_whitelist.as_ref() {
             Some(v) => v.iter().map(|h| api.canonical_address(h)).collect(),
             None => Ok(vec![]),

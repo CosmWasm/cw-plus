@@ -26,15 +26,15 @@ pub(crate) fn length_prefixed_with_key(namespace: &[u8], key: &[u8]) -> Vec<u8> 
 }
 
 pub(crate) fn get_with_prefix<S: ReadonlyStorage>(
-    storage: &S,
+    storage: &dyn Storage,
     namespace: &[u8],
     key: &[u8],
 ) -> Option<Vec<u8>> {
     storage.get(&concat(namespace, key))
 }
 
-pub(crate) fn set_with_prefix<S: Storage>(
-    storage: &mut S,
+pub(crate) fn set_with_prefix(
+    storage: &mut dyn Storage,
     namespace: &[u8],
     key: &[u8],
     value: &[u8],
@@ -42,7 +42,7 @@ pub(crate) fn set_with_prefix<S: Storage>(
     storage.set(&concat(namespace, key), value);
 }
 
-pub(crate) fn remove_with_prefix<S: Storage>(storage: &mut S, namespace: &[u8], key: &[u8]) {
+pub(crate) fn remove_with_prefix(storage: &mut dyn Storage, namespace: &[u8], key: &[u8]) {
     storage.remove(&concat(namespace, key));
 }
 

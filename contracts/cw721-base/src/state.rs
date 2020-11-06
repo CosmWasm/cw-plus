@@ -35,28 +35,28 @@ pub const TOKEN_COUNT: Item<u64> = Item::new(b"num_tokens");
 // pub const TOKENS: Map<&str, TokenInfo> = Map::new(b"tokens");
 pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new(b"operators");
 
-pub fn num_tokens<S: Storage>(storage: &S) -> StdResult<u64> {
+pub fn num_tokens(storage: &dyn Storage) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
-pub fn increment_tokens<S: Storage>(storage: &mut S) -> StdResult<u64> {
+pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
     let val = num_tokens(storage)? + 1;
     TOKEN_COUNT.save(storage, &val)?;
     Ok(val)
 }
 
-pub struct TokenIndexes<'a, S: Storage> {
-    pub owner: MultiIndex<'a, S, TokenInfo>,
+pub struct TokenIndexes<'a> {
+    pub owner: MultiIndex<'a, TokenInfo>,
 }
 
-impl<'a, S: Storage> IndexList<S, TokenInfo> for TokenIndexes<'a, S> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, TokenInfo>> + '_> {
-        let v: Vec<&dyn Index<S, TokenInfo>> = vec![&self.owner];
+impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<TokenInfo>> + '_> {
+        let v: Vec<&dyn Index<TokenInfo>> = vec![&self.owner];
         Box::new(v.into_iter())
     }
 }
 
-pub fn tokens<'a, S: Storage>() -> IndexedMap<'a, &'a str, TokenInfo, S, TokenIndexes<'a, S>> {
+pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
         owner: MultiIndex::new(|d| d.owner.to_vec(), b"tokens", b"tokens__owner"),
     };

@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, Storage};
+use cosmwasm_std::{CanonicalAddr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
@@ -25,11 +25,11 @@ impl AdminList {
 pub const ADMIN_LIST_KEY: &[u8] = b"admin_list";
 
 // config is all config information
-pub fn admin_list<S: Storage>(storage: &mut S) -> Singleton<S, AdminList> {
+pub fn admin_list(storage: &mut dyn Storage) -> Singleton<AdminList> {
     singleton(storage, ADMIN_LIST_KEY)
 }
 
-pub fn admin_list_read<S: ReadonlyStorage>(storage: &S) -> ReadonlySingleton<S, AdminList> {
+pub fn admin_list_read(storage: &dyn Storage) -> ReadonlySingleton<AdminList> {
     singleton_read(storage, ADMIN_LIST_KEY)
 }
 

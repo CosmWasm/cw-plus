@@ -6,7 +6,7 @@ use cosmwasm_storage::Bucket;
 use cw20::{AllowanceResponse, Expiration};
 
 /// this takes a v0.1.x store and converts it to a v0.2.x format
-pub fn migrate_v01_to_v02<S: Storage>(storage: &mut S) -> StdResult<()> {
+pub fn migrate_v01_to_v02(storage: &mut dyn Storage) -> StdResult<()> {
     // load all the data that needs to change
     let to_migrate: StdResult<Vec<(Vec<u8>, AllowanceResponse)>> = old_allowances(storage)
         .range(None, None, Order::Ascending)
@@ -38,12 +38,12 @@ pub fn migrate_v01_to_v02<S: Storage>(storage: &mut S) -> StdResult<()> {
 }
 
 /// this read the allowances bucket in the old format
-fn old_allowances<S: Storage>(storage: &mut S) -> Bucket<S, OldAllowanceResponse> {
+fn old_allowances(storage: &mut dyn Storage) -> Bucket<OldAllowanceResponse> {
     Bucket::new(storage, PREFIX_ALLOWANCE)
 }
 
 /// This allows us to write in the new format
-fn new_allowances<S: Storage>(storage: &mut S) -> Bucket<S, AllowanceResponse> {
+fn new_allowances(storage: &mut dyn Storage) -> Bucket<AllowanceResponse> {
     Bucket::new(storage, PREFIX_ALLOWANCE)
 }
 
@@ -157,10 +157,10 @@ pub mod testing {
     }
 
     /// this read the allowances bucket in the old format
-    fn allowances<'a, S: Storage>(
-        storage: &'a mut S,
+    fn allowances<'a>(
+        storage: &'a mut dyn Storage,
         owner: &CanonicalAddr,
-    ) -> Bucket<'a, S, OldAllowanceResponse> {
+    ) -> Bucket<'a, OldAllowanceResponse> {
         Bucket::multilevel(storage, &[PREFIX_ALLOWANCE, owner.as_slice()])
     }
 }

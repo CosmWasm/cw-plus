@@ -42,22 +42,22 @@ where
         Prefix::new(self.namespace, &p.prefix())
     }
 
-    pub fn save<S: Storage>(&self, store: &mut S, k: K, data: &T) -> StdResult<()> {
+    pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {
         self.key(k).save(store, data)
     }
 
-    pub fn remove<S: Storage>(&self, store: &mut S, k: K) {
+    pub fn remove(&self, store: &mut dyn Storage, k: K) {
         self.key(k).remove(store)
     }
 
     /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load<S: Storage>(&self, store: &S, k: K) -> StdResult<T> {
+    pub fn load(&self, store: &dyn Storage, k: K) -> StdResult<T> {
         self.key(k).load(store)
     }
 
     /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
     /// returns an error on issues parsing
-    pub fn may_load<S: Storage>(&self, store: &S, k: K) -> StdResult<Option<T>> {
+    pub fn may_load(&self, store: &dyn Storage, k: K) -> StdResult<Option<T>> {
         self.key(k).may_load(store)
     }
 
@@ -65,11 +65,10 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E, S>(&self, store: &mut S, k: K, action: A) -> Result<T, E>
+    pub fn update<A, E>(&self, store: &mut dyn Storage, k: K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
-        S: Storage,
     {
         self.key(k).update(store, action)
     }
@@ -85,9 +84,9 @@ where
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range<'c, S: Storage>(
+    pub fn range<'c>(
         &self,
-        store: &'c S,
+        store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
@@ -322,7 +321,7 @@ mod test {
         assert_eq!(None, different);
 
         // simple update
-        ALLOWANCE.update(&mut store, (b"owner", b"spender"), |v| {
+        ALLOWANCE.update(&mut store, (b"owner", b"spender"), |v| -> StdResult<u64> {
             Ok(v.unwrap_or_default() + 222)
         })?;
         let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
@@ -357,7 +356,9 @@ mod test {
         allow.save(&mut store, &1234)?;
         let loaded = allow.load(&store)?;
         assert_eq!(1234, loaded);
-        allow.update(&mut store, |x| Ok(x.unwrap_or_default() * 2))?;
+        allow.update(&mut store, |x| -> StdResult<u64> {
+            Ok(x.unwrap_or_default() * 2)
+        })?;
         let loaded = allow.load(&store)?;
         assert_eq!(2468, loaded);
 

@@ -1,9 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{
-    Api, CanonicalAddr, Coin, Env, HumanAddr, Order, ReadonlyStorage, StdError, StdResult, Storage,
-};
+use cosmwasm_std::{Api, CanonicalAddr, Coin, Env, HumanAddr, Order, StdError, StdResult, Storage};
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 
 use cw20::{Balance, Cw20Coin};
@@ -87,7 +85,7 @@ impl Escrow {
         false
     }
 
-    pub fn human_whitelist<A: Api>(&self, api: &A) -> StdResult<Vec<HumanAddr>> {
+    pub fn human_whitelist(&self, api: &dyn Api) -> StdResult<Vec<HumanAddr>> {
         self.cw20_whitelist
             .iter()
             .map(|h| api.human_address(h))
@@ -97,16 +95,16 @@ impl Escrow {
 
 pub const PREFIX_ESCROW: &[u8] = b"escrow";
 
-pub fn escrows<S: Storage>(storage: &mut S) -> Bucket<S, Escrow> {
+pub fn escrows(storage: &mut dyn Storage) -> Bucket<Escrow> {
     bucket(storage, PREFIX_ESCROW)
 }
 
-pub fn escrows_read<S: ReadonlyStorage>(storage: &S) -> ReadonlyBucket<S, Escrow> {
+pub fn escrows_read(storage: &dyn Storage) -> ReadonlyBucket<Escrow> {
     bucket_read(storage, PREFIX_ESCROW)
 }
 
 /// This returns the list of ids for all registered escrows
-pub fn all_escrow_ids<S: ReadonlyStorage>(storage: &S) -> StdResult<Vec<String>> {
+pub fn all_escrow_ids(storage: &dyn Storage) -> StdResult<Vec<String>> {
     prefixed_read(storage, PREFIX_ESCROW)
         .range(None, None, Order::Ascending)
         .map(|(k, _)| {

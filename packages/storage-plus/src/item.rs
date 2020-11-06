@@ -35,24 +35,24 @@ where
     }
 
     /// save will serialize the model and store, returns an error on serialization issues
-    pub fn save<S: Storage>(&self, store: &mut S, data: &T) -> StdResult<()> {
+    pub fn save(&self, store: &mut dyn Storage, data: &T) -> StdResult<()> {
         store.set(self.storage_key, &to_vec(data)?);
         Ok(())
     }
 
-    pub fn remove<S: Storage>(&self, store: &mut S) {
+    pub fn remove(&self, store: &mut dyn Storage) {
         store.remove(self.storage_key);
     }
 
     /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load<S: Storage>(&self, store: &S) -> StdResult<T> {
+    pub fn load(&self, store: &dyn Storage) -> StdResult<T> {
         let value = store.get(self.storage_key);
         must_deserialize(&value)
     }
 
     /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
     /// returns an error on issues parsing
-    pub fn may_load<S: Storage>(&self, store: &S) -> StdResult<Option<T>> {
+    pub fn may_load(&self, store: &dyn Storage) -> StdResult<Option<T>> {
         let value = store.get(self.storage_key);
         may_deserialize(&value)
     }
@@ -61,11 +61,10 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E, S>(&mut self, store: &mut S, action: A) -> Result<T, E>
+    pub fn update<A, E>(&mut self, store: &mut dyn Storage, action: A) -> Result<T, E>
     where
         A: FnOnce(T) -> Result<T, E>,
         E: From<StdError>,
-        S: Storage,
     {
         let input = self.load(store)?;
         let output = action(input)?;
