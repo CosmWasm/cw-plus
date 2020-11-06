@@ -45,18 +45,18 @@ pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
     Ok(val)
 }
 
-pub struct TokenIndexes<'a, S: Storage> {
-    pub owner: MultiIndex<'a, S, TokenInfo>,
+pub struct TokenIndexes<'a> {
+    pub owner: MultiIndex<'a, TokenInfo>,
 }
 
-impl<'a, S: Storage> IndexList<TokenInfo> for TokenIndexes<'a, S> {
+impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<TokenInfo>> + '_> {
         let v: Vec<&dyn Index<TokenInfo>> = vec![&self.owner];
         Box::new(v.into_iter())
     }
 }
 
-pub fn tokens<'a, S: Storage>() -> IndexedMap<'a, &'a str, TokenInfo, S, TokenIndexes<'a, S>> {
+pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
         owner: MultiIndex::new(|d| d.owner.to_vec(), b"tokens", b"tokens__owner"),
     };

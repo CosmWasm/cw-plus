@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, Querier, StdError, StdResult, Storage, KV,
+    InitResponse, MessageInfo, Order, StdError, StdResult, KV,
 };
 
 use cw0::maybe_canonical;
@@ -480,7 +480,7 @@ fn query_all_approvals(
     Ok(ApprovedForAllResponse { operators: res? })
 }
 
-fn parse_approval<A: Api>(api: A, item: StdResult<KV<Expiration>>) -> StdResult<cw721::Approval> {
+fn parse_approval(api: &dyn Api, item: StdResult<KV<Expiration>>) -> StdResult<cw721::Approval> {
     item.and_then(|(k, expires)| {
         let spender = api.human_address(&k.into())?;
         Ok(cw721::Approval { spender, expires })
@@ -497,7 +497,7 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
-    let tokens: Result<Vec<String>, _> = tokens::<S>()
+    let tokens: Result<Vec<String>, _> = tokens()
         .idx
         .owner
         .pks(deps.storage, &owner_raw, start, None, Order::Ascending)
@@ -516,7 +516,7 @@ fn query_all_tokens(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let tokens: StdResult<Vec<String>> = tokens::<S>()
+    let tokens: StdResult<Vec<String>> = tokens()
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
@@ -544,8 +544,8 @@ fn query_all_nft_info(
     })
 }
 
-fn humanize_approvals<A: Api>(
-    api: A,
+fn humanize_approvals(
+    api: &dyn Api,
     block: &BlockInfo,
     info: &TokenInfo,
     include_expired: bool,
@@ -556,7 +556,7 @@ fn humanize_approvals<A: Api>(
         .collect()
 }
 
-fn humanize_approval<A: Api>(api: A, approval: &Approval) -> StdResult<cw721::Approval> {
+fn humanize_approval(api: &dyn Api, approval: &Approval) -> StdResult<cw721::Approval> {
     Ok(cw721::Approval {
         spender: api.human_address(&approval.spender)?,
         expires: approval.expires,
@@ -624,7 +624,7 @@ mod tests {
     #[test]
     fn minting() {
         let mut deps = mock_dependencies(&[]);
-        setup_contract(&mut deps);
+        setup_contract(deps.as_mut());
 
         let token_id = "petrify".to_string();
         let name = "Petrify with Gaze".to_string();
@@ -703,7 +703,7 @@ mod tests {
     #[test]
     fn transferring_nft() {
         let mut deps = mock_dependencies(&[]);
-        setup_contract(&mut deps);
+        setup_contract(deps.as_mut());
 
         // Mint a token
         let token_id = "melt".to_string();
@@ -762,7 +762,7 @@ mod tests {
     #[test]
     fn sending_nft() {
         let mut deps = mock_dependencies(&[]);
-        setup_contract(&mut deps);
+        setup_contract(deps.as_mut());
 
         // Mint a token
         let token_id = "melt".to_string();
@@ -831,7 +831,7 @@ mod tests {
     #[test]
     fn approving_revoking() {
         let mut deps = mock_dependencies(&[]);
-        setup_contract(&mut deps);
+        setup_contract(deps.as_mut());
 
         // Mint a token
         let token_id = "grow".to_string();
@@ -924,7 +924,7 @@ mod tests {
     #[test]
     fn approving_all_revoking_all() {
         let mut deps = mock_dependencies(&[]);
-        setup_contract(&mut deps);
+        setup_contract(deps.as_mut());
 
         // Mint a couple tokens (from the same owner)
         let token_id1 = "grow1".to_string();
@@ -1110,7 +1110,7 @@ mod tests {
     #[test]
     fn query_tokens_by_owner() {
         let mut deps = mock_dependencies(&[]);
-        setup_contract(&mut deps);
+        setup_contract(deps.as_mut());
         let minter = mock_info(MINTER, &[]);
 
         // Mint a couple tokens (from the same owner)
