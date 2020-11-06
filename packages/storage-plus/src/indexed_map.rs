@@ -4,15 +4,14 @@
 use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::marker::PhantomData;
 
 use crate::indexes::Index;
 use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{Bound, Prefix};
 
-pub trait IndexList<S, T> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, T>> + '_>;
+pub trait IndexList<T> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<T>> + '_>;
 }
 
 /// IndexedBucket works like a bucket but has a secondary index
@@ -21,23 +20,20 @@ pub struct IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
-    I: IndexList<S, T>,
-    S: Storage,
+    I: IndexList<T>,
 {
     pk_namespace: &'a [u8],
     primary: Map<'a, K, T>,
     /// This is meant to be read directly to get the proper types, like:
     /// map.idx.owner.items(...)
     pub idx: I,
-    typed_store: PhantomData<S>,
 }
 
 impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
-    S: Storage,
-    I: IndexList<S, T>,
+    I: IndexList<T>,
 {
     /// TODO: remove traits here and make this const fn new
     pub fn new(pk_namespace: &'a [u8], indexes: I) -> Self {
@@ -45,7 +41,6 @@ where
             pk_namespace,
             primary: Map::new(pk_namespace),
             idx: indexes,
-            typed_store: PhantomData,
         }
     }
 }
@@ -54,8 +49,7 @@ impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
-    S: Storage,
-    I: IndexList<S, T>,
+    I: IndexList<T>,
 {
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
@@ -139,15 +133,14 @@ impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
-    S: Storage,
-    I: IndexList<S, T>,
+    I: IndexList<T>,
     K::Prefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
     pub fn range<'c>(
         &self,
-        store: &'c S,
+        store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
@@ -180,9 +173,9 @@ mod test {
     }
 
     // Future Note: this can likely be macro-derived
-    impl<'a> IndexList<S, Data> for DataIndexes<'a> {
-        fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<S, Data>> + '_> {
-            let v: Vec<&dyn Index<S, Data>> = vec![&self.name, &self.age];
+    impl<'a> IndexList<Data> for DataIndexes<'a> {
+        fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Data>> + '_> {
+            let v: Vec<&dyn Index<Data>> = vec![&self.name, &self.age];
             Box::new(v.into_iter())
         }
     }
@@ -334,16 +327,15 @@ mod test {
         let mut store = MockStorage::new();
         let mut map = build_map();
 
-        let name_count =
-            |map: &IndexedMap<&[u8], Data, MemoryStorage, DataIndexes<MemoryStorage>>,
-             store: &MemoryStorage,
-             name: &str|
-             -> usize {
-                map.idx
-                    .name
-                    .pks(store, &index_string(name), None, None, Order::Ascending)
-                    .count()
-            };
+        let name_count = |map: &IndexedMap<&[u8], Data, DataIndexes>,
+                          store: &MemoryStorage,
+                          name: &str|
+         -> usize {
+            map.idx
+                .name
+                .pks(store, &index_string(name), None, None, Order::Ascending)
+                .count()
+        };
 
         // set up some data
         let data1 = Data {
