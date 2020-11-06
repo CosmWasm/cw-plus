@@ -353,7 +353,7 @@ impl<'a> WasmCacheState<'a> {
 
     fn get_contract<'b>(
         &'b mut self,
-        parent: &'b HashMap<HumanAddr, ContractData>,
+        parent: &'a HashMap<HumanAddr, ContractData>,
         addr: &HumanAddr,
     ) -> Option<(usize, &'b mut dyn Storage)> {
         // if we created this transaction
@@ -365,12 +365,11 @@ impl<'a> WasmCacheState<'a> {
             // if we already have a local transaction on top, use it
             if let Some(x) = self.contract_diffs.get_mut(addr) {
                 return Some((code_id, x));
-            } else {
-                // else make a new transaction
-                let wrap = StorageTransaction::new(c.storage.as_ref());
-                self.contract_diffs.insert(addr.clone(), wrap);
-                Some((code_id, self.contract_diffs.get_mut(addr).unwrap()))
             }
+            // else make a new transaction
+            let wrap = StorageTransaction::new(c.storage.as_ref());
+            self.contract_diffs.insert(addr.clone(), wrap);
+            Some((code_id, self.contract_diffs.get_mut(addr).unwrap()))
         } else {
             None
         }
@@ -379,7 +378,7 @@ impl<'a> WasmCacheState<'a> {
     fn with_storage<F, T>(
         &mut self,
         querier: &dyn Querier,
-        parent: &HashMap<HumanAddr, ContractData>,
+        parent: &'a HashMap<HumanAddr, ContractData>,
         address: HumanAddr,
         env: Env,
         api: &dyn Api,
