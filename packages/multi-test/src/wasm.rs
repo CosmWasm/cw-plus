@@ -160,7 +160,6 @@ impl WasmRouter {
         idx
     }
 
-    // TODO: this should take &self and WasmCache should have a flush
     pub fn cache(&'_ self) -> WasmCache<'_> {
         WasmCache::new(self)
     }
@@ -231,31 +230,36 @@ impl WasmRouter {
     }
 }
 
-// TODO: how to add something like this as a transactional cache
-// reads hit local hashmap or then hit router
-// getting storage wraps the internal contract storage
-//  - adding handler
-//  - adding contract
-//  - writing existing contract
-// return op-log to flush, like transactional:
-//  - consume this struct (release router) and return list of ops to perform
-//  - pass ops &mut WasmRouter to update them
-//
-// In Router, we use this exclusively in all the calls in execute (not self.wasm)
-// In Querier, we use self.wasm
+/// A writable transactional cache over the wasm state.
+///
+/// Reads hit local hashmap or then hit router
+/// Getting storage wraps the internal contract storage
+///  - adding handler
+///  - adding contract
+///  - writing existing contract
+/// Return op-log to flush, like transactional:
+///  - consume this struct (release router) and return list of ops to perform
+///  - pass ops &mut WasmRouter to update them
+///
+/// In Router, we use this exclusively in all the calls in execute (not self.wasm)
+/// In Querier, we use self.wasm
 pub struct WasmCache<'a> {
     // and this into one with reference
     router: &'a WasmRouter,
     state: WasmCacheState<'a>,
 }
 
+/// This is the mutable state of the cached.
+/// Separated out so we can grab a mutable reference to both these HashMaps,
+/// while still getting an immutable reference to router.
+/// (We cannot take &mut WasmCache)
 pub struct WasmCacheState<'a> {
-    // WasmState - cache this, pass in separate?
     contracts: HashMap<HumanAddr, ContractData>,
-    // TODO: pull this out into other struct with mut reference
     contract_diffs: HashMap<HumanAddr, StorageTransaction<'a>>,
 }
 
+/// This is a set of data from the WasmCache with no external reference,
+/// which can be used to commit to the underlying WasmRouter.
 pub struct WasmOps {
     new_contracts: HashMap<HumanAddr, ContractData>,
     contract_diffs: Vec<(HumanAddr, RepLog)>,
@@ -284,6 +288,9 @@ impl<'a> WasmCache<'a> {
         }
     }
 
+    /// When we want to commit the WasmCache, we need a 2 step process to satisfy Rust reference counting:
+    /// 1. prepare() consumes WasmCache, releasing &WasmRouter, and creating a self-owned update info.
+    /// 2. WasmOps::commit() can now take &mut WasmRouter and updates the underlying state
     pub fn prepare(self) -> WasmOps {
         self.state.prepare()
     }
