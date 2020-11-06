@@ -362,9 +362,9 @@ impl<'a> WasmCacheState<'a> {
         }
         if let Some(c) = parent.get(addr) {
             let code_id = c.code_id;
-            // if we already have a local transaction on top, use it
-            if let Some(x) = self.contract_diffs.get_mut(addr) {
-                return Some((code_id, x));
+            if self.contract_diffs.contains_key(addr) {
+                let storage = self.contract_diffs.get_mut(addr).unwrap();
+                return Some((code_id, storage));
             }
             // else make a new transaction
             let wrap = StorageTransaction::new(c.storage.as_ref());
