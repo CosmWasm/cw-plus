@@ -2,7 +2,8 @@ use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, Querier, StdResult, WasmMsg, WasmQuery,
+    to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, Querier, QuerierWrapper, StdResult,
+    WasmMsg, WasmQuery,
 };
 
 use crate::{
@@ -48,7 +49,7 @@ impl Cw721Contract {
             msg: to_binary(&req)?,
         }
         .into();
-        querier.query(&query)
+        QuerierWrapper::new(querier).query(&query)
     }
 
     /*** queries ***/
