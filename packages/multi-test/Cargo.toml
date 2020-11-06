@@ -14,7 +14,7 @@ documentation = "https://docs.cosmwasm.com"
 iterator = ["cosmwasm-std/iterator"]
 
 [dependencies]
+cw0 = { path = "../../packages/cw0", version = "0.3.2" }
 cosmwasm-std = { version = "0.12.0-alpha2" }
-#cosmwasm-storage = { version = "0.12.0-alpha1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

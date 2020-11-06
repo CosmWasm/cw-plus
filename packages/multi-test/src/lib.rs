@@ -1,4 +1,3 @@
-mod balance;
 mod bank;
 mod handlers;
 mod test_helpers;

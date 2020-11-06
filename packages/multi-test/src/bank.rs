@@ -3,9 +3,8 @@ use cosmwasm_std::{
     Binary, Coin, HumanAddr, Storage,
 };
 
-//*** TODO: remove this and import cw0::balance when we are both on 0.12 ***/
-use crate::balance::NativeBalance;
 use crate::transactions::{RepLog, StorageTransaction};
+use cw0::NativeBalance;
 
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
