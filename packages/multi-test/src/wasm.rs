@@ -316,7 +316,8 @@ impl<'a> WasmCache<'a> {
     // TODO: better addr generation
     fn next_address(&self) -> HumanAddr {
         let count = self.router.contracts.len() + self.state.contracts.len();
-        HumanAddr::from(count.to_string())
+        // we make this longer so it is not rejected by tests
+        HumanAddr::from("Contract #".to_string() + &count.to_string())
     }
 
     pub fn handle(

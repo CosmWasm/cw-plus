@@ -2,7 +2,7 @@
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{coins, HumanAddr, Uint128};
-use cw20::Cw20CoinHuman;
+use cw20::{Cw20CoinHuman, Cw20Contract};
 use cw_multi_test::{Contract, ContractWrapper, Router, SimpleBank};
 
 use crate::msg::InitMsg;
@@ -68,14 +68,19 @@ fn reflect_send_cw20_tokens() {
 
     // they are different
     assert_ne!(cash_addr, escrow_addr);
-    //
-    // // reflect account is empty
-    // let funds = get_balance(&router, &reflect_addr);
-    // assert_eq!(funds, vec![]);
-    // // reflect count is 1
-    // let qres: ReflectResponse = router
-    //     .wrap()
-    //     .query_wasm_smart(&reflect_addr, &EmptyMsg {})
-    //     .unwrap();
-    // assert_eq!(1, qres.count);
+
+    // set up cw20 helpers
+    let cash = Cw20Contract(cash_addr.clone());
+
+    // ensure our balances
+    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    assert_eq!(owner_balance, Uint128(5000));
+    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    assert_eq!(escrow_balance, Uint128(0));
+
+    // TODO: send some tokens to create an escrow
+
+    // TODO: ensure balances updated
+
+    // TODO: ensure escrow properly created (use attributes?)
 }
