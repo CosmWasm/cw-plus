@@ -1,11 +1,11 @@
 #![cfg(test)]
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{coins, HumanAddr, Uint128};
-use cw20::{Cw20CoinHuman, Cw20Contract};
+use cosmwasm_std::{coins, to_binary, HumanAddr, Uint128};
+use cw20::{Cw20CoinHuman, Cw20Contract, Cw20HandleMsg};
 use cw_multi_test::{Contract, ContractWrapper, Router, SimpleBank};
 
-use crate::msg::InitMsg;
+use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, QueryMsg, ReceiveMsg};
 
 fn mock_router() -> Router {
     let env = mock_env();
@@ -34,7 +34,8 @@ pub fn contract_cw20() -> Box<dyn Contract> {
 }
 
 #[test]
-fn reflect_send_cw20_tokens() {
+// receive cw20 tokens and release upon approval
+fn escrow_happy_path_cw20_tokens() {
     let mut router = mock_router();
 
     // set personal balance
@@ -78,9 +79,63 @@ fn reflect_send_cw20_tokens() {
     let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
     assert_eq!(escrow_balance, Uint128(0));
 
-    // TODO: send some tokens to create an escrow
+    // send some tokens to create an escrow
+    let arb = HumanAddr::from("arbiter");
+    let ben = HumanAddr::from("beneficiary");
+    let id = "demo".to_string();
+    let create_msg = ReceiveMsg::Create(CreateMsg {
+        id: id.clone(),
+        arbiter: arb.clone(),
+        recipient: ben.clone(),
+        end_height: None,
+        end_time: None,
+        cw20_whitelist: None,
+    });
+    let create_bin = to_binary(&create_msg).unwrap();
+    let send_msg = Cw20HandleMsg::Send {
+        contract: escrow_addr.clone(),
+        amount: Uint128(1200),
+        msg: Some(create_bin),
+    };
+    let res = router
+        .execute_contract(&cash_addr, &owner, &send_msg, &[])
+        .unwrap();
+    println!("{:?}", res.attributes);
+    assert_eq!(6, res.attributes.len());
 
-    // TODO: ensure balances updated
+    // ensure balances updated
+    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    assert_eq!(owner_balance, Uint128(3800));
+    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    assert_eq!(escrow_balance, Uint128(1200));
 
-    // TODO: ensure escrow properly created (use attributes?)
+    // ensure escrow properly created
+    let details: DetailsResponse = router
+        .wrap()
+        .query_wasm_smart(&escrow_addr, &QueryMsg::Details { id: id.clone() })
+        .unwrap();
+    assert_eq!(id, details.id);
+    assert_eq!(arb, details.arbiter);
+    assert_eq!(ben, details.recipient);
+    assert_eq!(
+        vec![Cw20CoinHuman {
+            address: cash_addr.clone(),
+            amount: Uint128(1200)
+        }],
+        details.cw20_balance
+    );
+
+    // release escrow
+    let approve_msg = HandleMsg::Approve { id: id.clone() };
+    let _ = router
+        .execute_contract(&escrow_addr, &arb, &approve_msg, &[])
+        .unwrap();
+
+    // ensure balances updated - release to ben
+    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    assert_eq!(owner_balance, Uint128(3800));
+    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    assert_eq!(escrow_balance, Uint128(0));
+    let ben_balance = cash.balance(&router, ben.clone()).unwrap();
+    assert_eq!(ben_balance, Uint128(1200));
 }
