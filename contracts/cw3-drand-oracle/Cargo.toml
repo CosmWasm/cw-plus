@@ -1,0 +1,48 @@
+[package]
+name = "rand"
+version = "0.1.0"
+license = "AGPL-3.0"
+authors = ["Simon Warta <simon@confio.tech>"]
+edition = "2018"
+
+exclude = [
+  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
+  "artifacts/",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true
+
+[features]
+default = ["cranelift"]
+# for quicker tests, cargo test --lib
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces", "cosmwasm-vm/backtraces"]
+cranelift = ["cosmwasm-vm/default-cranelift"]
+singlepass = ["cosmwasm-vm/default-singlepass"]
+
+[dependencies]
+cosmwasm-std = { git = "https://github.com/CosmWasm/cosmwasm", branch = "0.11" , features = ["iterator"] }
+cosmwasm-storage = { git = "https://github.com/CosmWasm/cosmwasm", branch = "0.11" , features = ["iterator"] }
+drand-verify = "0.1"
+schemars = "0.7"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+cosmwasm-vm = { git = "https://github.com/CosmWasm/cosmwasm", branch = "0.11", default-features = false, features = ["iterator"] }
+cosmwasm-schema = { git = "https://github.com/CosmWasm/cosmwasm", branch = "0.11" }
+hex = "0.4"

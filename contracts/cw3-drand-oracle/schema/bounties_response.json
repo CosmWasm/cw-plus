@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BountiesResponse",
+  "type": "object",
+  "required": [
+    "bounties"
+  ],
+  "properties": {
+    "bounties": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Bounty"
+      }
+    }
+  },
+  "definitions": {
+    "Bounty": {
+      "type": "object",
+      "required": [
+        "amount",
+        "round"
+      ],
+      "properties": {
+        "amount": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        },
+        "round": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}
