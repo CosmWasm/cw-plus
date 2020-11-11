@@ -1,0 +1,108 @@
+html * {
+  box-sizing: border-box;
+  font-family: Tahoma, Geneva, sans-serif;
+}
+
+body {
+  padding: 0;
+  margin: 0;
+  background-color: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  align-content: center;
+  ;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.fadeIn {
+  opacity: 1;
+  animation-name: fadeIn;
+  animation-iteration-count: 1;
+  animation-timing-function: ease-in;
+  animation-duration: 200ms;
+}
+
+.content {
+  align-items: stretch;
+  align-content: stretch;
+  display: flex;
+  flex: 2;
+  flex-wrap: wrap;
+  flex-direction: column;
+  text-align: center;
+}
+
+.wrapper {
+  border: 10px solid #f0f0f0;
+  background-color: #fff;
+  padding: 0 20px 20px;
+  position: relative;
+  height: 40vh;
+  overflow-x: scroll;
+  width: 33.33vw;
+}
+
+h1 {
+  text-align: center;
+}
+
+h2 {
+  background-color: #fff;
+  margin: 0;
+  position: sticky;
+  padding: 20px 0;
+  top: 0;
+}
+
+p {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+a,
+a:visited {
+  text-decoration: none;
+  color: #d75ea1;
+}
+
+a:hover {
+  color: #cc3387;
+}
+
+.highlight {
+  font-weight: bold;
+}
+
+.console {
+  display: none;
+}
+
+.error {
+  color: #EF130D;
+  align-self: center;
+}
+
+@media screen and (max-width: 767px) {
+  .content {
+    flex-direction: column;
+  }
+
+  .wrapper {
+    width: 100vw;
+    height: auto;
+    max-height: 40vh;
+  }
+}
