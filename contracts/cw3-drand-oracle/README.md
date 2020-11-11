@@ -1,6 +1,6 @@
 # Rand – A drand client as a CosmWasm smart contract
 
-To learn more about this project, see this article: https://medium.com/confio/when-your-blockchain-needs-to-roll-the-dice-ed9da121f590
+In drand, random beacons are distributed via HTTP, Gossipsub, Tor or Twitter. Such network sources cannot be accessed by a blockchain directly. However, through this CosmWasm smart contract which allows storing random beacons on chain. Using cross-contract queries, other contracts can then read those random values and use them in their logic.
 
 ## Development build
 
