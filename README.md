@@ -4,16 +4,16 @@
 
 # Overview
 
-MoorNet is a Mirror to the Moors and Maths powering Payments on Distributed Ledgers. It is created at the convergence of Cosmos SDK and CosmWasm with Substrate IBC Consensus and PolkadotJS WASMProvider. This is a demonstration of how we can do the interoperability between Cosmos SDK, CosmWasm and PolkadotJS and Polkadot Substrate Pallets and Polkadot Consensus Engine through MoorNet. Currently MoorNet is demonstrating the potentials of blockchain interoperability. However we are planning to construct money streaming apps for the internet through MoorNet. MoorNet Contracts are curated for atomic swap between continous bonding curve tokens and time based asset tokens. MoorPay is created as a scaffold based Cosmos SDK boiler plate app to create off-chain workflows. MoorApp is created as a scaffold based Cosmos SDK boiler plate app to create on-chain workflows.
+MoorNet is a Mirror to the Moors and Maths powering Payments on Distributed Ledgers. It is created at the convergence of Cosmos SDK and CosmWasm with Substrate IBC Consensus and PolkadotJS WASMProvider. This is a demonstration of how we can do the interoperability between Cosmos SDK, CosmWasm and PolkadotJS and Polkadot Substrate Pallets and Polkadot Consensus Engine through MoorNet. Currently MoorNet is demonstrating the potentials of blockchain interoperability between Cosmos and Polkadot through the wonders of web assembly. Our next focus is to construct money streaming apps for the internet through MoorNet. MoorNet Contracts are curated for atomic swap between continous bonding curve tokens and time based asset tokens. 
 
-# Components
-- CosmWasm SmartContracts
-- Cosmos SDK 
+# Libraries
+- CosmWasm 
+- CosmosSDK 
 - Substrate Palatte
 - PolkadotJS 
 - Ethermint
 
-# Solutions
+# Components
 - DAO
 - CW 20
 - CW 721
