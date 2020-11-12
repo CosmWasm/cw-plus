@@ -1,0 +1,18 @@
+# Test binary built with `go test -c`
+*.test
+
+# LiteIDE, VSCode, and Sublime
+*.idea
+*.vscode
+*.sublime
+
+# Output of go coverage tool when used with LiteIDE
+*.out
+
+/bin
+
+*.key
+*.wasm
+
+test_data
+tmp

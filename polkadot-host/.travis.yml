@@ -1,0 +1,111 @@
+# Copyright 2019 ChainSafe Systems (ON) Corp.
+# This file is part of gossamer.
+#
+# The gossamer library is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# The gossamer library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with the gossamer library. If not, see <http://www.gnu.org/licenses/>.
+
+language: go
+
+os: linux
+dist: xenial
+go:
+- 1.15.x
+env:
+  global:
+  - CC_TEST_REPORTER_ID=abdad8b2e2ec0bfdd7af57d955c44e9470f4d174e744b824047f3037800f5b40
+  - VERSION=$(git rev-parse HEAD)
+cache:
+  directories:
+  - $HOME/.cache/go-build
+  - $GOPATH/pkg/mod
+before_cache:
+- rm -f ./trie/failing_test_data
+jobs:
+  include:
+  - name: Go Linter
+    script: make lint
+  - name: Unit Tests
+    before_script:
+    - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+    - chmod +x ./cc-test-reporter
+    - ./cc-test-reporter before-build
+    script: ./scripts/ci.sh
+    after_script:
+    - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+  - name: Test State - Race
+    script: make test-state-race
+  - name: Build Gossamer Docs
+    language: ruby
+    rvm:
+    - 2.6.3
+    gemfile:
+    - docs/Gemfile
+    before_install:
+    - gem update --system
+    - gem --version
+    cache: bundler # caching bundler gem packages will speed up build
+    script:
+    - cd docs
+    - bundle exec jekyll build
+    deploy:
+      strategy: git
+      provider: pages
+      cleanup: false
+      token: $GITHUB_TOKEN # set in settings on travis as a secure variable
+      local_dir: docs
+      target_branch: gh-pages
+      on:
+        branch: development # deploy on merge into development
+  - stage: Docker build
+    name: Build Docker Image
+    script:
+      - make VERSION=$VERSION docker-build
+      - make VERSION=$VERSION docker-version
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then travis_terminate 0; fi'
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - docker push chainsafe/gossamer:$VERSION
+  - stage: Integration Tests
+    name: Stable
+    script:
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then make it-stable; fi'
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then travis_terminate 0; fi'
+      - docker run --rm -it --entrypoint="make" chainsafe/gossamer:$VERSION it-stable
+  - name: RPC
+    script:
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then make it-rpc; fi'
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then travis_terminate 0; fi'
+      - docker run --rm -it --entrypoint="make" chainsafe/gossamer:$VERSION it-rpc
+  - name: Stress
+    script:
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then make it-stress; fi'
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then travis_terminate 0; fi'
+      - docker run --rm -it --entrypoint="make" chainsafe/gossamer:$VERSION it-stress
+  - name: GRANDPA
+    script:
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then make it-grandpa; fi'
+      - 'if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then travis_terminate 0; fi'
+      - docker run --rm -it --entrypoint="make" chainsafe/gossamer:$VERSION it-grandpa
+  allow_failures:
+    - stage: build
+      env:
+        - GOSSAMER_STRESS=true
+notifications:
+  slack:
+    secure: 0kBLVAFOp1nNrnhYbe1tULFbhqM0HgF5gYFkZDwPFSwbNshfygy4dLScxsIYe0ZAWedkiw9+Eb5oYcnsXR1ltzX35ORnyAEiOdqM5YVfa1J0xWm6kI2ZD3QLfWuhlin42eflicr2lSkDlTbbkRu85Qn/ieJZXsgpOEPQrQI6p/0iEIbNeTykIvmEJP74NQGUd4JQSIDayw0fhb1kDdON++dAovkxOwVvklh6f63Lu0V2S2ZVHl6oXePD9Hr4Nk35XoK3R98qstCwChQ/hIh4oXHBSO4GKFBAXtaC+0jqk/c1+Cjd9H++QyP3z3whYCsbX0Dh2Gt+V7J148rhQi8WKWrymCLIOXCYJnZSijJR0BDtwacPtgF2T8TTV05Xr8p/IFVGSCLI18lIfpPcTk4b684RAo0fAgm1nIAfGvKxPr7vECAxbbd8PVALo0O9k2GLFirZ6Sur6SdVfdKqErBXp6kTldQOy7zJOqAbEt4PMqrrZpMAHPF4BeSY023lezUwyU0HVXFZPD1GS+iO3GsH4IYJIWM4S1hA0Qoxf7kgAZVogco+f67l+wIS0NjYaG25nCxGiJPqqI/foCTQFYCtG2iOFWrsa0KNzyD0d4eQoq5j3OcoMumj9tPiqfMJZkNT0ZOhdSEwmb1oytf1+SoE7tWQUsLksR8egZLCXexu8JA=
+    on_success: change # default: change
+    on_failure: always # default: always
+  # email:
+  #   recipients:
+  #   - gossamer@chainsafe.io
+  #   on_success: change # default: change
+  #   on_failure: always # default: always
