@@ -1,5 +1,5 @@
 # MoorNet
-- Winner for the HackAtom India 2020
+- Winner for the Cosmos India HackAtom HackerEarth Hackathon 2020
 - https://www.hackerearth.com/challenges/hackathon/hackatom-india/dashboard/c695b8d/submission/
 
 # Overview
