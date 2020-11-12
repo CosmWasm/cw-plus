@@ -31,16 +31,16 @@ pub trait ClientDef {
      expected_consensus_state: &AnyConsensusState,
      ) -> Result<(), Box<dyn std::error::Error>>;
 
-    // /// Verify a `proof` that a connection state matches that of the input `connection_end`.
-    // fn verify_connection_state(
-    //     &self,
-    //     client_state: &Self::ClientState,
-    //     height: Height,
-    //     prefix: &CommitmentPrefix,
-    //     proof: &CommitmentProof,
-    //     connection_id: &ConnectionId,
-    //     expected_connection_end: &ConnectionEnd,
-    // ) -> Result<(), Box<dyn std::error::Error>>;
+
+    fn verify_connection_state(
+     &self,
+        client_state: &Self::ClientState,
+        height: Height,
+        prefix: &CommitmentPrefix,
+        proof: &CommitmentProof,
+        connection_id: &ConnectionId,
+        expected_connection_end: &ConnectionEnd,
+      ) -> Result<(), Box<dyn std::error::Error>>;
 
     // /// Verify the client state for this chain that it is stored on the counterparty chain.
     // #[allow(clippy::too_many_arguments)]
