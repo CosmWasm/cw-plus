@@ -1,30 +1,3 @@
-<div align="center">
-  <img alt="Gossamer logo" src="/docs/assets/img/gossamer_banner.png" width="600" />
-</div>
-<div align="center">
-  <a href="https://www.gnu.org/licenses/gpl-3.0">
-    <img alt="License: GPL v3" src="https://img.shields.io/badge/License-GPLv3-blue.svg" />
-  </a>
-  <a href="https://godoc.org/github.com/ChainSafe/gossamer">
-    <img alt="go doc" src="https://godoc.org/github.com/ChainSafe/gossamer?status.svg" />
-  </a>
-  <a href="https://goreportcard.com/report/github.com/ChainSafe/gossamer">
-    <img alt="go report card" src="https://goreportcard.com/badge/github.com/ChainSafe/gossamer" />
-  </a>
-  <a href="https://travis-ci.org/ChainSafe/gossamer/">
-    <img alt="build status" src="https://travis-ci.org/ChainSafe/gossamer.svg?branch=development" />
-  </a>
-</div>
-<div align="center">
-  <a href="https://codeclimate.com/github/ChainSafe/gossamer/badges">
-    <img alt="maintainability" src="https://api.codeclimate.com/v1/badges/933c7bb58eee9aba85eb/maintainability" />
-  </a>
-  <a href="https://codeclimate.com/github/ChainSafe/gossamer/test_coverage">
-    <img alt="Test Coverage" src="https://api.codeclimate.com/v1/badges/933c7bb58eee9aba85eb/test_coverage" />
-  </a>
-</div>
-<br />
-
 ## A Go Implementation of the Polkadot Host
 
 Gossamer is an implementation of the [Polkadot Host](https://github.com/w3f/polkadot-spec): a framework used to build and run nodes for different blockchain protocols that are compatible with the Polkadot ecosystem.  The core of the Polkadot Host is the wasm runtime which handles the logic of the chain.

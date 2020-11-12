@@ -1,7 +1,3 @@
-## About
-This project is a stripped down vanilla JavaScript template.
-This repository is only using Webpack 4 for Hot Module Reloading and to be able to include the necessary npm modules.
-
 ## Available Scripts
 
 ### `yarn install`
