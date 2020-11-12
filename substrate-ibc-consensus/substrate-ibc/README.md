@@ -1,22 +1,11 @@
-# Substrate IBC Pallet (work in progress)
+# Substrate IBC Pallet
 
 ## Purpose
 
 This pallet implements the standard [IBC protocol](https://github.com/cosmos/ics).
 
-The goal of this pallet is to allow the blockchains built on Substrate to gain the ability to interact with other chains in a trustless way via IBC protocol, no matter what consensus the counterparty chains use.
+The goal of this pallet is to allow the blockchains built on Substrate to gain the ability to interact with other chains in a trustless way via IBC protocol, no matter what consensus the counterparty chains use. Some components in [ICS spec](https://github.com/cosmos/ics/tree/master/spec) are implemented to support a working demo (https://github.com/cdot-network/ibc-demo), but not fully implemented as the spec:  
 
-This project is currently in an early stage and will eventually be submitted to upstream.
-
-Some components in [ICS spec](https://github.com/cosmos/ics/tree/master/spec) are implemented to support a working demo (https://github.com/cdot-network/ibc-demo), but not fully implemented as the spec:  
-* ics-002-client-semantics
-* ics-003-connection-semantics
-* ics-004-channel-and-packet-semantics
-* ics-005-port-allocation
-* ics-010-grandpa-client
-* ics-018-relayer-algorithms
-* ics-025-handler-interface
-* ics-026-routing-module
 
 Here is a [demo](https://github.com/cdot-network/ibc-demo) for showing how to utilize this pallet, which initializes a series of steps for cross-chain communication, from client creation to sending packet data.
 
@@ -121,7 +110,6 @@ client
 ```
 can invoke the ```test_create_client``` function. 
 
-Please refer to document [substrate_subxt_proc_macro::Call](https://docs.rs/substrate-subxt-proc-macro/0.12.0/substrate_subxt_proc_macro/derive.Call.html) for details.
 
 ### At Unit Test
 In unit test, we comply with the substrate's document [Runtime Tests](https://substrate.dev/docs/en/knowledgebase/runtime/tests). 
