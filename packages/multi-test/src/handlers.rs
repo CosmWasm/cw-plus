@@ -155,8 +155,8 @@ impl Router {
     /// This is just a helper around execute()
     pub fn execute_contract<T: Serialize, U: Into<HumanAddr>>(
         &mut self,
-        contract_addr: U,
         sender: U,
+        contract_addr: U,
         msg: &T,
         send_funds: &[Coin],
     ) -> Result<RouterResponse, String> {
@@ -465,7 +465,7 @@ mod test {
 
         // do one payout and see money coming in
         let res = router
-            .execute_contract(&contract_addr, &random, &EmptyMsg {}, &[])
+            .execute_contract(&random, &contract_addr, &EmptyMsg {}, &[])
             .unwrap();
         assert_eq!(1, res.attributes.len());
         assert_eq!(&attr("action", "payout"), &res.attributes[0]);
@@ -525,7 +525,7 @@ mod test {
             messages: vec![msg],
         };
         let res = router
-            .execute_contract(&reflect_addr, &HumanAddr::from("random"), &msgs, &[])
+            .execute_contract(&HumanAddr::from("random"), &reflect_addr, &msgs, &[])
             .unwrap();
 
         // ensure the attributes were relayed from the sub-message
@@ -583,7 +583,7 @@ mod test {
             messages: vec![msg],
         };
         let res = router
-            .execute_contract(&reflect_addr, &random, &msgs, &[])
+            .execute_contract(&random, &reflect_addr, &msgs, &[])
             .unwrap();
         assert_eq!(0, res.attributes.len());
         // ensure random got paid
@@ -614,7 +614,7 @@ mod test {
             messages: vec![msg, msg2],
         };
         let err = router
-            .execute_contract(&reflect_addr, &random, &msgs, &[])
+            .execute_contract(&random, &reflect_addr, &msgs, &[])
             .unwrap_err();
         assert_eq!("Cannot subtract 3 from 0", err.as_str());
 

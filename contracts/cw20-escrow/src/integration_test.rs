@@ -98,7 +98,7 @@ fn escrow_happy_path_cw20_tokens() {
         msg: Some(create_bin),
     };
     let res = router
-        .execute_contract(&cash_addr, &owner, &send_msg, &[])
+        .execute_contract(&owner, &cash_addr, &send_msg, &[])
         .unwrap();
     println!("{:?}", res.attributes);
     assert_eq!(6, res.attributes.len());
@@ -128,7 +128,7 @@ fn escrow_happy_path_cw20_tokens() {
     // release escrow
     let approve_msg = HandleMsg::Approve { id: id.clone() };
     let _ = router
-        .execute_contract(&escrow_addr, &arb, &approve_msg, &[])
+        .execute_contract(&arb, &escrow_addr, &approve_msg, &[])
         .unwrap();
 
     // ensure balances updated - release to ben
