@@ -35,30 +35,33 @@ type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// TODO: Allow to customize return values (CustomMsg beyond Empty)
-/// TODO: Allow different error types?
-pub struct ContractWrapper<T1, T2, T3, E>
+pub struct ContractWrapper<T1, T2, T3, E1, E2, E3>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
-    E: std::fmt::Display,
+    E1: std::fmt::Display,
+    E2: std::fmt::Display,
+    E3: std::fmt::Display,
 {
-    handle_fn: ContractFn<T1, HandleResponse, E>,
-    init_fn: ContractFn<T2, InitResponse, E>,
-    query_fn: QueryFn<T3, E>,
+    handle_fn: ContractFn<T1, HandleResponse, E1>,
+    init_fn: ContractFn<T2, InitResponse, E2>,
+    query_fn: QueryFn<T3, E3>,
 }
 
-impl<T1, T2, T3, E> ContractWrapper<T1, T2, T3, E>
+impl<T1, T2, T3, E1, E2, E3> ContractWrapper<T1, T2, T3, E1, E2, E3>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
-    E: std::fmt::Display,
+    E1: std::fmt::Display,
+    E2: std::fmt::Display,
+    E3: std::fmt::Display,
 {
     pub fn new(
-        handle_fn: ContractFn<T1, HandleResponse, E>,
-        init_fn: ContractFn<T2, InitResponse, E>,
-        query_fn: QueryFn<T3, E>,
+        handle_fn: ContractFn<T1, HandleResponse, E1>,
+        init_fn: ContractFn<T2, InitResponse, E2>,
+        query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
             handle_fn,
@@ -68,12 +71,14 @@ where
     }
 }
 
-impl<T1, T2, T3, E> Contract for ContractWrapper<T1, T2, T3, E>
+impl<T1, T2, T3, E1, E2, E3> Contract for ContractWrapper<T1, T2, T3, E1, E2, E3>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
-    E: std::fmt::Display,
+    E1: std::fmt::Display,
+    E2: std::fmt::Display,
+    E3: std::fmt::Display,
 {
     fn handle(
         &self,
@@ -311,7 +316,8 @@ impl<'a> WasmCache<'a> {
     // TODO: better addr generation
     fn next_address(&self) -> HumanAddr {
         let count = self.router.contracts.len() + self.state.contracts.len();
-        HumanAddr::from(count.to_string())
+        // we make this longer so it is not rejected by tests
+        HumanAddr::from("Contract #".to_string() + &count.to_string())
     }
 
     pub fn handle(
