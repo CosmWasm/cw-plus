@@ -3,16 +3,16 @@
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{coins, to_binary, HumanAddr, Uint128};
 use cw20::{Cw20CoinHuman, Cw20Contract, Cw20HandleMsg};
-use cw_multi_test::{Contract, ContractWrapper, Router, SimpleBank};
+use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
 use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, QueryMsg, ReceiveMsg};
 
-fn mock_router() -> Router {
+fn mock_router() -> App {
     let env = mock_env();
     let api = Box::new(MockApi::default());
     let bank = SimpleBank {};
 
-    Router::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
 }
 
 pub fn contract_escrow() -> Box<dyn Contract> {

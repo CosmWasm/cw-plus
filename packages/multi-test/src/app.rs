@@ -12,7 +12,7 @@ use crate::bank::{Bank, BankCache, BankOps, BankRouter};
 use crate::wasm::{Contract, StorageFactory, WasmCache, WasmOps, WasmRouter};
 
 #[derive(Default, Clone, Debug)]
-pub struct RouterResponse {
+pub struct AppResponse {
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
 }
@@ -49,12 +49,12 @@ impl ActionResponse {
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
 /// We offer .execute() as a wrapper around cache, execute, commit/rollback process
-pub struct Router {
+pub struct App {
     wasm: WasmRouter,
     bank: BankRouter,
 }
 
-impl Querier for Router {
+impl Querier for App {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
@@ -70,21 +70,21 @@ impl Querier for Router {
     }
 }
 
-impl Router {
+impl App {
     pub fn new<B: Bank + 'static>(
         api: Box<dyn Api>,
         block: BlockInfo,
         bank: B,
         storage_factory: StorageFactory,
     ) -> Self {
-        Router {
+        App {
             wasm: WasmRouter::new(api, block, storage_factory),
             bank: BankRouter::new(bank, storage_factory()),
         }
     }
 
-    pub fn cache(&'_ self) -> RouterCache<'_> {
-        RouterCache::new(self)
+    pub fn cache(&'_ self) -> AppCache<'_> {
+        AppCache::new(self)
     }
 
     /// This can set the block info to any value. Must be done before taking a cache
@@ -159,7 +159,7 @@ impl Router {
         contract_addr: U,
         msg: &T,
         send_funds: &[Coin],
-    ) -> Result<RouterResponse, String> {
+    ) -> Result<AppResponse, String> {
         let msg = to_binary(msg).map_err(|e| e.to_string())?;
         let msg = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
@@ -177,7 +177,7 @@ impl Router {
         &mut self,
         sender: HumanAddr,
         msg: CosmosMsg<Empty>,
-    ) -> Result<RouterResponse, String> {
+    ) -> Result<AppResponse, String> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -190,7 +190,7 @@ impl Router {
         &mut self,
         sender: HumanAddr,
         msgs: Vec<CosmosMsg<Empty>>,
-    ) -> Result<Vec<RouterResponse>, String> {
+    ) -> Result<Vec<AppResponse>, String> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
@@ -198,7 +198,7 @@ impl Router {
         let mut cache = self.cache();
 
         // run all messages, stops at first error
-        let res: Result<Vec<RouterResponse>, String> = msgs
+        let res: Result<Vec<AppResponse>, String> = msgs
             .into_iter()
             .map(|msg| cache.execute(sender.clone(), msg))
             .collect();
@@ -212,27 +212,27 @@ impl Router {
     }
 }
 
-pub struct RouterCache<'a> {
-    router: &'a Router,
+pub struct AppCache<'a> {
+    router: &'a App,
     wasm: WasmCache<'a>,
     bank: BankCache<'a>,
 }
 
-pub struct RouterOps {
+pub struct AppOps {
     wasm: WasmOps,
     bank: BankOps,
 }
 
-impl RouterOps {
-    pub fn commit(self, router: &mut Router) {
+impl AppOps {
+    pub fn commit(self, router: &mut App) {
         self.bank.commit(&mut router.bank);
         self.wasm.commit(&mut router.wasm);
     }
 }
 
-impl<'a> RouterCache<'a> {
-    fn new(router: &'a Router) -> Self {
-        RouterCache {
+impl<'a> AppCache<'a> {
+    fn new(router: &'a App) -> Self {
+        AppCache {
             router,
             wasm: router.wasm.cache(),
             bank: router.bank.cache(),
@@ -242,8 +242,8 @@ impl<'a> RouterCache<'a> {
     /// When we want to commit the RouterCache, we need a 2 step process to satisfy Rust reference counting:
     /// 1. prepare() consumes RouterCache, releasing &Router, and creating a self-owned update info.
     /// 2. RouterOps::commit() can now take &mut Router and updates the underlying state
-    pub fn prepare(self) -> RouterOps {
-        RouterOps {
+    pub fn prepare(self) -> AppOps {
+        AppOps {
             wasm: self.wasm.prepare(),
             bank: self.bank.prepare(),
         }
@@ -255,11 +255,7 @@ impl<'a> RouterCache<'a> {
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
-    fn execute(
-        &mut self,
-        sender: HumanAddr,
-        msg: CosmosMsg<Empty>,
-    ) -> Result<RouterResponse, String> {
+    fn execute(&mut self, sender: HumanAddr, msg: CosmosMsg<Empty>) -> Result<AppResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.handle_wasm(sender, msg)?;
@@ -271,14 +267,14 @@ impl<'a> RouterCache<'a> {
                     // append the events
                     attributes.extend_from_slice(&subres.attributes);
                 }
-                Ok(RouterResponse {
+                Ok(AppResponse {
                     attributes,
                     data: res.data,
                 })
             }
             CosmosMsg::Bank(msg) => {
                 self.bank.execute(sender, msg)?;
-                Ok(RouterResponse::default())
+                Ok(AppResponse::default())
             }
             _ => unimplemented!(),
         }
@@ -338,7 +334,7 @@ impl<'a> RouterCache<'a> {
         sender: T,
         recipient: U,
         amount: &[Coin],
-    ) -> Result<RouterResponse, String> {
+    ) -> Result<AppResponse, String> {
         if !amount.is_empty() {
             let sender: HumanAddr = sender.into();
             let msg = BankMsg::Send {
@@ -348,7 +344,7 @@ impl<'a> RouterCache<'a> {
             };
             self.bank.execute(sender, msg)?;
         }
-        Ok(RouterResponse::default())
+        Ok(AppResponse::default())
     }
 }
 
@@ -372,15 +368,15 @@ mod test {
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{attr, coin, coins};
 
-    fn mock_router() -> Router {
+    fn mock_router() -> App {
         let env = mock_env();
         let api = Box::new(MockApi::default());
         let bank = SimpleBank {};
 
-        Router::new(api, env.block, bank, || Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
     }
 
-    fn get_balance(router: &Router, addr: &HumanAddr) -> Vec<Coin> {
+    fn get_balance(router: &App, addr: &HumanAddr) -> Vec<Coin> {
         router.wrap().query_all_balances(addr).unwrap()
     }
 
