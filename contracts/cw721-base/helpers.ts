@@ -88,24 +88,6 @@ const useOptions = (options: Options): Network => {
     return wallet;
   };
 
-  const buildFeeTable = (feeToken: string, gasPrice: number): CosmWasmFeeTable => {
-    const stdFee = (gas: number, denom: string, price: number) => {
-      const amount = Math.floor(gas * price)
-      return {
-        amount: [{ amount: amount.toString(), denom: denom }],
-        gas: gas.toString(),
-      }
-    }
-
-    return {
-      upload: stdFee(1000000, feeToken, gasPrice),
-      init: stdFee(500000, feeToken, gasPrice),
-      migrate: stdFee(500000, feeToken, gasPrice),
-      exec: stdFee(200000, feeToken, gasPrice),
-      send: stdFee(80000, feeToken, gasPrice),
-      changeAdmin: stdFee(80000, feeToken, gasPrice),
-    }
-  }
   const connect = async (
     wallet: Secp256k1HdWallet,
     options: Options
