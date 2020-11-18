@@ -208,15 +208,15 @@ interface CW721Instance {
   allowance: (owner: string, spender: string) => Promise<AllowanceResponse>
   allAllowances: (owner: string, startAfter?: string, limit?: number) => Promise<AllAllowancesResponse>
   allAccounts: (startAfter?: string, limit?: number) => Promise<readonly string[]>
+  minter: () => Promise<any>
   contractInfo: () => Promise<any>
-  ownerOf: (tokenId: TokenId) => Promise<any>
   nftInfo: (tokenId: TokenId) => Promise<any>
   allNftInfo: (tokenId: TokenId) => Promise<any>
-  minter: () => Promise<any>
+  ownerOf: (tokenId: TokenId) => Promise<any>
+  approvedForAll: (owner: string, include_expired?: boolean, start_after?: string, limit?: number) => Promise<any>
   numTokens: () => Promise<any>
   tokens: (owner: string, startAfter?: string, limit?: number) => Promise<TokensResponse>
   allTokens: (startAfter?: string, limit?: number) => Promise<TokensResponse>
-  approvedForAll: (owner: string, include_expired?: boolean, start_after?: string, limit?: number) => Promise<any>
 
   // actions
   mint: (tokenId: TokenId, owner: string, name: string, level: number, description?: string, image?: string) => Promise<string>
@@ -282,6 +282,22 @@ const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
       return await client.queryContractSmart(contractAddress, { approved_for_all: { owner, include_expired, start_after, limit } })
     }
 
+    // total number of tokens issued
+    const numTokens = async (): Promise<any> => {
+      return client.queryContractSmart(contractAddress, { num_tokens: {} });
+    }
+
+    // list all token_ids that belong to a given owner
+    const tokens = async (owner: string, start_after?: string, limit?: number): Promise<TokensResponse> => {
+      return client.queryContractSmart(contractAddress, { tokens: { owner, start_after, limit } });
+    }
+
+    const allTokens = async (start_after?: string, limit?: number): Promise<TokensResponse> => {
+      return client.queryContractSmart(contractAddress, { all_tokens: { start_after, limit } });
+    }
+
+    // actions 
+
     const mint = async (token_id: TokenId, owner: string, name: string, level: number, description?: string, image?: string): Promise<string> => {
       const result = await client.execute(contractAddress, { mint: { token_id, owner, name, level, description, image } });
       return result.transactionHash;
@@ -297,20 +313,6 @@ const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
     const sendNft = async (contract: string, token_id: TokenId, msg?: any): Promise<string> => {
       const result = await client.execute(contractAddress, { send_nft: { contract, token_id, msg } })
       return result.transactionHash;
-    }
-
-    // total number of tokens issued
-    const numTokens = async (): Promise<any> => {
-      return client.queryContractSmart(contractAddress, { num_tokens: {} });
-    }
-
-    // list all token_ids that belong to a given owner
-    const tokens = async (owner: string, start_after?: string, limit?: number): Promise<TokensResponse> => {
-      return client.queryContractSmart(contractAddress, { tokens: { owner, start_after, limit } });
-    }
-
-    const allTokens = async (start_after?: string, limit?: number): Promise<TokensResponse> => {
-      return client.queryContractSmart(contractAddress, { all_tokens: { start_after, limit } });
     }
 
     const approve = async (spender: string, token_id: TokenId, expires?: Expiration): Promise<string> => {
@@ -338,22 +340,22 @@ const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
       allowance,
       allAllowances,
       allAccounts,
-      contractInfo,
       minter,
-      mint,
-      ownerOf,
-      approvedForAll,
+      contractInfo,
       nftInfo,
       allNftInfo,
+      ownerOf,
+      approvedForAll,
+      numTokens,
+      tokens,
+      allTokens,
+      mint,
       transferNft,
       sendNft,
       approve,
       approveAll,
       revoke,
-      revokeAll,
-      numTokens,
-      tokens,
-      allTokens
+      revokeAll
     };
   }
 
