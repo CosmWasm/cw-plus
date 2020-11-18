@@ -14,6 +14,11 @@
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
 
+import * as fs from 'fs';
+import { Slip10RawIndex } from "@cosmjs/crypto";
+import { GasLimits, GasPrice, makeCosmoshubPath, Secp256k1HdWallet } from "@cosmjs/launchpad";
+import { CosmWasmFeeTable, SigningCosmWasmClient } from "./src/types/signingcosmwasmclient";
+
 const path = require("path");
 
 interface Options {
