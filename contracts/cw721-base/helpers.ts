@@ -245,6 +245,7 @@ interface CW721Contract {
 const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
   const use = (contractAddress: string): CW721Instance => {
 
+    // queries
     const allowance = async (owner: string, spender: string): Promise<AllowanceResponse> => {
       return client.queryContractSmart(contractAddress, { allowance: { owner, spender } });
     };
@@ -297,7 +298,6 @@ const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
     }
 
     // actions 
-
     const mint = async (token_id: TokenId, owner: string, name: string, level: number, description?: string, image?: string): Promise<string> => {
       const result = await client.execute(contractAddress, { mint: { token_id, owner, name, level, description, image } });
       return result.transactionHash;
