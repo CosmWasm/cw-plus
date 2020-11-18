@@ -20,6 +20,3 @@ target/
 hash.txt
 contracts.txt
 artifacts/
-
-#npm
-node_modules/

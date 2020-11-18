@@ -14,14 +14,6 @@
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
 
-// import { MinterResponse } from "./src/types/helpertypes";
-
-// import * as fs from 'fs';
-// import { Slip10RawIndex } from "@cosmjs/crypto";
-// import { GasLimits, GasPrice, makeCosmoshubPath, Secp256k1HdWallet } from "@cosmjs/launchpad";
-//  import { CosmWasmFeeTable, SigningCosmWasmClient } from "./src/types/signingcosmwasmclient";
-
-// const axios = require('axios').default;
 const path = require("path");
 
 interface Options {
