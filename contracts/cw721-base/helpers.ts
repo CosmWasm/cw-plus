@@ -14,12 +14,14 @@
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
 
-import * as fs from 'fs';
-import { Slip10RawIndex } from "@cosmjs/crypto";
-import { GasLimits, GasPrice, makeCosmoshubPath, Secp256k1HdWallet } from "@cosmjs/launchpad";
-import { CosmWasmFeeTable, SigningCosmWasmClient } from "./src/types/signingcosmwasmclient";
+// import { MinterResponse } from "./src/types/helpertypes";
 
-const axios = require('axios').default;
+// import * as fs from 'fs';
+// import { Slip10RawIndex } from "@cosmjs/crypto";
+// import { GasLimits, GasPrice, makeCosmoshubPath, Secp256k1HdWallet } from "@cosmjs/launchpad";
+//  import { CosmWasmFeeTable, SigningCosmWasmClient } from "./src/types/signingcosmwasmclient";
+
+// const axios = require('axios').default;
 const path = require("path");
 
 interface Options {
@@ -161,6 +163,29 @@ interface ContractInfo {
   readonly symbol: string
 }
 
+interface NftInfo {
+  readonly name: string,
+  readonly description: string,
+  readonly image: any
+}
+
+interface Access {
+  readonly owner: string,
+  readonly approvals: []
+}
+interface AllNftInfo {
+  readonly access: Access,
+  readonly info: NftInfo
+}
+
+interface Operators {
+  readonly operators: []
+}
+
+interface Count {
+  readonly count: number
+}
+
 interface InitMsg {
   readonly name: string
   readonly symbol: string
@@ -208,13 +233,13 @@ interface CW721Instance {
   allowance: (owner: string, spender: string) => Promise<AllowanceResponse>
   allAllowances: (owner: string, startAfter?: string, limit?: number) => Promise<AllAllowancesResponse>
   allAccounts: (startAfter?: string, limit?: number) => Promise<readonly string[]>
-  minter: () => Promise<any>
-  contractInfo: () => Promise<any>
-  nftInfo: (tokenId: TokenId) => Promise<any>
-  allNftInfo: (tokenId: TokenId) => Promise<any>
-  ownerOf: (tokenId: TokenId) => Promise<any>
-  approvedForAll: (owner: string, include_expired?: boolean, start_after?: string, limit?: number) => Promise<any>
-  numTokens: () => Promise<any>
+  minter: () => Promise<MintInfo>
+  contractInfo: () => Promise<ContractInfo>
+  nftInfo: (tokenId: TokenId) => Promise<NftInfo>
+  allNftInfo: (tokenId: TokenId) => Promise<AllNftInfo>
+  ownerOf: (tokenId: TokenId) => Promise<Access>
+  approvedForAll: (owner: string, include_expired?: boolean, start_after?: string, limit?: number) => Promise<Operators>
+  numTokens: () => Promise<Count>
   tokens: (owner: string, startAfter?: string, limit?: number) => Promise<TokensResponse>
   allTokens: (startAfter?: string, limit?: number) => Promise<TokensResponse>
 
@@ -259,32 +284,32 @@ const CW721 = (client: SigningCosmWasmClient): CW721Contract => {
       return accounts.accounts;
     };
 
-    const minter = async (): Promise<any> => {
+    const minter = async (): Promise<MintInfo> => {
       return client.queryContractSmart(contractAddress, { minter: {} });
     };
 
-    const contractInfo = async (): Promise<any> => {
+    const contractInfo = async (): Promise<ContractInfo> => {
       return client.queryContractSmart(contractAddress, { contract_info: {} });
     };
 
-    const nftInfo = async (token_id: TokenId): Promise<any> => {
+    const nftInfo = async (token_id: TokenId): Promise<NftInfo> => {
       return client.queryContractSmart(contractAddress, { nft_info: { token_id } });
     }
 
-    const allNftInfo = async (token_id: TokenId): Promise<any> => {
+    const allNftInfo = async (token_id: TokenId): Promise<AllNftInfo> => {
       return client.queryContractSmart(contractAddress, { all_nft_info: { token_id } });
     }
 
-    const ownerOf = async (token_id: TokenId): Promise<any> => {
+    const ownerOf = async (token_id: TokenId): Promise<Access> => {
       return await client.queryContractSmart(contractAddress, { owner_of: { token_id } });
     }
 
-    const approvedForAll = async (owner: string, include_expired?: boolean, start_after?: string, limit?: number): Promise<any> => {
+    const approvedForAll = async (owner: string, include_expired?: boolean, start_after?: string, limit?: number): Promise<Operators> => {
       return await client.queryContractSmart(contractAddress, { approved_for_all: { owner, include_expired, start_after, limit } })
     }
 
     // total number of tokens issued
-    const numTokens = async (): Promise<any> => {
+    const numTokens = async (): Promise<Count> => {
       return client.queryContractSmart(contractAddress, { num_tokens: {} });
     }
 

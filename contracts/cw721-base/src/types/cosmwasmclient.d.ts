@@ -10,7 +10,7 @@ import {
   WrappedStdTx,
 } from "@cosmjs/launchpad";
 import { WasmExtension } from "./wasm";
-import { JsonObject } from "./types";
+import { JsonObject } from "./helpertypes";
 export interface GetSequenceResult {
   readonly accountNumber: number;
   readonly sequence: number;

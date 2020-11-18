@@ -1,5 +1,5 @@
 import { LcdClient } from "@cosmjs/launchpad";
-import { JsonObject, Model } from "./types";
+import { JsonObject, Model } from "./helpertypes";
 export interface CodeInfo {
   readonly id: number;
   /** Bech32 account address */
