@@ -25,8 +25,8 @@ before re-dispatching all those messages from the contract address.
 
 ### Queries
 
-`CanSend{sender, msg}` - This accepts one `CosmosMsg` and checks permissions,
-returning true or false based on the permissions. If `CanSend` returns true
+`CanExecute{sender, msg}` - This accepts one `CosmosMsg` and checks permissions,
+returning true or false based on the permissions. If `CanExecute` returns true
 then a call to `Execute` from that sender, with the same message, 
 before any further state changes, should also succeed. This can be used 
 to dynamically provide some client info on a generic cw1 contract without 

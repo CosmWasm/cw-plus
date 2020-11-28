@@ -135,8 +135,8 @@ const useOptions = (options: Options): Network => {
 
 type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {}}
 
-interface CanSendResponse {
-  readonly canSend: boolean;
+interface CanExecuteResponse {
+  readonly canExecute: boolean;
 }
 
 interface Permissions {
@@ -233,7 +233,7 @@ interface CW1Instance {
 
   permissions: (address?: string) => Promise<PermissionsInfo>
   allPermissions: (startAfter?: string, limit?: number) => Promise<AllPermissionsResponse>
-  canSend: (sender: string, msg: CosmosMsg) => Promise<CanSendResponse>
+  canExecute: (sender: string, msg: CosmosMsg) => Promise<CanExecuteResponse>
 
   // actions
   execute: (msgs: readonly CosmosMsg[]) => Promise<string>
@@ -278,8 +278,8 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       return client.queryContractSmart(contractAddress, {all_permissions: { start_after: startAfter, limit: limit }});
     };
 
-    const canSend = async (sender: string, msg: CosmosMsg): Promise<CanSendResponse> => {
-      return client.queryContractSmart(contractAddress, {can_send: { sender: sender, msg: msg }});
+    const canExecute = async (sender: string, msg: CosmosMsg): Promise<CanExecuteResponse> => {
+      return client.queryContractSmart(contractAddress, {can_execute: { sender: sender, msg: msg }});
     };
 
     const admins = async (): Promise<AdminListResponse> => {
@@ -326,7 +326,7 @@ const CW1 = (client: SigningCosmWasmClient): CW1Contract => {
       allAllowances,
       permissions,
       allPermissions,
-      canSend,
+      canExecute,
       execute,
       freeze,
       updateAdmins,

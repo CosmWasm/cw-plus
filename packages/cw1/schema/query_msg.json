@@ -3,13 +3,13 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Checks permissions of the caller on this proxy. If CanSend returns true then a call to `Execute` with the same message, from the given sender, before any further state changes, should also succeed.",
+      "description": "Checks permissions of the caller on this proxy. If CanExecute returns true then a call to `Execute` with the same message, from the given sender, before any further state changes, should also succeed.",
       "type": "object",
       "required": [
-        "can_send"
+        "can_execute"
       ],
       "properties": {
-        "can_send": {
+        "can_execute": {
           "type": "object",
           "required": [
             "msg",

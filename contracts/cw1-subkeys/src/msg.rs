@@ -59,9 +59,9 @@ where
     /// Returns PermissionsInfo
     Permissions { spender: HumanAddr },
     /// Checks permissions of the caller on this proxy.
-    /// If CanSend returns true then a call to `Execute` with the same message,
+    /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
-    CanSend {
+    CanExecute {
         sender: HumanAddr,
         msg: CosmosMsg<T>,
     },

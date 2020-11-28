@@ -5,7 +5,7 @@ use cosmwasm_std::{
     attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
     HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult,
 };
-use cw1::CanSendResponse;
+use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -61,7 +61,7 @@ pub fn handle_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    if !can_send(deps.as_ref(), &info.sender)? {
+    if !can_execute(deps.as_ref(), &info.sender)? {
         Err(ContractError::Unauthorized {})
     } else {
         let mut res = HandleResponse::default();
@@ -108,7 +108,7 @@ pub fn handle_update_admins(
     }
 }
 
-fn can_send(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
+fn can_execute(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
     let cfg = admin_list_read(deps.storage).load()?;
     let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
     Ok(can)
@@ -117,7 +117,7 @@ fn can_send(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
-        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
+        QueryMsg::CanExecute { sender, msg } => to_binary(&query_can_execute(deps, sender, msg)?),
     }
 }
 
@@ -129,13 +129,13 @@ pub fn query_admin_list(deps: Deps) -> StdResult<AdminListResponse> {
     })
 }
 
-pub fn query_can_send(
+pub fn query_can_execute(
     deps: Deps,
     sender: HumanAddr,
     _msg: CosmosMsg,
-) -> StdResult<CanSendResponse> {
-    Ok(CanSendResponse {
-        can_send: can_send(deps, &sender)?,
+) -> StdResult<CanExecuteResponse> {
+    Ok(CanExecuteResponse {
+        can_execute: can_execute(deps, &sender)?,
     })
 }
 
@@ -275,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn can_send_query_works() {
+    fn can_execute_query_works() {
         let mut deps = mock_dependencies(&[]);
 
         let alice = HumanAddr::from("alice");
@@ -303,19 +303,19 @@ mod tests {
         });
 
         // owner can send
-        let res = query_can_send(deps.as_ref(), alice.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
+        let res = query_can_execute(deps.as_ref(), alice.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, true);
 
         // owner can stake
-        let res = query_can_send(deps.as_ref(), bob.clone(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
+        let res = query_can_execute(deps.as_ref(), bob.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, true);
 
         // anyone cannot send
-        let res = query_can_send(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
 
         // anyone cannot stake
-        let res = query_can_send(deps.as_ref(), anyone.clone(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+        let res = query_can_execute(deps.as_ref(), anyone.clone(), staking_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
     }
 }
