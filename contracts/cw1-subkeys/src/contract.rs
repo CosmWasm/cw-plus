@@ -296,7 +296,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
         QueryMsg::Permissions { spender } => to_binary(&query_permissions(deps, spender)?),
-        QueryMsg::CanExecute { sender, msg } => to_binary(&query_can_execute(deps, sender, msg)?),
+        QueryMsg::CanExecute { sender, msgs } => to_binary(&query_can_execute(deps, sender, msgs)?),
         QueryMsg::AllAllowances { start_after, limit } => {
             to_binary(&query_all_allowances(deps, start_after, limit)?)
         }
@@ -327,39 +327,42 @@ pub fn query_permissions(deps: Deps, spender: HumanAddr) -> StdResult<Permission
 fn query_can_execute(
     deps: Deps,
     sender: HumanAddr,
-    msg: CosmosMsg,
+    msgs: Vec<CosmosMsg>,
 ) -> StdResult<CanExecuteResponse> {
     Ok(CanExecuteResponse {
-        can_execute: can_execute(deps, sender, msg)?,
+        can_execute: can_execute(deps, sender, msgs)?,
     })
 }
 
-// this can just return booleans and the query_can_execute wrapper creates the struct once, not on every path
-fn can_execute(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool> {
+fn can_execute(deps: Deps, sender: HumanAddr, msgs: Vec<CosmosMsg>) -> StdResult<Vec<bool>> {
     let owner_raw = deps.api.canonical_address(&sender)?;
     let cfg = admin_list_read(deps.storage).load()?;
     if cfg.is_admin(&owner_raw) {
-        return Ok(true);
+        return Ok(vec![true; msgs.len()]);
     }
-    match msg {
-        CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
-            // now we check if there is enough allowance for this message
-            let allowance = allowances_read(deps.storage).may_load(owner_raw.as_slice())?;
-            match allowance {
-                // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
-                Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
-                None => Ok(false),
+    let mut res = vec![false; msgs.len()];
+    for (i, msg) in msgs.iter().enumerate() {
+        res[i] = match msg {
+            CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
+                // now we check if there is enough allowance for this message
+                let allowance = allowances_read(deps.storage).may_load(owner_raw.as_slice())?;
+                match allowance {
+                    // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
+                    Some(allow) => allow.balance.sub(amount.clone()).is_ok(),
+                    None => false,
+                }
             }
-        }
-        CosmosMsg::Staking(staking_msg) => {
-            let perm_opt = permissions_read(deps.storage).may_load(owner_raw.as_slice())?;
-            match perm_opt {
-                Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
-                None => Ok(false),
+            CosmosMsg::Staking(staking_msg) => {
+                let perm_opt = permissions_read(deps.storage).may_load(owner_raw.as_slice())?;
+                match perm_opt {
+                    Some(permission) => check_staking_permissions(&staking_msg, permission).is_ok(),
+                    None => false,
+                }
             }
+            _ => false,
         }
-        _ => Ok(false),
     }
+    Ok(res)
 }
 
 const MAX_LIMIT: u32 = 30;
@@ -1497,41 +1500,22 @@ mod tests {
             recipient: None,
         });
 
-        // owner can send big or small
-        let res = query_can_execute(deps.as_ref(), owner.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
-        let res = query_can_execute(deps.as_ref(), owner.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
-        // owner can stake
-        let res =
-            query_can_execute(deps.as_ref(), owner.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        // owner can send big or small, can stake, and can withdraw stake
+        let msgs = vec![
+            send_msg,
+            send_msg_large,
+            staking_delegate_msg,
+            staking_withdraw_msg,
+        ];
+        let res = query_can_execute(deps.as_ref(), owner, msgs.clone()).unwrap();
+        assert_eq!(res.can_execute, vec![true; 4]);
 
-        // spender can send small
-        let res = query_can_execute(deps.as_ref(), spender.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
-        // not too big
-        let res =
-            query_can_execute(deps.as_ref(), spender.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
-        // spender can send staking msgs if permissioned
-        let res = query_can_execute(deps.as_ref(), spender.clone(), staking_delegate_msg.clone())
-            .unwrap();
-        assert_eq!(res.can_execute, true);
-        let res = query_can_execute(deps.as_ref(), spender.clone(), staking_withdraw_msg.clone())
-            .unwrap();
-        assert_eq!(res.can_execute, false);
+        // spender can send small, cannot send too big, can send staking msgs (if allowed), cannot withdraw staking
+        let res = query_can_execute(deps.as_ref(), spender, msgs.clone()).unwrap();
+        assert_eq!(res.can_execute, vec![true, false, true, false]);
 
         // random person cannot do anything
-        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
-        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
-        let res =
-            query_can_execute(deps.as_ref(), anyone.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
-        let res =
-            query_can_execute(deps.as_ref(), anyone.clone(), staking_withdraw_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
+        let res = query_can_execute(deps.as_ref(), anyone, msgs).unwrap();
+        assert_eq!(res.can_execute, vec![false; 4]);
     }
 }

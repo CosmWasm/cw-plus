@@ -21,5 +21,5 @@ where
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct CanExecuteResponse {
-    pub can_execute: bool,
+    pub can_execute: Vec<bool>,
 }

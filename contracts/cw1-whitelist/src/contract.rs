@@ -117,7 +117,7 @@ fn can_execute(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
-        QueryMsg::CanExecute { sender, msg } => to_binary(&query_can_execute(deps, sender, msg)?),
+        QueryMsg::CanExecute { sender, msgs } => to_binary(&query_can_execute(deps, sender, msgs)?),
     }
 }
 
@@ -132,10 +132,10 @@ pub fn query_admin_list(deps: Deps) -> StdResult<AdminListResponse> {
 pub fn query_can_execute(
     deps: Deps,
     sender: HumanAddr,
-    _msg: CosmosMsg,
+    msgs: Vec<CosmosMsg>,
 ) -> StdResult<CanExecuteResponse> {
     Ok(CanExecuteResponse {
-        can_execute: can_execute(deps, &sender)?,
+        can_execute: vec![can_execute(deps, &sender)?; msgs.len()],
     })
 }
 
@@ -302,20 +302,13 @@ mod tests {
             amount: coin(70000, "ureef"),
         });
 
-        // owner can send
-        let res = query_can_execute(deps.as_ref(), alice.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        let msgs = vec![send_msg, staking_msg];
+        // owner can send, owner can stake
+        let res = query_can_execute(deps.as_ref(), alice.clone(), msgs.clone()).unwrap();
+        assert_eq!(res.can_execute, vec![true, true]);
 
-        // owner can stake
-        let res = query_can_execute(deps.as_ref(), bob.clone(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
-
-        // anyone cannot send
-        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
-
-        // anyone cannot stake
-        let res = query_can_execute(deps.as_ref(), anyone.clone(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
+        // anyone cannot send, neither stake
+        let res = query_can_execute(deps.as_ref(), anyone.clone(), msgs).unwrap();
+        assert_eq!(res.can_execute, vec![false, false]);
     }
 }

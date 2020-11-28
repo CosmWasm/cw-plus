@@ -64,12 +64,15 @@
         "can_execute": {
           "type": "object",
           "required": [
-            "msg",
+            "msgs",
             "sender"
           ],
           "properties": {
-            "msg": {
-              "$ref": "#/definitions/CosmosMsg_for_Empty"
+            "msgs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CosmosMsg_for_Empty"
+              }
             },
             "sender": {
               "$ref": "#/definitions/HumanAddr"

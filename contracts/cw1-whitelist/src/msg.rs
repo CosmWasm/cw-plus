@@ -40,7 +40,7 @@ where
     /// before any further state changes, should also succeed.
     CanExecute {
         sender: HumanAddr,
-        msg: CosmosMsg<T>,
+        msgs: Vec<CosmosMsg<T>>,
     },
 }
 
