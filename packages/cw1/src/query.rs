@@ -11,15 +11,15 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     /// Checks permissions of the caller on this proxy.
-    /// If CanSend returns true then a call to `Execute` with the same message,
+    /// If CanExecute returns true then a call to `Execute` with the same message,
     /// from the given sender, before any further state changes, should also succeed.
-    CanSend {
+    CanExecute {
         sender: HumanAddr,
         msg: CosmosMsg<T>,
     },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct CanSendResponse {
-    pub can_send: bool,
+pub struct CanExecuteResponse {
+    pub can_execute: bool,
 }

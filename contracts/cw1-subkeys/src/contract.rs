@@ -7,7 +7,7 @@ use cosmwasm_std::{
     HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StakingMsg, StdError, StdResult,
 };
 use cw0::{calc_range_start_human, Expiration};
-use cw1::CanSendResponse;
+use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
@@ -296,7 +296,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, spender)?),
         QueryMsg::Permissions { spender } => to_binary(&query_permissions(deps, spender)?),
-        QueryMsg::CanSend { sender, msg } => to_binary(&query_can_send(deps, sender, msg)?),
+        QueryMsg::CanExecute { sender, msg } => to_binary(&query_can_execute(deps, sender, msg)?),
         QueryMsg::AllAllowances { start_after, limit } => {
             to_binary(&query_all_allowances(deps, start_after, limit)?)
         }
@@ -324,14 +324,18 @@ pub fn query_permissions(deps: Deps, spender: HumanAddr) -> StdResult<Permission
     Ok(permissions)
 }
 
-fn query_can_send(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<CanSendResponse> {
-    Ok(CanSendResponse {
-        can_send: can_send(deps, sender, msg)?,
+fn query_can_execute(
+    deps: Deps,
+    sender: HumanAddr,
+    msg: CosmosMsg,
+) -> StdResult<CanExecuteResponse> {
+    Ok(CanExecuteResponse {
+        can_execute: can_execute(deps, sender, msg)?,
     })
 }
 
-// this can just return booleans and the query_can_send wrapper creates the struct once, not on every path
-fn can_send(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool> {
+// this can just return booleans and the query_can_execute wrapper creates the struct once, not on every path
+fn can_execute(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool> {
     let owner_raw = deps.api.canonical_address(&sender)?;
     let cfg = admin_list_read(deps.storage).load()?;
     if cfg.is_admin(&owner_raw) {
@@ -1445,7 +1449,7 @@ mod tests {
     }
 
     #[test]
-    fn can_send_query_works() {
+    fn can_execute_query_works() {
         let mut deps = mock_dependencies(&[]);
 
         let owner = HumanAddr::from("admin007");
@@ -1494,39 +1498,40 @@ mod tests {
         });
 
         // owner can send big or small
-        let res = query_can_send(deps.as_ref(), owner.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        let res = query_can_send(deps.as_ref(), owner.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, true);
+        let res = query_can_execute(deps.as_ref(), owner.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, true);
+        let res = query_can_execute(deps.as_ref(), owner.clone(), send_msg_large.clone()).unwrap();
+        assert_eq!(res.can_execute, true);
         // owner can stake
         let res =
-            query_can_send(deps.as_ref(), owner.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
+            query_can_execute(deps.as_ref(), owner.clone(), staking_delegate_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, true);
 
         // spender can send small
-        let res = query_can_send(deps.as_ref(), spender.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
+        let res = query_can_execute(deps.as_ref(), spender.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, true);
         // not too big
-        let res = query_can_send(deps.as_ref(), spender.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+        let res =
+            query_can_execute(deps.as_ref(), spender.clone(), send_msg_large.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
         // spender can send staking msgs if permissioned
-        let res =
-            query_can_send(deps.as_ref(), spender.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_send, true);
-        let res =
-            query_can_send(deps.as_ref(), spender.clone(), staking_withdraw_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+        let res = query_can_execute(deps.as_ref(), spender.clone(), staking_delegate_msg.clone())
+            .unwrap();
+        assert_eq!(res.can_execute, true);
+        let res = query_can_execute(deps.as_ref(), spender.clone(), staking_withdraw_msg.clone())
+            .unwrap();
+        assert_eq!(res.can_execute, false);
 
         // random person cannot do anything
-        let res = query_can_send(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
-        let res = query_can_send(deps.as_ref(), anyone.clone(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
+        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg_large.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
         let res =
-            query_can_send(deps.as_ref(), anyone.clone(), staking_delegate_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+            query_can_execute(deps.as_ref(), anyone.clone(), staking_delegate_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
         let res =
-            query_can_send(deps.as_ref(), anyone.clone(), staking_withdraw_msg.clone()).unwrap();
-        assert_eq!(res.can_send, false);
+            query_can_execute(deps.as_ref(), anyone.clone(), staking_withdraw_msg.clone()).unwrap();
+        assert_eq!(res.can_execute, false);
     }
 }
