@@ -437,7 +437,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-    use std::string::ToString;
+    use cosmwasm_std::{coins, BankMsg, Coin};
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
@@ -446,17 +446,17 @@ mod tests {
 
     use super::*;
 
-    fn mock_env_height(height_delta: u64) -> Env {
-        let mut env = mock_env();
-        env.block.height += height_delta;
-        env
-    }
-
-    fn mock_env_time(time_delta: u64) -> Env {
-        let mut env = mock_env();
-        env.block.time += time_delta;
-        env
-    }
+    // fn mock_env_height(height_delta: u64) -> Env {
+    //     let mut env = mock_env();
+    //     env.block.height += height_delta;
+    //     env
+    // }
+    //
+    // fn mock_env_time(time_delta: u64) -> Env {
+    //     let mut env = mock_env();
+    //     env.block.time += time_delta;
+    //     env
+    // }
 
     const OWNER: &str = "admin0001";
     const VOTER1: &str = "voter0001";
@@ -472,31 +472,6 @@ mod tests {
             weight,
         }
     }
-
-    // // this will set up the init for other tests
-    // fn setup_test_case(
-    //     deps: DepsMut,
-    //     info: MessageInfo,
-    //     required_weight: u64,
-    //     max_voting_period: Duration,
-    // ) -> Result<InitResponse<Empty>, ContractError> {
-    //     // Init a contract with voters
-    //     let members = vec![
-    //         member(&info.sender, 0),
-    //         member(VOTER1, 1),
-    //         member(VOTER2, 2),
-    //         member(VOTER3, 3),
-    //         member(VOTER4, 4),
-    //         member(VOTER5, 5),
-    //     ];
-    //
-    //     let init_msg = InitMsg {
-    //         voters: members,
-    //         required_weight,
-    //         max_voting_period,
-    //     };
-    //     init(deps, mock_env(), info, init_msg)
-    // }
 
     // fn get_tally(deps: Deps, proposal_id: u64) -> u64 {
     //     // Get all the voters on the proposal
@@ -553,6 +528,49 @@ mod tests {
             .unwrap()
     }
 
+    // uploads code and returns address of group contract
+    fn init_flex(
+        app: &mut App,
+        group: HumanAddr,
+        required_weight: u64,
+        max_voting_period: Duration,
+    ) -> HumanAddr {
+        let flex_id = app.store_code(contract_flex());
+        let msg = crate::msg::InitMsg {
+            group,
+            required_weight,
+            max_voting_period,
+        };
+        app.instantiate_contract(flex_id, OWNER, &msg, &[], "flex")
+            .unwrap()
+    }
+
+    // this will set up both contracts, initializing the group with
+    // all voters defined above, and the multisig pointing to it and given threshold criteria.
+    // returns the address of the new multsig.
+    fn setup_test_case(
+        app: &mut App,
+        required_weight: u64,
+        max_voting_period: Duration,
+        init_funds: Vec<Coin>,
+    ) -> HumanAddr {
+        // Init a contract with voters
+        let members = vec![
+            member(OWNER, 0),
+            member(VOTER1, 1),
+            member(VOTER2, 2),
+            member(VOTER3, 3),
+            member(VOTER4, 4),
+            member(VOTER5, 5),
+        ];
+        let group_addr = init_group(app, members);
+        let flex_addr = init_flex(app, group_addr, required_weight, max_voting_period);
+        if !init_funds.is_empty() {
+            app.set_bank_balance(flex_addr.clone(), init_funds).unwrap();
+        }
+        flex_addr
+    }
+
     #[test]
     fn test_init_works() {
         let mut app = mock_app();
@@ -572,8 +590,7 @@ mod tests {
         let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "zero required weight");
 
         // Verify
-        assert!(res.is_err());
-        assert_eq!(res.unwrap_err(), (ContractError::ZeroWeight {}).to_string());
+        assert_eq!(res.unwrap_err(), ContractError::ZeroWeight {}.to_string());
 
         // Total weight less than required weight not allowed
         let init_msg = InitMsg {
@@ -584,10 +601,9 @@ mod tests {
         let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "high required weight");
 
         // Verify
-        assert!(res.is_err());
         assert_eq!(
             res.unwrap_err(),
-            (ContractError::UnreachableWeight {}).to_string()
+            ContractError::UnreachableWeight {}.to_string()
         );
 
         // All valid
@@ -632,96 +648,73 @@ mod tests {
 
     // TODO: query() tests
 
-    // #[test]
-    // fn test_propose_works() {
-    //     let mut deps = mock_dependencies(&[]);
-    //
-    //     let required_weight = 4;
-    //     let voting_period = Duration::Time(2000000);
-    //
-    //     let info = mock_info(OWNER, &[]);
-    //     setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
-    //
-    //     let bank_msg = BankMsg::Send {
-    //         from_address: OWNER.into(),
-    //         to_address: SOMEBODY.into(),
-    //         amount: vec![coin(1, "BTC")],
-    //     };
-    //     let msgs = vec![CosmosMsg::Bank(bank_msg)];
-    //
-    //     // Only voters can propose
-    //     let info = mock_info(SOMEBODY, &[]);
-    //     let proposal = HandleMsg::Propose {
-    //         title: "Rewarding somebody".to_string(),
-    //         description: "Do we reward her?".to_string(),
-    //         msgs: msgs.clone(),
-    //         latest: None,
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info, proposal.clone());
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::Unauthorized {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Wrong expiration option fails
-    //     let info = mock_info(OWNER, &[]);
-    //     let proposal_wrong_exp = HandleMsg::Propose {
-    //         title: "Rewarding somebody".to_string(),
-    //         description: "Do we reward her?".to_string(),
-    //         msgs: msgs.clone(),
-    //         latest: Some(Expiration::AtHeight(123456)),
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::WrongExpiration {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Proposal from voter works
-    //     let info = mock_info(VOTER3, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: vec![],
-    //             attributes: vec![
-    //                 attr("action", "propose"),
-    //                 attr("sender", VOTER3),
-    //                 attr("proposal_id", 1),
-    //                 attr("status", "Open"),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    //
-    //     // Proposal from voter with enough vote power directly passes
-    //     let info = mock_info(VOTER4, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info, proposal).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: vec![],
-    //             attributes: vec![
-    //                 attr("action", "propose"),
-    //                 attr("sender", VOTER4),
-    //                 attr("proposal_id", 2),
-    //                 attr("status", "Passed"),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    // }
-    //
+    #[test]
+    fn test_propose_works() {
+        let mut app = mock_app();
+
+        let required_weight = 4;
+        let voting_period = Duration::Time(2000000);
+        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+
+        let bank_msg = BankMsg::Send {
+            from_address: flex_addr.clone(),
+            to_address: SOMEBODY.into(),
+            amount: coins(1, "BTC"),
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+
+        // Only voters can propose
+        let proposal = HandleMsg::Propose {
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
+            msgs: msgs.clone(),
+            latest: None,
+        };
+        let res = app.execute_contract(SOMEBODY, &flex_addr, &proposal, &[]);
+        assert_eq!(res.unwrap_err(), ContractError::Unauthorized {}.to_string());
+
+        // Wrong expiration option fails
+        let proposal_wrong_exp = HandleMsg::Propose {
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
+            msgs: msgs.clone(),
+            latest: Some(Expiration::AtHeight(123456)),
+        };
+        let res = app.execute_contract(OWNER, &flex_addr, &proposal_wrong_exp, &[]);
+        assert_eq!(
+            res.unwrap_err(),
+            ContractError::WrongExpiration {}.to_string()
+        );
+
+        // Proposal from voter works
+        let res = app
+            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "propose"),
+                attr("sender", VOTER3),
+                attr("proposal_id", 1),
+                attr("status", "Open"),
+            ],
+        );
+
+        // Proposal from voter with enough vote power directly passes
+        let res = app
+            .execute_contract(VOTER4, &flex_addr, &proposal, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "propose"),
+                attr("sender", VOTER4),
+                attr("proposal_id", 2),
+                attr("status", "Passed"),
+            ],
+        );
+    }
+
     // #[test]
     // fn test_vote_works() {
     //     let mut deps = mock_dependencies(&[]);
