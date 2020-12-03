@@ -259,11 +259,13 @@ version = "0.3.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-multi-test",
  "cw-storage-plus",
  "cw0",
  "cw2",
  "cw3",
  "cw4",
+ "cw4-group",
  "schemars",
  "serde",
  "thiserror",
