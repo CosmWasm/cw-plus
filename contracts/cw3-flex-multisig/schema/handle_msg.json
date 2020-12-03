@@ -1,0 +1,472 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HandleMsg",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "propose"
+      ],
+      "properties": {
+        "propose": {
+          "type": "object",
+          "required": [
+            "description",
+            "msgs",
+            "title"
+          ],
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "latest": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "msgs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CosmosMsg_for_Empty"
+              }
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "vote"
+      ],
+      "properties": {
+        "vote": {
+          "type": "object",
+          "required": [
+            "proposal_id",
+            "vote"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "vote": {
+              "$ref": "#/definitions/Vote"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "execute"
+      ],
+      "properties": {
+        "execute": {
+          "type": "object",
+          "required": [
+            "proposal_id"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "close"
+      ],
+      "properties": {
+        "close": {
+          "type": "object",
+          "required": [
+            "proposal_id"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "BankMsg": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "send"
+          ],
+          "properties": {
+            "send": {
+              "type": "object",
+              "required": [
+                "amount",
+                "from_address",
+                "to_address"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Coin"
+                  }
+                },
+                "from_address": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "to_address": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "CosmosMsg_for_Empty": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "bank"
+          ],
+          "properties": {
+            "bank": {
+              "$ref": "#/definitions/BankMsg"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "custom"
+          ],
+          "properties": {
+            "custom": {
+              "$ref": "#/definitions/Empty"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "staking"
+          ],
+          "properties": {
+            "staking": {
+              "$ref": "#/definitions/StakingMsg"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "wasm"
+          ],
+          "properties": {
+            "wasm": {
+              "$ref": "#/definitions/WasmMsg"
+            }
+          }
+        }
+      ]
+    },
+    "Empty": {
+      "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
+      "type": "object"
+    },
+    "Expiration": {
+      "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "StakingMsg": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "delegate"
+          ],
+          "properties": {
+            "delegate": {
+              "type": "object",
+              "required": [
+                "amount",
+                "validator"
+              ],
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Coin"
+                },
+                "validator": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "undelegate"
+          ],
+          "properties": {
+            "undelegate": {
+              "type": "object",
+              "required": [
+                "amount",
+                "validator"
+              ],
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Coin"
+                },
+                "validator": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "withdraw"
+          ],
+          "properties": {
+            "withdraw": {
+              "type": "object",
+              "required": [
+                "validator"
+              ],
+              "properties": {
+                "recipient": {
+                  "description": "this is the \"withdraw address\", the one that should receive the rewards if None, then use delegator address",
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "validator": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "redelegate"
+          ],
+          "properties": {
+            "redelegate": {
+              "type": "object",
+              "required": [
+                "amount",
+                "dst_validator",
+                "src_validator"
+              ],
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Coin"
+                },
+                "dst_validator": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "src_validator": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Uint128": {
+      "type": "string"
+    },
+    "Vote": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "abstain",
+        "veto"
+      ]
+    },
+    "WasmMsg": {
+      "anyOf": [
+        {
+          "description": "this dispatches a call to another contract at a known address (with known ABI)",
+          "type": "object",
+          "required": [
+            "execute"
+          ],
+          "properties": {
+            "execute": {
+              "type": "object",
+              "required": [
+                "contract_addr",
+                "msg",
+                "send"
+              ],
+              "properties": {
+                "contract_addr": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "msg": {
+                  "description": "msg is the json-encoded HandleMsg struct (as raw Binary)",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/Binary"
+                    }
+                  ]
+                },
+                "send": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Coin"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "this instantiates a new contracts from previously uploaded wasm code",
+          "type": "object",
+          "required": [
+            "instantiate"
+          ],
+          "properties": {
+            "instantiate": {
+              "type": "object",
+              "required": [
+                "code_id",
+                "msg",
+                "send"
+              ],
+              "properties": {
+                "code_id": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                },
+                "label": {
+                  "description": "optional human-readbale label for the contract",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "msg": {
+                  "description": "msg is the json-encoded InitMsg struct (as raw Binary)",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/Binary"
+                    }
+                  ]
+                },
+                "send": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Coin"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

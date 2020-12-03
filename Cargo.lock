@@ -254,6 +254,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw3-flex-multisig"
+version = "0.3.2"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw3",
+ "cw4",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw4"
 version = "0.3.2"
 dependencies = [
