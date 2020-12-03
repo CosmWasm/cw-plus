@@ -473,24 +473,6 @@ mod tests {
         }
     }
 
-    // fn get_tally(deps: Deps, proposal_id: u64) -> u64 {
-    //     // Get all the voters on the proposal
-    //     let voters = QueryMsg::ListVotes {
-    //         proposal_id,
-    //         start_after: None,
-    //         limit: None,
-    //     };
-    //     let votes: VoteListResponse =
-    //         from_binary(&query(deps, mock_env(), voters).unwrap()).unwrap();
-    //     // Sum the weights of the Yes votes to get the tally
-    //     votes
-    //         .votes
-    //         .iter()
-    //         .filter(|&v| v.vote == Vote::Yes)
-    //         .map(|v| v.weight)
-    //         .sum()
-    // }
-
     pub fn contract_flex() -> Box<dyn Contract> {
         let contract = ContractWrapper::new(
             crate::contract::handle,
@@ -715,159 +697,161 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_vote_works() {
-    //     let mut deps = mock_dependencies(&[]);
-    //
-    //     let required_weight = 3;
-    //     let voting_period = Duration::Time(2000000);
-    //
-    //     let info = mock_info(OWNER, &[]);
-    //     setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
-    //
-    //     // Propose
-    //     let bank_msg = BankMsg::Send {
-    //         from_address: OWNER.into(),
-    //         to_address: SOMEBODY.into(),
-    //         amount: vec![coin(1, "BTC")],
-    //     };
-    //     let msgs = vec![CosmosMsg::Bank(bank_msg)];
-    //     let proposal = HandleMsg::Propose {
-    //         title: "Pay somebody".to_string(),
-    //         description: "Do I pay her?".to_string(),
-    //         msgs,
-    //         latest: None,
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
-    //
-    //     // Get the proposal id from the logs
-    //     let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
-    //
-    //     // Owner cannot vote (again)
-    //     let yes_vote = HandleMsg::Vote {
-    //         proposal_id,
-    //         vote: Vote::Yes,
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::AlreadyVoted {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Only voters can vote
-    //     let info = mock_info(SOMEBODY, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::Unauthorized {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // But voter1 can
-    //     let info = mock_info(VOTER1, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: vec![],
-    //             attributes: vec![
-    //                 attr("action", "vote"),
-    //                 attr("sender", VOTER1),
-    //                 attr("proposal_id", proposal_id),
-    //                 attr("status", "Open"),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    //
-    //     // No/Veto votes have no effect on the tally
-    //     // Get the proposal id from the logs
-    //     let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
-    //
-    //     // Compute the current tally
-    //     let tally = get_tally(deps.as_ref(), proposal_id);
-    //
-    //     // Cast a No vote
-    //     let no_vote = HandleMsg::Vote {
-    //         proposal_id,
-    //         vote: Vote::No,
-    //     };
-    //     let info = mock_info(VOTER2, &[]);
-    //     handle(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
-    //
-    //     // Cast a Veto vote
-    //     let veto_vote = HandleMsg::Vote {
-    //         proposal_id,
-    //         vote: Vote::Veto,
-    //     };
-    //     let info = mock_info(VOTER3, &[]);
-    //     handle(deps.as_mut(), mock_env(), info.clone(), veto_vote).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
-    //
-    //     // Once voted, votes cannot be changed
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::AlreadyVoted {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //     assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
-    //
-    //     // Expired proposals cannot be voted
-    //     let env = match voting_period {
-    //         Duration::Time(duration) => mock_env_time(duration + 1),
-    //         Duration::Height(duration) => mock_env_height(duration + 1),
-    //     };
-    //     let res = handle(deps.as_mut(), env, info, no_vote);
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::Expired {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Vote it again, so it passes
-    //     let info = mock_info(VOTER4, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: vec![],
-    //             attributes: vec![
-    //                 attr("action", "vote"),
-    //                 attr("sender", VOTER4),
-    //                 attr("proposal_id", proposal_id),
-    //                 attr("status", "Passed"),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    //
-    //     // non-Open proposals cannot be voted
-    //     let info = mock_info(VOTER5, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info, yes_vote);
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::NotOpen {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    // }
+    fn get_tally(app: &App, flex_addr: &HumanAddr, proposal_id: u64) -> u64 {
+        // Get all the voters on the proposal
+        let voters = QueryMsg::ListVotes {
+            proposal_id,
+            start_after: None,
+            limit: None,
+        };
+        let votes: VoteListResponse = app.wrap().query_wasm_smart(flex_addr, &voters).unwrap();
+        // Sum the weights of the Yes votes to get the tally
+        votes
+            .votes
+            .iter()
+            .filter(|&v| v.vote == Vote::Yes)
+            .map(|v| v.weight)
+            .sum()
+    }
+
+    fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
+        move |block: &mut BlockInfo| {
+            match voting_period {
+                Duration::Time(duration) => block.time += duration + 1,
+                Duration::Height(duration) => block.height += duration + 1,
+            };
+        }
+    }
+
+    fn unexpire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
+        move |block: &mut BlockInfo| {
+            match voting_period {
+                Duration::Time(duration) => block.time -= duration,
+                Duration::Height(duration) => block.height -= duration,
+            };
+        }
+    }
+
+    #[test]
+    fn test_vote_works() {
+        let mut app = mock_app();
+
+        let required_weight = 3;
+        let voting_period = Duration::Time(2000000);
+        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: flex_addr.clone(),
+            to_address: SOMEBODY.into(),
+            amount: coins(1, "BTC"),
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        };
+
+        // create proposal with 0 vote power
+        let res = app
+            .execute_contract(OWNER, &flex_addr, &proposal, &[])
+            .unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // Owner cannot vote (again)
+        let yes_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let err = app
+            .execute_contract(OWNER, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::AlreadyVoted {}.to_string());
+
+        // Only voters can vote
+        let err = app
+            .execute_contract(SOMEBODY, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {}.to_string());
+
+        // But voter1 can
+        let res = app
+            .execute_contract(VOTER1, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "vote"),
+                attr("sender", VOTER1),
+                attr("proposal_id", proposal_id),
+                attr("status", "Open"),
+            ],
+        );
+
+        // No/Veto votes have no effect on the tally
+        // Compute the current tally
+        let tally = get_tally(&app, &flex_addr, proposal_id);
+        assert_eq!(tally, 1);
+
+        // Cast a No vote
+        let no_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        let _ = app
+            .execute_contract(VOTER2, &flex_addr, &no_vote, &[])
+            .unwrap();
+
+        // Cast a Veto vote
+        let veto_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Veto,
+        };
+        let _ = app
+            .execute_contract(VOTER3, &flex_addr, &veto_vote, &[])
+            .unwrap();
+
+        // Tally unchanged
+        assert_eq!(tally, get_tally(&app, &flex_addr, proposal_id));
+
+        let err = app
+            .execute_contract(VOTER3, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::AlreadyVoted {}.to_string());
+
+        // Expired proposals cannot be voted
+        app.update_block(expire(voting_period));
+        let err = app
+            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::Expired {}.to_string());
+        app.update_block(unexpire(voting_period));
+
+        // Powerful voter supports it, so it passes
+        let res = app
+            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "vote"),
+                attr("sender", VOTER4),
+                attr("proposal_id", proposal_id),
+                attr("status", "Passed"),
+            ],
+        );
+
+        // non-Open proposals cannot be voted
+        let err = app
+            .execute_contract(VOTER5, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::NotOpen {}.to_string());
+    }
+
     //
     // #[test]
     // fn test_execute_works() {
