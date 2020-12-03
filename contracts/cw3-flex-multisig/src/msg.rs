@@ -7,15 +7,10 @@ use cw3::Vote;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
-    pub voters: Vec<Voter>,
+    // this is the group contract that contains the member list
+    pub group: HumanAddr,
     pub required_weight: u64,
     pub max_voting_period: Duration,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct Voter {
-    pub addr: HumanAddr,
-    pub weight: u64,
 }
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now

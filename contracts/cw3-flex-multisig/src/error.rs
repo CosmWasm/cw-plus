@@ -12,8 +12,8 @@ pub enum ContractError {
     #[error("Not possible to reach required (passing) weight")]
     UnreachableWeight {},
 
-    #[error("No voters")]
-    NoVoters {},
+    #[error("Group contract invalid address")]
+    InvalidGroup {},
 
     #[error("Unauthorized")]
     Unauthorized {},

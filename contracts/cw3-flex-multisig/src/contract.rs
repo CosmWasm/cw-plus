@@ -15,12 +15,11 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{
-    next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS, VOTERS,
-};
+use crate::state::{next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS};
+use cw4::Cw4Contract;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
+const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init(
@@ -32,10 +31,13 @@ pub fn init(
     if msg.required_weight == 0 {
         return Err(ContractError::ZeroWeight {});
     }
-    if msg.voters.is_empty() {
-        return Err(ContractError::NoVoters {});
+    // we just convert to canonical to check if this is a valid format
+    if deps.api.canonical_address(&msg.group).is_err() {
+        return Err(ContractError::InvalidGroup {});
     }
-    let total_weight = msg.voters.iter().map(|v| v.weight).sum();
+
+    let group = Cw4Contract(msg.group);
+    let total_weight = group.total_weight(&deps.querier)?;
 
     if total_weight < msg.required_weight {
         return Err(ContractError::UnreachableWeight {});
@@ -45,16 +47,11 @@ pub fn init(
 
     let cfg = Config {
         required_weight: msg.required_weight,
-        total_weight,
         max_voting_period: msg.max_voting_period,
+        group,
     };
     CONFIG.save(deps.storage, &cfg)?;
 
-    // add all voters
-    for voter in msg.voters.iter() {
-        let key = deps.api.canonical_address(&voter.addr)?;
-        VOTERS.save(deps.storage, &key, &voter.weight)?;
-    }
     Ok(InitResponse::default())
 }
 
@@ -89,11 +86,12 @@ pub fn handle_propose(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&info.sender)?;
-    let vote_power = VOTERS
-        .may_load(deps.storage, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
-
     let cfg = CONFIG.load(deps.storage)?;
+
+    let vote_power = cfg
+        .group
+        .is_member(&deps.querier, raw_sender)?
+        .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
@@ -152,8 +150,11 @@ pub fn handle_vote(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&info.sender)?;
-    let vote_power = VOTERS
-        .may_load(deps.storage, &raw_sender)?
+    let cfg = CONFIG.load(deps.storage)?;
+
+    let vote_power = cfg
+        .group
+        .is_member(&deps.querier, raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
@@ -291,9 +292,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
+    let total_weight = cfg.group.total_weight(&deps.querier)?;
     Ok(ThresholdResponse::AbsoluteCount {
         weight_needed: cfg.required_weight,
-        total_weight: cfg.total_weight,
+        total_weight,
     })
 }
 
@@ -401,10 +403,13 @@ fn list_votes(
 }
 
 fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
+    let cfg = CONFIG.load(deps.storage)?;
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let weight = VOTERS
-        .may_load(deps.storage, &voter_raw)?
+    let weight = cfg
+        .group
+        .is_member(&deps.querier, voter_raw)?
         .unwrap_or_default();
+
     Ok(VoterResponse {
         addr: voter,
         weight,
@@ -416,24 +421,17 @@ fn list_voters(
     start_after: Option<HumanAddr>,
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
-
-    let api = &deps.api;
-    let voters: StdResult<Vec<_>> = VOTERS
-        .range(deps.storage, start, None, Order::Ascending)
-        .take(limit)
-        .map(|item| {
-            let (key, weight) = item?;
-            Ok(VoterResponse {
-                addr: api.human_address(&CanonicalAddr::from(key))?,
-                weight,
-            })
+    let cfg = CONFIG.load(deps.storage)?;
+    let voters = cfg
+        .group
+        .list_members(&deps.querier, start_after, limit)?
+        .into_iter()
+        .map(|member| VoterResponse {
+            addr: member.addr,
+            weight: member.weight,
         })
         .collect();
-
-    Ok(VoterListResponse { voters: voters? })
+    Ok(VoterListResponse { voters })
 }
 
 #[cfg(test)]

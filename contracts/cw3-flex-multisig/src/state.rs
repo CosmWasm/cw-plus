@@ -6,13 +6,15 @@ use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
 
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
+use cw4::Cw4Contract;
 use cw_storage_plus::{Item, Map, U64Key};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
     pub required_weight: u64,
-    pub total_weight: u64,
     pub max_voting_period: Duration,
+    // Total weight and voters are queried from this contract
+    pub group: Cw4Contract,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -58,7 +60,6 @@ pub const CONFIG: Item<Config> = Item::new(b"config");
 pub const PROPOSAL_COUNT: Item<u64> = Item::new(b"proposal_count");
 
 // multiple-item maps
-pub const VOTERS: Map<&[u8], u64> = Map::new(b"voters");
 pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposals");
 pub const BALLOTS: Map<(U64Key, &[u8]), Ballot> = Map::new(b"votes");
 
