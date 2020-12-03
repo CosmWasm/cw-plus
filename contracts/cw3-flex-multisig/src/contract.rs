@@ -11,12 +11,12 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
 };
+use cw4::Cw4Contract;
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS};
-use cw4::Cw4Contract;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -445,18 +445,6 @@ mod tests {
     use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
     use super::*;
-
-    // fn mock_env_height(height_delta: u64) -> Env {
-    //     let mut env = mock_env();
-    //     env.block.height += height_delta;
-    //     env
-    // }
-    //
-    // fn mock_env_time(time_delta: u64) -> Env {
-    //     let mut env = mock_env();
-    //     env.block.time += time_delta;
-    //     env
-    // }
 
     const OWNER: &str = "admin0001";
     const VOTER1: &str = "voter0001";
