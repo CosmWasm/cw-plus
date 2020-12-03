@@ -90,7 +90,7 @@ pub fn handle_propose(
 
     let vote_power = cfg
         .group
-        .is_member(&deps.querier, raw_sender)?
+        .is_member(&deps.querier, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // max expires also used as default
@@ -154,7 +154,7 @@ pub fn handle_vote(
 
     let vote_power = cfg
         .group
-        .is_member(&deps.querier, raw_sender)?
+        .is_member(&deps.querier, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
@@ -407,7 +407,7 @@ fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = cfg
         .group
-        .is_member(&deps.querier, voter_raw)?
+        .is_member(&deps.querier, &voter_raw)?
         .unwrap_or_default();
 
     Ok(VoterResponse {
