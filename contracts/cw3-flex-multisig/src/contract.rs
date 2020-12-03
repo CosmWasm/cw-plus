@@ -437,7 +437,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-    use cosmwasm_std::{coins, BankMsg, Coin};
+    use cosmwasm_std::{coin, coins, BankMsg, Coin};
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
@@ -852,110 +852,98 @@ mod tests {
         assert_eq!(err, ContractError::NotOpen {}.to_string());
     }
 
-    //
-    // #[test]
-    // fn test_execute_works() {
-    //     let mut deps = mock_dependencies(&[]);
-    //
-    //     let required_weight = 3;
-    //     let voting_period = Duration::Time(2000000);
-    //
-    //     let info = mock_info(OWNER, &[]);
-    //     setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
-    //
-    //     // Propose
-    //     let bank_msg = BankMsg::Send {
-    //         from_address: OWNER.into(),
-    //         to_address: SOMEBODY.into(),
-    //         amount: vec![coin(1, "BTC")],
-    //     };
-    //     let msgs = vec![CosmosMsg::Bank(bank_msg)];
-    //     let proposal = HandleMsg::Propose {
-    //         title: "Pay somebody".to_string(),
-    //         description: "Do I pay her?".to_string(),
-    //         msgs: msgs.clone(),
-    //         latest: None,
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
-    //
-    //     // Get the proposal id from the logs
-    //     let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
-    //
-    //     // Only Passed can be executed
-    //     let execution = HandleMsg::Execute { proposal_id };
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), execution.clone());
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::WrongExecuteStatus {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Vote it, so it passes
-    //     let vote = HandleMsg::Vote {
-    //         proposal_id,
-    //         vote: Vote::Yes,
-    //     };
-    //     let info = mock_info(VOTER3, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), vote).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: vec![],
-    //             attributes: vec![
-    //                 attr("action", "vote"),
-    //                 attr("sender", VOTER3),
-    //                 attr("proposal_id", proposal_id),
-    //                 attr("status", "Passed"),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    //
-    //     // In passing: Try to close Passed fails
-    //     let closing = HandleMsg::Close { proposal_id };
-    //     let res = handle(deps.as_mut(), mock_env(), info, closing);
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::WrongCloseStatus {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Execute works. Anybody can execute Passed proposals
-    //     let info = mock_info(SOMEBODY, &[]);
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: msgs,
-    //             attributes: vec![
-    //                 attr("action", "execute"),
-    //                 attr("sender", SOMEBODY),
-    //                 attr("proposal_id", proposal_id),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    //
-    //     // In passing: Try to close Executed fails
-    //     let closing = HandleMsg::Close { proposal_id };
-    //     let res = handle(deps.as_mut(), mock_env(), info, closing);
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::WrongCloseStatus {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    // }
-    //
+    #[test]
+    fn test_execute_works() {
+        let mut app = mock_app();
+
+        let required_weight = 3;
+        let voting_period = Duration::Time(2000000);
+        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+
+        // ensure we have cash to cover the proposal
+        let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
+        assert_eq!(contract_bal, coin(10, "BTC"));
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: flex_addr.clone(),
+            to_address: SOMEBODY.into(),
+            amount: coins(1, "BTC"),
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        };
+
+        // create proposal with 0 vote power
+        let res = app
+            .execute_contract(OWNER, &flex_addr, &proposal, &[])
+            .unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // Only Passed can be executed
+        let execution = HandleMsg::Execute { proposal_id };
+        let err = app
+            .execute_contract(OWNER, &flex_addr, &execution, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::WrongExecuteStatus {}.to_string());
+
+        // Vote it, so it passes
+        let vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let res = app
+            .execute_contract(VOTER3, &flex_addr, &vote, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "vote"),
+                attr("sender", VOTER3),
+                attr("proposal_id", proposal_id),
+                attr("status", "Passed"),
+            ],
+        );
+
+        // In passing: Try to close Passed fails
+        let closing = HandleMsg::Close { proposal_id };
+        let err = app
+            .execute_contract(OWNER, &flex_addr, &closing, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
+
+        // Execute works. Anybody can execute Passed proposals
+        let res = app
+            .execute_contract(SOMEBODY, &flex_addr, &execution, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "execute"),
+                attr("sender", SOMEBODY),
+                attr("proposal_id", proposal_id),
+            ],
+        );
+
+        // verify money was transfered
+        let some_bal = app.wrap().query_balance(SOMEBODY, "BTC").unwrap();
+        assert_eq!(some_bal, coin(1, "BTC"));
+        let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
+        assert_eq!(contract_bal, coin(9, "BTC"));
+
+        // In passing: Try to close Executed fails
+        let err = app
+            .execute_contract(OWNER, &flex_addr, &closing, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
+    }
+
     // #[test]
     // fn test_close_works() {
     //     let mut deps = mock_dependencies(&[]);
