@@ -3,11 +3,14 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
+    "group",
     "max_voting_period",
-    "required_weight",
-    "voters"
+    "required_weight"
   ],
   "properties": {
+    "group": {
+      "$ref": "#/definitions/HumanAddr"
+    },
     "max_voting_period": {
       "$ref": "#/definitions/Duration"
     },
@@ -15,12 +18,6 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
-    },
-    "voters": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Voter"
-      }
     }
   },
   "definitions": {
@@ -57,23 +54,6 @@
     },
     "HumanAddr": {
       "type": "string"
-    },
-    "Voter": {
-      "type": "object",
-      "required": [
-        "addr",
-        "weight"
-      ],
-      "properties": {
-        "addr": {
-          "$ref": "#/definitions/HumanAddr"
-        },
-        "weight": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        }
-      }
     }
   }
 }
