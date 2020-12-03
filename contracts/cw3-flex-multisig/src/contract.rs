@@ -944,97 +944,62 @@ mod tests {
         assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
     }
 
-    // #[test]
-    // fn test_close_works() {
-    //     let mut deps = mock_dependencies(&[]);
-    //
-    //     let required_weight = 3;
-    //     let voting_period = Duration::Height(2000000);
-    //
-    //     let info = mock_info(OWNER, &[]);
-    //     setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
-    //
-    //     // Propose
-    //     let bank_msg = BankMsg::Send {
-    //         from_address: OWNER.into(),
-    //         to_address: SOMEBODY.into(),
-    //         amount: vec![coin(1, "BTC")],
-    //     };
-    //     let msgs = vec![CosmosMsg::Bank(bank_msg)];
-    //     let proposal = HandleMsg::Propose {
-    //         title: "Pay somebody".to_string(),
-    //         description: "Do I pay her?".to_string(),
-    //         msgs: msgs.clone(),
-    //         latest: None,
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
-    //
-    //     // Get the proposal id from the logs
-    //     let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
-    //
-    //     let closing = HandleMsg::Close { proposal_id };
-    //
-    //     // Anybody can close
-    //     let info = mock_info(SOMEBODY, &[]);
-    //
-    //     // Non-expired proposals cannot be closed
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), closing.clone());
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::NotExpired {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    //
-    //     // Expired proposals can be closed
-    //     let info = mock_info(OWNER, &[]);
-    //
-    //     let proposal = HandleMsg::Propose {
-    //         title: "(Try to) pay somebody".to_string(),
-    //         description: "Pay somebody after time?".to_string(),
-    //         msgs: msgs.clone(),
-    //         latest: Some(Expiration::AtHeight(123456)),
-    //     };
-    //     let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
-    //
-    //     // Get the proposal id from the logs
-    //     let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
-    //
-    //     let closing = HandleMsg::Close { proposal_id };
-    //
-    //     // Close expired works
-    //     let env = mock_env_height(1234567);
-    //     let res = handle(
-    //         deps.as_mut(),
-    //         env,
-    //         mock_info(SOMEBODY, &[]),
-    //         closing.clone(),
-    //     )
-    //     .unwrap();
-    //
-    //     // Verify
-    //     assert_eq!(
-    //         res,
-    //         HandleResponse {
-    //             messages: vec![],
-    //             attributes: vec![
-    //                 attr("action", "close"),
-    //                 attr("sender", SOMEBODY),
-    //                 attr("proposal_id", proposal_id),
-    //             ],
-    //             data: None,
-    //         }
-    //     );
-    //
-    //     // Trying to close it again fails
-    //     let res = handle(deps.as_mut(), mock_env(), info, closing);
-    //
-    //     // Verify
-    //     assert!(res.is_err());
-    //     match res.unwrap_err() {
-    //         ContractError::WrongCloseStatus {} => {}
-    //         e => panic!("unexpected error: {}", e),
-    //     }
-    // }
+    #[test]
+    fn test_close_works() {
+        let mut app = mock_app();
+
+        let required_weight = 3;
+        let voting_period = Duration::Height(2000000);
+        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            from_address: flex_addr.clone(),
+            to_address: SOMEBODY.into(),
+            amount: coins(1, "BTC"),
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        };
+
+        // create proposal with 0 vote power
+        let res = app
+            .execute_contract(OWNER, &flex_addr, &proposal, &[])
+            .unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // Non-expired proposals cannot be closed
+        let closing = HandleMsg::Close { proposal_id };
+        let err = app
+            .execute_contract(SOMEBODY, &flex_addr, &closing, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::NotExpired {}.to_string());
+
+        // Expired proposals can be closed
+        app.update_block(expire(voting_period));
+        let res = app
+            .execute_contract(SOMEBODY, &flex_addr, &closing, &[])
+            .unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "close"),
+                attr("sender", SOMEBODY),
+                attr("proposal_id", proposal_id),
+            ],
+        );
+
+        // Trying to close it again fails
+        let closing = HandleMsg::Close { proposal_id };
+        let err = app
+            .execute_contract(SOMEBODY, &flex_addr, &closing, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
+    }
 }
