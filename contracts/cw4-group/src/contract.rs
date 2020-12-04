@@ -422,7 +422,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_init(deps.as_mut());
 
-        // USER1 is updated and remove in the same line, we should remove this an add member3
+        // USER1 is updated and remove in the same call, we should remove this an add member3
         let add = vec![
             Member {
                 addr: USER1.into(),
@@ -439,6 +439,116 @@ mod tests {
         update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(5));
     }
+
+    #[test]
+    fn add_remove_hooks() {
+        // add will over-write and remove have no effect
+        let mut deps = mock_dependencies(&[]);
+        do_init(deps.as_mut());
+
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert!(hooks.hooks.is_empty());
+
+        let contract1 = HumanAddr::from("hook1");
+        let contract2 = HumanAddr::from("hook2");
+
+        let add_msg = HandleMsg::AddHook {
+            addr: contract1.clone(),
+        };
+
+        // non-admin cannot add hook
+        let user_info = mock_info(USER1, &[]);
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            user_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // admin can add it, and it appears in the query
+        let admin_info = mock_info(ADMIN, &[]);
+        let _ = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract1.clone()]);
+
+        // cannot remove a non-registered contract
+        let remove_msg = HandleMsg::RemoveHook {
+            addr: contract2.clone(),
+        };
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::HookNotRegistered {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // add second contract
+        let add_msg2 = HandleMsg::AddHook {
+            addr: contract2.clone(),
+        };
+        let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
+
+        // cannot re-add an existing contract
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::HookAlreadyRegistered {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // non-admin cannot remove
+        let remove_msg = HandleMsg::RemoveHook {
+            addr: contract1.clone(),
+        };
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            user_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // remove the original
+        let _ = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract2.clone()]);
+    }
+
+    #[test]
+    fn hooks_fire() {}
 
     #[test]
     fn raw_queries_work() {
