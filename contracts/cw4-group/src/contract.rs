@@ -1,11 +1,12 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    to_binary, Api, Binary, CanonicalAddr, Context, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, Order, StdResult,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
 use cw4::{
-    AdminResponse, HooksResponse, Member, MemberListResponse, MemberResponse, TotalWeightResponse,
+    AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
+    MemberResponse, TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
 
@@ -81,13 +82,20 @@ pub fn update_admin(
 }
 
 pub fn handle_update_members(
-    deps: DepsMut,
+    mut deps: DepsMut,
     info: MessageInfo,
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
-    update_members(deps, info.sender, add, remove)?;
-    Ok(HandleResponse::default())
+    // make the local update
+    let diff = update_members(deps.branch(), info.sender, add, remove)?;
+    // call all registered hooks
+    let mut ctx = Context::new();
+    for h in HOOKS.may_load(deps.storage)?.unwrap_or_default() {
+        let msg = diff.clone().into_cosmos_msg(h)?;
+        ctx.add_message(msg);
+    }
+    Ok(ctx.into())
 }
 
 // the logic from handle_update_admin extracted for easier import
@@ -96,11 +104,12 @@ pub fn update_members(
     sender: HumanAddr,
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
-) -> Result<(), ContractError> {
+) -> Result<MemberChangedHookMsg, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
     assert_admin(deps.api, sender, admin)?;
 
     let mut total = TOTAL.load(deps.storage)?;
+    let mut diffs: Vec<MemberDiff> = vec![];
 
     // add all new members and update total
     for add in to_add.into_iter() {
@@ -108,19 +117,24 @@ pub fn update_members(
         MEMBERS.update(deps.storage, &raw, |old| -> StdResult<_> {
             total -= old.unwrap_or_default();
             total += add.weight;
+            diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
             Ok(add.weight)
         })?;
     }
 
     for remove in to_remove.into_iter() {
         let raw = deps.api.canonical_address(&remove)?;
-        total -= MEMBERS.may_load(deps.storage, &raw)?.unwrap_or_default();
-        MEMBERS.remove(deps.storage, &raw);
+        let old = MEMBERS.may_load(deps.storage, &raw)?;
+        // only process this if they were actually in the lsit before
+        if let Some(weight) = old {
+            diffs.push(MemberDiff::new(remove, Some(weight), None));
+            total -= weight;
+            MEMBERS.remove(deps.storage, &raw);
+        }
     }
 
     TOTAL.save(deps.storage, &total)?;
-
-    Ok(())
+    Ok(MemberChangedHookMsg { diffs })
 }
 
 fn assert_admin(

@@ -22,6 +22,20 @@ pub struct MemberDiff {
     pub new_weight: Option<u64>,
 }
 
+impl MemberDiff {
+    pub fn new<T: Into<HumanAddr>>(
+        addr: T,
+        old_weight: Option<u64>,
+        new_weight: Option<u64>,
+    ) -> Self {
+        MemberDiff {
+            addr: addr.into(),
+            old_weight,
+            new_weight,
+        }
+    }
+}
+
 impl MemberChangedHookMsg {
     /// serializes the message
     pub fn into_binary(self) -> StdResult<Binary> {
