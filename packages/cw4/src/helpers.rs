@@ -78,7 +78,6 @@ impl Cw4Contract {
         querier.query(&query)
     }
 
-    // TODO: implement with raw queries
     /// Check if this address is a member, and if so, with which weight
     pub fn is_member(
         &self,
