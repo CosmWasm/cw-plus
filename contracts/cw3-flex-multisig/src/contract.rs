@@ -32,11 +32,13 @@ pub fn init(
         return Err(ContractError::ZeroWeight {});
     }
     // we just convert to canonical to check if this is a valid format
-    if deps.api.canonical_address(&msg.group).is_err() {
-        return Err(ContractError::InvalidGroup {});
+    if deps.api.canonical_address(&msg.group_addr).is_err() {
+        return Err(ContractError::InvalidGroup {
+            addr: msg.group_addr,
+        });
     }
 
-    let group = Cw4Contract(msg.group);
+    let group = Cw4Contract(msg.group_addr);
     let total_weight = group.total_weight(&deps.querier)?;
 
     if total_weight < msg.required_weight {
@@ -48,7 +50,7 @@ pub fn init(
     let cfg = Config {
         required_weight: msg.required_weight,
         max_voting_period: msg.max_voting_period,
-        group,
+        group_addr: group,
     };
     CONFIG.save(deps.storage, &cfg)?;
 
@@ -89,7 +91,7 @@ pub fn handle_propose(
     let cfg = CONFIG.load(deps.storage)?;
 
     let vote_power = cfg
-        .group
+        .group_addr
         .is_member(&deps.querier, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
@@ -153,7 +155,7 @@ pub fn handle_vote(
     let cfg = CONFIG.load(deps.storage)?;
 
     let vote_power = cfg
-        .group
+        .group_addr
         .is_member(&deps.querier, &raw_sender)?
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
@@ -292,7 +294,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
-    let total_weight = cfg.group.total_weight(&deps.querier)?;
+    let total_weight = cfg.group_addr.total_weight(&deps.querier)?;
     Ok(ThresholdResponse::AbsoluteCount {
         weight_needed: cfg.required_weight,
         total_weight,
@@ -406,7 +408,7 @@ fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = cfg
-        .group
+        .group_addr
         .is_member(&deps.querier, &voter_raw)?
         .unwrap_or_default();
 
@@ -423,7 +425,7 @@ fn list_voters(
 ) -> StdResult<VoterListResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let voters = cfg
-        .group
+        .group_addr
         .list_members(&deps.querier, start_after, limit)?
         .into_iter()
         .map(|member| VoterResponse {
@@ -507,7 +509,7 @@ mod tests {
     ) -> HumanAddr {
         let flex_id = app.store_code(contract_flex());
         let msg = crate::msg::InitMsg {
-            group,
+            group_addr: group,
             required_weight,
             max_voting_period,
         };
@@ -553,7 +555,7 @@ mod tests {
 
         // Zero required weight fails
         let init_msg = InitMsg {
-            group: group_addr.clone(),
+            group_addr: group_addr.clone(),
             required_weight: 0,
             max_voting_period,
         };
@@ -564,7 +566,7 @@ mod tests {
 
         // Total weight less than required weight not allowed
         let init_msg = InitMsg {
-            group: group_addr.clone(),
+            group_addr: group_addr.clone(),
             required_weight: 100,
             max_voting_period,
         };
@@ -578,7 +580,7 @@ mod tests {
 
         // All valid
         let init_msg = InitMsg {
-            group: group_addr.clone(),
+            group_addr: group_addr.clone(),
             required_weight: 1,
             max_voting_period,
         };

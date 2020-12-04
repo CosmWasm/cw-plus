@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{HumanAddr, StdError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,8 +12,8 @@ pub enum ContractError {
     #[error("Not possible to reach required (passing) weight")]
     UnreachableWeight {},
 
-    #[error("Group contract invalid address")]
-    InvalidGroup {},
+    #[error("Group contract invalid address '{addr}'")]
+    InvalidGroup { addr: HumanAddr },
 
     #[error("Unauthorized")]
     Unauthorized {},

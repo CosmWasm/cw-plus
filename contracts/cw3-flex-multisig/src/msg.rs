@@ -8,7 +8,7 @@ use cw3::Vote;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
     // this is the group contract that contains the member list
-    pub group: HumanAddr,
+    pub group_addr: HumanAddr,
     pub required_weight: u64,
     pub max_voting_period: Duration,
 }

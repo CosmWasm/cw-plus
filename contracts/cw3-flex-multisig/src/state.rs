@@ -14,7 +14,7 @@ pub struct Config {
     pub required_weight: u64,
     pub max_voting_period: Duration,
     // Total weight and voters are queried from this contract
-    pub group: Cw4Contract,
+    pub group_addr: Cw4Contract,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
