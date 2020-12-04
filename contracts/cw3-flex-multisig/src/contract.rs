@@ -12,7 +12,7 @@ use cw3::{
     VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
 };
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
-use cw_storage_plus::Bound;
+use cw_storage_plus::{Bound, PkOwned};
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
@@ -283,7 +283,22 @@ pub fn handle_membership_hook(
         return Err(ContractError::Unauthorized {});
     }
 
-    // TODO: close all open proposals
+    // TODO: make this efficient (brute force now)
+    // find all open proposals as (k, v) pairs
+    let open: StdResult<Vec<_>> = PROPOSALS
+        .range(deps.storage, None, None, Order::Ascending)
+        .filter(|item| match item {
+            Ok((_, prop)) => prop.status == Status::Open,
+            Err(_) => true,
+        })
+        .collect();
+
+    // close all open proposals
+    for (k, mut prop) in open? {
+        prop.status = Status::Rejected;
+        // TODO: make this cleaner
+        PROPOSALS.save(deps.storage, PkOwned(k).into(), &prop)?;
+    }
 
     Ok(HandleResponse::default())
 }
@@ -1124,7 +1139,7 @@ mod tests {
         let err = app
             .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(err, ContractError::Expired {}.to_string());
+        assert_eq!(err, ContractError::NotOpen {}.to_string());
     }
 
     // TODO: ensure no one else can call the hook
