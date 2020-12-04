@@ -111,7 +111,27 @@ while listeners are executed asynchronously in their own context, only
 
 ### Hooks
 
-TODO
+Hooks are the simplest to implement and most powerful. You have a handle
+method to add/remove hooks to the contract, and everytime a particular state
+change happens, a predefined message is sent to all hooks. If any of these
+fail (or it runs out of gas), the transaction is aborted.
+
+This is powerful, meaning that "hook" can do some arbitrary checks and
+abort the original change if it disapproves. For example, a multisig
+could decide the group cannot change when a proposal is open. If a 
+"change membership" hook is executed, it can check if there are any
+open proposals, and if so, return an error.
+
+The downside, is that you must trust the hooked contracts highly. They
+cannot break the logic of the original contract, but they can "brick it"
+(Denial of Service). They also increase the gas cost of the normal call,
+and must be kept to a very limited set, or the gas price will be extremely
+high. Currently, I would only support this if you need an "admin"
+(or InitMsg) to set/remove hooks. And removing hooks does itself not trigger
+a hook, so this can always suceed to remove load if the hooks start
+making trouble.
+
+TODO: add references to cw4-group implementation when completed
 
 ### Listeners
 
@@ -119,4 +139,6 @@ There is currently no clean way to support listeners, as that would require
 some way of isolating contracts as a prerequisite. We can add some thoughts
 on how this will look once that exists when it is possible.
 
-TODO
+In theory, we want to act like hooks, but executed in a different context.
+
+TODO: when this is possible
