@@ -77,6 +77,18 @@
           }
         }
       }
+    },
+    {
+      "description": "Shows all registered hooks. Returns HooksResponse.",
+      "type": "object",
+      "required": [
+        "hooks"
+      ],
+      "properties": {
+        "hooks": {
+          "type": "object"
+        }
+      }
     }
   ],
   "definitions": {
