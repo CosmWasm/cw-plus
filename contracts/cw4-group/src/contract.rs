@@ -548,7 +548,61 @@ mod tests {
     }
 
     #[test]
-    fn hooks_fire() {}
+    fn hooks_fire() {
+        let mut deps = mock_dependencies(&[]);
+        do_init(deps.as_mut());
+
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert!(hooks.hooks.is_empty());
+
+        let contract1 = HumanAddr::from("hook1");
+        let contract2 = HumanAddr::from("hook2");
+
+        // register 2 hooks
+        let admin_info = mock_info(ADMIN, &[]);
+        let add_msg = HandleMsg::AddHook {
+            addr: contract1.clone(),
+        };
+        let add_msg2 = HandleMsg::AddHook {
+            addr: contract2.clone(),
+        };
+        for msg in vec![add_msg, add_msg2] {
+            let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+        }
+
+        // make some changes - add 3, remove 2, and update 1
+        // USER1 is updated and remove in the same call, we should remove this an add member3
+        let add = vec![
+            Member {
+                addr: USER1.into(),
+                weight: 20,
+            },
+            Member {
+                addr: USER3.into(),
+                weight: 5,
+            },
+        ];
+        let remove = vec![USER2.into()];
+        let msg = HandleMsg::UpdateMembers { remove, add };
+
+        // admin updates properly
+        assert_users(&deps, Some(11), Some(6), None);
+        let res = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+        assert_users(&deps, Some(20), None, Some(5));
+
+        // ensure 2 messages for the 2 hooks
+        assert_eq!(res.messages.len(), 2);
+        // same order as in the message (adds first, then remove)
+        let diffs = vec![
+            MemberDiff::new(USER1, Some(11), Some(20)),
+            MemberDiff::new(USER3, None, Some(5)),
+            MemberDiff::new(USER2, Some(6), None),
+        ];
+        let hook_msg = MemberChangedHookMsg { diffs };
+        let msg1 = hook_msg.clone().into_cosmos_msg(contract1).unwrap();
+        let msg2 = hook_msg.into_cosmos_msg(contract2).unwrap();
+        assert_eq!(res.messages, vec![msg1, msg2]);
+    }
 
     #[test]
     fn raw_queries_work() {
