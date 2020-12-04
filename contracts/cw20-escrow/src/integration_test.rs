@@ -7,7 +7,7 @@ use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
 use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, QueryMsg, ReceiveMsg};
 
-fn mock_router() -> App {
+fn mock_app() -> App {
     let env = mock_env();
     let api = Box::new(MockApi::default());
     let bank = SimpleBank {};
@@ -36,7 +36,7 @@ pub fn contract_cw20() -> Box<dyn Contract> {
 #[test]
 // receive cw20 tokens and release upon approval
 fn escrow_happy_path_cw20_tokens() {
-    let mut router = mock_router();
+    let mut router = mock_app();
 
     // set personal balance
     let owner = HumanAddr::from("owner");

@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Api, Binary, CanonicalAddr, ContractResult, CosmosMsg, Empty,
-    HumanAddr, Querier, QuerierWrapper, QueryRequest, StdError, StdResult, SystemResult, WasmMsg,
-    WasmQuery,
+    HumanAddr, QuerierWrapper, QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
 };
 
 use crate::msg::Cw4HandleMsg;
@@ -67,26 +66,26 @@ impl Cw4Contract {
     }
 
     /// Read the admin
-    pub fn admin<Q: Querier>(&self, querier: &Q) -> StdResult<Option<HumanAddr>> {
+    pub fn admin(&self, querier: &QuerierWrapper) -> StdResult<Option<HumanAddr>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
-        let res: AdminResponse = QuerierWrapper::new(querier).query(&query)?;
+        let res: AdminResponse = querier.query(&query)?;
         Ok(res.admin)
     }
 
     /// Read the total weight
-    pub fn total_weight<Q: Querier>(&self, querier: &Q) -> StdResult<u64> {
+    pub fn total_weight(&self, querier: &QuerierWrapper) -> StdResult<u64> {
         let query = self.encode_raw_query(TOTAL_KEY)?;
-        QuerierWrapper::new(querier).query(&query)
+        querier.query(&query)
     }
 
     // TODO: implement with raw queries
     /// Check if this address is a member, and if so, with which weight
-    pub fn is_member<Q: Querier, T: Into<CanonicalAddr>>(
+    pub fn is_member(
         &self,
-        querier: &Q,
-        addr: T,
+        querier: &QuerierWrapper,
+        addr: &CanonicalAddr,
     ) -> StdResult<Option<u64>> {
-        let path = member_key(&addr.into());
+        let path = member_key(addr.as_slice());
         let query = self.encode_raw_query(path)?;
 
         // We have to copy the logic of Querier.query to handle the empty case, and not
@@ -112,14 +111,14 @@ impl Cw4Contract {
         }
     }
 
-    pub fn list_members<Q: Querier>(
+    pub fn list_members(
         &self,
-        querier: &Q,
+        querier: &QuerierWrapper,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     ) -> StdResult<Vec<Member>> {
         let query = self.encode_smart_query(Cw4QueryMsg::ListMembers { start_after, limit })?;
-        let res: MemberListResponse = QuerierWrapper::new(querier).query(&query)?;
+        let res: MemberListResponse = querier.query(&query)?;
         Ok(res.members)
     }
 }

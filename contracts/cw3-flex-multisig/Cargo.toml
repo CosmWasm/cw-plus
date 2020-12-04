@@ -1,0 +1,34 @@
+[package]
+name = "cw3-flex-multisig"
+version = "0.3.2"
+authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
+edition = "2018"
+description = "Implementing cw3 with multiple voting patterns and dynamic groups"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cosmwasm-plus"
+homepage = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all init/handle/query exports
+library = []
+
+[dependencies]
+cw0 = { path = "../../packages/cw0", version = "0.3.2" }
+cw2 = { path = "../../packages/cw2", version = "0.3.2" }
+cw3 = { path = "../../packages/cw3", version = "0.3.2" }
+cw4 = { path = "../../packages/cw4", version = "0.3.2" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.3.2", features = ["iterator"] }
+cosmwasm-std = { version = "0.12.0", features = ["iterator"] }
+schemars = "0.7"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.20" }
+
+[dev-dependencies]
+cosmwasm-schema = { version = "0.12.0" }
+cw4-group = { path = "../cw4-group", version = "0.3.2" }
+cw-multi-test = { path = "../../packages/multi-test", version = "0.3.2" }
