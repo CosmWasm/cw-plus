@@ -1051,17 +1051,31 @@ mod tests {
 
         // VOTER3 starts a proposal to send some tokens
         let cash_proposal = pay_somebody_proposal(&flex_addr);
-        let _ = app
+        let res = app
             .execute_contract(VOTER3, &flex_addr, &cash_proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let _cash_proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        let cash_proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        assert_ne!(cash_proposal_id, update_proposal_id);
+
+        // query state
+        let query_proposal = QueryMsg::Proposal {
+            proposal_id: cash_proposal_id,
+        };
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_proposal)
+            .unwrap();
+        assert_eq!(prop.status, Status::Open);
 
         // ensure VOTER3 is currently a member
-        let query = QueryMsg::Voter {
+        let query_voter = QueryMsg::Voter {
             address: VOTER3.into(),
         };
-        let power: VoterResponse = app.wrap().query_wasm_smart(&flex_addr, &query).unwrap();
+        let power: VoterResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_voter)
+            .unwrap();
         assert_eq!(power.weight, 3);
 
         // Pass and execute first proposal
@@ -1078,10 +1092,39 @@ mod tests {
             .unwrap();
 
         // check membership changed properly
-        let power: VoterResponse = app.wrap().query_wasm_smart(&flex_addr, &query).unwrap();
+        let power: VoterResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_voter)
+            .unwrap();
         assert_eq!(power.weight, 0); // FIXME: this should become None in a future PR
 
-        // TODO: Second proposal automatically closed (USER4 vote fails)
+        // first proposal executed, second closed
+        let query_prop_1 = QueryMsg::Proposal {
+            proposal_id: update_proposal_id,
+        };
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_prop_1)
+            .unwrap();
+        assert_eq!(prop.status, Status::Executed);
+        let query_prop_2 = QueryMsg::Proposal {
+            proposal_id: cash_proposal_id,
+        };
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_prop_2)
+            .unwrap();
+        assert_eq!(prop.status, Status::Rejected);
+
+        // voting on it fails
+        let yes_vote = HandleMsg::Vote {
+            proposal_id: cash_proposal_id,
+            vote: Vote::Yes,
+        };
+        let err = app
+            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::Expired {}.to_string());
     }
 
     // TODO: ensure no one else can call the hook
