@@ -3,7 +3,7 @@
 CosmWasm follows the actor model, but wraps it in atomic transactions.
 The standard contract call pattern is to simply return messages that must
 succeed, and the contract aborts if they don't. This covers > 90% of the
-cases we come across of, such as transfering tokens (native or cw20) or
+cases we come across of, such as transferring tokens (native or cw20) or
 staking, etc based upon some contract state transition.
 
 We can query to predict success, or store a local counter of available
@@ -104,7 +104,7 @@ It will need a custom native (Cosmos SDK) module to enable it.
 
 There are two types of event subscriptions. Both require that the contract
 emitting the events supports this explicitly. They are "hooks" and "listeners".
-The main difference is that hooks are executed synchronously in the
+The main difference is that hooks are executed synchronously and atomic in the
 same context as the contract (and can abort the original call on error),
 while listeners are executed asynchronously in their own context, only
 *after the original state change has been committed*.
@@ -124,11 +124,11 @@ open proposals, and if so, return an error.
 
 The downside, is that you must trust the hooked contracts highly. They
 cannot break the logic of the original contract, but they can "brick it"
-(Denial of Service). They also increase the gas cost of the normal call,
+(Denial of Service - when they return an error and the datastore transaction gets rolled back). They also increase the gas cost of the normal call,
 and must be kept to a very limited set, or the gas price will be extremely
 high. Currently, I would only support this if you need an "admin"
 (or InitMsg) to set/remove hooks. And removing hooks does itself not trigger
-a hook, so this can always suceed to remove load if the hooks start
+a hook, so this can always succeed to remove load if the hooks start
 making trouble.
 
 TODO: add references to cw4-group implementation when completed
