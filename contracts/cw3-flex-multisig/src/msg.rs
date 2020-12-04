@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
 use cw0::{Duration, Expiration};
 use cw3::Vote;
+use cw4::MemberChangedHookMsg;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
@@ -34,6 +35,8 @@ pub enum HandleMsg {
     Close {
         proposal_id: u64,
     },
+    /// handle update hook messages from the group contract
+    MemberChangedHook(MemberChangedHookMsg),
 }
 
 // TODO: add a custom query to return the voter list (all potential voters)

@@ -11,7 +11,7 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
 };
-use cw4::Cw4Contract;
+use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
@@ -73,6 +73,9 @@ pub fn handle(
         HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, info, proposal_id, vote),
         HandleMsg::Execute { proposal_id } => handle_execute(deps, env, info, proposal_id),
         HandleMsg::Close { proposal_id } => handle_close(deps, env, info, proposal_id),
+        HandleMsg::MemberChangedHook(MemberChangedHookMsg { diffs }) => {
+            handle_membership_hook(deps, env, info, diffs)
+        }
     }
 }
 
@@ -266,6 +269,23 @@ pub fn handle_close(
         ],
         data: None,
     })
+}
+
+pub fn handle_membership_hook(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    _diffs: Vec<MemberDiff>,
+) -> Result<HandleResponse<Empty>, ContractError> {
+    // this must be called with the same group contract
+    let cfg = CONFIG.load(deps.storage)?;
+    if info.sender != cfg.group_addr.0 {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // TODO: close all open proposals
+
+    Ok(HandleResponse::default())
 }
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -1049,20 +1069,20 @@ mod tests {
             proposal_id: update_proposal_id,
             vote: Vote::Yes,
         };
-        app
-            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+        app.execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
             .unwrap();
         let execution = HandleMsg::Execute {
             proposal_id: update_proposal_id,
         };
-        app
-            .execute_contract(VOTER4, &flex_addr, &execution, &[])
+        app.execute_contract(VOTER4, &flex_addr, &execution, &[])
             .unwrap();
 
         // check membership changed properly
         let power: VoterResponse = app.wrap().query_wasm_smart(&flex_addr, &query).unwrap();
-        assert_eq!(power.weight, 0); // TODO: this should become None
+        assert_eq!(power.weight, 0); // FIXME: this should become None in a future PR
 
         // TODO: Second proposal automatically closed (USER4 vote fails)
     }
+
+    // TODO: ensure no one else can call the hook
 }
