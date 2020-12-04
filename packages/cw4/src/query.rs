@@ -10,7 +10,6 @@ use crate::msg::Member;
 pub enum Cw4QueryMsg {
     /// Return AdminResponse
     Admin {},
-    // TODO: this also needs raw query access
     /// Return TotalWeightResponse
     TotalWeight {},
     /// Returns MembersListResponse
@@ -18,7 +17,6 @@ pub enum Cw4QueryMsg {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
-    // TODO: this also needs raw query access
     /// Returns MemberResponse
     Member { addr: HumanAddr },
 }
