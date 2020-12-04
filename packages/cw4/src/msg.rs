@@ -32,4 +32,8 @@ pub enum Cw4HandleMsg {
         remove: Vec<HumanAddr>,
         add: Vec<Member>,
     },
+    /// Add a new hook to be informed of all membership changes. Must be called by Admin
+    AddHook { addr: HumanAddr },
+    /// Remove a hook. Must be called by Admin
+    RemoveHook { addr: HumanAddr },
 }

@@ -19,6 +19,8 @@ pub enum Cw4QueryMsg {
     },
     /// Returns MemberResponse
     Member { addr: HumanAddr },
+    /// Shows all registered hooks. Returns HooksResponse.
+    Hooks {},
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -39,6 +41,11 @@ pub struct AdminResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct TotalWeightResponse {
     pub weight: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct HooksResponse {
+    pub hooks: Vec<HumanAddr>,
 }
 
 /// TOTAL_KEY is meant for raw queries
