@@ -7,6 +7,7 @@ use cosmwasm_std::{
 };
 
 use crate::msg::Cw4HandleMsg;
+use crate::query::HooksResponse;
 use crate::{member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, TOTAL_KEY};
 
 /// Cw4Contract is a wrapper around HumanAddr that provides a lot of helpers
@@ -49,6 +50,16 @@ impl Cw4Contract {
         self.encode_msg(msg)
     }
 
+    pub fn add_hook(&self, addr: HumanAddr) -> StdResult<CosmosMsg> {
+        let msg = Cw4HandleMsg::AddHook { addr };
+        self.encode_msg(msg)
+    }
+
+    pub fn remove_hook(&self, addr: HumanAddr) -> StdResult<CosmosMsg> {
+        let msg = Cw4HandleMsg::AddHook { addr };
+        self.encode_msg(msg)
+    }
+
     fn encode_smart_query(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Empty>> {
         Ok(WasmQuery::Smart {
             contract_addr: self.addr(),
@@ -70,6 +81,13 @@ impl Cw4Contract {
         let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
         let res: AdminResponse = querier.query(&query)?;
         Ok(res.admin)
+    }
+
+    /// Show the hooks
+    pub fn hooks(&self, querier: &QuerierWrapper) -> StdResult<Vec<HumanAddr>> {
+        let query = self.encode_smart_query(Cw4QueryMsg::Hooks {})?;
+        let res: HooksResponse = querier.query(&query)?;
+        Ok(res.hooks)
     }
 
     /// Read the total weight
