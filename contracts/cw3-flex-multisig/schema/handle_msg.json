@@ -108,6 +108,18 @@
           }
         }
       }
+    },
+    {
+      "description": "handle update hook messages from the group contract",
+      "type": "object",
+      "required": [
+        "member_changed_hook"
+      ],
+      "properties": {
+        "member_changed_hook": {
+          "$ref": "#/definitions/MemberChangedHookMsg"
+        }
+      }
     }
   ],
   "definitions": {
@@ -263,6 +275,49 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "MemberChangedHookMsg": {
+      "description": "MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg",
+      "type": "object",
+      "required": [
+        "diffs"
+      ],
+      "properties": {
+        "diffs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MemberDiff"
+          }
+        }
+      }
+    },
+    "MemberDiff": {
+      "description": "MemberDiff shows the old and new states for a given cw4 member They cannot both be None. old = None, new = Some -> Insert old = Some, new = Some -> Update old = Some, new = None -> Delete",
+      "type": "object",
+      "required": [
+        "addr"
+      ],
+      "properties": {
+        "addr": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "new_weight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "old_weight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     },
     "StakingMsg": {
       "anyOf": [
