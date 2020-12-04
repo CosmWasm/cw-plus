@@ -4,12 +4,14 @@ use cosmwasm_std::{
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
-use cw4::{AdminResponse, Member, MemberListResponse, MemberResponse, TotalWeightResponse};
+use cw4::{
+    AdminResponse, HooksResponse, Member, MemberListResponse, MemberResponse, TotalWeightResponse,
+};
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{ADMIN, MEMBERS, TOTAL};
+use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -50,6 +52,8 @@ pub fn handle(
     match msg {
         HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
         HandleMsg::UpdateMembers { add, remove } => handle_update_members(deps, info, add, remove),
+        HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
+        HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
     }
 }
 
@@ -135,6 +139,42 @@ fn assert_admin(
     }
 }
 
+pub fn handle_add_hook(
+    deps: DepsMut,
+    info: MessageInfo,
+    addr: HumanAddr,
+) -> Result<HandleResponse, ContractError> {
+    let admin = ADMIN.load(deps.storage)?;
+    assert_admin(deps.api, info.sender, admin)?;
+
+    let mut hooks = HOOKS.may_load(deps.storage)?.unwrap_or_default();
+    if !hooks.iter().any(|h| h == &addr) {
+        hooks.push(addr);
+    } else {
+        return Err(ContractError::HookAlreadyRegistered {});
+    }
+    HOOKS.save(deps.storage, &hooks)?;
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_remove_hook(
+    deps: DepsMut,
+    info: MessageInfo,
+    addr: HumanAddr,
+) -> Result<HandleResponse, ContractError> {
+    let admin = ADMIN.load(deps.storage)?;
+    assert_admin(deps.api, info.sender, admin)?;
+
+    let mut hooks = HOOKS.load(deps.storage)?;
+    if let Some(p) = hooks.iter().position(|x| x == &addr) {
+        hooks.remove(p);
+    } else {
+        return Err(ContractError::HookNotRegistered {});
+    }
+    HOOKS.save(deps.storage, &hooks)?;
+    Ok(HandleResponse::default())
+}
+
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member { addr } => to_binary(&query_member(deps, addr)?),
@@ -143,6 +183,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::Admin {} => to_binary(&query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
+        QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
     }
 }
 
@@ -150,6 +191,11 @@ fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
     let canon = ADMIN.load(deps.storage)?;
     let admin = canon.map(|c| deps.api.human_address(&c)).transpose()?;
     Ok(AdminResponse { admin })
+}
+
+fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {
+    let hooks = HOOKS.may_load(deps.storage)?.unwrap_or_default();
+    Ok(HooksResponse { hooks })
 }
 
 fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
