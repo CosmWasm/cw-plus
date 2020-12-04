@@ -1,29 +1,41 @@
 # CW3 Flexible Multisig
 
-**TODO** rewrite this - this is copy for fixed multisig
+This builds on [cw3-fixed-multisig](../cw3-fixed-multisig) with a more 
+powerful implementation of the [cw3 spec](../../packages/cw3/README.md).
+It is a multisig contract that is backed by a 
+[cw4 (group)](../../packages/cw4/README.md) contract, which independently
+maintains the voter set.
 
-This is a simple implementation of the [cw3 spec](../../packages/cw3/README.md).
-It is a multisig with a fixed set of addresses created upon initialization.
-Each address may have the same weight (K of N) or some may have extra voting
-power. This works much like the native Cosmos SDK multisig, except that rather
-than aggregating the signatures off chain and submitting the final result,
-we aggregate the approvals on-chain.
+This provides 2 main advantages:
 
-This is usable as is, and probably the most secure implementation of cw3
-(as it is the simplest), but we will be adding more complex cases, such
-as updating the multisig set, different voting rules for the same group
-with different permissions, and even allow token-weighted voting. All through
-the same client interface.
+* You can create two different multisigs with different voting thresholds
+  backed by the same group. Thus, you can have a 50% vote and a 67% vote
+  that always use the same voter set, but can take other actions.
+* TODO: It allows dynamic multisig groups. Since the group can change,
+  we can set one of the multisigs as the admin of the group contract,
+  and the
+
+
+Besides the dynamic voting set, the main difference with the native 
+Cosmos SDK multisig, is that it aggregates the signatures on chain with
+visible proposals (like `x/gov` in the Cosmos SDK), rather than requiring
+signers to share signatures off chain.
 
 ## Init
 
-To create the multisig, you must pass in a set of `HumanAddr` with a weight
-for each one, as well as a required weight to pass a proposal. To create
-a 2 of 3 multisig, pass 3 voters with weight 1 and a `required_weight` of 2.
+The first step to create such a multisig is to instantiate a cw4 contract
+with the desired member set. For now, this only is supported by
+[cw4-group](../cw4-group), but we will add a token-weighted group contract
+(TODO). 
 
-Note that 0 *is an allowed weight*. This doesn't give any voting rights, but
-it does allow that key to submit proposals that can later be approved by the
-voters. Any address not in the voter set cannot submit a proposal.
+If you create a `cw4-group` contract and want a multisig to be able
+to modify it's own group, set the admin as your personal key, then init the
+multisig pointing to the group, then modify the admin of the group to point
+back to the multisig. This is the current practice to create such circular
+dependencies (TODO: document better).
+
+When creating the multisig, you must set the required weight to pass a vote
+as well as the max/default voting period. (TODO: allow more threshold types) 
 
 ## Handle Process
 
@@ -45,6 +57,10 @@ be reverted and it will remain "Passed" so you can try again).
 
 Once a proposal has expired without passing, anyone can submit a "Close"
 message to mark it closed. This has no effect beyond cleaning up the UI/database.
+
+TODO: this contract currently assumes the group membership is static during
+the lifetime of one proposal. If the membership changes when a proposal is
+open, this will calculate incorrect values (future PR).
 
 ## Running this contract
 
