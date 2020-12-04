@@ -1140,6 +1140,15 @@ mod tests {
             .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
             .unwrap_err();
         assert_eq!(err, ContractError::NotOpen {}.to_string());
+
+        // extra: ensure no one else can call the hook
+        let hook_hack = HandleMsg::MemberChangedHook(MemberChangedHookMsg {
+            diffs: vec![MemberDiff::new(VOTER1, Some(1), None)],
+        });
+        let err = app
+            .execute_contract(VOTER2, &flex_addr, &hook_hack, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {}.to_string());
     }
 
     // TODO: ensure no one else can call the hook
