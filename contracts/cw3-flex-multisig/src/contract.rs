@@ -558,6 +558,21 @@ mod tests {
         (flex_addr, group_addr)
     }
 
+    fn pay_somebody_proposal(flex_addr: &HumanAddr) -> HandleMsg {
+        let bank_msg = BankMsg::Send {
+            from_address: flex_addr.clone(),
+            to_address: SOMEBODY.into(),
+            amount: coins(1, "BTC"),
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        HandleMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        }
+    }
+
     #[test]
     fn test_init_works() {
         let mut app = mock_app();
@@ -647,28 +662,19 @@ mod tests {
             false,
         );
 
-        let bank_msg = BankMsg::Send {
-            from_address: flex_addr.clone(),
-            to_address: SOMEBODY.into(),
-            amount: coins(1, "BTC"),
-        };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
-
-        // Only voters can propose
-        let proposal = HandleMsg::Propose {
-            title: "Rewarding somebody".to_string(),
-            description: "Do we reward her?".to_string(),
-            msgs: msgs.clone(),
-            latest: None,
-        };
+        let proposal = pay_somebody_proposal(&flex_addr);
         let res = app.execute_contract(SOMEBODY, &flex_addr, &proposal, &[]);
         assert_eq!(res.unwrap_err(), ContractError::Unauthorized {}.to_string());
 
         // Wrong expiration option fails
+        let msgs = match pay_somebody_proposal(&flex_addr) {
+            HandleMsg::Propose { msgs, .. } => msgs,
+            _ => panic!("Wrong variant"),
+        };
         let proposal_wrong_exp = HandleMsg::Propose {
             title: "Rewarding somebody".to_string(),
             description: "Do we reward her?".to_string(),
-            msgs: msgs.clone(),
+            msgs,
             latest: Some(Expiration::AtHeight(123456)),
         };
         let res = app.execute_contract(OWNER, &flex_addr, &proposal_wrong_exp, &[]);
@@ -755,21 +761,8 @@ mod tests {
             false,
         );
 
-        // Propose
-        let bank_msg = BankMsg::Send {
-            from_address: flex_addr.clone(),
-            to_address: SOMEBODY.into(),
-            amount: coins(1, "BTC"),
-        };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
-        let proposal = HandleMsg::Propose {
-            title: "Pay somebody".to_string(),
-            description: "Do I pay her?".to_string(),
-            msgs,
-            latest: None,
-        };
-
         // create proposal with 0 vote power
+        let proposal = pay_somebody_proposal(&flex_addr);
         let res = app
             .execute_contract(OWNER, &flex_addr, &proposal, &[])
             .unwrap();
@@ -885,21 +878,8 @@ mod tests {
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
         assert_eq!(contract_bal, coin(10, "BTC"));
 
-        // Propose
-        let bank_msg = BankMsg::Send {
-            from_address: flex_addr.clone(),
-            to_address: SOMEBODY.into(),
-            amount: coins(1, "BTC"),
-        };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
-        let proposal = HandleMsg::Propose {
-            title: "Pay somebody".to_string(),
-            description: "Do I pay her?".to_string(),
-            msgs,
-            latest: None,
-        };
-
         // create proposal with 0 vote power
+        let proposal = pay_somebody_proposal(&flex_addr);
         let res = app
             .execute_contract(OWNER, &flex_addr, &proposal, &[])
             .unwrap();
@@ -979,21 +959,8 @@ mod tests {
             true,
         );
 
-        // Propose
-        let bank_msg = BankMsg::Send {
-            from_address: flex_addr.clone(),
-            to_address: SOMEBODY.into(),
-            amount: coins(1, "BTC"),
-        };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
-        let proposal = HandleMsg::Propose {
-            title: "Pay somebody".to_string(),
-            description: "Do I pay her?".to_string(),
-            msgs,
-            latest: None,
-        };
-
         // create proposal with 0 vote power
+        let proposal = pay_somebody_proposal(&flex_addr);
         let res = app
             .execute_contract(OWNER, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1028,5 +995,74 @@ mod tests {
             .execute_contract(SOMEBODY, &flex_addr, &closing, &[])
             .unwrap_err();
         assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
+    }
+
+    // Currently this just closes all open proposals
+    // TODO: something more clever (lazily tracking voting power at start of election)
+    #[test]
+    fn handle_group_changes() {
+        let mut app = mock_app();
+
+        let required_weight = 4;
+        let voting_period = Duration::Time(20000);
+        let (flex_addr, group_addr) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            true,
+        );
+
+        // Start a proposal to remove VOTER3 from the set
+        let update_msg = Cw4Contract(group_addr.clone())
+            .update_members(vec![VOTER3.into()], vec![])
+            .unwrap();
+        let update_proposal = HandleMsg::Propose {
+            title: "Kick out VOTER3".to_string(),
+            description: "He's trying to steal our money".to_string(),
+            msgs: vec![update_msg],
+            latest: None,
+        };
+        let res = app
+            .execute_contract(VOTER1, &flex_addr, &update_proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let update_proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // VOTER3 starts a proposal to send some tokens
+        let cash_proposal = pay_somebody_proposal(&flex_addr);
+        let _ = app
+            .execute_contract(VOTER3, &flex_addr, &cash_proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let _cash_proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // ensure VOTER3 is currently a member
+        let query = QueryMsg::Voter {
+            address: VOTER3.into(),
+        };
+        let power: VoterResponse = app.wrap().query_wasm_smart(&flex_addr, &query).unwrap();
+        assert_eq!(power.weight, 3);
+
+        // Pass and execute first proposal
+        let yes_vote = HandleMsg::Vote {
+            proposal_id: update_proposal_id,
+            vote: Vote::Yes,
+        };
+        app
+            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        let execution = HandleMsg::Execute {
+            proposal_id: update_proposal_id,
+        };
+        app
+            .execute_contract(VOTER4, &flex_addr, &execution, &[])
+            .unwrap();
+
+        // check membership changed properly
+        let power: VoterResponse = app.wrap().query_wasm_smart(&flex_addr, &query).unwrap();
+        assert_eq!(power.weight, 0); // TODO: this should become None
+
+        // TODO: Second proposal automatically closed (USER4 vote fails)
     }
 }
