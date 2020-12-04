@@ -618,8 +618,6 @@ mod tests {
         );
     }
 
-    // TODO: query() tests
-
     #[test]
     fn test_propose_works() {
         let mut app = mock_app();

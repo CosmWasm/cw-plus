@@ -438,7 +438,7 @@ fn list_voters(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, from_binary, BankMsg};
 
     use cw0::Duration;
@@ -598,7 +598,7 @@ mod tests {
         setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
-            from_address: OWNER.into(),
+            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -689,7 +689,7 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: OWNER.into(),
+            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -843,7 +843,7 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: OWNER.into(),
+            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -946,7 +946,7 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: OWNER.into(),
+            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
