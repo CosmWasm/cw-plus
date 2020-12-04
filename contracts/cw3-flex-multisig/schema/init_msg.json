@@ -3,12 +3,12 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
-    "group",
+    "group_addr",
     "max_voting_period",
     "required_weight"
   ],
   "properties": {
-    "group": {
+    "group_addr": {
       "$ref": "#/definitions/HumanAddr"
     },
     "max_voting_period": {
