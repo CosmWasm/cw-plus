@@ -437,7 +437,7 @@ mod tests {
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
-    use cw4::Member;
+    use cw4::{Cw4HandleMsg, Member};
     use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
     use super::*;
@@ -513,14 +513,15 @@ mod tests {
 
     // this will set up both contracts, initializing the group with
     // all voters defined above, and the multisig pointing to it and given threshold criteria.
-    // returns the address of the new multsig.
+    // Returns (multisig address, group address).
     fn setup_test_case(
         app: &mut App,
         required_weight: u64,
         max_voting_period: Duration,
         init_funds: Vec<Coin>,
-    ) -> HumanAddr {
-        // Init a contract with voters
+        multisig_as_group_admin: bool,
+    ) -> (HumanAddr, HumanAddr) {
+        // 1. Initialize group contract with members (and OWNER as admin)
         let members = vec![
             member(OWNER, 0),
             member(VOTER1, 1),
@@ -530,11 +531,31 @@ mod tests {
             member(VOTER5, 5),
         ];
         let group_addr = init_group(app, members);
-        let flex_addr = init_flex(app, group_addr, required_weight, max_voting_period);
+
+        // 2. Set up Multisig backed by this group
+        let flex_addr = init_flex(app, group_addr.clone(), required_weight, max_voting_period);
+
+        // 3. Register a hook to the multisig on the group contract
+        let add_hook = Cw4HandleMsg::AddHook {
+            addr: flex_addr.clone(),
+        };
+        app.execute_contract(OWNER, &group_addr, &add_hook, &[])
+            .unwrap();
+
+        // 4. (Optional) Set the multisig as the group owner
+        if multisig_as_group_admin {
+            let update_admin = Cw4HandleMsg::UpdateAdmin {
+                admin: Some(flex_addr.clone()),
+            };
+            app.execute_contract(OWNER, &group_addr, &update_admin, &[])
+                .unwrap();
+        }
+
+        // Bonus: set some funds on the multisig contract for future proposals
         if !init_funds.is_empty() {
             app.set_bank_balance(flex_addr.clone(), init_funds).unwrap();
         }
-        flex_addr
+        (flex_addr, group_addr)
     }
 
     #[test]
@@ -618,7 +639,13 @@ mod tests {
 
         let required_weight = 4;
         let voting_period = Duration::Time(2000000);
-        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
 
         let bank_msg = BankMsg::Send {
             from_address: flex_addr.clone(),
@@ -720,7 +747,13 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -840,7 +873,13 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            true,
+        );
 
         // ensure we have cash to cover the proposal
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
@@ -932,7 +971,13 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Height(2000000);
-        let flex_addr = setup_test_case(&mut app, required_weight, voting_period, coins(10, "BTC"));
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            true,
+        );
 
         // Propose
         let bank_msg = BankMsg::Send {
