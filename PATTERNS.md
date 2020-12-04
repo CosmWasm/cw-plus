@@ -88,3 +88,35 @@ pub fn init(deps: DepsMut,
     })
 }
 ```
+
+## Isolating contracts
+
+We don't currently support any technique for dispatching a message that is 
+not atomically executing in the same context (and using the same gas) as
+the calling contract. 
+
+We are investigating this in the context of building
+a cron service. (TODO: link to CyberCongress design).
+When there is an approach that allows this, it will be documented here.
+It will need a custom native (Cosmos SDK) module to enable it.
+
+## Subscribing to Events
+
+There are two types of event subscriptions. Both require that the contract
+emitting the events supports this explicitly. They are "hooks" and "listeners".
+The main difference is that hooks are executed synchronously in the
+same context as the contract (and can abort the original call on error),
+while listeners are executed asynchronously in their own context, only
+*after the original state change has been committed*.
+
+### Hooks
+
+TODO
+
+### Listeners
+
+There is currently no clean way to support listeners, as that would require
+some way of isolating contracts as a prerequisite. We can add some thoughts
+on how this will look once that exists when it is possible.
+
+TODO
