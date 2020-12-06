@@ -125,7 +125,7 @@ pub fn update_members(
     for remove in to_remove.into_iter() {
         let raw = deps.api.canonical_address(&remove)?;
         let old = MEMBERS.may_load(deps.storage, &raw)?;
-        // only process this if they were actually in the lsit before
+        // Only process this if they were actually in the list before
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
             total -= weight;
