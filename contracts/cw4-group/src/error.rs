@@ -8,6 +8,10 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    #[error("Given address already registered as a hook")]
+    HookAlreadyRegistered {},
+
+    #[error("Given address not registered as a hook")]
+    HookNotRegistered {},
 }

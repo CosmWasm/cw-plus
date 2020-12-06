@@ -1,15 +1,18 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    to_binary, Api, Binary, CanonicalAddr, Context, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, Order, StdResult,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
-use cw4::{AdminResponse, Member, MemberListResponse, MemberResponse, TotalWeightResponse};
+use cw4::{
+    AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
+    MemberResponse, TotalWeightResponse,
+};
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{ADMIN, MEMBERS, TOTAL};
+use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -50,6 +53,8 @@ pub fn handle(
     match msg {
         HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
         HandleMsg::UpdateMembers { add, remove } => handle_update_members(deps, info, add, remove),
+        HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
+        HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
     }
 }
 
@@ -77,13 +82,20 @@ pub fn update_admin(
 }
 
 pub fn handle_update_members(
-    deps: DepsMut,
+    mut deps: DepsMut,
     info: MessageInfo,
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
-    update_members(deps, info.sender, add, remove)?;
-    Ok(HandleResponse::default())
+    // make the local update
+    let diff = update_members(deps.branch(), info.sender, add, remove)?;
+    // call all registered hooks
+    let mut ctx = Context::new();
+    for h in HOOKS.may_load(deps.storage)?.unwrap_or_default() {
+        let msg = diff.clone().into_cosmos_msg(h)?;
+        ctx.add_message(msg);
+    }
+    Ok(ctx.into())
 }
 
 // the logic from handle_update_admin extracted for easier import
@@ -92,11 +104,12 @@ pub fn update_members(
     sender: HumanAddr,
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
-) -> Result<(), ContractError> {
+) -> Result<MemberChangedHookMsg, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
     assert_admin(deps.api, sender, admin)?;
 
     let mut total = TOTAL.load(deps.storage)?;
+    let mut diffs: Vec<MemberDiff> = vec![];
 
     // add all new members and update total
     for add in to_add.into_iter() {
@@ -104,19 +117,24 @@ pub fn update_members(
         MEMBERS.update(deps.storage, &raw, |old| -> StdResult<_> {
             total -= old.unwrap_or_default();
             total += add.weight;
+            diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
             Ok(add.weight)
         })?;
     }
 
     for remove in to_remove.into_iter() {
         let raw = deps.api.canonical_address(&remove)?;
-        total -= MEMBERS.may_load(deps.storage, &raw)?.unwrap_or_default();
-        MEMBERS.remove(deps.storage, &raw);
+        let old = MEMBERS.may_load(deps.storage, &raw)?;
+        // Only process this if they were actually in the list before
+        if let Some(weight) = old {
+            diffs.push(MemberDiff::new(remove, Some(weight), None));
+            total -= weight;
+            MEMBERS.remove(deps.storage, &raw);
+        }
     }
 
     TOTAL.save(deps.storage, &total)?;
-
-    Ok(())
+    Ok(MemberChangedHookMsg { diffs })
 }
 
 fn assert_admin(
@@ -135,6 +153,42 @@ fn assert_admin(
     }
 }
 
+pub fn handle_add_hook(
+    deps: DepsMut,
+    info: MessageInfo,
+    addr: HumanAddr,
+) -> Result<HandleResponse, ContractError> {
+    let admin = ADMIN.load(deps.storage)?;
+    assert_admin(deps.api, info.sender, admin)?;
+
+    let mut hooks = HOOKS.may_load(deps.storage)?.unwrap_or_default();
+    if !hooks.iter().any(|h| h == &addr) {
+        hooks.push(addr);
+    } else {
+        return Err(ContractError::HookAlreadyRegistered {});
+    }
+    HOOKS.save(deps.storage, &hooks)?;
+    Ok(HandleResponse::default())
+}
+
+pub fn handle_remove_hook(
+    deps: DepsMut,
+    info: MessageInfo,
+    addr: HumanAddr,
+) -> Result<HandleResponse, ContractError> {
+    let admin = ADMIN.load(deps.storage)?;
+    assert_admin(deps.api, info.sender, admin)?;
+
+    let mut hooks = HOOKS.load(deps.storage)?;
+    if let Some(p) = hooks.iter().position(|x| x == &addr) {
+        hooks.remove(p);
+    } else {
+        return Err(ContractError::HookNotRegistered {});
+    }
+    HOOKS.save(deps.storage, &hooks)?;
+    Ok(HandleResponse::default())
+}
+
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member { addr } => to_binary(&query_member(deps, addr)?),
@@ -143,6 +197,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }
         QueryMsg::Admin {} => to_binary(&query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
+        QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
     }
 }
 
@@ -150,6 +205,11 @@ fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
     let canon = ADMIN.load(deps.storage)?;
     let admin = canon.map(|c| deps.api.human_address(&c)).transpose()?;
     Ok(AdminResponse { admin })
+}
+
+fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {
+    let hooks = HOOKS.may_load(deps.storage)?.unwrap_or_default();
+    Ok(HooksResponse { hooks })
 }
 
 fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
@@ -362,7 +422,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_init(deps.as_mut());
 
-        // USER1 is updated and remove in the same line, we should remove this an add member3
+        // USER1 is updated and remove in the same call, we should remove this an add member3
         let add = vec![
             Member {
                 addr: USER1.into(),
@@ -378,6 +438,170 @@ mod tests {
         // admin updates properly
         update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(5));
+    }
+
+    #[test]
+    fn add_remove_hooks() {
+        // add will over-write and remove have no effect
+        let mut deps = mock_dependencies(&[]);
+        do_init(deps.as_mut());
+
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert!(hooks.hooks.is_empty());
+
+        let contract1 = HumanAddr::from("hook1");
+        let contract2 = HumanAddr::from("hook2");
+
+        let add_msg = HandleMsg::AddHook {
+            addr: contract1.clone(),
+        };
+
+        // non-admin cannot add hook
+        let user_info = mock_info(USER1, &[]);
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            user_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // admin can add it, and it appears in the query
+        let admin_info = mock_info(ADMIN, &[]);
+        let _ = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract1.clone()]);
+
+        // cannot remove a non-registered contract
+        let remove_msg = HandleMsg::RemoveHook {
+            addr: contract2.clone(),
+        };
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::HookNotRegistered {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // add second contract
+        let add_msg2 = HandleMsg::AddHook {
+            addr: contract2.clone(),
+        };
+        let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
+
+        // cannot re-add an existing contract
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::HookAlreadyRegistered {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // non-admin cannot remove
+        let remove_msg = HandleMsg::RemoveHook {
+            addr: contract1.clone(),
+        };
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            user_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // remove the original
+        let _ = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract2.clone()]);
+    }
+
+    #[test]
+    fn hooks_fire() {
+        let mut deps = mock_dependencies(&[]);
+        do_init(deps.as_mut());
+
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert!(hooks.hooks.is_empty());
+
+        let contract1 = HumanAddr::from("hook1");
+        let contract2 = HumanAddr::from("hook2");
+
+        // register 2 hooks
+        let admin_info = mock_info(ADMIN, &[]);
+        let add_msg = HandleMsg::AddHook {
+            addr: contract1.clone(),
+        };
+        let add_msg2 = HandleMsg::AddHook {
+            addr: contract2.clone(),
+        };
+        for msg in vec![add_msg, add_msg2] {
+            let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+        }
+
+        // make some changes - add 3, remove 2, and update 1
+        // USER1 is updated and remove in the same call, we should remove this an add member3
+        let add = vec![
+            Member {
+                addr: USER1.into(),
+                weight: 20,
+            },
+            Member {
+                addr: USER3.into(),
+                weight: 5,
+            },
+        ];
+        let remove = vec![USER2.into()];
+        let msg = HandleMsg::UpdateMembers { remove, add };
+
+        // admin updates properly
+        assert_users(&deps, Some(11), Some(6), None);
+        let res = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+        assert_users(&deps, Some(20), None, Some(5));
+
+        // ensure 2 messages for the 2 hooks
+        assert_eq!(res.messages.len(), 2);
+        // same order as in the message (adds first, then remove)
+        let diffs = vec![
+            MemberDiff::new(USER1, Some(11), Some(20)),
+            MemberDiff::new(USER3, None, Some(5)),
+            MemberDiff::new(USER2, Some(6), None),
+        ];
+        let hook_msg = MemberChangedHookMsg { diffs };
+        let msg1 = hook_msg.clone().into_cosmos_msg(contract1).unwrap();
+        let msg2 = hook_msg.into_cosmos_msg(contract2).unwrap();
+        assert_eq!(res.messages, vec![msg1, msg2]);
     }
 
     #[test]

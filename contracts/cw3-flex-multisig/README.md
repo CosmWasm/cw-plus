@@ -29,10 +29,16 @@ with the desired member set. For now, this only is supported by
 (TODO). 
 
 If you create a `cw4-group` contract and want a multisig to be able
-to modify it's own group, set the admin as your personal key, then init the
-multisig pointing to the group, then modify the admin of the group to point
-back to the multisig. This is the current practice to create such circular
-dependencies (TODO: document better).
+to modify it's own group, do the following in multiple transactions:
+
+  * init cw4-group, with your personal key as admin
+  * init a multisig pointing to the group
+  * TODO: `AddHook{multisig}` on the group contract 
+  * `UpdateAdmin{multisig}` on the group contract
+
+This is the current practice to create such circular dependencies,
+and depends on an external driver (hard to impossible to script such a
+self-deploying contract on-chain). (TODO: document better).
 
 When creating the multisig, you must set the required weight to pass a vote
 as well as the max/default voting period. (TODO: allow more threshold types) 

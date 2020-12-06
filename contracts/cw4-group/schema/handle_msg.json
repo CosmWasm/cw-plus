@@ -55,6 +55,46 @@
           }
         }
       }
+    },
+    {
+      "description": "Add a new hook to be informed of all membership changes. Must be called by Admin",
+      "type": "object",
+      "required": [
+        "add_hook"
+      ],
+      "properties": {
+        "add_hook": {
+          "type": "object",
+          "required": [
+            "addr"
+          ],
+          "properties": {
+            "addr": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Remove a hook. Must be called by Admin",
+      "type": "object",
+      "required": [
+        "remove_hook"
+      ],
+      "properties": {
+        "remove_hook": {
+          "type": "object",
+          "required": [
+            "addr"
+          ],
+          "properties": {
+            "addr": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
