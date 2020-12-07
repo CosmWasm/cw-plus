@@ -424,7 +424,7 @@ fn list_voters(
         .into_iter()
         .map(|member| VoterResponse {
             addr: member.addr,
-            weight: Some(member.weight),
+            weight: member.weight,
         })
         .collect();
     Ok(VoterListResponse { voters })
@@ -607,7 +607,7 @@ mod tests {
             voters.voters,
             vec![VoterResponse {
                 addr: OWNER.into(),
-                weight: Some(1)
+                weight: 1
             }]
         );
     }

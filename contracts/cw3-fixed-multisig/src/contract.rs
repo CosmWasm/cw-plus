@@ -423,7 +423,7 @@ fn list_voters(
             let (key, weight) = item?;
             Ok(VoterResponse {
                 addr: api.human_address(&CanonicalAddr::from(key))?,
-                weight: Some(weight),
+                weight,
             })
         })
         .collect();
