@@ -407,10 +407,7 @@ fn list_votes(
 fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let weight = cfg
-        .group_addr
-        .is_member(&deps.querier, &voter_raw)?
-        .unwrap_or_default();
+    let weight = cfg.group_addr.is_member(&deps.querier, &voter_raw)?;
 
     Ok(VoterResponse {
         addr: voter,
@@ -430,7 +427,7 @@ fn list_voters(
         .into_iter()
         .map(|member| VoterResponse {
             addr: member.addr,
-            weight: member.weight,
+            weight: Some(member.weight),
         })
         .collect();
     Ok(VoterListResponse { voters })
@@ -613,7 +610,7 @@ mod tests {
             voters.voters,
             vec![VoterResponse {
                 addr: OWNER.into(),
-                weight: 1
+                weight: Some(1)
             }]
         );
     }
