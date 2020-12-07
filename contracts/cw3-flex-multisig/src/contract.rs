@@ -9,7 +9,7 @@ use cw0::{maybe_canonical, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
-    VoteListResponse, VoteResponse, VoterListResponse, VoterResponse,
+    VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
 };
 use cw4::Cw4Contract;
 use cw_storage_plus::Bound;
@@ -404,15 +404,12 @@ fn list_votes(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
+fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterInfo> {
     let cfg = CONFIG.load(deps.storage)?;
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = cfg.group_addr.is_member(&deps.querier, &voter_raw)?;
 
-    Ok(VoterResponse {
-        addr: voter,
-        weight,
-    })
+    Ok(VoterInfo { weight })
 }
 
 fn list_voters(
