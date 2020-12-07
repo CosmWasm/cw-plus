@@ -32,9 +32,9 @@ pub enum Cw3QueryMsg {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
-    /// Voter extension: Returns VoterResponse
+    /// Voter extension: Returns VoterInfo
     Voter { address: HumanAddr },
-    /// Voter extension: Returns VoterListResponse
+    /// ListVoters extension: Returns VoterListResponse
     ListVoters {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
@@ -129,6 +129,11 @@ pub struct VoteInfo {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteResponse {
     pub vote: Option<Vote>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VoterInfo {
+    pub weight: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
