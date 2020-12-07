@@ -163,7 +163,7 @@
       }
     },
     {
-      "description": "Returns VoterResponse",
+      "description": "Returns VoterInfo",
       "type": "object",
       "required": [
         "voter"
