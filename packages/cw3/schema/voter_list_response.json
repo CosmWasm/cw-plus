@@ -20,17 +20,15 @@
     "VoterResponse": {
       "type": "object",
       "required": [
-        "addr"
+        "addr",
+        "weight"
       ],
       "properties": {
         "addr": {
           "$ref": "#/definitions/HumanAddr"
         },
         "weight": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": "integer",
           "format": "uint64",
           "minimum": 0.0
         }

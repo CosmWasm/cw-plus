@@ -68,7 +68,7 @@ pub enum QueryMsg {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
-    /// Returns VoterResponse
+    /// Returns VoterInfo
     Voter { address: HumanAddr },
     /// Returns VoterListResponse
     ListVoters {
