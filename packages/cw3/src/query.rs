@@ -134,7 +134,7 @@ pub struct VoteResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoterResponse {
     pub addr: HumanAddr,
-    pub weight: u64,
+    pub weight: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

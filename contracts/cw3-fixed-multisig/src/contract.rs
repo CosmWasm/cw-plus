@@ -402,9 +402,7 @@ fn list_votes(
 
 fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let weight = VOTERS
-        .may_load(deps.storage, &voter_raw)?
-        .unwrap_or_default();
+    let weight = VOTERS.may_load(deps.storage, &voter_raw)?;
     Ok(VoterResponse {
         addr: voter,
         weight,
@@ -428,7 +426,7 @@ fn list_voters(
             let (key, weight) = item?;
             Ok(VoterResponse {
                 addr: api.human_address(&CanonicalAddr::from(key))?,
-                weight,
+                weight: Some(weight),
             })
         })
         .collect();
