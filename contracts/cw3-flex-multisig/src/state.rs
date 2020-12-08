@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
+use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, Order, StdError, StdResult, Storage};
 
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
@@ -46,6 +46,23 @@ impl Proposal {
 
         status
     }
+}
+
+pub fn max_proposal_height(storage: &dyn Storage) -> StdResult<Option<u64>> {
+    // TODO: this is O(open proposals), with clever composite secondary indexes (status, height), we may get this to O(1)
+    let heights: StdResult<Vec<u64>> = proposals()
+        .idx
+        .status
+        .items(
+            storage,
+            &status_index(Status::Open),
+            None,
+            None,
+            Order::Ascending,
+        )
+        .map(|res| Ok(res?.1.start_height))
+        .collect();
+    Ok(heights?.into_iter().max())
 }
 
 // we cast a ballot with our chosen vote and a given weight

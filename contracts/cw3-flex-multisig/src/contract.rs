@@ -18,7 +18,7 @@ use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::snapshot::{snapshot_diff, snapshoted_weight};
 use crate::state::{
-    next_id, parse_id, proposals, status_index, Ballot, Config, Proposal, BALLOTS, CONFIG,
+    max_proposal_height, next_id, parse_id, proposals, Ballot, Config, Proposal, BALLOTS, CONFIG,
 };
 
 // version info for migration info
@@ -292,20 +292,7 @@ pub fn handle_membership_hook(
     }
 
     // find the latest snapshot height
-    // TODO: this is O(open proposals), with clever composite secondary indexes (status, height), we may get this to O(1)
-    let heights: StdResult<Vec<u64>> = proposals()
-        .idx
-        .status
-        .items(
-            deps.storage,
-            &status_index(Status::Open),
-            None,
-            None,
-            Order::Ascending,
-        )
-        .map(|res| Ok(res?.1.start_height))
-        .collect();
-    let max_height = heights?.into_iter().max();
+    let max_height = max_proposal_height(deps.storage)?;
 
     // only try snapshot if there is an open proposal
     if let Some(last_height) = max_height {
