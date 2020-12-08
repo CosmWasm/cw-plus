@@ -12,11 +12,11 @@ use cw3::{
     VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
 };
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
-use cw_storage_plus::{Bound, PkOwned};
+use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::snapshot::snapshot_diff;
+use crate::snapshot::{snapshot_diff, snapshoted_weight};
 use crate::state::{
     next_id, parse_id, proposals, status_index, Ballot, Config, Proposal, BALLOTS, CONFIG,
 };
@@ -161,11 +161,6 @@ pub fn handle_vote(
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let cfg = CONFIG.load(deps.storage)?;
 
-    let vote_power = cfg
-        .group_addr
-        .is_member(&deps.querier, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
-
     // ensure proposal exists and can be voted on
     let mut prop = proposals().load(deps.storage, proposal_id.into())?;
     if prop.status != Status::Open {
@@ -174,6 +169,15 @@ pub fn handle_vote(
     if prop.expires.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
+
+    // use a snapshot of "start of proposal" if available, otherwise, current group weight
+    let vote_power = snapshoted_weight(
+        deps.as_ref(),
+        &raw_sender,
+        prop.start_height,
+        &cfg.group_addr,
+    )?
+    .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // cast vote if no vote previously cast
     BALLOTS.update(

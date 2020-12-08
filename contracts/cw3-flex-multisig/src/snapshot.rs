@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, Deps, DepsMut, HumanAddr, Order, StdResult, Storage};
+use cosmwasm_std::{CanonicalAddr, Deps, DepsMut, Order, StdResult, Storage};
 use cw3::VoterInfo;
 use cw4::{Cw4Contract, MemberDiff};
 use cw_storage_plus::{Bound, Map, U64Key};
@@ -11,18 +11,16 @@ pub const SNAPSHOTS: Map<(&[u8], U64Key), VoterInfo> = Map::new(b"snapshots");
 /// or query the current contract state otherwise
 pub fn snapshoted_weight(
     deps: Deps,
-    addr: &HumanAddr,
+    addr: &CanonicalAddr,
     height: u64,
     group: &Cw4Contract,
 ) -> StdResult<Option<u64>> {
-    let raw_addr = deps.api.canonical_address(addr)?;
-
-    let snapshot = load_snapshot(deps.storage, &raw_addr, height)?;
+    let snapshot = load_snapshot(deps.storage, &addr, height)?;
     match snapshot {
         // use snapshot if available
         Some(info) => Ok(info.weight),
         // otherwise load from the group
-        None => group.is_member(&deps.querier, &raw_addr),
+        None => group.is_member(&deps.querier, &addr),
     }
 }
 
