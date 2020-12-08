@@ -1069,7 +1069,7 @@ mod tests {
             .unwrap();
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
-        let prop_state = |app: &App| -> ProposalResponse {
+        let prop_state = |app: &App, proposal_id: u64| -> ProposalResponse {
             let query_prop = QueryMsg::Proposal { proposal_id };
             app.wrap()
                 .query_wasm_smart(&flex_addr, &query_prop)
@@ -1077,7 +1077,7 @@ mod tests {
         };
 
         // 1/4 votes
-        assert_eq!(prop_state(&app).status, Status::Open);
+        assert_eq!(prop_state(&app, proposal_id).status, Status::Open);
 
         // a few blocks later...
         app.update_block(|block| block.height += 2);
@@ -1105,19 +1105,36 @@ mod tests {
         assert_eq!(power.weight, None);
 
         // proposal still open
-        assert_eq!(prop_state(&app).status, Status::Open);
+        assert_eq!(prop_state(&app, proposal_id).status, Status::Open);
 
         // a few blocks later...
         app.update_block(|block| block.height += 3);
 
-        // VOTER2 can only vote with weight of 2 (not enough to pass)
+        // make a second proposal
+        let proposal2 = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER1, &flex_addr, &proposal2, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id2: u64 = res.attributes[2].value.parse().unwrap();
+
+        // VOTER2 can pass this alone with the updated vote (newer height ignores snapshot)
+        let yes_vote = HandleMsg::Vote {
+            proposal_id: proposal_id2,
+            vote: Vote::Yes,
+        };
+        app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_state(&app, proposal_id2).status, Status::Passed);
+
+        // VOTER2 can only vote on first proposal with weight of 2 (not enough to pass)
         let yes_vote = HandleMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
         app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
             .unwrap();
-        assert_eq!(prop_state(&app).status, Status::Open);
+        assert_eq!(prop_state(&app, proposal_id).status, Status::Open);
 
         // newbie cannot vote
         let err = app
@@ -1128,7 +1145,7 @@ mod tests {
         // previously removed VOTER3 can still vote, passing the proposal
         app.execute_contract(VOTER3, &flex_addr, &yes_vote, &[])
             .unwrap();
-        assert_eq!(prop_state(&app).status, Status::Passed);
+        assert_eq!(prop_state(&app, proposal_id).status, Status::Passed);
     }
 
     // Currently this just closes all open proposals
