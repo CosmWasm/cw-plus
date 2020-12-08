@@ -151,3 +151,33 @@ on how this will look once that exists when it is possible.
 In theory, we want to act like hooks, but executed in a different context.
 
 TODO: when this is possible
+
+## Initializing circular dependencies
+
+It often happens that contract A must know the address of contract B,
+and B know A. For example, say A is an CW20 token and B is a bonding curve
+contract that can mint new tokens. A must have B as "minter", and B must
+know A's address to dispatch the mint messages. Seems impossible to set up.
+But there is a way.
+
+The main point is that we script the setup not *inside* the contract, but
+*externally*, using eg. CosmJS deployment scripts (or CLI tools). This
+is actually more flexible, as the contract doesn't need to know the 
+init details of the other contracts it interacts with, just the public
+handle interface they support. 
+
+Starting as an external scripter named "Earl", we can do the following:
+
+* Earl uploads CW20 contract (A) and sets "Earl" as admin/minter
+* Earl upload Bonding curve contract (B) and sets A as managed token.
+* Earl updates contract A to set B as minter/admin
+
+After this we now see A <--> B, and Earl has no special permissions.
+He was just an admin briefly in the deploy script, so he could swap
+out the permissions once the other contracts were set up.
+
+As an example, we use this pattern when 
+[setting up the `cw3-flex-multisig` test cases](https://github.com/CosmWasm/cosmwasm-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L572-L591).
+The multisig needs to know the group to query memberships, and the group
+needs to have a registered hook to the multisig to update it. We set them
+up as "OWNER" and then step down, leaving the contracts pointing to each other.
