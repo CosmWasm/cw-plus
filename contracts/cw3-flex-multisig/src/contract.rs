@@ -1087,11 +1087,11 @@ mod tests {
         let query_voter = QueryMsg::Voter {
             address: VOTER3.into(),
         };
-        let power: VoterResponse = app
+        let power: VoterInfo = app
             .wrap()
             .query_wasm_smart(&flex_addr, &query_voter)
             .unwrap();
-        assert_eq!(power.weight, 3);
+        assert_eq!(power.weight, Some(3));
 
         // Pass and execute first proposal
         let yes_vote = HandleMsg::Vote {
@@ -1107,11 +1107,11 @@ mod tests {
             .unwrap();
 
         // check membership changed properly
-        let power: VoterResponse = app
+        let power: VoterInfo = app
             .wrap()
             .query_wasm_smart(&flex_addr, &query_voter)
             .unwrap();
-        assert_eq!(power.weight, 0); // FIXME: this should become None in a future PR
+        assert_eq!(power.weight, None);
 
         // first proposal executed, second closed
         let query_prop_1 = QueryMsg::Proposal {
