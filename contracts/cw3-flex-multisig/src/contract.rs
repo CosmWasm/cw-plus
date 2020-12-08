@@ -1047,8 +1047,7 @@ mod tests {
         assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
     }
 
-    // Currently this just closes all open proposals
-    // TODO: something more clever (lazily tracking voting power at start of election)
+    // use the power from the beginning of the voting period
     #[test]
     fn handle_group_changes_from_external() {
         let mut app = mock_app();
@@ -1063,31 +1062,39 @@ mod tests {
             false,
         );
 
-        // VOTER3 starts a proposal to send some tokens
+        // VOTER1 starts a proposal to send some tokens (1/4 votes)
         let proposal = pay_somebody_proposal(&flex_addr);
         let res = app
-            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .execute_contract(VOTER1, &flex_addr, &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        let prop_state = |app: &App| -> ProposalResponse {
+            let query_prop = QueryMsg::Proposal { proposal_id };
+            app.wrap()
+                .query_wasm_smart(&flex_addr, &query_prop)
+                .unwrap()
+        };
 
-        // query state
-        let query_proposal = QueryMsg::Proposal { proposal_id };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_proposal)
-            .unwrap();
-        assert_eq!(prop.status, Status::Open);
+        // 1/4 votes
+        assert_eq!(prop_state(&app).status, Status::Open);
+
+        // a few blocks later...
+        app.update_block(|block| block.height += 2);
 
         // admin changes the group
+        // updates VOTER2 power to 7 -> with snapshot, vote doesn't pass proposal
+        // adds NEWBIE with 2 power -> with snapshot, invalid vote
+        // removes VOTER3 -> with snapshot, can vote and pass proposal
+        let newbie: &str = "newbie";
         let update_msg = Cw4HandleMsg::UpdateMembers {
             remove: vec![VOTER3.into()],
-            add: vec![],
+            add: vec![member(VOTER2, 7), member(newbie, 2)],
         };
         app.execute_contract(OWNER, &group_addr, &update_msg, &[])
             .unwrap();
 
-        // check membership changed properly
+        // check membership queries properly updated
         let query_voter = QueryMsg::Voter {
             address: VOTER3.into(),
         };
@@ -1097,27 +1104,36 @@ mod tests {
             .unwrap();
         assert_eq!(power.weight, None);
 
-        // proposal closed
-        let query_prop = QueryMsg::Proposal { proposal_id };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_prop)
-            .unwrap();
-        assert_eq!(prop.status, Status::Rejected);
+        // proposal still open
+        assert_eq!(prop_state(&app).status, Status::Open);
 
-        // voting on it fails
+        // a few blocks later...
+        app.update_block(|block| block.height += 3);
+
+        // VOTER2 can only vote with weight of 2 (not enough to pass)
         let yes_vote = HandleMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
+        app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_state(&app).status, Status::Open);
+
+        // newbie cannot vote
         let err = app
-            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .execute_contract(newbie, &flex_addr, &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(err, ContractError::NotOpen {}.to_string());
+        assert_eq!(err, ContractError::Unauthorized {}.to_string());
+
+        // previously removed VOTER3 can still vote, passing the proposal
+        app.execute_contract(VOTER3, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_state(&app).status, Status::Passed);
     }
 
     // Currently this just closes all open proposals
     // TODO: something more clever (lazily tracking voting power at start of election)
+    #[ignore]
     #[test]
     fn handle_group_changes_from_proposal() {
         let mut app = mock_app();
