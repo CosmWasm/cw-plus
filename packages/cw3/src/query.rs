@@ -96,17 +96,18 @@ where
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "lowercase")]
+#[repr(u8)]
 pub enum Status {
     /// proposal was created, but voting has not yet begun for whatever reason
-    Pending,
+    Pending = 1,
     /// you can vote on this
-    Open,
+    Open = 2,
     /// voting is over and it did not pass
-    Rejected,
+    Rejected = 3,
     /// voting is over and it did pass, but has not yet executed
-    Passed,
+    Passed = 4,
     /// voting is over it passed, and the proposal was executed
-    Executed,
+    Executed = 5,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

@@ -7,7 +7,7 @@ use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
 use cw4::Cw4Contract;
-use cw_storage_plus::{Item, Map, U64Key};
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex, U64Key};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
@@ -59,8 +59,7 @@ pub struct Ballot {
 pub const CONFIG: Item<Config> = Item::new(b"config");
 pub const PROPOSAL_COUNT: Item<u64> = Item::new(b"proposal_count");
 
-// multiple-item maps
-pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposals");
+// multiple-item map
 pub const BALLOTS: Map<(U64Key, &[u8]), Ballot> = Map::new(b"votes");
 
 pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
@@ -76,4 +75,34 @@ pub fn parse_id(data: &[u8]) -> StdResult<u64> {
             "Corrupted data found. 8 byte expected.",
         )),
     }
+}
+
+// pub const PROPOSALS: Map<U64Key, Proposal> = Map::new(b"proposals");
+
+pub struct ProposalIndexes<'a> {
+    pub status: MultiIndex<'a, Proposal>,
+}
+
+impl<'a> IndexList<Proposal> for ProposalIndexes<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Proposal>> + '_> {
+        let v: Vec<&dyn Index<Proposal>> = vec![&self.status];
+        Box::new(v.into_iter())
+    }
+}
+
+/// Returns a value that can be used as a secondary index key in the proposals map
+pub fn status_index(status: &Status) -> Vec<u8> {
+    vec![*status as u8]
+}
+
+// secondary indexes on state for PROPOSALS to find all open proposals efficiently
+pub fn proposals<'a>() -> IndexedMap<'a, U64Key, Proposal, ProposalIndexes<'a>> {
+    let indexes = ProposalIndexes {
+        status: MultiIndex::new(
+            |p| status_index(&p.status),
+            b"proposals",
+            b"proposals__status",
+        ),
+    };
+    IndexedMap::new(b"proposals", indexes)
 }

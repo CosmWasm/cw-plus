@@ -16,7 +16,7 @@ use cw_storage_plus::{Bound, PkOwned};
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS};
+use crate::state::{next_id, parse_id, proposals, Ballot, Config, Proposal, BALLOTS, CONFIG};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -125,7 +125,7 @@ pub fn handle_propose(
         required_weight: cfg.required_weight,
     };
     let id = next_id(deps.storage)?;
-    PROPOSALS.save(deps.storage, id.into(), &prop)?;
+    proposals().save(deps.storage, id.into(), &prop)?;
 
     // add the first yes vote from voter
     let ballot = Ballot {
@@ -163,7 +163,7 @@ pub fn handle_vote(
         .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
+    let mut prop = proposals().load(deps.storage, proposal_id.into())?;
     if prop.status != Status::Open {
         return Err(ContractError::NotOpen {});
     }
@@ -191,7 +191,7 @@ pub fn handle_vote(
         if prop.yes_weight >= prop.required_weight {
             prop.status = Status::Passed;
         }
-        PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
+        proposals().save(deps.storage, proposal_id.into(), &prop)?;
     }
 
     Ok(HandleResponse {
@@ -214,7 +214,7 @@ pub fn handle_execute(
 ) -> Result<HandleResponse, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
+    let mut prop = proposals().load(deps.storage, proposal_id.into())?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
     if prop.status != Status::Passed {
@@ -223,7 +223,7 @@ pub fn handle_execute(
 
     // set it to executed
     prop.status = Status::Executed;
-    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
+    proposals().save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
     Ok(HandleResponse {
@@ -245,7 +245,7 @@ pub fn handle_close(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
+    let mut prop = proposals().load(deps.storage, proposal_id.into())?;
     if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
         .any(|x| *x == prop.status)
@@ -258,7 +258,7 @@ pub fn handle_close(
 
     // set it to failed
     prop.status = Status::Rejected;
-    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
+    proposals().save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -285,7 +285,7 @@ pub fn handle_membership_hook(
 
     // TODO: make this efficient (brute force now)
     // find all open proposals as (k, v) pairs
-    let open: StdResult<Vec<_>> = PROPOSALS
+    let open: StdResult<Vec<_>> = proposals()
         .range(deps.storage, None, None, Order::Ascending)
         .filter(|item| match item {
             Ok((_, prop)) => prop.status == Status::Open,
@@ -297,7 +297,7 @@ pub fn handle_membership_hook(
     for (k, mut prop) in open? {
         prop.status = Status::Rejected;
         // TODO: make this cleaner
-        PROPOSALS.save(deps.storage, PkOwned(k).into(), &prop)?;
+        proposals().save(deps.storage, PkOwned(k).into(), &prop)?;
     }
 
     Ok(HandleResponse::default())
@@ -337,7 +337,7 @@ fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
 }
 
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
-    let prop = PROPOSALS.load(deps.storage, id.into())?;
+    let prop = proposals().load(deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
     Ok(ProposalResponse {
         id,
@@ -362,7 +362,7 @@ fn list_proposals(
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive_int);
-    let props: StdResult<Vec<_>> = PROPOSALS
+    let props: StdResult<Vec<_>> = proposals()
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
@@ -379,7 +379,7 @@ fn reverse_proposals(
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let end = start_before.map(Bound::exclusive_int);
-    let props: StdResult<Vec<_>> = PROPOSALS
+    let props: StdResult<Vec<_>> = proposals()
         .range(deps.storage, None, end, Order::Descending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
