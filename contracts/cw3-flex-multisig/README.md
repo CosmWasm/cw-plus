@@ -33,7 +33,7 @@ to modify it's own group, do the following in multiple transactions:
 
   * init cw4-group, with your personal key as admin
   * init a multisig pointing to the group
-  * TODO: `AddHook{multisig}` on the group contract 
+  * `AddHook{multisig}` on the group contract
   * `UpdateAdmin{multisig}` on the group contract
 
 This is the current practice to create such circular dependencies,
