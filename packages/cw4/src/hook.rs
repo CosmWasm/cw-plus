@@ -17,9 +17,9 @@ pub struct MemberChangedHookMsg {
 /// old = Some, new = None -> Delete
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MemberDiff {
-    pub addr: HumanAddr,
-    pub old_weight: Option<u64>,
-    pub new_weight: Option<u64>,
+    pub key: HumanAddr,
+    pub old: Option<u64>,
+    pub new: Option<u64>,
 }
 
 impl MemberDiff {
@@ -29,9 +29,9 @@ impl MemberDiff {
         new_weight: Option<u64>,
     ) -> Self {
         MemberDiff {
-            addr: addr.into(),
-            old_weight,
-            new_weight,
+            key: addr.into(),
+            old: old_weight,
+            new: new_weight,
         }
     }
 }

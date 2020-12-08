@@ -31,15 +31,13 @@ pub fn snapshot_diff(
     current_height: u64,
     latest_snapshot_height: u64,
 ) -> StdResult<()> {
-    let raw_addr = deps.api.canonical_address(&diff.addr)?;
+    let raw_addr = deps.api.canonical_address(&diff.key)?;
     match load_snapshot(deps.storage, &raw_addr, latest_snapshot_height)? {
         Some(_) => Ok(()),
         None => SNAPSHOTS.save(
             deps.storage,
             (&raw_addr, current_height.into()),
-            &VoterInfo {
-                weight: diff.old_weight,
-            },
+            &VoterInfo { weight: diff.old },
         ),
     }
 }
