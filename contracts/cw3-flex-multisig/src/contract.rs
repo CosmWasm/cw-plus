@@ -16,6 +16,7 @@ use cw_storage_plus::{Bound, PkOwned};
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::snapshot::snapshot_diff;
 use crate::state::{
     next_id, parse_id, proposals, status_index, Ballot, Config, Proposal, BALLOTS, CONFIG,
 };
@@ -120,6 +121,7 @@ pub fn handle_propose(
     let prop = Proposal {
         title,
         description,
+        start_height: env.block.height,
         expires,
         msgs,
         status,
@@ -274,10 +276,10 @@ pub fn handle_close(
 }
 
 pub fn handle_membership_hook(
-    deps: DepsMut,
-    _env: Env,
+    mut deps: DepsMut,
+    env: Env,
     info: MessageInfo,
-    _diffs: Vec<MemberDiff>,
+    diffs: Vec<MemberDiff>,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // this must be called with the same group contract
     let cfg = CONFIG.load(deps.storage)?;
@@ -285,8 +287,9 @@ pub fn handle_membership_hook(
         return Err(ContractError::Unauthorized {});
     }
 
-    // find all open proposals as (k, v) pairs using secondary index
-    let open: StdResult<Vec<_>> = proposals()
+    // find the latest snapshot height
+    // TODO: this is O(open proposals), with clever composite secondary indexes (status, height), we may get this to O(1)
+    let heights: StdResult<Vec<u64>> = proposals()
         .idx
         .status
         .items(
@@ -296,13 +299,16 @@ pub fn handle_membership_hook(
             None,
             Order::Ascending,
         )
+        .map(|res| Ok(res?.1.start_height))
         .collect();
+    let max_height = heights?.into_iter().max();
 
-    // close all open proposals
-    for (k, mut prop) in open? {
-        prop.status = Status::Rejected;
-        // TODO: make this PkOwned cast cleaner
-        proposals().save(deps.storage, PkOwned(k).into(), &prop)?;
+    // only try snapshot if there is an open proposal
+    if let Some(last_height) = max_height {
+        // save the diff if we have no diff on that account since last snapshot
+        for diff in diffs {
+            snapshot_diff(deps.branch(), diff, env.block.height, last_height)?;
+        }
     }
 
     Ok(HandleResponse::default())

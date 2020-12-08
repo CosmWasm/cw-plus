@@ -21,6 +21,7 @@ pub struct Config {
 pub struct Proposal {
     pub title: String,
     pub description: String,
+    pub start_height: u64,
     pub expires: Expiration,
     pub msgs: Vec<CosmosMsg<Empty>>,
     pub status: Status,
