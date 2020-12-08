@@ -91,15 +91,15 @@ impl<'a> IndexList<Proposal> for ProposalIndexes<'a> {
 }
 
 /// Returns a value that can be used as a secondary index key in the proposals map
-pub fn status_index(status: &Status) -> Vec<u8> {
-    vec![*status as u8]
+pub fn status_index(status: Status) -> Vec<u8> {
+    vec![status as u8]
 }
 
 // secondary indexes on state for PROPOSALS to find all open proposals efficiently
 pub fn proposals<'a>() -> IndexedMap<'a, U64Key, Proposal, ProposalIndexes<'a>> {
     let indexes = ProposalIndexes {
         status: MultiIndex::new(
-            |p| status_index(&p.status),
+            |p| status_index(p.status),
             b"proposals",
             b"proposals__status",
         ),

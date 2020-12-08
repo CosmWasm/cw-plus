@@ -16,7 +16,9 @@ use cw_storage_plus::{Bound, PkOwned};
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{next_id, parse_id, proposals, Ballot, Config, Proposal, BALLOTS, CONFIG};
+use crate::state::{
+    next_id, parse_id, proposals, status_index, Ballot, Config, Proposal, BALLOTS, CONFIG,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -283,20 +285,23 @@ pub fn handle_membership_hook(
         return Err(ContractError::Unauthorized {});
     }
 
-    // TODO: make this efficient (brute force now)
-    // find all open proposals as (k, v) pairs
+    // find all open proposals as (k, v) pairs using secondary index
     let open: StdResult<Vec<_>> = proposals()
-        .range(deps.storage, None, None, Order::Ascending)
-        .filter(|item| match item {
-            Ok((_, prop)) => prop.status == Status::Open,
-            Err(_) => true,
-        })
+        .idx
+        .status
+        .items(
+            deps.storage,
+            &status_index(Status::Open),
+            None,
+            None,
+            Order::Ascending,
+        )
         .collect();
 
     // close all open proposals
     for (k, mut prop) in open? {
         prop.status = Status::Rejected;
-        // TODO: make this cleaner
+        // TODO: make this PkOwned cast cleaner
         proposals().save(deps.storage, PkOwned(k).into(), &prop)?;
     }
 
@@ -345,7 +350,6 @@ fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> 
         description: prop.description,
         msgs: prop.msgs,
         expires: prop.expires,
-        // TODO: check
         status,
     })
 }
