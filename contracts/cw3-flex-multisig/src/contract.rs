@@ -1036,7 +1036,76 @@ mod tests {
     // Currently this just closes all open proposals
     // TODO: something more clever (lazily tracking voting power at start of election)
     #[test]
-    fn handle_group_changes() {
+    fn handle_group_changes_from_external() {
+        let mut app = mock_app();
+
+        let required_weight = 4;
+        let voting_period = Duration::Time(20000);
+        let (flex_addr, group_addr) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
+
+        // VOTER3 starts a proposal to send some tokens
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // query state
+        let query_proposal = QueryMsg::Proposal { proposal_id };
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_proposal)
+            .unwrap();
+        assert_eq!(prop.status, Status::Open);
+
+        // admin changes the group
+        let update_msg = Cw4HandleMsg::UpdateMembers {
+            remove: vec![VOTER3.into()],
+            add: vec![],
+        };
+        app.execute_contract(OWNER, &group_addr, &update_msg, &[])
+            .unwrap();
+
+        // check membership changed properly
+        let query_voter = QueryMsg::Voter {
+            address: VOTER3.into(),
+        };
+        let power: VoterInfo = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_voter)
+            .unwrap();
+        assert_eq!(power.weight, None);
+
+        // proposal closed
+        let query_prop = QueryMsg::Proposal { proposal_id };
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_prop)
+            .unwrap();
+        assert_eq!(prop.status, Status::Rejected);
+
+        // voting on it fails
+        let yes_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let err = app
+            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::NotOpen {}.to_string());
+    }
+
+    // Currently this just closes all open proposals
+    // TODO: something more clever (lazily tracking voting power at start of election)
+    #[test]
+    fn handle_group_changes_from_proposal() {
         let mut app = mock_app();
 
         let required_weight = 4;
@@ -1151,6 +1220,4 @@ mod tests {
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {}.to_string());
     }
-
-    // TODO: ensure no one else can call the hook
 }
