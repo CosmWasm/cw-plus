@@ -11,7 +11,7 @@ balance, if we want, but in the end, we optimistically
 commit changes as if all other actions succeed, and just fire and forget,
 trusting the system to roll it back if they fail.
 
-This means there are 3 places we do not handle:
+This means there are 3 cases we do not handle:
 
 1. If you want to get the return value of a message call and do some
     processing based on it.
@@ -131,7 +131,16 @@ high. Currently, I would only support this if you need an "admin"
 a hook, so this can always succeed to remove load if the hooks start
 making trouble.
 
-TODO: add references to cw4-group implementation when completed
+To see an example of hooks, please check out how `cw3-flex-multisig`
+registers on `cw4-group` to be informed of any changes to the voting set.
+This is essential to manage proper vote counts when the voting set changes
+while a proposal is open.
+
+* [Definition of the hooks in cw4 spec](https://github.com/CosmWasm/cosmwasm-plus/blob/c5e8fc92c0412fecd6cdd951c2c0261aa3c9445a/packages/cw4/src/hook.rs)
+* [Adding/removing hooks](https://github.com/CosmWasm/cosmwasm-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L156-L190) - which may be refactored into common code
+* [Dispatching updates to all registered hooks](https://github.com/CosmWasm/cosmwasm-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L91-L98)
+* [`cw3-flex-multisig` registers HandleMsg variant](https://github.com/CosmWasm/cosmwasm-plus/blob/db560558c901a2bda933d035dbbc30321c3c66ff/contracts/cw3-flex-multisig/src/msg.rs#L38-L39)
+* [`cw3-flex-multisig` updates state based on the hook](https://github.com/CosmWasm/cosmwasm-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L276-L309)
 
 ### Listeners
 
