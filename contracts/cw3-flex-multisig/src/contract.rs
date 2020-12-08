@@ -698,11 +698,12 @@ mod tests {
         );
 
         let proposal = pay_somebody_proposal(&flex_addr);
+        // Only voters can propose
         let res = app.execute_contract(SOMEBODY, &flex_addr, &proposal, &[]);
         assert_eq!(res.unwrap_err(), ContractError::Unauthorized {}.to_string());
 
         // Wrong expiration option fails
-        let msgs = match pay_somebody_proposal(&flex_addr) {
+        let msgs = match proposal.clone() {
             HandleMsg::Propose { msgs, .. } => msgs,
             _ => panic!("Wrong variant"),
         };
