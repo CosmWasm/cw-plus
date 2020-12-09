@@ -236,9 +236,30 @@ mod tests {
         (b"D", Some(22)),
     ];
 
-    fn assert_final_values(map: &TestMap, storage: &mut dyn Storage) {
+    const VALUES_START_3: &[(&[u8], Option<u64>)] =
+        &[(b"A", Some(5)), (b"B", Some(7)), (b"C", None), (b"D", None)];
+
+    const VALUES_START_5: &[(&[u8], Option<u64>)] = &[
+        (b"A", Some(8)),
+        (b"B", None),
+        (b"C", Some(13)),
+        (b"D", None),
+    ];
+
+    fn assert_final_values(map: &TestMap, storage: &dyn Storage) {
         for (k, v) in FINAL_VALUES.iter().cloned() {
             assert_eq!(v, map.may_load(storage, k).unwrap());
+        }
+    }
+
+    fn assert_values_at_height(
+        map: &TestMap,
+        storage: &dyn Storage,
+        height: u64,
+        values: &[(&[u8], Option<u64>)],
+    ) {
+        for (k, v) in values.iter().cloned() {
+            assert_eq!(v, map.may_load_at_height(storage, k, height).unwrap());
         }
     }
 
@@ -246,9 +267,11 @@ mod tests {
     fn never_works_like_normal_map() {
         let mut storage = MockStorage::new();
         init_data(&NEVER, &mut storage);
-        assert_final_values(&NEVER, &mut storage);
+        assert_final_values(&NEVER, &storage);
 
         // historical queries return present values
+        assert_values_at_height(&NEVER, &storage, 3, FINAL_VALUES);
+        assert_values_at_height(&NEVER, &storage, 5, FINAL_VALUES);
     }
 
     #[test]
@@ -256,5 +279,9 @@ mod tests {
         let mut storage = MockStorage::new();
         init_data(&EVERY, &mut storage);
         assert_final_values(&EVERY, &mut storage);
+
+        // historical queries return historical values
+        assert_values_at_height(&EVERY, &storage, 3, VALUES_START_3);
+        assert_values_at_height(&EVERY, &storage, 5, VALUES_START_5);
     }
 }
