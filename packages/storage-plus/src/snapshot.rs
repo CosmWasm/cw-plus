@@ -9,13 +9,14 @@ use crate::keys::{PrimaryKey, U64Key};
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
-use crate::Bound;
+use crate::{Bound, Prefixer};
 
 /// Map that maintains a snapshots of one or more checkpoints
 pub struct SnapshotMap<'a, K, T> {
     primary: Map<'a, K, T>,
 
     // maps height to number of checkpoints (only used for selected)
+    #[allow(dead_code)]
     checkpoints: Map<'a, U64Key, u32>,
 
     // this stores all changes (key, height). Must differentiate between no data written,
@@ -50,7 +51,7 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a>,
 {
     pub fn key(&self, k: K) -> Path<T> {
         self.primary.key(k)
@@ -61,7 +62,7 @@ where
     }
 
     /// is_checkpoint looks at the strategy and determines if we want to checkpoint
-    fn is_checkpoint(&self, store: &dyn Storage, k: &K, height: u64) -> StdResult<bool> {
+    fn is_checkpoint(&self, _store: &dyn Storage, _k: &K, _height: u64) -> StdResult<bool> {
         match self.strategy {
             Strategy::EveryBlock => Ok(true),
             Strategy::Selected => unimplemented!(),
@@ -73,18 +74,18 @@ where
     fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
         let old = self.may_load(store, k.clone())?;
         self.changelog
-            .save(store, (k, height.into()), &ChangeSet { old })
+            .save(store, (k, U64Key::from(height)), &ChangeSet { old })
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {
-        if self.is_checkpoint(&store, &k, height) {
+        if self.is_checkpoint(store, &k, height)? {
             self.write_change(store, k.clone(), height)?;
         }
         self.primary.save(store, k, data)
     }
 
     pub fn remove(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
-        if self.is_checkpoint(&store, &k, height) {
+        if self.is_checkpoint(store, &k, height)? {
             self.write_change(store, k.clone(), height)?;
         }
         self.primary.remove(store, k);
@@ -117,7 +118,7 @@ where
         let first = self
             .changelog
             .prefix(k.clone())
-            .range(storage, Some(start), None, Order::Ascending)
+            .range(store, Some(start), None, Order::Ascending)
             .next();
 
         if let Some(r) = first {
@@ -151,11 +152,11 @@ where
 
         let output = action(input)?;
         // optimize the save (save the extra read in write_change)
-        if self.is_checkpoint(&store, &k, height) {
+        if self.is_checkpoint(store, &k, height)? {
             self.changelog
                 .save(store, (k.clone(), height.into()), &diff)?;
         }
-        self.primary.save(store, k, &output);
+        self.primary.save(store, k, &output)?;
 
         Ok(output)
     }
@@ -199,6 +200,7 @@ mod tests {
     type TestMap = SnapshotMap<'static, &'static [u8], u64>;
     const NEVER: TestMap = SnapshotMap::new(snapshot_names!("never"), Strategy::Never);
     const EVERY: TestMap = SnapshotMap::new(snapshot_names!("every"), Strategy::EveryBlock);
+    #[allow(dead_code)]
     const SELECT: TestMap = SnapshotMap::new(snapshot_names!("select"), Strategy::Selected);
 
     // Fills a map &[u8] -> u64 with the following writes:
@@ -208,26 +210,36 @@ mod tests {
     // 4: B = None, C = 13
     // 5: A = None, D = 22
     // Final values -> C = 13, D = 22
+    // Values at beginning of 3 -> A = 5, B = 7
+    // Values at beginning of 5 -> A = 8, C = 13
     fn init_data(map: &TestMap, storage: &mut dyn Storage) {
         map.save(storage, b"A", &5, 1).unwrap();
         map.save(storage, b"B", &7, 2).unwrap();
 
         // also use update to set - to ensure this works
         map.save(storage, b"C", &1, 3).unwrap();
-        map.update(storage, b"A", 3, |_| Ok(8)).unwrap();
+        map.update(storage, b"A", 3, |_| -> StdResult<u64> { Ok(8) })
+            .unwrap();
 
         map.remove(storage, b"B", 4).unwrap();
         map.save(storage, b"C", &13, 4).unwrap();
 
         map.remove(storage, b"A", 5).unwrap();
-        map.update(storage, b"D", 5, |_| Ok(22)).unwrap();
+        map.update(storage, b"D", 5, |_| -> StdResult<u64> { Ok(22) })
+            .unwrap();
     }
 
+    const FINAL_VALUES: &[(&[u8], Option<u64>)] = &[
+        (b"A", None),
+        (b"B", None),
+        (b"C", Some(13)),
+        (b"D", Some(22)),
+    ];
+
     fn assert_final_values(map: &TestMap, storage: &mut dyn Storage) {
-        assert_eq!(None, map.may_load(storage, b"A"));
-        assert_eq!(None, map.may_load(storage, b"B"));
-        assert_eq!(Some(13u64), map.may_load(storage, b"C"));
-        assert_eq!(Some(22u64), map.may_load(storage, b"D"));
+        for (k, v) in FINAL_VALUES.iter().cloned() {
+            assert_eq!(v, map.may_load(storage, k).unwrap());
+        }
     }
 
     #[test]
@@ -235,12 +247,14 @@ mod tests {
         let mut storage = MockStorage::new();
         init_data(&NEVER, &mut storage);
         assert_final_values(&NEVER, &mut storage);
+
+        // historical queries return present values
     }
 
     #[test]
     fn every_blocks_stores_present_and_past() {
         let mut storage = MockStorage::new();
-        init_data(&NEVER, &mut storage);
-        assert_final_values(&NEVER, &mut storage);
+        init_data(&EVERY, &mut storage);
+        assert_final_values(&EVERY, &mut storage);
     }
 }
