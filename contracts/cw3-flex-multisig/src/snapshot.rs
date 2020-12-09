@@ -3,7 +3,7 @@ use cw3::VoterInfo;
 use cw4::{Cw4Contract, MemberDiff};
 use cw_storage_plus::{Bound, Map, U64Key};
 
-/// SNAPSHOTS pk: (HUmanAddr, height) -> get the weight
+/// SNAPSHOTS pk: (HumanAddr, height) -> get the weight
 /// Use VoterInfo, so None (no data) is different than VoterInfo{weight: None} (record it was removed)
 pub const SNAPSHOTS: Map<(&[u8], U64Key), VoterInfo> = Map::new(b"snapshots");
 
@@ -43,7 +43,7 @@ pub fn snapshot_diff(
 }
 
 /// this will look for the first snapshot of the given address >= given height
-/// if none, there is no snapshot since that time, and the group query will give the current status
+/// If None, there is no snapshot since that time.
 fn load_snapshot(
     storage: &dyn Storage,
     addr: &CanonicalAddr,
