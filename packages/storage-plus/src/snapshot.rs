@@ -1,13 +1,15 @@
+#![cfg(feature = "iterator")]
+
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{StdError, StdResult, Storage};
+use cosmwasm_std::{Order, StdError, StdResult, Storage};
 
 use crate::keys::{PrimaryKey, U64Key};
 use crate::map::Map;
 use crate::path::Path;
-#[cfg(feature = "iterator")]
 use crate::prefix::Prefix;
+use crate::Bound;
 
 /// Map that maintains a snapshots of one or more checkpoints
 pub struct SnapshotMap<'a, K, T> {
@@ -20,7 +22,7 @@ pub struct SnapshotMap<'a, K, T> {
     // and explicit None (just inserted)
     changelog: Map<'a, (K, U64Key), ChangeSet<T>>,
 
-    // TODO: currently only support Never
+    // TODO: Selected not yet implemented
     strategy: Strategy,
 }
 
@@ -28,6 +30,8 @@ pub struct SnapshotMap<'a, K, T> {
 pub enum Strategy {
     EveryBlock,
     Never,
+    // Only writes for linked blocks - does a few more reads to save some writes.
+    // Probably uses more gas, but less total disk usage
     Selected,
 }
 
@@ -45,28 +49,46 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
 
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
-    T: Serialize + DeserializeOwned,
+    T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
     pub fn key(&self, k: K) -> Path<T> {
         self.primary.key(k)
     }
 
-    #[cfg(feature = "iterator")]
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         self.primary.prefix(p)
     }
 
-    pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {
-        // TODO: check strategy
-        unimplemented!();
-        // self.key(k).save(store, data)
+    /// is_checkpoint looks at the strategy and determines if we want to checkpoint
+    fn is_checkpoint(&self, store: &dyn Storage, k: &K, height: u64) -> StdResult<bool> {
+        match self.strategy {
+            Strategy::EveryBlock => Ok(true),
+            Strategy::Selected => unimplemented!(),
+            Strategy::Never => Ok(false),
+        }
     }
 
-    pub fn remove(&self, store: &mut dyn Storage, k: K, height: u64) {
-        // TODO: check strategy
-        unimplemented!();
-        // self.key(k).remove(store)
+    /// load old value and store changelog
+    fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
+        let old = self.may_load(store, k.clone())?;
+        self.changelog
+            .save(store, (k, height.into()), &ChangeSet { old })
+    }
+
+    pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {
+        if self.is_checkpoint(&store, &k, height) {
+            self.write_change(store, k.clone(), height)?;
+        }
+        self.primary.save(store, k, data)
+    }
+
+    pub fn remove(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
+        if self.is_checkpoint(&store, &k, height) {
+            self.write_change(store, k.clone(), height)?;
+        }
+        self.primary.remove(store, k);
+        Ok(())
     }
 
     /// load will return an error if no data is set at the given key, or on parse error
@@ -89,22 +111,53 @@ where
         k: K,
         height: u64,
     ) -> StdResult<Option<T>> {
-        // TODO: check strategy
-        unimplemented!();
-        // self.key(k).may_load(store)
+        // this will look for the first snapshot of the given address >= given height
+        // If None, there is no snapshot since that time.
+        let start = Bound::inclusive(U64Key::new(height));
+        let first = self
+            .changelog
+            .prefix(k.clone())
+            .range(storage, Some(start), None, Order::Ascending)
+            .next();
+
+        if let Some(r) = first {
+            // if we found a match, return this last one
+            r.map(|(_, v)| v.old)
+        } else {
+            // otherwise, return current value
+            self.may_load(store, k)
+        }
     }
 
     /// Loads the data, perform the specified action, and store the result
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&self, store: &mut dyn Storage, k: K, action: A) -> Result<T, E>
+    ///
+    /// This is a bit more customized than needed to only read "old" value 1 time, not 2 per naive approach
+    pub fn update<A, E>(
+        &self,
+        store: &mut dyn Storage,
+        k: K,
+        height: u64,
+        action: A,
+    ) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
     {
-        // TODO
-        unimplemented!();
+        let input = self.may_load(store, k.clone())?;
+        let diff = ChangeSet { old: input.clone() };
+
+        let output = action(input)?;
+        // optimize the save (save the extra read in write_change)
+        if self.is_checkpoint(&store, &k, height) {
+            self.changelog
+                .save(store, (k.clone(), height.into()), &diff)?;
+        }
+        self.primary.save(store, k, &output);
+
+        Ok(output)
     }
 }
 
@@ -133,6 +186,7 @@ macro_rules! snapshot_names {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cosmwasm_std::testing::MockStorage;
 
     #[test]
     fn namespace_macro() {
@@ -140,5 +194,53 @@ mod tests {
         assert_eq!(names.pk, b"demo");
         assert_eq!(names.checkpoints, b"demo__checkpoints");
         assert_eq!(names.changelog, b"demo__changelog");
+    }
+
+    type TestMap = SnapshotMap<'static, &'static [u8], u64>;
+    const NEVER: TestMap = SnapshotMap::new(snapshot_names!("never"), Strategy::Never);
+    const EVERY: TestMap = SnapshotMap::new(snapshot_names!("every"), Strategy::EveryBlock);
+    const SELECT: TestMap = SnapshotMap::new(snapshot_names!("select"), Strategy::Selected);
+
+    // Fills a map &[u8] -> u64 with the following writes:
+    // 1: A = 5
+    // 2: B = 7
+    // 3: C = 1, A = 8
+    // 4: B = None, C = 13
+    // 5: A = None, D = 22
+    // Final values -> C = 13, D = 22
+    fn init_data(map: &TestMap, storage: &mut dyn Storage) {
+        map.save(storage, b"A", &5, 1).unwrap();
+        map.save(storage, b"B", &7, 2).unwrap();
+
+        // also use update to set - to ensure this works
+        map.save(storage, b"C", &1, 3).unwrap();
+        map.update(storage, b"A", 3, |_| Ok(8)).unwrap();
+
+        map.remove(storage, b"B", 4).unwrap();
+        map.save(storage, b"C", &13, 4).unwrap();
+
+        map.remove(storage, b"A", 5).unwrap();
+        map.update(storage, b"D", 5, |_| Ok(22)).unwrap();
+    }
+
+    fn assert_final_values(map: &TestMap, storage: &mut dyn Storage) {
+        assert_eq!(None, map.may_load(storage, b"A"));
+        assert_eq!(None, map.may_load(storage, b"B"));
+        assert_eq!(Some(13u64), map.may_load(storage, b"C"));
+        assert_eq!(Some(22u64), map.may_load(storage, b"D"));
+    }
+
+    #[test]
+    fn never_works_like_normal_map() {
+        let mut storage = MockStorage::new();
+        init_data(&NEVER, &mut storage);
+        assert_final_values(&NEVER, &mut storage);
+    }
+
+    #[test]
+    fn every_blocks_stores_present_and_past() {
+        let mut storage = MockStorage::new();
+        init_data(&NEVER, &mut storage);
+        assert_final_values(&NEVER, &mut storage);
     }
 }
