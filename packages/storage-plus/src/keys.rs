@@ -197,6 +197,12 @@ impl<T: Endian> From<PkOwned> for IntKey<T> {
     }
 }
 
+impl<T: Endian> Into<Vec<u8>> for IntKey<T> {
+    fn into(self) -> Vec<u8> {
+        self.wrapped.0
+    }
+}
+
 impl<T: Endian> AsRef<PkOwned> for IntKey<T> {
     fn as_ref(&self) -> &PkOwned {
         &self.wrapped

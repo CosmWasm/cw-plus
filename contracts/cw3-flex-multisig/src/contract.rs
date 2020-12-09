@@ -12,12 +12,13 @@ use cw3::{
     VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
 };
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
-use cw_storage_plus::{Bound, PkOwned};
+use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::snapshot::{snapshot_diff, snapshoted_weight};
 use crate::state::{
-    next_id, parse_id, proposals, status_index, Ballot, Config, Proposal, BALLOTS, CONFIG,
+    max_proposal_height, next_id, parse_id, proposals, Ballot, Config, Proposal, BALLOTS, CONFIG,
 };
 
 // version info for migration info
@@ -120,6 +121,7 @@ pub fn handle_propose(
     let prop = Proposal {
         title,
         description,
+        start_height: env.block.height,
         expires,
         msgs,
         status,
@@ -159,11 +161,6 @@ pub fn handle_vote(
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let cfg = CONFIG.load(deps.storage)?;
 
-    let vote_power = cfg
-        .group_addr
-        .is_member(&deps.querier, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
-
     // ensure proposal exists and can be voted on
     let mut prop = proposals().load(deps.storage, proposal_id.into())?;
     if prop.status != Status::Open {
@@ -172,6 +169,15 @@ pub fn handle_vote(
     if prop.expires.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
+
+    // use a snapshot of "start of proposal" if available, otherwise, current group weight
+    let vote_power = snapshoted_weight(
+        deps.as_ref(),
+        &raw_sender,
+        prop.start_height,
+        &cfg.group_addr,
+    )?
+    .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // cast vote if no vote previously cast
     BALLOTS.update(
@@ -274,10 +280,10 @@ pub fn handle_close(
 }
 
 pub fn handle_membership_hook(
-    deps: DepsMut,
-    _env: Env,
+    mut deps: DepsMut,
+    env: Env,
     info: MessageInfo,
-    _diffs: Vec<MemberDiff>,
+    diffs: Vec<MemberDiff>,
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // this must be called with the same group contract
     let cfg = CONFIG.load(deps.storage)?;
@@ -285,24 +291,15 @@ pub fn handle_membership_hook(
         return Err(ContractError::Unauthorized {});
     }
 
-    // find all open proposals as (k, v) pairs using secondary index
-    let open: StdResult<Vec<_>> = proposals()
-        .idx
-        .status
-        .items(
-            deps.storage,
-            &status_index(Status::Open),
-            None,
-            None,
-            Order::Ascending,
-        )
-        .collect();
+    // find the latest snapshot height
+    let max_height = max_proposal_height(deps.storage)?;
 
-    // close all open proposals
-    for (k, mut prop) in open? {
-        prop.status = Status::Rejected;
-        // TODO: make this PkOwned cast cleaner
-        proposals().save(deps.storage, PkOwned(k).into(), &prop)?;
+    // only try snapshot if there is an open proposal
+    if let Some(last_height) = max_height {
+        // save the diff if we have no diff on that account since last snapshot
+        for diff in diffs {
+            snapshot_diff(deps.branch(), diff, env.block.height, last_height)?;
+        }
     }
 
     Ok(HandleResponse::default())
@@ -1037,8 +1034,7 @@ mod tests {
         assert_eq!(err, ContractError::WrongCloseStatus {}.to_string());
     }
 
-    // Currently this just closes all open proposals
-    // TODO: something more clever (lazily tracking voting power at start of election)
+    // uses the power from the beginning of the voting period
     #[test]
     fn handle_group_changes_from_external() {
         let mut app = mock_app();
@@ -1053,31 +1049,41 @@ mod tests {
             false,
         );
 
-        // VOTER3 starts a proposal to send some tokens
+        // VOTER1 starts a proposal to send some tokens (1/4 votes)
         let proposal = pay_somebody_proposal(&flex_addr);
         let res = app
-            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .execute_contract(VOTER1, &flex_addr, &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        let prop_status = |app: &App, proposal_id: u64| -> Status {
+            let query_prop = QueryMsg::Proposal { proposal_id };
+            let prop: ProposalResponse = app
+                .wrap()
+                .query_wasm_smart(&flex_addr, &query_prop)
+                .unwrap();
+            prop.status
+        };
 
-        // query state
-        let query_proposal = QueryMsg::Proposal { proposal_id };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_proposal)
-            .unwrap();
-        assert_eq!(prop.status, Status::Open);
+        // 1/4 votes
+        assert_eq!(prop_status(&app, proposal_id), Status::Open);
+
+        // a few blocks later...
+        app.update_block(|block| block.height += 2);
 
         // admin changes the group
+        // updates VOTER2 power to 7 -> with snapshot, vote doesn't pass proposal
+        // adds NEWBIE with 2 power -> with snapshot, invalid vote
+        // removes VOTER3 -> with snapshot, can vote and pass proposal
+        let newbie: &str = "newbie";
         let update_msg = Cw4HandleMsg::UpdateMembers {
             remove: vec![VOTER3.into()],
-            add: vec![],
+            add: vec![member(VOTER2, 7), member(newbie, 2)],
         };
         app.execute_contract(OWNER, &group_addr, &update_msg, &[])
             .unwrap();
 
-        // check membership changed properly
+        // check membership queries properly updated
         let query_voter = QueryMsg::Voter {
             address: VOTER3.into(),
         };
@@ -1087,27 +1093,53 @@ mod tests {
             .unwrap();
         assert_eq!(power.weight, None);
 
-        // proposal closed
-        let query_prop = QueryMsg::Proposal { proposal_id };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_prop)
-            .unwrap();
-        assert_eq!(prop.status, Status::Rejected);
+        // proposal still open
+        assert_eq!(prop_status(&app, proposal_id), Status::Open);
 
-        // voting on it fails
+        // a few blocks later...
+        app.update_block(|block| block.height += 3);
+
+        // make a second proposal
+        let proposal2 = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER1, &flex_addr, &proposal2, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id2: u64 = res.attributes[2].value.parse().unwrap();
+
+        // VOTER2 can pass this alone with the updated vote (newer height ignores snapshot)
+        let yes_vote = HandleMsg::Vote {
+            proposal_id: proposal_id2,
+            vote: Vote::Yes,
+        };
+        app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_status(&app, proposal_id2), Status::Passed);
+
+        // VOTER2 can only vote on first proposal with weight of 2 (not enough to pass)
         let yes_vote = HandleMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
+        app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_status(&app, proposal_id), Status::Open);
+
+        // newbie cannot vote
         let err = app
-            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .execute_contract(newbie, &flex_addr, &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(err, ContractError::NotOpen {}.to_string());
+        assert_eq!(err, ContractError::Unauthorized {}.to_string());
+
+        // previously removed VOTER3 can still vote, passing the proposal
+        app.execute_contract(VOTER3, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_status(&app, proposal_id), Status::Passed);
     }
 
-    // Currently this just closes all open proposals
-    // TODO: something more clever (lazily tracking voting power at start of election)
+    // uses the power from the beginning of the voting period
+    // similar to above - simpler case, but shows that one proposals can
+    // trigger the action
     #[test]
     fn handle_group_changes_from_proposal() {
         let mut app = mock_app();
@@ -1138,34 +1170,32 @@ mod tests {
         // Get the proposal id from the logs
         let update_proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
-        // VOTER3 starts a proposal to send some tokens
+        // next block...
+        app.update_block(|b| b.height += 1);
+
+        // VOTER1 starts a proposal to send some tokens
         let cash_proposal = pay_somebody_proposal(&flex_addr);
         let res = app
-            .execute_contract(VOTER3, &flex_addr, &cash_proposal, &[])
+            .execute_contract(VOTER1, &flex_addr, &cash_proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
         let cash_proposal_id: u64 = res.attributes[2].value.parse().unwrap();
         assert_ne!(cash_proposal_id, update_proposal_id);
 
-        // query state
-        let query_proposal = QueryMsg::Proposal {
-            proposal_id: cash_proposal_id,
+        // query proposal state
+        let prop_status = |app: &App, proposal_id: u64| -> Status {
+            let query_prop = QueryMsg::Proposal { proposal_id };
+            let prop: ProposalResponse = app
+                .wrap()
+                .query_wasm_smart(&flex_addr, &query_prop)
+                .unwrap();
+            prop.status
         };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_proposal)
-            .unwrap();
-        assert_eq!(prop.status, Status::Open);
+        assert_eq!(prop_status(&app, cash_proposal_id), Status::Open);
+        assert_eq!(prop_status(&app, update_proposal_id), Status::Open);
 
-        // ensure VOTER3 is currently a member
-        let query_voter = QueryMsg::Voter {
-            address: VOTER3.into(),
-        };
-        let power: VoterInfo = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_voter)
-            .unwrap();
-        assert_eq!(power.weight, Some(3));
+        // next block...
+        app.update_block(|b| b.height += 1);
 
         // Pass and execute first proposal
         let yes_vote = HandleMsg::Vote {
@@ -1180,40 +1210,29 @@ mod tests {
         app.execute_contract(VOTER4, &flex_addr, &execution, &[])
             .unwrap();
 
-        // check membership changed properly
-        let power: VoterInfo = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_voter)
-            .unwrap();
-        assert_eq!(power.weight, None);
+        // ensure that the update_proposal is executed, but the other unchanged
+        assert_eq!(prop_status(&app, update_proposal_id), Status::Executed);
+        assert_eq!(prop_status(&app, cash_proposal_id), Status::Open);
 
-        // first proposal executed, second closed
-        let query_prop_1 = QueryMsg::Proposal {
-            proposal_id: update_proposal_id,
-        };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_prop_1)
-            .unwrap();
-        assert_eq!(prop.status, Status::Executed);
-        let query_prop_2 = QueryMsg::Proposal {
-            proposal_id: cash_proposal_id,
-        };
-        let prop: ProposalResponse = app
-            .wrap()
-            .query_wasm_smart(&flex_addr, &query_prop_2)
-            .unwrap();
-        assert_eq!(prop.status, Status::Rejected);
+        // next block...
+        app.update_block(|b| b.height += 1);
 
+        // VOTER3 can still pass the cash proposal
         // voting on it fails
         let yes_vote = HandleMsg::Vote {
             proposal_id: cash_proposal_id,
             vote: Vote::Yes,
         };
+        app.execute_contract(VOTER3, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_status(&app, cash_proposal_id), Status::Passed);
+
+        // but cannot open a new one
+        let cash_proposal = pay_somebody_proposal(&flex_addr);
         let err = app
-            .execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .execute_contract(VOTER3, &flex_addr, &cash_proposal, &[])
             .unwrap_err();
-        assert_eq!(err, ContractError::NotOpen {}.to_string());
+        assert_eq!(err, ContractError::Unauthorized {}.to_string());
 
         // extra: ensure no one else can call the hook
         let hook_hack = HandleMsg::MemberChangedHook(MemberChangedHookMsg {

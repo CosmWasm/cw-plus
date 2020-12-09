@@ -93,7 +93,7 @@ where
     }
 }
 
-pub(crate) fn range_with_prefix<'a>(
+pub fn range_with_prefix<'a>(
     storage: &'a dyn Storage,
     namespace: &[u8],
     start: Option<Bound>,

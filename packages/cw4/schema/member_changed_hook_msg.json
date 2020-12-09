@@ -22,13 +22,13 @@
       "description": "MemberDiff shows the old and new states for a given cw4 member They cannot both be None. old = None, new = Some -> Insert old = Some, new = Some -> Update old = Some, new = None -> Delete",
       "type": "object",
       "required": [
-        "addr"
+        "key"
       ],
       "properties": {
-        "addr": {
+        "key": {
           "$ref": "#/definitions/HumanAddr"
         },
-        "new_weight": {
+        "new": {
           "type": [
             "integer",
             "null"
@@ -36,7 +36,7 @@
           "format": "uint64",
           "minimum": 0.0
         },
-        "old_weight": {
+        "old": {
           "type": [
             "integer",
             "null"
