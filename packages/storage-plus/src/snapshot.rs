@@ -16,14 +16,13 @@ pub struct SnapshotMap<'a, K, T> {
     primary: Map<'a, K, T>,
 
     // maps height to number of checkpoints (only used for selected)
-    #[allow(dead_code)]
     checkpoints: Map<'a, U64Key, u32>,
 
     // this stores all changes (key, height). Must differentiate between no data written,
     // and explicit None (just inserted)
     changelog: Map<'a, (K, U64Key), ChangeSet<T>>,
 
-    // TODO: Selected not yet implemented
+    // How agressive we are about checkpointing all data
     strategy: Strategy,
 }
 
@@ -46,6 +45,27 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
             strategy,
         }
     }
+
+    pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
+        self.checkpoints
+            .update::<_, StdError>(store, height.into(), |count| {
+                Ok(count.unwrap_or_default() + 1)
+            })?;
+        Ok(())
+    }
+
+    pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
+        let count = self
+            .checkpoints
+            .may_load(store, height.into())?
+            .unwrap_or_default();
+        if count <= 1 {
+            self.checkpoints.remove(store, height.into());
+            Ok(())
+        } else {
+            self.checkpoints.save(store, height.into(), &(count - 1))
+        }
+    }
 }
 
 impl<'a, K, T> SnapshotMap<'a, K, T>
@@ -61,12 +81,35 @@ where
         self.primary.prefix(p)
     }
 
-    /// is_checkpoint looks at the strategy and determines if we want to checkpoint
-    fn is_checkpoint(&self, _store: &dyn Storage, _k: &K, _height: u64) -> StdResult<bool> {
+    /// should_checkpoint looks at the strategy and determines if we want to checkpoint
+    fn should_checkpoint(&self, store: &dyn Storage, k: &K) -> StdResult<bool> {
         match self.strategy {
             Strategy::EveryBlock => Ok(true),
-            Strategy::Selected => unimplemented!(),
             Strategy::Never => Ok(false),
+            Strategy::Selected => {
+                // most recent checkpoint
+                let checkpoint = self
+                    .checkpoints
+                    .range(store, None, None, Order::Descending)
+                    .next()
+                    .transpose()?;
+                if let Some((height, _)) = checkpoint {
+                    // any changelog for the given key since then?
+                    let start = Bound::inclusive(U64Key::from(height));
+                    let first = self
+                        .changelog
+                        .prefix(k.clone())
+                        .range(store, Some(start), None, Order::Ascending)
+                        .next()
+                        .transpose()?;
+                    if first.is_none() {
+                        // there must be at least one open checkpoint and no changelog for the given address since then
+                        return Ok(true);
+                    }
+                }
+                // otherwise, we don't save this
+                Ok(false)
+            }
         }
     }
 
@@ -78,14 +121,14 @@ where
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {
-        if self.is_checkpoint(store, &k, height)? {
+        if self.should_checkpoint(store, &k)? {
             self.write_change(store, k.clone(), height)?;
         }
         self.primary.save(store, k, data)
     }
 
     pub fn remove(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
-        if self.is_checkpoint(store, &k, height)? {
+        if self.should_checkpoint(store, &k)? {
             self.write_change(store, k.clone(), height)?;
         }
         self.primary.remove(store, k);
@@ -152,7 +195,7 @@ where
 
         let output = action(input)?;
         // optimize the save (save the extra read in write_change)
-        if self.is_checkpoint(store, &k, height)? {
+        if self.should_checkpoint(store, &k)? {
             self.changelog
                 .save(store, (k.clone(), height.into()), &diff)?;
         }
@@ -213,6 +256,13 @@ mod tests {
     // Values at beginning of 3 -> A = 5, B = 7
     // Values at beginning of 5 -> A = 8, C = 13
     fn init_data(map: &TestMap, storage: &mut dyn Storage) {
+        // checkpoint at 2 and 3
+        map.add_checkpoint(storage, 2).unwrap();
+        map.add_checkpoint(storage, 3).unwrap();
+        // add and remove 5 (should not effect anything)
+        // map.add_checkpoint(storage, 5).unwrap();
+        // map.remove_checkpoint(storage, 5).unwrap();
+
         map.save(storage, b"A", &5, 1).unwrap();
         map.save(storage, b"B", &7, 2).unwrap();
 
@@ -283,5 +333,17 @@ mod tests {
         // historical queries return historical values
         assert_values_at_height(&EVERY, &storage, 3, VALUES_START_3);
         assert_values_at_height(&EVERY, &storage, 5, VALUES_START_5);
+    }
+
+    #[test]
+    fn selected_shows_3_not_5() {
+        let mut storage = MockStorage::new();
+        init_data(&SELECT, &mut storage);
+        assert_final_values(&SELECT, &mut storage);
+
+        // historical queries return historical values
+        assert_values_at_height(&SELECT, &storage, 3, VALUES_START_3);
+        // no checkpoint at 5, means just current values
+        // assert_values_at_height(&SELECT, &storage, 5, FINAL_VALUES);
     }
 }
