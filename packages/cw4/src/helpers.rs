@@ -139,7 +139,7 @@ impl Cw4Contract {
     ) -> StdResult<Option<u64>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Member {
             addr: member,
-            height: Some(height),
+            at_height: Some(height),
         })?;
         let res: MemberResponse = querier.query(&query)?;
         Ok(res.weight)

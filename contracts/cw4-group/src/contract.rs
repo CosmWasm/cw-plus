@@ -200,7 +200,10 @@ pub fn handle_remove_hook(
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Member { addr, height } => to_binary(&query_member(deps, addr, height)?),
+        QueryMsg::Member {
+            addr,
+            at_height: height,
+        } => to_binary(&query_member(deps, addr, height)?),
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }

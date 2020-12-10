@@ -74,7 +74,7 @@
             "addr": {
               "$ref": "#/definitions/HumanAddr"
             },
-            "height": {
+            "at_height": {
               "type": [
                 "integer",
                 "null"

@@ -20,7 +20,7 @@ pub enum Cw4QueryMsg {
     /// Returns MemberResponse
     Member {
         addr: HumanAddr,
-        height: Option<u64>,
+        at_height: Option<u64>,
     },
     /// Shows all registered hooks. Returns HooksResponse.
     Hooks {},
