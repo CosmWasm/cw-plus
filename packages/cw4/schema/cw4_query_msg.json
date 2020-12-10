@@ -3,18 +3,6 @@
   "title": "Cw4QueryMsg",
   "anyOf": [
     {
-      "description": "Return AdminResponse",
-      "type": "object",
-      "required": [
-        "admin"
-      ],
-      "properties": {
-        "admin": {
-          "type": "object"
-        }
-      }
-    },
-    {
       "description": "Return TotalWeightResponse",
       "type": "object",
       "required": [

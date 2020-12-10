@@ -8,9 +8,7 @@ use cosmwasm_std::{
 
 use crate::msg::Cw4HandleMsg;
 use crate::query::HooksResponse;
-use crate::{
-    member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY,
-};
+use crate::{member_key, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY};
 
 /// Cw4Contract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with cw4 contracts
@@ -20,12 +18,16 @@ use crate::{
 pub struct Cw4Contract(pub HumanAddr);
 
 impl Cw4Contract {
+    pub fn new(addr: HumanAddr) -> Self {
+        Cw4Contract(addr)
+    }
+
     pub fn addr(&self) -> HumanAddr {
         self.0.clone()
     }
 
     /// Convert this address to a form fit for storage
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw4CanonicalContract> {
+    pub fn canonical(&self, api: &dyn Api) -> StdResult<Cw4CanonicalContract> {
         let canon = api.canonical_address(&self.0)?;
         Ok(Cw4CanonicalContract(canon))
     }
@@ -37,19 +39,6 @@ impl Cw4Contract {
             send: vec![],
         }
         .into())
-    }
-
-    pub fn update_admin<T: Into<HumanAddr>>(
-        &self,
-        admin: Option<HumanAddr>,
-    ) -> StdResult<CosmosMsg> {
-        let msg = Cw4HandleMsg::UpdateAdmin { admin };
-        self.encode_msg(msg)
-    }
-
-    pub fn update_members(&self, remove: Vec<HumanAddr>, add: Vec<Member>) -> StdResult<CosmosMsg> {
-        let msg = Cw4HandleMsg::UpdateMembers { remove, add };
-        self.encode_msg(msg)
     }
 
     pub fn add_hook(&self, addr: HumanAddr) -> StdResult<CosmosMsg> {
@@ -76,13 +65,6 @@ impl Cw4Contract {
             key: key.into(),
         }
         .into())
-    }
-
-    /// Read the admin
-    pub fn admin(&self, querier: &QuerierWrapper) -> StdResult<Option<HumanAddr>> {
-        let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
-        let res: AdminResponse = querier.query(&query)?;
-        Ok(res.admin)
     }
 
     /// Show the hooks
@@ -164,7 +146,7 @@ pub struct Cw4CanonicalContract(pub CanonicalAddr);
 
 impl Cw4CanonicalContract {
     /// Convert this address to a form fit for usage in messages and queries
-    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw4Contract> {
+    pub fn human(&self, api: &dyn Api) -> StdResult<Cw4Contract> {
         let human = api.human_address(&self.0)?;
         Ok(Cw4Contract(human))
     }

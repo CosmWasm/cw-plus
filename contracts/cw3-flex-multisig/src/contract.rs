@@ -457,7 +457,8 @@ mod tests {
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
-    use cw4::{Cw4HandleMsg, Member};
+    use cw4::Member;
+    use cw4_group::helpers::Cw4GroupContract;
     use cw_multi_test::{next_block, App, Contract, ContractWrapper, SimpleBank};
 
     use super::*;
@@ -559,7 +560,7 @@ mod tests {
 
         // 3. (Optional) Set the multisig as the group owner
         if multisig_as_group_admin {
-            let update_admin = Cw4HandleMsg::UpdateAdmin {
+            let update_admin = cw4_group::msg::HandleMsg::UpdateAdmin {
                 admin: Some(flex_addr.clone()),
             };
             app.execute_contract(OWNER, &group_addr, &update_admin, &[])
@@ -1056,7 +1057,7 @@ mod tests {
         // adds NEWBIE with 2 power -> with snapshot, invalid vote
         // removes VOTER3 -> with snapshot, can vote and pass proposal
         let newbie: &str = "newbie";
-        let update_msg = Cw4HandleMsg::UpdateMembers {
+        let update_msg = cw4_group::msg::HandleMsg::UpdateMembers {
             remove: vec![VOTER3.into()],
             add: vec![member(VOTER2, 7), member(newbie, 2)],
         };
@@ -1135,7 +1136,7 @@ mod tests {
         );
 
         // Start a proposal to remove VOTER3 from the set
-        let update_msg = Cw4Contract(group_addr.clone())
+        let update_msg = Cw4GroupContract::new(group_addr.clone())
             .update_members(vec![VOTER3.into()], vec![])
             .unwrap();
         let update_proposal = HandleMsg::Propose {
