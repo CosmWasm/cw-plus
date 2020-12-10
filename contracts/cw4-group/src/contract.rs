@@ -1,8 +1,11 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Context, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, Order, StdResult,
 };
-use cw0::maybe_canonical;
+use cw0::{
+    hooks::{add_hook, prepare_hooks, remove_hook, HOOKS},
+    maybe_canonical,
+};
 use cw2::set_contract_version;
 use cw4::{
     AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
@@ -12,7 +15,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
+use crate::state::{ADMIN, MEMBERS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -98,12 +101,12 @@ pub fn handle_update_members(
     // make the local update
     let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
-    let mut ctx = Context::new();
-    for h in HOOKS.may_load(deps.storage)?.unwrap_or_default() {
-        let msg = diff.clone().into_cosmos_msg(h)?;
-        ctx.add_message(msg);
-    }
-    Ok(ctx.into())
+    let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
+    Ok(HandleResponse {
+        messages,
+        attributes: vec![],
+        data: None,
+    })
 }
 
 // the logic from handle_update_admin extracted for easier import
@@ -169,14 +172,7 @@ pub fn handle_add_hook(
 ) -> Result<HandleResponse, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
     assert_admin(deps.api, info.sender, admin)?;
-
-    let mut hooks = HOOKS.may_load(deps.storage)?.unwrap_or_default();
-    if !hooks.iter().any(|h| h == &addr) {
-        hooks.push(addr);
-    } else {
-        return Err(ContractError::HookAlreadyRegistered {});
-    }
-    HOOKS.save(deps.storage, &hooks)?;
+    add_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
 
@@ -187,14 +183,7 @@ pub fn handle_remove_hook(
 ) -> Result<HandleResponse, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
     assert_admin(deps.api, info.sender, admin)?;
-
-    let mut hooks = HOOKS.load(deps.storage)?;
-    if let Some(p) = hooks.iter().position(|x| x == &addr) {
-        hooks.remove(p);
-    } else {
-        return Err(ContractError::HookNotRegistered {});
-    }
-    HOOKS.save(deps.storage, &hooks)?;
+    remove_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
 
@@ -271,7 +260,8 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
+    use cosmwasm_std::{from_slice, OwnedDeps, Querier, StdError, Storage};
+    use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
     use cw4::{member_key, TOTAL_KEY};
 
     const ADMIN: &str = "juan";
@@ -533,8 +523,11 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
+
         match err {
-            ContractError::HookNotRegistered {} => {}
+            ContractError::Std(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, HOOK_NOT_REGISTERED)
+            }
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -555,7 +548,9 @@ mod tests {
         )
         .unwrap_err();
         match err {
-            ContractError::HookAlreadyRegistered {} => {}
+            ContractError::Std(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, HOOK_ALREADY_REGISTERED)
+            }
             e => panic!("Unexpected error: {}", e),
         }
 

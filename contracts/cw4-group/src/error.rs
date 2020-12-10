@@ -8,10 +8,4 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-
-    #[error("Given address already registered as a hook")]
-    HookAlreadyRegistered {},
-
-    #[error("Given address not registered as a hook")]
-    HookNotRegistered {},
 }
