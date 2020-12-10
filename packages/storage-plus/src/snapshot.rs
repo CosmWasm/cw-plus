@@ -11,7 +11,9 @@ use crate::path::Path;
 use crate::prefix::Prefix;
 use crate::{Bound, Prefixer};
 
-/// Map that maintains a snapshots of one or more checkpoints
+/// Map that maintains a snapshots of one or more checkpoints.
+/// We can query historical data as well as current state.
+/// What data is snapshotted depends on the Strategy.
 pub struct SnapshotMap<'a, K, T> {
     primary: Map<'a, K, T>,
 
@@ -22,7 +24,7 @@ pub struct SnapshotMap<'a, K, T> {
     // and explicit None (just inserted)
     changelog: Map<'a, (K, U64Key), ChangeSet<T>>,
 
-    // How agressive we are about checkpointing all data
+    // How aggressive we are about checkpointing all data
     strategy: Strategy,
 }
 
@@ -148,7 +150,7 @@ where
 
     // may_load_at_height reads historical data from given checkpoints.
     // only guaranteed to give correct data if Strategy::EveryBlock or
-    // Strategy::Selected and h element of checkpoint heights
+    // Strategy::Selected and h is registered as checkpoint
     pub fn may_load_at_height(
         &self,
         store: &dyn Storage,
@@ -243,7 +245,6 @@ mod tests {
     type TestMap = SnapshotMap<'static, &'static [u8], u64>;
     const NEVER: TestMap = SnapshotMap::new(snapshot_names!("never"), Strategy::Never);
     const EVERY: TestMap = SnapshotMap::new(snapshot_names!("every"), Strategy::EveryBlock);
-    #[allow(dead_code)]
     const SELECT: TestMap = SnapshotMap::new(snapshot_names!("select"), Strategy::Selected);
 
     // Fills a map &[u8] -> u64 with the following writes:
@@ -256,15 +257,11 @@ mod tests {
     // Values at beginning of 3 -> A = 5, B = 7
     // Values at beginning of 5 -> A = 8, C = 13
     fn init_data(map: &TestMap, storage: &mut dyn Storage) {
-        // checkpoint at 2 and 3
-        map.add_checkpoint(storage, 2).unwrap();
-        map.add_checkpoint(storage, 3).unwrap();
-        // add and remove 5 (should not effect anything)
-        // map.add_checkpoint(storage, 5).unwrap();
-        // map.remove_checkpoint(storage, 5).unwrap();
-
         map.save(storage, b"A", &5, 1).unwrap();
         map.save(storage, b"B", &7, 2).unwrap();
+
+        // checkpoint 3
+        map.add_checkpoint(storage, 3).unwrap();
 
         // also use update to set - to ensure this works
         map.save(storage, b"C", &1, 3).unwrap();
@@ -343,7 +340,8 @@ mod tests {
 
         // historical queries return historical values
         assert_values_at_height(&SELECT, &storage, 3, VALUES_START_3);
-        // no checkpoint at 5, means just current values
-        // assert_values_at_height(&SELECT, &storage, 5, FINAL_VALUES);
+        // we cannot claim anything later than 3, they may or may not have changelogs related to needs of 3
+        // previous to 3 nothing should be checkmarked, so they use value at 3
+        assert_values_at_height(&SELECT, &storage, 1, VALUES_START_3);
     }
 }
