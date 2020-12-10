@@ -20,15 +20,15 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    create(deps, msg.admin, msg.members)?;
+    create(deps, msg.admin, msg.members, env.block.height)?;
     Ok(InitResponse::default())
 }
 
 // create is the init logic with set_contract_version removed so it can more
 // easily be imported in other contracts
-pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> StdResult<()> {
+pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>, height: u64) -> StdResult<()> {
     let admin_raw = maybe_canonical(deps.api, admin)?;
     ADMIN.save(deps.storage, &admin_raw)?;
 
@@ -36,7 +36,7 @@ pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> 
     for member in members.into_iter() {
         total += member.weight;
         let raw = deps.api.canonical_address(&member.addr)?;
-        MEMBERS.save(deps.storage, &raw, &member.weight)?;
+        MEMBERS.save(deps.storage, &raw, &member.weight, height)?;
     }
     TOTAL.save(deps.storage, &total)?;
 
@@ -46,13 +46,13 @@ pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> 
 // And declare a custom Error variant for the ones where you will want to make use of it
 pub fn handle(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
-        HandleMsg::UpdateMembers { add, remove } => handle_update_members(deps, info, add, remove),
+        HandleMsg::UpdateMembers { add, remove } => handle_update_members(deps, env, info, add, remove),
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
     }
@@ -83,12 +83,13 @@ pub fn update_admin(
 
 pub fn handle_update_members(
     mut deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
     // make the local update
-    let diff = update_members(deps.branch(), info.sender, add, remove)?;
+    let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
     let mut ctx = Context::new();
     for h in HOOKS.may_load(deps.storage)?.unwrap_or_default() {
@@ -101,6 +102,7 @@ pub fn handle_update_members(
 // the logic from handle_update_admin extracted for easier import
 pub fn update_members(
     deps: DepsMut,
+    height: u64,
     sender: HumanAddr,
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
@@ -114,7 +116,7 @@ pub fn update_members(
     // add all new members and update total
     for add in to_add.into_iter() {
         let raw = deps.api.canonical_address(&add.addr)?;
-        MEMBERS.update(deps.storage, &raw, |old| -> StdResult<_> {
+        MEMBERS.update(deps.storage, &raw, height, |old| -> StdResult<_> {
             total -= old.unwrap_or_default();
             total += add.weight;
             diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
@@ -129,7 +131,7 @@ pub fn update_members(
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
             total -= weight;
-            MEMBERS.remove(deps.storage, &raw);
+            MEMBERS.remove(deps.storage, &raw, height)?;
         }
     }
 
@@ -386,15 +388,17 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // non-admin cannot update
+        let height = mock_env().block.height;
         let err =
-            update_members(deps.as_mut(), USER1.into(), add.clone(), remove.clone()).unwrap_err();
+            update_members(deps.as_mut(), height, USER1.into(), add.clone(), remove.clone()).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
         // admin updates properly
-        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
+        let height = mock_env().block.height;
+        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(15));
     }
 
@@ -412,7 +416,8 @@ mod tests {
         let remove = vec![USER3.into()];
 
         // admin updates properly
-        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
+        let height = mock_env().block.height;
+        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, Some(4), Some(6), None);
     }
 
@@ -436,7 +441,8 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // admin updates properly
-        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
+        let height = mock_env().block.height;
+        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(5));
     }
 
