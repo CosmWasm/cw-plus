@@ -25,13 +25,6 @@ configure in the `init` phase.
 
 There are four messages supported by a group contract:
 
-`UpdateAdmin{admin}` - changes (or clears) the admin for the contract
-
-`UpdateMembers{add, remove}` - takes a membership diff and adds/updates the
-  members, as well as removing any provided addresses. If an address is on both
-  lists, it will be removed. If it appears multiple times in `add`, only the
-  last occurance will be used.
-
 `AddHook{addr}` - adds a contract address to be called upon every 
   `UpdateMembers` call. This can only be called by the admin, and care must
   be taken. A contract returning an error or running out of gas will
@@ -50,8 +43,6 @@ problem, but we cover how to instantiate that in
 ## Queries
 
 ### Smart
-
-`Admin{}` - Returns the `admin` address, or `None` if unset.
 
 `TotalWeight{}` - Returns the total weight of all current members,
   this is very useful if some conditions are defined on a "percentage of members".
