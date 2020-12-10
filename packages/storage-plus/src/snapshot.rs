@@ -32,8 +32,11 @@ pub struct SnapshotMap<'a, K, T> {
 pub enum Strategy {
     EveryBlock,
     Never,
-    // Only writes for linked blocks - does a few more reads to save some writes.
-    // Probably uses more gas, but less total disk usage
+    /// Only writes for linked blocks - does a few more reads to save some writes.
+    /// Probably uses more gas, but less total disk usage.
+    ///
+    /// Note that you need a trusted source (eg. own contract) to set/remove checkpoints.
+    /// Useful when the checkpoint setting happens in the same contract as the snapshotting.
     Selected,
 }
 
@@ -88,36 +91,39 @@ where
         match self.strategy {
             Strategy::EveryBlock => Ok(true),
             Strategy::Never => Ok(false),
-            Strategy::Selected => {
-                // most recent checkpoint
-                let checkpoint = self
-                    .checkpoints
-                    .range(store, None, None, Order::Descending)
-                    .next()
-                    .transpose()?;
-                if let Some((height, _)) = checkpoint {
-                    // any changelog for the given key since then?
-                    let start = Bound::inclusive(U64Key::from(height));
-                    let first = self
-                        .changelog
-                        .prefix(k.clone())
-                        .range(store, Some(start), None, Order::Ascending)
-                        .next()
-                        .transpose()?;
-                    if first.is_none() {
-                        // there must be at least one open checkpoint and no changelog for the given address since then
-                        return Ok(true);
-                    }
-                }
-                // otherwise, we don't save this
-                Ok(false)
+            Strategy::Selected => self.should_checkpoint_selected(store, k),
+        }
+    }
+
+    /// this is just pulled out from above for the selected block
+    fn should_checkpoint_selected(&self, store: &dyn Storage, k: &K) -> StdResult<bool> {
+        // most recent checkpoint
+        let checkpoint = self
+            .checkpoints
+            .range(store, None, None, Order::Descending)
+            .next()
+            .transpose()?;
+        if let Some((height, _)) = checkpoint {
+            // any changelog for the given key since then?
+            let start = Bound::inclusive(U64Key::from(height));
+            let first = self
+                .changelog
+                .prefix(k.clone())
+                .range(store, Some(start), None, Order::Ascending)
+                .next()
+                .transpose()?;
+            if first.is_none() {
+                // there must be at least one open checkpoint and no changelog for the given address since then
+                return Ok(true);
             }
         }
+        // otherwise, we don't save this
+        Ok(false)
     }
 
     /// load old value and store changelog
     fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
-        let old = self.may_load(store, k.clone())?;
+        let old = self.primary.may_load(store, k.clone())?;
         self.changelog
             .save(store, (k, U64Key::from(height)), &ChangeSet { old })
     }
@@ -193,11 +199,12 @@ where
         E: From<StdError>,
     {
         let input = self.may_load(store, k.clone())?;
-        let diff = ChangeSet { old: input.clone() };
+        let old = input.clone();
 
         let output = action(input)?;
         // optimize the save (save the extra read in write_change)
         if self.should_checkpoint(store, &k)? {
+            let diff = ChangeSet { old };
             self.changelog
                 .save(store, (k.clone(), height.into()), &diff)?;
         }
