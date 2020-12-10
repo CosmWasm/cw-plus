@@ -56,10 +56,13 @@ problem, but we cover how to instantiate that in
 `TotalWeight{}` - Returns the total weight of all current members,
   this is very useful if some conditions are defined on a "percentage of members".
   
-`Member{addr}` - Returns the weight of this voter if they are a member of the
+`Member{addr, height}` - Returns the weight of this voter if they are a member of the
   group (may be 0), or `None` if they are not a member of the group.
+  If height is set and the cw4 implementation supports snapshots,
+  this will return the weight of that member at
+  the beginning of the block with the given height.
   
- `MemberList{start_after, limit}` - Allows us to paginate over the list
+`MemberList{start_after, limit}` - Allows us to paginate over the list
    of all members. 0-weight members will be included. Removed members will not.
 
 ### Raw
