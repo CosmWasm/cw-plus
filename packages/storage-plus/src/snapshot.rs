@@ -155,14 +155,18 @@ where
     }
 
     // may_load_at_height reads historical data from given checkpoints.
-    // only guaranteed to give correct data if Strategy::EveryBlock or
-    // Strategy::Selected and h is registered as checkpoint
+    // Only returns `Ok` if we have the data to be able to give the correct answer
+    // (Strategy::EveryBlock or Strategy::Selected and h is registered as checkpoint)
+    //
+    // If there is no checkpoint for that height, then we return StdError::NotFound
     pub fn may_load_at_height(
         &self,
         store: &dyn Storage,
         k: K,
         height: u64,
     ) -> StdResult<Option<T>> {
+        self.assert_checkpointed(store, height)?;
+
         // this will look for the first snapshot of the given address >= given height
         // If None, there is no snapshot since that time.
         let start = Bound::inclusive(U64Key::new(height));
@@ -178,6 +182,19 @@ where
         } else {
             // otherwise, return current value
             self.may_load(store, k)
+        }
+    }
+
+    // If there is no checkpoint for that height, then we return StdError::NotFound
+    pub fn assert_checkpointed(&self, store: &dyn Storage, height: u64) -> StdResult<()> {
+        let has = match self.strategy {
+            Strategy::EveryBlock => true,
+            Strategy::Never => false,
+            Strategy::Selected => self.checkpoints.may_load(store, height.into())?.is_some(),
+        };
+        match has {
+            true => Ok(()),
+            false => Err(StdError::not_found("checkpoint")),
         }
     }
 
@@ -302,9 +319,13 @@ mod tests {
         map.remove(storage, b"B", 4).unwrap();
         map.save(storage, b"C", &13, 4).unwrap();
 
+        // checkpoint 5
+        map.add_checkpoint(storage, 5).unwrap();
         map.remove(storage, b"A", 5).unwrap();
         map.update(storage, b"D", 5, |_| -> StdResult<u64> { Ok(22) })
             .unwrap();
+        // and delete it later (unknown if all data present)
+        map.remove_checkpoint(storage, 5).unwrap();
     }
 
     const FINAL_VALUES: &[(&[u8], Option<u64>)] = &[
@@ -341,15 +362,21 @@ mod tests {
         }
     }
 
+    fn assert_missing_checkpoint(map: &TestMap, storage: &dyn Storage, height: u64) {
+        for k in &[b"A", b"B", b"C", b"D"] {
+            assert!(map.may_load_at_height(storage, *k, height).is_err());
+        }
+    }
+
     #[test]
     fn never_works_like_normal_map() {
         let mut storage = MockStorage::new();
         init_data(&NEVER, &mut storage);
         assert_final_values(&NEVER, &storage);
 
-        // historical queries return present values
-        assert_values_at_height(&NEVER, &storage, 3, FINAL_VALUES);
-        assert_values_at_height(&NEVER, &storage, 5, FINAL_VALUES);
+        // historical queries return error
+        assert_missing_checkpoint(&NEVER, &storage, 3);
+        assert_missing_checkpoint(&NEVER, &storage, 5);
     }
 
     #[test]
@@ -371,8 +398,9 @@ mod tests {
 
         // historical queries return historical values
         assert_values_at_height(&SELECT, &storage, 3, VALUES_START_3);
-        // we cannot claim anything later than 3, they may or may not have changelogs related to needs of 3
-        // previous to 3 nothing should be checkmarked, so they use value at 3
-        assert_values_at_height(&SELECT, &storage, 1, VALUES_START_3);
+        // never checkpointed
+        assert_missing_checkpoint(&NEVER, &storage, 1);
+        // deleted checkpoint
+        assert_missing_checkpoint(&NEVER, &storage, 5);
     }
 }
