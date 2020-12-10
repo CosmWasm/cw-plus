@@ -1,9 +1,9 @@
 [package]
-name = "cw4-group"
+name = "cw4-stake"
 version = "0.3.2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
-description = "Simple cw4 implementation of group membership controlled by admin "
+description = "CW4 implementation of group based on staked tokens"
 license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cosmwasm-plus"
 homepage = "https://cosmwasm.com"

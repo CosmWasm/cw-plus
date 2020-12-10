@@ -297,6 +297,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw4-stake"
+version = "0.3.2"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw0",
+ "cw2",
+ "cw4",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw721"
 version = "0.3.2"
 dependencies = [
