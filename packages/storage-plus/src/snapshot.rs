@@ -269,6 +269,7 @@ pub struct SnapshotNamespaces<'a> {
 #[macro_export]
 macro_rules! snapshot_names {
     ($var:expr) => {
+        #[allow(clippy::string_lit_as_bytes)]
         SnapshotNamespaces {
             pk: $var.as_bytes(),
             checkpoints: concat!($var, "__checkpoints").as_bytes(),
