@@ -2,6 +2,8 @@ use cosmwasm_std::{
     attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
     InitResponse, MessageInfo, QuerierWrapper, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
+
+use cw0::claim::{claim_tokens, create_claim, CLAIMS};
 use cw2::set_contract_version;
 use cw20_base::allowances::{
     handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
@@ -15,8 +17,7 @@ use cw20_base::state::{token_info, MinterData, TokenInfo};
 use crate::error::ContractError;
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
-    claims, claims_read, invest_info, invest_info_read, total_supply, total_supply_read, Claim,
-    InvestmentInfo, Supply,
+    invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
 };
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -278,15 +279,12 @@ pub fn unbond(
     supply.claims += unbond;
     totals.save(&supply)?;
 
-    // add a claim to this user to get their tokens after the unbonding period
-    claims(deps.storage).update(sender_raw.as_slice(), |old| -> Result<_, ContractError> {
-        let mut claims = old.unwrap_or_default();
-        claims.push(Claim {
-            amount: unbond,
-            released: invest.unbonding_period.after(&env.block),
-        });
-        Ok(claims)
-    })?;
+    create_claim(
+        deps.storage,
+        &sender_raw,
+        unbond,
+        invest.unbonding_period.after(&env.block),
+    )?;
 
     // unbond them
     let res = HandleResponse {
@@ -317,26 +315,9 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleRespons
     }
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
+    // Ensure we have enough balance to cover this and only send some claims if that is all we can cover
     let sender_raw = deps.api.canonical_address(&info.sender)?;
-    // Ensure we have enough balance to cover this and
-    // only send some claims if that is all we can cover
-    let cap = balance.amount;
-    let mut to_send = Uint128(0);
-    claims(deps.storage).update(sender_raw.as_slice(), |claim| -> Result<_, ContractError> {
-        let (_send, waiting): (Vec<_>, _) =
-            claim.unwrap_or_default().iter().cloned().partition(|c| {
-                // if mature and we can pay, then include in _send
-                if c.released.is_expired(&env.block) && to_send + c.amount <= cap {
-                    to_send += c.amount;
-                    true
-                } else {
-                    // not to send, leave in waiting and save again
-                    false
-                }
-            });
-        Ok(waiting)
-    })?;
-
+    let to_send = claim_tokens(deps.storage, &sender_raw, &env.block, Some(balance.amount))?;
     if to_send == Uint128(0) {
         return Err(ContractError::NothingToClaim {});
     }
@@ -459,8 +440,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn query_claims(deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
     let address_raw = deps.api.canonical_address(&address)?;
-    let claims = claims_read(deps.storage)
-        .may_load(address_raw.as_slice())?
+    let claims = CLAIMS
+        .may_load(deps.storage, &address_raw)?
         .unwrap_or_default();
     Ok(ClaimsResponse { claims })
 }
@@ -492,7 +473,7 @@ mod tests {
         mock_dependencies, mock_env, mock_info, MockQuerier, MOCK_CONTRACT_ADDR,
     };
     use cosmwasm_std::{coins, Coin, CosmosMsg, Decimal, FullDelegation, Validator};
-    use cw0::{Duration, DAY, HOUR, WEEK};
+    use cw0::{claim::Claim, Duration, DAY, HOUR, WEEK};
     use std::str::FromStr;
 
     fn sample_validator<U: Into<HumanAddr>>(addr: U) -> Validator {
