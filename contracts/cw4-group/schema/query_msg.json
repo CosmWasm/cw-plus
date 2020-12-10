@@ -73,6 +73,14 @@
           "properties": {
             "addr": {
               "$ref": "#/definitions/HumanAddr"
+            },
+            "at_height": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         }

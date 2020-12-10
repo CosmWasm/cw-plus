@@ -269,6 +269,7 @@ pub struct SnapshotNamespaces<'a> {
 #[macro_export]
 macro_rules! snapshot_names {
     ($var:expr) => {
+        #[allow(clippy::string_lit_as_bytes)]
         SnapshotNamespaces {
             pk: $var.as_bytes(),
             checkpoints: concat!($var, "__checkpoints").as_bytes(),
@@ -284,10 +285,15 @@ mod tests {
 
     #[test]
     fn namespace_macro() {
-        let names = snapshot_names!("demo");
-        assert_eq!(names.pk, b"demo");
-        assert_eq!(names.checkpoints, b"demo__checkpoints");
-        assert_eq!(names.changelog, b"demo__changelog");
+        let check = |names: SnapshotNamespaces| {
+            assert_eq!(names.pk, b"demo");
+            assert_eq!(names.checkpoints, b"demo__checkpoints");
+            assert_eq!(names.changelog, b"demo__changelog");
+        };
+        // FIXME: we have to do this weird way due to the clippy allow statement
+        check(snapshot_names!("demo"));
+        // ex. this line fails to compile
+        // let names = snapshot_names!("demo");
     }
 
     type TestMap = SnapshotMap<'static, &'static [u8], u64>;

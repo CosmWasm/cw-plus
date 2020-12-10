@@ -8,7 +8,9 @@ use cosmwasm_std::{
 
 use crate::msg::Cw4HandleMsg;
 use crate::query::HooksResponse;
-use crate::{member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, TOTAL_KEY};
+use crate::{
+    member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY,
+};
 
 /// Cw4Contract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with cw4 contracts
@@ -126,6 +128,21 @@ impl Cw4Contract {
                 }
             }
         }
+    }
+
+    /// Return the member's weight at the given snapshot - requires a smart query
+    pub fn member_at_height(
+        &self,
+        querier: &QuerierWrapper,
+        member: HumanAddr,
+        height: u64,
+    ) -> StdResult<Option<u64>> {
+        let query = self.encode_smart_query(Cw4QueryMsg::Member {
+            addr: member,
+            at_height: Some(height),
+        })?;
+        let res: MemberResponse = querier.query(&query)?;
+        Ok(res.weight)
     }
 
     pub fn list_members(

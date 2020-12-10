@@ -18,7 +18,10 @@ pub enum Cw4QueryMsg {
         limit: Option<u32>,
     },
     /// Returns MemberResponse
-    Member { addr: HumanAddr },
+    Member {
+        addr: HumanAddr,
+        at_height: Option<u64>,
+    },
     /// Shows all registered hooks. Returns HooksResponse.
     Hooks {},
 }

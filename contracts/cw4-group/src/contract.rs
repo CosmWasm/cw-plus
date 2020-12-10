@@ -20,15 +20,20 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    create(deps, msg.admin, msg.members)?;
+    create(deps, msg.admin, msg.members, env.block.height)?;
     Ok(InitResponse::default())
 }
 
 // create is the init logic with set_contract_version removed so it can more
 // easily be imported in other contracts
-pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> StdResult<()> {
+pub fn create(
+    deps: DepsMut,
+    admin: Option<HumanAddr>,
+    members: Vec<Member>,
+    height: u64,
+) -> StdResult<()> {
     let admin_raw = maybe_canonical(deps.api, admin)?;
     ADMIN.save(deps.storage, &admin_raw)?;
 
@@ -36,7 +41,7 @@ pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> 
     for member in members.into_iter() {
         total += member.weight;
         let raw = deps.api.canonical_address(&member.addr)?;
-        MEMBERS.save(deps.storage, &raw, &member.weight)?;
+        MEMBERS.save(deps.storage, &raw, &member.weight, height)?;
     }
     TOTAL.save(deps.storage, &total)?;
 
@@ -46,13 +51,15 @@ pub fn create(deps: DepsMut, admin: Option<HumanAddr>, members: Vec<Member>) -> 
 // And declare a custom Error variant for the ones where you will want to make use of it
 pub fn handle(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
-        HandleMsg::UpdateMembers { add, remove } => handle_update_members(deps, info, add, remove),
+        HandleMsg::UpdateMembers { add, remove } => {
+            handle_update_members(deps, env, info, add, remove)
+        }
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
     }
@@ -83,12 +90,13 @@ pub fn update_admin(
 
 pub fn handle_update_members(
     mut deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
     // make the local update
-    let diff = update_members(deps.branch(), info.sender, add, remove)?;
+    let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
     let mut ctx = Context::new();
     for h in HOOKS.may_load(deps.storage)?.unwrap_or_default() {
@@ -101,6 +109,7 @@ pub fn handle_update_members(
 // the logic from handle_update_admin extracted for easier import
 pub fn update_members(
     deps: DepsMut,
+    height: u64,
     sender: HumanAddr,
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
@@ -114,7 +123,7 @@ pub fn update_members(
     // add all new members and update total
     for add in to_add.into_iter() {
         let raw = deps.api.canonical_address(&add.addr)?;
-        MEMBERS.update(deps.storage, &raw, |old| -> StdResult<_> {
+        MEMBERS.update(deps.storage, &raw, height, |old| -> StdResult<_> {
             total -= old.unwrap_or_default();
             total += add.weight;
             diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
@@ -129,7 +138,7 @@ pub fn update_members(
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
             total -= weight;
-            MEMBERS.remove(deps.storage, &raw);
+            MEMBERS.remove(deps.storage, &raw, height)?;
         }
     }
 
@@ -191,7 +200,10 @@ pub fn handle_remove_hook(
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Member { addr } => to_binary(&query_member(deps, addr)?),
+        QueryMsg::Member {
+            addr,
+            at_height: height,
+        } => to_binary(&query_member(deps, addr, height)?),
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
@@ -217,9 +229,12 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member(deps: Deps, addr: HumanAddr) -> StdResult<MemberResponse> {
+fn query_member(deps: Deps, addr: HumanAddr, height: Option<u64>) -> StdResult<MemberResponse> {
     let raw = deps.api.canonical_address(&addr)?;
-    let weight = MEMBERS.may_load(deps.storage, &raw)?;
+    let weight = match height {
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, &raw, h),
+        None => MEMBERS.may_load(deps.storage, &raw),
+    }?;
     Ok(MemberResponse { weight })
 }
 
@@ -331,13 +346,13 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_init(deps.as_mut());
 
-        let member1 = query_member(deps.as_ref(), USER1.into()).unwrap();
+        let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
         assert_eq!(member1.weight, Some(11));
 
-        let member2 = query_member(deps.as_ref(), USER2.into()).unwrap();
+        let member2 = query_member(deps.as_ref(), USER2.into(), None).unwrap();
         assert_eq!(member2.weight, Some(6));
 
-        let member3 = query_member(deps.as_ref(), USER3.into()).unwrap();
+        let member3 = query_member(deps.as_ref(), USER3.into(), None).unwrap();
         assert_eq!(member3.weight, None);
 
         let members = list_members(deps.as_ref(), None, None).unwrap();
@@ -350,27 +365,31 @@ mod tests {
         user1_weight: Option<u64>,
         user2_weight: Option<u64>,
         user3_weight: Option<u64>,
+        height: Option<u64>,
     ) {
-        let member1 = query_member(deps.as_ref(), USER1.into()).unwrap();
+        let member1 = query_member(deps.as_ref(), USER1.into(), height).unwrap();
         assert_eq!(member1.weight, user1_weight);
 
-        let member2 = query_member(deps.as_ref(), USER2.into()).unwrap();
+        let member2 = query_member(deps.as_ref(), USER2.into(), height).unwrap();
         assert_eq!(member2.weight, user2_weight);
 
-        let member3 = query_member(deps.as_ref(), USER3.into()).unwrap();
+        let member3 = query_member(deps.as_ref(), USER3.into(), height).unwrap();
         assert_eq!(member3.weight, user3_weight);
 
-        // compute expected metrics
-        let weights = vec![user1_weight, user2_weight, user3_weight];
-        let sum: u64 = weights.iter().map(|x| x.unwrap_or_default()).sum();
-        let count = weights.iter().filter(|x| x.is_some()).count();
+        // this is only valid if we are not doing a historical query
+        if height.is_none() {
+            // compute expected metrics
+            let weights = vec![user1_weight, user2_weight, user3_weight];
+            let sum: u64 = weights.iter().map(|x| x.unwrap_or_default()).sum();
+            let count = weights.iter().filter(|x| x.is_some()).count();
 
-        // TODO: more detailed compare?
-        let members = list_members(deps.as_ref(), None, None).unwrap();
-        assert_eq!(count, members.members.len());
+            // TODO: more detailed compare?
+            let members = list_members(deps.as_ref(), None, None).unwrap();
+            assert_eq!(count, members.members.len());
 
-        let total = query_total_weight(deps.as_ref()).unwrap();
-        assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
+            let total = query_total_weight(deps.as_ref()).unwrap();
+            assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
+        }
     }
 
     #[test]
@@ -386,16 +405,35 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // non-admin cannot update
-        let err =
-            update_members(deps.as_mut(), USER1.into(), add.clone(), remove.clone()).unwrap_err();
+        let height = mock_env().block.height;
+        let err = update_members(
+            deps.as_mut(),
+            height + 5,
+            USER1.into(),
+            add.clone(),
+            remove.clone(),
+        )
+        .unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
+        // Test the values from init
+        assert_users(&deps, Some(11), Some(6), None, None);
+        // Note all values were set at height, the beginning of that block was all None
+        assert_users(&deps, None, None, None, Some(height));
+        // This will get us the values at the start of the block after init (expected initial values)
+        assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
+
         // admin updates properly
-        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
-        assert_users(&deps, None, Some(6), Some(15));
+        update_members(deps.as_mut(), height + 10, ADMIN.into(), add, remove).unwrap();
+
+        // updated properly
+        assert_users(&deps, None, Some(6), Some(15), None);
+
+        // snapshot still shows old value
+        assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
     }
 
     #[test]
@@ -412,8 +450,9 @@ mod tests {
         let remove = vec![USER3.into()];
 
         // admin updates properly
-        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
-        assert_users(&deps, Some(4), Some(6), None);
+        let height = mock_env().block.height;
+        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
+        assert_users(&deps, Some(4), Some(6), None, None);
     }
 
     #[test]
@@ -436,8 +475,9 @@ mod tests {
         let remove = vec![USER1.into()];
 
         // admin updates properly
-        update_members(deps.as_mut(), ADMIN.into(), add, remove).unwrap();
-        assert_users(&deps, None, Some(6), Some(5));
+        let height = mock_env().block.height;
+        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
+        assert_users(&deps, None, Some(6), Some(5), None);
     }
 
     #[test]
@@ -586,9 +626,9 @@ mod tests {
         let msg = HandleMsg::UpdateMembers { remove, add };
 
         // admin updates properly
-        assert_users(&deps, Some(11), Some(6), None);
+        assert_users(&deps, Some(11), Some(6), None, None);
         let res = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
-        assert_users(&deps, Some(20), None, Some(5));
+        assert_users(&deps, Some(20), None, Some(5), None);
 
         // ensure 2 messages for the 2 hooks
         assert_eq!(res.messages.len(), 2);
