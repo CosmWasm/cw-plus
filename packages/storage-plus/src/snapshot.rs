@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 
-use crate::keys::{PrimaryKey, U64Key};
+use crate::keys::{EmptyPrefix, PrimaryKey, U64Key};
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
@@ -204,6 +204,30 @@ where
         self.primary.save(store, k, &output)?;
 
         Ok(output)
+    }
+}
+
+// short-cut for simple keys, rather than .prefix(()).range(...)
+#[cfg(feature = "iterator")]
+impl<'a, K, T> SnapshotMap<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + Prefixer<'a>,
+    K::Prefix: EmptyPrefix,
+{
+    // I would prefer not to copy code from Prefix, but no other way
+    // with lifetimes (create Prefix inside function and return ref = no no)
+    pub fn range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(K::Prefix::new()).range(store, min, max, order)
     }
 }
 
