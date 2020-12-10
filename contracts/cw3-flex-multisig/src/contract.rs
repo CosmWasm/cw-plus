@@ -16,10 +16,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::snapshot::{snapshot_diff, snapshoted_weight};
-use crate::state::{
-    max_proposal_height, next_id, parse_id, proposals, Ballot, Config, Proposal, BALLOTS, CONFIG,
-};
+use crate::state::{next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -129,7 +126,7 @@ pub fn handle_propose(
         required_weight: cfg.required_weight,
     };
     let id = next_id(deps.storage)?;
-    proposals().save(deps.storage, id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, id.into(), &prop)?;
 
     // add the first yes vote from voter
     let ballot = Ballot {
@@ -162,7 +159,7 @@ pub fn handle_vote(
     let cfg = CONFIG.load(deps.storage)?;
 
     // ensure proposal exists and can be voted on
-    let mut prop = proposals().load(deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
     if prop.status != Status::Open {
         return Err(ContractError::NotOpen {});
     }
@@ -171,13 +168,10 @@ pub fn handle_vote(
     }
 
     // use a snapshot of "start of proposal" if available, otherwise, current group weight
-    let vote_power = snapshoted_weight(
-        deps.as_ref(),
-        &raw_sender,
-        prop.start_height,
-        &cfg.group_addr,
-    )?
-    .ok_or_else(|| ContractError::Unauthorized {})?;
+    let vote_power = cfg
+        .group_addr
+        .member_at_height(&deps.querier, info.sender.clone(), prop.start_height)?
+        .ok_or_else(|| ContractError::Unauthorized {})?;
 
     // cast vote if no vote previously cast
     BALLOTS.update(
@@ -199,7 +193,7 @@ pub fn handle_vote(
         if prop.yes_weight >= prop.required_weight {
             prop.status = Status::Passed;
         }
-        proposals().save(deps.storage, proposal_id.into(), &prop)?;
+        PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
     }
 
     Ok(HandleResponse {
@@ -222,7 +216,7 @@ pub fn handle_execute(
 ) -> Result<HandleResponse, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = proposals().load(deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
     if prop.status != Status::Passed {
@@ -231,7 +225,7 @@ pub fn handle_execute(
 
     // set it to executed
     prop.status = Status::Executed;
-    proposals().save(deps.storage, proposal_id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
     Ok(HandleResponse {
@@ -253,7 +247,7 @@ pub fn handle_close(
 ) -> Result<HandleResponse<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = proposals().load(deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
     if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
         .any(|x| *x == prop.status)
@@ -266,7 +260,7 @@ pub fn handle_close(
 
     // set it to failed
     prop.status = Status::Rejected;
-    proposals().save(deps.storage, proposal_id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -280,26 +274,16 @@ pub fn handle_close(
 }
 
 pub fn handle_membership_hook(
-    mut deps: DepsMut,
-    env: Env,
+    deps: DepsMut,
+    _env: Env,
     info: MessageInfo,
-    diffs: Vec<MemberDiff>,
+    _diffs: Vec<MemberDiff>,
 ) -> Result<HandleResponse<Empty>, ContractError> {
-    // this must be called with the same group contract
+    // This is now a no-op
+    // But we leave the authorization check as a demo
     let cfg = CONFIG.load(deps.storage)?;
     if info.sender != cfg.group_addr.0 {
         return Err(ContractError::Unauthorized {});
-    }
-
-    // find the latest snapshot height
-    let max_height = max_proposal_height(deps.storage)?;
-
-    // only try snapshot if there is an open proposal
-    if let Some(last_height) = max_height {
-        // save the diff if we have no diff on that account since last snapshot
-        for diff in diffs {
-            snapshot_diff(deps.branch(), diff, env.block.height, last_height)?;
-        }
     }
 
     Ok(HandleResponse::default())
@@ -339,7 +323,7 @@ fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
 }
 
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
-    let prop = proposals().load(deps.storage, id.into())?;
+    let prop = PROPOSALS.load(deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
     Ok(ProposalResponse {
         id,
@@ -363,7 +347,7 @@ fn list_proposals(
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive_int);
-    let props: StdResult<Vec<_>> = proposals()
+    let props: StdResult<Vec<_>> = PROPOSALS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
@@ -380,7 +364,7 @@ fn reverse_proposals(
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let end = start_before.map(Bound::exclusive_int);
-    let props: StdResult<Vec<_>> = proposals()
+    let props: StdResult<Vec<_>> = PROPOSALS
         .range(deps.storage, None, end, Order::Descending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
@@ -474,7 +458,7 @@ mod tests {
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4HandleMsg, Member};
-    use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
+    use cw_multi_test::{next_block, App, Contract, ContractWrapper, SimpleBank};
 
     use super::*;
 
@@ -567,24 +551,20 @@ mod tests {
             member(VOTER5, 5),
         ];
         let group_addr = init_group(app, members);
+        app.update_block(next_block);
 
         // 2. Set up Multisig backed by this group
         let flex_addr = init_flex(app, group_addr.clone(), required_weight, max_voting_period);
+        app.update_block(next_block);
 
-        // 3. Register a hook to the multisig on the group contract
-        let add_hook = Cw4HandleMsg::AddHook {
-            addr: flex_addr.clone(),
-        };
-        app.execute_contract(OWNER, &group_addr, &add_hook, &[])
-            .unwrap();
-
-        // 4. (Optional) Set the multisig as the group owner
+        // 3. (Optional) Set the multisig as the group owner
         if multisig_as_group_admin {
             let update_admin = Cw4HandleMsg::UpdateAdmin {
                 admin: Some(flex_addr.clone()),
             };
             app.execute_contract(OWNER, &group_addr, &update_admin, &[])
                 .unwrap();
+            app.update_block(next_block);
         }
 
         // Bonus: set some funds on the multisig contract for future proposals
