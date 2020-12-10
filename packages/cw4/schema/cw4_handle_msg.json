@@ -3,6 +3,30 @@
   "title": "Cw4HandleMsg",
   "anyOf": [
     {
+      "description": "Change the admin",
+      "type": "object",
+      "required": [
+        "update_admin"
+      ],
+      "properties": {
+        "update_admin": {
+          "type": "object",
+          "properties": {
+            "admin": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "Add a new hook to be informed of all membership changes. Must be called by Admin",
       "type": "object",
       "required": [

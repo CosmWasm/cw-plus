@@ -2,13 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-use cosmwasm_std::{
-    to_binary, Api, CanonicalAddr, CosmosMsg, Empty, HumanAddr, QuerierWrapper, QueryRequest,
-    StdResult, WasmMsg, WasmQuery,
-};
+use cosmwasm_std::{to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 use cw4::{Cw4Contract, Member};
 
-use crate::msg::{AdminResponse, HandleMsg, QueryMsg};
+use crate::msg::HandleMsg;
 
 /// Cw4GroupContract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with cw4-group contracts.
@@ -45,32 +42,9 @@ impl Cw4GroupContract {
         .into())
     }
 
-    pub fn update_admin<T: Into<HumanAddr>>(
-        &self,
-        admin: Option<HumanAddr>,
-    ) -> StdResult<CosmosMsg> {
-        let msg = HandleMsg::UpdateAdmin { admin };
-        self.encode_msg(msg)
-    }
-
     pub fn update_members(&self, remove: Vec<HumanAddr>, add: Vec<Member>) -> StdResult<CosmosMsg> {
         let msg = HandleMsg::UpdateMembers { remove, add };
         self.encode_msg(msg)
-    }
-
-    fn encode_smart_query(&self, msg: QueryMsg) -> StdResult<QueryRequest<Empty>> {
-        Ok(WasmQuery::Smart {
-            contract_addr: self.addr(),
-            msg: to_binary(&msg)?,
-        }
-        .into())
-    }
-
-    /// Read the admin
-    pub fn admin(&self, querier: &QuerierWrapper) -> StdResult<Option<HumanAddr>> {
-        let query = self.encode_smart_query(QueryMsg::Admin {})?;
-        let res: AdminResponse = querier.query(&query)?;
-        Ok(res.admin)
     }
 }
 

@@ -6,6 +6,8 @@ use cosmwasm_std::HumanAddr;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw4QueryMsg {
+    /// Return AdminResponse
+    Admin {},
     /// Return TotalWeightResponse
     TotalWeight {},
     /// Returns MembersListResponse
@@ -20,6 +22,11 @@ pub enum Cw4QueryMsg {
     },
     /// Shows all registered hooks. Returns HooksResponse.
     Hooks {},
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct AdminResponse {
+    pub admin: Option<HumanAddr>,
 }
 
 /// A group member has a weight associated with them.

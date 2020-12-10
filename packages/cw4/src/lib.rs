@@ -7,8 +7,9 @@ pub use crate::helpers::{Cw4CanonicalContract, Cw4Contract};
 pub use crate::hook::{MemberChangedHookMsg, MemberDiff};
 pub use crate::msg::Cw4HandleMsg;
 pub use crate::query::{
-    member_key, Cw4QueryMsg, HooksResponse, Member, MemberListResponse, MemberResponse,
-    TotalWeightResponse, MEMBERS_CHANGELOG, MEMBERS_CHECKPOINTS, MEMBERS_KEY, TOTAL_KEY,
+    member_key, AdminResponse, Cw4QueryMsg, HooksResponse, Member, MemberListResponse,
+    MemberResponse, TotalWeightResponse, MEMBERS_CHANGELOG, MEMBERS_CHECKPOINTS, MEMBERS_KEY,
+    TOTAL_KEY,
 };
 
 #[cfg(test)]

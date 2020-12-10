@@ -8,7 +8,9 @@ use cosmwasm_std::{
 
 use crate::msg::Cw4HandleMsg;
 use crate::query::HooksResponse;
-use crate::{member_key, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY};
+use crate::{
+    member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY,
+};
 
 /// Cw4Contract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with cw4 contracts
@@ -48,6 +50,14 @@ impl Cw4Contract {
 
     pub fn remove_hook(&self, addr: HumanAddr) -> StdResult<CosmosMsg> {
         let msg = Cw4HandleMsg::AddHook { addr };
+        self.encode_msg(msg)
+    }
+
+    pub fn update_admin<T: Into<HumanAddr>>(
+        &self,
+        admin: Option<HumanAddr>,
+    ) -> StdResult<CosmosMsg> {
+        let msg = Cw4HandleMsg::UpdateAdmin { admin };
         self.encode_msg(msg)
     }
 
@@ -136,6 +146,13 @@ impl Cw4Contract {
         let query = self.encode_smart_query(Cw4QueryMsg::ListMembers { start_after, limit })?;
         let res: MemberListResponse = querier.query(&query)?;
         Ok(res.members)
+    }
+
+    /// Read the admin
+    pub fn admin(&self, querier: &QuerierWrapper) -> StdResult<Option<HumanAddr>> {
+        let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
+        let res: AdminResponse = querier.query(&query)?;
+        Ok(res.admin)
     }
 }
 

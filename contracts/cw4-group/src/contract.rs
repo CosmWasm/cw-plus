@@ -8,13 +8,13 @@ use cw0::{
 };
 use cw2::set_contract_version;
 use cw4::{
-    HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
-    TotalWeightResponse,
+    AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
+    MemberResponse, TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{AdminResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{ADMIN, MEMBERS, TOTAL};
 
 // version info for migration info

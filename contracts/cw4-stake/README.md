@@ -30,13 +30,11 @@ To create it, you must pass in a list of members, as well as an optional
 
 ```rust
 pub struct InitMsg {
-    pub admin: Option<HumanAddr>,
-    pub members: Vec<Member>,
-}
-
-pub struct Member {
-    pub addr: HumanAddr,
-    pub weight: u64,
+    /// denom of the token to stake
+    pub stake: String,
+    pub tokens_per_weight: u64,
+    pub min_bond: Uint128,
+    pub unbonding_period: Duration,
 }
 ```
 
@@ -49,7 +47,12 @@ it does define this address is part of the group. This could be used in
 eg. a KYC whitelist to say they are allowed, but cannot participate in
 decision-making.
 
+If `min_bond` is higher than `tokens_per_weight`, you cannot have anyone with 0 weight.
+
 ## Messages
 
 Update messages and queries are defined by the 
 [cw4 spec](../../packages/cw4/README.md). Please refer to it for more info.
+
+The following have been added:
+
