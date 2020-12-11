@@ -94,7 +94,7 @@ impl Cw4Contract {
 
     /// Read the total weight
     pub fn total_weight(&self, querier: &QuerierWrapper) -> StdResult<u64> {
-        let query = self.encode_raw_query(TOTAL_KEY)?;
+        let query = self.encode_raw_query(TOTAL_KEY.as_bytes())?;
         querier.query(&query)
     }
 

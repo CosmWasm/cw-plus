@@ -17,9 +17,9 @@ pub struct Item<'a, T> {
 }
 
 impl<'a, T> Item<'a, T> {
-    pub const fn new(storage_key: &'a [u8]) -> Self {
+    pub const fn new(storage_key: &'a str) -> Self {
         Item {
-            storage_key,
+            storage_key: storage_key.as_bytes(),
             data_type: PhantomData,
         }
     }
@@ -88,7 +88,7 @@ mod test {
     }
 
     // note const constructor rather than 2 funcs with Singleton
-    const CONFIG: Item<Config> = Item::new(b"config");
+    const CONFIG: Item<Config> = Item::new("config");
 
     #[test]
     fn save_and_load() {
@@ -137,10 +137,10 @@ mod test {
         };
         CONFIG.save(&mut store, &cfg).unwrap();
 
-        let reader = Item::<Config>::new(b"config");
+        let reader = Item::<Config>::new("config");
         assert_eq!(cfg, reader.load(&store).unwrap());
 
-        let other_reader = Item::<Config>::new(b"config2");
+        let other_reader = Item::<Config>::new("config2");
         assert_eq!(other_reader.may_load(&store).unwrap(), None);
     }
 

@@ -28,12 +28,12 @@ pub struct Approval {
     pub expires: Expiration,
 }
 
-pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new(b"nft_info");
-pub const MINTER: Item<CanonicalAddr> = Item::new(b"minter");
-pub const TOKEN_COUNT: Item<u64> = Item::new(b"num_tokens");
+pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("nft_info");
+pub const MINTER: Item<CanonicalAddr> = Item::new("minter");
+pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
 
-// pub const TOKENS: Map<&str, TokenInfo> = Map::new(b"tokens");
-pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new(b"operators");
+// pub const TOKENS: Map<&str, TokenInfo> = Map::new("tokens");
+pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new("operators");
 
 pub fn num_tokens(storage: &dyn Storage) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
@@ -58,7 +58,7 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
-        owner: MultiIndex::new(|d| d.owner.to_vec(), b"tokens", b"tokens__owner"),
+        owner: MultiIndex::new(|d| d.owner.to_vec(), "tokens", "tokens__owner"),
     };
-    IndexedMap::new(b"tokens", indexes)
+    IndexedMap::new("tokens", indexes)
 }

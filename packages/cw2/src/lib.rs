@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw_storage_plus::Item;
 
-pub const CONTRACT: Item<ContractVersion> = Item::new(b"contract_info");
+pub const CONTRACT: Item<ContractVersion> = Item::new("contract_info");
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ContractVersion {

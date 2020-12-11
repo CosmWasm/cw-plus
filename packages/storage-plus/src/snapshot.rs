@@ -49,9 +49,9 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
         strategy: Strategy,
     ) -> Self {
         SnapshotMap {
-            primary: Map::new(pk.as_bytes()),
-            checkpoints: Map::new(checkpoints.as_bytes()),
-            changelog: Map::new(changelog.as_bytes()),
+            primary: Map::new(pk),
+            checkpoints: Map::new(checkpoints),
+            changelog: Map::new(changelog),
             strategy,
         }
     }

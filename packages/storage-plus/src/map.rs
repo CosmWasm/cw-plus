@@ -19,9 +19,9 @@ pub struct Map<'a, K, T> {
 }
 
 impl<'a, K, T> Map<'a, K, T> {
-    pub const fn new(namespace: &'a [u8]) -> Self {
+    pub const fn new(namespace: &'a str) -> Self {
         Map {
-            namespace,
+            namespace: namespace.as_bytes(),
             data_type: PhantomData,
             key_type: PhantomData,
         }
@@ -114,9 +114,9 @@ mod test {
         pub age: i32,
     }
 
-    const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
+    const PEOPLE: Map<&[u8], Data> = Map::new("people");
 
-    const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+    const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
     #[test]
     fn create_path() {
