@@ -369,6 +369,7 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
     // use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
+    use cw0::claim::Claim;
     use cw0::Duration;
     use cw4::{member_key, TOTAL_KEY};
 
@@ -408,7 +409,7 @@ mod tests {
         init(deps, mock_env(), info, msg).unwrap();
     }
 
-    fn bond_stake(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
+    fn bond(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
         let mut env = mock_env();
         env.block.height += height_delta;
 
@@ -416,6 +417,21 @@ mod tests {
             if *stake != 0 {
                 let msg = HandleMsg::Bond {};
                 let info = mock_info(HumanAddr::from(*addr), &coins(*stake, DENOM));
+                handle(deps.branch(), env.clone(), info, msg).unwrap();
+            }
+        }
+    }
+
+    fn unbond(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
+        let mut env = mock_env();
+        env.block.height += height_delta;
+
+        for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
+            if *stake != 0 {
+                let msg = HandleMsg::Unbond {
+                    amount: Uint128(*stake),
+                };
+                let info = mock_info(HumanAddr::from(*addr), &[]);
                 handle(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -508,13 +524,13 @@ mod tests {
         assert_users(&deps, None, None, None, None);
 
         // ensure it rounds down, and respects cut-off
-        bond_stake(deps.as_mut(), 12_000, 7_500, 4_000, 1);
+        bond(deps.as_mut(), 12_000, 7_500, 4_000, 1);
 
         // Assert updated weights
         assert_users(&deps, Some(12), Some(7), None, None);
 
         // add some more, ensure the sum is properly respected (7.5 + 7.6 = 15 not 14)
-        bond_stake(deps.as_mut(), 0, 7_600, 1_200, 2);
+        bond(deps.as_mut(), 0, 7_600, 1_200, 2);
 
         // Assert updated weights
         assert_users(&deps, Some(12), Some(15), Some(5), None);
@@ -526,12 +542,40 @@ mod tests {
     }
 
     #[test]
+    fn unbond_stake_update_membership() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+        let height = mock_env().block.height;
+
+        // ensure it rounds down, and respects cut-off
+        bond(deps.as_mut(), 12_000, 7_500, 4_000, 1);
+        unbond(deps.as_mut(), 4_500, 2_600, 1_111, 2);
+
+        // Assert updated weights
+        assert_users(&deps, Some(7), None, None, None);
+
+        // Adding a little more returns weight
+        bond(deps.as_mut(), 600, 100, 2_222, 3);
+
+        // Assert updated weights
+        assert_users(&deps, Some(8), Some(5), Some(5), None);
+
+        // check historical queries all work
+        assert_users(&deps, None, None, None, Some(height + 1)); // before first stake
+        assert_users(&deps, Some(12), Some(7), None, Some(height + 2)); // after first bond
+        assert_users(&deps, Some(7), None, None, Some(height + 3)); // after first unbond
+        assert_users(&deps, Some(8), Some(5), Some(5), Some(height + 4)); // after second bond
+
+        // TODO: error if try to ubond more than stake
+    }
+
+    #[test]
     fn raw_queries_work() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
         default_init(deps.as_mut());
         // Set values as (11, 6, None)
-        bond_stake(deps.as_mut(), 11_000, 6_000, 0, 1);
+        bond(deps.as_mut(), 11_000, 6_000, 0, 1);
 
         // get total from raw key
         let total_raw = deps.storage.get(TOTAL_KEY).unwrap();
@@ -550,8 +594,156 @@ mod tests {
         assert_eq!(None, member3_raw);
     }
 
-    // TODO: unbonding -> claims
-    // TODO: accepting claims
+    fn get_claims<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Vec<Claim> {
+        query_claims(deps, addr.into()).unwrap().claims
+    }
+
+    #[test]
+    fn unbond_claim_workflow() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+
+        // create some data
+        bond(deps.as_mut(), 12_000, 7_500, 4_000, 1);
+        unbond(deps.as_mut(), 4_500, 2_600, 0, 2);
+        let mut env = mock_env();
+        env.block.height += 2;
+
+        // check the claims for each user
+        let expires = Duration::Height(UNBONDING_BLOCKS).after(&env.block);
+        assert_eq!(
+            get_claims(deps.as_ref(), USER1),
+            vec![Claim::new(4_500, expires)]
+        );
+        assert_eq!(
+            get_claims(deps.as_ref(), USER2),
+            vec![Claim::new(2_600, expires)]
+        );
+        assert_eq!(get_claims(deps.as_ref(), USER3), vec![]);
+
+        // do another unbond later on
+        let mut env2 = mock_env();
+        env2.block.height += 22;
+        unbond(deps.as_mut(), 0, 1_345, 1_500, 22);
+
+        // with updated claims
+        let expires2 = Duration::Height(UNBONDING_BLOCKS).after(&env2.block);
+        assert_eq!(
+            get_claims(deps.as_ref(), USER1),
+            vec![Claim::new(4_500, expires)]
+        );
+        assert_eq!(
+            get_claims(deps.as_ref(), USER2),
+            vec![Claim::new(2_600, expires), Claim::new(1_345, expires2)]
+        );
+        assert_eq!(
+            get_claims(deps.as_ref(), USER3),
+            vec![Claim::new(1_500, expires2)]
+        );
+
+        // nothing can be withdrawn yet
+        let err = handle(
+            deps.as_mut(),
+            env2.clone(),
+            mock_info(USER1, &[]),
+            HandleMsg::Claim {},
+        )
+        .unwrap_err();
+        match err {
+            ContractError::NothingToClaim {} => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // now mature first section, withdraw that
+        let mut env3 = mock_env();
+        env3.block.height += 2 + UNBONDING_BLOCKS;
+        // first one can now release
+        let res = handle(
+            deps.as_mut(),
+            env3.clone(),
+            mock_info(USER1, &[]),
+            HandleMsg::Claim {},
+        )
+        .unwrap();
+        assert_eq!(
+            res.messages,
+            vec![BankMsg::Send {
+                from_address: env3.contract.address.clone(),
+                to_address: USER1.into(),
+                amount: coins(4_500, DENOM),
+            }
+            .into()]
+        );
+
+        // second releases partially
+        let res = handle(
+            deps.as_mut(),
+            env3.clone(),
+            mock_info(USER2, &[]),
+            HandleMsg::Claim {},
+        )
+        .unwrap();
+        assert_eq!(
+            res.messages,
+            vec![BankMsg::Send {
+                from_address: env3.contract.address.clone(),
+                to_address: USER2.into(),
+                amount: coins(2_600, DENOM),
+            }
+            .into()]
+        );
+
+        // but the third one cannot release
+        let err = handle(
+            deps.as_mut(),
+            env3.clone(),
+            mock_info(USER3, &[]),
+            HandleMsg::Claim {},
+        )
+        .unwrap_err();
+        match err {
+            ContractError::NothingToClaim {} => {}
+            e => panic!("unexpected error: {}", e),
+        }
+
+        // claims updated properly
+        assert_eq!(get_claims(deps.as_ref(), USER1), vec![]);
+        assert_eq!(
+            get_claims(deps.as_ref(), USER2),
+            vec![Claim::new(1_345, expires2)]
+        );
+        assert_eq!(
+            get_claims(deps.as_ref(), USER3),
+            vec![Claim::new(1_500, expires2)]
+        );
+
+        // add another few claims for 2
+        unbond(deps.as_mut(), 0, 600, 0, 30 + UNBONDING_BLOCKS);
+        unbond(deps.as_mut(), 0, 1_005, 0, 50 + UNBONDING_BLOCKS);
+
+        // ensure second can claim all tokens at once
+        let mut env4 = mock_env();
+        env4.block.height += 55 + UNBONDING_BLOCKS + UNBONDING_BLOCKS;
+        let res = handle(
+            deps.as_mut(),
+            env4.clone(),
+            mock_info(USER2, &[]),
+            HandleMsg::Claim {},
+        )
+        .unwrap();
+        assert_eq!(
+            res.messages,
+            vec![BankMsg::Send {
+                from_address: env4.contract.address.clone(),
+                to_address: USER2.into(),
+                // 1_345 + 600 + 1_005
+                amount: coins(2_950, DENOM),
+            }
+            .into()]
+        );
+        assert_eq!(get_claims(deps.as_ref(), USER2), vec![]);
+    }
+
     // TODO: edge-case -> weight = 0, also min_bond = 0
 
     // #[test]

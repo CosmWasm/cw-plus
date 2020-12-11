@@ -14,6 +14,15 @@ pub struct Claim {
     pub released: Expiration,
 }
 
+impl Claim {
+    pub fn new(amount: u128, released: Expiration) -> Self {
+        Claim {
+            amount: amount.into(),
+            released,
+        }
+    }
+}
+
 /// this creates a claim, such that the given address an claim an amount of tokens after the release date
 pub fn create_claim(
     storage: &mut dyn Storage,
