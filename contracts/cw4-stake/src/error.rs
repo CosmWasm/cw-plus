@@ -8,4 +8,7 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
+
+    #[error("No claims that can be released currently")]
+    NothingToClaim {},
 }

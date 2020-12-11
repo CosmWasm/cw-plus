@@ -1,9 +1,9 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, StdResult,
+    coin, coins, to_binary, Api, BankMsg, Binary, CanonicalAddr, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Uint128,
 };
 use cw0::{
-    hooks::{add_hook, prepare_hooks, remove_hook, HOOKS},
+    hooks::{add_hook, remove_hook, HOOKS},
     maybe_canonical,
 };
 use cw2::set_contract_version;
@@ -14,8 +14,9 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{ADMIN, MEMBERS, TOTAL};
+use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, QueryMsg, StakedResponse};
+use crate::state::{Config, ADMIN, CONFIG, MEMBERS, STAKE, TOTAL};
+use cw0::claim::{claim_tokens, create_claim, CLAIMS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -23,32 +24,22 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    create(deps, msg.admin, msg.members, env.block.height)?;
-    Ok(InitResponse::default())
-}
 
-// create is the init logic with set_contract_version removed so it can more
-// easily be imported in other contracts
-pub fn create(
-    deps: DepsMut,
-    admin: Option<HumanAddr>,
-    members: Vec<Member>,
-    height: u64,
-) -> StdResult<()> {
-    let admin_raw = maybe_canonical(deps.api, admin)?;
+    let admin_raw = maybe_canonical(deps.api, msg.admin)?;
     ADMIN.save(deps.storage, &admin_raw)?;
 
-    let mut total = 0u64;
-    for member in members.into_iter() {
-        total += member.weight;
-        let raw = deps.api.canonical_address(&member.addr)?;
-        MEMBERS.save(deps.storage, &raw, &member.weight, height)?;
-    }
-    TOTAL.save(deps.storage, &total)?;
+    let config = Config {
+        denom: msg.stake,
+        tokens_per_weight: msg.tokens_per_weight,
+        min_bond: msg.min_bond,
+        unbonding_period: msg.unbonding_period,
+    };
+    CONFIG.save(deps.storage, &config)?;
+    TOTAL.save(deps.storage, &0)?;
 
-    Ok(())
+    Ok(InitResponse::default())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -60,11 +51,11 @@ pub fn handle(
 ) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
-        HandleMsg::UpdateMembers { add, remove } => {
-            handle_update_members(deps, env, info, add, remove)
-        }
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
+        HandleMsg::Bond {} => handle_bond(deps, info),
+        HandleMsg::Unbond { amount } => handle_unbond(deps, env, info, amount),
+        HandleMsg::Claim {} => handle_claim(deps, env, info),
     }
 }
 
@@ -91,17 +82,77 @@ pub fn update_admin(
     })
 }
 
-pub fn handle_update_members(
-    mut deps: DepsMut,
+pub fn handle_bond(_deps: DepsMut, _info: MessageInfo) -> Result<HandleResponse, ContractError> {
+    unimplemented!();
+    // TODO: ensure the denom was proper
+
+    // // make the local update
+    // let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
+    // // call all registered hooks
+    // let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
+    // Ok(HandleResponse {
+    //     messages,
+    //     attributes: vec![],
+    //     data: None,
+    // })
+}
+
+pub fn handle_unbond(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    add: Vec<Member>,
-    remove: Vec<HumanAddr>,
+    amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    // make the local update
-    let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
-    // call all registered hooks
-    let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
+    // reduce the sender's stake - aborting if insufficient
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
+    let _new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
+        stake.unwrap_or_default() - amount
+    })?;
+
+    // provide them a claim
+    let config = CONFIG.load(deps.storage)?;
+    create_claim(
+        deps.storage,
+        &sender_raw,
+        amount,
+        config.unbonding_period.after(&env.block),
+    )?;
+
+    // update their membership
+    unimplemented!();
+
+    // // make the local update
+    // let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
+    // // call all registered hooks
+    // let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
+    // Ok(HandleResponse {
+    //     messages,
+    //     attributes: vec![],
+    //     data: None,
+    // })
+}
+
+pub fn handle_claim(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<HandleResponse, ContractError> {
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
+    let release = claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
+    if release == Uint128(0) {
+        return Err(ContractError::NothingToClaim {});
+    }
+
+    let config = CONFIG.load(deps.storage)?;
+    let amount = coins(release.u128(), config.denom);
+
+    let messages = vec![BankMsg::Send {
+        from_address: env.contract.address,
+        to_address: info.sender,
+        amount,
+    }
+    .into()];
+
     Ok(HandleResponse {
         messages,
         attributes: vec![],
@@ -199,6 +250,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Admin {} => to_binary(&query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
         QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
+        QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
+        QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
     }
 }
 
@@ -216,6 +269,25 @@ fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {
 fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     let weight = TOTAL.load(deps.storage)?;
     Ok(TotalWeightResponse { weight })
+}
+
+pub fn query_claims(deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
+    let address_raw = deps.api.canonical_address(&address)?;
+    let claims = CLAIMS
+        .may_load(deps.storage, &address_raw)?
+        .unwrap_or_default();
+    Ok(ClaimsResponse { claims })
+}
+
+pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse> {
+    let address_raw = deps.api.canonical_address(&address)?;
+    let stake = STAKE
+        .may_load(deps.storage, &address_raw)?
+        .unwrap_or_default();
+    let denom = CONFIG.load(deps.storage)?.denom;
+    Ok(StakedResponse {
+        stake: coin(stake.u128(), denom),
+    })
 }
 
 fn query_member(deps: Deps, addr: HumanAddr, height: Option<u64>) -> StdResult<MemberResponse> {

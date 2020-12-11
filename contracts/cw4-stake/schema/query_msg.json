@@ -3,6 +3,45 @@
   "title": "QueryMsg",
   "anyOf": [
     {
+      "description": "Claims shows the tokens in process of unbonding for this address",
+      "type": "object",
+      "required": [
+        "claims"
+      ],
+      "properties": {
+        "claims": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "staked"
+      ],
+      "properties": {
+        "staked": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "Return AdminResponse",
       "type": "object",
       "required": [

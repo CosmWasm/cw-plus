@@ -2,10 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Coin, HumanAddr, Uint128};
-use cw0::{Duration, Expiration};
+use cw0::claim::Claim;
+use cw0::Duration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
 pub struct InitMsg {
     /// denom of the token to stake
     pub stake: String,
@@ -50,6 +50,8 @@ pub enum QueryMsg {
         address: HumanAddr,
     },
 
+    /// Return AdminResponse
+    Admin {},
     /// Return TotalWeightResponse
     TotalWeight {},
     /// Returns MembersListResponse
@@ -69,12 +71,6 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ClaimsResponse {
     pub claims: Vec<Claim>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Claim {
-    pub amount: Uint128,
-    pub released: Expiration,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

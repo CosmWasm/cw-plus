@@ -4,7 +4,7 @@ use std::fs::create_dir_all;
 use cosmwasm_schema::{export_schema, export_schema_with_title, remove_schemas, schema_for};
 
 pub use cw4::{AdminResponse, MemberListResponse, MemberResponse, TotalWeightResponse};
-pub use cw4_stake::msg::{HandleMsg, InitMsg, QueryMsg};
+pub use cw4_stake::msg::{ClaimsResponse, HandleMsg, InitMsg, QueryMsg, StakedResponse};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -19,4 +19,6 @@ fn main() {
     export_schema(&schema_for!(MemberListResponse), &out_dir);
     export_schema(&schema_for!(MemberResponse), &out_dir);
     export_schema(&schema_for!(TotalWeightResponse), &out_dir);
+    export_schema(&schema_for!(ClaimsResponse), &out_dir);
+    export_schema(&schema_for!(StakedResponse), &out_dir);
 }
