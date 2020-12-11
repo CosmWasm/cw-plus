@@ -367,9 +367,9 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, Storage};
-    // use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
+    use cosmwasm_std::{from_slice, StdError, Storage};
     use cw0::claim::Claim;
+    use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
     use cw0::Duration;
     use cw4::{member_key, TOTAL_KEY};
 
@@ -761,174 +761,173 @@ mod tests {
         assert_eq!(get_claims(deps.as_ref(), USER2), vec![]);
     }
 
+    #[test]
+    fn add_remove_hooks() {
+        // add will over-write and remove have no effect
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert!(hooks.hooks.is_empty());
+
+        let contract1 = HumanAddr::from("hook1");
+        let contract2 = HumanAddr::from("hook2");
+
+        let add_msg = HandleMsg::AddHook {
+            addr: contract1.clone(),
+        };
+
+        // non-admin cannot add hook
+        let user_info = mock_info(USER1, &[]);
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            user_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // admin can add it, and it appears in the query
+        let admin_info = mock_info(ADMIN, &[]);
+        let _ = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract1.clone()]);
+
+        // cannot remove a non-registered contract
+        let remove_msg = HandleMsg::RemoveHook {
+            addr: contract2.clone(),
+        };
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap_err();
+
+        match err {
+            ContractError::Std(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, HOOK_NOT_REGISTERED)
+            }
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // add second contract
+        let add_msg2 = HandleMsg::AddHook {
+            addr: contract2.clone(),
+        };
+        let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
+
+        // cannot re-add an existing contract
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            add_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Std(StdError::GenericErr { msg, .. }) => {
+                assert_eq!(msg, HOOK_ALREADY_REGISTERED)
+            }
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // non-admin cannot remove
+        let remove_msg = HandleMsg::RemoveHook {
+            addr: contract1.clone(),
+        };
+        let err = handle(
+            deps.as_mut(),
+            mock_env(),
+            user_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap_err();
+        match err {
+            ContractError::Unauthorized {} => {}
+            e => panic!("Unexpected error: {}", e),
+        }
+
+        // remove the original
+        let _ = handle(
+            deps.as_mut(),
+            mock_env(),
+            admin_info.clone(),
+            remove_msg.clone(),
+        )
+        .unwrap();
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert_eq!(hooks.hooks, vec![contract2.clone()]);
+    }
+
+    #[test]
+    fn hooks_fire() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
+
+        let hooks = query_hooks(deps.as_ref()).unwrap();
+        assert!(hooks.hooks.is_empty());
+
+        let contract1 = HumanAddr::from("hook1");
+        let contract2 = HumanAddr::from("hook2");
+
+        // register 2 hooks
+        let admin_info = mock_info(ADMIN, &[]);
+        let add_msg = HandleMsg::AddHook {
+            addr: contract1.clone(),
+        };
+        let add_msg2 = HandleMsg::AddHook {
+            addr: contract2.clone(),
+        };
+        for msg in vec![add_msg, add_msg2] {
+            let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+        }
+
+        // check firing on bond
+        assert_users(deps.as_ref(), None, None, None, None);
+        let info = mock_info(USER1, &coins(13_800, DENOM));
+        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        assert_users(deps.as_ref(), Some(13), None, None, None);
+
+        // ensure messages for each of the 2 hooks
+        assert_eq!(res.messages.len(), 2);
+        let diff = MemberDiff::new(USER1, None, Some(13));
+        let hook_msg = MemberChangedHookMsg::one(diff);
+        let msg1 = hook_msg.clone().into_cosmos_msg(contract1.clone()).unwrap();
+        let msg2 = hook_msg.into_cosmos_msg(contract2.clone()).unwrap();
+        assert_eq!(res.messages, vec![msg1, msg2]);
+
+        // check firing on unbond
+        let msg = HandleMsg::Unbond {
+            amount: Uint128(7_300),
+        };
+        let info = mock_info(USER1, &[]);
+        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_users(deps.as_ref(), Some(6), None, None, None);
+
+        // ensure messages for each of the 2 hooks
+        assert_eq!(res.messages.len(), 2);
+        let diff = MemberDiff::new(USER1, Some(13), Some(6));
+        let hook_msg = MemberChangedHookMsg::one(diff);
+        let msg1 = hook_msg.clone().into_cosmos_msg(contract1).unwrap();
+        let msg2 = hook_msg.into_cosmos_msg(contract2).unwrap();
+        assert_eq!(res.messages, vec![msg1, msg2]);
+    }
+
     // TODO: edge-case -> weight = 0, also min_bond = 0
 
-    // #[test]
-    // fn add_remove_hooks() {
-    //     // add will over-write and remove have no effect
-    //     let mut deps = mock_dependencies(&[]);
-    //     default_init(deps.as_mut());
-    //
-    //     let hooks = query_hooks(deps.as_ref()).unwrap();
-    //     assert!(hooks.hooks.is_empty());
-    //
-    //     let contract1 = HumanAddr::from("hook1");
-    //     let contract2 = HumanAddr::from("hook2");
-    //
-    //     let add_msg = HandleMsg::AddHook {
-    //         addr: contract1.clone(),
-    //     };
-    //
-    //     // non-admin cannot add hook
-    //     let user_info = mock_info(USER1, &[]);
-    //     let err = handle(
-    //         deps.as_mut(),
-    //         mock_env(),
-    //         user_info.clone(),
-    //         add_msg.clone(),
-    //     )
-    //     .unwrap_err();
-    //     match err {
-    //         ContractError::Unauthorized {} => {}
-    //         e => panic!("Unexpected error: {}", e),
-    //     }
-    //
-    //     // admin can add it, and it appears in the query
-    //     let admin_info = mock_info(ADMIN, &[]);
-    //     let _ = handle(
-    //         deps.as_mut(),
-    //         mock_env(),
-    //         admin_info.clone(),
-    //         add_msg.clone(),
-    //     )
-    //     .unwrap();
-    //     let hooks = query_hooks(deps.as_ref()).unwrap();
-    //     assert_eq!(hooks.hooks, vec![contract1.clone()]);
-    //
-    //     // cannot remove a non-registered contract
-    //     let remove_msg = HandleMsg::RemoveHook {
-    //         addr: contract2.clone(),
-    //     };
-    //     let err = handle(
-    //         deps.as_mut(),
-    //         mock_env(),
-    //         admin_info.clone(),
-    //         remove_msg.clone(),
-    //     )
-    //     .unwrap_err();
-    //
-    //     match err {
-    //         ContractError::Std(StdError::GenericErr { msg, .. }) => {
-    //             assert_eq!(msg, HOOK_NOT_REGISTERED)
-    //         }
-    //         e => panic!("Unexpected error: {}", e),
-    //     }
-    //
-    //     // add second contract
-    //     let add_msg2 = HandleMsg::AddHook {
-    //         addr: contract2.clone(),
-    //     };
-    //     let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
-    //     let hooks = query_hooks(deps.as_ref()).unwrap();
-    //     assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
-    //
-    //     // cannot re-add an existing contract
-    //     let err = handle(
-    //         deps.as_mut(),
-    //         mock_env(),
-    //         admin_info.clone(),
-    //         add_msg.clone(),
-    //     )
-    //     .unwrap_err();
-    //     match err {
-    //         ContractError::Std(StdError::GenericErr { msg, .. }) => {
-    //             assert_eq!(msg, HOOK_ALREADY_REGISTERED)
-    //         }
-    //         e => panic!("Unexpected error: {}", e),
-    //     }
-    //
-    //     // non-admin cannot remove
-    //     let remove_msg = HandleMsg::RemoveHook {
-    //         addr: contract1.clone(),
-    //     };
-    //     let err = handle(
-    //         deps.as_mut(),
-    //         mock_env(),
-    //         user_info.clone(),
-    //         remove_msg.clone(),
-    //     )
-    //     .unwrap_err();
-    //     match err {
-    //         ContractError::Unauthorized {} => {}
-    //         e => panic!("Unexpected error: {}", e),
-    //     }
-    //
-    //     // remove the original
-    //     let _ = handle(
-    //         deps.as_mut(),
-    //         mock_env(),
-    //         admin_info.clone(),
-    //         remove_msg.clone(),
-    //     )
-    //     .unwrap();
-    //     let hooks = query_hooks(deps.as_ref()).unwrap();
-    //     assert_eq!(hooks.hooks, vec![contract2.clone()]);
-    // }
-    //
-    // #[test]
-    // fn hooks_fire() {
-    //     let mut deps = mock_dependencies(&[]);
-    //     default_init(deps.as_mut());
-    //
-    //     let hooks = query_hooks(deps.as_ref()).unwrap();
-    //     assert!(hooks.hooks.is_empty());
-    //
-    //     let contract1 = HumanAddr::from("hook1");
-    //     let contract2 = HumanAddr::from("hook2");
-    //
-    //     // register 2 hooks
-    //     let admin_info = mock_info(ADMIN, &[]);
-    //     let add_msg = HandleMsg::AddHook {
-    //         addr: contract1.clone(),
-    //     };
-    //     let add_msg2 = HandleMsg::AddHook {
-    //         addr: contract2.clone(),
-    //     };
-    //     for msg in vec![add_msg, add_msg2] {
-    //         let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
-    //     }
-    //
-    //     // make some changes - add 3, remove 2, and update 1
-    //     // USER1 is updated and remove in the same call, we should remove this an add member3
-    //     let add = vec![
-    //         Member {
-    //             addr: USER1.into(),
-    //             weight: 20,
-    //         },
-    //         Member {
-    //             addr: USER3.into(),
-    //             weight: 5,
-    //         },
-    //     ];
-    //     let remove = vec![USER2.into()];
-    //     let msg = HandleMsg::UpdateMembers { remove, add };
-    //
-    //     // admin updates properly
-    //     assert_users(deps.as_ref(), Some(11), Some(6), None, None);
-    //     let res = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
-    //     assert_users(deps.as_ref(), Some(20), None, Some(5), None);
-    //
-    //     // ensure 2 messages for the 2 hooks
-    //     assert_eq!(res.messages.len(), 2);
-    //     // same order as in the message (adds first, then remove)
-    //     let diffs = vec![
-    //         MemberDiff::new(USER1, Some(11), Some(20)),
-    //         MemberDiff::new(USER3, None, Some(5)),
-    //         MemberDiff::new(USER2, Some(6), None),
-    //     ];
-    //     let hook_msg = MemberChangedHookMsg { diffs };
-    //     let msg1 = hook_msg.clone().into_cosmos_msg(contract1).unwrap();
-    //     let msg2 = hook_msg.into_cosmos_msg(contract2).unwrap();
-    //     assert_eq!(res.messages, vec![msg1, msg2]);
-    // }
+    // TODO: bond with invalid coins
 }
