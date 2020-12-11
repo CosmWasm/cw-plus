@@ -27,9 +27,7 @@
       "type": "string"
     },
     "tokens_per_weight": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
+      "$ref": "#/definitions/Uint128"
     },
     "unbonding_period": {
       "$ref": "#/definitions/Duration"

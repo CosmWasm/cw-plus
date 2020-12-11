@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MemberChangedHookMsg",
-  "description": "MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg",
+  "description": "MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg This contains a list of all diffs on the given transaction.",
   "type": "object",
   "required": [
     "diffs"
