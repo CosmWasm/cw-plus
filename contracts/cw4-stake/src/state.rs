@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{CanonicalAddr, Uint128};
 use cw0::Duration;
 use cw4::TOTAL_KEY;
-use cw_storage_plus::{snapshot_names, Item, Map, SnapshotMap, SnapshotNamespaces, Strategy};
+use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
@@ -19,8 +19,11 @@ pub const ADMIN: Item<Option<CanonicalAddr>> = Item::new(b"admin");
 pub const CONFIG: Item<Config> = Item::new(b"config");
 pub const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
 
-// Note: this must be same as cw4::MEMBERS_KEY but macro needs literal, not const
-pub const MEMBERS: SnapshotMap<&[u8], u64> =
-    SnapshotMap::new(snapshot_names!("members"), Strategy::EveryBlock);
+pub const MEMBERS: SnapshotMap<&[u8], u64> = SnapshotMap::new(
+    cw4::MEMBERS_KEY,
+    cw4::MEMBERS_CHECKPOINTS,
+    cw4::MEMBERS_CHANGELOG,
+    Strategy::EveryBlock,
+);
 
 pub const STAKE: Map<&[u8], Uint128> = Map::new(b"stake");
