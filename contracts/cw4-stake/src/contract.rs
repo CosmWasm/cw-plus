@@ -462,26 +462,42 @@ mod tests {
         default_init(deps.as_mut());
 
         // a member cannot update admin
-        let err = update_admin(deps.as_mut(), USER1.into(), Some(USER3.into())).unwrap_err();
+        let msg = HandleMsg::UpdateAdmin {
+            admin: Some(USER3.into()),
+        };
+        let err = handle(deps.as_mut(), mock_env(), mock_info(USER1, &[]), msg).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
         }
 
         // admin can change it
-        update_admin(deps.as_mut(), ADMIN.into(), Some(USER3.into())).unwrap();
+        let msg = HandleMsg::UpdateAdmin {
+            admin: Some(USER3.into()),
+        };
+        handle(deps.as_mut(), mock_env(), mock_info(ADMIN, &[]), msg).unwrap();
         assert_eq!(get_admin(deps.as_ref()), Some(USER3.into()));
 
         // and unset it
-        update_admin(deps.as_mut(), USER3.into(), None).unwrap();
+        let msg = HandleMsg::UpdateAdmin { admin: None };
+        handle(deps.as_mut(), mock_env(), mock_info(USER3, &[]), msg).unwrap();
         assert_eq!(get_admin(deps.as_ref()), None);
 
         // no one can change it now
-        let err = update_admin(deps.as_mut(), USER3.into(), Some(USER1.into())).unwrap_err();
+        let msg = HandleMsg::UpdateAdmin {
+            admin: Some(USER1.into()),
+        };
+        let err = handle(deps.as_mut(), mock_env(), mock_info(USER3, &[]), msg).unwrap_err();
         match err {
             ContractError::Unauthorized {} => {}
             e => panic!("Unexpected error: {}", e),
         }
+    }
+
+    fn get_member(deps: Deps, addr: HumanAddr, at_height: Option<u64>) -> Option<u64> {
+        let raw = query(deps, mock_env(), QueryMsg::Member { addr, at_height }).unwrap();
+        let res: MemberResponse = from_slice(&raw).unwrap();
+        res.weight
     }
 
     // this tests the member queries
@@ -492,14 +508,14 @@ mod tests {
         user3_weight: Option<u64>,
         height: Option<u64>,
     ) {
-        let member1 = query_member(deps, USER1.into(), height).unwrap();
-        assert_eq!(member1.weight, user1_weight);
+        let member1 = get_member(deps, USER1.into(), height);
+        assert_eq!(member1, user1_weight);
 
-        let member2 = query_member(deps, USER2.into(), height).unwrap();
-        assert_eq!(member2.weight, user2_weight);
+        let member2 = get_member(deps, USER2.into(), height);
+        assert_eq!(member2, user2_weight);
 
-        let member3 = query_member(deps, USER3.into(), height).unwrap();
-        assert_eq!(member3.weight, user3_weight);
+        let member3 = get_member(deps, USER3.into(), height);
+        assert_eq!(member3, user3_weight);
 
         // this is only valid if we are not doing a historical query
         if height.is_none() {
@@ -509,10 +525,16 @@ mod tests {
             let count = weights.iter().filter(|x| x.is_some()).count();
 
             // TODO: more detailed compare?
-            let members = list_members(deps, None, None).unwrap();
+            let msg = QueryMsg::ListMembers {
+                start_after: None,
+                limit: None,
+            };
+            let raw = query(deps, mock_env(), msg).unwrap();
+            let members: MemberListResponse = from_slice(&raw).unwrap();
             assert_eq!(count, members.members.len());
 
-            let total = query_total_weight(deps).unwrap();
+            let raw = query(deps, mock_env(), QueryMsg::TotalWeight {}).unwrap();
+            let total: TotalWeightResponse = from_slice(&raw).unwrap();
             assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
         }
     }
@@ -583,10 +605,26 @@ mod tests {
         assert_users(deps.as_ref(), None, None, None, Some(height + 1)); // before first stake
         assert_users(deps.as_ref(), Some(12), Some(7), None, Some(height + 2)); // after first bond
         assert_users(deps.as_ref(), Some(7), None, None, Some(height + 3)); // after first unbond
-        assert_users(deps.as_ref(), Some(8), Some(5), Some(5), Some(height + 4));
-        // after second bond
+        assert_users(deps.as_ref(), Some(8), Some(5), Some(5), Some(height + 4)); // after second bond
 
-        // TODO: error if try to ubond more than stake
+        // error if try to unbond more than stake (USER2 has 5000 staked)
+        let msg = HandleMsg::Unbond {
+            amount: Uint128(5100),
+        };
+        let mut env = mock_env();
+        env.block.height += 5;
+        let info = mock_info(USER2, &[]);
+        let err = handle(deps.as_mut(), env, info, msg).unwrap_err();
+        match err {
+            ContractError::Std(StdError::Underflow {
+                minuend,
+                subtrahend,
+            }) => {
+                assert_eq!(minuend.as_str(), "5000");
+                assert_eq!(subtrahend.as_str(), "5100");
+            }
+            e => panic!("Unexpected error: {}", e),
+        }
     }
 
     #[test]
@@ -968,5 +1006,19 @@ mod tests {
         handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
     }
 
-    // TODO: edge-case -> weight = 0, also min_bond = 0
+    #[test]
+    fn ensure_bonding_edge_cases() {
+        // use min_bond 0, tokens_per_weight 500
+        let mut deps = mock_dependencies(&[]);
+        do_init(deps.as_mut(), Uint128(100), Uint128(0), Duration::Height(5));
+
+        // setting 50 tokens, gives us Some(0) weight
+        // even setting to 1 token
+        bond(deps.as_mut(), 50, 1, 102, 1);
+        assert_users(deps.as_ref(), Some(0), Some(0), Some(1), None);
+
+        // reducing to 0 token makes us None even with min_bond 0
+        unbond(deps.as_mut(), 49, 1, 102, 2);
+        assert_users(deps.as_ref(), Some(0), None, None, None);
+    }
 }
