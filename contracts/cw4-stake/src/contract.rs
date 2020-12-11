@@ -450,6 +450,12 @@ mod tests {
         assert_eq!(0, res.weight);
     }
 
+    fn get_admin(deps: Deps) -> Option<HumanAddr> {
+        let raw = query(deps, mock_env(), QueryMsg::Admin {}).unwrap();
+        let res: AdminResponse = from_slice(&raw).unwrap();
+        res.admin
+    }
+
     #[test]
     fn try_update_admin() {
         let mut deps = mock_dependencies(&[]);
@@ -464,14 +470,11 @@ mod tests {
 
         // admin can change it
         update_admin(deps.as_mut(), ADMIN.into(), Some(USER3.into())).unwrap();
-        assert_eq!(
-            query_admin(deps.as_ref()).unwrap().admin,
-            Some(USER3.into())
-        );
+        assert_eq!(get_admin(deps.as_ref()), Some(USER3.into()));
 
         // and unset it
         update_admin(deps.as_mut(), USER3.into(), None).unwrap();
-        assert_eq!(query_admin(deps.as_ref()).unwrap().admin, None);
+        assert_eq!(get_admin(deps.as_ref()), None);
 
         // no one can change it now
         let err = update_admin(deps.as_mut(), USER3.into(), Some(USER1.into())).unwrap_err();
@@ -927,7 +930,43 @@ mod tests {
         assert_eq!(res.messages, vec![msg1, msg2]);
     }
 
-    // TODO: edge-case -> weight = 0, also min_bond = 0
+    #[test]
+    fn only_bond_valid_coins() {
+        let mut deps = mock_dependencies(&[]);
+        default_init(deps.as_mut());
 
-    // TODO: bond with invalid coins
+        // cannot bond with 0 coins
+        let info = mock_info(HumanAddr::from(USER1), &[]);
+        let err = handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
+        match err {
+            ContractError::MissingDenom(denom) => assert_eq!(denom.as_str(), DENOM),
+            _ => panic!("Unexpected error: {}", err),
+        }
+
+        // cannot bond with incorrect denom
+        let info = mock_info(HumanAddr::from(USER1), &[coin(500, "FOO")]);
+        let err = handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
+        match err {
+            ContractError::ExtraDenoms(denom) => assert_eq!(denom.as_str(), DENOM),
+            _ => panic!("Unexpected error: {}", err),
+        }
+
+        // cannot bond with 2 coins (even if one is correct)
+        let info = mock_info(
+            HumanAddr::from(USER1),
+            &[coin(1234, DENOM), coin(5000, "BAR")],
+        );
+        let err = handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
+        match err {
+            ContractError::ExtraDenoms(denom) => assert_eq!(denom.as_str(), DENOM),
+            _ => panic!("Unexpected error: {}", err),
+        }
+
+        // can bond with just the proper denom
+        // cannot bond with incorrect denom
+        let info = mock_info(HumanAddr::from(USER1), &[coin(500, DENOM)]);
+        handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+    }
+
+    // TODO: edge-case -> weight = 0, also min_bond = 0
 }
