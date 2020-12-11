@@ -266,40 +266,47 @@ pub struct SnapshotNamespaces<'a> {
     pub changelog: &'a [u8],
 }
 
-#[macro_export]
-macro_rules! snapshot_names {
-    ($var:expr) => {
-        #[allow(clippy::string_lit_as_bytes)]
+impl<'a> SnapshotNamespaces<'a> {
+    pub const fn new(
+        pk: &'static str,
+        checkpoints: &'static str,
+        changelog: &'static str,
+    ) -> SnapshotNamespaces<'a> {
         SnapshotNamespaces {
-            pk: $var.as_bytes(),
-            checkpoints: concat!($var, "__checkpoints").as_bytes(),
-            changelog: concat!($var, "__changelog").as_bytes(),
+            pk: pk.as_bytes(),
+            checkpoints: checkpoints.as_bytes(),
+            changelog: changelog.as_bytes(),
         }
-    };
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SnapshotNamespaces;
     use cosmwasm_std::testing::MockStorage;
 
     #[test]
-    fn namespace_macro() {
-        let check = |names: SnapshotNamespaces| {
-            assert_eq!(names.pk, b"demo");
-            assert_eq!(names.checkpoints, b"demo__checkpoints");
-            assert_eq!(names.changelog, b"demo__changelog");
-        };
-        // FIXME: we have to do this weird way due to the clippy allow statement
-        check(snapshot_names!("demo"));
-        // ex. this line fails to compile
-        // let names = snapshot_names!("demo");
+    fn snapshot_names() {
+        let names = SnapshotNamespaces::new("demo", "demo__checkpoints", "demo__changelog");
+        assert_eq!(names.pk, b"demo");
+        assert_eq!(names.checkpoints, b"demo__checkpoints");
+        assert_eq!(names.changelog, b"demo__changelog");
     }
 
     type TestMap = SnapshotMap<'static, &'static [u8], u64>;
-    const NEVER: TestMap = SnapshotMap::new(snapshot_names!("never"), Strategy::Never);
-    const EVERY: TestMap = SnapshotMap::new(snapshot_names!("every"), Strategy::EveryBlock);
-    const SELECT: TestMap = SnapshotMap::new(snapshot_names!("select"), Strategy::Selected);
+    const NEVER: TestMap = SnapshotMap::new(
+        SnapshotNamespaces::new("never", "never__check", "never__change"),
+        Strategy::Never,
+    );
+    const EVERY: TestMap = SnapshotMap::new(
+        SnapshotNamespaces::new("every", "every__check", "every__change"),
+        Strategy::EveryBlock,
+    );
+    const SELECT: TestMap = SnapshotMap::new(
+        SnapshotNamespaces::new("select", "select__check", "select__change"),
+        Strategy::Selected,
+    );
 
     // Fills a map &[u8] -> u64 with the following writes:
     // 1: A = 5
