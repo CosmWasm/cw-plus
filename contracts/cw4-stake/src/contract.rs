@@ -367,7 +367,7 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
+    use cosmwasm_std::{from_slice, Storage};
     // use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
     use cw0::claim::Claim;
     use cw0::Duration;
@@ -482,20 +482,20 @@ mod tests {
     }
 
     // this tests the member queries
-    fn assert_users<S: Storage, A: Api, Q: Querier>(
-        deps: &OwnedDeps<S, A, Q>,
+    fn assert_users(
+        deps: Deps,
         user1_weight: Option<u64>,
         user2_weight: Option<u64>,
         user3_weight: Option<u64>,
         height: Option<u64>,
     ) {
-        let member1 = query_member(deps.as_ref(), USER1.into(), height).unwrap();
+        let member1 = query_member(deps, USER1.into(), height).unwrap();
         assert_eq!(member1.weight, user1_weight);
 
-        let member2 = query_member(deps.as_ref(), USER2.into(), height).unwrap();
+        let member2 = query_member(deps, USER2.into(), height).unwrap();
         assert_eq!(member2.weight, user2_weight);
 
-        let member3 = query_member(deps.as_ref(), USER3.into(), height).unwrap();
+        let member3 = query_member(deps, USER3.into(), height).unwrap();
         assert_eq!(member3.weight, user3_weight);
 
         // this is only valid if we are not doing a historical query
@@ -506,12 +506,24 @@ mod tests {
             let count = weights.iter().filter(|x| x.is_some()).count();
 
             // TODO: more detailed compare?
-            let members = list_members(deps.as_ref(), None, None).unwrap();
+            let members = list_members(deps, None, None).unwrap();
             assert_eq!(count, members.members.len());
 
-            let total = query_total_weight(deps.as_ref()).unwrap();
+            let total = query_total_weight(deps).unwrap();
             assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
         }
+    }
+
+    // this tests the member queries
+    fn assert_stake(deps: Deps, user1_stake: u128, user2_stake: u128, user3_stake: u128) {
+        let stake1 = query_staked(deps, USER1.into()).unwrap();
+        assert_eq!(stake1.stake, coin(user1_stake, DENOM));
+
+        let stake2 = query_staked(deps, USER2.into()).unwrap();
+        assert_eq!(stake2.stake, coin(user2_stake, DENOM));
+
+        let stake3 = query_staked(deps, USER3.into()).unwrap();
+        assert_eq!(stake3.stake, coin(user3_stake, DENOM));
     }
 
     #[test]
@@ -521,24 +533,27 @@ mod tests {
         let height = mock_env().block.height;
 
         // Assert original weights
-        assert_users(&deps, None, None, None, None);
+        assert_users(deps.as_ref(), None, None, None, None);
 
         // ensure it rounds down, and respects cut-off
         bond(deps.as_mut(), 12_000, 7_500, 4_000, 1);
 
         // Assert updated weights
-        assert_users(&deps, Some(12), Some(7), None, None);
+        assert_stake(deps.as_ref(), 12_000, 7_500, 4_000);
+        assert_users(deps.as_ref(), Some(12), Some(7), None, None);
 
         // add some more, ensure the sum is properly respected (7.5 + 7.6 = 15 not 14)
         bond(deps.as_mut(), 0, 7_600, 1_200, 2);
 
         // Assert updated weights
-        assert_users(&deps, Some(12), Some(15), Some(5), None);
+        assert_stake(deps.as_ref(), 12_000, 15_100, 5_200);
+        assert_users(deps.as_ref(), Some(12), Some(15), Some(5), None);
 
         // check historical queries all work
-        assert_users(&deps, None, None, None, Some(height + 1)); // before first stake
-        assert_users(&deps, Some(12), Some(7), None, Some(height + 2)); // after first stake
-        assert_users(&deps, Some(12), Some(15), Some(5), Some(height + 3)); // after second stake
+        assert_users(deps.as_ref(), None, None, None, Some(height + 1)); // before first stake
+        assert_users(deps.as_ref(), Some(12), Some(7), None, Some(height + 2)); // after first stake
+        assert_users(deps.as_ref(), Some(12), Some(15), Some(5), Some(height + 3));
+        // after second stake
     }
 
     #[test]
@@ -552,19 +567,21 @@ mod tests {
         unbond(deps.as_mut(), 4_500, 2_600, 1_111, 2);
 
         // Assert updated weights
-        assert_users(&deps, Some(7), None, None, None);
+        assert_stake(deps.as_ref(), 7_500, 4_900, 2_889);
+        assert_users(deps.as_ref(), Some(7), None, None, None);
 
         // Adding a little more returns weight
         bond(deps.as_mut(), 600, 100, 2_222, 3);
 
         // Assert updated weights
-        assert_users(&deps, Some(8), Some(5), Some(5), None);
+        assert_users(deps.as_ref(), Some(8), Some(5), Some(5), None);
 
         // check historical queries all work
-        assert_users(&deps, None, None, None, Some(height + 1)); // before first stake
-        assert_users(&deps, Some(12), Some(7), None, Some(height + 2)); // after first bond
-        assert_users(&deps, Some(7), None, None, Some(height + 3)); // after first unbond
-        assert_users(&deps, Some(8), Some(5), Some(5), Some(height + 4)); // after second bond
+        assert_users(deps.as_ref(), None, None, None, Some(height + 1)); // before first stake
+        assert_users(deps.as_ref(), Some(12), Some(7), None, Some(height + 2)); // after first bond
+        assert_users(deps.as_ref(), Some(7), None, None, Some(height + 3)); // after first unbond
+        assert_users(deps.as_ref(), Some(8), Some(5), Some(5), Some(height + 4));
+        // after second bond
 
         // TODO: error if try to ubond more than stake
     }
@@ -897,9 +914,9 @@ mod tests {
     //     let msg = HandleMsg::UpdateMembers { remove, add };
     //
     //     // admin updates properly
-    //     assert_users(&deps, Some(11), Some(6), None, None);
+    //     assert_users(deps.as_ref(), Some(11), Some(6), None, None);
     //     let res = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
-    //     assert_users(&deps, Some(20), None, Some(5), None);
+    //     assert_users(deps.as_ref(), Some(20), None, Some(5), None);
     //
     //     // ensure 2 messages for the 2 hooks
     //     assert_eq!(res.messages.len(), 2);
