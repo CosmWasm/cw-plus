@@ -651,7 +651,7 @@ mod tests {
         do_init(deps.as_mut());
 
         // get total from raw key
-        let total_raw = deps.storage.get(TOTAL_KEY).unwrap();
+        let total_raw = deps.storage.get(TOTAL_KEY.as_bytes()).unwrap();
         let total: u64 = from_slice(&total_raw).unwrap();
         assert_eq!(17, total);
 

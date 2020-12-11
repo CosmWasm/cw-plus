@@ -36,9 +36,9 @@ where
     I: IndexList<T>,
 {
     /// TODO: remove traits here and make this const fn new
-    pub fn new(pk_namespace: &'a [u8], indexes: I) -> Self {
+    pub fn new(pk_namespace: &'a str, indexes: I) -> Self {
         IndexedMap {
-            pk_namespace,
+            pk_namespace: pk_namespace.as_bytes(),
             primary: Map::new(pk_namespace),
             idx: indexes,
         }
@@ -183,10 +183,10 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(|d| index_string(&d.name), b"data", b"data__name"),
-            age: UniqueIndex::new(|d| index_int(d.age), b"data__age"),
+            name: MultiIndex::new(|d| index_string(&d.name), "data", "data__name"),
+            age: UniqueIndex::new(|d| index_int(d.age), "data__age"),
         };
-        IndexedMap::new(b"data", indexes)
+        IndexedMap::new("data", indexes)
     }
 
     #[test]

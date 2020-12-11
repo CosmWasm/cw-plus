@@ -48,7 +48,7 @@ pub struct MultiIndex<'a, T> {
 
 impl<'a, T> MultiIndex<'a, T> {
     // TODO: make this a const fn
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a [u8], idx_namespace: &'a [u8]) -> Self {
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
         MultiIndex {
             index: idx_fn,
             pk_map: Map::new(pk_namespace),
@@ -137,7 +137,7 @@ pub struct UniqueIndex<'a, T> {
 
 impl<'a, T> UniqueIndex<'a, T> {
     // TODO: make this a const fn
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a [u8]) -> Self {
+    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a str) -> Self {
         UniqueIndex {
             index: idx_fn,
             idx_map: Map::new(idx_namespace),
