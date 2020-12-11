@@ -42,11 +42,16 @@ pub enum Strategy {
 
 impl<'a, K, T> SnapshotMap<'a, K, T> {
     /// Usage: SnapshotMap::new(snapshot_names!("foobar"), Strategy::EveryBlock)
-    pub const fn new(namespaces: SnapshotNamespaces<'a>, strategy: Strategy) -> Self {
+    pub const fn new(
+        pk: &'a str,
+        checkpoints: &'a str,
+        changelog: &'a str,
+        strategy: Strategy,
+    ) -> Self {
         SnapshotMap {
-            primary: Map::new(namespaces.pk),
-            checkpoints: Map::new(namespaces.checkpoints),
-            changelog: Map::new(namespaces.changelog),
+            primary: Map::new(pk.as_bytes()),
+            checkpoints: Map::new(checkpoints.as_bytes()),
+            changelog: Map::new(changelog.as_bytes()),
             strategy,
         }
     }
@@ -260,51 +265,24 @@ struct ChangeSet<T> {
     pub old: Option<T>,
 }
 
-pub struct SnapshotNamespaces<'a> {
-    pub pk: &'a [u8],
-    pub checkpoints: &'a [u8],
-    pub changelog: &'a [u8],
-}
-
-impl<'a> SnapshotNamespaces<'a> {
-    pub const fn new(
-        pk: &'static str,
-        checkpoints: &'static str,
-        changelog: &'static str,
-    ) -> SnapshotNamespaces<'a> {
-        SnapshotNamespaces {
-            pk: pk.as_bytes(),
-            checkpoints: checkpoints.as_bytes(),
-            changelog: changelog.as_bytes(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SnapshotNamespaces;
     use cosmwasm_std::testing::MockStorage;
 
-    #[test]
-    fn snapshot_names() {
-        let names = SnapshotNamespaces::new("demo", "demo__checkpoints", "demo__changelog");
-        assert_eq!(names.pk, b"demo");
-        assert_eq!(names.checkpoints, b"demo__checkpoints");
-        assert_eq!(names.changelog, b"demo__changelog");
-    }
-
     type TestMap = SnapshotMap<'static, &'static [u8], u64>;
-    const NEVER: TestMap = SnapshotMap::new(
-        SnapshotNamespaces::new("never", "never__check", "never__change"),
-        Strategy::Never,
-    );
+    const NEVER: TestMap =
+        SnapshotMap::new("never", "never__check", "never__change", Strategy::Never);
     const EVERY: TestMap = SnapshotMap::new(
-        SnapshotNamespaces::new("every", "every__check", "every__change"),
+        "every",
+        "every__check",
+        "every__change",
         Strategy::EveryBlock,
     );
     const SELECT: TestMap = SnapshotMap::new(
-        SnapshotNamespaces::new("select", "select__check", "select__change"),
+        "select",
+        "select__check",
+        "select__change",
         Strategy::Selected,
     );
 
