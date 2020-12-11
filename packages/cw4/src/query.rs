@@ -53,7 +53,9 @@ pub struct HooksResponse {
 
 /// TOTAL_KEY is meant for raw queries
 pub const TOTAL_KEY: &[u8] = b"total";
-pub const MEMBERS_KEY: &[u8] = b"members";
+pub const MEMBERS_KEY: &str = "members";
+pub const MEMBERS_CHECKPOINTS: &str = "members__checkpoints";
+pub const MEMBERS_CHANGELOG: &str = "members__changelog";
 
 /// member_key is meant for raw queries for one member, given canonical address
 pub fn member_key(address: &[u8]) -> Vec<u8> {
