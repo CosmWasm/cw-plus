@@ -10,7 +10,7 @@ use cw_storage_plus::{snapshot_names, Item, Map, SnapshotMap, SnapshotNamespaces
 pub struct Config {
     /// denom of the token to stake
     pub denom: String,
-    pub tokens_per_weight: u64,
+    pub tokens_per_weight: Uint128,
     pub min_bond: Uint128,
     pub unbonding_period: Duration,
 }

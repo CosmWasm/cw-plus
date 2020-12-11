@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    coin, coins, to_binary, Api, BankMsg, Binary, CanonicalAddr, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Uint128,
+    coin, coins, to_binary, Api, BankMsg, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128,
 };
 use cw0::{
     hooks::{add_hook, remove_hook, HOOKS},
@@ -17,6 +17,7 @@ use crate::error::ContractError;
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, QueryMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CONFIG, MEMBERS, STAKE, TOTAL};
 use cw0::claim::{claim_tokens, create_claim, CLAIMS};
+use cw0::hooks::prepare_hooks;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -30,10 +31,16 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
     let admin_raw = maybe_canonical(deps.api, msg.admin)?;
     ADMIN.save(deps.storage, &admin_raw)?;
 
+    // min_bond is at least 1, so 0 stake -> non-membership
+    let min_bond = match msg.min_bond {
+        Uint128(0) => Uint128(1),
+        v => v,
+    };
+
     let config = Config {
         denom: msg.stake,
         tokens_per_weight: msg.tokens_per_weight,
-        min_bond: msg.min_bond,
+        min_bond,
         unbonding_period: msg.unbonding_period,
     };
     CONFIG.save(deps.storage, &config)?;
@@ -53,7 +60,7 @@ pub fn handle(
         HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
-        HandleMsg::Bond {} => handle_bond(deps, info),
+        HandleMsg::Bond {} => handle_bond(deps, env, info),
         HandleMsg::Unbond { amount } => handle_unbond(deps, env, info, amount),
         HandleMsg::Claim {} => handle_claim(deps, env, info),
     }
@@ -64,37 +71,57 @@ pub fn handle_update_admin(
     info: MessageInfo,
     new_admin: Option<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
-    update_admin(deps, info.sender, new_admin)?;
+    let api = deps.api;
+    ADMIN.update(deps.storage, |state| -> Result<_, ContractError> {
+        assert_admin(api, &info.sender, state)?;
+        let new_admin = maybe_canonical(api, new_admin)?;
+        Ok(new_admin)
+    })?;
     Ok(HandleResponse::default())
 }
 
-// the logic from handle_update_admin extracted for easier import
-pub fn update_admin(
+pub fn handle_bond(
     deps: DepsMut,
-    sender: HumanAddr,
-    new_admin: Option<HumanAddr>,
-) -> Result<Option<CanonicalAddr>, ContractError> {
-    let api = deps.api;
-    ADMIN.update(deps.storage, |state| -> Result<_, ContractError> {
-        assert_admin(api, sender, state)?;
-        let new_admin = maybe_canonical(api, new_admin)?;
-        Ok(new_admin)
+    env: Env,
+    info: MessageInfo,
+) -> Result<HandleResponse, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+
+    // ensure the sent denom was proper
+    // NOTE: those clones are not needed (if we move denom, we return early),
+    // but the compiler cannot see that
+    let sent = match info.sent_funds.len() {
+        0 => Err(ContractError::MissingDenom(cfg.denom.clone())),
+        1 => {
+            if info.sent_funds[0].denom == cfg.denom {
+                Ok(info.sent_funds[0].amount)
+            } else {
+                Err(ContractError::ExtraDenoms(cfg.denom.clone()))
+            }
+        }
+        _ => Err(ContractError::ExtraDenoms(cfg.denom.clone())),
+    }?;
+
+    // update the sender's stake
+    let sender_raw = deps.api.canonical_address(&info.sender)?;
+    let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
+        Ok(stake.unwrap_or_default() + sent)
+    })?;
+
+    let messages = update_membership(
+        deps.storage,
+        info.sender,
+        &sender_raw,
+        new_stake,
+        &cfg,
+        env.block.height,
+    )?;
+
+    Ok(HandleResponse {
+        messages,
+        attributes: vec![],
+        data: None,
     })
-}
-
-pub fn handle_bond(_deps: DepsMut, _info: MessageInfo) -> Result<HandleResponse, ContractError> {
-    unimplemented!();
-    // TODO: ensure the denom was proper
-
-    // // make the local update
-    // let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
-    // // call all registered hooks
-    // let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
-    // Ok(HandleResponse {
-    //     messages,
-    //     attributes: vec![],
-    //     data: None,
-    // })
 }
 
 pub fn handle_unbond(
@@ -105,31 +132,70 @@ pub fn handle_unbond(
 ) -> Result<HandleResponse, ContractError> {
     // reduce the sender's stake - aborting if insufficient
     let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let _new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
+    let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
         stake.unwrap_or_default() - amount
     })?;
 
     // provide them a claim
-    let config = CONFIG.load(deps.storage)?;
+    let cfg = CONFIG.load(deps.storage)?;
     create_claim(
         deps.storage,
         &sender_raw,
         amount,
-        config.unbonding_period.after(&env.block),
+        cfg.unbonding_period.after(&env.block),
     )?;
 
-    // update their membership
-    unimplemented!();
+    let messages = update_membership(
+        deps.storage,
+        info.sender,
+        &sender_raw,
+        new_stake,
+        &cfg,
+        env.block.height,
+    )?;
 
-    // // make the local update
-    // let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
-    // // call all registered hooks
-    // let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
-    // Ok(HandleResponse {
-    //     messages,
-    //     attributes: vec![],
-    //     data: None,
-    // })
+    Ok(HandleResponse {
+        messages,
+        attributes: vec![],
+        data: None,
+    })
+}
+
+fn update_membership(
+    storage: &mut dyn Storage,
+    sender: HumanAddr,
+    sender_raw: &CanonicalAddr,
+    new_stake: Uint128,
+    cfg: &Config,
+    height: u64,
+) -> StdResult<Vec<CosmosMsg>> {
+    // update their membership weight
+    let new = calc_weight(new_stake, cfg);
+    let old = MEMBERS.may_load(storage, sender_raw)?;
+    match new.as_ref() {
+        Some(w) => MEMBERS.save(storage, sender_raw, w, height),
+        None => MEMBERS.remove(storage, sender_raw, height),
+    }?;
+
+    // update total
+    TOTAL.update(storage, |total| -> StdResult<_> {
+        Ok(total + new.unwrap_or_default() - old.unwrap_or_default())
+    })?;
+
+    // alert the hooks
+    let diff = MemberDiff::new(sender, old, new);
+    prepare_hooks(storage, |h| {
+        MemberChangedHookMsg::one(diff.clone()).into_cosmos_msg(h)
+    })
+}
+
+fn calc_weight(stake: Uint128, cfg: &Config) -> Option<u64> {
+    if stake < cfg.min_bond {
+        None
+    } else {
+        let w = stake.u128() / (cfg.tokens_per_weight.u128());
+        Some(w as u64)
+    }
 }
 
 pub fn handle_claim(
@@ -160,56 +226,16 @@ pub fn handle_claim(
     })
 }
 
-// the logic from handle_update_admin extracted for easier import
-pub fn update_members(
-    deps: DepsMut,
-    height: u64,
-    sender: HumanAddr,
-    to_add: Vec<Member>,
-    to_remove: Vec<HumanAddr>,
-) -> Result<MemberChangedHookMsg, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, sender, admin)?;
-
-    let mut total = TOTAL.load(deps.storage)?;
-    let mut diffs: Vec<MemberDiff> = vec![];
-
-    // add all new members and update total
-    for add in to_add.into_iter() {
-        let raw = deps.api.canonical_address(&add.addr)?;
-        MEMBERS.update(deps.storage, &raw, height, |old| -> StdResult<_> {
-            total -= old.unwrap_or_default();
-            total += add.weight;
-            diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
-            Ok(add.weight)
-        })?;
-    }
-
-    for remove in to_remove.into_iter() {
-        let raw = deps.api.canonical_address(&remove)?;
-        let old = MEMBERS.may_load(deps.storage, &raw)?;
-        // Only process this if they were actually in the list before
-        if let Some(weight) = old {
-            diffs.push(MemberDiff::new(remove, Some(weight), None));
-            total -= weight;
-            MEMBERS.remove(deps.storage, &raw, height)?;
-        }
-    }
-
-    TOTAL.save(deps.storage, &total)?;
-    Ok(MemberChangedHookMsg { diffs })
-}
-
 fn assert_admin(
     api: &dyn Api,
-    sender: HumanAddr,
+    sender: &HumanAddr,
     admin: Option<CanonicalAddr>,
 ) -> Result<(), ContractError> {
     let owner = match admin {
         Some(x) => x,
         None => return Err(ContractError::Unauthorized {}),
     };
-    if api.canonical_address(&sender)? != owner {
+    if api.canonical_address(sender)? != owner {
         Err(ContractError::Unauthorized {})
     } else {
         Ok(())
@@ -222,7 +248,7 @@ pub fn handle_add_hook(
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, info.sender, admin)?;
+    assert_admin(deps.api, &info.sender, admin)?;
     add_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -233,7 +259,7 @@ pub fn handle_remove_hook(
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, info.sender, admin)?;
+    assert_admin(deps.api, &info.sender, admin)?;
     remove_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }

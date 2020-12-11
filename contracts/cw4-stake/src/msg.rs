@@ -9,7 +9,7 @@ use cw0::Duration;
 pub struct InitMsg {
     /// denom of the token to stake
     pub stake: String,
-    pub tokens_per_weight: u64,
+    pub tokens_per_weight: Uint128,
     pub min_bond: Uint128,
     pub unbonding_period: Duration,
 

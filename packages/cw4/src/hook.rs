@@ -3,13 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 
-/// MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct MemberChangedHookMsg {
-    pub diffs: Vec<MemberDiff>,
-}
-
 /// MemberDiff shows the old and new states for a given cw4 member
 /// They cannot both be None.
 /// old = None, new = Some -> Insert
@@ -36,7 +29,23 @@ impl MemberDiff {
     }
 }
 
+/// MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg
+/// This contains a list of all diffs on the given transaction.
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct MemberChangedHookMsg {
+    pub diffs: Vec<MemberDiff>,
+}
+
 impl MemberChangedHookMsg {
+    pub fn one(diff: MemberDiff) -> Self {
+        MemberChangedHookMsg { diffs: vec![diff] }
+    }
+
+    pub fn new(diffs: Vec<MemberDiff>) -> Self {
+        MemberChangedHookMsg { diffs }
+    }
+
     /// serializes the message
     pub fn into_binary(self) -> StdResult<Binary> {
         let msg = MemberChangedHandleMsg::MemberChangedHook(self);

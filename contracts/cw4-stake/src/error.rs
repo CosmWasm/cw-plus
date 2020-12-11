@@ -11,4 +11,10 @@ pub enum ContractError {
 
     #[error("No claims that can be released currently")]
     NothingToClaim {},
+
+    #[error("Must send '{0}' to stake")]
+    MissingDenom(String),
+
+    #[error("Sent unsupported denoms, must send '{0}' to stake")]
+    ExtraDenoms(String),
 }
