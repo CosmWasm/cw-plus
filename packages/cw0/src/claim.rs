@@ -5,8 +5,8 @@ use crate::Expiration;
 use cosmwasm_std::{BlockInfo, CanonicalAddr, StdResult, Storage, Uint128};
 use cw_storage_plus::Map;
 
-// TODO: revisit design (multiple keys?)
-pub const CLAIMS: Map<&[u8], Vec<Claim>> = Map::new(b"claim");
+// TODO: revisit design (split each claim on own key?)
+pub const CLAIMS: Map<&[u8], Vec<Claim>> = Map::new("claim");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Claim {

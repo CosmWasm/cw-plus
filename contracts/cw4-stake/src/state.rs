@@ -15,8 +15,8 @@ pub struct Config {
     pub unbonding_period: Duration,
 }
 
-pub const ADMIN: Item<Option<CanonicalAddr>> = Item::new(b"admin");
-pub const CONFIG: Item<Config> = Item::new(b"config");
+pub const ADMIN: Item<Option<CanonicalAddr>> = Item::new("admin");
+pub const CONFIG: Item<Config> = Item::new("config");
 pub const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
 
 pub const MEMBERS: SnapshotMap<&[u8], u64> = SnapshotMap::new(
@@ -26,4 +26,4 @@ pub const MEMBERS: SnapshotMap<&[u8], u64> = SnapshotMap::new(
     Strategy::EveryBlock,
 );
 
-pub const STAKE: Map<&[u8], Uint128> = Map::new(b"stake");
+pub const STAKE: Map<&[u8], Uint128> = Map::new("stake");
