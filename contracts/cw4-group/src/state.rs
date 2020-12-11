@@ -8,8 +8,8 @@ pub const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
 // Note: this must be same as cw4::MEMBERS_KEY but macro needs literal, not const
 pub const MEMBERS: SnapshotMap<&[u8], u64> = SnapshotMap::new(
     cw4::MEMBERS_KEY,
-    cw4::MEMBERS_CHECK,
-    cw4::MEMBERS_CHANGE,
+    cw4::MEMBERS_CHECKPOINTS,
+    cw4::MEMBERS_CHANGELOG,
     Strategy::EveryBlock,
 );
 
