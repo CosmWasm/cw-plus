@@ -260,8 +260,8 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OwnedDeps, Querier, StdError, Storage};
-    use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
+    use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
+    use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
 
     const ADMIN: &str = "juan";
@@ -525,9 +525,7 @@ mod tests {
         .unwrap_err();
 
         match err {
-            ContractError::Std(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, HOOK_NOT_REGISTERED)
-            }
+            ContractError::Hook(HookError::HookNotRegistered {}) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -548,9 +546,7 @@ mod tests {
         )
         .unwrap_err();
         match err {
-            ContractError::Std(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, HOOK_ALREADY_REGISTERED)
-            }
+            ContractError::Hook(HookError::HookAlreadyRegistered {}) => {}
             e => panic!("Unexpected error: {}", e),
         }
 

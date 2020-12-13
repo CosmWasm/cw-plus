@@ -369,7 +369,7 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, StdError, Storage};
     use cw0::claim::Claim;
-    use cw0::hooks::{HOOK_ALREADY_REGISTERED, HOOK_NOT_REGISTERED};
+    use cw0::hooks::HookError;
     use cw0::Duration;
     use cw4::{member_key, TOTAL_KEY};
 
@@ -857,9 +857,7 @@ mod tests {
         .unwrap_err();
 
         match err {
-            ContractError::Std(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, HOOK_NOT_REGISTERED)
-            }
+            ContractError::Hook(HookError::HookNotRegistered {}) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
@@ -880,9 +878,7 @@ mod tests {
         )
         .unwrap_err();
         match err {
-            ContractError::Std(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, HOOK_ALREADY_REGISTERED)
-            }
+            ContractError::Hook(HookError::HookAlreadyRegistered {}) => {}
             e => panic!("Unexpected error: {}", e),
         }
 
