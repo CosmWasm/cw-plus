@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
+use cosmwasm_std::{BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128};
 
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
@@ -59,6 +59,15 @@ impl Votes {
             veto: 0,
         }
     }
+
+    pub fn add_vote(&mut self, vote: Vote, weight: u64) {
+        match vote {
+            Vote::Yes => self.yes += weight,
+            Vote::Abstain => self.abstain += weight,
+            Vote::No => self.no += weight,
+            Vote::Veto => self.veto += weight,
+        }
+    }
 }
 
 impl Proposal {
@@ -66,7 +75,7 @@ impl Proposal {
         let mut status = self.status;
 
         // if open, check if voting is passed or timed out
-        if status == Status::Open && self.yes_weight >= self.required_weight {
+        if status == Status::Open && self.is_passed() {
             status = Status::Passed;
         }
         if status == Status::Open && self.expires.is_expired(block) {
@@ -75,6 +84,32 @@ impl Proposal {
 
         status
     }
+
+    pub fn mark_if_passed(&mut self) {
+        if self.is_passed() {
+            self.status = Status::Passed;
+        }
+    }
+
+    pub fn is_passed(&self) -> bool {
+        match self.threshold {
+            Threshold::AbsoluteCount { weight_needed } => self.votes.yes >= weight_needed,
+            Threshold::AbsolutePercentage { percentage_needed } => {
+                self.votes.yes >= apply_percentage(self.total_weight, percentage_needed)
+            }
+            Threshold::ThresholdQuora { threshold, quroum } => {
+                let total = self.votes.total();
+                total >= apply_percentage(self.total_weight, quroum)
+                    && self.votes.yes >= apply_percentage(total, threshold)
+            }
+        }
+    }
+}
+
+// this is a helper function so Decimal works with u64 rather than Uint128
+fn apply_percentage(weight: u64, percentage: Decimal) -> u64 {
+    let applied = percentage * Uint128(weight as u128);
+    applied.u128() as u64
 }
 
 // we cast a ballot with our chosen vote and a given weight

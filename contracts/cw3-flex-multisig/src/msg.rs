@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ContractError;
 use cosmwasm_std::{CosmosMsg, Decimal, Empty, HumanAddr};
 use cw0::{Duration, Expiration};
-use cw3::Vote;
+use cw3::{ThresholdResponse, Vote};
 use cw4::MemberChangedHookMsg;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -45,7 +45,7 @@ impl Threshold {
     pub fn validate(&self, total_weight: u64) -> Result<(), ContractError> {
         match self {
             Threshold::AbsoluteCount { weight_needed } => {
-                if weight_needed == 0 {
+                if *weight_needed == 0 {
                     Err(ContractError::ZeroThreshold {})
                 } else if *weight_needed > total_weight {
                     Err(ContractError::UnreachableThreshold {})
@@ -60,7 +60,28 @@ impl Threshold {
                 valid_percentage(threshold)?;
                 valid_percentage(quroum)
             }
-        };
+        }
+    }
+
+    /// Creates a response from the saved data, just missing the total_weight info
+    pub fn to_response(&self, total_weight: u64) -> ThresholdResponse {
+        match self.clone() {
+            Threshold::AbsoluteCount { weight_needed } => ThresholdResponse::AbsoluteCount {
+                weight_needed,
+                total_weight,
+            },
+            Threshold::AbsolutePercentage { percentage_needed } => {
+                ThresholdResponse::AbsolutePercentage {
+                    percentage_needed,
+                    total_weight,
+                }
+            }
+            Threshold::ThresholdQuora { threshold, quroum } => ThresholdResponse::ThresholdQuora {
+                threshold,
+                quroum,
+                total_weight,
+            },
+        }
     }
 }
 

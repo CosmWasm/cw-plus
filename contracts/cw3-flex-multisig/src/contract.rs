@@ -104,24 +104,19 @@ pub fn handle_propose(
         return Err(ContractError::WrongExpiration {});
     }
 
-    let status = if vote_power < cfg.required_weight {
-        Status::Open
-    } else {
-        Status::Passed
-    };
-
     // create a proposal
-    let prop = Proposal {
+    let mut prop = Proposal {
         title,
         description,
         start_height: env.block.height,
         expires,
         msgs,
-        status,
+        status: Status::Open,
         votes: Votes::new(vote_power),
         threshold: cfg.threshold,
         total_weight: cfg.group_addr.total_weight(&deps.querier)?,
     };
+    prop.mark_if_passed();
     let id = next_id(deps.storage)?;
     PROPOSALS.save(deps.storage, id.into(), &prop)?;
 
@@ -164,7 +159,7 @@ pub fn handle_vote(
         return Err(ContractError::Expired {});
     }
 
-    // use a snapshot of "start of proposal" if available, otherwise, current group weight
+    // use a snapshot of "start of proposal"
     let vote_power = cfg
         .group_addr
         .member_at_height(&deps.querier, info.sender.clone(), prop.start_height)?
@@ -183,15 +178,10 @@ pub fn handle_vote(
         },
     )?;
 
-    // if yes vote, update tally
-    if vote == Vote::Yes {
-        prop.yes_weight += vote_power;
-        // update status when the passing vote comes in
-        if prop.yes_weight >= prop.required_weight {
-            prop.status = Status::Passed;
-        }
-        PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
-    }
+    // update vote tally
+    prop.votes.add_vote(vote, vote_power);
+    prop.mark_if_passed();
+    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(HandleResponse {
         messages: vec![],
@@ -313,10 +303,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let total_weight = cfg.group_addr.total_weight(&deps.querier)?;
-    Ok(ThresholdResponse::AbsoluteCount {
-        weight_needed: cfg.required_weight,
-        total_weight,
-    })
+    Ok(cfg.threshold.to_response(total_weight))
 }
 
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
