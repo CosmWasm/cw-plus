@@ -63,7 +63,7 @@ The following messages have been added to handle un/staking tokens:
 `Bond{}` - bond all staking tokens sent with the message and update membership weight
 
 `Unbond{tokens}` - starts the unbonding process for the given number 
-  of tokens. The sender immediately looses weight from these tokens,
+  of tokens. The sender immediately loses weight from these tokens,
   and can claim them back to his wallet after `unbonding_period`
 
 `Claim{}` -  used to claim your native tokens that you previously "unbonded"

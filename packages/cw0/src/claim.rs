@@ -11,29 +11,30 @@ pub const CLAIMS: Map<&[u8], Vec<Claim>> = Map::new("claim");
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Claim {
     pub amount: Uint128,
-    pub released: Expiration,
+    pub release_at: Expiration,
 }
 
 impl Claim {
     pub fn new(amount: u128, released: Expiration) -> Self {
         Claim {
             amount: amount.into(),
-            released,
+            release_at: released,
         }
     }
 }
 
-/// this creates a claim, such that the given address an claim an amount of tokens after the release date
+/// This creates a claim, such that the given address can claim an amount of tokens after
+/// the release date.
 pub fn create_claim(
     storage: &mut dyn Storage,
     addr: &CanonicalAddr,
     amount: Uint128,
-    released: Expiration,
+    release_at: Expiration,
 ) -> StdResult<()> {
     // add a claim to this user to get their tokens after the unbonding period
     CLAIMS.update(storage, &addr, |old| -> StdResult<_> {
         let mut claims = old.unwrap_or_default();
-        claims.push(Claim { amount, released });
+        claims.push(Claim { amount, release_at });
         Ok(claims)
     })?;
     Ok(())
@@ -52,7 +53,7 @@ pub fn claim_tokens(
         let (_send, waiting): (Vec<_>, _) =
             claim.unwrap_or_default().iter().cloned().partition(|c| {
                 // if mature and we can pay fully, then include in _send
-                if c.released.is_expired(block) {
+                if c.release_at.is_expired(block) {
                     if let Some(limit) = cap {
                         if to_send + c.amount > limit {
                             return false;

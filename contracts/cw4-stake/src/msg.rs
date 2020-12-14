@@ -8,7 +8,7 @@ use cw0::Duration;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
     /// denom of the token to stake
-    pub stake: String,
+    pub denom: String,
     pub tokens_per_weight: Uint128,
     pub min_bond: Uint128,
     pub unbonding_period: Duration,
@@ -23,9 +23,9 @@ pub enum HandleMsg {
     /// Bond will bond all staking tokens sent with the message and update membership weight
     Bond {},
     /// Unbond will start the unbonding process for the given number of tokens.
-    /// The sender immediately looses weight from these tokens, and can claim them
+    /// The sender immediately loses weight from these tokens, and can claim them
     /// back to his wallet after `unbonding_period`
-    Unbond { amount: Uint128 },
+    Unbond { tokens: Uint128 },
     /// Claim is used to claim your native tokens that you previously "unbonded"
     /// after the contract-defined waiting period (eg. 1 week)
     Claim {},

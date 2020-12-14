@@ -18,13 +18,13 @@
       "type": "object",
       "required": [
         "amount",
-        "released"
+        "release_at"
       ],
       "properties": {
         "amount": {
           "$ref": "#/definitions/Uint128"
         },
-        "released": {
+        "release_at": {
           "$ref": "#/definitions/Expiration"
         }
       }

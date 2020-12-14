@@ -15,7 +15,7 @@
       }
     },
     {
-      "description": "Unbond will start the unbonding process for the given number of tokens. The sender immediately looses weight from these tokens, and can claim them back to his wallet after `unbonding_period`",
+      "description": "Unbond will start the unbonding process for the given number of tokens. The sender immediately loses weight from these tokens, and can claim them back to his wallet after `unbonding_period`",
       "type": "object",
       "required": [
         "unbond"
@@ -24,10 +24,10 @@
         "unbond": {
           "type": "object",
           "required": [
-            "amount"
+            "tokens"
           ],
           "properties": {
-            "amount": {
+            "tokens": {
               "$ref": "#/definitions/Uint128"
             }
           }

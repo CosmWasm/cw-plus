@@ -827,7 +827,7 @@ mod tests {
         // proper claims
         let expected_claims = vec![Claim {
             amount: bobs_claim,
-            released: (DAY * 3).after(&env.block),
+            release_at: (DAY * 3).after(&env.block),
         }];
         assert_eq!(expected_claims, get_claims(deps.as_ref(), &bob));
 
@@ -870,7 +870,7 @@ mod tests {
         let bobs_claim = Uint128(540);
         let original_claims = vec![Claim {
             amount: bobs_claim,
-            released: (DAY * 3).after(&env.block),
+            release_at: (DAY * 3).after(&env.block),
         }];
         assert_eq!(original_claims, get_claims(deps.as_ref(), &bob));
 

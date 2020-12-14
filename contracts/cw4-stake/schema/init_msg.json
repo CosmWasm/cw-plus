@@ -3,8 +3,8 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
+    "denom",
     "min_bond",
-    "stake",
     "tokens_per_weight",
     "unbonding_period"
   ],
@@ -19,12 +19,12 @@
         }
       ]
     },
-    "min_bond": {
-      "$ref": "#/definitions/Uint128"
-    },
-    "stake": {
+    "denom": {
       "description": "denom of the token to stake",
       "type": "string"
+    },
+    "min_bond": {
+      "$ref": "#/definitions/Uint128"
     },
     "tokens_per_weight": {
       "$ref": "#/definitions/Uint128"

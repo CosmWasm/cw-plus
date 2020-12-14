@@ -38,7 +38,7 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
     };
 
     let config = Config {
-        denom: msg.stake,
+        denom: msg.denom,
         tokens_per_weight: msg.tokens_per_weight,
         min_bond,
         unbonding_period: msg.unbonding_period,
@@ -61,7 +61,7 @@ pub fn handle(
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
         HandleMsg::Bond {} => handle_bond(deps, env, info),
-        HandleMsg::Unbond { amount } => handle_unbond(deps, env, info, amount),
+        HandleMsg::Unbond { tokens: amount } => handle_unbond(deps, env, info, amount),
         HandleMsg::Claim {} => handle_claim(deps, env, info),
     }
 }
@@ -98,7 +98,7 @@ pub fn handle_bond(
 
     // ensure the sent denom was proper
     // NOTE: those clones are not needed (if we move denom, we return early),
-    // but the compiler cannot see that
+    // but the compiler cannot see that (yet...)
     let sent = match info.sent_funds.len() {
         0 => Err(ContractError::MissingDenom(cfg.denom.clone())),
         1 => {
@@ -214,7 +214,7 @@ pub fn handle_claim(
 ) -> Result<HandleResponse, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let release = claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
-    if release == Uint128(0) {
+    if release.is_zero() {
         return Err(ContractError::NothingToClaim {});
     }
 
@@ -399,7 +399,7 @@ mod tests {
         unbonding_period: Duration,
     ) {
         let msg = InitMsg {
-            stake: DENOM.to_string(),
+            denom: DENOM.to_string(),
             tokens_per_weight,
             min_bond,
             unbonding_period,
@@ -429,7 +429,7 @@ mod tests {
         for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
             if *stake != 0 {
                 let msg = HandleMsg::Unbond {
-                    amount: Uint128(*stake),
+                    tokens: Uint128(*stake),
                 };
                 let info = mock_info(HumanAddr::from(*addr), &[]);
                 handle(deps.branch(), env.clone(), info, msg).unwrap();
@@ -609,7 +609,7 @@ mod tests {
 
         // error if try to unbond more than stake (USER2 has 5000 staked)
         let msg = HandleMsg::Unbond {
-            amount: Uint128(5100),
+            tokens: Uint128(5100),
         };
         let mut env = mock_env();
         env.block.height += 5;
@@ -949,7 +949,7 @@ mod tests {
 
         // check firing on unbond
         let msg = HandleMsg::Unbond {
-            amount: Uint128(7_300),
+            tokens: Uint128(7_300),
         };
         let info = mock_info(USER1, &[]);
         let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
