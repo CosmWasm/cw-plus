@@ -29,7 +29,7 @@ impl MemberDiff {
     }
 }
 
-/// MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg
+/// MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg.
 /// This contains a list of all diffs on the given transaction.
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]

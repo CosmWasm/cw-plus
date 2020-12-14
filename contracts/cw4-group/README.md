@@ -42,16 +42,10 @@ decision-making.
 Basic update messages, queries, and hooks are defined by the 
 [cw4 spec](../../packages/cw4/README.md). Please refer to it for more info.
 
-`cw4-group` adds two messages:
-
-`UpdateAdmin{admin}` - changes (or clears) the admin for the contract
+`cw4-group` adds one message to control the group membership:
 
 `UpdateMembers{add, remove}` - takes a membership diff and adds/updates the
 members, as well as removing any provided addresses. If an address is on both
 lists, it will be removed. If it appears multiple times in `add`, only the
 last occurance will be used.
-
-as well as one query:
-
-`Admin{}` - Returns the `admin` address, or `None` if unset.
 
