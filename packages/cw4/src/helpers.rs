@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Api, Binary, CanonicalAddr, ContractResult, CosmosMsg, Empty,
+    from_slice, to_binary, to_vec, Binary, CanonicalAddr, ContractResult, CosmosMsg, Empty,
     HumanAddr, QuerierWrapper, QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
 };
 
@@ -26,12 +26,6 @@ impl Cw4Contract {
 
     pub fn addr(&self) -> HumanAddr {
         self.0.clone()
-    }
-
-    /// Convert this address to a form fit for storage
-    pub fn canonical(&self, api: &dyn Api) -> StdResult<Cw4CanonicalContract> {
-        let canon = api.canonical_address(&self.0)?;
-        Ok(Cw4CanonicalContract(canon))
     }
 
     fn encode_msg(&self, msg: Cw4HandleMsg) -> StdResult<CosmosMsg> {
@@ -153,18 +147,5 @@ impl Cw4Contract {
         let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
         let res: AdminResponse = querier.query(&query)?;
         Ok(res.admin)
-    }
-}
-
-/// This is a respresentation of Cw4Contract for storage.
-/// Don't use it directly, just translate to the Cw4Contract when needed.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw4CanonicalContract(pub CanonicalAddr);
-
-impl Cw4CanonicalContract {
-    /// Convert this address to a form fit for usage in messages and queries
-    pub fn human(&self, api: &dyn Api) -> StdResult<Cw4Contract> {
-        let human = api.human_address(&self.0)?;
-        Ok(Cw4Contract(human))
     }
 }

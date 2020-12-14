@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, StdResult, WasmMsg};
+use cosmwasm_std::{to_binary, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 
 use crate::msg::{Cw3HandleMsg, Vote};
 use cw0::Expiration;
@@ -19,12 +19,6 @@ pub struct Cw3Contract(pub HumanAddr);
 impl Cw3Contract {
     pub fn addr(&self) -> HumanAddr {
         self.0.clone()
-    }
-
-    /// Convert this address to a form fit for storage
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw3CanonicalContract> {
-        let canon = api.canonical_address(&self.0)?;
-        Ok(Cw3CanonicalContract(canon))
     }
 
     pub fn encode_msg(&self, msg: Cw3HandleMsg) -> StdResult<CosmosMsg> {
@@ -68,18 +62,5 @@ impl Cw3Contract {
     pub fn close(&self, proposal_id: u64) -> StdResult<CosmosMsg> {
         let msg = Cw3HandleMsg::Close { proposal_id };
         self.encode_msg(msg)
-    }
-}
-
-/// This is a respresentation of Cw3Contract for storage.
-/// Don't use it directly, just translate to the Cw3Contract when needed.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw3CanonicalContract(pub CanonicalAddr);
-
-impl Cw3CanonicalContract {
-    /// Convert this address to a form fit for usage in messages and queries
-    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw3Contract> {
-        let human = api.human_address(&self.0)?;
-        Ok(Cw3Contract(human))
     }
 }

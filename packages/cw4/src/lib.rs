@@ -3,7 +3,7 @@ mod hook;
 mod msg;
 mod query;
 
-pub use crate::helpers::{Cw4CanonicalContract, Cw4Contract};
+pub use crate::helpers::Cw4Contract;
 pub use crate::hook::{MemberChangedHookMsg, MemberDiff};
 pub use crate::msg::Cw4HandleMsg;
 pub use crate::query::{

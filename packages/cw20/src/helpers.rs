@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, Querier, QuerierWrapper, StdResult,
-    Uint128, WasmMsg, WasmQuery,
+    to_binary, CosmosMsg, HumanAddr, Querier, QuerierWrapper, StdResult, Uint128, WasmMsg,
+    WasmQuery,
 };
 
 use crate::{
@@ -21,12 +21,6 @@ pub struct Cw20Contract(pub HumanAddr);
 impl Cw20Contract {
     pub fn addr(&self) -> HumanAddr {
         self.0.clone()
-    }
-
-    /// Convert this address to a form fit for storage
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw20CanonicalContract> {
-        let canon = api.canonical_address(&self.0)?;
-        Ok(Cw20CanonicalContract(canon))
     }
 
     pub fn call<T: Into<Cw20HandleMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
@@ -98,18 +92,5 @@ impl Cw20Contract {
     /// returns true if the contract supports the mintable extension
     pub fn is_mintable<Q: Querier>(&self, querier: &Q) -> bool {
         self.minter(querier).is_ok()
-    }
-}
-
-/// This is a respresentation of Cw20Contract for storage.
-/// Don't use it directly, just translate to the Cw20Contract when needed.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw20CanonicalContract(pub CanonicalAddr);
-
-impl Cw20CanonicalContract {
-    /// Convert this address to a form fit for usage in messages and queries
-    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw20Contract> {
-        let human = api.human_address(&self.0)?;
-        Ok(Cw20Contract(human))
     }
 }
