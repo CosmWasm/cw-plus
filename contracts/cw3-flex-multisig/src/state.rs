@@ -99,7 +99,7 @@ impl Proposal {
         match self.threshold {
             Threshold::AbsoluteCount { weight_needed } => self.votes.yes >= weight_needed,
             Threshold::AbsolutePercentage { percentage_needed } => {
-                self.votes.yes >= apply_percentage(self.total_weight, percentage_needed)
+                self.votes.yes >= votes_needed(self.total_weight, percentage_needed)
             }
             Threshold::ThresholdQuora { threshold, quroum } => {
                 let total = self.votes.total();
@@ -107,12 +107,12 @@ impl Proposal {
                 if self.expires.is_expired(block) {
                     // * if we have closed yet, we need quorum% of total votes to have voted,
                     //   and threshold% of yes votes (from those who voted)
-                    total >= apply_percentage(self.total_weight, quroum)
-                        && self.votes.yes >= apply_percentage(total, threshold)
+                    total >= votes_needed(self.total_weight, quroum)
+                        && self.votes.yes >= votes_needed(total, threshold)
                 } else {
                     // * if we have not closed yet, we need threshold% of yes votes (from 100% voters)
                     //   as we are sure this cannot change with any possible sequence of future votes
-                    self.votes.yes >= apply_percentage(self.total_weight, threshold)
+                    self.votes.yes >= votes_needed(self.total_weight, threshold)
                 }
             }
         }
@@ -120,9 +120,17 @@ impl Proposal {
 }
 
 // this is a helper function so Decimal works with u64 rather than Uint128
-fn apply_percentage(weight: u64, percentage: Decimal) -> u64 {
-    let applied = percentage * Uint128(weight as u128);
-    applied.u128() as u64
+// also, we must *round up* here, as we need 8, not 7 votes to reach 50% of 15 total
+fn votes_needed(weight: u64, percentage: Decimal) -> u64 {
+    // we multiply by 1million to detect rounding issues
+    const FACTOR: u128 = 1_000_000;
+    let applied = percentage * Uint128(FACTOR * weight as u128);
+    let rounded = (applied.u128() / FACTOR) as u64;
+    if applied.u128() % FACTOR > 0 {
+        rounded + 1
+    } else {
+        rounded
+    }
 }
 
 // we cast a ballot with our chosen vote and a given weight
@@ -153,5 +161,120 @@ pub fn parse_id(data: &[u8]) -> StdResult<u64> {
         Err(_) => Err(StdError::generic_err(
             "Corrupted data found. 8 byte expected.",
         )),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use cosmwasm_std::testing::mock_env;
+
+    #[test]
+    fn count_votes() {
+        let mut votes = Votes::new(5);
+        votes.add_vote(Vote::No, 10);
+        votes.add_vote(Vote::Veto, 20);
+        votes.add_vote(Vote::Yes, 30);
+        votes.add_vote(Vote::Abstain, 40);
+
+        assert_eq!(votes.total(), 105);
+        assert_eq!(votes.yes, 35);
+        assert_eq!(votes.no, 10);
+        assert_eq!(votes.veto, 20);
+        assert_eq!(votes.abstain, 40);
+    }
+
+    #[test]
+    // we ensure this rounds up (as it calculates needed votes)
+    fn votes_needed_rounds_properly() {
+        // round up right below 1
+        assert_eq!(1, votes_needed(3, Decimal::permille(333)));
+        // round up right over 1
+        assert_eq!(2, votes_needed(3, Decimal::permille(334)));
+        assert_eq!(11, votes_needed(30, Decimal::permille(334)));
+
+        // exact matches don't round
+        assert_eq!(17, votes_needed(34, Decimal::percent(50)));
+        assert_eq!(12, votes_needed(48, Decimal::percent(25)));
+    }
+
+    fn check_is_passed(
+        threshold: Threshold,
+        votes: Votes,
+        total_weight: u64,
+        is_expired: bool,
+    ) -> bool {
+        let block = mock_env().block;
+        let expires = match is_expired {
+            true => Expiration::AtHeight(block.height - 5),
+            false => Expiration::AtHeight(block.height + 100),
+        };
+        let prop = Proposal {
+            title: "Demo".to_string(),
+            description: "Info".to_string(),
+            start_height: 100,
+            expires,
+            msgs: vec![],
+            status: Status::Open,
+            threshold,
+            total_weight,
+            votes,
+        };
+        prop.is_passed(&block)
+    }
+
+    #[test]
+    fn proposal_passed_absolute_count() {
+        let fixed = Threshold::AbsoluteCount { weight_needed: 10 };
+        let mut votes = Votes::new(7);
+        votes.add_vote(Vote::Veto, 4);
+        // same expired or not, total_weight or whatever
+        assert_eq!(
+            false,
+            check_is_passed(fixed.clone(), votes.clone(), 30, false)
+        );
+        assert_eq!(
+            false,
+            check_is_passed(fixed.clone(), votes.clone(), 30, true)
+        );
+        // a few more yes votes and we are good
+        votes.add_vote(Vote::Yes, 3);
+        assert_eq!(
+            true,
+            check_is_passed(fixed.clone(), votes.clone(), 30, false)
+        );
+        assert_eq!(
+            true,
+            check_is_passed(fixed.clone(), votes.clone(), 30, true)
+        );
+    }
+
+    #[test]
+    fn proposal_passed_absolute_percentage() {
+        let percent = Threshold::AbsolutePercentage {
+            percentage_needed: Decimal::percent(50),
+        };
+        let mut votes = Votes::new(7);
+        votes.add_vote(Vote::No, 4);
+        votes.add_vote(Vote::Abstain, 2);
+        // same expired or not, if total > 2 * yes
+        assert_eq!(
+            false,
+            check_is_passed(percent.clone(), votes.clone(), 15, false)
+        );
+        assert_eq!(
+            false,
+            check_is_passed(percent.clone(), votes.clone(), 15, true)
+        );
+
+        // if the total were a bit lower, this would pass
+        assert_eq!(
+            true,
+            check_is_passed(percent.clone(), votes.clone(), 14, false)
+        );
+        assert_eq!(
+            true,
+            check_is_passed(percent.clone(), votes.clone(), 14, true)
+        );
     }
 }
