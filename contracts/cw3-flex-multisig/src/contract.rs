@@ -446,6 +446,7 @@ mod tests {
     use cw_multi_test::{next_block, App, Contract, ContractWrapper, SimpleBank};
 
     use super::*;
+    use crate::msg::Threshold;
 
     const OWNER: &str = "admin0001";
     const VOTER1: &str = "voter0001";
@@ -500,16 +501,30 @@ mod tests {
     }
 
     // uploads code and returns address of group contract
+    fn init_flex_static(
+        app: &mut App,
+        group: HumanAddr,
+        weight_needed: u64,
+        max_voting_period: Duration,
+    ) -> HumanAddr {
+        init_flex(
+            app,
+            group,
+            Threshold::AbsoluteCount { weight_needed },
+            max_voting_period,
+        )
+    }
+
     fn init_flex(
         app: &mut App,
         group: HumanAddr,
-        required_weight: u64,
+        threshold: Threshold,
         max_voting_period: Duration,
     ) -> HumanAddr {
         let flex_id = app.store_code(contract_flex());
         let msg = crate::msg::InitMsg {
             group_addr: group,
-            required_weight,
+            threshold,
             max_voting_period,
         };
         app.instantiate_contract(flex_id, OWNER, &msg, &[], "flex")
@@ -539,7 +554,8 @@ mod tests {
         app.update_block(next_block);
 
         // 2. Set up Multisig backed by this group
-        let flex_addr = init_flex(app, group_addr.clone(), required_weight, max_voting_period);
+        let flex_addr =
+            init_flex_static(app, group_addr.clone(), required_weight, max_voting_period);
         app.update_block(next_block);
 
         // 3. (Optional) Set the multisig as the group owner
@@ -587,18 +603,21 @@ mod tests {
         // Zero required weight fails
         let init_msg = InitMsg {
             group_addr: group_addr.clone(),
-            required_weight: 0,
+            threshold: Threshold::AbsoluteCount { weight_needed: 0 },
             max_voting_period,
         };
         let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "zero required weight");
 
         // Verify
-        assert_eq!(res.unwrap_err(), ContractError::ZeroWeight {}.to_string());
+        assert_eq!(
+            res.unwrap_err(),
+            ContractError::ZeroThreshold {}.to_string()
+        );
 
         // Total weight less than required weight not allowed
         let init_msg = InitMsg {
             group_addr: group_addr.clone(),
-            required_weight: 100,
+            threshold: Threshold::AbsoluteCount { weight_needed: 100 },
             max_voting_period,
         };
         let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "high required weight");
@@ -606,13 +625,13 @@ mod tests {
         // Verify
         assert_eq!(
             res.unwrap_err(),
-            ContractError::UnreachableWeight {}.to_string()
+            ContractError::UnreachableThreshold {}.to_string()
         );
 
         // All valid
         let init_msg = InitMsg {
             group_addr: group_addr.clone(),
-            required_weight: 1,
+            threshold: Threshold::AbsoluteCount { weight_needed: 1 },
             max_voting_period,
         };
         let flex_addr = app
