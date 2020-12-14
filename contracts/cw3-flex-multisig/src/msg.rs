@@ -165,15 +165,24 @@ mod tests {
         // TODO: test the error messages
 
         // 0 is never a valid percentage
-        assert!(valid_percentage(&Decimal::zero()).is_err());
+        let err = valid_percentage(&Decimal::zero()).unwrap_err();
+        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
 
         // 100% is
         valid_percentage(&Decimal::one()).unwrap();
 
         // 101% is not
-        assert!(valid_percentage(&Decimal::percent(101)).is_err());
+        let err = valid_percentage(&Decimal::percent(101)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            ContractError::UnreachableThreshold {}.to_string()
+        );
         // not 100.1%
-        assert!(valid_percentage(&Decimal::permille(1001)).is_err());
+        let err = valid_percentage(&Decimal::permille(1001)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            ContractError::UnreachableThreshold {}.to_string()
+        );
 
         // other values in between 0 and 1 are valid
         valid_percentage(&Decimal::permille(1)).unwrap();
@@ -244,5 +253,42 @@ mod tests {
     }
 
     #[test]
-    fn threshold_response() {}
+    fn threshold_response() {
+        let total_weight: u64 = 100;
+
+        let res = Threshold::AbsoluteCount { weight_needed: 42 }.to_response(total_weight);
+        assert_eq!(
+            res,
+            ThresholdResponse::AbsoluteCount {
+                weight_needed: 42,
+                total_weight
+            }
+        );
+
+        let res = Threshold::AbsolutePercentage {
+            percentage_needed: Decimal::percent(51),
+        }
+        .to_response(total_weight);
+        assert_eq!(
+            res,
+            ThresholdResponse::AbsolutePercentage {
+                percentage_needed: Decimal::percent(51),
+                total_weight
+            }
+        );
+
+        let res = Threshold::ThresholdQuora {
+            threshold: Decimal::percent(66),
+            quroum: Decimal::percent(50),
+        }
+        .to_response(total_weight);
+        assert_eq!(
+            res,
+            ThresholdResponse::ThresholdQuora {
+                threshold: Decimal::percent(66),
+                quroum: Decimal::percent(50),
+                total_weight
+            }
+        );
+    }
 }
