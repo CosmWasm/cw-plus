@@ -155,3 +155,94 @@ pub enum QueryMsg {
         limit: Option<u32>,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_percentage() {
+        // TODO: test the error messages
+
+        // 0 is never a valid percentage
+        assert!(valid_percentage(&Decimal::zero()).is_err());
+
+        // 100% is
+        valid_percentage(&Decimal::one()).unwrap();
+
+        // 101% is not
+        assert!(valid_percentage(&Decimal::percent(101)).is_err());
+        // not 100.1%
+        assert!(valid_percentage(&Decimal::permille(1001)).is_err());
+
+        // other values in between 0 and 1 are valid
+        valid_percentage(&Decimal::permille(1)).unwrap();
+        valid_percentage(&Decimal::percent(17)).unwrap();
+        valid_percentage(&Decimal::percent(99)).unwrap();
+    }
+
+    #[test]
+    fn validate_threshold() {
+        // absolute count ensures 0 < required <= total_weight
+        let err = Threshold::AbsoluteCount { weight_needed: 0 }
+            .validate(5)
+            .unwrap_err();
+        // TODO: remove to_string() when PartialEq implemented
+        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+        let err = Threshold::AbsoluteCount { weight_needed: 6 }
+            .validate(5)
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            ContractError::UnreachableThreshold {}.to_string()
+        );
+
+        Threshold::AbsoluteCount { weight_needed: 1 }
+            .validate(5)
+            .unwrap();
+        Threshold::AbsoluteCount { weight_needed: 5 }
+            .validate(5)
+            .unwrap();
+
+        // AbsolutePercentage just enforces valid_percentage (tested above)
+        let err = Threshold::AbsolutePercentage {
+            percentage_needed: Decimal::zero(),
+        }
+        .validate(5)
+        .unwrap_err();
+        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+        Threshold::AbsolutePercentage {
+            percentage_needed: Decimal::percent(51),
+        }
+        .validate(5)
+        .unwrap();
+
+        // Quorum enforces both valid just enforces valid_percentage (tested above)
+        Threshold::ThresholdQuora {
+            threshold: Decimal::percent(51),
+            quroum: Decimal::percent(40),
+        }
+        .validate(5)
+        .unwrap();
+        let err = Threshold::ThresholdQuora {
+            threshold: Decimal::percent(101),
+            quroum: Decimal::percent(40),
+        }
+        .validate(5)
+        .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            ContractError::UnreachableThreshold {}.to_string()
+        );
+        let err = Threshold::ThresholdQuora {
+            threshold: Decimal::percent(51),
+            quroum: Decimal::percent(0),
+        }
+        .validate(5)
+        .unwrap_err();
+        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+    }
+
+    #[test]
+    fn threshold_response() {}
+}
