@@ -102,17 +102,19 @@ impl Proposal {
                 self.votes.yes >= votes_needed(self.total_weight, percentage_needed)
             }
             Threshold::ThresholdQuora { threshold, quroum } => {
-                let total = self.votes.total();
                 // this one is tricky, as we have two compares:
                 if self.expires.is_expired(block) {
-                    // * if we have closed yet, we need quorum% of total votes to have voted,
-                    //   and threshold% of yes votes (from those who voted)
+                    // * if we have closed yet, we need quorum% of total votes to have voted (counting abstain)
+                    //   and threshold% of yes votes from those who voted (ignoring abstain)
+                    let total = self.votes.total();
+                    let opinions = total - self.votes.abstain;
                     total >= votes_needed(self.total_weight, quroum)
-                        && self.votes.yes >= votes_needed(total, threshold)
+                        && self.votes.yes >= votes_needed(opinions, threshold)
                 } else {
-                    // * if we have not closed yet, we need threshold% of yes votes (from 100% voters)
+                    // * if we have not closed yet, we need threshold% of yes votes (from 100% voters - abstain)
                     //   as we are sure this cannot change with any possible sequence of future votes
-                    self.votes.yes >= votes_needed(self.total_weight, threshold)
+                    self.votes.yes
+                        >= votes_needed(self.total_weight - self.votes.abstain, threshold)
                 }
             }
         }
@@ -275,6 +277,85 @@ mod test {
         assert_eq!(
             true,
             check_is_passed(percent.clone(), votes.clone(), 14, true)
+        );
+    }
+
+    #[test]
+    fn proposal_passed_quorum() {
+        let quorum = Threshold::ThresholdQuora {
+            threshold: Decimal::percent(50),
+            quroum: Decimal::percent(40),
+        };
+        // all non-yes votes are counted for quorum
+        let passing = Votes {
+            yes: 7,
+            no: 3,
+            abstain: 2,
+            veto: 1,
+        };
+        // abstain votes are not counted for threshold => yes / (yes + no + veto)
+        let passes_ignoring_abstain = Votes {
+            yes: 6,
+            no: 4,
+            abstain: 5,
+            veto: 2,
+        };
+        // fails any way you look at it
+        let failing = Votes {
+            yes: 6,
+            no: 5,
+            abstain: 2,
+            veto: 2,
+        };
+
+        // first, expired (voting period over)
+        // over quorum (40% of 30 = 12), over threshold (7/11 > 50%)
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passing.clone(), 30, true)
+        );
+        // under quorum it is not passing (40% of 33 = 13.2 > 13)
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), passing.clone(), 33, true)
+        );
+        // over quorum, threshold passes if we ignore abstain
+        // 17 total votes w/ abstain => 40% quorum of 40 total
+        // 6 yes / (6 yes + 4 no + 2 votes) => 50% threshold
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passes_ignoring_abstain.clone(), 40, true)
+        );
+        // over quorum, but under threshold fails also
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), failing.clone(), 20, true)
+        );
+
+        // now, check with open voting period
+        // would pass if closed, but fail here, as remaining votes no -> fail
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), passing.clone(), 30, false)
+        );
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), passes_ignoring_abstain.clone(), 40, false)
+        );
+        // if we have threshold * total_weight as yes votes this must pass
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passing.clone(), 14, false)
+        );
+        // all votes have been cast, some abstain
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passes_ignoring_abstain.clone(), 17, false)
+        );
+        // 3 votes uncast, if they all vote no, we have 7 yes, 7 no+veto, 2 abstain (out of 16)
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passing.clone(), 16, false)
         );
     }
 }
