@@ -22,4 +22,7 @@ pub enum ContractError {
 
     #[error("Sent unsupported denoms, must send '{0}' to stake")]
     ExtraDenoms(String),
+
+    #[error("No funds sent")]
+    NoFunds {},
 }

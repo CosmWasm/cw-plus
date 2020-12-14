@@ -100,16 +100,19 @@ pub fn handle_bond(
     // NOTE: those clones are not needed (if we move denom, we return early),
     // but the compiler cannot see that (yet...)
     let sent = match info.sent_funds.len() {
-        0 => Err(ContractError::MissingDenom(cfg.denom.clone())),
+        0 => Err(ContractError::NoFunds {}),
         1 => {
             if info.sent_funds[0].denom == cfg.denom {
                 Ok(info.sent_funds[0].amount)
             } else {
-                Err(ContractError::ExtraDenoms(cfg.denom.clone()))
+                Err(ContractError::MissingDenom(cfg.denom.clone()))
             }
         }
         _ => Err(ContractError::ExtraDenoms(cfg.denom.clone())),
     }?;
+    if sent.is_zero() {
+        return Err(ContractError::NoFunds {});
+    }
 
     // update the sender's stake
     let sender_raw = deps.api.canonical_address(&info.sender)?;
@@ -181,6 +184,12 @@ fn update_membership(
     // update their membership weight
     let new = calc_weight(new_stake, cfg);
     let old = MEMBERS.may_load(storage, sender_raw)?;
+
+    // short-circuit if no change
+    if new == old {
+        return Ok(vec![]);
+    }
+    // otherwise, record change of weight
     match new.as_ref() {
         Some(w) => MEMBERS.save(storage, sender_raw, w, height),
         None => MEMBERS.remove(storage, sender_raw, height),
@@ -973,7 +982,7 @@ mod tests {
         let info = mock_info(HumanAddr::from(USER1), &[]);
         let err = handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
         match err {
-            ContractError::MissingDenom(denom) => assert_eq!(denom.as_str(), DENOM),
+            ContractError::NoFunds {} => {}
             _ => panic!("Unexpected error: {}", err),
         }
 
@@ -981,7 +990,7 @@ mod tests {
         let info = mock_info(HumanAddr::from(USER1), &[coin(500, "FOO")]);
         let err = handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
         match err {
-            ContractError::ExtraDenoms(denom) => assert_eq!(denom.as_str(), DENOM),
+            ContractError::MissingDenom(denom) => assert_eq!(denom.as_str(), DENOM),
             _ => panic!("Unexpected error: {}", err),
         }
 
