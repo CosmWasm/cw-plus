@@ -116,7 +116,7 @@ pub fn handle_propose(
         threshold: cfg.threshold,
         total_weight: cfg.group_addr.total_weight(&deps.querier)?,
     };
-    prop.mark_if_passed();
+    prop.update_status(&env.block);
     let id = next_id(deps.storage)?;
     PROPOSALS.save(deps.storage, id.into(), &prop)?;
 
@@ -180,7 +180,7 @@ pub fn handle_vote(
 
     // update vote tally
     prop.votes.add_vote(vote, vote_power);
-    prop.mark_if_passed();
+    prop.update_status(&env.block);
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(HandleResponse {

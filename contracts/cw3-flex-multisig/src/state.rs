@@ -71,11 +71,13 @@ impl Votes {
 }
 
 impl Proposal {
+    /// current_status is non-mutable and returns what the status should be.
+    /// (designed for queries)
     pub fn current_status(&self, block: &BlockInfo) -> Status {
         let mut status = self.status;
 
         // if open, check if voting is passed or timed out
-        if status == Status::Open && self.is_passed() {
+        if status == Status::Open && self.is_passed(block) {
             status = Status::Passed;
         }
         if status == Status::Open && self.expires.is_expired(block) {
@@ -85,13 +87,15 @@ impl Proposal {
         status
     }
 
-    pub fn mark_if_passed(&mut self) {
-        if self.is_passed() {
-            self.status = Status::Passed;
-        }
+    /// update_status sets the status of the proposal to current_status.
+    /// (designed for handler logic)
+    pub fn update_status(&mut self, block: &BlockInfo) {
+        self.status = self.current_status(block);
     }
 
-    pub fn is_passed(&self) -> bool {
+    // returns true iff this proposal is sure to pass (even before expiration if no future
+    // sequence of possible votes can cause it to fail)
+    pub fn is_passed(&self, block: &BlockInfo) -> bool {
         match self.threshold {
             Threshold::AbsoluteCount { weight_needed } => self.votes.yes >= weight_needed,
             Threshold::AbsolutePercentage { percentage_needed } => {
@@ -99,8 +103,17 @@ impl Proposal {
             }
             Threshold::ThresholdQuora { threshold, quroum } => {
                 let total = self.votes.total();
-                total >= apply_percentage(self.total_weight, quroum)
-                    && self.votes.yes >= apply_percentage(total, threshold)
+                // this one is tricky, as we have two compares:
+                if self.expires.is_expired(block) {
+                    // * if we have closed yet, we need quorum% of total votes to have voted,
+                    //   and threshold% of yes votes (from those who voted)
+                    total >= apply_percentage(self.total_weight, quroum)
+                        && self.votes.yes >= apply_percentage(total, threshold)
+                } else {
+                    // * if we have not closed yet, we need threshold% of yes votes (from 100% voters)
+                    //   as we are sure this cannot change with any possible sequence of future votes
+                    self.votes.yes >= apply_percentage(self.total_weight, threshold)
+                }
             }
         }
     }
