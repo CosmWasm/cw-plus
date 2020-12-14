@@ -16,7 +16,9 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS};
+use crate::state::{
+    next_id, parse_id, Ballot, Config, Proposal, Votes, BALLOTS, CONFIG, PROPOSALS,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -28,9 +30,6 @@ pub fn init(
     _info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
-    if msg.required_weight == 0 {
-        return Err(ContractError::ZeroWeight {});
-    }
     // we just convert to canonical to check if this is a valid format
     if deps.api.canonical_address(&msg.group_addr).is_err() {
         return Err(ContractError::InvalidGroup {
@@ -40,15 +39,12 @@ pub fn init(
 
     let group = Cw4Contract(msg.group_addr);
     let total_weight = group.total_weight(&deps.querier)?;
-
-    if total_weight < msg.required_weight {
-        return Err(ContractError::UnreachableWeight {});
-    }
+    msg.threshold.validate(total_weight)?;
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let cfg = Config {
-        required_weight: msg.required_weight,
+        threshold: msg.threshold,
         max_voting_period: msg.max_voting_period,
         group_addr: group,
     };
@@ -122,8 +118,9 @@ pub fn handle_propose(
         expires,
         msgs,
         status,
-        yes_weight: vote_power,
-        required_weight: cfg.required_weight,
+        votes: Votes::new(vote_power),
+        threshold: cfg.threshold,
+        total_weight: cfg.group_addr.total_weight(&deps.querier)?,
     };
     let id = next_id(deps.storage)?;
     PROPOSALS.save(deps.storage, id.into(), &prop)?;

@@ -9,9 +9,11 @@ use cw3::{Status, Vote};
 use cw4::Cw4Contract;
 use cw_storage_plus::{Item, Map, U64Key};
 
+use crate::msg::Threshold;
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
-    pub required_weight: u64,
+    pub threshold: Threshold,
     pub max_voting_period: Duration,
     // Total weight and voters are queried from this contract
     pub group_addr: Cw4Contract,
@@ -25,10 +27,38 @@ pub struct Proposal {
     pub expires: Expiration,
     pub msgs: Vec<CosmosMsg<Empty>>,
     pub status: Status,
-    /// how many votes have already said yes
-    pub yes_weight: u64,
-    /// how many votes needed to pass
-    pub required_weight: u64,
+    /// pass requirements
+    pub threshold: Threshold,
+    // the total weight when the proposal started (used to calculate percentages)
+    pub total_weight: u64,
+    // summary of existing votes
+    pub votes: Votes,
+}
+
+// weight of votes for each option
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct Votes {
+    pub yes: u64,
+    pub no: u64,
+    pub abstain: u64,
+    pub veto: u64,
+}
+
+impl Votes {
+    /// sum of all votes
+    pub fn total(&self) -> u64 {
+        self.yes + self.no + self.abstain + self.veto
+    }
+
+    /// create it with a yes vote for this much
+    pub fn new(init_weight: u64) -> Self {
+        Votes {
+            yes: init_weight,
+            no: 0,
+            abstain: 0,
+            veto: 0,
+        }
+    }
 }
 
 impl Proposal {
