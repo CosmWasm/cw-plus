@@ -2,10 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Coin, Decimal, HumanAddr, Uint128};
-use cw0::Duration;
+use cw0::{claim::Claim, Duration};
 use cw20::Expiration;
-
-use crate::state::Claim;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {

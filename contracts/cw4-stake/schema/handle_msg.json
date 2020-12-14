@@ -1,7 +1,51 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cw4HandleMsg",
+  "title": "HandleMsg",
   "anyOf": [
+    {
+      "description": "Bond will bond all staking tokens sent with the message and update membership weight",
+      "type": "object",
+      "required": [
+        "bond"
+      ],
+      "properties": {
+        "bond": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Unbond will start the unbonding process for the given number of tokens. The sender immediately loses weight from these tokens, and can claim them back to his wallet after `unbonding_period`",
+      "type": "object",
+      "required": [
+        "unbond"
+      ],
+      "properties": {
+        "unbond": {
+          "type": "object",
+          "required": [
+            "tokens"
+          ],
+          "properties": {
+            "tokens": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Claim is used to claim your native tokens that you previously \"unbonded\" after the contract-defined waiting period (eg. 1 week)",
+      "type": "object",
+      "required": [
+        "claim"
+      ],
+      "properties": {
+        "claim": {
+          "type": "object"
+        }
+      }
+    },
     {
       "description": "Change the admin",
       "type": "object",
@@ -69,6 +113,9 @@
   ],
   "definitions": {
     "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
       "type": "string"
     }
   }

@@ -20,3 +20,6 @@ target/
 hash.txt
 contracts.txt
 artifacts/
+
+# code coverage
+tarpaulin-report.*

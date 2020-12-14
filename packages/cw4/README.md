@@ -23,14 +23,9 @@ as part of another flow. Implementations should work with this setup,
 but may add extra `Option<T>` fields for non-essential extensions to
 configure in the `init` phase.
 
-There are four messages supported by a group contract:
+There are three messages supported by a group contract:
 
 `UpdateAdmin{admin}` - changes (or clears) the admin for the contract
-
-`UpdateMembers{add, remove}` - takes a membership diff and adds/updates the
-  members, as well as removing any provided addresses. If an address is on both
-  lists, it will be removed. If it appears multiple times in `add`, only the
-  last occurance will be used.
 
 `AddHook{addr}` - adds a contract address to be called upon every 
   `UpdateMembers` call. This can only be called by the admin, and care must
@@ -51,8 +46,6 @@ problem, but we cover how to instantiate that in
 
 ### Smart
 
-`Admin{}` - Returns the `admin` address, or `None` if unset.
-
 `TotalWeight{}` - Returns the total weight of all current members,
   this is very useful if some conditions are defined on a "percentage of members".
   
@@ -64,6 +57,8 @@ problem, but we cover how to instantiate that in
   
 `MemberList{start_after, limit}` - Allows us to paginate over the list
    of all members. 0-weight members will be included. Removed members will not.
+
+`Admin{}` - Returns the `admin` address, or `None` if unset.
 
 ### Raw
 
