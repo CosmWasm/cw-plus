@@ -394,4 +394,63 @@ mod tests {
         // deleted checkpoint
         assert_missing_checkpoint(&NEVER, &storage, 5);
     }
+
+    #[test]
+    fn handle_multiple_writes_in_one_block() {
+        let mut storage = MockStorage::new();
+        init_data(&EVERY, &mut storage);
+
+        EVERY.save(&mut storage, b"A", &5, 1).unwrap();
+        EVERY.save(&mut storage, b"B", &7, 2).unwrap();
+        EVERY.save(&mut storage, b"C", &2, 2).unwrap();
+
+        // update and save - A query at 3 => 5, at 4 => 12
+        EVERY
+            .update(&mut storage, b"A", 3, |_| -> StdResult<u64> { Ok(9) })
+            .unwrap();
+        EVERY.save(&mut storage, b"A", &12, 3).unwrap();
+        assert_eq!(
+            Some(3),
+            EVERY.may_load_at_height(&storage, b"A", 2).unwrap()
+        );
+        assert_eq!(
+            Some(3),
+            EVERY.may_load_at_height(&storage, b"A", 3).unwrap()
+        );
+        assert_eq!(
+            Some(12),
+            EVERY.may_load_at_height(&storage, b"A", 4).unwrap()
+        );
+
+        // save and remove - B query at 4 => 7, at 5 => None
+        EVERY.save(&mut storage, b"B", &17, 4).unwrap();
+        EVERY.remove(&mut storage, b"B", 4).unwrap();
+        assert_eq!(
+            Some(7),
+            EVERY.may_load_at_height(&storage, b"B", 3).unwrap()
+        );
+        assert_eq!(
+            Some(7),
+            EVERY.may_load_at_height(&storage, b"B", 4).unwrap()
+        );
+        assert_eq!(None, EVERY.may_load_at_height(&storage, b"B", 5).unwrap());
+
+        // remove and update - C query at 5 => 2, at 6 => 16
+        EVERY.remove(&mut storage, b"C", 5).unwrap();
+        EVERY
+            .update(&mut storage, b"C", 5, |_| -> StdResult<u64> { Ok(16) })
+            .unwrap();
+        assert_eq!(
+            Some(2),
+            EVERY.may_load_at_height(&storage, b"C", 4).unwrap()
+        );
+        assert_eq!(
+            Some(2),
+            EVERY.may_load_at_height(&storage, b"C", 5).unwrap()
+        );
+        assert_eq!(
+            Some(16),
+            EVERY.may_load_at_height(&storage, b"C", 6).unwrap()
+        );
+    }
 }
