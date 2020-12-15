@@ -5,17 +5,21 @@ use cosmwasm_std::{
 
 use cw2::set_contract_version;
 use cw20_base::allowances::{
-    handle_decrease_allowance, handle_increase_allowance, handle_send_from, handle_transfer_from,
-    query_allowance,
+    deduct_allowance, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
+    handle_transfer_from, query_allowance,
 };
 use cw20_base::contract::{
-    handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
+    handle_send,
+    handle_transfer,
+    query_balance,
+    query_token_info,
+    // handle_burn, handle_mint,
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
 use crate::error::ContractError;
 use crate::msg::{CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{Supply, SUPPLY};
+use crate::state::{CurveState, CURVE_STATE};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
@@ -43,8 +47,8 @@ pub fn init(
     };
     token_info(deps.storage).save(&data)?;
 
-    let supply = Supply::new(msg.reserve_denom);
-    SUPPLY.save(deps.storage, &supply)?;
+    let supply = CurveState::new(msg.reserve_denom);
+    CURVE_STATE.save(deps.storage, &supply)?;
 
     Ok(InitResponse::default())
 }
@@ -107,31 +111,33 @@ pub fn handle(
 
 pub fn handle_buy(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
+    let supply = CURVE_STATE.load(deps.storage)?;
+
+    // ensure the sent denom was proper
+    let sent = match info.sent_funds.len() {
+        0 => Err(ContractError::NoFunds {}),
+        1 => {
+            if info.sent_funds[0].denom == supply.reserve_denom {
+                Ok(info.sent_funds[0].amount)
+            } else {
+                Err(ContractError::MissingDenom(supply.reserve_denom.clone()))
+            }
+        }
+        _ => Err(ContractError::ExtraDenoms(supply.reserve_denom.clone())),
+    }?;
+    if sent.is_zero() {
+        return Err(ContractError::NoFunds {});
+    }
+
+    // TODO: calculate how many tokens can be purchased with this and mint them
+
     unimplemented!();
-    // // ensure we have the proper denom
-    // let invest = invest_info_read(deps.storage).load()?;
-    // // payment finds the proper coin (or throws an error)
-    // let payment = info
-    //     .sent_funds
-    //     .iter()
-    //     .find(|x| x.denom == invest.bond_denom)
-    //     .ok_or_else(|| ContractError::EmptyBalance {
-    //         denom: invest.bond_denom.clone(),
-    //     })?;
-    //
-    // // bonded is the total number of tokens we have delegated from this address
-    // let bonded = get_bonded(&deps.querier, &env.contract.address)?;
-    //
     // // calculate to_mint and update total supply
     // let mut totals = total_supply(deps.storage);
     // let mut supply = totals.load()?;
-    // // TODO: this is just a safety assertion - do we keep it, or remove caching?
-    // // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
-    // // have expensive queries everywhere
-    // assert_bonds(&supply, bonded)?;
     // let to_mint = if supply.issued.is_zero() || bonded.is_zero() {
     //     FALLBACK_RATIO * payment.amount
     // } else {
@@ -150,11 +156,6 @@ pub fn handle_buy(
     //
     // // bond them to the validator
     // let res = HandleResponse {
-    //     messages: vec![StakingMsg::Delegate {
-    //         validator: invest.validator,
-    //         amount: payment.clone(),
-    //     }
-    //     .into()],
     //     attributes: vec![
     //         attr("action", "bond"),
     //         attr("from", info.sender),
@@ -167,10 +168,10 @@ pub fn handle_buy(
 }
 
 pub fn handle_sell(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    amount: Uint128,
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
     unimplemented!();
 }
@@ -182,7 +183,18 @@ pub fn handle_sell_from(
     owner: HumanAddr,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    unimplemented!();
+    let owner_raw = deps.api.canonical_address(&owner)?;
+    let spender_raw = deps.api.canonical_address(&info.sender)?;
+
+    // deduct allowance before doing anything else have enough allowance
+    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
+
+    // TODO: don't return verbatim, different return attrs
+    let owner_info = MessageInfo {
+        sender: owner.clone(),
+        sent_funds: info.sent_funds,
+    };
+    handle_sell(deps, env, owner_info, amount)
 }
 
 // pub fn unbond(
@@ -273,11 +285,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub fn query_curve_info(deps: Deps) -> StdResult<CurveInfoResponse> {
-    let Supply {
+    let CurveState {
         reserve,
         supply,
         reserve_denom,
-    } = SUPPLY.load(deps.storage)?;
+    } = CURVE_STATE.load(deps.storage)?;
     Ok(CurveInfoResponse {
         reserve,
         supply,
@@ -287,6 +299,8 @@ pub fn query_curve_info(deps: Deps) -> StdResult<CurveInfoResponse> {
     })
 }
 
+// this is poor mans "skip" flag
+#[cfg(target_arch = "arm")]
 #[cfg(test)]
 mod tests {
     use super::*;
