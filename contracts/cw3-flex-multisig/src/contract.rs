@@ -978,6 +978,41 @@ mod tests {
             .execute_contract(VOTER5, &flex_addr, &yes_vote, &[])
             .unwrap_err();
         assert_eq!(err, ContractError::NotOpen {}.to_string());
+
+        // query individual votes
+        // initial (with 0 weight)
+        let voter = OWNER.into();
+        let vote: VoteResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
+            .unwrap();
+        assert_eq!(
+            vote,
+            VoteResponse {
+                vote: Some(Vote::Yes)
+            }
+        );
+
+        // nay sayer
+        let voter = VOTER2.into();
+        let vote: VoteResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
+            .unwrap();
+        assert_eq!(
+            vote,
+            VoteResponse {
+                vote: Some(Vote::No)
+            }
+        );
+
+        // non-voter
+        let voter = VOTER5.into();
+        let vote: VoteResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
+            .unwrap();
+        assert_eq!(vote, VoteResponse { vote: None });
     }
 
     #[test]
@@ -1151,6 +1186,17 @@ mod tests {
         // 1/4 votes
         assert_eq!(prop_status(&app, proposal_id), Status::Open);
 
+        // check current threshold (global)
+        let threshold: ThresholdResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Threshold {})
+            .unwrap();
+        let expected_thresh = ThresholdResponse::AbsoluteCount {
+            weight_needed: 4,
+            total_weight: 15,
+        };
+        assert_eq!(expected_thresh, threshold);
+
         // a few blocks later...
         app.update_block(|block| block.height += 2);
 
@@ -1218,6 +1264,19 @@ mod tests {
         app.execute_contract(VOTER3, &flex_addr, &yes_vote, &[])
             .unwrap();
         assert_eq!(prop_status(&app, proposal_id), Status::Passed);
+
+        // check current threshold (global) is updated
+        let threshold: ThresholdResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Threshold {})
+            .unwrap();
+        let expected_thresh = ThresholdResponse::AbsoluteCount {
+            weight_needed: 4,
+            total_weight: 19,
+        };
+        assert_eq!(expected_thresh, threshold);
+
+        // TODO: check proposal threshold not changed
     }
 
     // uses the power from the beginning of the voting period
@@ -1326,4 +1385,11 @@ mod tests {
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {}.to_string());
     }
+
+    // TODO: scenario tests
+    // TODO: query threshold
+
+    // TODO: issue:
+    // - add threshold to proposal response
+    // - include weight in VoteResponse
 }
