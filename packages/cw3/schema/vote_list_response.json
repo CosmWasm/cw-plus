@@ -27,6 +27,7 @@
       ]
     },
     "VoteInfo": {
+      "description": "Returns the vote (opinion as well as weight counted) as well as the address of the voter who submitted it",
       "type": "object",
       "required": [
         "vote",

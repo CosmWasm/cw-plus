@@ -7,7 +7,7 @@ pub use crate::helpers::Cw3Contract;
 pub use crate::msg::{Cw3HandleMsg, Vote};
 pub use crate::query::{
     Cw3QueryMsg, ProposalListResponse, ProposalResponse, Status, ThresholdResponse, VoteInfo,
-    VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
+    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
 
 #[cfg(test)]

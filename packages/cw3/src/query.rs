@@ -10,29 +10,37 @@ use crate::msg::Vote;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw3QueryMsg {
-    /// Return ThresholdResponse
+    /// Returns the threshold rules that would be used for a new proposal that was
+    /// opened right now. The threshold rules do not change often, but the `total_weight`
+    /// in the response may easily differ from that used in previously opened proposals.
+    /// Returns ThresholdResponse.
     Threshold {},
-    /// Returns ProposalResponse
+    /// Returns details of the proposal state. Returns ProposalResponse.
     Proposal { proposal_id: u64 },
-    /// Returns ProposalListResponse
+    /// Iterate over details of all proposals from oldest to newest. Returns ProposalListResponse
     ListProposals {
         start_after: Option<u64>,
         limit: Option<u32>,
     },
-    /// Returns ProposalListResponse
+    /// Iterate reverse over details of all proposals, this is useful to easily query
+    /// only the most recent proposals (to get updates). Returns ProposalListResponse
     ReverseProposals {
         start_before: Option<u64>,
         limit: Option<u32>,
     },
-    /// Returns VoteResponse
+    /// Query the vote made by the given voter on `proposal_id`. This should
+    /// return an error if there is no such proposal. It will return a None value
+    /// if the proposal exists but the voter did not vote. Returns VoteResponse
     Vote { proposal_id: u64, voter: HumanAddr },
-    /// Returns VoteListResponse
+    /// Iterate (with pagination) over all votes for this proposal. The ordering is arbitrary,
+    /// unlikely to be sorted by HumanAddr. But ordering is consistent and pagination from the end
+    /// of each page will cover all votes for the proposal. Returns VoteListResponse
     ListVotes {
         proposal_id: u64,
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
-    /// Voter extension: Returns VoterInfo
+    /// Voter extension: Returns VoterResponse
     Voter { address: HumanAddr },
     /// ListVoters extension: Returns VoterListResponse
     ListVoters {
@@ -118,8 +126,12 @@ where
     pub title: String,
     pub description: String,
     pub msgs: Vec<CosmosMsg<T>>,
-    pub expires: Expiration,
     pub status: Status,
+    pub expires: Expiration,
+    /// This is the threshold that is applied to this proposal. Both the rules of the voting contract,
+    /// as well as the total_weight of the voting group may have changed since this time. That means
+    /// that the generic `Threshold{}` query does not provide valid information for existing proposals.
+    pub threshold: ThresholdResponse,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
@@ -148,6 +160,8 @@ pub struct VoteListResponse {
     pub votes: Vec<VoteInfo>,
 }
 
+/// Returns the vote (opinion as well as weight counted) as well as
+/// the address of the voter who submitted it
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteInfo {
     pub voter: HumanAddr,
@@ -157,21 +171,21 @@ pub struct VoteInfo {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteResponse {
-    pub vote: Option<Vote>,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct VoterInfo {
-    pub weight: Option<u64>,
+    pub vote: Option<VoteInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoterResponse {
-    pub addr: HumanAddr,
-    pub weight: u64,
+    pub weight: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoterListResponse {
-    pub voters: Vec<VoterResponse>,
+    pub voters: Vec<VoterDetail>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VoterDetail {
+    pub addr: HumanAddr,
+    pub weight: u64,
 }

@@ -6,7 +6,7 @@
     "vote": {
       "anyOf": [
         {
-          "$ref": "#/definitions/Vote"
+          "$ref": "#/definitions/VoteInfo"
         },
         {
           "type": "null"
@@ -15,6 +15,9 @@
     }
   },
   "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    },
     "Vote": {
       "type": "string",
       "enum": [
@@ -23,6 +26,28 @@
         "abstain",
         "veto"
       ]
+    },
+    "VoteInfo": {
+      "description": "Returns the vote (opinion as well as weight counted) as well as the address of the voter who submitted it",
+      "type": "object",
+      "required": [
+        "vote",
+        "voter",
+        "weight"
+      ],
+      "properties": {
+        "vote": {
+          "$ref": "#/definitions/Vote"
+        },
+        "voter": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "weight": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     }
   }
 }
