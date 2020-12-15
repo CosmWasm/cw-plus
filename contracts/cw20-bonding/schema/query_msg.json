@@ -3,33 +3,13 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Claims shows the number of tokens this address can access when they are done unbonding",
+      "description": "Returns the reserve and supply quantities, as well as the spot price to buy 1 token",
       "type": "object",
       "required": [
-        "claims"
+        "curve_info"
       ],
       "properties": {
-        "claims": {
-          "type": "object",
-          "required": [
-            "address"
-          ],
-          "properties": {
-            "address": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Investment shows metadata on the staking info of the contract",
-      "type": "object",
-      "required": [
-        "investment"
-      ],
-      "properties": {
-        "investment": {
+        "curve_info": {
           "type": "object"
         }
       }

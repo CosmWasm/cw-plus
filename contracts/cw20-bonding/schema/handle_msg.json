@@ -3,69 +3,13 @@
   "title": "HandleMsg",
   "anyOf": [
     {
-      "description": "Bond will bond all staking tokens sent with the message and release derivative tokens",
+      "description": "Buy will attempt to purchase as many supply tokens as possible. You must send only reserve tokens in that message",
       "type": "object",
       "required": [
-        "bond"
+        "buy"
       ],
       "properties": {
-        "bond": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "description": "Unbond will \"burn\" the given amount of derivative tokens and send the unbonded staking tokens to the message sender (after exit tax is deducted)",
-      "type": "object",
-      "required": [
-        "unbond"
-      ],
-      "properties": {
-        "unbond": {
-          "type": "object",
-          "required": [
-            "amount"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Claim is used to claim your native tokens that you previously \"unbonded\" after the chain-defined waiting period (eg. 3 weeks)",
-      "type": "object",
-      "required": [
-        "claim"
-      ],
-      "properties": {
-        "claim": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "description": "Reinvest will check for all accumulated rewards, withdraw them, and re-bond them to the same validator. Anyone can call this, which updates the value of the token (how much under custody).",
-      "type": "object",
-      "required": [
-        "reinvest"
-      ],
-      "properties": {
-        "reinvest": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "description": "_BondAllTokens can only be called by the contract itself, after all rewards have been withdrawn. This is an example of using \"callbacks\" in message flows. This can only be invoked by the contract itself as a return from Reinvest",
-      "type": "object",
-      "required": [
-        "__bond_all_tokens"
-      ],
-      "properties": {
-        "__bond_all_tokens": {
+        "buy": {
           "type": "object"
         }
       }

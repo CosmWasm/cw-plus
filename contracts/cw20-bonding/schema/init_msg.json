@@ -4,101 +4,27 @@
   "type": "object",
   "required": [
     "decimals",
-    "exit_tax",
-    "min_withdrawal",
     "name",
-    "symbol",
-    "unbonding_period",
-    "validator"
+    "reserve_denom",
+    "symbol"
   ],
   "properties": {
     "decimals": {
-      "description": "decimal places of the derivative token (for UI)",
+      "description": "decimal places of the supply token (for UI)",
       "type": "integer",
       "format": "uint8",
       "minimum": 0.0
     },
-    "exit_tax": {
-      "description": "this is how much the owner takes as a cut when someone unbonds",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Decimal"
-        }
-      ]
-    },
-    "min_withdrawal": {
-      "description": "This is the minimum amount we will pull out to reinvest, as well as a minumum that can be unbonded (to avoid needless staking tx)",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Uint128"
-        }
-      ]
-    },
     "name": {
-      "description": "name of the derivative token",
+      "description": "name of the supply token",
+      "type": "string"
+    },
+    "reserve_denom": {
+      "description": "this is the reserve token denom (only support native for now)",
       "type": "string"
     },
     "symbol": {
-      "description": "symbol / ticker of the derivative token",
-      "type": "string"
-    },
-    "unbonding_period": {
-      "description": "This is the unbonding period of the native staking module We need this to only allow claims to be redeemed after the money has arrived",
-      "allOf": [
-        {
-          "$ref": "#/definitions/Duration"
-        }
-      ]
-    },
-    "validator": {
-      "description": "This is the validator that all tokens will be bonded to",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
-    }
-  },
-  "definitions": {
-    "Decimal": {
-      "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
-      "type": "string"
-    },
-    "Duration": {
-      "description": "Duration is a delta of time. You can add it to a BlockInfo or Expiration to move that further in the future. Note that an height-based Duration and a time-based Expiration cannot be combined",
-      "anyOf": [
-        {
-          "type": "object",
-          "required": [
-            "height"
-          ],
-          "properties": {
-            "height": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "time"
-          ],
-          "properties": {
-            "time": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        }
-      ]
-    },
-    "HumanAddr": {
-      "type": "string"
-    },
-    "Uint128": {
+      "description": "symbol / ticker of the supply token",
       "type": "string"
     }
   }

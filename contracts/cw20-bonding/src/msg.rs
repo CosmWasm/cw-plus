@@ -96,4 +96,5 @@ pub struct CurveInfoResponse {
     pub reserve: Uint128,
     pub supply: Uint128,
     pub spot_price: Decimal,
+    pub reserve_denom: String,
 }

@@ -1,13 +1,12 @@
 use cosmwasm_std::{
-    attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, QuerierWrapper, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
+    to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, StdResult, Uint128,
 };
 
-use cw0::claim::{claim_tokens, create_claim, CLAIMS};
 use cw2::set_contract_version;
 use cw20_base::allowances::{
-    handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
-    handle_transfer_from, query_allowance,
+    handle_decrease_allowance, handle_increase_allowance, handle_send_from, handle_transfer_from,
+    query_allowance,
 };
 use cw20_base::contract::{
     handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
@@ -15,32 +14,20 @@ use cw20_base::contract::{
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
 use crate::error::ContractError;
-use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
-use crate::state::{
-    invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
-};
-
-const FALLBACK_RATIO: Decimal = Decimal::one();
+use crate::msg::{CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::state::{Supply, SUPPLY};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw20-staking";
+const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    // ensure the validator is registered
-    let vals = deps.querier.query_validators()?;
-    if !vals.iter().any(|v| v.address == msg.validator) {
-        return Err(ContractError::NotInValidatorSet {
-            validator: msg.validator.to_string(),
-        });
-    }
 
     // store token info using cw20-base format
     let data = TokenInfo {
@@ -56,20 +43,8 @@ pub fn init(
     };
     token_info(deps.storage).save(&data)?;
 
-    let denom = deps.querier.query_bonded_denom()?;
-    let invest = InvestmentInfo {
-        owner: deps.api.canonical_address(&info.sender)?,
-        exit_tax: msg.exit_tax,
-        unbonding_period: msg.unbonding_period,
-        bond_denom: denom,
-        validator: msg.validator,
-        min_withdrawal: msg.min_withdrawal,
-    };
-    invest_info(deps.storage).save(&invest)?;
-
-    // set supply to 0
-    let supply = Supply::default();
-    total_supply(deps.storage).save(&supply)?;
+    let supply = Supply::new(msg.reserve_denom);
+    SUPPLY.save(deps.storage, &supply)?;
 
     Ok(InitResponse::default())
 }
@@ -81,17 +56,18 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::Bond {} => bond(deps, env, info),
-        HandleMsg::Unbond { amount } => unbond(deps, env, info, amount),
-        HandleMsg::Claim {} => claim(deps, env, info),
-        HandleMsg::Reinvest {} => reinvest(deps, env, info),
-        HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env, info),
+        HandleMsg::Buy {} => handle_buy(deps, env, info),
+
+        // we override these from cw20
+        HandleMsg::Burn { amount } => Ok(handle_sell(deps, env, info, amount)?),
+        HandleMsg::BurnFrom { owner, amount } => {
+            Ok(handle_sell_from(deps, env, info, owner, amount)?)
+        }
 
         // these all come from cw20-base to implement the cw20 standard
         HandleMsg::Transfer { recipient, amount } => {
             Ok(handle_transfer(deps, env, info, recipient, amount)?)
         }
-        HandleMsg::Burn { amount } => Ok(handle_burn(deps, env, info, amount)?),
         HandleMsg::Send {
             contract,
             amount,
@@ -118,9 +94,6 @@ pub fn handle(
         } => Ok(handle_transfer_from(
             deps, env, info, owner, recipient, amount,
         )?),
-        HandleMsg::BurnFrom { owner, amount } => {
-            Ok(handle_burn_from(deps, env, info, owner, amount)?)
-        }
         HandleMsg::SendFrom {
             owner,
             contract,
@@ -132,303 +105,164 @@ pub fn handle(
     }
 }
 
-// get_bonded returns the total amount of delegations from contract
-// it ensures they are all the same denom
-fn get_bonded(querier: &QuerierWrapper, contract: &HumanAddr) -> Result<Uint128, ContractError> {
-    let bonds = querier.query_all_delegations(contract)?;
-    if bonds.is_empty() {
-        return Ok(Uint128(0));
-    }
-    let denom = bonds[0].amount.denom.as_str();
-    bonds.iter().fold(Ok(Uint128(0)), |racc, d| {
-        let acc = racc?;
-        if d.amount.denom.as_str() != denom {
-            Err(ContractError::DifferentBondDenom {
-                denom1: denom.into(),
-                denom2: d.amount.denom.to_string(),
-            })
-        } else {
-            Ok(acc + d.amount.amount)
-        }
-    })
+pub fn handle_buy(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<HandleResponse, ContractError> {
+    unimplemented!();
+    // // ensure we have the proper denom
+    // let invest = invest_info_read(deps.storage).load()?;
+    // // payment finds the proper coin (or throws an error)
+    // let payment = info
+    //     .sent_funds
+    //     .iter()
+    //     .find(|x| x.denom == invest.bond_denom)
+    //     .ok_or_else(|| ContractError::EmptyBalance {
+    //         denom: invest.bond_denom.clone(),
+    //     })?;
+    //
+    // // bonded is the total number of tokens we have delegated from this address
+    // let bonded = get_bonded(&deps.querier, &env.contract.address)?;
+    //
+    // // calculate to_mint and update total supply
+    // let mut totals = total_supply(deps.storage);
+    // let mut supply = totals.load()?;
+    // // TODO: this is just a safety assertion - do we keep it, or remove caching?
+    // // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
+    // // have expensive queries everywhere
+    // assert_bonds(&supply, bonded)?;
+    // let to_mint = if supply.issued.is_zero() || bonded.is_zero() {
+    //     FALLBACK_RATIO * payment.amount
+    // } else {
+    //     payment.amount.multiply_ratio(supply.issued, bonded)
+    // };
+    // supply.bonded = bonded + payment.amount;
+    // supply.issued += to_mint;
+    // totals.save(&supply)?;
+    //
+    // // call into cw20-base to mint the token, call as self as no one else is allowed
+    // let sub_info = MessageInfo {
+    //     sender: env.contract.address.clone(),
+    //     sent_funds: vec![],
+    // };
+    // handle_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
+    //
+    // // bond them to the validator
+    // let res = HandleResponse {
+    //     messages: vec![StakingMsg::Delegate {
+    //         validator: invest.validator,
+    //         amount: payment.clone(),
+    //     }
+    //     .into()],
+    //     attributes: vec![
+    //         attr("action", "bond"),
+    //         attr("from", info.sender),
+    //         attr("bonded", payment.amount),
+    //         attr("minted", to_mint),
+    //     ],
+    //     data: None,
+    // };
+    // Ok(res)
 }
 
-fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
-    if supply.bonded != bonded {
-        Err(ContractError::BondedMismatch {
-            stored: supply.bonded,
-            queried: bonded,
-        })
-    } else {
-        Ok(())
-    }
-}
-
-pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
-    // ensure we have the proper denom
-    let invest = invest_info_read(deps.storage).load()?;
-    // payment finds the proper coin (or throws an error)
-    let payment = info
-        .sent_funds
-        .iter()
-        .find(|x| x.denom == invest.bond_denom)
-        .ok_or_else(|| ContractError::EmptyBalance {
-            denom: invest.bond_denom.clone(),
-        })?;
-
-    // bonded is the total number of tokens we have delegated from this address
-    let bonded = get_bonded(&deps.querier, &env.contract.address)?;
-
-    // calculate to_mint and update total supply
-    let mut totals = total_supply(deps.storage);
-    let mut supply = totals.load()?;
-    // TODO: this is just a safety assertion - do we keep it, or remove caching?
-    // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
-    // have expensive queries everywhere
-    assert_bonds(&supply, bonded)?;
-    let to_mint = if supply.issued.is_zero() || bonded.is_zero() {
-        FALLBACK_RATIO * payment.amount
-    } else {
-        payment.amount.multiply_ratio(supply.issued, bonded)
-    };
-    supply.bonded = bonded + payment.amount;
-    supply.issued += to_mint;
-    totals.save(&supply)?;
-
-    // call into cw20-base to mint the token, call as self as no one else is allowed
-    let sub_info = MessageInfo {
-        sender: env.contract.address.clone(),
-        sent_funds: vec![],
-    };
-    handle_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
-
-    // bond them to the validator
-    let res = HandleResponse {
-        messages: vec![StakingMsg::Delegate {
-            validator: invest.validator,
-            amount: payment.clone(),
-        }
-        .into()],
-        attributes: vec![
-            attr("action", "bond"),
-            attr("from", info.sender),
-            attr("bonded", payment.amount),
-            attr("minted", to_mint),
-        ],
-        data: None,
-    };
-    Ok(res)
-}
-
-// TODO: replace this with deps.dup()
-// after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
-fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
-    DepsMut {
-        storage: deps.storage,
-        api: deps.api,
-        querier: deps.querier,
-    }
-}
-
-pub fn unbond(
-    mut deps: DepsMut,
+pub fn handle_sell(
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-
-    let invest = invest_info_read(deps.storage).load()?;
-    // ensure it is big enough to care
-    if amount < invest.min_withdrawal {
-        return Err(ContractError::UnbondTooSmall {
-            min_bonded: invest.min_withdrawal,
-            denom: invest.bond_denom,
-        });
-    }
-    // calculate tax and remainer to unbond
-    let tax = amount * invest.exit_tax;
-
-    // burn from the original caller
-    handle_burn(dup(&mut deps), env.clone(), info.clone(), amount)?;
-    if tax > Uint128(0) {
-        let sub_info = MessageInfo {
-            sender: env.contract.address.clone(),
-            sent_funds: vec![],
-        };
-        // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
-        let human_owner = deps.api.human_address(&invest.owner)?;
-        handle_mint(dup(&mut deps), env.clone(), sub_info, human_owner, tax)?;
-    }
-
-    // re-calculate bonded to ensure we have real values
-    // bonded is the total number of tokens we have delegated from this address
-    let bonded = get_bonded(&deps.querier, &env.contract.address)?;
-
-    // calculate how many native tokens this is worth and update supply
-    let remainder = (amount - tax)?;
-    let mut totals = total_supply(deps.storage);
-    let mut supply = totals.load()?;
-    // TODO: this is just a safety assertion - do we keep it, or remove caching?
-    // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
-    // have expensive queries everywhere
-    assert_bonds(&supply, bonded)?;
-    let unbond = remainder.multiply_ratio(bonded, supply.issued);
-    supply.bonded = (bonded - unbond)?;
-    supply.issued = (supply.issued - remainder)?;
-    supply.claims += unbond;
-    totals.save(&supply)?;
-
-    create_claim(
-        deps.storage,
-        &sender_raw,
-        unbond,
-        invest.unbonding_period.after(&env.block),
-    )?;
-
-    // unbond them
-    let res = HandleResponse {
-        messages: vec![StakingMsg::Undelegate {
-            validator: invest.validator,
-            amount: coin(unbond.u128(), &invest.bond_denom),
-        }
-        .into()],
-        attributes: vec![
-            attr("action", "unbond"),
-            attr("to", info.sender),
-            attr("unbonded", unbond),
-            attr("burnt", amount),
-        ],
-        data: None,
-    };
-    Ok(res)
+    unimplemented!();
 }
 
-pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
-    // find how many tokens the contract has
-    let invest = invest_info_read(deps.storage).load()?;
-    let mut balance = deps
-        .querier
-        .query_balance(&env.contract.address, &invest.bond_denom)?;
-    if balance.amount < invest.min_withdrawal {
-        return Err(ContractError::BalanceTooSmall {});
-    }
-
-    // check how much to send - min(balance, claims[sender]), and reduce the claim
-    // Ensure we have enough balance to cover this and only send some claims if that is all we can cover
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let to_send = claim_tokens(deps.storage, &sender_raw, &env.block, Some(balance.amount))?;
-    if to_send == Uint128(0) {
-        return Err(ContractError::NothingToClaim {});
-    }
-
-    // update total supply (lower claim)
-    total_supply(deps.storage).update(|mut supply| -> StdResult<_> {
-        supply.claims = (supply.claims - to_send)?;
-        Ok(supply)
-    })?;
-
-    // transfer tokens to the sender
-    balance.amount = to_send;
-    let res = HandleResponse {
-        messages: vec![BankMsg::Send {
-            from_address: env.contract.address,
-            to_address: info.sender.clone(),
-            amount: vec![balance],
-        }
-        .into()],
-        attributes: vec![
-            attr("action", "claim"),
-            attr("from", info.sender),
-            attr("amount", to_send),
-        ],
-        data: None,
-    };
-    Ok(res)
-}
-
-/// reinvest will withdraw all pending rewards,
-/// then issue a callback to itself via _bond_all_tokens
-/// to reinvest the new earnings (and anything else that accumulated)
-pub fn reinvest(
-    deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
-    let contract_addr = env.contract.address;
-    let invest = invest_info_read(deps.storage).load()?;
-    let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
-
-    // and bond them to the validator
-    let res = HandleResponse {
-        messages: vec![
-            StakingMsg::Withdraw {
-                validator: invest.validator,
-                recipient: Some(contract_addr.clone()),
-            }
-            .into(),
-            WasmMsg::Execute {
-                contract_addr,
-                msg,
-                send: vec![],
-            }
-            .into(),
-        ],
-        attributes: vec![],
-        data: None,
-    };
-    Ok(res)
-}
-
-pub fn _bond_all_tokens(
+pub fn handle_sell_from(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    owner: HumanAddr,
+    amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    // this is just meant as a call-back to ourself
-    if info.sender != env.contract.address {
-        return Err(ContractError::Unauthorized {});
-    }
-
-    // find how many tokens we have to bond
-    let invest = invest_info_read(deps.storage).load()?;
-    let mut balance = deps
-        .querier
-        .query_balance(&env.contract.address, &invest.bond_denom)?;
-
-    // we deduct pending claims from our account balance before reinvesting.
-    // if there is not enough funds, we just return a no-op
-    match total_supply(deps.storage).update(|mut supply| -> StdResult<_> {
-        balance.amount = (balance.amount - supply.claims)?;
-        // this just triggers the "no op" case if we don't have min_withdrawal left to reinvest
-        (balance.amount - invest.min_withdrawal)?;
-        supply.bonded += balance.amount;
-        Ok(supply)
-    }) {
-        Ok(_) => {}
-        // if it is below the minimum, we do a no-op (do not revert other state from withdrawal)
-        Err(StdError::Underflow { .. }) => return Ok(HandleResponse::default()),
-        Err(e) => return Err(ContractError::Std(e)),
-    }
-
-    // and bond them to the validator
-    let res = HandleResponse {
-        messages: vec![StakingMsg::Delegate {
-            validator: invest.validator,
-            amount: balance.clone(),
-        }
-        .into()],
-        attributes: vec![attr("action", "reinvest"), attr("bonded", balance.amount)],
-        data: None,
-    };
-    Ok(res)
+    unimplemented!();
 }
+
+// pub fn unbond(
+//     mut deps: DepsMut,
+//     env: Env,
+//     info: MessageInfo,
+//     amount: Uint128,
+// ) -> Result<HandleResponse, ContractError> {
+//     let sender_raw = deps.api.canonical_address(&info.sender)?;
+//
+//     let invest = invest_info_read(deps.storage).load()?;
+//     // ensure it is big enough to care
+//     if amount < invest.min_withdrawal {
+//         return Err(ContractError::UnbondTooSmall {
+//             min_bonded: invest.min_withdrawal,
+//             denom: invest.bond_denom,
+//         });
+//     }
+//     // calculate tax and remainer to unbond
+//     let tax = amount * invest.exit_tax;
+//
+//     // burn from the original caller
+//     handle_burn(dup(&mut deps), env.clone(), info.clone(), amount)?;
+//     if tax > Uint128(0) {
+//         let sub_info = MessageInfo {
+//             sender: env.contract.address.clone(),
+//             sent_funds: vec![],
+//         };
+//         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
+//         let human_owner = deps.api.human_address(&invest.owner)?;
+//         handle_mint(dup(&mut deps), env.clone(), sub_info, human_owner, tax)?;
+//     }
+//
+//     // re-calculate bonded to ensure we have real values
+//     // bonded is the total number of tokens we have delegated from this address
+//     let bonded = get_bonded(&deps.querier, &env.contract.address)?;
+//
+//     // calculate how many native tokens this is worth and update supply
+//     let remainder = (amount - tax)?;
+//     let mut totals = total_supply(deps.storage);
+//     let mut supply = totals.load()?;
+//     // TODO: this is just a safety assertion - do we keep it, or remove caching?
+//     // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
+//     // have expensive queries everywhere
+//     assert_bonds(&supply, bonded)?;
+//     let unbond = remainder.multiply_ratio(bonded, supply.issued);
+//     supply.bonded = (bonded - unbond)?;
+//     supply.issued = (supply.issued - remainder)?;
+//     supply.claims += unbond;
+//     totals.save(&supply)?;
+//
+//     create_claim(
+//         deps.storage,
+//         &sender_raw,
+//         unbond,
+//         invest.unbonding_period.after(&env.block),
+//     )?;
+//
+//     // unbond them
+//     let res = HandleResponse {
+//         messages: vec![StakingMsg::Undelegate {
+//             validator: invest.validator,
+//             amount: coin(unbond.u128(), &invest.bond_denom),
+//         }
+//         .into()],
+//         attributes: vec![
+//             attr("action", "unbond"),
+//             attr("to", info.sender),
+//             attr("unbonded", unbond),
+//             attr("burnt", amount),
+//         ],
+//         data: None,
+//     };
+//     Ok(res)
+// }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // custom queries
-        QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
-        QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
+        QueryMsg::CurveInfo {} => to_binary(&query_curve_info(deps)?),
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
@@ -438,32 +272,19 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_claims(deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
-    let claims = CLAIMS
-        .may_load(deps.storage, &address_raw)?
-        .unwrap_or_default();
-    Ok(ClaimsResponse { claims })
-}
-
-pub fn query_investment(deps: Deps) -> StdResult<InvestmentResponse> {
-    let invest = invest_info_read(deps.storage).load()?;
-    let supply = total_supply_read(deps.storage).load()?;
-
-    let res = InvestmentResponse {
-        owner: deps.api.human_address(&invest.owner)?,
-        exit_tax: invest.exit_tax,
-        validator: invest.validator,
-        min_withdrawal: invest.min_withdrawal,
-        token_supply: supply.issued,
-        staked_tokens: coin(supply.bonded.u128(), &invest.bond_denom),
-        nominal_value: if supply.issued.is_zero() {
-            FALLBACK_RATIO
-        } else {
-            Decimal::from_ratio(supply.bonded, supply.issued)
-        },
-    };
-    Ok(res)
+pub fn query_curve_info(deps: Deps) -> StdResult<CurveInfoResponse> {
+    let Supply {
+        reserve,
+        supply,
+        reserve_denom,
+    } = SUPPLY.load(deps.storage)?;
+    Ok(CurveInfoResponse {
+        reserve,
+        supply,
+        reserve_denom,
+        // TODO
+        spot_price: Decimal::one(),
+    })
 }
 
 #[cfg(test)]
