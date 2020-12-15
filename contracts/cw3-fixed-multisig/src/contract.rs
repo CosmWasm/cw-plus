@@ -9,7 +9,7 @@ use cw0::{maybe_canonical, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
-    VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
+    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
 use cw_storage_plus::Bound;
 
@@ -300,14 +300,20 @@ fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
     let prop = PROPOSALS.load(deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
+
+    let cfg = CONFIG.load(deps.storage)?;
+    let threshold = ThresholdResponse::AbsoluteCount {
+        weight: cfg.required_weight,
+        total_weight: cfg.total_weight,
+    };
     Ok(ProposalResponse {
         id,
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
-        expires: prop.expires,
-        // TODO: check
         status,
+        expires: prop.expires,
+        threshold,
     })
 }
 
@@ -321,12 +327,18 @@ fn list_proposals(
     start_after: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
+    let cfg = CONFIG.load(deps.storage)?;
+    let threshold = ThresholdResponse::AbsoluteCount {
+        weight: cfg.required_weight,
+        total_weight: cfg.total_weight,
+    };
+
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|p| map_proposal(&env.block, p))
+        .map(|p| map_proposal(&env.block, &threshold, p))
         .collect();
 
     Ok(ProposalListResponse { proposals: props? })
@@ -338,12 +350,18 @@ fn reverse_proposals(
     start_before: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
+    let cfg = CONFIG.load(deps.storage)?;
+    let threshold = ThresholdResponse::AbsoluteCount {
+        weight: cfg.required_weight,
+        total_weight: cfg.total_weight,
+    };
+
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let end = start_before.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
         .range(deps.storage, None, end, Order::Descending)
         .take(limit)
-        .map(|p| map_proposal(&env.block, p))
+        .map(|p| map_proposal(&env.block, &threshold, p))
         .collect();
 
     Ok(ProposalListResponse { proposals: props? })
@@ -351,6 +369,7 @@ fn reverse_proposals(
 
 fn map_proposal(
     block: &BlockInfo,
+    threshold: &ThresholdResponse,
     item: StdResult<(Vec<u8>, Proposal)>,
 ) -> StdResult<ProposalResponse> {
     let (key, prop) = item?;
@@ -360,15 +379,20 @@ fn map_proposal(
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
-        expires: prop.expires,
         status,
+        expires: prop.expires,
+        threshold: threshold.clone(),
     })
 }
 
 fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
-    let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
-    let vote = prop.map(|b| b.vote);
+    let ballot = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
+    let vote = ballot.map(|b| VoteInfo {
+        voter,
+        vote: b.vote,
+        weight: b.weight,
+    });
     Ok(VoteResponse { vote })
 }
 
@@ -400,10 +424,10 @@ fn list_votes(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterInfo> {
+fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = VOTERS.may_load(deps.storage, &voter_raw)?;
-    Ok(VoterInfo { weight })
+    Ok(VoterResponse { weight })
 }
 
 fn list_voters(
@@ -421,7 +445,7 @@ fn list_voters(
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
-            Ok(VoterResponse {
+            Ok(VoterDetail {
                 addr: api.human_address(&CanonicalAddr::from(key))?,
                 weight,
             })
