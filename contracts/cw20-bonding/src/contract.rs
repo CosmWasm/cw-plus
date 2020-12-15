@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    attr, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
     MessageInfo, StdResult, Uint128,
 };
 
@@ -9,14 +9,11 @@ use cw20_base::allowances::{
     handle_transfer_from, query_allowance,
 };
 use cw20_base::contract::{
-    handle_send,
-    handle_transfer,
-    query_balance,
-    query_token_info,
-    // handle_burn, handle_mint,
+    handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
+use crate::curves::{Constant, Curve};
 use crate::error::ContractError;
 use crate::msg::{CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE};
@@ -59,13 +56,17 @@ pub fn handle(
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
+    // TODO: where does this come from in real code?
+    // right now test with 2 reserve to buy 1 supply
+    let curve = Constant(Decimal::percent(200));
+
     match msg {
-        HandleMsg::Buy {} => handle_buy(deps, env, info),
+        HandleMsg::Buy {} => handle_buy(deps, env, info, &curve),
 
         // we override these from cw20
-        HandleMsg::Burn { amount } => Ok(handle_sell(deps, env, info, amount)?),
+        HandleMsg::Burn { amount } => Ok(handle_sell(deps, env, info, &curve, amount)?),
         HandleMsg::BurnFrom { owner, amount } => {
-            Ok(handle_sell_from(deps, env, info, owner, amount)?)
+            Ok(handle_sell_from(deps, env, info, &curve, owner, amount)?)
         }
 
         // these all come from cw20-base to implement the cw20 standard
@@ -111,67 +112,74 @@ pub fn handle(
 
 pub fn handle_buy(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
+    curve: &dyn Curve,
 ) -> Result<HandleResponse, ContractError> {
-    let supply = CURVE_STATE.load(deps.storage)?;
+    let mut state = CURVE_STATE.load(deps.storage)?;
 
     // ensure the sent denom was proper
-    let sent = match info.sent_funds.len() {
+    let payment = match info.sent_funds.len() {
         0 => Err(ContractError::NoFunds {}),
         1 => {
-            if info.sent_funds[0].denom == supply.reserve_denom {
+            if info.sent_funds[0].denom == state.reserve_denom {
                 Ok(info.sent_funds[0].amount)
             } else {
-                Err(ContractError::MissingDenom(supply.reserve_denom))
+                Err(ContractError::MissingDenom(state.reserve_denom.clone()))
             }
         }
-        _ => Err(ContractError::ExtraDenoms(supply.reserve_denom)),
+        _ => Err(ContractError::ExtraDenoms(state.reserve_denom.clone())),
     }?;
-    if sent.is_zero() {
+    if payment.is_zero() {
         return Err(ContractError::NoFunds {});
     }
 
-    // TODO: calculate how many tokens can be purchased with this and mint them
-    let _ = supply;
+    // TODO: we need to get these values from somewhere, based on each token's definition
+    // (Pass in via InitMsg?)
+    const RESERVE_DECIMALS: u128 = 1_000_000;
+    // This we can get from the local digits stored in init
+    const SUPPLY_DECIMALS: u128 = 1_000_000;
 
-    unimplemented!();
-    // // calculate to_mint and update total supply
-    // let mut totals = total_supply(deps.storage);
-    // let mut supply = totals.load()?;
-    // let to_mint = if supply.issued.is_zero() || bonded.is_zero() {
-    //     FALLBACK_RATIO * payment.amount
-    // } else {
-    //     payment.amount.multiply_ratio(supply.issued, bonded)
-    // };
-    // supply.bonded = bonded + payment.amount;
-    // supply.issued += to_mint;
-    // totals.save(&supply)?;
-    //
-    // // call into cw20-base to mint the token, call as self as no one else is allowed
-    // let sub_info = MessageInfo {
-    //     sender: env.contract.address.clone(),
-    //     sent_funds: vec![],
-    // };
-    // handle_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
-    //
-    // // bond them to the validator
-    // let res = HandleResponse {
-    //     attributes: vec![
-    //         attr("action", "bond"),
-    //         attr("from", info.sender),
-    //         attr("bonded", payment.amount),
-    //         attr("minted", to_mint),
-    //     ],
-    //     data: None,
-    // };
-    // Ok(res)
+    // calculate how many tokens can be purchased with this and mint them
+    let supply = state.supply;
+    let reserve = state.reserve + payment;
+    let reserve_dec = Decimal::from_ratio(reserve, RESERVE_DECIMALS);
+    // apply bonding curve
+    let new_supply_dec = curve.supply(reserve_dec);
+    let new_supply = new_supply_dec * Uint128(SUPPLY_DECIMALS);
+
+    // calculate how many are created and then update bonding curve state
+    let minted = (new_supply - supply)?;
+    state.supply = new_supply;
+    state.reserve = reserve;
+    CURVE_STATE.save(deps.storage, &state)?;
+
+    // call into cw20-base to mint the token, call as self as no one else is allowed
+    let sub_info = MessageInfo {
+        sender: env.contract.address.clone(),
+        sent_funds: vec![],
+    };
+    handle_mint(deps, env, sub_info, info.sender.clone(), minted)?;
+
+    // bond them to the validator
+    let res = HandleResponse {
+        messages: vec![],
+        attributes: vec![
+            attr("action", "bond"),
+            attr("from", info.sender),
+            attr("bonded", payment),
+            attr("minted", minted),
+        ],
+        data: None,
+    };
+    Ok(res)
 }
 
 pub fn handle_sell(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
+    _curve: &dyn Curve,
     _amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
     unimplemented!();
@@ -181,6 +189,7 @@ pub fn handle_sell_from(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    curve: &dyn Curve,
     owner: HumanAddr,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
@@ -195,7 +204,7 @@ pub fn handle_sell_from(
         sender: owner,
         sent_funds: info.sent_funds,
     };
-    handle_sell(deps, env, owner_info, amount)
+    handle_sell(deps, env, owner_info, curve, amount)
 }
 
 // pub fn unbond(
