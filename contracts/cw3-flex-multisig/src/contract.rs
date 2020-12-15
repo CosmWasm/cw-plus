@@ -1536,4 +1536,61 @@ mod tests {
         app.update_block(expire(voting_period));
         assert_eq!(prop_status(&app), Status::Passed);
     }
+
+    #[test]
+    fn quorum_enforced_even_if_absolute_threshold_met() {
+        let mut app = mock_app();
+
+        // 33% required for quora, which is 5 of the initial 15
+        // 50% yes required to pass early (8 of the initial 15)
+        let voting_period = Duration::Time(20000);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            // note that 60% yes is not enough to pass without 20% no as well
+            Threshold::ThresholdQuora {
+                threshold: Decimal::percent(60),
+                quorum: Decimal::percent(80),
+            },
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
+
+        // create proposal
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER5, &flex_addr, &proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        let prop_status = |app: &App| -> Status {
+            let query_prop = QueryMsg::Proposal { proposal_id };
+            let prop: ProposalResponse = app
+                .wrap()
+                .query_wasm_smart(&flex_addr, &query_prop)
+                .unwrap();
+            prop.status
+        };
+        assert_eq!(prop_status(&app), Status::Open);
+        app.update_block(|block| block.height += 3);
+
+        // reach 60% of yes votes, not enough to pass early (or late)
+        let yes_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        app.execute_contract(VOTER4, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        // 9 of 15 is 60% absolute threshold, but less than 12 (80% quorum needed)
+        assert_eq!(prop_status(&app), Status::Open);
+
+        // add 3 weight no vote and we hit quorum and this passes
+        let no_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        app.execute_contract(VOTER3, &flex_addr, &no_vote, &[])
+            .unwrap();
+        assert_eq!(prop_status(&app), Status::Passed);
+    }
 }

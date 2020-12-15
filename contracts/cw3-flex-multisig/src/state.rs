@@ -103,23 +103,22 @@ impl Proposal {
             Threshold::AbsolutePercentage {
                 percentage: percentage_needed,
             } => self.votes.yes >= votes_needed(self.total_weight, percentage_needed),
-            Threshold::ThresholdQuora {
-                threshold,
-                quorum: quroum,
-            } => {
+            Threshold::ThresholdQuora { threshold, quorum } => {
                 // this one is tricky, as we have two compares:
                 if self.expires.is_expired(block) {
                     // * if we have closed yet, we need quorum% of total votes to have voted (counting abstain)
                     //   and threshold% of yes votes from those who voted (ignoring abstain)
                     let total = self.votes.total();
                     let opinions = total - self.votes.abstain;
-                    total >= votes_needed(self.total_weight, quroum)
+                    total >= votes_needed(self.total_weight, quorum)
                         && self.votes.yes >= votes_needed(opinions, threshold)
                 } else {
                     // * if we have not closed yet, we need threshold% of yes votes (from 100% voters - abstain)
                     //   as we are sure this cannot change with any possible sequence of future votes
-                    self.votes.yes
-                        >= votes_needed(self.total_weight - self.votes.abstain, threshold)
+                    // * we also need quorum (which may not always be the case above)
+                    self.votes.total() >= votes_needed(self.total_weight, quorum)
+                        && self.votes.yes
+                            >= votes_needed(self.total_weight - self.votes.abstain, threshold)
                 }
             }
         }
@@ -361,6 +360,64 @@ mod test {
         assert_eq!(
             true,
             check_is_passed(quorum.clone(), passing.clone(), 16, false)
+        );
+    }
+
+    #[test]
+    fn quorum_edge_cases() {
+        // when we pass absolute threshold (everyone else voting no, we pass), but still don't hit quorum
+        let quorum = Threshold::ThresholdQuora {
+            threshold: Decimal::percent(60),
+            quorum: Decimal::percent(80),
+        };
+
+        // try 9 yes, 1 no (out of 15) -> 90% voter threshold, 60% absolute threshold, still no quorum
+        // doesn't matter if expired or not
+        let missing_voters = Votes {
+            yes: 9,
+            no: 1,
+            abstain: 0,
+            veto: 0,
+        };
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), missing_voters.clone(), 15, false)
+        );
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), missing_voters.clone(), 15, true)
+        );
+
+        // 1 less yes, 3 vetos and this passes only when expired
+        let wait_til_expired = Votes {
+            yes: 8,
+            no: 1,
+            abstain: 0,
+            veto: 3,
+        };
+        assert_eq!(
+            false,
+            check_is_passed(quorum.clone(), wait_til_expired.clone(), 15, false)
+        );
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), wait_til_expired.clone(), 15, true)
+        );
+
+        // 9 yes and 3 nos passes early
+        let passes_early = Votes {
+            yes: 9,
+            no: 3,
+            abstain: 0,
+            veto: 0,
+        };
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passes_early.clone(), 15, false)
+        );
+        assert_eq!(
+            true,
+            check_is_passed(quorum.clone(), passes_early.clone(), 15, true)
         );
     }
 }
