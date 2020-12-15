@@ -97,6 +97,11 @@ impl App {
         self.wasm.update_block(action);
     }
 
+    /// Returns a copy of the current block_info
+    pub fn block_info(&self) -> BlockInfo {
+        self.wasm.block_info()
+    }
+
     /// This is an "admin" function to let us adjust bank accounts
     pub fn set_bank_balance(
         &mut self,

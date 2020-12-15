@@ -575,16 +575,23 @@ mod tests {
         (flex_addr, group_addr)
     }
 
-    fn pay_somebody_proposal(flex_addr: &HumanAddr) -> HandleMsg {
+    fn proposal_info(flex_addr: &HumanAddr) -> (Vec<CosmosMsg<Empty>>, String, String) {
         let bank_msg = BankMsg::Send {
             from_address: flex_addr.clone(),
             to_address: SOMEBODY.into(),
             amount: coins(1, "BTC"),
         };
         let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let title = "Pay somebody".to_string();
+        let description = "Do I pay her?".to_string();
+        (msgs, title, description)
+    }
+
+    fn pay_somebody_proposal(flex_addr: &HumanAddr) -> HandleMsg {
+        let (msgs, title, description) = proposal_info(flex_addr);
         HandleMsg::Propose {
-            title: "Pay somebody".to_string(),
-            description: "Do I pay her?".to_string(),
+            title,
+            description,
             msgs,
             latest: None,
         }
@@ -766,6 +773,98 @@ mod tests {
                 Duration::Height(duration) => block.height -= duration,
             };
         }
+    }
+
+    #[test]
+    fn test_proposal_queries() {
+        let mut app = mock_app();
+
+        let required_weight = 3;
+        let voting_period = Duration::Time(2000000);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            required_weight,
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
+
+        // create proposal with 1 vote power
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER1, &flex_addr, &proposal, &[])
+            .unwrap();
+        let proposal_id1: u64 = res.attributes[2].value.parse().unwrap();
+
+        // another proposal immediately passes
+        app.update_block(next_block);
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .unwrap();
+        let proposal_id2: u64 = res.attributes[2].value.parse().unwrap();
+
+        // expire them both
+        app.update_block(expire(voting_period));
+
+        // add one more open proposal, 2 votes
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER2, &flex_addr, &proposal, &[])
+            .unwrap();
+        let proposal_id3: u64 = res.attributes[2].value.parse().unwrap();
+        let proposed_at = app.block_info();
+
+        // next block, let's query them all... make sure status is properly updated (1 should be rejected in query)
+        app.update_block(next_block);
+        let list_query = QueryMsg::ListProposals {
+            start_after: None,
+            limit: None,
+        };
+        let res: ProposalListResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &list_query)
+            .unwrap();
+        assert_eq!(3, res.proposals.len());
+
+        // check the id and status are properly set
+        let info: Vec<_> = res.proposals.iter().map(|p| (p.id, p.status)).collect();
+        let expected_info = vec![
+            (proposal_id1, Status::Rejected),
+            (proposal_id2, Status::Passed),
+            (proposal_id3, Status::Open),
+        ];
+        assert_eq!(expected_info, info);
+
+        // ensure the common features are set
+        let (expected_msgs, expected_title, expected_description) = proposal_info(&flex_addr);
+        for prop in res.proposals {
+            assert_eq!(prop.title, expected_title);
+            assert_eq!(prop.description, expected_description);
+            assert_eq!(prop.msgs, expected_msgs);
+        }
+
+        // reverse query can get just proposal_id3
+        let list_query = QueryMsg::ReverseProposals {
+            start_before: None,
+            limit: Some(1),
+        };
+        let res: ProposalListResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &list_query)
+            .unwrap();
+        assert_eq!(1, res.proposals.len());
+
+        let (msgs, title, description) = proposal_info(&flex_addr);
+        let expected = ProposalResponse {
+            id: proposal_id3,
+            title,
+            description,
+            msgs,
+            expires: voting_period.after(&proposed_at),
+            status: Status::Open,
+        };
+        assert_eq!(&expected, &res.proposals[0]);
     }
 
     #[test]

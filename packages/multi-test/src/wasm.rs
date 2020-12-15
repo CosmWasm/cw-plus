@@ -159,6 +159,11 @@ impl WasmRouter {
         action(&mut self.block);
     }
 
+    /// Returns a copy of the current block_info
+    pub fn block_info(&self) -> BlockInfo {
+        self.block.clone()
+    }
+
     pub fn store_code(&mut self, code: Box<dyn Contract>) -> usize {
         let idx = self.handlers.len() + 1;
         self.handlers.insert(idx, code);
