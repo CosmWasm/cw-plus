@@ -64,7 +64,7 @@ Examples:
 
 Price Constant: `f(x) = k` and `F(x) = kx` and `F^-1(x) = x/k`
 
-Price Linear: `f(x) = x` and `F(x) = x^2/2` and `F^-1(x) = (2x)^(0.5)`
+Price Linear: `f(x) = kx` and `F(x) = kx^2/2` and `F^-1(x) = (2x/k)^(0.5)`
 
 Price Square Root: `f(x) = x^0.5` and `F(x) = x^1.5/1.5` and `F^-1(x) = (1.5*x)^(2/3)`
 
