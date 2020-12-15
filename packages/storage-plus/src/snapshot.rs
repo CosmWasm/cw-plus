@@ -10,6 +10,7 @@ use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
 use crate::{Bound, Prefixer};
+use std::fmt::Debug;
 
 /// Map that maintains a snapshots of one or more checkpoints.
 /// We can query historical data as well as current state.
@@ -230,17 +231,8 @@ where
         E: From<StdError>,
     {
         let input = self.may_load(store, k.clone())?;
-        let old = input.clone();
-
         let output = action(input)?;
-        // optimize the save (save the extra read in write_change)
-        if self.should_checkpoint(store, &k)? {
-            let diff = ChangeSet { old };
-            self.changelog
-                .save(store, (k.clone(), height.into()), &diff)?;
-        }
-        self.primary.save(store, k, &output)?;
-
+        self.save(store, k, &output, height)?;
         Ok(output)
     }
 }
@@ -407,8 +399,8 @@ mod tests {
     #[test]
     fn handle_multiple_writes_in_one_block() {
         let mut storage = MockStorage::new();
-        init_data(&EVERY, &mut storage);
 
+        println!("SETUP");
         EVERY.save(&mut storage, b"A", &5, 1).unwrap();
         EVERY.save(&mut storage, b"B", &7, 2).unwrap();
         EVERY.save(&mut storage, b"C", &2, 2).unwrap();
@@ -419,11 +411,11 @@ mod tests {
             .unwrap();
         EVERY.save(&mut storage, b"A", &12, 3).unwrap();
         assert_eq!(
-            Some(3),
+            Some(5),
             EVERY.may_load_at_height(&storage, b"A", 2).unwrap()
         );
         assert_eq!(
-            Some(3),
+            Some(5),
             EVERY.may_load_at_height(&storage, b"A", 3).unwrap()
         );
         assert_eq!(
