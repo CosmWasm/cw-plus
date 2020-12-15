@@ -437,7 +437,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-    use cosmwasm_std::{coin, coins, BankMsg, Coin};
+    use cosmwasm_std::{coin, coins, BankMsg, Coin, Decimal};
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
@@ -500,21 +500,6 @@ mod tests {
             .unwrap()
     }
 
-    // uploads code and returns address of group contract
-    fn init_flex_static(
-        app: &mut App,
-        group: HumanAddr,
-        weight_needed: u64,
-        max_voting_period: Duration,
-    ) -> HumanAddr {
-        init_flex(
-            app,
-            group,
-            Threshold::AbsoluteCount { weight_needed },
-            max_voting_period,
-        )
-    }
-
     fn init_flex(
         app: &mut App,
         group: HumanAddr,
@@ -534,9 +519,25 @@ mod tests {
     // this will set up both contracts, initializing the group with
     // all voters defined above, and the multisig pointing to it and given threshold criteria.
     // Returns (multisig address, group address).
+    fn setup_test_case_fixed(
+        app: &mut App,
+        weight_needed: u64,
+        max_voting_period: Duration,
+        init_funds: Vec<Coin>,
+        multisig_as_group_admin: bool,
+    ) -> (HumanAddr, HumanAddr) {
+        setup_test_case(
+            app,
+            Threshold::AbsoluteCount { weight_needed },
+            max_voting_period,
+            init_funds,
+            multisig_as_group_admin,
+        )
+    }
+
     fn setup_test_case(
         app: &mut App,
-        required_weight: u64,
+        threshold: Threshold,
         max_voting_period: Duration,
         init_funds: Vec<Coin>,
         multisig_as_group_admin: bool,
@@ -554,8 +555,7 @@ mod tests {
         app.update_block(next_block);
 
         // 2. Set up Multisig backed by this group
-        let flex_addr =
-            init_flex_static(app, group_addr.clone(), required_weight, max_voting_period);
+        let flex_addr = init_flex(app, group_addr.clone(), threshold, max_voting_period);
         app.update_block(next_block);
 
         // 3. (Optional) Set the multisig as the group owner
@@ -681,7 +681,7 @@ mod tests {
 
         let required_weight = 4;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case(
+        let (flex_addr, _) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -781,7 +781,7 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case(
+        let (flex_addr, _) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -873,7 +873,7 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case(
+        let (flex_addr, _) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -1021,7 +1021,7 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case(
+        let (flex_addr, _) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -1106,7 +1106,7 @@ mod tests {
 
         let required_weight = 3;
         let voting_period = Duration::Height(2000000);
-        let (flex_addr, _) = setup_test_case(
+        let (flex_addr, _) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -1159,7 +1159,7 @@ mod tests {
 
         let required_weight = 4;
         let voting_period = Duration::Time(20000);
-        let (flex_addr, group_addr) = setup_test_case(
+        let (flex_addr, group_addr) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -1288,7 +1288,7 @@ mod tests {
 
         let required_weight = 4;
         let voting_period = Duration::Time(20000);
-        let (flex_addr, group_addr) = setup_test_case(
+        let (flex_addr, group_addr) = setup_test_case_fixed(
             &mut app,
             required_weight,
             voting_period,
@@ -1387,9 +1387,83 @@ mod tests {
     }
 
     // TODO: scenario tests
-    // TODO: query threshold
+    // uses the power from the beginning of the voting period
+    #[test]
+    fn percentage_handles_group_changes() {
+        let mut app = mock_app();
 
-    // TODO: issue:
-    // - add threshold to proposal response
-    // - include weight in VoteResponse
+        // 33% required, which is 5 of the initial 15
+        let voting_period = Duration::Time(20000);
+        let (flex_addr, group_addr) = setup_test_case(
+            &mut app,
+            Threshold::AbsolutePercentage {
+                percentage_needed: Decimal::percent(33),
+            },
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
+
+        // VOTER3 starts a proposal to send some tokens (3/5 votes)
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        let prop_status = |app: &App| -> Status {
+            let query_prop = QueryMsg::Proposal { proposal_id };
+            let prop: ProposalResponse = app
+                .wrap()
+                .query_wasm_smart(&flex_addr, &query_prop)
+                .unwrap();
+            prop.status
+        };
+
+        // 3/5 votes
+        assert_eq!(prop_status(&app), Status::Open);
+
+        // a few blocks later...
+        app.update_block(|block| block.height += 2);
+
+        // admin changes the group (3 -> 0, 2 -> 7, 0 -> 15) - total = 32, require 11 to pass
+        let newbie: &str = "newbie";
+        let update_msg = cw4_group::msg::HandleMsg::UpdateMembers {
+            remove: vec![VOTER3.into()],
+            add: vec![member(VOTER2, 7), member(newbie, 15)],
+        };
+        app.execute_contract(OWNER, &group_addr, &update_msg, &[])
+            .unwrap();
+
+        // a few blocks later...
+        app.update_block(|block| block.height += 3);
+
+        // VOTER2 votes according to original weights: 3 + 2 = 5 / 5 => Passed
+        // with updated weights, it would be 3 + 7 = 10 / 11 => Open
+        let yes_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        assert_eq!(prop_status(&app), Status::Passed);
+
+        // new proposal can be passed single-handedly by newbie
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(newbie, &flex_addr, &proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id2: u64 = res.attributes[2].value.parse().unwrap();
+
+        // check proposal2 status
+        let query_prop = QueryMsg::Proposal {
+            proposal_id: proposal_id2,
+        };
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &query_prop)
+            .unwrap();
+        assert_eq!(Status::Passed, prop.status);
+    }
 }
