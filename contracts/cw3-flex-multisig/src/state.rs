@@ -97,11 +97,16 @@ impl Proposal {
     // sequence of possible votes can cause it to fail)
     pub fn is_passed(&self, block: &BlockInfo) -> bool {
         match self.threshold {
-            Threshold::AbsoluteCount { weight_needed } => self.votes.yes >= weight_needed,
-            Threshold::AbsolutePercentage { percentage_needed } => {
-                self.votes.yes >= votes_needed(self.total_weight, percentage_needed)
-            }
-            Threshold::ThresholdQuora { threshold, quroum } => {
+            Threshold::AbsoluteCount {
+                weight: weight_needed,
+            } => self.votes.yes >= weight_needed,
+            Threshold::AbsolutePercentage {
+                percentage: percentage_needed,
+            } => self.votes.yes >= votes_needed(self.total_weight, percentage_needed),
+            Threshold::ThresholdQuora {
+                threshold,
+                quorum: quroum,
+            } => {
                 // this one is tricky, as we have two compares:
                 if self.expires.is_expired(block) {
                     // * if we have closed yet, we need quorum% of total votes to have voted (counting abstain)
@@ -227,7 +232,7 @@ mod test {
 
     #[test]
     fn proposal_passed_absolute_count() {
-        let fixed = Threshold::AbsoluteCount { weight_needed: 10 };
+        let fixed = Threshold::AbsoluteCount { weight: 10 };
         let mut votes = Votes::new(7);
         votes.add_vote(Vote::Veto, 4);
         // same expired or not, total_weight or whatever
@@ -254,7 +259,7 @@ mod test {
     #[test]
     fn proposal_passed_absolute_percentage() {
         let percent = Threshold::AbsolutePercentage {
-            percentage_needed: Decimal::percent(50),
+            percentage: Decimal::percent(50),
         };
         let mut votes = Votes::new(7);
         votes.add_vote(Vote::No, 4);
@@ -284,7 +289,7 @@ mod test {
     fn proposal_passed_quorum() {
         let quorum = Threshold::ThresholdQuora {
             threshold: Decimal::percent(50),
-            quroum: Decimal::percent(40),
+            quorum: Decimal::percent(40),
         };
         // all non-yes votes are counted for quorum
         let passing = Votes {

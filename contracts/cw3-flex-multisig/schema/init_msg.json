@@ -60,7 +60,7 @@
     "Threshold": {
       "anyOf": [
         {
-          "description": "Declares a total weight needed to pass This usually implies that count_needed is stable, even if total_weight changes eg. 3 of 5 multisig -> 3 of 6 multisig",
+          "description": "Declares a total weight needed to pass This usually implies that weight_needed is stable, even if total_weight changes eg. 3 of 5 multisig -> 3 of 6 multisig",
           "type": "object",
           "required": [
             "absolute_count"
@@ -69,10 +69,10 @@
             "absolute_count": {
               "type": "object",
               "required": [
-                "weight_needed"
+                "weight"
               ],
               "properties": {
-                "weight_needed": {
+                "weight": {
                   "type": "integer",
                   "format": "uint64",
                   "minimum": 0.0
@@ -91,10 +91,10 @@
             "absolute_percentage": {
               "type": "object",
               "required": [
-                "percentage_needed"
+                "percentage"
               ],
               "properties": {
-                "percentage_needed": {
+                "percentage": {
                   "$ref": "#/definitions/Decimal"
                 }
               }
@@ -102,7 +102,7 @@
           }
         },
         {
-          "description": "Declares a threshold (minimum percentage of votes that must approve) and a quorum (minimum percentage of voter weight that must vote). This allows eg. 25% of total weight YES to pass, if we have quorum of 40% and threshold of 51% and most of the people sit out the election. This is more common in general elections where participation is expected to be low.",
+          "description": "Declares a threshold (minimum percentage of votes that must approve) and a quorum (minimum percentage of voter weight that must vote). This allows eg. 20.04% of the total weight yes votes to pass, if we have a quorum of 40% and threshold of 51%, and most of the people sit out the election.\n\nThis is more common in general elections, where participation is expected to be low.",
           "type": "object",
           "required": [
             "threshold_quora"
@@ -111,11 +111,11 @@
             "threshold_quora": {
               "type": "object",
               "required": [
-                "quroum",
+                "quorum",
                 "threshold"
               ],
               "properties": {
-                "quroum": {
+                "quorum": {
                   "$ref": "#/definitions/Decimal"
                 },
                 "threshold": {

@@ -9,7 +9,7 @@ pub enum ContractError {
     #[error("Required threshold cannot be zero")]
     ZeroThreshold {},
 
-    #[error("Not possible to reach required (passing) threshol")]
+    #[error("Not possible to reach required (passing) threshold")]
     UnreachableThreshold {},
 
     #[error("Group contract invalid address '{addr}'")]

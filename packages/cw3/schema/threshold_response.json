@@ -14,7 +14,7 @@
           "type": "object",
           "required": [
             "total_weight",
-            "weight_needed"
+            "weight"
           ],
           "properties": {
             "total_weight": {
@@ -22,7 +22,7 @@
               "format": "uint64",
               "minimum": 0.0
             },
-            "weight_needed": {
+            "weight": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
@@ -41,11 +41,11 @@
         "absolute_percentage": {
           "type": "object",
           "required": [
-            "percentage_needed",
+            "percentage",
             "total_weight"
           ],
           "properties": {
-            "percentage_needed": {
+            "percentage": {
               "$ref": "#/definitions/Decimal"
             },
             "total_weight": {
@@ -67,12 +67,12 @@
         "threshold_quora": {
           "type": "object",
           "required": [
-            "quroum",
+            "quorum",
             "threshold",
             "total_weight"
           ],
           "properties": {
-            "quroum": {
+            "quorum": {
               "$ref": "#/definitions/Decimal"
             },
             "threshold": {

@@ -50,10 +50,7 @@ pub enum ThresholdResponse {
     /// Declares a total weight needed to pass
     /// This usually implies that count_needed is stable, even if total_weight changes
     /// eg. 3 of 5 multisig -> 3 of 6 multisig
-    AbsoluteCount {
-        weight_needed: u64,
-        total_weight: u64,
-    },
+    AbsoluteCount { weight: u64, total_weight: u64 },
     /// Declares a percentage of the total weight needed to pass
     /// This implies the percentage is stable, when total_weight changes
     /// eg. at 50.1%, we go from needing 51/100 to needing 101/200
@@ -62,7 +59,7 @@ pub enum ThresholdResponse {
     /// as the first will pass with 60% yes votes and 10% no votes, while the second
     /// will require the others to vote anything (no, abstain...) to pass
     AbsolutePercentage {
-        percentage_needed: Decimal,
+        percentage: Decimal,
         total_weight: u64,
     },
     /// Declares a threshold (minimum percentage of votes that must approve)
@@ -73,7 +70,7 @@ pub enum ThresholdResponse {
     /// to be low.
     ThresholdQuora {
         threshold: Decimal,
-        quroum: Decimal,
+        quorum: Decimal,
         total_weight: u64,
     },
 }

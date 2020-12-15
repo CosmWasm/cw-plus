@@ -19,9 +19,9 @@ pub struct InitMsg {
 #[serde(rename_all = "snake_case")]
 pub enum Threshold {
     /// Declares a total weight needed to pass
-    /// This usually implies that count_needed is stable, even if total_weight changes
+    /// This usually implies that weight_needed is stable, even if total_weight changes
     /// eg. 3 of 5 multisig -> 3 of 6 multisig
-    AbsoluteCount { weight_needed: u64 },
+    AbsoluteCount { weight: u64 },
     /// Declares a percentage of the total weight needed to pass
     /// This implies the percentage is stable, when total_weight changes
     /// eg. at 50.1%, we go from needing 51/100 to needing 101/200
@@ -29,14 +29,15 @@ pub enum Threshold {
     /// Note: percentage_needed = 60% is different than threshold = 60%, quora = 100%
     /// as the first will pass with 60% yes votes and 10% no votes, while the second
     /// will require the others to vote anything (no, abstain...) to pass
-    AbsolutePercentage { percentage_needed: Decimal },
+    AbsolutePercentage { percentage: Decimal },
     /// Declares a threshold (minimum percentage of votes that must approve)
     /// and a quorum (minimum percentage of voter weight that must vote).
-    /// This allows eg. 25% of total weight YES to pass, if we have quorum of 40%
-    /// and threshold of 51% and most of the people sit out the election.
-    /// This is more common in general elections where participation is expected
+    /// This allows eg. 20.04% of the total weight yes votes to pass, if we have
+    /// a quorum of 40% and threshold of 51%, and most of the people sit out the election.
+    ///
+    /// This is more common in general elections, where participation is expected
     /// to be low.
-    ThresholdQuora { threshold: Decimal, quroum: Decimal },
+    ThresholdQuora { threshold: Decimal, quorum: Decimal },
 }
 
 impl Threshold {
@@ -44,7 +45,9 @@ impl Threshold {
     /// given a total weight of all members in the group
     pub fn validate(&self, total_weight: u64) -> Result<(), ContractError> {
         match self {
-            Threshold::AbsoluteCount { weight_needed } => {
+            Threshold::AbsoluteCount {
+                weight: weight_needed,
+            } => {
                 if *weight_needed == 0 {
                     Err(ContractError::ZeroThreshold {})
                 } else if *weight_needed > total_weight {
@@ -53,10 +56,13 @@ impl Threshold {
                     Ok(())
                 }
             }
-            Threshold::AbsolutePercentage { percentage_needed } => {
-                valid_percentage(percentage_needed)
-            }
-            Threshold::ThresholdQuora { threshold, quroum } => {
+            Threshold::AbsolutePercentage {
+                percentage: percentage_needed,
+            } => valid_percentage(percentage_needed),
+            Threshold::ThresholdQuora {
+                threshold,
+                quorum: quroum,
+            } => {
                 valid_percentage(threshold)?;
                 valid_percentage(quroum)
             }
@@ -66,19 +72,17 @@ impl Threshold {
     /// Creates a response from the saved data, just missing the total_weight info
     pub fn to_response(&self, total_weight: u64) -> ThresholdResponse {
         match self.clone() {
-            Threshold::AbsoluteCount { weight_needed } => ThresholdResponse::AbsoluteCount {
-                weight_needed,
+            Threshold::AbsoluteCount { weight } => ThresholdResponse::AbsoluteCount {
+                weight,
                 total_weight,
             },
-            Threshold::AbsolutePercentage { percentage_needed } => {
-                ThresholdResponse::AbsolutePercentage {
-                    percentage_needed,
-                    total_weight,
-                }
-            }
-            Threshold::ThresholdQuora { threshold, quroum } => ThresholdResponse::ThresholdQuora {
+            Threshold::AbsolutePercentage { percentage } => ThresholdResponse::AbsolutePercentage {
+                percentage,
+                total_weight,
+            },
+            Threshold::ThresholdQuora { threshold, quorum } => ThresholdResponse::ThresholdQuora {
                 threshold,
-                quroum,
+                quorum,
                 total_weight,
             },
         }
@@ -193,12 +197,12 @@ mod tests {
     #[test]
     fn validate_threshold() {
         // absolute count ensures 0 < required <= total_weight
-        let err = Threshold::AbsoluteCount { weight_needed: 0 }
+        let err = Threshold::AbsoluteCount { weight: 0 }
             .validate(5)
             .unwrap_err();
         // TODO: remove to_string() when PartialEq implemented
         assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
-        let err = Threshold::AbsoluteCount { weight_needed: 6 }
+        let err = Threshold::AbsoluteCount { weight: 6 }
             .validate(5)
             .unwrap_err();
         assert_eq!(
@@ -206,22 +210,18 @@ mod tests {
             ContractError::UnreachableThreshold {}.to_string()
         );
 
-        Threshold::AbsoluteCount { weight_needed: 1 }
-            .validate(5)
-            .unwrap();
-        Threshold::AbsoluteCount { weight_needed: 5 }
-            .validate(5)
-            .unwrap();
+        Threshold::AbsoluteCount { weight: 1 }.validate(5).unwrap();
+        Threshold::AbsoluteCount { weight: 5 }.validate(5).unwrap();
 
         // AbsolutePercentage just enforces valid_percentage (tested above)
         let err = Threshold::AbsolutePercentage {
-            percentage_needed: Decimal::zero(),
+            percentage: Decimal::zero(),
         }
         .validate(5)
         .unwrap_err();
         assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
         Threshold::AbsolutePercentage {
-            percentage_needed: Decimal::percent(51),
+            percentage: Decimal::percent(51),
         }
         .validate(5)
         .unwrap();
@@ -229,13 +229,13 @@ mod tests {
         // Quorum enforces both valid just enforces valid_percentage (tested above)
         Threshold::ThresholdQuora {
             threshold: Decimal::percent(51),
-            quroum: Decimal::percent(40),
+            quorum: Decimal::percent(40),
         }
         .validate(5)
         .unwrap();
         let err = Threshold::ThresholdQuora {
             threshold: Decimal::percent(101),
-            quroum: Decimal::percent(40),
+            quorum: Decimal::percent(40),
         }
         .validate(5)
         .unwrap_err();
@@ -245,7 +245,7 @@ mod tests {
         );
         let err = Threshold::ThresholdQuora {
             threshold: Decimal::percent(51),
-            quroum: Decimal::percent(0),
+            quorum: Decimal::percent(0),
         }
         .validate(5)
         .unwrap_err();
@@ -256,37 +256,37 @@ mod tests {
     fn threshold_response() {
         let total_weight: u64 = 100;
 
-        let res = Threshold::AbsoluteCount { weight_needed: 42 }.to_response(total_weight);
+        let res = Threshold::AbsoluteCount { weight: 42 }.to_response(total_weight);
         assert_eq!(
             res,
             ThresholdResponse::AbsoluteCount {
-                weight_needed: 42,
+                weight: 42,
                 total_weight
             }
         );
 
         let res = Threshold::AbsolutePercentage {
-            percentage_needed: Decimal::percent(51),
+            percentage: Decimal::percent(51),
         }
         .to_response(total_weight);
         assert_eq!(
             res,
             ThresholdResponse::AbsolutePercentage {
-                percentage_needed: Decimal::percent(51),
+                percentage: Decimal::percent(51),
                 total_weight
             }
         );
 
         let res = Threshold::ThresholdQuora {
             threshold: Decimal::percent(66),
-            quroum: Decimal::percent(50),
+            quorum: Decimal::percent(50),
         }
         .to_response(total_weight);
         assert_eq!(
             res,
             ThresholdResponse::ThresholdQuora {
                 threshold: Decimal::percent(66),
-                quroum: Decimal::percent(50),
+                quorum: Decimal::percent(50),
                 total_weight
             }
         );

@@ -292,7 +292,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     Ok(ThresholdResponse::AbsoluteCount {
-        weight_needed: cfg.required_weight,
+        weight: cfg.required_weight,
         total_weight: cfg.total_weight,
     })
 }

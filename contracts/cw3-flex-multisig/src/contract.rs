@@ -528,7 +528,9 @@ mod tests {
     ) -> (HumanAddr, HumanAddr) {
         setup_test_case(
             app,
-            Threshold::AbsoluteCount { weight_needed },
+            Threshold::AbsoluteCount {
+                weight: weight_needed,
+            },
             max_voting_period,
             init_funds,
             multisig_as_group_admin,
@@ -610,7 +612,7 @@ mod tests {
         // Zero required weight fails
         let init_msg = InitMsg {
             group_addr: group_addr.clone(),
-            threshold: Threshold::AbsoluteCount { weight_needed: 0 },
+            threshold: Threshold::AbsoluteCount { weight: 0 },
             max_voting_period,
         };
         let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "zero required weight");
@@ -624,7 +626,7 @@ mod tests {
         // Total weight less than required weight not allowed
         let init_msg = InitMsg {
             group_addr: group_addr.clone(),
-            threshold: Threshold::AbsoluteCount { weight_needed: 100 },
+            threshold: Threshold::AbsoluteCount { weight: 100 },
             max_voting_period,
         };
         let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "high required weight");
@@ -638,7 +640,7 @@ mod tests {
         // All valid
         let init_msg = InitMsg {
             group_addr: group_addr.clone(),
-            threshold: Threshold::AbsoluteCount { weight_needed: 1 },
+            threshold: Threshold::AbsoluteCount { weight: 1 },
             max_voting_period,
         };
         let flex_addr = app
@@ -1192,7 +1194,7 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Threshold {})
             .unwrap();
         let expected_thresh = ThresholdResponse::AbsoluteCount {
-            weight_needed: 4,
+            weight: 4,
             total_weight: 15,
         };
         assert_eq!(expected_thresh, threshold);
@@ -1271,7 +1273,7 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Threshold {})
             .unwrap();
         let expected_thresh = ThresholdResponse::AbsoluteCount {
-            weight_needed: 4,
+            weight: 4,
             total_weight: 19,
         };
         assert_eq!(expected_thresh, threshold);
@@ -1396,7 +1398,7 @@ mod tests {
         let (flex_addr, group_addr) = setup_test_case(
             &mut app,
             Threshold::AbsolutePercentage {
-                percentage_needed: Decimal::percent(33),
+                percentage: Decimal::percent(33),
             },
             voting_period,
             coins(10, "BTC"),
@@ -1478,7 +1480,7 @@ mod tests {
             &mut app,
             Threshold::ThresholdQuora {
                 threshold: Decimal::percent(50),
-                quroum: Decimal::percent(33),
+                quorum: Decimal::percent(33),
             },
             voting_period,
             coins(10, "BTC"),
