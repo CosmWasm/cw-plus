@@ -1386,7 +1386,6 @@ mod tests {
         assert_eq!(err, ContractError::Unauthorized {}.to_string());
     }
 
-    // TODO: scenario tests
     // uses the power from the beginning of the voting period
     #[test]
     fn percentage_handles_group_changes() {
@@ -1465,5 +1464,74 @@ mod tests {
             .query_wasm_smart(&flex_addr, &query_prop)
             .unwrap();
         assert_eq!(Status::Passed, prop.status);
+    }
+
+    // uses the power from the beginning of the voting period
+    #[test]
+    fn quorum_handles_group_changes() {
+        let mut app = mock_app();
+
+        // 33% required for quora, which is 5 of the initial 15
+        // 50% yes required to pass early (8 of the initial 15)
+        let voting_period = Duration::Time(20000);
+        let (flex_addr, group_addr) = setup_test_case(
+            &mut app,
+            Threshold::ThresholdQuora {
+                threshold: Decimal::percent(50),
+                quroum: Decimal::percent(33),
+            },
+            voting_period,
+            coins(10, "BTC"),
+            false,
+        );
+
+        // VOTER3 starts a proposal to send some tokens (3 votes)
+        let proposal = pay_somebody_proposal(&flex_addr);
+        let res = app
+            .execute_contract(VOTER3, &flex_addr, &proposal, &[])
+            .unwrap();
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+        let prop_status = |app: &App| -> Status {
+            let query_prop = QueryMsg::Proposal { proposal_id };
+            let prop: ProposalResponse = app
+                .wrap()
+                .query_wasm_smart(&flex_addr, &query_prop)
+                .unwrap();
+            prop.status
+        };
+
+        // 3/5 votes - not expired
+        assert_eq!(prop_status(&app), Status::Open);
+
+        // a few blocks later...
+        app.update_block(|block| block.height += 2);
+
+        // admin changes the group (3 -> 0, 2 -> 7, 0 -> 15) - total = 32, require 11 to pass
+        let newbie: &str = "newbie";
+        let update_msg = cw4_group::msg::HandleMsg::UpdateMembers {
+            remove: vec![VOTER3.into()],
+            add: vec![member(VOTER2, 7), member(newbie, 15)],
+        };
+        app.execute_contract(OWNER, &group_addr, &update_msg, &[])
+            .unwrap();
+
+        // a few blocks later...
+        app.update_block(|block| block.height += 3);
+
+        // VOTER2 votes no, according to original weights: 3 yes, 2 no, 5 total (will pass when expired)
+        // with updated weights, it would be 3 yes, 7 no, 10 total (will fail when expired)
+        let yes_vote = HandleMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        app.execute_contract(VOTER2, &flex_addr, &yes_vote, &[])
+            .unwrap();
+        // not expired yet
+        assert_eq!(prop_status(&app), Status::Open);
+
+        // wait until the vote is over, and see it was passed (met quorum, and threshold of voters)
+        app.update_block(expire(voting_period));
+        assert_eq!(prop_status(&app), Status::Passed);
     }
 }
