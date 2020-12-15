@@ -9,7 +9,7 @@ use cw0::{maybe_canonical, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
-    VoteListResponse, VoteResponse, VoterInfo, VoterListResponse, VoterResponse,
+    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
@@ -309,13 +309,15 @@ fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
     let prop = PROPOSALS.load(deps.storage, id.into())?;
     let status = prop.current_status(&env.block);
+    let threshold = prop.threshold.to_response(prop.total_weight);
     Ok(ProposalResponse {
         id,
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
-        expires: prop.expires,
         status,
+        expires: prop.expires,
+        threshold,
     })
 }
 
@@ -363,20 +365,26 @@ fn map_proposal(
 ) -> StdResult<ProposalResponse> {
     let (key, prop) = item?;
     let status = prop.current_status(block);
+    let threshold = prop.threshold.to_response(prop.total_weight);
     Ok(ProposalResponse {
         id: parse_id(&key)?,
         title: prop.title,
         description: prop.description,
         msgs: prop.msgs,
-        expires: prop.expires,
         status,
+        expires: prop.expires,
+        threshold,
     })
 }
 
 fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteResponse> {
     let voter_raw = deps.api.canonical_address(&voter)?;
     let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
-    let vote = prop.map(|b| b.vote);
+    let vote = prop.map(|b| VoteInfo {
+        voter,
+        vote: b.vote,
+        weight: b.weight,
+    });
     Ok(VoteResponse { vote })
 }
 
@@ -408,12 +416,12 @@ fn list_votes(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterInfo> {
+fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let voter_raw = deps.api.canonical_address(&voter)?;
     let weight = cfg.group_addr.is_member(&deps.querier, &voter_raw)?;
 
-    Ok(VoterInfo { weight })
+    Ok(VoterResponse { weight })
 }
 
 fn list_voters(
@@ -426,7 +434,7 @@ fn list_voters(
         .group_addr
         .list_members(&deps.querier, start_after, limit)?
         .into_iter()
-        .map(|member| VoterResponse {
+        .map(|member| VoterDetail {
             addr: member.addr,
             weight: member.weight,
         })
@@ -670,7 +678,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             voters.voters,
-            vec![VoterResponse {
+            vec![VoterDetail {
                 addr: OWNER.into(),
                 weight: 1
             }]
@@ -865,6 +873,10 @@ mod tests {
             msgs,
             expires: voting_period.after(&proposed_at),
             status: Status::Open,
+            threshold: ThresholdResponse::AbsoluteCount {
+                weight: 3,
+                total_weight: 15,
+            },
         };
         assert_eq!(&expected, &res.proposals[0]);
     }
@@ -989,9 +1001,11 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
             .unwrap();
         assert_eq!(
-            vote,
-            VoteResponse {
-                vote: Some(Vote::Yes)
+            vote.vote.unwrap(),
+            VoteInfo {
+                voter: OWNER.into(),
+                vote: Vote::Yes,
+                weight: 0
             }
         );
 
@@ -1002,9 +1016,11 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
             .unwrap();
         assert_eq!(
-            vote,
-            VoteResponse {
-                vote: Some(Vote::No)
+            vote.vote.unwrap(),
+            VoteInfo {
+                voter: VOTER2.into(),
+                vote: Vote::No,
+                weight: 2
             }
         );
 
@@ -1014,7 +1030,7 @@ mod tests {
             .wrap()
             .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
             .unwrap();
-        assert_eq!(vote, VoteResponse { vote: None });
+        assert!(vote.vote.is_none());
     }
 
     #[test]
@@ -1218,7 +1234,7 @@ mod tests {
         let query_voter = QueryMsg::Voter {
             address: VOTER3.into(),
         };
-        let power: VoterInfo = app
+        let power: VoterResponse = app
             .wrap()
             .query_wasm_smart(&flex_addr, &query_voter)
             .unwrap();
