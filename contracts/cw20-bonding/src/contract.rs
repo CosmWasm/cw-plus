@@ -123,16 +123,17 @@ pub fn handle_buy(
             if info.sent_funds[0].denom == supply.reserve_denom {
                 Ok(info.sent_funds[0].amount)
             } else {
-                Err(ContractError::MissingDenom(supply.reserve_denom.clone()))
+                Err(ContractError::MissingDenom(supply.reserve_denom))
             }
         }
-        _ => Err(ContractError::ExtraDenoms(supply.reserve_denom.clone())),
+        _ => Err(ContractError::ExtraDenoms(supply.reserve_denom)),
     }?;
     if sent.is_zero() {
         return Err(ContractError::NoFunds {});
     }
 
     // TODO: calculate how many tokens can be purchased with this and mint them
+    let _ = supply;
 
     unimplemented!();
     // // calculate to_mint and update total supply
@@ -191,7 +192,7 @@ pub fn handle_sell_from(
 
     // TODO: don't return verbatim, different return attrs
     let owner_info = MessageInfo {
-        sender: owner.clone(),
+        sender: owner,
         sent_funds: info.sent_funds,
     };
     handle_sell(deps, env, owner_info, amount)
