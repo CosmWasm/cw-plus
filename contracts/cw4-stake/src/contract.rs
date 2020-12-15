@@ -20,7 +20,7 @@ use cw0::claim::{claim_tokens, create_claim, CLAIMS};
 use cw0::hooks::prepare_hooks;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw4-group";
+const CONTRACT_NAME: &str = "crates.io:cw4-stake";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
