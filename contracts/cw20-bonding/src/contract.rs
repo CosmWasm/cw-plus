@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, StdResult, Uint128,
+    attr, coins, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse,
+    HumanAddr, InitResponse, MessageInfo, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -9,7 +9,7 @@ use cw20_base::allowances::{
     handle_transfer_from, query_allowance,
 };
 use cw20_base::contract::{
-    handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
+    handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
@@ -165,10 +165,10 @@ pub fn handle_buy(
     let res = HandleResponse {
         messages: vec![],
         attributes: vec![
-            attr("action", "bond"),
+            attr("action", "buy"),
             attr("from", info.sender),
-            attr("bonded", payment),
-            attr("minted", minted),
+            attr("reserve", payment),
+            attr("supply", minted),
         ],
         data: None,
     };
@@ -176,13 +176,52 @@ pub fn handle_buy(
 }
 
 pub fn handle_sell(
-    _deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _curve: &dyn Curve,
-    _amount: Uint128,
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    curve: &dyn Curve,
+    amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    unimplemented!();
+    // burn from the caller, this ensures there are tokens to cover this
+    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+
+    // TODO: we need to get these values from somewhere, based on each token's definition
+    // (Pass in via InitMsg?)
+    const RESERVE_DECIMALS: u128 = 1_000_000;
+    // This we can get from the local digits stored in init
+    const SUPPLY_DECIMALS: u128 = 1_000_000;
+
+    // calculate how many tokens can be purchased with this and mint them
+    let mut state = CURVE_STATE.load(deps.storage)?;
+    let supply = (state.supply - amount)?;
+    let supply_dec = Decimal::from_ratio(supply, SUPPLY_DECIMALS);
+    // apply bonding curve
+    let new_reserve_dec = curve.reserve(supply_dec);
+    let new_reserve = new_reserve_dec * Uint128(RESERVE_DECIMALS);
+
+    // calculate how many are created and then update bonding curve state
+    let released = (state.reserve - new_reserve)?;
+    state.supply = supply;
+    state.reserve = new_reserve;
+    CURVE_STATE.save(deps.storage, &state)?;
+
+    // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
+    let msg = BankMsg::Send {
+        from_address: env.contract.address,
+        to_address: info.sender.clone(),
+        amount: coins(released.u128(), state.reserve_denom),
+    };
+    let res = HandleResponse {
+        messages: vec![msg.into()],
+        attributes: vec![
+            attr("action", "sell"),
+            attr("from", info.sender),
+            attr("supply", amount),
+            attr("reserve", released),
+        ],
+        data: None,
+    };
+    Ok(res)
 }
 
 pub fn handle_sell_from(
