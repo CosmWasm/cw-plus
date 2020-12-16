@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, coins, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, StdResult, Uint128,
+    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -13,7 +13,7 @@ use cw20_base::contract::{
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
-use crate::curves::{Constant, Curve};
+use crate::curves::{decimal, Constant, Curve, DecimalPlaces};
 use crate::error::ContractError;
 use crate::msg::{CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE};
@@ -56,9 +56,16 @@ pub fn handle(
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
+    // TODO: we need to get these values from somewhere, based on each token's definition
+    // (Pass in via InitMsg?)
+    const NORMALIZE: DecimalPlaces = DecimalPlaces {
+        supply: 6,
+        reserve: 6,
+    };
+
     // TODO: where does this come from in real code? (same in handle and query)
     // right now test with 2 reserve to buy 1 supply
-    let curve = Constant(Decimal::percent(200));
+    let curve = Constant::new(decimal(2u128, 0), NORMALIZE);
 
     match msg {
         HandleMsg::Buy {} => handle_buy(deps, env, info, &curve),
@@ -134,19 +141,11 @@ pub fn handle_buy(
         return Err(ContractError::NoFunds {});
     }
 
-    // TODO: we need to get these values from somewhere, based on each token's definition
-    // (Pass in via InitMsg?)
-    const RESERVE_DECIMALS: Uint128 = Uint128(1_000_000);
-    // This we can get from the local digits stored in init
-    const SUPPLY_DECIMALS: Uint128 = Uint128(1_000_000);
-
     // calculate how many tokens can be purchased with this and mint them
-    let supply = state.supply;
-    let reserve = state.reserve + payment;
-    let new_supply = curve.supply_int(reserve, SUPPLY_DECIMALS, RESERVE_DECIMALS);
-    let minted = (new_supply - supply)?;
+    state.reserve += payment;
+    let new_supply = curve.supply(state.reserve);
+    let minted = (new_supply - state.supply)?;
     state.supply = new_supply;
-    state.reserve = reserve;
     CURVE_STATE.save(deps.storage, &state)?;
 
     // call into cw20-base to mint the token, call as self as no one else is allowed
@@ -180,18 +179,11 @@ pub fn handle_sell(
     // burn from the caller, this ensures there are tokens to cover this
     handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
 
-    // TODO: we need to get these values from somewhere, based on each token's definition
-    // (Pass in via InitMsg?)
-    const RESERVE_DECIMALS: Uint128 = Uint128(1_000_000);
-    // This we can get from the local digits stored in init
-    const SUPPLY_DECIMALS: Uint128 = Uint128(1_000_000);
-
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
-    let supply = (state.supply - amount)?;
-    let new_reserve = curve.reserve_int(supply, SUPPLY_DECIMALS, RESERVE_DECIMALS);
+    state.supply = (state.supply - amount)?;
+    let new_reserve = curve.reserve(state.supply);
     let released = (state.reserve - new_reserve)?;
-    state.supply = supply;
     state.reserve = new_reserve;
     CURVE_STATE.save(deps.storage, &state)?;
 
@@ -237,9 +229,16 @@ pub fn handle_sell_from(
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    // TODO: we need to get these values from somewhere, based on each token's definition
+    // (Pass in via InitMsg?)
+    const NORMALIZE: DecimalPlaces = DecimalPlaces {
+        supply: 6,
+        reserve: 6,
+    };
+
     // TODO: where does this come from in real code? (same in handle and query)
     // right now test with 2 reserve to buy 1 supply
-    let curve = Constant(Decimal::percent(200));
+    let curve = Constant::new(decimal(2u128, 0), NORMALIZE);
 
     match msg {
         // custom queries
@@ -261,9 +260,7 @@ pub fn query_curve_info(deps: Deps, curve: &dyn Curve) -> StdResult<CurveInfoRes
     } = CURVE_STATE.load(deps.storage)?;
 
     // This we can get from the local digits stored in init
-    const SUPPLY_DECIMALS: Uint128 = Uint128(1_000_000);
-    let supply_dec = Decimal::from_ratio(supply, SUPPLY_DECIMALS);
-    let spot_price = curve.spot_price(supply_dec);
+    let spot_price = curve.spot_price(supply);
 
     Ok(CurveInfoResponse {
         reserve,
