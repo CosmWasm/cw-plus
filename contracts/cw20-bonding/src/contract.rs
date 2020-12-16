@@ -56,7 +56,7 @@ pub fn handle(
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
-    // TODO: where does this come from in real code?
+    // TODO: where does this come from in real code? (same in handle and query)
     // right now test with 2 reserve to buy 1 supply
     let curve = Constant(Decimal::percent(200));
 
@@ -136,19 +136,14 @@ pub fn handle_buy(
 
     // TODO: we need to get these values from somewhere, based on each token's definition
     // (Pass in via InitMsg?)
-    const RESERVE_DECIMALS: u128 = 1_000_000;
+    const RESERVE_DECIMALS: Uint128 = Uint128(1_000_000);
     // This we can get from the local digits stored in init
-    const SUPPLY_DECIMALS: u128 = 1_000_000;
+    const SUPPLY_DECIMALS: Uint128 = Uint128(1_000_000);
 
     // calculate how many tokens can be purchased with this and mint them
     let supply = state.supply;
     let reserve = state.reserve + payment;
-    let reserve_dec = Decimal::from_ratio(reserve, RESERVE_DECIMALS);
-    // apply bonding curve
-    let new_supply_dec = curve.supply(reserve_dec);
-    let new_supply = new_supply_dec * Uint128(SUPPLY_DECIMALS);
-
-    // calculate how many are created and then update bonding curve state
+    let new_supply = curve.supply_int(reserve, SUPPLY_DECIMALS, RESERVE_DECIMALS);
     let minted = (new_supply - supply)?;
     state.supply = new_supply;
     state.reserve = reserve;
@@ -187,19 +182,14 @@ pub fn handle_sell(
 
     // TODO: we need to get these values from somewhere, based on each token's definition
     // (Pass in via InitMsg?)
-    const RESERVE_DECIMALS: u128 = 1_000_000;
+    const RESERVE_DECIMALS: Uint128 = Uint128(1_000_000);
     // This we can get from the local digits stored in init
-    const SUPPLY_DECIMALS: u128 = 1_000_000;
+    const SUPPLY_DECIMALS: Uint128 = Uint128(1_000_000);
 
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
     let supply = (state.supply - amount)?;
-    let supply_dec = Decimal::from_ratio(supply, SUPPLY_DECIMALS);
-    // apply bonding curve
-    let new_reserve_dec = curve.reserve(supply_dec);
-    let new_reserve = new_reserve_dec * Uint128(RESERVE_DECIMALS);
-
-    // calculate how many are created and then update bonding curve state
+    let new_reserve = curve.reserve_int(supply, SUPPLY_DECIMALS, RESERVE_DECIMALS);
     let released = (state.reserve - new_reserve)?;
     state.supply = supply;
     state.reserve = new_reserve;
@@ -246,84 +236,14 @@ pub fn handle_sell_from(
     handle_sell(deps, env, owner_info, curve, amount)
 }
 
-// pub fn unbond(
-//     mut deps: DepsMut,
-//     env: Env,
-//     info: MessageInfo,
-//     amount: Uint128,
-// ) -> Result<HandleResponse, ContractError> {
-//     let sender_raw = deps.api.canonical_address(&info.sender)?;
-//
-//     let invest = invest_info_read(deps.storage).load()?;
-//     // ensure it is big enough to care
-//     if amount < invest.min_withdrawal {
-//         return Err(ContractError::UnbondTooSmall {
-//             min_bonded: invest.min_withdrawal,
-//             denom: invest.bond_denom,
-//         });
-//     }
-//     // calculate tax and remainer to unbond
-//     let tax = amount * invest.exit_tax;
-//
-//     // burn from the original caller
-//     handle_burn(dup(&mut deps), env.clone(), info.clone(), amount)?;
-//     if tax > Uint128(0) {
-//         let sub_info = MessageInfo {
-//             sender: env.contract.address.clone(),
-//             sent_funds: vec![],
-//         };
-//         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
-//         let human_owner = deps.api.human_address(&invest.owner)?;
-//         handle_mint(dup(&mut deps), env.clone(), sub_info, human_owner, tax)?;
-//     }
-//
-//     // re-calculate bonded to ensure we have real values
-//     // bonded is the total number of tokens we have delegated from this address
-//     let bonded = get_bonded(&deps.querier, &env.contract.address)?;
-//
-//     // calculate how many native tokens this is worth and update supply
-//     let remainder = (amount - tax)?;
-//     let mut totals = total_supply(deps.storage);
-//     let mut supply = totals.load()?;
-//     // TODO: this is just a safety assertion - do we keep it, or remove caching?
-//     // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
-//     // have expensive queries everywhere
-//     assert_bonds(&supply, bonded)?;
-//     let unbond = remainder.multiply_ratio(bonded, supply.issued);
-//     supply.bonded = (bonded - unbond)?;
-//     supply.issued = (supply.issued - remainder)?;
-//     supply.claims += unbond;
-//     totals.save(&supply)?;
-//
-//     create_claim(
-//         deps.storage,
-//         &sender_raw,
-//         unbond,
-//         invest.unbonding_period.after(&env.block),
-//     )?;
-//
-//     // unbond them
-//     let res = HandleResponse {
-//         messages: vec![StakingMsg::Undelegate {
-//             validator: invest.validator,
-//             amount: coin(unbond.u128(), &invest.bond_denom),
-//         }
-//         .into()],
-//         attributes: vec![
-//             attr("action", "unbond"),
-//             attr("to", info.sender),
-//             attr("unbonded", unbond),
-//             attr("burnt", amount),
-//         ],
-//         data: None,
-//     };
-//     Ok(res)
-// }
-
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    // TODO: where does this come from in real code? (same in handle and query)
+    // right now test with 2 reserve to buy 1 supply
+    let curve = Constant(Decimal::percent(200));
+
     match msg {
         // custom queries
-        QueryMsg::CurveInfo {} => to_binary(&query_curve_info(deps)?),
+        QueryMsg::CurveInfo {} => to_binary(&query_curve_info(deps, &curve)?),
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
@@ -333,18 +253,23 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_curve_info(deps: Deps) -> StdResult<CurveInfoResponse> {
+pub fn query_curve_info(deps: Deps, curve: &dyn Curve) -> StdResult<CurveInfoResponse> {
     let CurveState {
         reserve,
         supply,
         reserve_denom,
     } = CURVE_STATE.load(deps.storage)?;
+
+    // This we can get from the local digits stored in init
+    const SUPPLY_DECIMALS: Uint128 = Uint128(1_000_000);
+    let supply_dec = Decimal::from_ratio(supply, SUPPLY_DECIMALS);
+    let spot_price = curve.spot_price(supply_dec);
+
     Ok(CurveInfoResponse {
         reserve,
         supply,
         reserve_denom,
-        // TODO
-        spot_price: Decimal::one(),
+        spot_price,
     })
 }
 

@@ -1,4 +1,4 @@
-use cosmwasm_std::Decimal;
+use cosmwasm_std::{Decimal, Uint128};
 
 /// This defines the curves we are using.
 ///
@@ -26,6 +26,29 @@ pub trait Curve {
     /// with a total paid amount of reserve.
     /// `F^-1(x)` from the README
     fn supply(&self, reserve: Decimal) -> Decimal;
+
+    /// Helper to deal with Uint128 types if you know the normalizing factor
+    fn reserve_int(
+        &self,
+        supply: Uint128,
+        supply_decimal: Uint128,
+        reserve_decimal: Uint128,
+    ) -> Uint128 {
+        let supply_dec = Decimal::from_ratio(supply, supply_decimal);
+        let new_reserve_dec = self.reserve(supply_dec);
+        new_reserve_dec * reserve_decimal
+    }
+
+    fn supply_int(
+        &self,
+        reserve: Uint128,
+        supply_decimal: Uint128,
+        reserve_decimal: Uint128,
+    ) -> Uint128 {
+        let reserve_dec = Decimal::from_ratio(reserve, reserve_decimal);
+        let new_supply_dec = self.supply(reserve_dec);
+        new_supply_dec * supply_decimal
+    }
 }
 
 /// spot price is always this value
