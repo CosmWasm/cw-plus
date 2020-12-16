@@ -21,55 +21,22 @@ pub struct InitMsg {
 /// individual voter used in tallying should be snapshotted at the beginning of
 /// the block at which the proposal starts (this is likely the responsibility of a
 /// correct cw4 implementation).
+/// See also `ThresholdResponse` in the cw3 spec.
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Threshold {
-    /// Declares that a fixed weight of yes votes is needed to pass.
-    /// It does not matter how many no votes are cast, or how many do not vote,
-    /// as long as `weight` yes votes are cast.
-    ///
-    /// This is the simplest format and usually suitable for small multisigs of trusted parties,
-    /// like 3 of 5. (weight: 3, total_weight: 5)
-    ///
-    /// A proposal of this type can pass early as soon as the needed weight of yes votes has been cast.
+    /// Declares that a fixed weight of Yes votes is needed to pass.
+    /// See `ThresholdResponse.AbsoluteCount` in the cw3 spec for details.
     AbsoluteCount { weight: u64 },
 
-    /// Declares a percentage of the total weight that must cast yes votes in order for
-    /// a proposal to pass. The percentage is computed over the total weight minus the weight of the
-    /// abstained votes.
-    ///
-    /// This is useful for similar circumstances as `AbsoluteCount`, where we have a relatively
-    /// small set of voters and participation is required. The advantage here is that if the
-    /// voting set (group) changes between proposals, the number of votes needed is adjusted
-    /// accordingly.
-    ///
-    /// Example: we set `percentage` to 51%. Proposal 1 starts when there is a `total_weight` of 5.
-    /// This will require 3 weight of yes votes in order to pass. Later, the Proposal 2 starts but the
-    /// `total_weight` of the group has increased to 9. That proposal will then automatically
-    /// require 5 yes of 9 to pass, rather than 3 yes of 9 as would be the case with `AbsoluteCount`.
-    ///
-    /// A proposal of this type can pass early as soon as the needed weight of yes votes has been cast.
+    /// Declares a percentage of the total weight that must cast Yes votes in order for
+    /// a proposal to pass.
+    /// See `ThresholdResponse.AbsolutePercentage` in the cw3 spec for details.
     AbsolutePercentage { percentage: Decimal },
 
     /// Declares a `quorum` of the total votes that must participate in the election in order
-    /// for the vote to be considered at all. Within the votes that were cast, it requires `threshold`
-    /// in favor. That is calculated by ignoring the abstain votes (they count towards `quorum`
-    /// but do not influence `threshold`). That is, we calculate `yes / (yes + no + veto)`
-    /// and compare that with `threshold` to consider if the proposal was passed.
-    ///
-    /// It is rather difficult for a proposal of this type to pass early. That can only happen if
-    /// the required quorum has been already met, and in the case if all remaining voters were
-    /// to vote no, the threshold would still be met.
-    ///
-    /// 30% yes votes, 10% no votes, and 20% abstain would pass early if quorum <= 60%
-    /// (who has cast votes) and if the threshold is <= 37.5% (the remaining 40% voting
-    /// no => 30% yes + 50% no). Once the voting period has passed with no additional votes,
-    /// that same proposal would be considered successful if quorum <= 60% and threshold <= 75%
-    /// (percent in favor if we ignore abstain votes).
-    ///
-    /// This type is more common in general elections where participation is expected to often
-    /// be low, and `AbsolutePercentage` would either be too restrictive to pass anything,
-    /// or allow low percentages to pass if there was high participation in one election.
+    /// for the vote to be considered at all.
+    /// See `ThresholdResponse.ThresholdQuorum` in the cw3 spec for details.
     ThresholdQuorum { threshold: Decimal, quorum: Decimal },
 }
 
