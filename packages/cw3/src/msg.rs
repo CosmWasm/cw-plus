@@ -39,8 +39,8 @@ pub enum Vote {
     No,
     /// Marks participation but does not count towards the ratio of support / opposed
     Abstain,
-    /// Veto is generally to be treated as a no vote. Some implementations may allow certain
-    /// voters to be able to Veto, or them to be counted stronger then nos in some way.
+    /// Veto is generally to be treated as a No vote. Some implementations may allow certain
+    /// voters to be able to Veto, or them to be counted stronger than No in some way.
     Veto,
 }
 
