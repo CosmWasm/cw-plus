@@ -263,6 +263,7 @@ mod test {
         votes.add_vote(Vote::No, 4);
         votes.add_vote(Vote::Abstain, 2);
         // same expired or not, if yes >= ceiling(0.5 * (total - abstained))
+        // 7 of (15-2) passes
         assert_eq!(
             true,
             check_is_passed(percent.clone(), votes.clone(), 15, false)
@@ -270,6 +271,11 @@ mod test {
         assert_eq!(
             true,
             check_is_passed(percent.clone(), votes.clone(), 15, true)
+        );
+        // but 7 of (17-2) fails
+        assert_eq!(
+            false,
+            check_is_passed(percent.clone(), votes.clone(), 17, false)
         );
 
         // if the total were a bit lower, this would pass
