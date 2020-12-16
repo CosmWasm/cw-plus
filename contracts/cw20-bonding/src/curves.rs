@@ -79,16 +79,14 @@ impl Curve for Constant {
     /// Note that both need to be normalized.
     fn reserve(&self, supply: Uint128) -> Uint128 {
         // supply * self.value
-        let out = decimal(supply, 0) * self.value * self.normalize.supply_to_reserve();
-        // TODO: handle overflow better? Result?
-        out.floor().to_u128().unwrap().into()
+        let reserve = self.normalize.from_supply(supply) * self.value;
+        self.normalize.to_reserve(reserve)
     }
 
     fn supply(&self, reserve: Uint128) -> Uint128 {
         // reserve / self.value
-        let out = decimal(reserve, 0) * self.normalize.reserve_to_supply() / self.value;
-        // TODO: handle overflow better? Result?
-        out.floor().to_u128().unwrap().into()
+        let supply = self.normalize.from_reserve(reserve) / self.value;
+        self.normalize.to_supply(supply)
     }
 }
 
@@ -98,21 +96,26 @@ pub struct Linear {
     pub normalize: DecimalPlaces,
 }
 
+impl Linear {
+    pub fn new(slope: Decimal, normalize: DecimalPlaces) -> Self {
+        Self { slope, normalize }
+    }
+}
+
 impl Curve for Linear {
     fn spot_price(&self, supply: Uint128) -> StdDecimal {
         // supply * self.value * (normalize.reserve / normalize.supply)
-        let out = decimal(supply, 0) * self.slope;
+        let out = self.normalize.from_supply(supply) * self.slope;
         decimal_to_std(out)
     }
 
     fn reserve(&self, supply: Uint128) -> Uint128 {
         // TODO: self.slope * supply * supply / 2
-        let normalized = decimal(supply, self.normalize.supply);
+        let normalized = self.normalize.from_supply(supply);
         let square = normalized * normalized;
         // Note: multiplying by 0.5 is much faster than dividing by 2
-        let out = square * self.slope * Decimal::new(5, 1);
-        // TODO: handle overflow better? Result?
-        out.floor().to_u128().unwrap().into()
+        let reserve = square * self.slope * Decimal::new(5, 1);
+        self.normalize.to_reserve(reserve)
     }
 
     fn supply(&self, _reserve: Uint128) -> Uint128 {
@@ -138,43 +141,26 @@ impl DecimalPlaces {
         }
     }
 
-    pub fn to_reserve(&self) -> Decimal {
-        Decimal::new(1, self.reserve)
+    pub fn to_reserve(&self, reserve: Decimal) -> Uint128 {
+        let factor = decimal(10u128.pow(self.reserve), 0);
+        let out = reserve * factor;
+        // TODO: handle overflow better? Result?
+        out.floor().to_u128().unwrap().into()
     }
 
-    pub fn from_reserve(&self) -> Decimal {
-        Decimal::from_i128_with_scale(10i128.pow(self.reserve), 0)
+    pub fn to_supply(&self, supply: Decimal) -> Uint128 {
+        let factor = decimal(10u128.pow(self.supply), 0);
+        let out = supply * factor;
+        // TODO: handle overflow better? Result?
+        out.floor().to_u128().unwrap().into()
     }
 
-    pub fn to_supply(&self) -> Decimal {
-        Decimal::new(1, self.supply)
+    pub fn from_supply(&self, supply: Uint128) -> Decimal {
+        decimal(supply, self.supply)
     }
 
-    pub fn from_supply(&self) -> Decimal {
-        Decimal::from_i128_with_scale(10i128.pow(self.supply), 0)
-    }
-
-    pub fn supply_to_reserve(&self) -> Decimal {
-        let mul = (self.reserve as i32) - (self.supply as i32);
-        tens_exp(mul)
-    }
-
-    pub fn reserve_to_supply(&self) -> Decimal {
-        let mul = (self.supply as i32) - (self.reserve as i32);
-        tens_exp(mul)
-    }
-}
-
-/// returns 10^exp
-fn tens_exp(exp: i32) -> Decimal {
-    let positive = exp > 0;
-    let exp = exp.abs() as u32;
-    if positive {
-        // calculate the power
-        Decimal::from_i128_with_scale(10i128.pow(exp), 0)
-    } else {
-        // 10 ^ -exp done automatically
-        Decimal::new(1, exp)
+    pub fn from_reserve(&self, reserve: Uint128) -> Decimal {
+        decimal(reserve, self.reserve)
     }
 }
 
@@ -183,7 +169,6 @@ mod tests {
     use super::*;
     // TODO: test DecimalPlaces return proper decimals
 
-    // TODO: test Constant Curve behaves properly
     #[test]
     fn constant_curve() {
         // supply is nstep (9), reserve is uatom (6)
@@ -203,7 +188,33 @@ mod tests {
         assert_eq!(Uint128(24_000_000_000), supply);
     }
 
-    // TODO: test Linear Curve, what is implemented
+    #[test]
+    fn linear_curve() {
+        // supply is usdt (2), reserve is btc (8)
+        let normalize = DecimalPlaces::new(2, 8);
+        // slope is 0.1 (eg hits 1.0 after 10btc)
+        let curve = Linear::new(decimal(1u128, 1), normalize);
+
+        // do some sanity checks....
+        // spot price is 0.1 with 1 USDT supply
+        assert_eq!(StdDecimal::permille(100), curve.spot_price(Uint128(100)));
+        // spot price is 1.7 with 17 USDT supply
+        assert_eq!(StdDecimal::permille(1700), curve.spot_price(Uint128(1700)));
+        // spot price is 0.212 with 2.12 USDT supply
+        assert_eq!(StdDecimal::permille(212), curve.spot_price(Uint128(212)));
+
+        // if we have 10 USDT, we should have 5 BTC
+        let reserve = curve.reserve(Uint128(1000));
+        assert_eq!(Uint128(500_000_000), reserve);
+        // if we have 20 USDT, we should have 20 BTC
+        let reserve = curve.reserve(Uint128(2000));
+        assert_eq!(Uint128(2_000_000_000), reserve);
+
+        // TODO
+        // if we have 36 ATOM, we should have 24 STEP
+        // let supply = curve.supply(Uint128(36_000_000));
+        // assert_eq!(Uint128(24_000_000_000), supply);
+    }
 
     // TODO: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
 }
