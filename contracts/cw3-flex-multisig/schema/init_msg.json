@@ -5,7 +5,7 @@
   "required": [
     "group_addr",
     "max_voting_period",
-    "required_weight"
+    "threshold"
   ],
   "properties": {
     "group_addr": {
@@ -14,13 +14,15 @@
     "max_voting_period": {
       "$ref": "#/definitions/Duration"
     },
-    "required_weight": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
+    "threshold": {
+      "$ref": "#/definitions/Threshold"
     }
   },
   "definitions": {
+    "Decimal": {
+      "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
+      "type": "string"
+    },
     "Duration": {
       "description": "Duration is a delta of time. You can add it to a BlockInfo or Expiration to move that further in the future. Note that an height-based Duration and a time-based Expiration cannot be combined",
       "anyOf": [
@@ -54,6 +56,77 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "Threshold": {
+      "description": "This defines the different ways tallies can happen.\n\nThe total_weight used for calculating success as well as the weights of each individual voter used in tallying should be snapshotted at the beginning of the block at which the proposal starts (this is likely the responsibility of a correct cw4 implementation). See also `ThresholdResponse` in the cw3 spec.",
+      "anyOf": [
+        {
+          "description": "Declares that a fixed weight of Yes votes is needed to pass. See `ThresholdResponse.AbsoluteCount` in the cw3 spec for details.",
+          "type": "object",
+          "required": [
+            "absolute_count"
+          ],
+          "properties": {
+            "absolute_count": {
+              "type": "object",
+              "required": [
+                "weight"
+              ],
+              "properties": {
+                "weight": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "Declares a percentage of the total weight that must cast Yes votes in order for a proposal to pass. See `ThresholdResponse.AbsolutePercentage` in the cw3 spec for details.",
+          "type": "object",
+          "required": [
+            "absolute_percentage"
+          ],
+          "properties": {
+            "absolute_percentage": {
+              "type": "object",
+              "required": [
+                "percentage"
+              ],
+              "properties": {
+                "percentage": {
+                  "$ref": "#/definitions/Decimal"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "Declares a `quorum` of the total votes that must participate in the election in order for the vote to be considered at all. See `ThresholdResponse.ThresholdQuorum` in the cw3 spec for details.",
+          "type": "object",
+          "required": [
+            "threshold_quorum"
+          ],
+          "properties": {
+            "threshold_quorum": {
+              "type": "object",
+              "required": [
+                "quorum",
+                "threshold"
+              ],
+              "properties": {
+                "quorum": {
+                  "$ref": "#/definitions/Decimal"
+                },
+                "threshold": {
+                  "$ref": "#/definitions/Decimal"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

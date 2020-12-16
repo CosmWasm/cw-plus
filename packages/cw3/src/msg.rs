@@ -33,9 +33,14 @@ where
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Vote {
+    /// Marks support for the proposal.
     Yes,
+    /// Marks opposition to the proposal.
     No,
+    /// Marks participation but does not count towards the ratio of support / opposed
     Abstain,
+    /// Veto is generally to be treated as a No vote. Some implementations may allow certain
+    /// voters to be able to Veto, or them to be counted stronger than No in some way.
     Veto,
 }
 

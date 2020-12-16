@@ -6,11 +6,11 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
-    #[error("Required weight cannot be zero")]
-    ZeroWeight {},
+    #[error("Required threshold cannot be zero")]
+    ZeroThreshold {},
 
-    #[error("Not possible to reach required (passing) weight")]
-    UnreachableWeight {},
+    #[error("Not possible to reach required (passing) threshold")]
+    UnreachableThreshold {},
 
     #[error("Group contract invalid address '{addr}'")]
     InvalidGroup { addr: HumanAddr },
