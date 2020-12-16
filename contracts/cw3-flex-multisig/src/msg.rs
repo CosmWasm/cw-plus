@@ -127,7 +127,6 @@ pub enum HandleMsg {
     MemberChangedHook(MemberChangedHookMsg),
 }
 
-// TODO: add a custom query to return the voter list (all potential voters)
 // We can also add this as a cw3 extension
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]

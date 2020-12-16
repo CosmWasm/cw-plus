@@ -147,7 +147,6 @@ impl Mul<u64> for Duration {
 mod test {
     use super::*;
 
-    // TODO: add tests for the logic
     #[test]
     fn compare_expiration() {
         // matching pairs
