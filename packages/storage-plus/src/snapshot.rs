@@ -10,6 +10,7 @@ use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
 use crate::{Bound, Prefixer};
+use std::fmt::Debug;
 
 /// Map that maintains a snapshots of one or more checkpoints.
 /// We can query historical data as well as current state.
@@ -128,6 +129,15 @@ where
 
     /// load old value and store changelog
     fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
+        // if there is already data in the changelog for this key and block, do not write more
+        if self
+            .changelog
+            .may_load(store, (k.clone(), U64Key::from(height)))?
+            .is_some()
+        {
+            return Ok(());
+        }
+        // otherwise, store the previous value
         let old = self.primary.may_load(store, k.clone())?;
         self.changelog
             .save(store, (k, U64Key::from(height)), &ChangeSet { old })
@@ -221,17 +231,8 @@ where
         E: From<StdError>,
     {
         let input = self.may_load(store, k.clone())?;
-        let old = input.clone();
-
         let output = action(input)?;
-        // optimize the save (save the extra read in write_change)
-        if self.should_checkpoint(store, &k)? {
-            let diff = ChangeSet { old };
-            self.changelog
-                .save(store, (k.clone(), height.into()), &diff)?;
-        }
-        self.primary.save(store, k, &output)?;
-
+        self.save(store, k, &output, height)?;
         Ok(output)
     }
 }
@@ -393,5 +394,64 @@ mod tests {
         assert_missing_checkpoint(&NEVER, &storage, 1);
         // deleted checkpoint
         assert_missing_checkpoint(&NEVER, &storage, 5);
+    }
+
+    #[test]
+    fn handle_multiple_writes_in_one_block() {
+        let mut storage = MockStorage::new();
+
+        println!("SETUP");
+        EVERY.save(&mut storage, b"A", &5, 1).unwrap();
+        EVERY.save(&mut storage, b"B", &7, 2).unwrap();
+        EVERY.save(&mut storage, b"C", &2, 2).unwrap();
+
+        // update and save - A query at 3 => 5, at 4 => 12
+        EVERY
+            .update(&mut storage, b"A", 3, |_| -> StdResult<u64> { Ok(9) })
+            .unwrap();
+        EVERY.save(&mut storage, b"A", &12, 3).unwrap();
+        assert_eq!(
+            Some(5),
+            EVERY.may_load_at_height(&storage, b"A", 2).unwrap()
+        );
+        assert_eq!(
+            Some(5),
+            EVERY.may_load_at_height(&storage, b"A", 3).unwrap()
+        );
+        assert_eq!(
+            Some(12),
+            EVERY.may_load_at_height(&storage, b"A", 4).unwrap()
+        );
+
+        // save and remove - B query at 4 => 7, at 5 => None
+        EVERY.save(&mut storage, b"B", &17, 4).unwrap();
+        EVERY.remove(&mut storage, b"B", 4).unwrap();
+        assert_eq!(
+            Some(7),
+            EVERY.may_load_at_height(&storage, b"B", 3).unwrap()
+        );
+        assert_eq!(
+            Some(7),
+            EVERY.may_load_at_height(&storage, b"B", 4).unwrap()
+        );
+        assert_eq!(None, EVERY.may_load_at_height(&storage, b"B", 5).unwrap());
+
+        // remove and update - C query at 5 => 2, at 6 => 16
+        EVERY.remove(&mut storage, b"C", 5).unwrap();
+        EVERY
+            .update(&mut storage, b"C", 5, |_| -> StdResult<u64> { Ok(16) })
+            .unwrap();
+        assert_eq!(
+            Some(2),
+            EVERY.may_load_at_height(&storage, b"C", 4).unwrap()
+        );
+        assert_eq!(
+            Some(2),
+            EVERY.may_load_at_height(&storage, b"C", 5).unwrap()
+        );
+        assert_eq!(
+            Some(16),
+            EVERY.may_load_at_height(&storage, b"C", 6).unwrap()
+        );
     }
 }
