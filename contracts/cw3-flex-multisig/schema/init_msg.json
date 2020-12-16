@@ -106,10 +106,10 @@
           "description": "Declares a `quorum` of the total votes that must participate in the election in order for the vote to be considered at all. Within the votes that were cast, it requires `threshold` in favor. That is calculated by ignoring the abstain votes (they count towards `quorum` but do not influence `threshold`). That is, we calculate `yes / (yes + no + veto)` and compare that with `threshold` to consider if the proposal was passed.\n\nIt is rather difficult for a proposal of this type to pass early. That can only happen if the required quorum has been already met, and in the case if all remaining voters were to vote no, the threshold would still be met.\n\n30% yes votes, 10% no votes, and 20% abstain would pass early if quorum <= 60% (who has cast votes) and if the threshold is <= 37.5% (the remaining 40% voting no => 30% yes + 50% no). Once the voting period has passed with no additional votes, that same proposal would be considered successful if quorum <= 60% and threshold <= 75% (percent in favor if we ignore abstain votes).\n\nThis type is more common in general elections where participation is expected to often be low, and `AbsolutePercentage` would either be too restrictive to pass anything, or allow low percentages to pass if there was high participation in one election.",
           "type": "object",
           "required": [
-            "threshold_quora"
+            "threshold_quorum"
           ],
           "properties": {
-            "threshold_quora": {
+            "threshold_quorum": {
               "type": "object",
               "required": [
                 "quorum",

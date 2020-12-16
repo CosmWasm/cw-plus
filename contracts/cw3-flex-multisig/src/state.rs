@@ -106,7 +106,7 @@ impl Proposal {
                 self.votes.yes
                     >= votes_needed(self.total_weight - self.votes.abstain, percentage_needed)
             }
-            Threshold::ThresholdQuora { threshold, quorum } => {
+            Threshold::ThresholdQuorum { threshold, quorum } => {
                 // we always require the quorum
                 if self.votes.total() < votes_needed(self.total_weight, quorum) {
                     return false;
@@ -283,7 +283,7 @@ mod test {
 
     #[test]
     fn proposal_passed_quorum() {
-        let quorum = Threshold::ThresholdQuora {
+        let quorum = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(50),
             quorum: Decimal::percent(40),
         };
@@ -363,7 +363,7 @@ mod test {
     #[test]
     fn quorum_edge_cases() {
         // when we pass absolute threshold (everyone else voting no, we pass), but still don't hit quorum
-        let quorum = Threshold::ThresholdQuora {
+        let quorum = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(60),
             quorum: Decimal::percent(80),
         };

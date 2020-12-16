@@ -111,7 +111,7 @@ pub enum ThresholdResponse {
     /// be low, and `AbsolutePercentage` would either be too high to pass anything,
     /// or allow low percentages to pass, independently of if there was high participation in the
     /// election or not.
-    ThresholdQuora {
+    ThresholdQuorum {
         threshold: Decimal,
         quorum: Decimal,
         total_weight: u64,

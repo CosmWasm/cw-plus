@@ -70,7 +70,7 @@ pub enum Threshold {
     /// This type is more common in general elections where participation is expected to often
     /// be low, and `AbsolutePercentage` would either be too restrictive to pass anything,
     /// or allow low percentages to pass if there was high participation in one election.
-    ThresholdQuora { threshold: Decimal, quorum: Decimal },
+    ThresholdQuorum { threshold: Decimal, quorum: Decimal },
 }
 
 impl Threshold {
@@ -92,7 +92,7 @@ impl Threshold {
             Threshold::AbsolutePercentage {
                 percentage: percentage_needed,
             } => valid_percentage(percentage_needed),
-            Threshold::ThresholdQuora {
+            Threshold::ThresholdQuorum {
                 threshold,
                 quorum: quroum,
             } => {
@@ -113,11 +113,13 @@ impl Threshold {
                 percentage,
                 total_weight,
             },
-            Threshold::ThresholdQuora { threshold, quorum } => ThresholdResponse::ThresholdQuora {
-                threshold,
-                quorum,
-                total_weight,
-            },
+            Threshold::ThresholdQuorum { threshold, quorum } => {
+                ThresholdResponse::ThresholdQuorum {
+                    threshold,
+                    quorum,
+                    total_weight,
+                }
+            }
         }
     }
 }
@@ -261,13 +263,13 @@ mod tests {
         .unwrap();
 
         // Quorum enforces both valid just enforces valid_percentage (tested above)
-        Threshold::ThresholdQuora {
+        Threshold::ThresholdQuorum {
             threshold: Decimal::percent(51),
             quorum: Decimal::percent(40),
         }
         .validate(5)
         .unwrap();
-        let err = Threshold::ThresholdQuora {
+        let err = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(101),
             quorum: Decimal::percent(40),
         }
@@ -277,7 +279,7 @@ mod tests {
             err.to_string(),
             ContractError::UnreachableThreshold {}.to_string()
         );
-        let err = Threshold::ThresholdQuora {
+        let err = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(51),
             quorum: Decimal::percent(0),
         }
@@ -311,14 +313,14 @@ mod tests {
             }
         );
 
-        let res = Threshold::ThresholdQuora {
+        let res = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(66),
             quorum: Decimal::percent(50),
         }
         .to_response(total_weight);
         assert_eq!(
             res,
-            ThresholdResponse::ThresholdQuora {
+            ThresholdResponse::ThresholdQuorum {
                 threshold: Decimal::percent(66),
                 quorum: Decimal::percent(50),
                 total_weight

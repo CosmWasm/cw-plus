@@ -1494,7 +1494,7 @@ mod tests {
         let voting_period = Duration::Time(20000);
         let (flex_addr, group_addr) = setup_test_case(
             &mut app,
-            Threshold::ThresholdQuora {
+            Threshold::ThresholdQuorum {
                 threshold: Decimal::percent(50),
                 quorum: Decimal::percent(33),
             },
@@ -1563,7 +1563,7 @@ mod tests {
         let (flex_addr, _) = setup_test_case(
             &mut app,
             // note that 60% yes is not enough to pass without 20% no as well
-            Threshold::ThresholdQuora {
+            Threshold::ThresholdQuorum {
                 threshold: Decimal::percent(60),
                 quorum: Decimal::percent(80),
             },
