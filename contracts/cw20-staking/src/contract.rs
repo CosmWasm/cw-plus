@@ -220,16 +220,6 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse
     Ok(res)
 }
 
-// TODO: replace this with deps.dup()
-// after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
-fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
-    DepsMut {
-        storage: deps.storage,
-        api: deps.api,
-        querier: deps.querier,
-    }
-}
-
 pub fn unbond(
     mut deps: DepsMut,
     env: Env,
@@ -250,7 +240,7 @@ pub fn unbond(
     let tax = amount * invest.exit_tax;
 
     // burn from the original caller
-    handle_burn(dup(&mut deps), env.clone(), info.clone(), amount)?;
+    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
     if tax > Uint128(0) {
         let sub_info = MessageInfo {
             sender: env.contract.address.clone(),
@@ -258,7 +248,7 @@ pub fn unbond(
         };
         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
         let human_owner = deps.api.human_address(&invest.owner)?;
-        handle_mint(dup(&mut deps), env.clone(), sub_info, human_owner, tax)?;
+        handle_mint(deps.branch(), env.clone(), sub_info, human_owner, tax)?;
     }
 
     // re-calculate bonded to ensure we have real values

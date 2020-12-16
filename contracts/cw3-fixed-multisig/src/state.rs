@@ -29,7 +29,6 @@ pub struct Proposal {
 }
 
 impl Proposal {
-    /// TODO: we should get the current BlockInfo and then we can determine this a bit better
     pub fn current_status(&self, block: &BlockInfo) -> Status {
         let mut status = self.status;
 

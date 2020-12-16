@@ -418,7 +418,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(dup(&mut deps), env, info, init_msg).unwrap();
+        let res = init(deps.branch(), env, info, init_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let meta = query_token_info(deps.as_ref()).unwrap();
@@ -434,16 +434,6 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), addr), amount);
         assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
         meta
-    }
-
-    // TODO: replace this with deps.dup()
-    // after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
-    fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
-        DepsMut {
-            storage: deps.storage,
-            api: deps.api,
-            querier: deps.querier,
-        }
     }
 
     #[test]

@@ -34,19 +34,9 @@ pub fn init(
     info: MessageInfo,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let result = whitelist_init(dup(&mut deps), env, info, msg)?;
+    let result = whitelist_init(deps.branch(), env, info, msg)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(result)
-}
-
-// TODO: replace this with deps.dup()
-// after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
-fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
-    DepsMut {
-        storage: deps.storage,
-        api: deps.api,
-        querier: deps.querier,
-    }
 }
 
 pub fn handle(
@@ -447,7 +437,7 @@ mod tests {
             admins: admins.to_vec(),
             mutable: true,
         };
-        init(dup(&mut deps), mock_env(), info.clone(), init_msg).unwrap();
+        init(deps.branch(), mock_env(), info.clone(), init_msg).unwrap();
 
         // Add subkeys with initial allowances
         for (spender, expiration) in spenders.iter().zip(expirations) {
@@ -457,7 +447,7 @@ mod tests {
                     amount: amount.clone(),
                     expires: Some(expiration.clone()),
                 };
-                handle(dup(&mut deps), mock_env(), info.clone(), msg).unwrap();
+                handle(deps.branch(), mock_env(), info.clone(), msg).unwrap();
             }
         }
     }

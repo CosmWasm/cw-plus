@@ -81,18 +81,8 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        init(dup(&mut deps), env, info, init_msg).unwrap();
+        init(deps.branch(), env, info, init_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
-    }
-
-    // TODO: replace this with deps.dup()
-    // after https://github.com/CosmWasm/cosmwasm/pull/620 is merged
-    fn dup<'a>(deps: &'a mut DepsMut<'_>) -> DepsMut<'a> {
-        DepsMut {
-            storage: deps.storage,
-            api: deps.api,
-            querier: deps.querier,
-        }
     }
 
     #[test]
