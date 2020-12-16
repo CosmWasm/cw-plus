@@ -131,12 +131,8 @@ fn votes_needed(weight: u64, percentage: Decimal) -> u64 {
     // we multiply by 1million to detect rounding issues
     const FACTOR: u128 = 1_000_000;
     let applied = percentage * Uint128(FACTOR * weight as u128);
-    let rounded = (applied.u128() / FACTOR) as u64;
-    if applied.u128() % FACTOR > 0 {
-        rounded + 1
-    } else {
-        rounded
-    }
+    // Divide by factor, rounding up to the nearest integer
+    ((applied.u128() + FACTOR - 1) / FACTOR) as u64
 }
 
 // we cast a ballot with our chosen vote and a given weight
