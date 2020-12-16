@@ -107,21 +107,19 @@ impl Proposal {
                     >= votes_needed(self.total_weight - self.votes.abstain, percentage_needed)
             }
             Threshold::ThresholdQuora { threshold, quorum } => {
-                // this one is tricky, as we have two compares:
+                // we always require the quorum
+                if self.votes.total() < votes_needed(self.total_weight, quorum) {
+                    return false;
+                }
                 if self.expires.is_expired(block) {
-                    // * if we have closed yet, we need quorum% of total votes to have voted (counting abstain)
-                    //   and threshold% of yes votes from those who voted (ignoring abstain)
-                    let total = self.votes.total();
-                    let opinions = total - self.votes.abstain;
-                    total >= votes_needed(self.total_weight, quorum)
-                        && self.votes.yes >= votes_needed(opinions, threshold)
+                    // If expired, we compare Yes votes against the total number of votes (minus abstain).
+                    let opinions = self.votes.total() - self.votes.abstain;
+                    self.votes.yes >= votes_needed(opinions, threshold)
                 } else {
-                    // * if we have not closed yet, we need threshold% of yes votes (from 100% voters - abstain)
-                    //   as we are sure this cannot change with any possible sequence of future votes
-                    // * we also need quorum (which may not always be the case above)
-                    self.votes.total() >= votes_needed(self.total_weight, quorum)
-                        && self.votes.yes
-                            >= votes_needed(self.total_weight - self.votes.abstain, threshold)
+                    // If not expired, we must assume all non-votes will be cast as No.
+                    // We compare threshold against the total weight (minus abstain).
+                    let possible_opinions = self.total_weight - self.votes.abstain;
+                    self.votes.yes >= votes_needed(possible_opinions, threshold)
                 }
             }
         }
