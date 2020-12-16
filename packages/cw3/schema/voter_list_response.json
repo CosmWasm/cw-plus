@@ -9,7 +9,7 @@
     "voters": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/VoterResponse"
+        "$ref": "#/definitions/VoterDetail"
       }
     }
   },
@@ -17,7 +17,7 @@
     "HumanAddr": {
       "type": "string"
     },
-    "VoterResponse": {
+    "VoterDetail": {
       "type": "object",
       "required": [
         "addr",

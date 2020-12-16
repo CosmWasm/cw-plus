@@ -110,7 +110,7 @@
       }
     },
     {
-      "description": "handle update hook messages from the group contract",
+      "description": "Handles update hook messages from the group contract",
       "type": "object",
       "required": [
         "member_changed_hook"
