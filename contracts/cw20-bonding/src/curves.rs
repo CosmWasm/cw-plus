@@ -71,8 +71,8 @@ impl Curve for Constant {
     // we need to normalize value with the reserve decimal places
     // (eg 0.1 value would return 100_000 if reserve was uatom)
     fn spot_price(&self, _supply: Uint128) -> StdDecimal {
-        let out = self.value * self.normalize.to_reserve();
-        decimal_to_std(out)
+        // let out = self.value * self.normalize.to_reserve();
+        decimal_to_std(self.value)
     }
 
     /// Returns total number of reserve tokens needed to purchase a given number of supply tokens.
@@ -101,7 +101,7 @@ pub struct Linear {
 impl Curve for Linear {
     fn spot_price(&self, supply: Uint128) -> StdDecimal {
         // supply * self.value * (normalize.reserve / normalize.supply)
-        let out = decimal(supply, 0) * self.slope * self.normalize.supply_to_reserve();
+        let out = decimal(supply, 0) * self.slope;
         decimal_to_std(out)
     }
 
@@ -122,6 +122,7 @@ impl Curve for Linear {
 }
 
 /// DecimalPlaces should be passed into curve constructors
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct DecimalPlaces {
     /// Number of decimal places for the supply token (this is what was passed in cw20-base init
     pub supply: u32,
@@ -179,11 +180,30 @@ fn tens_exp(exp: i32) -> Decimal {
 
 #[cfg(test)]
 mod tests {
-    // TODO: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
-
+    use super::*;
     // TODO: test DecimalPlaces return proper decimals
 
     // TODO: test Constant Curve behaves properly
+    #[test]
+    fn constant_curve() {
+        // supply is nstep (9), reserve is uatom (6)
+        let normalize = DecimalPlaces::new(9, 6);
+        let curve = Constant::new(decimal(15u128, 1), normalize);
+
+        // do some sanity checks....
+        // spot price is always 1.5 ATOM
+        assert_eq!(StdDecimal::percent(150), curve.spot_price(Uint128(123)));
+
+        // if we have 30 STEP, we should have 45 ATOM
+        let reserve = curve.reserve(Uint128(30_000_000_000));
+        assert_eq!(Uint128(45_000_000), reserve);
+
+        // if we have 36 ATOM, we should have 24 STEP
+        let supply = curve.supply(Uint128(36_000_000));
+        assert_eq!(Uint128(24_000_000_000), supply);
+    }
 
     // TODO: test Linear Curve, what is implemented
+
+    // TODO: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
 }
