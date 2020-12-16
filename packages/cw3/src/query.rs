@@ -70,7 +70,8 @@ pub enum ThresholdResponse {
     AbsoluteCount { weight: u64, total_weight: u64 },
 
     /// Declares a percentage of the total weight that must cast Yes votes, in order for
-    /// a proposal to pass. As with `AbsoluteCount`, Yes votes are the only ones that count.
+    /// a proposal to pass. The passing weight is computed over the total weight minus the weight of the
+    /// abstained votes.
     ///
     /// This is useful for similar circumstances as `AbsoluteCount`, where we have a relatively
     /// small set of voters, and participation is required.

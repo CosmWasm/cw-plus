@@ -102,7 +102,10 @@ impl Proposal {
             } => self.votes.yes >= weight_needed,
             Threshold::AbsolutePercentage {
                 percentage: percentage_needed,
-            } => self.votes.yes >= votes_needed(self.total_weight, percentage_needed),
+            } => {
+                self.votes.yes
+                    >= votes_needed(self.total_weight - self.votes.abstain, percentage_needed)
+            }
             Threshold::ThresholdQuora { threshold, quorum } => {
                 // this one is tricky, as we have two compares:
                 if self.expires.is_expired(block) {
@@ -259,13 +262,13 @@ mod test {
         let mut votes = Votes::new(7);
         votes.add_vote(Vote::No, 4);
         votes.add_vote(Vote::Abstain, 2);
-        // same expired or not, if total > 2 * yes
+        // same expired or not, if yes >= ceiling(0.5 * (total - abstained))
         assert_eq!(
-            false,
+            true,
             check_is_passed(percent.clone(), votes.clone(), 15, false)
         );
         assert_eq!(
-            false,
+            true,
             check_is_passed(percent.clone(), votes.clone(), 15, true)
         );
 

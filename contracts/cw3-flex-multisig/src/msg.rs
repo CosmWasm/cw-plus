@@ -35,7 +35,8 @@ pub enum Threshold {
     AbsoluteCount { weight: u64 },
 
     /// Declares a percentage of the total weight that must cast yes votes in order for
-    /// a proposal to pass. As with `AbsoluteCount`, it only matters the sum of yes votes.
+    /// a proposal to pass. The percentage is computed over the total weight minus the weight of the
+    /// abstained votes.
     ///
     /// This is useful for similar circumstances as `AbsoluteCount`, where we have a relatively
     /// small set of voters and participation is required. The advantage here is that if the
