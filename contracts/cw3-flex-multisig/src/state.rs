@@ -11,6 +11,10 @@ use cw_storage_plus::{Item, Map, U64Key};
 
 use crate::msg::Threshold;
 
+// we multiply by this when calculating needed_votes in order to round up properly
+// Note: `10u128.pow(9)` fails as "u128::pow` is not yet stable as a const fn"
+const PRECISION_FACTOR: u128 = 1_000_000_000;
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
     pub threshold: Threshold,
@@ -129,11 +133,9 @@ impl Proposal {
 // this is a helper function so Decimal works with u64 rather than Uint128
 // also, we must *round up* here, as we need 8, not 7 votes to reach 50% of 15 total
 fn votes_needed(weight: u64, percentage: Decimal) -> u64 {
-    // we multiply by 1million to detect rounding issues
-    const FACTOR: u128 = 1_000_000;
-    let applied = percentage * Uint128(FACTOR * weight as u128);
-    // Divide by factor, rounding up to the nearest integer
-    ((applied.u128() + FACTOR - 1) / FACTOR) as u64
+    let applied = percentage * Uint128(PRECISION_FACTOR * weight as u128);
+    // Divide by PRECISION_FACTOR, rounding up to the nearest integer
+    ((applied.u128() + PRECISION_FACTOR - 1) / PRECISION_FACTOR) as u64
 }
 
 // we cast a ballot with our chosen vote and a given weight
