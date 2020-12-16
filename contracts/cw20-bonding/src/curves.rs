@@ -1,4 +1,5 @@
 use cosmwasm_std::{Decimal as StdDecimal, Uint128};
+use num_integer::Roots;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::str::FromStr;
@@ -71,20 +72,20 @@ impl Curve for Constant {
     // we need to normalize value with the reserve decimal places
     // (eg 0.1 value would return 100_000 if reserve was uatom)
     fn spot_price(&self, _supply: Uint128) -> StdDecimal {
-        // let out = self.value * self.normalize.to_reserve();
+        // f(x) = self.value
         decimal_to_std(self.value)
     }
 
     /// Returns total number of reserve tokens needed to purchase a given number of supply tokens.
     /// Note that both need to be normalized.
     fn reserve(&self, supply: Uint128) -> Uint128 {
-        // supply * self.value
+        // f(x) = supply * self.value
         let reserve = self.normalize.from_supply(supply) * self.value;
         self.normalize.to_reserve(reserve)
     }
 
     fn supply(&self, reserve: Uint128) -> Uint128 {
-        // reserve / self.value
+        // f(x) = reserve / self.value
         let supply = self.normalize.from_reserve(reserve) / self.value;
         self.normalize.to_supply(supply)
     }
@@ -104,13 +105,13 @@ impl Linear {
 
 impl Curve for Linear {
     fn spot_price(&self, supply: Uint128) -> StdDecimal {
-        // supply * self.value * (normalize.reserve / normalize.supply)
+        // f(x) = supply * self.value
         let out = self.normalize.from_supply(supply) * self.slope;
         decimal_to_std(out)
     }
 
     fn reserve(&self, supply: Uint128) -> Uint128 {
-        // TODO: self.slope * supply * supply / 2
+        // f(x) = self.slope * supply * supply / 2
         let normalized = self.normalize.from_supply(supply);
         let square = normalized * normalized;
         // Note: multiplying by 0.5 is much faster than dividing by 2
@@ -118,10 +119,29 @@ impl Curve for Linear {
         self.normalize.to_reserve(reserve)
     }
 
-    fn supply(&self, _reserve: Uint128) -> Uint128 {
-        // TODO: (2 * reserve / self.slope) ^ 0.5
-        unimplemented!()
+    fn supply(&self, reserve: Uint128) -> Uint128 {
+        // f(x) = (2 * reserve / self.slope) ^ 0.5
+        // note: use addition here to optimize 2* operation
+        let square = self.normalize.from_reserve(reserve + reserve) / self.slope;
+        let supply = square_root(square);
+        self.normalize.to_supply(supply)
     }
+}
+
+// we multiply by 10^18, turn to int, take square root, then divide by 10^9 as we convert back to decimal
+fn square_root(square: Decimal) -> Decimal {
+    // must be even
+    // TODO: this can overflow easily at 18... what is a good value?
+    const EXTRA_DIGITS: u32 = 12;
+    let multiplier = 10u128.saturating_pow(EXTRA_DIGITS);
+
+    // multiply by 10^18 and turn to u128
+    let extended = square * decimal(multiplier, 0);
+    let extended = extended.floor().to_u128().unwrap();
+
+    // take square root, and build a decimal again
+    let root = extended.sqrt();
+    decimal(root, EXTRA_DIGITS / 2)
 }
 
 /// DecimalPlaces should be passed into curve constructors
@@ -210,10 +230,14 @@ mod tests {
         let reserve = curve.reserve(Uint128(2000));
         assert_eq!(Uint128(2_000_000_000), reserve);
 
-        // TODO
-        // if we have 36 ATOM, we should have 24 STEP
-        // let supply = curve.supply(Uint128(36_000_000));
-        // assert_eq!(Uint128(24_000_000_000), supply);
+        // if we have 1.25 BTC, we should have 5 USDT
+        let supply = curve.supply(Uint128(125_000_000));
+        assert_eq!(Uint128(500), supply);
+        // test square root rounding
+        // TODO: test when supply has many more decimal places than reserve
+        // if we have 1.11 BTC, we should have 4.7116875957... USDT
+        let supply = curve.supply(Uint128(111_000_000));
+        assert_eq!(Uint128(471), supply);
     }
 
     // TODO: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
