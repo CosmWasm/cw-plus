@@ -563,19 +563,42 @@ mod tests {
             Uint128(10_000_000)
         );
 
-        // TODO: burn from (after burn properly tested above)
+        // test burn from works properly (burn tested in burning_sends_reserve)
+        // cannot burn more than they have
 
-        // // burn some, but not too much
-        // let burn_too_much = HandleMsg::Burn {
-        //     amount: Uint128(1000),
-        // };
-        // let failed = handle(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
-        // assert!(failed.is_err());
-        // assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
-        // let burn = HandleMsg::Burn {
-        //     amount: Uint128(130),
-        // };
-        // handle(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();
-        // assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(420));
+        let info = mock_info(alice, &[]);
+        let burn_from = HandleMsg::BurnFrom {
+            owner: bob.into(),
+            amount: Uint128(3_300_000),
+        };
+        let err = handle(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
+        assert_eq!(
+            "Cannot subtract 3300000 from 3000000",
+            err.to_string().as_str()
+        );
+
+        // burn 1_000_000 EPOXY to get back 1_500 DENOM (constant curve)
+        let info = mock_info(alice, &[]);
+        let burn_from = HandleMsg::BurnFrom {
+            owner: bob.into(),
+            amount: Uint128(1_000_000),
+        };
+        let res = handle(deps.as_mut(), mock_env(), info, burn_from).unwrap();
+
+        // bob balance is lower, not alice
+        assert_eq!(get_balance(deps.as_ref(), alice), Uint128(25_000_000));
+        assert_eq!(get_balance(deps.as_ref(), bob), Uint128(2_000_000));
+
+        // ensure alice got our money back
+        assert_eq!(1, res.messages.len());
+        assert_eq!(
+            &res.messages[0],
+            &BankMsg::Send {
+                from_address: MOCK_CONTRACT_ADDR.into(),
+                to_address: alice.into(),
+                amount: coins(1_500, DENOM),
+            }
+            .into()
+        );
     }
 }
