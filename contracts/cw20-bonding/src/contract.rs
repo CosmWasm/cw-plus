@@ -180,40 +180,18 @@ pub fn handle_buy(
 }
 
 pub fn handle_sell(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     curve_fn: CurveFn,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
-    // burn from the caller, this ensures there are tokens to cover this
-    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+    let receiver = info.sender.clone();
+    // do all the work
+    let mut res = do_sell(deps, env, info, curve_fn, receiver, amount)?;
 
-    // calculate how many tokens can be purchased with this and mint them
-    let mut state = CURVE_STATE.load(deps.storage)?;
-    let curve = curve_fn(state.decimals);
-    state.supply = (state.supply - amount)?;
-    let new_reserve = curve.reserve(state.supply);
-    let released = (state.reserve - new_reserve)?;
-    state.reserve = new_reserve;
-    CURVE_STATE.save(deps.storage, &state)?;
-
-    // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
-    let msg = BankMsg::Send {
-        from_address: env.contract.address,
-        to_address: info.sender.clone(),
-        amount: coins(released.u128(), state.reserve_denom),
-    };
-    let res = HandleResponse {
-        messages: vec![msg.into()],
-        attributes: vec![
-            attr("action", "sell"),
-            attr("from", info.sender),
-            attr("supply", amount),
-            attr("reserve", released),
-        ],
-        data: None,
-    };
+    // add our custom attributes
+    res.attributes.push(attr("action", "burn"));
     Ok(res)
 }
 
@@ -231,12 +209,58 @@ pub fn handle_sell_from(
     // deduct allowance before doing anything else have enough allowance
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
-    // TODO: don't return verbatim, different return attrs
+    // do all the work in do_sell
+    let receiver = info.sender;
     let owner_info = MessageInfo {
         sender: owner,
         sent_funds: info.sent_funds,
     };
-    handle_sell(deps, env, owner_info, curve_fn, amount)
+    let mut res = do_sell(deps, env, owner_info, curve_fn, receiver.clone(), amount)?;
+
+    // add our custom attributes
+    res.attributes.push(attr("action", "burn_from"));
+    res.attributes.push(attr("by", receiver));
+    Ok(res)
+}
+
+fn do_sell(
+    mut deps: DepsMut,
+    env: Env,
+    // info.sender is the one burning tokens
+    info: MessageInfo,
+    curve_fn: CurveFn,
+    // receiver is the one who gains (same for handle_sell, diff for handle_sell_from)
+    receiver: HumanAddr,
+    amount: Uint128,
+) -> Result<HandleResponse, ContractError> {
+    // burn from the caller, this ensures there are tokens to cover this
+    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+
+    // calculate how many tokens can be purchased with this and mint them
+    let mut state = CURVE_STATE.load(deps.storage)?;
+    let curve = curve_fn(state.decimals);
+    state.supply = (state.supply - amount)?;
+    let new_reserve = curve.reserve(state.supply);
+    let released = (state.reserve - new_reserve)?;
+    state.reserve = new_reserve;
+    CURVE_STATE.save(deps.storage, &state)?;
+
+    // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
+    let msg = BankMsg::Send {
+        from_address: env.contract.address,
+        to_address: receiver,
+        amount: coins(released.u128(), state.reserve_denom),
+    };
+    let res = HandleResponse {
+        messages: vec![msg.into()],
+        attributes: vec![
+            attr("from", info.sender),
+            attr("supply", amount),
+            attr("reserve", released),
+        ],
+        data: None,
+    };
+    Ok(res)
 }
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
