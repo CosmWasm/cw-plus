@@ -22,6 +22,8 @@ use crate::state::{CurveState, CURVE_STATE};
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub type CurveFn = fn(DecimalPlaces) -> Box<dyn Curve>;
+
 pub fn init(
     deps: DepsMut,
     env: Env,
@@ -44,7 +46,8 @@ pub fn init(
     };
     token_info(deps.storage).save(&data)?;
 
-    let supply = CurveState::new(msg.reserve_denom);
+    let places = DecimalPlaces::new(msg.decimals, msg.reserve_decimals);
+    let supply = CurveState::new(msg.reserve_denom, places);
     CURVE_STATE.save(deps.storage, &supply)?;
 
     Ok(InitResponse::default())
@@ -56,24 +59,16 @@ pub fn handle(
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
-    // TODO: we need to get these values from somewhere, based on each token's definition
-    // (Pass in via InitMsg?)
-    const NORMALIZE: DecimalPlaces = DecimalPlaces {
-        supply: 6,
-        reserve: 6,
-    };
-
     // TODO: where does this come from in real code? (same in handle and query)
-    // right now test with 2 reserve to buy 1 supply
-    let curve = Constant::new(decimal(2u128, 0), NORMALIZE);
+    let curve_fn: CurveFn = |normalize| Box::new(Constant::new(decimal(2u128, 0), normalize));
 
     match msg {
-        HandleMsg::Buy {} => handle_buy(deps, env, info, &curve),
+        HandleMsg::Buy {} => handle_buy(deps, env, info, curve_fn),
 
         // we override these from cw20
-        HandleMsg::Burn { amount } => Ok(handle_sell(deps, env, info, &curve, amount)?),
+        HandleMsg::Burn { amount } => Ok(handle_sell(deps, env, info, curve_fn, amount)?),
         HandleMsg::BurnFrom { owner, amount } => {
-            Ok(handle_sell_from(deps, env, info, &curve, owner, amount)?)
+            Ok(handle_sell_from(deps, env, info, curve_fn, owner, amount)?)
         }
 
         // these all come from cw20-base to implement the cw20 standard
@@ -121,7 +116,7 @@ pub fn handle_buy(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    curve: &dyn Curve,
+    curve_fn: CurveFn,
 ) -> Result<HandleResponse, ContractError> {
     let mut state = CURVE_STATE.load(deps.storage)?;
 
@@ -142,6 +137,7 @@ pub fn handle_buy(
     }
 
     // calculate how many tokens can be purchased with this and mint them
+    let curve = curve_fn(state.decimals);
     state.reserve += payment;
     let new_supply = curve.supply(state.reserve);
     let minted = (new_supply - state.supply)?;
@@ -173,7 +169,7 @@ pub fn handle_sell(
     mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    curve: &dyn Curve,
+    curve_fn: CurveFn,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
     // burn from the caller, this ensures there are tokens to cover this
@@ -181,6 +177,7 @@ pub fn handle_sell(
 
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
+    let curve = curve_fn(state.decimals);
     state.supply = (state.supply - amount)?;
     let new_reserve = curve.reserve(state.supply);
     let released = (state.reserve - new_reserve)?;
@@ -210,7 +207,7 @@ pub fn handle_sell_from(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    curve: &dyn Curve,
+    curve_fn: CurveFn,
     owner: HumanAddr,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
@@ -225,24 +222,16 @@ pub fn handle_sell_from(
         sender: owner,
         sent_funds: info.sent_funds,
     };
-    handle_sell(deps, env, owner_info, curve, amount)
+    handle_sell(deps, env, owner_info, curve_fn, amount)
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    // TODO: we need to get these values from somewhere, based on each token's definition
-    // (Pass in via InitMsg?)
-    const NORMALIZE: DecimalPlaces = DecimalPlaces {
-        supply: 6,
-        reserve: 6,
-    };
-
     // TODO: where does this come from in real code? (same in handle and query)
-    // right now test with 2 reserve to buy 1 supply
-    let curve = Constant::new(decimal(2u128, 0), NORMALIZE);
+    let curve_fn: CurveFn = |normalize| Box::new(Constant::new(decimal(2u128, 0), normalize));
 
     match msg {
         // custom queries
-        QueryMsg::CurveInfo {} => to_binary(&query_curve_info(deps, &curve)?),
+        QueryMsg::CurveInfo {} => to_binary(&query_curve_info(deps, curve_fn)?),
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
@@ -252,14 +241,16 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_curve_info(deps: Deps, curve: &dyn Curve) -> StdResult<CurveInfoResponse> {
+pub fn query_curve_info(deps: Deps, curve_fn: CurveFn) -> StdResult<CurveInfoResponse> {
     let CurveState {
         reserve,
         supply,
         reserve_denom,
+        decimals,
     } = CURVE_STATE.load(deps.storage)?;
 
     // This we can get from the local digits stored in init
+    let curve = curve_fn(decimals);
     let spot_price = curve.spot_price(supply);
 
     Ok(CurveInfoResponse {

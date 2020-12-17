@@ -5,12 +5,13 @@
   "required": [
     "decimals",
     "name",
+    "reserve_decimals",
     "reserve_denom",
     "symbol"
   ],
   "properties": {
     "decimals": {
-      "description": "decimal places of the supply token (for UI)",
+      "description": "number of decimal places of the supply token, needed for proper curve math. If it is eg. BTC, where a balance of 10^8 means 1 BTC, then use 8 here.",
       "type": "integer",
       "format": "uint8",
       "minimum": 0.0
@@ -18,6 +19,12 @@
     "name": {
       "description": "name of the supply token",
       "type": "string"
+    },
+    "reserve_decimals": {
+      "description": "number of decimal places for the reserve token, needed for proper curve math. Same format as decimals above, eg. if it is uatom, where 1 unit is 10^-6 ATOM, use 6 here",
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
     },
     "reserve_denom": {
       "description": "this is the reserve token denom (only support native for now)",

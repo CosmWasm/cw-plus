@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::Uint128;
 use cw_storage_plus::Item;
 
+use crate::curves::DecimalPlaces;
+
 /// Supply is dynamic and tracks the current supply of staked and ERC20 tokens.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
 pub struct CurveState {
@@ -12,16 +14,20 @@ pub struct CurveState {
     /// supply is how many tokens this contract has issued
     pub supply: Uint128,
 
-    // what is the reserve denom
+    // the denom of the reserve token
     pub reserve_denom: String,
+
+    // how to normalize reserve and supply
+    pub decimals: DecimalPlaces,
 }
 
 impl CurveState {
-    pub fn new(reserve_denom: String) -> Self {
+    pub fn new(reserve_denom: String, decimals: DecimalPlaces) -> Self {
         CurveState {
             reserve: Uint128(0),
             supply: Uint128(0),
             reserve_denom,
+            decimals,
         }
     }
 }

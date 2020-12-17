@@ -10,11 +10,15 @@ pub struct InitMsg {
     pub name: String,
     /// symbol / ticker of the supply token
     pub symbol: String,
-    /// decimal places of the supply token (for UI)
+    /// number of decimal places of the supply token, needed for proper curve math.
+    /// If it is eg. BTC, where a balance of 10^8 means 1 BTC, then use 8 here.
     pub decimals: u8,
 
     /// this is the reserve token denom (only support native for now)
     pub reserve_denom: String,
+    /// number of decimal places for the reserve token, needed for proper curve math.
+    /// Same format as decimals above, eg. if it is uatom, where 1 unit is 10^-6 ATOM, use 6 here
+    pub reserve_decimals: u8,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

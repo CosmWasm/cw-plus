@@ -1,8 +1,11 @@
-use cosmwasm_std::{Decimal as StdDecimal, Uint128};
 use num_integer::Roots;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+
+use cosmwasm_std::{Decimal as StdDecimal, Uint128};
 
 /// This defines the curves we are using.
 ///
@@ -198,7 +201,7 @@ fn cube_root(cube: Decimal) -> Decimal {
 }
 
 /// DecimalPlaces should be passed into curve constructors
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema, Default)]
 pub struct DecimalPlaces {
     /// Number of decimal places for the supply token (this is what was passed in cw20-base init
     pub supply: u32,
@@ -337,5 +340,5 @@ mod tests {
         assert_eq!(Uint128(235_000_000), supply);
     }
 
-    // TODO: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
+    // Idea: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
 }
