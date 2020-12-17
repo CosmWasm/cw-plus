@@ -293,5 +293,49 @@ mod tests {
         assert_eq!(Uint128(471), supply);
     }
 
+    #[test]
+    fn sqrt_curve() {
+        // supply is utree (6) reserve is chf (2)
+        let normalize = DecimalPlaces::new(6, 2);
+        // slope is 0.35 (eg hits 0.35 after 1 chf, 3.5 after 100chf)
+        let curve = SquareRoot::new(decimal(35u128, 2), normalize);
+
+        // do some sanity checks....
+        // spot price is 0.35 with 1 TREE supply
+        assert_eq!(
+            StdDecimal::percent(35),
+            curve.spot_price(Uint128(1_000_000))
+        );
+        // spot price is 3.5 with 100 TREE supply
+        assert_eq!(
+            StdDecimal::percent(350),
+            curve.spot_price(Uint128(100_000_000))
+        );
+        // spot price should be 23.478713763747788 with 4500 TREE supply (test rounding and reporting here)
+        // rounds off around 8-9 sig figs (note diff for last points)
+        assert_eq!(
+            StdDecimal::from_ratio(2347871365u128, 100_000_000u128),
+            curve.spot_price(Uint128(4_500_000_000))
+        );
+
+        // if we have 1 TREE, we should have 0.2333333333333 CHF
+        let reserve = curve.reserve(Uint128(1_000_000));
+        assert_eq!(Uint128(23), reserve);
+        // if we have 100 TREE, we should have 233.333333333 CHF
+        let reserve = curve.reserve(Uint128(100_000_000));
+        assert_eq!(Uint128(233_33), reserve);
+        // test rounding
+        // if we have 235 TREE, we should have 840.5790828021146 CHF
+        let reserve = curve.reserve(Uint128(235_000_000));
+        assert_eq!(Uint128(840_57), reserve); // round down
+
+        // // if we have 0.23 CHF, we should have 0.990453 TREE (round down)
+        let supply = curve.supply(Uint128(23));
+        assert_eq!(Uint128(990_000), supply);
+        // if we have 840.58 CHF, we should have 235.000170 TREE (round down)
+        let supply = curve.supply(Uint128(84058));
+        assert_eq!(Uint128(235_000_000), supply);
+    }
+
     // TODO: generic test that curve.supply(curve.reserve(supply)) == supply (or within some small rounding margin)
 }
