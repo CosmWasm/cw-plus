@@ -128,6 +128,43 @@ impl Curve for Linear {
     }
 }
 
+/// spot_price is slope * (supply)^0.5
+pub struct SquareRoot {
+    pub slope: Decimal,
+    pub normalize: DecimalPlaces,
+}
+
+impl SquareRoot {
+    pub fn new(slope: Decimal, normalize: DecimalPlaces) -> Self {
+        Self { slope, normalize }
+    }
+}
+
+impl Curve for SquareRoot {
+    fn spot_price(&self, supply: Uint128) -> StdDecimal {
+        // f(x) = self.slope * supply^0.5
+        let square = self.normalize.from_supply(supply);
+        let root = square_root(square);
+        decimal_to_std(root * self.slope)
+    }
+
+    fn reserve(&self, supply: Uint128) -> Uint128 {
+        // f(x) = self.slope * supply * supply^0.5 / 1.5
+        let normalized = self.normalize.from_supply(supply);
+        let root = square_root(normalized);
+        let reserve = self.slope * normalized * root / Decimal::new(15, 1);
+        self.normalize.to_reserve(reserve)
+    }
+
+    fn supply(&self, reserve: Uint128) -> Uint128 {
+        // f(x) = (1.5 * reserve / self.slope) ^ (2/3)
+        let base = self.normalize.from_reserve(reserve) * Decimal::new(15, 1) / self.slope;
+        let squared = base * base;
+        let supply = cube_root(squared);
+        self.normalize.to_supply(supply)
+    }
+}
+
 // we multiply by 10^18, turn to int, take square root, then divide by 10^9 as we convert back to decimal
 fn square_root(square: Decimal) -> Decimal {
     // must be even
@@ -142,6 +179,22 @@ fn square_root(square: Decimal) -> Decimal {
     // take square root, and build a decimal again
     let root = extended.sqrt();
     decimal(root, EXTRA_DIGITS / 2)
+}
+
+// we multiply by 10^9, turn to int, take cube root, then divide by 10^3 as we convert back to decimal
+fn cube_root(cube: Decimal) -> Decimal {
+    // must be multiple of 3
+    // TODO: what is a good value?
+    const EXTRA_DIGITS: u32 = 9;
+    let multiplier = 10u128.saturating_pow(EXTRA_DIGITS);
+
+    // multiply out and turn to u128
+    let extended = cube * decimal(multiplier, 0);
+    let extended = extended.floor().to_u128().unwrap();
+
+    // take cube root, and build a decimal again
+    let root = extended.cbrt();
+    decimal(root, EXTRA_DIGITS / 3)
 }
 
 /// DecimalPlaces should be passed into curve constructors
