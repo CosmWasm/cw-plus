@@ -289,7 +289,7 @@ mod tests {
     use super::*;
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::Decimal;
+    use cosmwasm_std::{coin, Decimal};
 
     const DENOM: &str = "satoshi";
     const CREATOR: &str = "creator";
@@ -371,19 +371,9 @@ mod tests {
         };
         setup_test(deps.as_mut(), 2, 8, curve_type.clone());
 
-        // fails when no tokens sent
-        let info = mock_info(INVESTOR, &[]);
-        let buy = HandleMsg::Buy {};
-        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
-        assert_eq!(err, ContractError::NoFunds {});
-
-        // fails when wrong tokens sent
-        let info = mock_info(INVESTOR, &coins(1234567, "wei"));
-        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
-        assert_eq!(err, ContractError::MissingDenom(DENOM.into()));
-
         // succeeds with proper token (5 BTC = 5*10^8 satoshi)
         let info = mock_info(INVESTOR, &coins(500_000_000, DENOM));
+        let buy = HandleMsg::Buy {};
         handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
 
         // bob got 1000 EPOXY (10.00)
@@ -422,31 +412,31 @@ mod tests {
         assert_eq!(token.total_supply, Uint128(2000));
     }
 
-    // #[test]
-    // fn bonding_fails_with_wrong_denom() {
-    //     let mut deps = mock_dependencies(&[]);
-    //     set_validator(&mut deps.querier);
-    //
-    //     let creator = HumanAddr::from("creator");
-    //     let init_msg = default_init(2, 50);
-    //     let info = mock_info(&creator, &[]);
-    //
-    //     // make sure we can init with this
-    //     let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-    //     assert_eq!(0, res.messages.len());
-    //
-    //     // let's bond some tokens now
-    //     let bob = HumanAddr::from("bob");
-    //     let bond_msg = HandleMsg::Bond {};
-    //     let info = mock_info(&bob, &[coin(500, "photon")]);
-    //
-    //     // try to bond and make sure we trigger delegation
-    //     let res = handle(deps.as_mut(), mock_env(), info, bond_msg);
-    //     match res.unwrap_err() {
-    //         ContractError::EmptyBalance { .. } => {}
-    //         e => panic!("Expected wrong denom error, got: {:?}", e),
-    //     };
-    // }
+    #[test]
+    fn bonding_fails_with_wrong_denom() {
+        let mut deps = mock_dependencies(&[]);
+        let curve_type = CurveType::Linear {
+            slope: Uint128(1),
+            scale: 1,
+        };
+        setup_test(deps.as_mut(), 2, 8, curve_type.clone());
+
+        // fails when no tokens sent
+        let info = mock_info(INVESTOR, &[]);
+        let buy = HandleMsg::Buy {};
+        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        assert_eq!(err, ContractError::NoFunds {});
+
+        // fails when wrong tokens sent
+        let info = mock_info(INVESTOR, &coins(1234567, "wei"));
+        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        assert_eq!(err, ContractError::MissingDenom(DENOM.into()));
+
+        // fails when too many tokens sent
+        let info = mock_info(INVESTOR, &[coin(3400022, DENOM), coin(1234567, "wei")]);
+        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        assert_eq!(err, ContractError::ExtraDenoms(DENOM.into()));
+    }
 
     // #[test]
     // fn unbonding_maintains_price_ratio() {
@@ -538,84 +528,85 @@ mod tests {
     //     assert_eq!(invest.nominal_value, ratio);
     // }
 
-    // #[test]
-    // fn cw20_imports_work() {
-    //     let mut deps = mock_dependencies(&[]);
-    //
-    //     // set the actors... bob stakes, sends coins to carl, and gives allowance to alice
-    //     let bob = HumanAddr::from("bob");
-    //     let alice = HumanAddr::from("alice");
-    //     let carl = HumanAddr::from("carl");
-    //
-    //     // create the contract
-    //     let creator = HumanAddr::from("creator");
-    //     let init_msg = default_init(2, 50);
-    //     let info = mock_info(&creator, &[]);
-    //     init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-    //
-    //     // bond some tokens to create a balance
-    //     let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
-    //     handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
-    //
-    //     // bob got 1000 DRV for 1000 stake at a 1.0 ratio
-    //     assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(1000));
-    //
-    //     // send coins to carl
-    //     let bob_info = mock_info(&bob, &[]);
-    //     let transfer = HandleMsg::Transfer {
-    //         recipient: carl.clone(),
-    //         amount: Uint128(200),
-    //     };
-    //     handle(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
-    //     assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(800));
-    //     assert_eq!(get_balance(deps.as_ref(), &carl), Uint128(200));
-    //
-    //     // allow alice
-    //     let allow = HandleMsg::IncreaseAllowance {
-    //         spender: alice.clone(),
-    //         amount: Uint128(350),
-    //         expires: None,
-    //     };
-    //     handle(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
-    //     assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(800));
-    //     assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(0));
-    //     assert_eq!(
-    //         query_allowance(deps.as_ref(), bob.clone(), alice.clone())
-    //             .unwrap()
-    //             .allowance,
-    //         Uint128(350)
-    //     );
-    //
-    //     // alice takes some for herself
-    //     let self_pay = HandleMsg::TransferFrom {
-    //         owner: bob.clone(),
-    //         recipient: alice.clone(),
-    //         amount: Uint128(250),
-    //     };
-    //     let alice_info = mock_info(&alice, &[]);
-    //     handle(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
-    //     assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
-    //     assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(250));
-    //     assert_eq!(
-    //         query_allowance(deps.as_ref(), bob.clone(), alice.clone())
-    //             .unwrap()
-    //             .allowance,
-    //         Uint128(100)
-    //     );
-    //
-    //     // TODO: move burn tests to new test case (this is custom code)
-    //
-    //     // // burn some, but not too much
-    //     // let burn_too_much = HandleMsg::Burn {
-    //     //     amount: Uint128(1000),
-    //     // };
-    //     // let failed = handle(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
-    //     // assert!(failed.is_err());
-    //     // assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
-    //     // let burn = HandleMsg::Burn {
-    //     //     amount: Uint128(130),
-    //     // };
-    //     // handle(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();
-    //     // assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(420));
-    // }
+    #[test]
+    fn cw20_imports_work() {
+        let mut deps = mock_dependencies(&[]);
+        let curve_type = CurveType::Constant {
+            value: Uint128(15),
+            scale: 1,
+        };
+        setup_test(deps.as_mut(), 9, 6, curve_type.clone());
+
+        let alice: &str = "alice";
+        let bob: &str = "bobby";
+        let carl: &str = "carl";
+
+        // spend 45_000 uatom for 30_000_000 EPOXY
+        let info = mock_info(bob, &coins(45_000, DENOM));
+        let buy = HandleMsg::Buy {};
+        handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
+
+        // check balances
+        assert_eq!(get_balance(deps.as_ref(), bob), Uint128(30_000_000));
+        assert_eq!(get_balance(deps.as_ref(), carl), Uint128(0));
+
+        // send coins to carl
+        let bob_info = mock_info(bob, &[]);
+        let transfer = HandleMsg::Transfer {
+            recipient: carl.into(),
+            amount: Uint128(2_000_000),
+        };
+        handle(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
+        assert_eq!(get_balance(deps.as_ref(), bob), Uint128(28_000_000));
+        assert_eq!(get_balance(deps.as_ref(), carl), Uint128(2_000_000));
+
+        // allow alice
+        let allow = HandleMsg::IncreaseAllowance {
+            spender: alice.into(),
+            amount: Uint128(35_000_000),
+            expires: None,
+        };
+        handle(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
+        assert_eq!(get_balance(deps.as_ref(), bob), Uint128(28_000_000));
+        assert_eq!(get_balance(deps.as_ref(), alice), Uint128(0));
+        assert_eq!(
+            query_allowance(deps.as_ref(), bob.into(), alice.into())
+                .unwrap()
+                .allowance,
+            Uint128(35_000_000)
+        );
+
+        // alice takes some for herself
+        let self_pay = HandleMsg::TransferFrom {
+            owner: bob.into(),
+            recipient: alice.into(),
+            amount: Uint128(25_000_000),
+        };
+        let alice_info = mock_info(alice, &[]);
+        handle(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
+        assert_eq!(get_balance(deps.as_ref(), bob), Uint128(3_000_000));
+        assert_eq!(get_balance(deps.as_ref(), alice), Uint128(25_000_000));
+        assert_eq!(get_balance(deps.as_ref(), carl), Uint128(2_000_000));
+        assert_eq!(
+            query_allowance(deps.as_ref(), bob.into(), alice.into())
+                .unwrap()
+                .allowance,
+            Uint128(10_000_000)
+        );
+
+        // TODO: burn from (after burn properly tested above)
+
+        // // burn some, but not too much
+        // let burn_too_much = HandleMsg::Burn {
+        //     amount: Uint128(1000),
+        // };
+        // let failed = handle(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
+        // assert!(failed.is_err());
+        // assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
+        // let burn = HandleMsg::Burn {
+        //     amount: Uint128(130),
+        // };
+        // handle(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();
+        // assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(420));
+    }
 }
