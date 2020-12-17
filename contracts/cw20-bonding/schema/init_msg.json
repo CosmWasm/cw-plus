@@ -3,6 +3,7 @@
   "title": "InitMsg",
   "type": "object",
   "required": [
+    "curve_type",
     "decimals",
     "name",
     "reserve_decimals",
@@ -10,6 +11,14 @@
     "symbol"
   ],
   "properties": {
+    "curve_type": {
+      "description": "enum to store the curve parameters used for this contract if you want to add a custom Curve, you should make a new contract that imports this one. write a custom `init`, and then dispatch `your::handle` -> `cw20_bonding::do_handle` with your custom curve as a parameter (and same with `query` -> `do_query`)",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CurveType"
+        }
+      ]
+    },
     "decimals": {
       "description": "number of decimal places of the supply token, needed for proper curve math. If it is eg. BTC, where a balance of 10^8 means 1 BTC, then use 8 here.",
       "type": "integer",
@@ -32,6 +41,93 @@
     },
     "symbol": {
       "description": "symbol / ticker of the supply token",
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "CurveType": {
+      "anyOf": [
+        {
+          "description": "Constant always returns `value * 10^-scale` as spot price",
+          "type": "object",
+          "required": [
+            "constant"
+          ],
+          "properties": {
+            "constant": {
+              "type": "object",
+              "required": [
+                "scale",
+                "value"
+              ],
+              "properties": {
+                "scale": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "value": {
+                  "$ref": "#/definitions/Uint128"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "Linear returns `slope * 10^-scale * supply` as spot price",
+          "type": "object",
+          "required": [
+            "linear"
+          ],
+          "properties": {
+            "linear": {
+              "type": "object",
+              "required": [
+                "scale",
+                "slope"
+              ],
+              "properties": {
+                "scale": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "slope": {
+                  "$ref": "#/definitions/Uint128"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "SquareRoot returns `slope * 10^-scale * supply^0.5` as spot price",
+          "type": "object",
+          "required": [
+            "square_root"
+          ],
+          "properties": {
+            "square_root": {
+              "type": "object",
+              "required": [
+                "scale",
+                "slope"
+              ],
+              "properties": {
+                "scale": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "slope": {
+                  "$ref": "#/definitions/Uint128"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Uint128": {
       "type": "string"
     }
   }
