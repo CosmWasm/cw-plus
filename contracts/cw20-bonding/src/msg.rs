@@ -142,7 +142,9 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct CurveInfoResponse {
+    // how many reserve tokens have been received
     pub reserve: Uint128,
+    // how many supply tokens have been issued
     pub supply: Uint128,
     pub spot_price: Decimal,
     pub reserve_denom: String,
