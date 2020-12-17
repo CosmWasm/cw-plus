@@ -13,16 +13,14 @@ use cw20_base::contract::{
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
-use crate::curves::{decimal, Constant, Curve, DecimalPlaces};
+use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
-use crate::msg::{CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{CurveState, CURVE_STATE};
+use crate::msg::{CurveFn, CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::state::{CurveState, CURVE_STATE, CURVE_TYPE};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-pub type CurveFn = fn(DecimalPlaces) -> Box<dyn Curve>;
 
 pub fn init(
     deps: DepsMut,
@@ -50,6 +48,8 @@ pub fn init(
     let supply = CurveState::new(msg.reserve_denom, places);
     CURVE_STATE.save(deps.storage, &supply)?;
 
+    CURVE_TYPE.save(deps.storage, &msg.curve_type)?;
+
     Ok(InitResponse::default())
 }
 
@@ -59,9 +59,23 @@ pub fn handle(
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
-    // TODO: where does this come from in real code? (same in handle and query)
-    let curve_fn: CurveFn = |normalize| Box::new(Constant::new(decimal(2u128, 0), normalize));
+    // default implementation stores curve info as enum, you can do something else in a derived
+    // contract and just pass in your custom curve to do_handle
+    let curve_type = CURVE_TYPE.load(deps.storage)?;
+    let curve_fn = curve_type.to_curve_fn();
+    do_handle(deps, env, info, msg, curve_fn)
+}
 
+/// We pull out logic here, so we can import this from another contract and set a different Curve.
+/// This contacts sets a curve with an enum in InitMsg and stored in state, but you may want to
+/// use custom math not included - make this easily reusable
+pub fn do_handle(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: HandleMsg,
+    curve_fn: CurveFn,
+) -> Result<HandleResponse, ContractError> {
     match msg {
         HandleMsg::Buy {} => handle_buy(deps, env, info, curve_fn),
 
@@ -225,10 +239,18 @@ pub fn handle_sell_from(
     handle_sell(deps, env, owner_info, curve_fn, amount)
 }
 
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    // TODO: where does this come from in real code? (same in handle and query)
-    let curve_fn: CurveFn = |normalize| Box::new(Constant::new(decimal(2u128, 0), normalize));
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    // default implementation stores curve info as enum, you can do something else in a derived
+    // contract and just pass in your custom curve to do_handle
+    let curve_type = CURVE_TYPE.load(deps.storage)?;
+    let curve_fn = curve_type.to_curve_fn();
+    do_query(deps, env, msg, curve_fn)
+}
 
+/// We pull out logic here, so we can import this from another contract and set a different Curve.
+/// This contacts sets a curve with an enum in InitMsg and stored in state, but you may want to
+/// use custom math not included - make this easily reusable
+pub fn do_query(deps: Deps, _env: Env, msg: QueryMsg, curve_fn: CurveFn) -> StdResult<Binary> {
     match msg {
         // custom queries
         QueryMsg::CurveInfo {} => to_binary(&query_curve_info(deps, curve_fn)?),

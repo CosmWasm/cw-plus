@@ -5,6 +5,7 @@ use cosmwasm_std::Uint128;
 use cw_storage_plus::Item;
 
 use crate::curves::DecimalPlaces;
+use crate::msg::CurveType;
 
 /// Supply is dynamic and tracks the current supply of staked and ERC20 tokens.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema, Default)]
@@ -32,7 +33,6 @@ impl CurveState {
     }
 }
 
-pub const CURVE_STATE: Item<CurveState> = Item::new("total_supply");
+pub const CURVE_STATE: Item<CurveState> = Item::new("curve_state");
 
-// TODO: add curve functions
-// TODO: make this customizable in handle/query call
+pub const CURVE_TYPE: Item<CurveType> = Item::new("curve_type");
