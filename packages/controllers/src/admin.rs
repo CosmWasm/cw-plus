@@ -83,7 +83,7 @@ pub struct AdminResponse {
 
 // errors
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum AdminError {
     #[error("{0}")]
     Std(#[from] StdError),
@@ -100,10 +100,10 @@ pub fn handle_update_admin(
     controller: &Admin,
     deps: DepsMut,
     info: MessageInfo,
-    new_admin: Option<HumanAddr>,
+    msg: UpdateAdminHandleMsg,
 ) -> Result<HandleResponse, AdminError> {
     controller.assert_admin(deps.as_ref(), &info.sender)?;
-    controller.set(deps, new_admin)?;
+    controller.set(deps, msg.admin)?;
     // TODO: add some common log attributes here
     Ok(HandleResponse::default())
 }
@@ -111,4 +111,87 @@ pub fn handle_update_admin(
 pub fn query_admin(controller: &Admin, deps: Deps) -> StdResult<AdminResponse> {
     let admin = controller.get(deps)?;
     Ok(AdminResponse { admin })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use cosmwasm_std::testing::{mock_dependencies, mock_info};
+
+    #[test]
+    fn set_and_get_admin() {
+        let mut deps = mock_dependencies(&[]);
+        let control = Admin::new("foo");
+
+        // initialize and check
+        let admin = Some(HumanAddr::from("admin"));
+        control.set(deps.as_mut(), admin.clone()).unwrap();
+        let got = control.get(deps.as_ref()).unwrap();
+        assert_eq!(admin, got);
+
+        // clear it and check
+        control.set(deps.as_mut(), None).unwrap();
+        let got = control.get(deps.as_ref()).unwrap();
+        assert_eq!(None, got);
+    }
+
+    #[test]
+    fn admin_checks() {
+        let mut deps = mock_dependencies(&[]);
+
+        let control = Admin::new("foo");
+        let owner = HumanAddr::from("big boss");
+        let imposter = HumanAddr::from("imposter");
+
+        // ensure checks proper with owner set
+        control.set(deps.as_mut(), Some(owner.clone())).unwrap();
+        assert_eq!(true, control.is_admin(deps.as_ref(), &owner).unwrap());
+        assert_eq!(false, control.is_admin(deps.as_ref(), &imposter).unwrap());
+        control.assert_admin(deps.as_ref(), &owner).unwrap();
+        let err = control.assert_admin(deps.as_ref(), &imposter).unwrap_err();
+        assert_eq!(AdminError::NotAdmin {}, err);
+
+        // ensure checks proper with owner None
+        control.set(deps.as_mut(), None).unwrap();
+        assert_eq!(false, control.is_admin(deps.as_ref(), &owner).unwrap());
+        assert_eq!(false, control.is_admin(deps.as_ref(), &imposter).unwrap());
+        let err = control.assert_admin(deps.as_ref(), &owner).unwrap_err();
+        assert_eq!(AdminError::NotAdmin {}, err);
+        let err = control.assert_admin(deps.as_ref(), &imposter).unwrap_err();
+        assert_eq!(AdminError::NotAdmin {}, err);
+    }
+
+    #[test]
+    fn test_handle_query() {
+        let mut deps = mock_dependencies(&[]);
+
+        // initial setup
+        let control = Admin::new("foo");
+        let owner = HumanAddr::from("big boss");
+        let imposter = HumanAddr::from("imposter");
+        let friend = HumanAddr::from("buddy");
+        control.set(deps.as_mut(), Some(owner.clone())).unwrap();
+
+        // query shows results
+        let res = query_admin(&control, deps.as_ref()).unwrap();
+        assert_eq!(Some(owner.clone()), res.admin);
+
+        // imposter cannot update
+        let info = mock_info(&imposter, &[]);
+        let msg = UpdateAdminHandleMsg {
+            admin: Some(friend.clone()),
+        };
+        let err = handle_update_admin(&control, deps.as_mut(), info, msg.clone()).unwrap_err();
+        assert_eq!(AdminError::NotAdmin {}, err);
+
+        // owner can update
+        let info = mock_info(&owner, &[]);
+        let res = handle_update_admin(&control, deps.as_mut(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // query shows results
+        let res = query_admin(&control, deps.as_ref()).unwrap();
+        assert_eq!(Some(friend.clone()), res.admin);
+    }
 }
