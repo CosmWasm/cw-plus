@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, StdResult,
+    to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, Order, StdResult,
 };
 use cw0::{
     hooks::{add_hook, prepare_hooks, remove_hook, HOOKS},
@@ -8,14 +8,15 @@ use cw0::{
 };
 use cw2::set_contract_version;
 use cw4::{
-    AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
-    MemberResponse, TotalWeightResponse,
+    HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
+    TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{ADMIN, MEMBERS, TOTAL};
+use cw_controllers::admin::{handle_update_admin, query_admin};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -59,36 +60,13 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
+        HandleMsg::UpdateAdmin(msg) => Ok(handle_update_admin(&ADMIN, deps, info, msg)?),
         HandleMsg::UpdateMembers { add, remove } => {
             handle_update_members(deps, env, info, add, remove)
         }
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
     }
-}
-
-pub fn handle_update_admin(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_admin: Option<HumanAddr>,
-) -> Result<HandleResponse, ContractError> {
-    update_admin(deps, info.sender, new_admin)?;
-    Ok(HandleResponse::default())
-}
-
-// the logic from handle_update_admin extracted for easier import
-pub fn update_admin(
-    deps: DepsMut,
-    sender: HumanAddr,
-    new_admin: Option<HumanAddr>,
-) -> Result<Option<CanonicalAddr>, ContractError> {
-    let api = deps.api;
-    ADMIN.update(deps.storage, |state| -> Result<_, ContractError> {
-        assert_admin(api, sender, state)?;
-        let new_admin = maybe_canonical(api, new_admin)?;
-        Ok(new_admin)
-    })
 }
 
 pub fn handle_update_members(
@@ -109,7 +87,7 @@ pub fn handle_update_members(
     })
 }
 
-// the logic from handle_update_admin extracted for easier import
+// the logic from handle_update_members extracted for easier import
 pub fn update_members(
     deps: DepsMut,
     height: u64,
@@ -117,8 +95,7 @@ pub fn update_members(
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
 ) -> Result<MemberChangedHookMsg, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &sender)?;
 
     let mut total = TOTAL.load(deps.storage)?;
     let mut diffs: Vec<MemberDiff> = vec![];
@@ -149,29 +126,12 @@ pub fn update_members(
     Ok(MemberChangedHookMsg { diffs })
 }
 
-fn assert_admin(
-    api: &dyn Api,
-    sender: HumanAddr,
-    admin: Option<CanonicalAddr>,
-) -> Result<(), ContractError> {
-    let owner = match admin {
-        Some(x) => x,
-        None => return Err(ContractError::Unauthorized {}),
-    };
-    if api.canonical_address(&sender)? != owner {
-        Err(ContractError::Unauthorized {})
-    } else {
-        Ok(())
-    }
-}
-
 pub fn handle_add_hook(
     deps: DepsMut,
     info: MessageInfo,
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, info.sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
     add_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -181,8 +141,7 @@ pub fn handle_remove_hook(
     info: MessageInfo,
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, info.sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
     remove_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -196,16 +155,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
-        QueryMsg::Admin {} => to_binary(&query_admin(deps)?),
+        QueryMsg::Admin(_) => to_binary(&query_admin(&ADMIN, deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
         QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
     }
-}
-
-fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
-    let canon = ADMIN.load(deps.storage)?;
-    let admin = canon.map(|c| deps.api.human_address(&c)).transpose()?;
-    Ok(AdminResponse { admin })
 }
 
 fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {

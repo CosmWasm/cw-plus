@@ -10,19 +10,7 @@
       ],
       "properties": {
         "update_admin": {
-          "type": "object",
-          "properties": {
-            "admin": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
+          "$ref": "#/definitions/UpdateAdminHandleMsg"
         }
       }
     },
@@ -116,6 +104,22 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
+        }
+      }
+    },
+    "UpdateAdminHandleMsg": {
+      "description": "This should be embedded in parent `HandleMsg` as `UpdateAdmin(UpdateAdminHandleMsg)`",
+      "type": "object",
+      "properties": {
+        "admin": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }
