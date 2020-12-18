@@ -10,3 +10,7 @@ This is the beginning of an experiment in code composition, and how best to
 reuse code among multiple contracts. We have already seen some "extend" and
 existing base contract (like `cw20-staking` extends `cw20-base`), but this
 goes for smaller scale units.
+
+Supported controllers:
+
+* Admin (`UpdateAdmin` handler, `Admin` querier, set_admin and is_admin methods)

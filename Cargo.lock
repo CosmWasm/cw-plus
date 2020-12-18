@@ -73,6 +73,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-controllers"
+version = "0.3.2"
+dependencies = [
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw0",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-multi-test"
 version = "0.3.2"
 dependencies = [

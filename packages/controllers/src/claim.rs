@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::Expiration;
 use cosmwasm_std::{BlockInfo, CanonicalAddr, StdResult, Storage, Uint128};
+use cw0::Expiration;
 use cw_storage_plus::Map;
 
 // TODO: revisit design (split each claim on own key?)
