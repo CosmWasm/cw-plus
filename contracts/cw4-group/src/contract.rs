@@ -213,18 +213,19 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
+    use cosmwasm_std::{from_slice, Api, OwnedDeps, Querier, Storage};
     use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
+    use cw_controllers::admin::{AdminError, UpdateAdminHandleMsg};
 
-    const ADMIN: &str = "juan";
+    const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
     const USER2: &str = "else";
     const USER3: &str = "funny";
 
     fn do_init(deps: DepsMut) {
         let msg = InitMsg {
-            admin: Some(ADMIN.into()),
+            admin: Some(INIT_ADMIN.into()),
             members: vec![
                 Member {
                     addr: USER1.into(),
@@ -246,42 +247,52 @@ mod tests {
         do_init(deps.as_mut());
 
         // it worked, let's query the state
-        let res = query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(HumanAddr::from(ADMIN)), res.admin);
+        let res = query_admin(&ADMIN, deps.as_ref()).unwrap();
+        assert_eq!(Some(HumanAddr::from(INIT_ADMIN)), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(17, res.weight);
     }
 
+    // TODO: calling the Update Admin in tests is much harder, but I probably don't even need
+    // this test anymore
     #[test]
     fn try_update_admin() {
         let mut deps = mock_dependencies(&[]);
         do_init(deps.as_mut());
 
         // a member cannot update admin
-        let err = update_admin(deps.as_mut(), USER1.into(), Some(USER3.into())).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let info = mock_info(USER1, &[]);
+        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg {
+            admin: Some(USER3.into()),
+        });
+        let err = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // admin can change it
-        update_admin(deps.as_mut(), ADMIN.into(), Some(USER3.into())).unwrap();
+        let info = mock_info(INIT_ADMIN, &[]);
+        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg {
+            admin: Some(USER3.into()),
+        });
+        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(
-            query_admin(deps.as_ref()).unwrap().admin,
+            query_admin(&ADMIN, deps.as_ref()).unwrap().admin,
             Some(USER3.into())
         );
 
         // and unset it
-        update_admin(deps.as_mut(), USER3.into(), None).unwrap();
-        assert_eq!(query_admin(deps.as_ref()).unwrap().admin, None);
+        let info = mock_info(USER3, &[]);
+        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg { admin: None });
+        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(query_admin(&ADMIN, deps.as_ref()).unwrap().admin, None,);
 
         // no one can change it now
-        let err = update_admin(deps.as_mut(), USER3.into(), Some(USER1.into())).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let info = mock_info(USER3, &[]);
+        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg {
+            admin: Some(USER1.into()),
+        });
+        let err = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, AdminError::NotAdmin {}.into());
     }
 
     #[test]
@@ -357,10 +368,7 @@ mod tests {
             remove.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // Test the values from init
         assert_users(&deps, Some(11), Some(6), None, None);
@@ -370,7 +378,7 @@ mod tests {
         assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
 
         // admin updates properly
-        update_members(deps.as_mut(), height + 10, ADMIN.into(), add, remove).unwrap();
+        update_members(deps.as_mut(), height + 10, INIT_ADMIN.into(), add, remove).unwrap();
 
         // updated properly
         assert_users(&deps, None, Some(6), Some(15), None);
@@ -394,7 +402,7 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
+        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, Some(4), Some(6), None, None);
     }
 
@@ -419,7 +427,7 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
+        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(5), None);
     }
 
@@ -448,13 +456,10 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::Admin(AdminError::NotAdmin {}), err);
 
         // admin can add it, and it appears in the query
-        let admin_info = mock_info(ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN, &[]);
         let _ = handle(
             deps.as_mut(),
             mock_env(),
@@ -476,11 +481,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
-
-        match err {
-            ContractError::Hook(HookError::HookNotRegistered {}) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::Hook(HookError::HookNotRegistered {}), err);
 
         // add second contract
         let add_msg2 = HandleMsg::AddHook {
@@ -514,10 +515,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // remove the original
         let _ = handle(
@@ -543,7 +541,7 @@ mod tests {
         let contract2 = HumanAddr::from("hook2");
 
         // register 2 hooks
-        let admin_info = mock_info(ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN, &[]);
         let add_msg = HandleMsg::AddHook {
             addr: contract1.clone(),
         };

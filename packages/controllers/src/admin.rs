@@ -54,7 +54,7 @@ impl<'a> Admin<'a> {
     /// Helper for a nice one-line auth check.
     pub fn assert_admin(&self, deps: Deps, caller: &HumanAddr) -> Result<(), AdminError> {
         if !self.is_admin(deps, caller)? {
-            return Err(AdminError::NotAdmin {});
+            Err(AdminError::NotAdmin {})
         } else {
             Ok(())
         }
@@ -68,7 +68,7 @@ impl<'a> Admin<'a> {
 /// This should be embedded in parent `HandleMsg` as `UpdateAdmin(UpdateAdminHandleMsg)`
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct UpdateAdminHandleMsg {
-    admin: Option<HumanAddr>,
+    pub admin: Option<HumanAddr>,
 }
 
 /// This should be embedded in parent `QueryMsg` as `Admin(AdminQueryMsg)`

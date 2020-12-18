@@ -6,7 +6,7 @@ use cw_storage_plus::Item;
 // store all hook addresses in one item. We cannot have many of them before the contract becomes unusable anyway.
 pub const HOOKS: Item<Vec<HumanAddr>> = Item::new("hooks");
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum HookError {
     #[error("{0}")]
     Std(#[from] StdError),
