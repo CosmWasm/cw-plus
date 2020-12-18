@@ -216,7 +216,7 @@ mod tests {
     use cosmwasm_std::{from_slice, Api, OwnedDeps, Querier, Storage};
     use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
-    use cw_controllers::admin::{AdminError, UpdateAdminHandleMsg};
+    use cw_controllers::admin::AdminError;
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
@@ -252,47 +252,6 @@ mod tests {
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(17, res.weight);
-    }
-
-    // TODO: calling the Update Admin in tests is much harder, but I probably don't even need
-    // this test anymore
-    #[test]
-    fn try_update_admin() {
-        let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
-
-        // a member cannot update admin
-        let info = mock_info(USER1, &[]);
-        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg {
-            admin: Some(USER3.into()),
-        });
-        let err = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-        assert_eq!(err, AdminError::NotAdmin {}.into());
-
-        // admin can change it
-        let info = mock_info(INIT_ADMIN, &[]);
-        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg {
-            admin: Some(USER3.into()),
-        });
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(
-            query_admin(&ADMIN, deps.as_ref()).unwrap().admin,
-            Some(USER3.into())
-        );
-
-        // and unset it
-        let info = mock_info(USER3, &[]);
-        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg { admin: None });
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(query_admin(&ADMIN, deps.as_ref()).unwrap().admin, None,);
-
-        // no one can change it now
-        let info = mock_info(USER3, &[]);
-        let msg = HandleMsg::UpdateAdmin(UpdateAdminHandleMsg {
-            admin: Some(USER1.into()),
-        });
-        let err = handle(deps.as_mut(), mock_env(), info, msg).unwrap_err();
-        assert_eq!(err, AdminError::NotAdmin {}.into());
     }
 
     #[test]
@@ -456,7 +415,7 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap_err();
-        assert_eq!(ContractError::Admin(AdminError::NotAdmin {}), err);
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // admin can add it, and it appears in the query
         let admin_info = mock_info(INIT_ADMIN, &[]);
@@ -481,7 +440,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
-        assert_eq!(ContractError::Hook(HookError::HookNotRegistered {}), err);
+        assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
         let add_msg2 = HandleMsg::AddHook {
@@ -499,10 +458,7 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Hook(HookError::HookAlreadyRegistered {}) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
         let remove_msg = HandleMsg::RemoveHook {
