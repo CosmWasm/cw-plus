@@ -10,7 +10,7 @@
       ],
       "properties": {
         "admin": {
-          "$ref": "#/definitions/AdminQueryMsg"
+          "type": "object"
         }
       }
     },
@@ -100,10 +100,6 @@
     }
   ],
   "definitions": {
-    "AdminQueryMsg": {
-      "description": "This should be embedded in parent `QueryMsg` as `Admin(AdminQueryMsg)`",
-      "type": "object"
-    },
     "HumanAddr": {
       "type": "string"
     }

@@ -1,3 +1,3 @@
-pub mod admin;
-pub mod claim;
-pub mod hooks;
+mod admin;
+
+pub use admin::{Admin, AdminError, AdminResponse};

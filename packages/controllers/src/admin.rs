@@ -9,6 +9,23 @@ use thiserror::Error;
 use cw0::maybe_canonical;
 use cw_storage_plus::Item;
 
+// TODO: should the return values end up in cw0, so eg. cw4 can import them as well as this module?
+/// Returned from Admin.query_admin()
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct AdminResponse {
+    pub admin: Option<HumanAddr>,
+}
+
+/// Errors returned from Admin
+#[derive(Error, Debug, PartialEq)]
+pub enum AdminError {
+    #[error("{0}")]
+    Std(#[from] StdError),
+
+    #[error("Caller is not admin")]
+    NotAdmin {},
+}
+
 // state/logic
 pub struct Admin<'a>(Item<'a, Option<CanonicalAddr>>);
 
@@ -59,58 +76,23 @@ impl<'a> Admin<'a> {
             Ok(())
         }
     }
-}
 
-// messages
-// TODO: should all the definitions end up in cw0, so eg. cw4 can import them as well as this module?
-// Or should the cwX specs not define these types at all, and just require the base contract to mix this in?
+    pub fn handle_update_admin(
+        &self,
+        deps: DepsMut,
+        info: MessageInfo,
+        new_admin: Option<HumanAddr>,
+    ) -> Result<HandleResponse, AdminError> {
+        self.assert_admin(deps.as_ref(), &info.sender)?;
+        self.set(deps, new_admin)?;
+        // TODO: add some common log attributes here
+        Ok(HandleResponse::default())
+    }
 
-/// This should be embedded in parent `HandleMsg` as `UpdateAdmin(UpdateAdminHandleMsg)`
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct UpdateAdminHandleMsg {
-    pub admin: Option<HumanAddr>,
-}
-
-/// This should be embedded in parent `QueryMsg` as `Admin(AdminQueryMsg)`
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct AdminQueryMsg {}
-
-/// Returned from AdminQueryMsg
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct AdminResponse {
-    pub admin: Option<HumanAddr>,
-}
-
-// errors
-
-#[derive(Error, Debug, PartialEq)]
-pub enum AdminError {
-    #[error("{0}")]
-    Std(#[from] StdError),
-
-    #[error("Caller is not admin")]
-    NotAdmin {},
-}
-
-// handlers: maybe they don't even make sense, as they are so simple???
-
-pub fn handle_update_admin(
-    // we need to pass in the controller from the contract, so we know which key it uses
-    // better naming here?
-    controller: &Admin,
-    deps: DepsMut,
-    info: MessageInfo,
-    msg: UpdateAdminHandleMsg,
-) -> Result<HandleResponse, AdminError> {
-    controller.assert_admin(deps.as_ref(), &info.sender)?;
-    controller.set(deps, msg.admin)?;
-    // TODO: add some common log attributes here
-    Ok(HandleResponse::default())
-}
-
-pub fn query_admin(controller: &Admin, deps: Deps) -> StdResult<AdminResponse> {
-    let admin = controller.get(deps)?;
-    Ok(AdminResponse { admin })
+    pub fn query_admin(&self, deps: Deps) -> StdResult<AdminResponse> {
+        let admin = self.get(deps)?;
+        Ok(AdminResponse { admin })
+    }
 }
 
 #[cfg(test)]
@@ -174,24 +156,26 @@ mod tests {
         control.set(deps.as_mut(), Some(owner.clone())).unwrap();
 
         // query shows results
-        let res = query_admin(&control, deps.as_ref()).unwrap();
+        let res = control.query_admin(deps.as_ref()).unwrap();
         assert_eq!(Some(owner.clone()), res.admin);
 
         // imposter cannot update
         let info = mock_info(&imposter, &[]);
-        let msg = UpdateAdminHandleMsg {
-            admin: Some(friend.clone()),
-        };
-        let err = handle_update_admin(&control, deps.as_mut(), info, msg.clone()).unwrap_err();
+        let new_admin = Some(friend.clone());
+        let err = control
+            .handle_update_admin(deps.as_mut(), info, new_admin.clone())
+            .unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // owner can update
         let info = mock_info(&owner, &[]);
-        let res = handle_update_admin(&control, deps.as_mut(), info, msg).unwrap();
+        let res = control
+            .handle_update_admin(deps.as_mut(), info, new_admin)
+            .unwrap();
         assert_eq!(0, res.messages.len());
 
         // query shows results
-        let res = query_admin(&control, deps.as_ref()).unwrap();
+        let res = control.query_admin(deps.as_ref()).unwrap();
         assert_eq!(Some(friend.clone()), res.admin);
     }
 }

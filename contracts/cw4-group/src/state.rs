@@ -1,5 +1,5 @@
 use cw4::TOTAL_KEY;
-use cw_controllers::admin::Admin;
+use cw_controllers::Admin;
 use cw_storage_plus::{Item, SnapshotMap, Strategy};
 
 pub const ADMIN: Admin = Admin::new("admin");

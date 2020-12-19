@@ -16,7 +16,6 @@ use cw_storage_plus::Bound;
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{ADMIN, MEMBERS, TOTAL};
-use cw_controllers::admin::{handle_update_admin, query_admin};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -24,7 +23,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    msg: InitMsg,
+) -> Result<InitResponse, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     create(deps, msg.admin, msg.members, env.block.height)?;
     Ok(InitResponse::default())
@@ -33,13 +37,12 @@ pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdRes
 // create is the init logic with set_contract_version removed so it can more
 // easily be imported in other contracts
 pub fn create(
-    deps: DepsMut,
+    mut deps: DepsMut,
     admin: Option<HumanAddr>,
     members: Vec<Member>,
     height: u64,
-) -> StdResult<()> {
-    let admin_raw = maybe_canonical(deps.api, admin)?;
-    ADMIN.save(deps.storage, &admin_raw)?;
+) -> Result<(), ContractError> {
+    ADMIN.set(deps.branch(), admin)?;
 
     let mut total = 0u64;
     for member in members.into_iter() {
@@ -60,7 +63,7 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin(msg) => Ok(handle_update_admin(&ADMIN, deps, info, msg)?),
+        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::UpdateMembers { add, remove } => {
             handle_update_members(deps, env, info, add, remove)
         }
@@ -155,7 +158,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
-        QueryMsg::Admin(_) => to_binary(&query_admin(&ADMIN, deps)?),
+        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
         QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
     }
@@ -216,7 +219,7 @@ mod tests {
     use cosmwasm_std::{from_slice, Api, OwnedDeps, Querier, Storage};
     use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
-    use cw_controllers::admin::AdminError;
+    use cw_controllers::AdminError;
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
@@ -247,7 +250,7 @@ mod tests {
         do_init(deps.as_mut());
 
         // it worked, let's query the state
-        let res = query_admin(&ADMIN, deps.as_ref()).unwrap();
+        let res = ADMIN.query_admin(deps.as_ref()).unwrap();
         assert_eq!(Some(HumanAddr::from(INIT_ADMIN)), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
