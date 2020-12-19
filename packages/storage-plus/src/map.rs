@@ -104,6 +104,7 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
+    use crate::{U64Key, U8Key};
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -117,6 +118,8 @@ mod test {
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
+
+    const INT_KEYS: Map<(U8Key, U64Key), u64> = Map::new("integers_tuple");
 
     #[test]
     fn create_path() {
@@ -181,6 +184,25 @@ mod test {
     }
 
     #[test]
+    fn composite_integer_keys() {
+        let mut store = MockStorage::new();
+
+        // save and load on a composite key
+        let test = INT_KEYS.key((U8Key::new(2), U64Key::new(12345)));
+        assert_eq!(None, test.may_load(&store).unwrap());
+        test.save(&mut store, &1234).unwrap();
+        assert_eq!(1234, test.load(&store).unwrap());
+
+        // not under other key
+        let different = INT_KEYS.may_load(&store, (2.into(), 12346.into())).unwrap();
+        assert_eq!(None, different);
+
+        // matches under a proper copy
+        let same = INT_KEYS.load(&store, (2.into(), 12345.into())).unwrap();
+        assert_eq!(1234, same);
+    }
+
+    #[test]
     #[cfg(feature = "iterator")]
     fn range_simple_key() {
         let mut store = MockStorage::new();
@@ -234,6 +256,38 @@ mod test {
         assert_eq!(
             all,
             vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_int_composite_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys, one under different owner
+        INT_KEYS
+            .save(&mut store, (1.into(), 123456.into()), &1000)
+            .unwrap();
+        INT_KEYS
+            .save(&mut store, (1.into(), 123457.into()), &3000)
+            .unwrap();
+        INT_KEYS
+            .save(&mut store, (2.into(), 123456.into()), &5000)
+            .unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = INT_KEYS
+            .prefix(1.into())
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (123456u64.to_be_bytes().to_vec(), 1000),
+                (123457u64.to_be_bytes().to_vec(), 3000)
+            ]
         );
     }
 
