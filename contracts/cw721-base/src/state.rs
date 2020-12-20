@@ -46,7 +46,7 @@ pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 }
 
 pub struct TokenIndexes<'a> {
-    pub owner: MultiIndex<'a, TokenInfo>,
+    pub owner: MultiIndex<'a, &'a [u8], TokenInfo>,
 }
 
 impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {

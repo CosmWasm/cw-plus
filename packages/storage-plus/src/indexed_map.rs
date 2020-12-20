@@ -168,7 +168,7 @@ mod test {
     }
 
     struct DataIndexes<'a> {
-        pub name: MultiIndex<'a, Data>,
+        pub name: MultiIndex<'a, &'a [u8], Data>,
         pub age: UniqueIndex<'a, Data>,
     }
 
