@@ -6,9 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
+use crate::keys::{EmptyPrefix, Prefixer};
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, Endian};
+use crate::{Bound, Endian, Prefix, PrimaryKey};
+use std::marker::PhantomData;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: bool = true;
@@ -39,27 +41,32 @@ where
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()>;
 }
 
-pub struct MultiIndex<'a, T> {
+pub struct MultiIndex<'a, K, T> {
     index: fn(&T) -> Vec<u8>,
+    idx_namespace: &'a [u8],
     idx_map: Map<'a, (&'a [u8], &'a [u8]), bool>,
-    // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
+    // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk_map: Map<'a, &'a [u8], T>,
+    idx_type: PhantomData<K>,
 }
 
-impl<'a, T> MultiIndex<'a, T> {
+impl<'a, K, T> MultiIndex<'a, K, T> {
     // TODO: make this a const fn
     pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
         MultiIndex {
             index: idx_fn,
             pk_map: Map::new(pk_namespace),
+            idx_namespace: idx_namespace.as_bytes(),
             idx_map: Map::new(idx_namespace),
+            idx_type: PhantomData,
         }
     }
 }
 
-impl<'a, T> Index<T> for MultiIndex<'a, T>
+impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data);
@@ -73,9 +80,10 @@ where
     }
 }
 
-impl<'a, T> MultiIndex<'a, T>
+impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
 {
     pub fn pks<'c>(
         &self,
@@ -106,6 +114,10 @@ where
         Box::new(mapped)
     }
 
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+        Prefix::new(self.idx_namespace, &p.prefix())
+    }
+
     #[cfg(test)]
     pub fn count<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> usize {
         self.pks(store, idx, None, None, Order::Ascending).count()
@@ -123,9 +135,32 @@ where
     }
 }
 
+// short-cut for simple keys, rather than .prefix(()).range(...)
+impl<'a, K, T> MultiIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
+    K::Prefix: EmptyPrefix,
+{
+    // I would prefer not to copy code from Prefix, but no other way
+    // with lifetimes (create Prefix inside function and return ref = no no)
+    pub fn range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(K::Prefix::new()).range(store, min, max, order)
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub(crate) struct UniqueRef<T> {
-    // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
+    // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk: Binary,
     value: T,
 }
