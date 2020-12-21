@@ -204,7 +204,7 @@ version = "0.3.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-storage-plus",
+ "cosmwasm-storage",
  "cw0",
  "cw2",
  "cw20",
@@ -219,7 +219,7 @@ version = "0.3.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
+ "cw-storage-plus",
  "cw0",
  "cw2",
  "cw20",
