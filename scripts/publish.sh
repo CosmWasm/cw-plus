@@ -3,8 +3,8 @@ set -o errexit -o nounset -o pipefail
 command -v shellcheck > /dev/null && shellcheck "$0"
 
 # these are imported by other packages
-BASE_PACKAGES="storage-plus cw0"
-ALL_PACKAGES="cw1 cw2 cw3 cw4 cw20 cw721"
+BASE_PACKAGES="cw0 storage-plus"
+ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw721"
 
 # these are imported by other contracts
 BASE_CONTRACTS="cw1-whitelist cw20-base cw721-base"
@@ -17,8 +17,6 @@ for pack in $BASE_PACKAGES; do
     cd "packages/$pack"
     echo "Publishing $pack"
     cargo publish
-    # there are some dependencies between these
-    sleep $SLEEP_TIME
   )
 done
 

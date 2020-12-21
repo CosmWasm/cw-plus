@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Api, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, StdResult,
+    to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
+    MessageInfo, Order, StdResult,
 };
 use cw0::{
     hooks::{add_hook, prepare_hooks, remove_hook, HOOKS},
@@ -8,8 +8,8 @@ use cw0::{
 };
 use cw2::set_contract_version;
 use cw4::{
-    AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
-    MemberResponse, TotalWeightResponse,
+    HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
+    TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
 
@@ -23,7 +23,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    msg: InitMsg,
+) -> Result<InitResponse, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     create(deps, msg.admin, msg.members, env.block.height)?;
     Ok(InitResponse::default())
@@ -32,13 +37,12 @@ pub fn init(deps: DepsMut, env: Env, _info: MessageInfo, msg: InitMsg) -> StdRes
 // create is the init logic with set_contract_version removed so it can more
 // easily be imported in other contracts
 pub fn create(
-    deps: DepsMut,
+    mut deps: DepsMut,
     admin: Option<HumanAddr>,
     members: Vec<Member>,
     height: u64,
-) -> StdResult<()> {
-    let admin_raw = maybe_canonical(deps.api, admin)?;
-    ADMIN.save(deps.storage, &admin_raw)?;
+) -> Result<(), ContractError> {
+    ADMIN.set(deps.branch(), admin)?;
 
     let mut total = 0u64;
     for member in members.into_iter() {
@@ -59,36 +63,13 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
+        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::UpdateMembers { add, remove } => {
             handle_update_members(deps, env, info, add, remove)
         }
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
     }
-}
-
-pub fn handle_update_admin(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_admin: Option<HumanAddr>,
-) -> Result<HandleResponse, ContractError> {
-    update_admin(deps, info.sender, new_admin)?;
-    Ok(HandleResponse::default())
-}
-
-// the logic from handle_update_admin extracted for easier import
-pub fn update_admin(
-    deps: DepsMut,
-    sender: HumanAddr,
-    new_admin: Option<HumanAddr>,
-) -> Result<Option<CanonicalAddr>, ContractError> {
-    let api = deps.api;
-    ADMIN.update(deps.storage, |state| -> Result<_, ContractError> {
-        assert_admin(api, sender, state)?;
-        let new_admin = maybe_canonical(api, new_admin)?;
-        Ok(new_admin)
-    })
 }
 
 pub fn handle_update_members(
@@ -109,7 +90,7 @@ pub fn handle_update_members(
     })
 }
 
-// the logic from handle_update_admin extracted for easier import
+// the logic from handle_update_members extracted for easier import
 pub fn update_members(
     deps: DepsMut,
     height: u64,
@@ -117,8 +98,7 @@ pub fn update_members(
     to_add: Vec<Member>,
     to_remove: Vec<HumanAddr>,
 ) -> Result<MemberChangedHookMsg, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &sender)?;
 
     let mut total = TOTAL.load(deps.storage)?;
     let mut diffs: Vec<MemberDiff> = vec![];
@@ -149,29 +129,12 @@ pub fn update_members(
     Ok(MemberChangedHookMsg { diffs })
 }
 
-fn assert_admin(
-    api: &dyn Api,
-    sender: HumanAddr,
-    admin: Option<CanonicalAddr>,
-) -> Result<(), ContractError> {
-    let owner = match admin {
-        Some(x) => x,
-        None => return Err(ContractError::Unauthorized {}),
-    };
-    if api.canonical_address(&sender)? != owner {
-        Err(ContractError::Unauthorized {})
-    } else {
-        Ok(())
-    }
-}
-
 pub fn handle_add_hook(
     deps: DepsMut,
     info: MessageInfo,
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, info.sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
     add_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -181,8 +144,7 @@ pub fn handle_remove_hook(
     info: MessageInfo,
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, info.sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
     remove_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -196,16 +158,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
-        QueryMsg::Admin {} => to_binary(&query_admin(deps)?),
+        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
         QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
     }
-}
-
-fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
-    let canon = ADMIN.load(deps.storage)?;
-    let admin = canon.map(|c| deps.api.human_address(&c)).transpose()?;
-    Ok(AdminResponse { admin })
 }
 
 fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {
@@ -260,18 +216,19 @@ fn list_members(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OwnedDeps, Querier, Storage};
+    use cosmwasm_std::{from_slice, Api, OwnedDeps, Querier, Storage};
     use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
+    use cw_controllers::AdminError;
 
-    const ADMIN: &str = "juan";
+    const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
     const USER2: &str = "else";
     const USER3: &str = "funny";
 
     fn do_init(deps: DepsMut) {
         let msg = InitMsg {
-            admin: Some(ADMIN.into()),
+            admin: Some(INIT_ADMIN.into()),
             members: vec![
                 Member {
                     addr: USER1.into(),
@@ -293,42 +250,11 @@ mod tests {
         do_init(deps.as_mut());
 
         // it worked, let's query the state
-        let res = query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(HumanAddr::from(ADMIN)), res.admin);
+        let res = ADMIN.query_admin(deps.as_ref()).unwrap();
+        assert_eq!(Some(HumanAddr::from(INIT_ADMIN)), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(17, res.weight);
-    }
-
-    #[test]
-    fn try_update_admin() {
-        let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
-
-        // a member cannot update admin
-        let err = update_admin(deps.as_mut(), USER1.into(), Some(USER3.into())).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
-
-        // admin can change it
-        update_admin(deps.as_mut(), ADMIN.into(), Some(USER3.into())).unwrap();
-        assert_eq!(
-            query_admin(deps.as_ref()).unwrap().admin,
-            Some(USER3.into())
-        );
-
-        // and unset it
-        update_admin(deps.as_mut(), USER3.into(), None).unwrap();
-        assert_eq!(query_admin(deps.as_ref()).unwrap().admin, None);
-
-        // no one can change it now
-        let err = update_admin(deps.as_mut(), USER3.into(), Some(USER1.into())).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
     }
 
     #[test]
@@ -404,10 +330,7 @@ mod tests {
             remove.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // Test the values from init
         assert_users(&deps, Some(11), Some(6), None, None);
@@ -417,7 +340,7 @@ mod tests {
         assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
 
         // admin updates properly
-        update_members(deps.as_mut(), height + 10, ADMIN.into(), add, remove).unwrap();
+        update_members(deps.as_mut(), height + 10, INIT_ADMIN.into(), add, remove).unwrap();
 
         // updated properly
         assert_users(&deps, None, Some(6), Some(15), None);
@@ -441,7 +364,7 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
+        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, Some(4), Some(6), None, None);
     }
 
@@ -466,7 +389,7 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, ADMIN.into(), add, remove).unwrap();
+        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
         assert_users(&deps, None, Some(6), Some(5), None);
     }
 
@@ -495,13 +418,10 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // admin can add it, and it appears in the query
-        let admin_info = mock_info(ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN, &[]);
         let _ = handle(
             deps.as_mut(),
             mock_env(),
@@ -523,11 +443,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
-
-        match err {
-            ContractError::Hook(HookError::HookNotRegistered {}) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
         let add_msg2 = HandleMsg::AddHook {
@@ -545,10 +461,7 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Hook(HookError::HookAlreadyRegistered {}) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
         let remove_msg = HandleMsg::RemoveHook {
@@ -561,10 +474,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(err, AdminError::NotAdmin {}.into());
 
         // remove the original
         let _ = handle(
@@ -590,7 +500,7 @@ mod tests {
         let contract2 = HumanAddr::from("hook2");
 
         // register 2 hooks
-        let admin_info = mock_info(ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN, &[]);
         let add_msg = HandleMsg::AddHook {
             addr: contract1.clone(),
         };

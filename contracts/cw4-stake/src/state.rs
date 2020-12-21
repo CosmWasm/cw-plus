@@ -1,9 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Uint128};
+use cosmwasm_std::Uint128;
 use cw0::Duration;
 use cw4::TOTAL_KEY;
+use cw_controllers::Admin;
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -15,7 +16,7 @@ pub struct Config {
     pub unbonding_period: Duration,
 }
 
-pub const ADMIN: Item<Option<CanonicalAddr>> = Item::new("admin");
+pub const ADMIN: Admin = Admin::new("admin");
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
 
