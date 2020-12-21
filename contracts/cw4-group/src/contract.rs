@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, Order, StdResult,
+    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
+    InitResponse, MessageInfo, Order, StdResult,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
@@ -76,13 +76,20 @@ pub fn handle_update_members(
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
 ) -> Result<HandleResponse, ContractError> {
+    let attributes = vec![
+        attr("action", "update_members"),
+        attr("added", add.len()),
+        attr("removed", remove.len()),
+        attr("sender", &info.sender),
+    ];
+
     // make the local update
     let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
     let messages = HOOKS.prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
     Ok(HandleResponse {
         messages,
-        attributes: vec![],
+        attributes,
         data: None,
     })
 }
