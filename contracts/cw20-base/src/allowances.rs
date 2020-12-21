@@ -90,7 +90,7 @@ pub fn handle_decrease_allowance(
 }
 
 // this can be used to update a lower allowance - call bucket.update with proper keys
-fn deduct_allowance(
+pub fn deduct_allowance(
     storage: &mut dyn Storage,
     owner: &CanonicalAddr,
     spender: &CanonicalAddr,
