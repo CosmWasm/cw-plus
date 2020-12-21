@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Coin, HumanAddr, Uint128};
-use cw0::claim::Claim;
 use cw0::Duration;
+pub use cw_controllers::ClaimsResponse;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
@@ -66,11 +66,6 @@ pub enum QueryMsg {
     },
     /// Shows all registered hooks. Returns HooksResponse.
     Hooks {},
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ClaimsResponse {
-    pub claims: Vec<Claim>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
