@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128,
+    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
+    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
@@ -97,16 +97,21 @@ pub fn handle_bond(
 
     let messages = update_membership(
         deps.storage,
-        info.sender,
+        info.sender.clone(),
         &sender_raw,
         new_stake,
         &cfg,
         env.block.height,
     )?;
 
+    let attributes = vec![
+        attr("action", "bond"),
+        attr("amount", sent),
+        attr("sender", info.sender),
+    ];
     Ok(HandleResponse {
         messages,
-        attributes: vec![],
+        attributes,
         data: None,
     })
 }
@@ -134,16 +139,21 @@ pub fn handle_unbond(
 
     let messages = update_membership(
         deps.storage,
-        info.sender,
+        info.sender.clone(),
         &sender_raw,
         new_stake,
         &cfg,
         env.block.height,
     )?;
 
+    let attributes = vec![
+        attr("action", "unbond"),
+        attr("amount", amount),
+        attr("sender", info.sender),
+    ];
     Ok(HandleResponse {
         messages,
-        attributes: vec![],
+        attributes,
         data: None,
     })
 }
@@ -204,19 +214,34 @@ pub fn handle_claim(
 
     let config = CONFIG.load(deps.storage)?;
     let amount = coins(release.u128(), config.denom);
+    let amount_str = coins_to_string(&amount);
 
     let messages = vec![BankMsg::Send {
         from_address: env.contract.address,
-        to_address: info.sender,
+        to_address: info.sender.clone(),
         amount,
     }
     .into()];
 
+    let attributes = vec![
+        attr("action", "claim"),
+        attr("tokens", amount_str),
+        attr("sender", info.sender),
+    ];
     Ok(HandleResponse {
         messages,
-        attributes: vec![],
+        attributes,
         data: None,
     })
+}
+
+// TODO: put in cosmwasm-std
+fn coins_to_string(coins: &[Coin]) -> String {
+    let strings: Vec<_> = coins
+        .iter()
+        .map(|c| format!("{}{}", c.amount, c.denom))
+        .collect();
+    strings.join(",")
 }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
