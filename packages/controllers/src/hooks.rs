@@ -1,13 +1,29 @@
-use cosmwasm_std::{CosmosMsg, HumanAddr, StdError, StdResult, Storage};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use thiserror::Error;
 
+use cosmwasm_std::{
+    CosmosMsg, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult, Storage,
+};
 use cw_storage_plus::Item;
-use std::ops::Deref;
+
+use crate::admin::{Admin, AdminError};
+
+// this is copied from cw4
+// TODO: pull into cw0 as common dep
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct HooksResponse {
+    pub hooks: Vec<HumanAddr>,
+}
 
 #[derive(Error, Debug, PartialEq)]
 pub enum HookError {
     #[error("{0}")]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    Admin(#[from] AdminError),
 
     #[error("Given address already registered as a hook")]
     HookAlreadyRegistered {},
@@ -64,5 +80,36 @@ impl<'a> Hooks<'a> {
             .into_iter()
             .map(prep)
             .collect()
+    }
+
+    pub fn handle_add_hook(
+        &self,
+        admin: &Admin,
+        deps: DepsMut,
+        info: MessageInfo,
+        addr: HumanAddr,
+    ) -> Result<HandleResponse, HookError> {
+        admin.assert_admin(deps.as_ref(), &info.sender)?;
+        self.add_hook(deps.storage, addr)?;
+        // TODO: add attributes here
+        Ok(HandleResponse::default())
+    }
+
+    pub fn handle_remove_hook(
+        &self,
+        admin: &Admin,
+        deps: DepsMut,
+        info: MessageInfo,
+        addr: HumanAddr,
+    ) -> Result<HandleResponse, HookError> {
+        admin.assert_admin(deps.as_ref(), &info.sender)?;
+        self.remove_hook(deps.storage, addr)?;
+        // TODO: add attributes here
+        Ok(HandleResponse::default())
+    }
+
+    pub fn query_hooks(&self, deps: Deps) -> StdResult<HooksResponse> {
+        let hooks = self.may_load(deps.storage)?.unwrap_or_default();
+        Ok(HooksResponse { hooks })
     }
 }

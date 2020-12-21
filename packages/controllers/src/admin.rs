@@ -1,11 +1,11 @@
-use cosmwasm_std::{
-    CanonicalAddr, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult,
-};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use thiserror::Error;
 
+use cosmwasm_std::{
+    CanonicalAddr, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult,
+};
 use cw0::maybe_canonical;
 use cw_storage_plus::Item;
 
