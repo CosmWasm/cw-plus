@@ -1,6 +1,5 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use thiserror::Error;
 
 use cosmwasm_std::{
@@ -35,39 +34,29 @@ pub enum HookError {
 // store all hook addresses in one item. We cannot have many of them before the contract becomes unusable anyway.
 pub struct Hooks<'a>(Item<'a, Vec<HumanAddr>>);
 
-// allow easy access to the basic Item operations if desired
-// TODO: reconsider if we need this here, maybe only for maps?
-impl<'a> Deref for Hooks<'a> {
-    type Target = Item<'a, Vec<HumanAddr>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl<'a> Hooks<'a> {
     pub const fn new(storage_key: &'a str) -> Self {
         Hooks(Item::new(storage_key))
     }
 
     pub fn add_hook(&self, storage: &mut dyn Storage, addr: HumanAddr) -> Result<(), HookError> {
-        let mut hooks = self.may_load(storage)?.unwrap_or_default();
+        let mut hooks = self.0.may_load(storage)?.unwrap_or_default();
         if !hooks.iter().any(|h| h == &addr) {
             hooks.push(addr);
         } else {
             return Err(HookError::HookAlreadyRegistered {});
         }
-        Ok(self.save(storage, &hooks)?)
+        Ok(self.0.save(storage, &hooks)?)
     }
 
     pub fn remove_hook(&self, storage: &mut dyn Storage, addr: HumanAddr) -> Result<(), HookError> {
-        let mut hooks = self.load(storage)?;
+        let mut hooks = self.0.load(storage)?;
         if let Some(p) = hooks.iter().position(|x| x == &addr) {
             hooks.remove(p);
         } else {
             return Err(HookError::HookNotRegistered {});
         }
-        Ok(self.save(storage, &hooks)?)
+        Ok(self.0.save(storage, &hooks)?)
     }
 
     pub fn prepare_hooks<F: Fn(HumanAddr) -> StdResult<CosmosMsg>>(
@@ -75,7 +64,8 @@ impl<'a> Hooks<'a> {
         storage: &dyn Storage,
         prep: F,
     ) -> StdResult<Vec<CosmosMsg>> {
-        self.may_load(storage)?
+        self.0
+            .may_load(storage)?
             .unwrap_or_default()
             .into_iter()
             .map(prep)
@@ -109,7 +99,9 @@ impl<'a> Hooks<'a> {
     }
 
     pub fn query_hooks(&self, deps: Deps) -> StdResult<HooksResponse> {
-        let hooks = self.may_load(deps.storage)?.unwrap_or_default();
+        let hooks = self.0.may_load(deps.storage)?.unwrap_or_default();
         Ok(HooksResponse { hooks })
     }
 }
+
+// TODO: add test coverage

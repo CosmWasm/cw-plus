@@ -1,6 +1,5 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use thiserror::Error;
 
 use cosmwasm_std::{
@@ -29,16 +28,6 @@ pub enum AdminError {
 // state/logic
 pub struct Admin<'a>(Item<'a, Option<CanonicalAddr>>);
 
-// allow easy access to the basic Item operations if desired
-// TODO: reconsider if we need this here, maybe only for maps?
-impl<'a> Deref for Admin<'a> {
-    type Target = Item<'a, Option<CanonicalAddr>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 // this is the core business logic we expose
 impl<'a> Admin<'a> {
     pub const fn new(namespace: &'a str) -> Self {
@@ -47,18 +36,18 @@ impl<'a> Admin<'a> {
 
     pub fn set(&self, deps: DepsMut, admin: Option<HumanAddr>) -> StdResult<()> {
         let admin_raw = maybe_canonical(deps.api, admin)?;
-        self.save(deps.storage, &admin_raw)
+        self.0.save(deps.storage, &admin_raw)
     }
 
     pub fn get(&self, deps: Deps) -> StdResult<Option<HumanAddr>> {
-        let canon = self.load(deps.storage)?;
+        let canon = self.0.load(deps.storage)?;
         canon.map(|c| deps.api.human_address(&c)).transpose()
     }
 
     /// Returns Ok(true) if this is an admin, Ok(false) if not and an Error if
     /// we hit an error with Api or Storage usage
     pub fn is_admin(&self, deps: Deps, caller: &HumanAddr) -> StdResult<bool> {
-        match self.load(deps.storage)? {
+        match self.0.load(deps.storage)? {
             Some(owner) => {
                 let caller_raw = deps.api.canonical_address(caller)?;
                 Ok(caller_raw == owner)
