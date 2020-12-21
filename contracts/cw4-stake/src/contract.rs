@@ -12,8 +12,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, QueryMsg, StakedResponse};
-use crate::state::{Config, ADMIN, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
-use cw0::claim::{claim_tokens, create_claim, CLAIMS};
+use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-stake";
@@ -126,7 +125,7 @@ pub fn handle_unbond(
 
     // provide them a claim
     let cfg = CONFIG.load(deps.storage)?;
-    create_claim(
+    CLAIMS.create_claim(
         deps.storage,
         &sender_raw,
         amount,
@@ -198,7 +197,7 @@ pub fn handle_claim(
     info: MessageInfo,
 ) -> Result<HandleResponse, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let release = claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
+    let release = CLAIMS.claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
     if release.is_zero() {
         return Err(ContractError::NothingToClaim {});
     }
@@ -230,7 +229,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&list_members(deps, start_after, limit)?)
         }
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
-        QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
+        QueryMsg::Claims { address } => to_binary(&CLAIMS.query_claims(deps, address)?),
         QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
@@ -304,10 +303,9 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, Api, StdError, Storage};
-    use cw0::claim::Claim;
     use cw0::Duration;
     use cw4::{member_key, TOTAL_KEY};
-    use cw_controllers::{AdminError, HookError};
+    use cw_controllers::{AdminError, Claim, HookError};
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";

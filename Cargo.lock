@@ -108,7 +108,6 @@ name = "cw0"
 version = "0.3.2"
 dependencies = [
  "cosmwasm-std",
- "cw-storage-plus",
  "schemars",
  "serde",
  "thiserror",
@@ -232,6 +231,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cosmwasm-storage",
+ "cw-controllers",
  "cw0",
  "cw2",
  "cw20",

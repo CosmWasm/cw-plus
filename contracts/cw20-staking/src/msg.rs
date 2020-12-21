@@ -2,8 +2,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Coin, Decimal, HumanAddr, Uint128};
-use cw0::{claim::Claim, Duration};
+use cw0::Duration;
 use cw20::Expiration;
+pub use cw_controllers::ClaimsResponse;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InitMsg {
@@ -114,11 +115,6 @@ pub enum QueryMsg {
         owner: HumanAddr,
         spender: HumanAddr,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ClaimsResponse {
-    pub claims: Vec<Claim>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
