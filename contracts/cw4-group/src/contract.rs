@@ -2,20 +2,17 @@ use cosmwasm_std::{
     to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
     MessageInfo, Order, StdResult,
 };
-use cw0::{
-    hooks::{add_hook, prepare_hooks, remove_hook, HOOKS},
-    maybe_canonical,
-};
+use cw0::maybe_canonical;
 use cw2::set_contract_version;
 use cw4::{
-    HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
+    Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{ADMIN, MEMBERS, TOTAL};
+use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -67,8 +64,8 @@ pub fn handle(
         HandleMsg::UpdateMembers { add, remove } => {
             handle_update_members(deps, env, info, add, remove)
         }
-        HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
-        HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
+        HandleMsg::AddHook { addr } => Ok(HOOKS.handle_add_hook(&ADMIN, deps, info, addr)?),
+        HandleMsg::RemoveHook { addr } => Ok(HOOKS.handle_remove_hook(&ADMIN, deps, info, addr)?),
     }
 }
 
@@ -82,7 +79,7 @@ pub fn handle_update_members(
     // make the local update
     let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
-    let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
+    let messages = HOOKS.prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
     Ok(HandleResponse {
         messages,
         attributes: vec![],
@@ -129,26 +126,6 @@ pub fn update_members(
     Ok(MemberChangedHookMsg { diffs })
 }
 
-pub fn handle_add_hook(
-    deps: DepsMut,
-    info: MessageInfo,
-    addr: HumanAddr,
-) -> Result<HandleResponse, ContractError> {
-    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-    add_hook(deps.storage, addr)?;
-    Ok(HandleResponse::default())
-}
-
-pub fn handle_remove_hook(
-    deps: DepsMut,
-    info: MessageInfo,
-    addr: HumanAddr,
-) -> Result<HandleResponse, ContractError> {
-    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-    remove_hook(deps.storage, addr)?;
-    Ok(HandleResponse::default())
-}
-
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member {
@@ -158,15 +135,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
-        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
-        QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
+        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
+        QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
     }
-}
-
-fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {
-    let hooks = HOOKS.may_load(deps.storage)?.unwrap_or_default();
-    Ok(HooksResponse { hooks })
 }
 
 fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
@@ -217,9 +189,8 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, Api, OwnedDeps, Querier, Storage};
-    use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
-    use cw_controllers::AdminError;
+    use cw_controllers::{AdminError, HookError};
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
@@ -399,7 +370,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_init(deps.as_mut());
 
-        let hooks = query_hooks(deps.as_ref()).unwrap();
+        let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
         let contract1 = HumanAddr::from("hook1");
@@ -418,7 +389,7 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap_err();
-        assert_eq!(err, AdminError::NotAdmin {}.into());
+        assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // admin can add it, and it appears in the query
         let admin_info = mock_info(INIT_ADMIN, &[]);
@@ -429,7 +400,7 @@ mod tests {
             add_msg.clone(),
         )
         .unwrap();
-        let hooks = query_hooks(deps.as_ref()).unwrap();
+        let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract1.clone()]);
 
         // cannot remove a non-registered contract
@@ -450,7 +421,7 @@ mod tests {
             addr: contract2.clone(),
         };
         let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
-        let hooks = query_hooks(deps.as_ref()).unwrap();
+        let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
 
         // cannot re-add an existing contract
@@ -474,7 +445,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap_err();
-        assert_eq!(err, AdminError::NotAdmin {}.into());
+        assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // remove the original
         let _ = handle(
@@ -484,7 +455,7 @@ mod tests {
             remove_msg.clone(),
         )
         .unwrap();
-        let hooks = query_hooks(deps.as_ref()).unwrap();
+        let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract2.clone()]);
     }
 
@@ -493,7 +464,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_init(deps.as_mut());
 
-        let hooks = query_hooks(deps.as_ref()).unwrap();
+        let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
         let contract1 = HumanAddr::from("hook1");

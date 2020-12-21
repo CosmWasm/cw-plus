@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::Uint128;
 use cw0::Duration;
 use cw4::TOTAL_KEY;
-use cw_controllers::Admin;
+use cw_controllers::{Admin, Hooks};
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -17,6 +17,7 @@ pub struct Config {
 }
 
 pub const ADMIN: Admin = Admin::new("admin");
+pub const HOOKS: Hooks = Hooks::new("cw4-hooks");
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
 
