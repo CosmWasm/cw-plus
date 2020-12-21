@@ -84,7 +84,7 @@ impl<'a> Admin<'a> {
             attr("sender", info.sender),
         ];
 
-        self.set(deps, new_admin.clone())?;
+        self.set(deps, new_admin)?;
 
         Ok(HandleResponse {
             messages: vec![],
