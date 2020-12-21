@@ -1,5 +1,4 @@
 mod balance;
-pub mod claim;
 mod expiration;
 mod pagination;
 
