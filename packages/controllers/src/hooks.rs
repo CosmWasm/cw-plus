@@ -30,7 +30,7 @@ impl<'a> Deref for Hooks<'a> {
 }
 
 impl<'a> Hooks<'a> {
-    pub fn new(storage_key: &'a str) -> Self {
+    pub const fn new(storage_key: &'a str) -> Self {
         Hooks(Item::new(storage_key))
     }
 

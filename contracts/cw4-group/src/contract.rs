@@ -2,10 +2,7 @@ use cosmwasm_std::{
     to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
     MessageInfo, Order, StdResult,
 };
-use cw0::{
-    hooks::{add_hook, prepare_hooks, remove_hook, HOOKS},
-    maybe_canonical,
-};
+use cw0::maybe_canonical;
 use cw2::set_contract_version;
 use cw4::{
     HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
@@ -15,7 +12,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{ADMIN, MEMBERS, TOTAL};
+use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -82,7 +79,7 @@ pub fn handle_update_members(
     // make the local update
     let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
-    let messages = prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
+    let messages = HOOKS.prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
     Ok(HandleResponse {
         messages,
         attributes: vec![],
@@ -135,7 +132,7 @@ pub fn handle_add_hook(
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-    add_hook(deps.storage, addr)?;
+    HOOKS.add_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
 
@@ -145,7 +142,7 @@ pub fn handle_remove_hook(
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
-    remove_hook(deps.storage, addr)?;
+    HOOKS.remove_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
 
@@ -217,9 +214,8 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, Api, OwnedDeps, Querier, Storage};
-    use cw0::hooks::HookError;
     use cw4::{member_key, TOTAL_KEY};
-    use cw_controllers::AdminError;
+    use cw_controllers::{AdminError, HookError};
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
