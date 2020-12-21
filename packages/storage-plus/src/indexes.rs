@@ -13,10 +13,17 @@ use crate::{Bound, Endian, Prefix, PrimaryKey};
 use std::marker::PhantomData;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
-const MARKER: bool = true;
+// FIXME: Re-introduce this for MultiIndex
+// const MARKER: bool = true;
 
 pub fn index_string(data: &str) -> Vec<u8> {
     data.as_bytes().to_vec()
+}
+
+pub fn index_tuple(name: &str, age: u32) -> Vec<u8> {
+    let mut name = name.as_bytes().to_vec();
+    name.extend_from_slice(&age.to_be_bytes());
+    name
 }
 
 // Look at https://docs.rs/endiannezz/0.4.1/endiannezz/trait.Primitive.html
@@ -44,7 +51,7 @@ where
 pub struct MultiIndex<'a, K, T> {
     index: fn(&T) -> Vec<u8>,
     idx_namespace: &'a [u8],
-    idx_map: Map<'a, (&'a [u8], &'a [u8]), bool>,
+    idx_map: Map<'a, (&'a [u8], &'a [u8]), T>,
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk_map: Map<'a, &'a [u8], T>,
     idx_type: PhantomData<K>,
@@ -70,7 +77,7 @@ where
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data);
-        self.idx_map.save(store, (&idx, &pk), &MARKER)
+        self.idx_map.save(store, (&idx, &pk), &data)
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
@@ -145,7 +152,7 @@ where
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
     pub fn range<'c>(
-        &self,
+        &'c self,
         store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
@@ -155,6 +162,13 @@ where
         T: 'c,
     {
         self.prefix(K::Prefix::new()).range(store, min, max, order)
+        // let mapped = self.prefix(K::Prefix::new()).range(store, min, max, order).map(move |res| {
+        //     let kv = res?;
+        //     let pk = kv.0;
+        //     let v = self.pk_map.load(store, &pk)?;
+        //     Ok((pk, v))
+        // });
+        // Box::new(mapped)
     }
 }
 
