@@ -226,8 +226,40 @@ mod test {
         assert_eq!(2, all.len());
         assert_eq!(
             all,
-            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data)]
+            vec![
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone())
+            ]
         );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(
+                &store,
+                Some(Bound::Inclusive(b"j".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        );
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range(
+                &store,
+                Some(Bound::Inclusive(b"jo".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(b"john".to_vec(), data)]);
     }
 
     #[test]
