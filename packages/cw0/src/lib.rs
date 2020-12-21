@@ -1,7 +1,6 @@
 mod balance;
 pub mod claim;
 mod expiration;
-pub mod hooks;
 mod pagination;
 
 pub use crate::balance::NativeBalance;
