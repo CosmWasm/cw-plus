@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    CanonicalAddr, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult,
+    attr, CanonicalAddr, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult,
 };
 use cw0::maybe_canonical;
 use cw_storage_plus::Item;
@@ -73,9 +73,24 @@ impl<'a> Admin<'a> {
         new_admin: Option<HumanAddr>,
     ) -> Result<HandleResponse, AdminError> {
         self.assert_admin(deps.as_ref(), &info.sender)?;
-        self.set(deps, new_admin)?;
-        // TODO: add some common log attributes here
-        Ok(HandleResponse::default())
+
+        let admin_str = match new_admin.as_ref() {
+            Some(admin) => admin.to_string(),
+            None => "None".to_string(),
+        };
+        let attributes = vec![
+            attr("action", "update_admin"),
+            attr("admin", admin_str),
+            attr("sender", info.sender),
+        ];
+
+        self.set(deps, new_admin.clone())?;
+
+        Ok(HandleResponse {
+            messages: vec![],
+            attributes,
+            data: None,
+        })
     }
 
     pub fn query_admin(&self, deps: Deps) -> StdResult<AdminResponse> {
