@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    coin, coins, to_binary, Api, BankMsg, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env,
+    coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env,
     HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128,
 };
 use cw0::{
@@ -8,8 +8,8 @@ use cw0::{
 };
 use cw2::set_contract_version;
 use cw4::{
-    AdminResponse, HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse,
-    MemberResponse, TotalWeightResponse,
+    HooksResponse, Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
+    TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
 
@@ -25,11 +25,14 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(
+    mut deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InitMsg,
+) -> Result<InitResponse, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let admin_raw = maybe_canonical(deps.api, msg.admin)?;
-    ADMIN.save(deps.storage, &admin_raw)?;
+    ADMIN.set(deps.branch(), msg.admin)?;
 
     // min_bond is at least 1, so 0 stake -> non-membership
     let min_bond = match msg.min_bond {
@@ -57,36 +60,13 @@ pub fn handle(
     msg: HandleMsg,
 ) -> Result<HandleResponse, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin { admin } => handle_update_admin(deps, info, admin),
+        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::AddHook { addr } => handle_add_hook(deps, info, addr),
         HandleMsg::RemoveHook { addr } => handle_remove_hook(deps, info, addr),
         HandleMsg::Bond {} => handle_bond(deps, env, info),
         HandleMsg::Unbond { tokens: amount } => handle_unbond(deps, env, info, amount),
         HandleMsg::Claim {} => handle_claim(deps, env, info),
     }
-}
-
-pub fn handle_update_admin(
-    deps: DepsMut,
-    info: MessageInfo,
-    new_admin: Option<HumanAddr>,
-) -> Result<HandleResponse, ContractError> {
-    update_admin(deps, info.sender, new_admin)?;
-    Ok(HandleResponse::default())
-}
-
-// the logic from handle_update_admin extracted for easier import
-pub fn update_admin(
-    deps: DepsMut,
-    sender: HumanAddr,
-    new_admin: Option<HumanAddr>,
-) -> Result<Option<CanonicalAddr>, ContractError> {
-    let api = deps.api;
-    ADMIN.update(deps.storage, |state| -> Result<_, ContractError> {
-        assert_admin(api, &sender, state)?;
-        let new_admin = maybe_canonical(api, new_admin)?;
-        Ok(new_admin)
-    })
 }
 
 pub fn handle_bond(
@@ -244,29 +224,12 @@ pub fn handle_claim(
     })
 }
 
-fn assert_admin(
-    api: &dyn Api,
-    sender: &HumanAddr,
-    admin: Option<CanonicalAddr>,
-) -> Result<(), ContractError> {
-    let owner = match admin {
-        Some(x) => x,
-        None => return Err(ContractError::Unauthorized {}),
-    };
-    if api.canonical_address(sender)? != owner {
-        Err(ContractError::Unauthorized {})
-    } else {
-        Ok(())
-    }
-}
-
 pub fn handle_add_hook(
     deps: DepsMut,
     info: MessageInfo,
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, &info.sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
     add_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -276,8 +239,7 @@ pub fn handle_remove_hook(
     info: MessageInfo,
     addr: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
-    let admin = ADMIN.load(deps.storage)?;
-    assert_admin(deps.api, &info.sender, admin)?;
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
     remove_hook(deps.storage, addr)?;
     Ok(HandleResponse::default())
 }
@@ -291,18 +253,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
-        QueryMsg::Admin {} => to_binary(&query_admin(deps)?),
+        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
         QueryMsg::Hooks {} => to_binary(&query_hooks(deps)?),
         QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
         QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
     }
-}
-
-fn query_admin(deps: Deps) -> StdResult<AdminResponse> {
-    let canon = ADMIN.load(deps.storage)?;
-    let admin = canon.map(|c| deps.api.human_address(&c)).transpose()?;
-    Ok(AdminResponse { admin })
 }
 
 fn query_hooks(deps: Deps) -> StdResult<HooksResponse> {
