@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
+use crate::iter_helpers::to_length_prefixed;
 use crate::keys::{EmptyPrefix, Prefixer};
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
@@ -20,10 +21,11 @@ pub fn index_string(data: &str) -> Vec<u8> {
     data.as_bytes().to_vec()
 }
 
+// FIXME: Return tuple, and handle length-prefixed strings internally
 pub fn index_tuple(name: &str, age: u32) -> Vec<u8> {
-    let mut name = name.as_bytes().to_vec();
-    name.extend_from_slice(&age.to_be_bytes());
-    name
+    let mut name_age = to_length_prefixed(name.as_bytes());
+    name_age.extend_from_slice(&to_length_prefixed(&age.to_be_bytes()));
+    name_age
 }
 
 // Look at https://docs.rs/endiannezz/0.4.1/endiannezz/trait.Primitive.html
@@ -51,7 +53,7 @@ where
 pub struct MultiIndex<'a, K, T> {
     index: fn(&T) -> Vec<u8>,
     idx_namespace: &'a [u8],
-    idx_map: Map<'a, (&'a [u8], &'a [u8]), T>,
+    idx_map: Map<'a, K, T>,
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk_map: Map<'a, &'a [u8], T>,
     idx_type: PhantomData<K>,
@@ -76,13 +78,16 @@ where
     K: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data);
-        self.idx_map.save(store, (&idx, &pk), &data)
+        let mut idx = (self.index)(data);
+        // self.idx_map.save(store, (&idx, &pk), &data)
+        idx.extend_from_slice(pk);
+        self.idx_map.save_raw(store, &idx, &data)
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data);
-        self.idx_map.remove(store, (&idx, &pk));
+        let mut idx = (self.index)(old_data);
+        idx.extend_from_slice(pk);
+        self.idx_map.remove_raw(store, &idx);
         Ok(())
     }
 }
@@ -92,54 +97,55 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    pub fn pks<'c>(
-        &self,
-        store: &'c dyn Storage,
-        idx: &[u8],
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let prefix = self.idx_map.prefix(idx);
-        let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
-        Box::new(mapped)
-    }
+    // FIXME: Re-introduce, or replace these by range()
+    // pub fn pks<'c>(
+    //     &self,
+    //     store: &'c dyn Storage,
+    //     idx: &[u8],
+    //     min: Option<Bound>,
+    //     max: Option<Bound>,
+    //     order: Order,
+    // ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+    //     let prefix = self.idx_map.prefix(idx);
+    //     let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
+    //     Box::new(mapped)
+    // }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    pub fn items<'c>(
-        &'c self,
-        store: &'c dyn Storage,
-        idx: &[u8],
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-        let mapped = self.pks(store, idx, min, max, order).map(move |pk| {
-            let v = self.pk_map.load(store, &pk)?;
-            Ok((pk, v))
-        });
-        Box::new(mapped)
-    }
+    // pub fn items<'c>(
+    //     &'c self,
+    //     store: &'c dyn Storage,
+    //     idx: &[u8],
+    //     min: Option<Bound>,
+    //     max: Option<Bound>,
+    //     order: Order,
+    // ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
+    //     let mapped = self.pks(store, idx, min, max, order).map(move |pk| {
+    //         let v = self.pk_map.load(store, &pk)?;
+    //         Ok((pk, v))
+    //     });
+    //     Box::new(mapped)
+    // }
 
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.idx_namespace, &p.prefix())
     }
 
-    #[cfg(test)]
-    pub fn count<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> usize {
-        self.pks(store, idx, None, None, Order::Ascending).count()
-    }
+    // #[cfg(test)]
+    // pub fn count<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> usize {
+    //     self.pks(store, idx, None, None, Order::Ascending).count()
+    // }
 
-    #[cfg(test)]
-    pub fn all_pks<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> Vec<Vec<u8>> {
-        self.pks(store, idx, None, None, Order::Ascending).collect()
-    }
+    // #[cfg(test)]
+    // pub fn all_pks<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> Vec<Vec<u8>> {
+    //     self.pks(store, idx, None, None, Order::Ascending).collect()
+    // }
 
-    #[cfg(test)]
-    pub fn all_items<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> StdResult<Vec<KV<T>>> {
-        self.items(store, idx, None, None, Order::Ascending)
-            .collect()
-    }
+    // #[cfg(test)]
+    // pub fn all_items<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> StdResult<Vec<KV<T>>> {
+    //     self.items(store, idx, None, None, Order::Ascending)
+    //         .collect()
+    // }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
@@ -162,13 +168,6 @@ where
         T: 'c,
     {
         self.prefix(K::Prefix::new()).range(store, min, max, order)
-        // let mapped = self.prefix(K::Prefix::new()).range(store, min, max, order).map(move |res| {
-        //     let kv = res?;
-        //     let pk = kv.0;
-        //     let v = self.pk_map.load(store, &pk)?;
-        //     Ok((pk, v))
-        // });
-        // Box::new(mapped)
     }
 }
 
