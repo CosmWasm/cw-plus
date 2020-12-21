@@ -3,7 +3,6 @@ use cosmwasm_std::{
     InitResponse, MessageInfo, QuerierWrapper, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 
-use cw0::claim::{claim_tokens, create_claim, CLAIMS};
 use cw2::set_contract_version;
 use cw20_base::allowances::{
     handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
@@ -15,9 +14,9 @@ use cw20_base::contract::{
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
 use crate::error::ContractError;
-use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
+use crate::msg::{HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
 use crate::state::{
-    invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply,
+    invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply, CLAIMS,
 };
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -269,7 +268,7 @@ pub fn unbond(
     supply.claims += unbond;
     totals.save(&supply)?;
 
-    create_claim(
+    CLAIMS.create_claim(
         deps.storage,
         &sender_raw,
         unbond,
@@ -307,7 +306,8 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleRespons
     // check how much to send - min(balance, claims[sender]), and reduce the claim
     // Ensure we have enough balance to cover this and only send some claims if that is all we can cover
     let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let to_send = claim_tokens(deps.storage, &sender_raw, &env.block, Some(balance.amount))?;
+    let to_send =
+        CLAIMS.claim_tokens(deps.storage, &sender_raw, &env.block, Some(balance.amount))?;
     if to_send == Uint128(0) {
         return Err(ContractError::NothingToClaim {});
     }
@@ -417,7 +417,7 @@ pub fn _bond_all_tokens(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // custom queries
-        QueryMsg::Claims { address } => to_binary(&query_claims(deps, address)?),
+        QueryMsg::Claims { address } => to_binary(&CLAIMS.query_claims(deps, address)?),
         QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
@@ -426,14 +426,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&query_allowance(deps, owner, spender)?)
         }
     }
-}
-
-pub fn query_claims(deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
-    let claims = CLAIMS
-        .may_load(deps.storage, &address_raw)?
-        .unwrap_or_default();
-    Ok(ClaimsResponse { claims })
 }
 
 pub fn query_investment(deps: Deps) -> StdResult<InvestmentResponse> {
@@ -459,12 +451,14 @@ pub fn query_investment(deps: Deps) -> StdResult<InvestmentResponse> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
+
     use cosmwasm_std::testing::{
         mock_dependencies, mock_env, mock_info, MockQuerier, MOCK_CONTRACT_ADDR,
     };
     use cosmwasm_std::{coins, Coin, CosmosMsg, Decimal, FullDelegation, Validator};
-    use cw0::{claim::Claim, Duration, DAY, HOUR, WEEK};
-    use std::str::FromStr;
+    use cw0::{Duration, DAY, HOUR, WEEK};
+    use cw_controllers::Claim;
 
     fn sample_validator<U: Into<HumanAddr>>(addr: U) -> Validator {
         Validator {
@@ -529,7 +523,7 @@ mod tests {
     }
 
     fn get_claims<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Vec<Claim> {
-        query_claims(deps, addr.into()).unwrap().claims
+        CLAIMS.query_claims(deps, addr.into()).unwrap().claims
     }
 
     #[test]

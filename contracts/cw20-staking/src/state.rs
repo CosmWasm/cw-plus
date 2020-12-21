@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, Storage, Uint128};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 use cw0::Duration;
+use cw_controllers::Claims;
+
+pub const CLAIMS: Claims = Claims::new("claims");
 
 pub const KEY_INVESTMENT: &[u8] = b"invest";
 pub const KEY_TOTAL_SUPPLY: &[u8] = b"total_supply";
