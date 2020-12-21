@@ -11,7 +11,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{ClaimsResponse, HandleMsg, InitMsg, QueryMsg, StakedResponse};
+use crate::msg::{HandleMsg, InitMsg, QueryMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
@@ -239,14 +239,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     let weight = TOTAL.load(deps.storage)?;
     Ok(TotalWeightResponse { weight })
-}
-
-pub fn query_claims(deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
-    let claims = CLAIMS
-        .may_load(deps.storage, &address_raw)?
-        .unwrap_or_default();
-    Ok(ClaimsResponse { claims })
 }
 
 pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse> {
@@ -543,7 +535,7 @@ mod tests {
     }
 
     fn get_claims<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Vec<Claim> {
-        query_claims(deps, addr.into()).unwrap().claims
+        CLAIMS.query_claims(deps, addr.into()).unwrap().claims
     }
 
     #[test]
