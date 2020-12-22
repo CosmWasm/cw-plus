@@ -2,14 +2,14 @@
  * This is a set of helpers meant for use with @cosmjs/cli
  * With these you can easily use the cw20 contract without worrying about forming messages and parsing queries.
  * 
- * Usage: npx @cosmjs/cli@^0.22 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.23 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
  * 
  * Create a client:
- *   const client = await useOptions(coralnetOptions).setup(password);
+ *   const client = await useOptions(hackatomOptions).setup(password);
  *   await client.getAccount()
  * 
  * Get the mnemonic:
- *   await useOptions(coralnetOptions).recoverMnemonic(password)
+ *   await useOptions(hackatomOptions).recoverMnemonic(password)
  * 
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
@@ -20,24 +20,29 @@ interface Options {
   readonly httpUrl: string
   readonly networkId: string
   readonly feeToken: string
-  readonly gasPrice: number
+  readonly gasPrice: GasPrice
   readonly bech32prefix: string
   readonly hdPath: readonly Slip10RawIndex[]
-  readonly faucetToken: string
   readonly faucetUrl?: string
   readonly defaultKeyFile: string
+  readonly gasLimits: Partial<GasLimits<CosmWasmFeeTable>> // only set the ones you want to override
 }
-  
-const coralnetOptions: Options = {
-  httpUrl: 'https://lcd.coralnet.cosmwasm.com',
-  networkId: 'cosmwasm-coral',
-  feeToken: 'ushell',
-  gasPrice: 0.025,
-  bech32prefix: 'coral',
-  faucetToken: 'SHELL',
-  faucetUrl: 'https://faucet.coralnet.cosmwasm.com/credit',
+
+const hackatomOptions: Options = {
+  httpUrl: 'https://lcd.heldernet.cosmwasm.com',
+  networkId: 'hackatom-wasm',
+  gasPrice:  GasPrice.fromString("0.025ucosm"),
+  bech32prefix: 'cosmos',
+  feeToken: 'ucosm',
+  faucetUrl: 'https://faucet.heldernet.cosmwasm.com/credit',
   hdPath: makeCosmoshubPath(0),
-  defaultKeyFile: path.join(process.env.HOME, ".coral.key"),
+  defaultKeyFile: path.join(process.env.HOME, ".heldernet.key"),
+  gasLimits: {
+    upload: 1500000,
+    init: 600000,
+    register:800000,
+    transfer: 80000,
+  },
 }
 
 interface Network {
@@ -47,57 +52,38 @@ interface Network {
 
 const useOptions = (options: Options): Network => {
 
-  const loadOrCreateWallet = async (options: Options, filename: string, password: string): Promise<Secp256k1Wallet> => {
+  const loadOrCreateWallet = async (options: Options, filename: string, password: string): Promise<Secp256k1HdWallet> => {
     let encrypted: string;
     try {
       encrypted = fs.readFileSync(filename, 'utf8');
     } catch (err) {
       // generate if no file exists
-      const wallet = await Secp256k1Wallet.generate(12, options.hdPath, options.bech32prefix);
+      const wallet = await Secp256k1HdWallet.generate(12, options.hdPath, options.bech32prefix);
       const encrypted = await wallet.serialize(password);
       fs.writeFileSync(filename, encrypted, 'utf8');
       return wallet;
     }
     // otherwise, decrypt the file (we cannot put deserialize inside try or it will over-write on a bad password)
-    const wallet = await Secp256k1Wallet.deserialize(encrypted, password);
+    const wallet = await Secp256k1HdWallet.deserialize(encrypted, password);
     return wallet;
   };
   
-  const buildFeeTable = (options: Options): FeeTable => {
-    const { feeToken, gasPrice } = options;
-    const stdFee = (gas: number, denom: string, price: number) => {
-      const amount = Math.floor(gas * price)
-      return {
-        amount: [{ amount: amount.toString(), denom: denom }],
-        gas: gas.toString(),
-      }
-    }
-  
-    return {
-      upload: stdFee(1500000, feeToken, gasPrice),
-      init: stdFee(600000, feeToken, gasPrice),
-      migrate: stdFee(600000, feeToken, gasPrice),
-      exec: stdFee(200000, feeToken, gasPrice),
-      send: stdFee(80000, feeToken, gasPrice),
-      changeAdmin: stdFee(80000, feeToken, gasPrice),
-    }
-  };
-
   const connect = async (
-    wallet: Secp256k1Wallet,
+    wallet: Secp256k1HdWallet,
     options: Options
   ): Promise<SigningCosmWasmClient> => {
-    const feeTable = buildFeeTable(options);
     const [{ address }] = await wallet.getAccounts();
-  
+
     const client = new SigningCosmWasmClient(
       options.httpUrl,
       address,
       wallet,
-      feeTable
+      hackatomOptions.gasPrice,
+      hackatomOptions.gasLimits,
     );
     return client;
   };
+
   
   const hitFaucet = async (
     faucetUrl: string,
@@ -109,24 +95,25 @@ const useOptions = (options: Options): Network => {
   
   const setup = async (password: string, filename?: string): Promise<SigningCosmWasmClient> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(coralnetOptions, keyfile, password);
-    const client = await connect(wallet, coralnetOptions);
+    const wallet = await loadOrCreateWallet(hackatomOptions, keyfile, password);
+    const client = await connect(wallet, hackatomOptions);
 
     // ensure we have some tokens
     if (options.faucetUrl) {
       const account = await client.getAccount();
       if (!account) {
         console.log(`Getting ${options.feeToken} from faucet`);
-        await hitFaucet(options.faucetUrl, client.senderAddress, options.faucetToken);
-      }  
+        await hitFaucet(options.faucetUrl, client.senderAddress, options.feeToken);
+      }
     }
 
     return client;
   }
 
+
   const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(coralnetOptions, keyfile, password);
+    const wallet = await loadOrCreateWallet(hackatomOptions, keyfile, password);
     return wallet.mnemonic;
   }
 
@@ -141,14 +128,6 @@ interface Balances {
 interface MintInfo {
   readonly minter: string
   readonly cap?: string // decimal as string
-}
-
-interface InitMsg {
-  readonly name: string
-  readonly symbol: string
-  readonly decimals: number
-  readonly initial_balances: readonly Balances[]
-  readonly mint?: MintInfo
 }
 
 type Expiration = {readonly at_height: number} | {readonly at_time: number} | {readonly never: {}}; 
@@ -202,7 +181,7 @@ interface CW20Contract {
   // codeId must come from a previous deploy
   // label is the public name of the contract in listing
   // if you set admin, you can run migrations on this contract (likely client.senderAddress)
-  instantiate: (codeId: number, initMsg: InitMsg, label: string, admin?: string) => Promise<CW20Instance>
+  instantiate: (codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string) => Promise<CW20Instance>
 
   use: (contractAddress: string) => CW20Instance
 }
@@ -297,16 +276,16 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
   
   const upload = async (): Promise<number> => {
     const meta = {
-      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.2.1/contracts/cw20-base",
-      builder: "cosmwasm/workspace-optimizer:0.10.3"
+      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.3.2/contracts/cw20-base",
+      builder: "cosmwasm/workspace-optimizer:0.10.7"
     };
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.2.1/cw20_base.wasm";
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.3.2/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
     const result = await client.upload(wasm, meta);
     return result.codeId;
   }
 
-  const instantiate = async (codeId: number, initMsg: InitMsg, label: string, admin?: string): Promise<CW20Instance> => {
+  const instantiate = async (codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string): Promise<CW20Instance> => {
     const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, admin});
     return use(result.contractAddress);
   }
