@@ -2,7 +2,7 @@
  * This is a set of helpers meant for use with @cosmjs/cli
  * With these you can easily use the cw20 contract without worrying about forming messages and parsing queries.
  * 
- * Usage: npx @cosmjs/cli@^0.22 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.23 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
  * 
  * Create a client:
  *   const client = await useOptions(hackatomOptions).setup(password);
@@ -276,10 +276,10 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
   
   const upload = async (): Promise<number> => {
     const meta = {
-      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.2.1/contracts/cw20-base",
-      builder: "cosmwasm/workspace-optimizer:0.10.3"
+      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.3.2/contracts/cw20-base",
+      builder: "cosmwasm/workspace-optimizer:0.10.7"
     };
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.2.1/cw20_base.wasm";
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.3.2/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
     const result = await client.upload(wasm, meta);
     return result.codeId;
