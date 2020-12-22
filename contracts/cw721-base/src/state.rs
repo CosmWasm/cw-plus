@@ -46,7 +46,9 @@ pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 }
 
 pub struct TokenIndexes<'a> {
-    pub owner: MultiIndex<'a, &'a [u8], TokenInfo>,
+    // Use tuple here, so pk goes to second tuple element, and range() works,
+    // provided that index_fn result is length prefixed
+    pub owner: MultiIndex<'a, (&'a [u8], &'a [u8]), TokenInfo>,
 }
 
 impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
@@ -58,7 +60,12 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
-        owner: MultiIndex::new(|d| d.owner.to_vec(), "tokens", "tokens__owner"),
+        // FIXME: Publish and use to_length_prefixed
+        owner: MultiIndex::new(
+            |d| [b"\x00", &[d.owner.len() as u8], &*d.owner].concat(),
+            "tokens",
+            "tokens__owner",
+        ),
     };
     IndexedMap::new("tokens", indexes)
 }

@@ -497,16 +497,19 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
-    // FIXME! Modify the MultiMap to use range()
-    // let tokens: Result<Vec<String>, _> = tokens()
-    //     .idx
-    //     .owner
-    //     .pks(deps.storage, &owner_raw, start, None, Order::Ascending)
-    //     .take(limit)
-    //     .map(String::from_utf8)
-    //     .collect();
-    // let tokens = tokens.map_err(StdError::invalid_utf8)?;
-    let tokens = vec![];
+    let res: Result<Vec<_>, _> = tokens()
+        .idx
+        .owner
+        .prefix(&owner_raw)
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .collect();
+    let tuples: Vec<_> = res?;
+    let res: Result<Vec<_>, _> = tuples
+        .iter()
+        .map(|t| String::from_utf8(t.0.clone()))
+        .collect();
+    let tokens = res.map_err(StdError::invalid_utf8)?;
     Ok(TokensResponse { tokens })
 }
 
