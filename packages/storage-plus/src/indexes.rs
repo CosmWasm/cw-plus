@@ -24,6 +24,7 @@ pub fn index_string(data: &str) -> Vec<u8> {
 // FIXME: Return tuple, and handle length-prefixed strings internally
 pub fn index_tuple(name: &str, age: u32) -> Vec<u8> {
     let mut name_age = to_length_prefixed(name.as_bytes());
+    // name_age.extend_from_slice(&age.to_be_bytes());
     name_age.extend_from_slice(&to_length_prefixed(&age.to_be_bytes()));
     name_age
 }
@@ -97,19 +98,20 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    // FIXME: Re-introduce, or replace these by range()
-    // pub fn pks<'c>(
-    //     &self,
-    //     store: &'c dyn Storage,
-    //     idx: &[u8],
-    //     min: Option<Bound>,
-    //     max: Option<Bound>,
-    //     order: Order,
-    // ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-    //     let prefix = self.idx_map.prefix(idx);
-    //     let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
-    //     Box::new(mapped)
-    // }
+    // FIXME?: Use range() syntax / return values
+    // FIXME?: Move to Prefix<T> for ergonomics
+    // FIXME: Add pk recovery from composite keys
+    pub fn pks<'c>(
+        &self,
+        store: &'c dyn Storage,
+        prefix: Prefix<T>,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
+        Box::new(mapped)
+    }
 
     /// returns all items that match this secondary index, always by pk Ascending
     // pub fn items<'c>(

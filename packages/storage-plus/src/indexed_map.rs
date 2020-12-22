@@ -160,7 +160,7 @@ mod test {
     use crate::iter_helpers::to_length_prefixed;
     use crate::U32Key;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{MemoryStorage, Order};
+    use cosmwasm_std::Order;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
