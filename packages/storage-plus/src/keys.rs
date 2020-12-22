@@ -156,6 +156,7 @@ impl<'a, T: AsRef<PkOwned>> Prefixer<'a> for T {
     }
 }
 
+pub type U8Key = IntKey<u8>;
 pub type U16Key = IntKey<u16>;
 pub type U32Key = IntKey<u32>;
 pub type U64Key = IntKey<u64>;
