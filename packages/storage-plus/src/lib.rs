@@ -14,7 +14,7 @@ pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};
 #[cfg(feature = "iterator")]
-pub use indexes::{index_int, index_string, Index, MultiIndex, UniqueIndex};
+pub use indexes::{index_string, Index, MultiIndex, UniqueIndex};
 pub use item::Item;
 pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
 pub use keys::{PkOwned, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};

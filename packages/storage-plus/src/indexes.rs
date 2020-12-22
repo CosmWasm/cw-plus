@@ -6,22 +6,15 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
-use crate::keys::IntKey;
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, Endian, PrimaryKey};
+use crate::{Bound, PrimaryKey};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
 
 pub fn index_string(data: &str) -> Vec<u8> {
     data.as_bytes().to_vec()
-}
-
-// Look at https://docs.rs/endiannezz/0.4.1/endiannezz/trait.Primitive.html
-// if you want to make this generic over all ints
-pub fn index_int<T: Endian>(data: T) -> IntKey<T> {
-    IntKey::<T>::new(data)
 }
 
 // 2 main variants:
@@ -43,7 +36,7 @@ where
 pub struct MultiIndex<'a, T> {
     index: fn(&T) -> Vec<u8>,
     idx_map: Map<'a, (&'a [u8], &'a [u8]), u32>,
-    // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
+    // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk_map: Map<'a, &'a [u8], T>,
 }
 
@@ -126,15 +119,13 @@ where
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct UniqueRef<T> {
-    // note, we collapse the pubkey - combining everything under the namespace - even if it is composite
+    // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk: Binary,
     value: T,
 }
 
 pub struct UniqueIndex<'a, K, T> {
-    // index: fn(&T) -> Vec<u8>,
     index: fn(&T) -> K,
-    // idx_map: Map<'a, &'a [u8], UniqueRef<T>>,
     idx_map: Map<'a, K, UniqueRef<T>>,
 }
 
