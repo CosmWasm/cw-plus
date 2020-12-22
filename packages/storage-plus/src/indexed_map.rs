@@ -165,7 +165,7 @@ mod test {
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
         pub name: String,
-        pub age: i32,
+        pub age: u32,
     }
 
     struct DataIndexes<'a> {
@@ -185,7 +185,7 @@ mod test {
     fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d| index_string(&d.name), "data", "data__name"),
-            age: UniqueIndex::new(|d| index_int(d.age as u32), "data__age"),
+            age: UniqueIndex::new(|d| index_int(d.age), "data__age"),
         };
         IndexedMap::new("data", indexes)
     }
