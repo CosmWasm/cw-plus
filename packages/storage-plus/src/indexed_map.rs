@@ -157,6 +157,7 @@ mod test {
     use super::*;
 
     use crate::indexes::{index_int, index_string, MultiIndex, UniqueIndex};
+    use crate::U32Key;
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -169,7 +170,7 @@ mod test {
 
     struct DataIndexes<'a> {
         pub name: MultiIndex<'a, Data>,
-        pub age: UniqueIndex<'a, Data>,
+        pub age: UniqueIndex<'a, U32Key, Data>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -184,7 +185,7 @@ mod test {
     fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d| index_string(&d.name), "data", "data__name"),
-            age: UniqueIndex::new(|d| index_int(d.age), "data__age"),
+            age: UniqueIndex::new(|d| index_int(d.age as u32), "data__age"),
         };
         IndexedMap::new("data", indexes)
     }
@@ -257,13 +258,13 @@ mod test {
 
         // match on proper age
         let proper = index_int(42);
-        let aged = map.idx.age.item(&store, &proper).unwrap().unwrap();
+        let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
         assert_eq!(pk.to_vec(), aged.0);
         assert_eq!(data, aged.1);
 
         // no match on wrong age
         let too_old = index_int(43);
-        let aged = map.idx.age.item(&store, &too_old).unwrap();
+        let aged = map.idx.age.item(&store, too_old).unwrap();
         assert_eq!(None, aged);
     }
 
@@ -300,14 +301,14 @@ mod test {
         // query by unique key
         // match on proper age
         let age42 = index_int(42);
-        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
+        let (k, v) = map.idx.age.item(&store, age42.clone()).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk1);
         assert_eq!(&v.name, "Maria");
         assert_eq!(v.age, 42);
 
         // match on other age
         let age23 = index_int(23);
-        let (k, v) = map.idx.age.item(&store, &age23).unwrap().unwrap();
+        let (k, v) = map.idx.age.item(&store, age23).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk2);
         assert_eq!(&v.name, "Maria");
         assert_eq!(v.age, 23);
@@ -316,7 +317,7 @@ mod test {
         map.remove(&mut store, pk1).unwrap();
         map.save(&mut store, pk3, &data3).unwrap();
         // now 42 is the new owner
-        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
+        let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk3);
         assert_eq!(&v.name, "Marta");
         assert_eq!(v.age, 42);

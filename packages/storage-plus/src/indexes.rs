@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
+use crate::keys::IntKey;
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, Endian};
+use crate::{Bound, Endian, PrimaryKey};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
@@ -19,8 +20,8 @@ pub fn index_string(data: &str) -> Vec<u8> {
 
 // Look at https://docs.rs/endiannezz/0.4.1/endiannezz/trait.Primitive.html
 // if you want to make this generic over all ints
-pub fn index_int<T: Endian>(data: T) -> Vec<u8> {
-    data.to_be_bytes().into()
+pub fn index_int<T: Endian>(data: T) -> IntKey<T> {
+    IntKey::<T>::new(data)
 }
 
 // 2 main variants:
@@ -130,14 +131,16 @@ pub(crate) struct UniqueRef<T> {
     value: T,
 }
 
-pub struct UniqueIndex<'a, T> {
-    index: fn(&T) -> Vec<u8>,
-    idx_map: Map<'a, &'a [u8], UniqueRef<T>>,
+pub struct UniqueIndex<'a, K, T> {
+    // index: fn(&T) -> Vec<u8>,
+    index: fn(&T) -> K,
+    // idx_map: Map<'a, &'a [u8], UniqueRef<T>>,
+    idx_map: Map<'a, K, UniqueRef<T>>,
 }
 
-impl<'a, T> UniqueIndex<'a, T> {
+impl<'a, K, T> UniqueIndex<'a, K, T> {
     // TODO: make this a const fn
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, idx_namespace: &'a str) -> Self {
+    pub fn new(idx_fn: fn(&T) -> K, idx_namespace: &'a str) -> Self {
         UniqueIndex {
             index: idx_fn,
             idx_map: Map::new(idx_namespace),
@@ -145,15 +148,16 @@ impl<'a, T> UniqueIndex<'a, T> {
     }
 }
 
-impl<'a, T> Index<T> for UniqueIndex<'a, T>
+impl<'a, K, T> Index<T> for UniqueIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data);
         // error if this is already set
         self.idx_map
-            .update(store, &idx, |existing| -> StdResult<_> {
+            .update(store, idx, |existing| -> StdResult<_> {
                 match existing {
                     Some(_) => Err(StdError::generic_err("Violates unique constraint on index")),
                     None => Ok(UniqueRef::<T> {
@@ -167,20 +171,21 @@ where
 
     fn remove(&self, store: &mut dyn Storage, _pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = (self.index)(old_data);
-        self.idx_map.remove(store, &idx);
+        self.idx_map.remove(store, idx);
         Ok(())
     }
 }
 
-impl<'a, T> UniqueIndex<'a, T>
+impl<'a, K, T> UniqueIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
 {
     /// returns all items that match this secondary index, always by pk Ascending
-    pub fn item(&self, store: &dyn Storage, idx: &[u8]) -> StdResult<Option<KV<T>>> {
+    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<KV<T>>> {
         let data = self
             .idx_map
-            .may_load(store, &idx)?
+            .may_load(store, idx)?
             .map(|i| (i.pk.into(), i.value));
         Ok(data)
     }
