@@ -162,6 +162,12 @@ pub type U32Key = IntKey<u32>;
 pub type U64Key = IntKey<u64>;
 pub type U128Key = IntKey<u128>;
 
+pub type I8Key = IntKey<i8>;
+pub type I16Key = IntKey<i16>;
+pub type I32Key = IntKey<i32>;
+pub type I64Key = IntKey<i64>;
+pub type I128Key = IntKey<i128>;
+
 /// It will cast one-particular int type into a Key via PkOwned, ensuring you don't mix up u32 and u64
 /// You can use new or the from/into pair to build a key from an int:
 ///
