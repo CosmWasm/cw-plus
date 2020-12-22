@@ -2,25 +2,36 @@
 
 [![CircleCI](https://circleci.com/gh/CosmWasm/cosmwasm-plus/tree/master.svg?style=shield)](https://circleci.com/gh/CosmWasm/cosmwasm-plus/tree/master)
 
-| Specification    | Download                                                                                                   | Docs                                                            |
+| Specification    | Crates.io                                                                                                  | Docs                                                            |
 | ---------------- | ---------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
 | cw0              | [![cw0 on crates.io](https://img.shields.io/crates/v/cw0.svg)](https://crates.io/crates/cw0)              | [![Docs](https://docs.rs/cw0/badge.svg)](https://docs.rs/cw0)    |
 | cw1              | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)              | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)    |
 | cw2              | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)              | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)    |
 | cw3              | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)              | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)    |
-| cw20              | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20)              | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20)    |
-| cw721              | [![cw721 on crates.io](https://img.shields.io/crates/v/cw721.svg)](https://crates.io/crates/cw721)              | [![Docs](https://docs.rs/cw721/badge.svg)](https://docs.rs/cw721)    |
+| cw4              | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)              | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)    |
+| cw20              | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20)          | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20)    |
+| cw721              | [![cw721 on crates.io](https://img.shields.io/crates/v/cw721.svg)](https://crates.io/crates/cw721)      | [![Docs](https://docs.rs/cw721/badge.svg)](https://docs.rs/cw721)    |
+
+| Utilities        | Crates.io                                                                                                                        | Docs                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
+| cw-controllers      | [![cw-controllers on crates.io](https://img.shields.io/crates/v/cw-controllers.svg)](https://crates.io/crates/cw-controllers)             | [![Docs](https://docs.rs/cw-controllers/badge.svg)](https://docs.rs/cw-controllers)    |
+| cw-multi-test       | [![cw-multi-test on crates.io](https://img.shields.io/crates/v/cw-multi-test.svg)](https://crates.io/crates/cw-multi-test)                | [![Docs](https://docs.rs/cw-multi-test/badge.svg)](https://docs.rs/cw-multi-test)    |
+| cw-storage-plus     | [![cw-storage-plus on crates.io](https://img.shields.io/crates/v/cw-storage-plus.svg)](https://crates.io/crates/cw-storage-plus)          | [![Docs](https://docs.rs/cw-storage-plus/badge.svg)](https://docs.rs/cw-storage-plus)    |
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
-| cw1-subkeys             | [![cw1-subkeys on crates.io](https://img.shields.io/crates/v/cw1-subkeys.svg)](https://crates.io/crates/cw1-subkeys)          | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
-| cw1-whitelist           | [![cw1-whitelist on crates.io](https://img.shields.io/crates/v/cw1-whitelist.svg)](https://crates.io/crates/cw1-whitelist)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
-| cw3-fixed-multisig       | [![cw3-fixed-multisig on crates.io](https://img.shields.io/crates/v/cw3-fixed-multisig.svg)](https://crates.io/crates/cw3-fixed-multisig)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
-| cw20-atomic-swap        | [![cw20-atomic-swap on crates.io](https://img.shields.io/crates/v/cw20-atomic-swap.svg)](https://crates.io/crates/cw20-atomic-swap)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
-| cw20-base               | [![cw20-base on crates.io](https://img.shields.io/crates/v/cw20-base.svg)](https://crates.io/crates/cw20-base)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
-| cw20-escrow             | [![cw20-escrow on crates.io](https://img.shields.io/crates/v/cw20-escrow.svg)](https://crates.io/crates/cw20-escrow)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
-| cw20-staking            | [![cw20-staking on crates.io](https://img.shields.io/crates/v/cw20-staking.svg)](https://crates.io/crates/cw20-staking)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
-| cw721-base           | [![cw721-base on crates.io](https://img.shields.io/crates/v/cw721-base.svg)](https://crates.io/crates/cw721-base)          | [![Docs](https://docs.rs/cw721-base/badge.svg)](https://docs.rs/cw721-base)    |
+| cw1-subkeys             | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw1_subkeys.wasm)                        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
+| cw1-whitelist           | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw1_whitelist.wasm)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
+| cw3-fixed-multisig       | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw3_fixed_multisig.wasm)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
+| cw3-flex-multisig       | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw3_flex_multisig.wasm)          | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)    |
+| cw4-group               | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)    |
+| cw4-stake               | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)    |
+| cw20-atomic-swap        | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw20_atomic_swap.wasm)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
+| cw20-base               | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
+| cw20-bonding            | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw20_bonding.wasm)          | [![Docs](https://docs.rs/cw20-bonding/badge.svg)](https://docs.rs/cw20-bonding)    |
+| cw20-escrow             | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
+| cw20-staking            | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
+| cw721-base              | [Release v0.4.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw721_base.wasm)          | [![Docs](https://docs.rs/cw721-base/badge.svg)](https://docs.rs/cw721-base)    |
 
 
 This is a collection of specification and contracts designed for
@@ -106,7 +117,7 @@ To compile all the contracts, run the following in the repo root:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.10.4
+  cosmwasm/workspace-optimizer:0.10.7
 ```
 
 This will compile all packages in the `contracts` directory and output the
