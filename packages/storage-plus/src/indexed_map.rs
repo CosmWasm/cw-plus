@@ -156,8 +156,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_string, MultiIndex, UniqueIndex};
-    use crate::U32Key;
+    use crate::indexes::{index_string, index_string_tuple, MultiIndex, UniqueIndex};
+    use crate::{PkOwned, U32Key};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -165,18 +165,20 @@ mod test {
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
         pub name: String,
+        pub last_name: String,
         pub age: u32,
     }
 
     struct DataIndexes<'a> {
         pub name: MultiIndex<'a, Data>,
         pub age: UniqueIndex<'a, U32Key, Data>,
+        pub name_lastname: UniqueIndex<'a, (PkOwned, PkOwned), Data>,
     }
 
     // Future Note: this can likely be macro-derived
     impl<'a> IndexList<Data> for DataIndexes<'a> {
         fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Data>> + '_> {
-            let v: Vec<&dyn Index<Data>> = vec![&self.name, &self.age];
+            let v: Vec<&dyn Index<Data>> = vec![&self.name, &self.age, &self.name_lastname];
             Box::new(v.into_iter())
         }
     }
@@ -186,6 +188,10 @@ mod test {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d| index_string(&d.name), "data", "data__name"),
             age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
+            name_lastname: UniqueIndex::new(
+                |d| index_string_tuple(&d.name, &d.last_name),
+                "data__name_lastname",
+            ),
         };
         IndexedMap::new("data", indexes)
     }
@@ -198,6 +204,7 @@ mod test {
         // save data
         let data = Data {
             name: "Maria".to_string(),
+            last_name: "".to_string(),
             age: 42,
         };
         let pk: &[u8] = b"5627";
@@ -276,14 +283,16 @@ mod test {
         // first data
         let data1 = Data {
             name: "Maria".to_string(),
+            last_name: "Doe".to_string(),
             age: 42,
         };
         let pk1: &[u8] = b"5627";
         map.save(&mut store, pk1, &data1).unwrap();
 
-        // same name (multi-index), different age => ok
+        // same name (multi-index), different last name, different age => ok
         let data2 = Data {
             name: "Maria".to_string(),
+            last_name: "Williams".to_string(),
             age: 23,
         };
         let pk2: &[u8] = b"7326";
@@ -292,6 +301,7 @@ mod test {
         // different name, same age => error
         let data3 = Data {
             name: "Marta".to_string(),
+            last_name: "Williams".to_string(),
             age: 42,
         };
         let pk3: &[u8] = b"8263";
@@ -324,6 +334,49 @@ mod test {
     }
 
     #[test]
+    fn unique_index_enforced_composite_key() {
+        let mut store = MockStorage::new();
+        let mut map = build_map();
+
+        // first data
+        let data1 = Data {
+            name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            age: 1,
+        };
+        let pk1: &[u8] = b"1";
+        map.save(&mut store, pk1, &data1).unwrap();
+
+        // same name, different lastname => ok
+        let data2 = Data {
+            name: "John".to_string(),
+            last_name: "Wayne".to_string(),
+            age: 2,
+        };
+        let pk2: &[u8] = b"2";
+        map.save(&mut store, pk2, &data2).unwrap();
+
+        // different name, same last name => ok
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Doe".to_string(),
+            age: 3,
+        };
+        let pk3: &[u8] = b"3";
+        map.save(&mut store, pk3, &data3).unwrap();
+
+        // same name, same lastname => error
+        let data4 = Data {
+            name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            age: 4,
+        };
+        let pk4: &[u8] = b"4";
+        // enforce this returns some error
+        map.save(&mut store, pk4, &data4).unwrap_err();
+    }
+
+    #[test]
     fn remove_and_update_reflected_on_indexes() {
         let mut store = MockStorage::new();
         let mut map = build_map();
@@ -341,18 +394,21 @@ mod test {
         // set up some data
         let data1 = Data {
             name: "John".to_string(),
+            last_name: "Doe".to_string(),
             age: 22,
         };
         let pk1: &[u8] = b"john";
         map.save(&mut store, pk1, &data1).unwrap();
         let data2 = Data {
             name: "John".to_string(),
+            last_name: "Wayne".to_string(),
             age: 25,
         };
         let pk2: &[u8] = b"john2";
         map.save(&mut store, pk2, &data2).unwrap();
         let data3 = Data {
             name: "Fred".to_string(),
+            last_name: "Astaire".to_string(),
             age: 33,
         };
         let pk3: &[u8] = b"fred";

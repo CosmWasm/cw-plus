@@ -8,13 +8,17 @@ use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, PrimaryKey};
+use crate::{Bound, PkOwned, PrimaryKey};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
 
 pub fn index_string(data: &str) -> Vec<u8> {
     data.as_bytes().to_vec()
+}
+
+pub fn index_string_tuple(data1: &str, data2: &str) -> (PkOwned, PkOwned) {
+    (PkOwned(index_string(data1)), PkOwned(index_string(data2)))
 }
 
 // 2 main variants:
