@@ -502,4 +502,67 @@ mod test {
         assert_eq!(data3, ages[2].1.value);
         assert_eq!(data1, ages[3].1.value);
     }
+
+    #[test]
+    fn unique_index_composite_key_range() {
+        let mut store = MockStorage::new();
+        let mut map = build_map();
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk: &[u8] = b"5627";
+        map.save(&mut store, pk, &data1).unwrap();
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk: &[u8] = b"5628";
+        map.save(&mut store, pk, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Young".to_string(),
+            age: 24,
+        };
+        let pk: &[u8] = b"5629";
+        map.save(&mut store, pk, &data3).unwrap();
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Rodriguez".to_string(),
+            age: 12,
+        };
+        let pk: &[u8] = b"5630";
+        map.save(&mut store, pk, &data4).unwrap();
+
+        let res: StdResult<Vec<_>> = map
+            .idx
+            .name_lastname
+            .prefix(PkOwned(b"Maria".to_vec()))
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let marias = res.unwrap();
+
+        // Only two people are called "Maria"
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // The (index) keys are the (encoded) last names, in ascending order
+        assert_eq!(b"", marias[0].0.as_slice());
+        assert_eq!(b"Young", marias[1].0.as_slice());
+
+        // The pks are in the (UniqueRef) values
+        assert_eq!(b"5627".to_vec(), marias[0].1.pk);
+        assert_eq!(b"5629".to_vec(), marias[1].1.pk);
+
+        // The associated data is in the (UniqueRef) values
+        assert_eq!(data1, marias[0].1.value);
+        assert_eq!(data3, marias[1].1.value);
+    }
 }
