@@ -125,8 +125,8 @@ where
 #[derive(Deserialize, Serialize)]
 pub struct UniqueRef<T> {
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
-    pk: Binary,
-    value: T,
+    pub pk: Binary,
+    pub value: T,
 }
 
 pub struct UniqueIndex<'a, K, T> {
