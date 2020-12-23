@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
+use crate::keys::EmptyPrefix;
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, PkOwned, PrimaryKey};
+use crate::{Bound, PkOwned, Prefix, PrimaryKey};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
@@ -122,7 +123,7 @@ where
 }
 
 #[derive(Deserialize, Serialize)]
-pub(crate) struct UniqueRef<T> {
+pub struct UniqueRef<T> {
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
     pk: Binary,
     value: T,
@@ -176,6 +177,11 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<UniqueRef<T>> {
+        // Prefix::<T>::new(self.idx_namespace, &p.prefix())
+        self.idx_map.prefix(p)
+    }
+
     /// returns all items that match this secondary index, always by pk Ascending
     pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<KV<T>>> {
         let data = self
@@ -183,5 +189,28 @@ where
             .may_load(store, idx)?
             .map(|i| (i.pk.into(), i.value));
         Ok(data)
+    }
+}
+
+// short-cut for simple keys, rather than .prefix(()).range(...)
+impl<'a, K, T> UniqueIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
+    K::Prefix: EmptyPrefix,
+{
+    // I would prefer not to copy code from Prefix, but no other way
+    // with lifetimes (create Prefix inside function and return ref = no no)
+    pub fn range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<KV<UniqueRef<T>>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(K::Prefix::new()).range(store, min, max, order)
     }
 }
