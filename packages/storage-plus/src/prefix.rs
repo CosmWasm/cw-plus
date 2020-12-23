@@ -51,6 +51,7 @@ where
     storage_prefix: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
+    de_fn: fn(KV) -> StdResult<KV<T>>,
 }
 
 impl<T> Deref for Prefix<T>
@@ -69,11 +70,20 @@ where
     T: Serialize + DeserializeOwned,
 {
     pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
+        Prefix::new_de_fn(top_name, sub_names, deserialize_kv)
+    }
+
+    pub fn new_de_fn(
+        top_name: &[u8],
+        sub_names: &[&[u8]],
+        de_fn: fn(KV) -> StdResult<KV<T>>,
+    ) -> Self {
         // FIXME: we can use a custom function here, probably make this cleaner
         let storage_prefix = nested_namespaces_with_key(&[top_name], sub_names, b"");
         Prefix {
             storage_prefix,
             data: PhantomData,
+            de_fn,
         }
     }
 
@@ -87,8 +97,8 @@ where
     where
         T: 'a,
     {
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(deserialize_kv::<T>);
+        let mapped =
+            range_with_prefix(store, &self.storage_prefix, min, max, order).map(self.de_fn);
         Box::new(mapped)
     }
 }
@@ -165,6 +175,7 @@ mod test {
         let prefix = Prefix {
             storage_prefix: b"foo".to_vec(),
             data: PhantomData::<u64>,
+            de_fn: deserialize_kv,
         };
 
         // set some data, we care about "foo" prefix
