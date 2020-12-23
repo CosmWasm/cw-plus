@@ -4,12 +4,12 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
+use cosmwasm_std::{from_slice, Binary, Order, StdError, StdResult, Storage, KV};
 
 use crate::keys::EmptyPrefix;
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, PkOwned, Prefix, PrimaryKey};
+use crate::{Bound, PkOwned, Prefix, Prefixer, PrimaryKey};
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 const MARKER: u32 = 1;
@@ -123,15 +123,16 @@ where
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct UniqueRef<T> {
+pub(crate) struct UniqueRef<T> {
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
-    pub pk: Binary,
-    pub value: T,
+    pk: Binary,
+    value: T,
 }
 
 pub struct UniqueIndex<'a, K, T> {
     index: fn(&T) -> K,
     idx_map: Map<'a, K, UniqueRef<T>>,
+    idx_namespace: &'a [u8],
 }
 
 impl<'a, K, T> UniqueIndex<'a, K, T> {
@@ -140,6 +141,7 @@ impl<'a, K, T> UniqueIndex<'a, K, T> {
         UniqueIndex {
             index: idx_fn,
             idx_map: Map::new(idx_namespace),
+            idx_namespace: idx_namespace.as_bytes(),
         }
     }
 }
@@ -172,14 +174,19 @@ where
     }
 }
 
+pub(crate) fn deserialize_unique_kv<T: DeserializeOwned>(kv: KV) -> StdResult<KV<T>> {
+    let (_, v) = kv;
+    let t = from_slice::<UniqueRef<T>>(&v)?;
+    Ok((t.pk.into(), t.value))
+}
+
 impl<'a, K, T> UniqueIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<UniqueRef<T>> {
-        // Prefix::<T>::new(self.idx_namespace, &p.prefix())
-        self.idx_map.prefix(p)
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), deserialize_unique_kv)
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
@@ -207,7 +214,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<UniqueRef<T>>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
     where
         T: 'c,
     {

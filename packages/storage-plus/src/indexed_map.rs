@@ -484,23 +484,17 @@ mod test {
         let count = ages.len();
         assert_eq!(4, count);
 
-        // The (index) keys are the (unique, encoded) ages, in ascending order
-        assert_eq!(12u32.to_be_bytes(), ages[0].0.as_slice());
-        assert_eq!(13u32.to_be_bytes(), ages[1].0.as_slice());
-        assert_eq!(24u32.to_be_bytes(), ages[2].0.as_slice());
-        assert_eq!(42u32.to_be_bytes(), ages[3].0.as_slice());
+        // The pks
+        assert_eq!(b"5630".to_vec(), ages[0].0);
+        assert_eq!(b"5628".to_vec(), ages[1].0);
+        assert_eq!(b"5629".to_vec(), ages[2].0);
+        assert_eq!(b"5627".to_vec(), ages[3].0);
 
-        // The pks are in the (UniqueRef) values
-        assert_eq!(b"5630".to_vec(), ages[0].1.pk);
-        assert_eq!(b"5628".to_vec(), ages[1].1.pk);
-        assert_eq!(b"5629".to_vec(), ages[2].1.pk);
-        assert_eq!(b"5627".to_vec(), ages[3].1.pk);
-
-        // The associated data is in the (UniqueRef) values
-        assert_eq!(data4, ages[0].1.value);
-        assert_eq!(data2, ages[1].1.value);
-        assert_eq!(data3, ages[2].1.value);
-        assert_eq!(data1, ages[3].1.value);
+        // The associated data
+        assert_eq!(data4, ages[0].1);
+        assert_eq!(data2, ages[1].1);
+        assert_eq!(data3, ages[2].1);
+        assert_eq!(data1, ages[3].1);
     }
 
     #[test]
@@ -553,16 +547,12 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // The (index) keys are the (encoded) last names, in ascending order
-        assert_eq!(b"", marias[0].0.as_slice());
-        assert_eq!(b"Young", marias[1].0.as_slice());
+        // The pks
+        assert_eq!(b"5627".to_vec(), marias[0].0);
+        assert_eq!(b"5629".to_vec(), marias[1].0);
 
-        // The pks are in the (UniqueRef) values
-        assert_eq!(b"5627".to_vec(), marias[0].1.pk);
-        assert_eq!(b"5629".to_vec(), marias[1].1.pk);
-
-        // The associated data is in the (UniqueRef) values
-        assert_eq!(data1, marias[0].1.value);
-        assert_eq!(data3, marias[1].1.value);
+        // The associated data
+        assert_eq!(data1, marias[0].1);
+        assert_eq!(data3, marias[1].1);
     }
 }
