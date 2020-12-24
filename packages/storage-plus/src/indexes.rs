@@ -223,7 +223,7 @@ where
     }
 }
 
-pub(crate) fn deserialize_unique_kv<T: DeserializeOwned>(kv: KV) -> StdResult<KV<T>> {
+fn deserialize_unique_kv<T: DeserializeOwned>(kv: KV) -> StdResult<KV<T>> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
     Ok((t.pk.into(), t.value))
