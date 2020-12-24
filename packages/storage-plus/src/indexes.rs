@@ -6,27 +6,26 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Order, StdError, StdResult, Storage, KV};
 
-use crate::iter_helpers::to_length_prefixed;
 use crate::keys::{EmptyPrefix, Prefixer};
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
-use crate::{Bound, Endian, Prefix, PrimaryKey};
+use crate::{Bound, Endian, PkOwned, Prefix, PrimaryKey, U32Key};
 use std::marker::PhantomData;
 
 /// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
 // FIXME: Re-introduce this for MultiIndex
 // const MARKER: bool = true;
 
-pub fn index_string(data: &str) -> Vec<u8> {
-    data.as_bytes().to_vec()
+pub fn index_string(data: &str) -> PkOwned {
+    PkOwned(data.as_bytes().to_vec())
 }
 
-// FIXME: Return tuple, and handle length-prefixed strings internally
-pub fn index_tuple(name: &str, age: u32) -> Vec<u8> {
-    let mut name_age = to_length_prefixed(name.as_bytes());
-    // name_age.extend_from_slice(&age.to_be_bytes());
-    name_age.extend_from_slice(&to_length_prefixed(&age.to_be_bytes()));
-    name_age
+pub fn index_tuple(name: &str, age: u32) -> (PkOwned, U32Key) {
+    (index_string(name), U32Key::new(age))
+}
+
+pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (PkOwned, U32Key, PkOwned) {
+    (index_string(name), U32Key::new(age), PkOwned(pk))
 }
 
 // Look at https://docs.rs/endiannezz/0.4.1/endiannezz/trait.Primitive.html
@@ -52,7 +51,7 @@ where
 }
 
 pub struct MultiIndex<'a, K, T> {
-    index: fn(&T) -> Vec<u8>,
+    index: fn(&T, Vec<u8>) -> K,
     idx_namespace: &'a [u8],
     idx_map: Map<'a, K, T>,
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
@@ -62,7 +61,11 @@ pub struct MultiIndex<'a, K, T> {
 
 impl<'a, K, T> MultiIndex<'a, K, T> {
     // TODO: make this a const fn
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
+    pub fn new(
+        idx_fn: fn(&T, Vec<u8>) -> K,
+        pk_namespace: &'a str,
+        idx_namespace: &'a str,
+    ) -> Self {
         MultiIndex {
             index: idx_fn,
             pk_map: Map::new(pk_namespace),
@@ -79,16 +82,13 @@ where
     K: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let mut idx = (self.index)(data);
-        // self.idx_map.save(store, (&idx, &pk), &data)
-        idx.extend_from_slice(pk);
-        self.idx_map.save_raw(store, &idx, &data)
+        let idx = (self.index)(data, pk.to_vec());
+        self.idx_map.save(store, idx, &data)
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let mut idx = (self.index)(old_data);
-        idx.extend_from_slice(pk);
-        self.idx_map.remove_raw(store, &idx);
+        let idx = (self.index)(old_data, pk.to_vec());
+        self.idx_map.remove(store, idx);
         Ok(())
     }
 }

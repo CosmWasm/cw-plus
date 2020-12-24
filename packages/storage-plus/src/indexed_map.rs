@@ -157,8 +157,7 @@ mod test {
     use super::*;
 
     use crate::indexes::{index_int, index_string, index_tuple, MultiIndex, UniqueIndex};
-    use crate::iter_helpers::to_length_prefixed;
-    use crate::U32Key;
+    use crate::{index_triple, PkOwned, U32Key};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::Order;
     use serde::{Deserialize, Serialize};
@@ -170,7 +169,8 @@ mod test {
     }
 
     struct DataIndexes<'a> {
-        pub name: MultiIndex<'a, &'a [u8], Data>,
+        // Second arg is for storing pk
+        pub name: MultiIndex<'a, (PkOwned, PkOwned), Data>,
         pub age: UniqueIndex<'a, Data>,
     }
 
@@ -184,7 +184,8 @@ mod test {
 
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
-        pub name_age: MultiIndex<'a, (&'a [u8], U32Key), Data>,
+        // Third arg needed for storing pk
+        pub name_age: MultiIndex<'a, (PkOwned, U32Key, PkOwned), Data>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -198,7 +199,11 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(|d| index_string(&d.name), "data", "data__name"),
+            name: MultiIndex::new(
+                |d, k| (PkOwned(d.name.as_bytes().to_vec()), PkOwned(k)),
+                "data",
+                "data__name",
+            ),
             age: UniqueIndex::new(|d| index_int(d.age), "data__age"),
         };
         IndexedMap::new("data", indexes)
@@ -342,21 +347,19 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .range(
-                &store,
-                Some(Bound::Inclusive("Maria".into())),
-                None,
-                Order::Descending,
-            )
+            .prefix(PkOwned(b"Maria".to_vec()))
+            .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
         let count = marias.len();
-        assert_eq!(3, count);
+        assert_eq!(2, count);
 
-        // Sorted by age ascending
+        // Sorted by (descending) pk
+        assert_eq!(marias[0].0, b"5629");
+        assert_eq!(marias[1].0, b"5627");
+        // Data is correct
         assert_eq!(marias[0].1, data3);
         assert_eq!(marias[1].1, data1);
-        assert_eq!(marias[2].1, data4);
     }
 
     #[test]
@@ -364,7 +367,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |d, k| index_triple(&d.name, d.age, k),
+                "data",
+                "data__name_age",
+            ),
         };
         let mut map = IndexedMap::new("data", indexes);
 
@@ -400,7 +407,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name_age
-            .prefix(b"Maria")
+            .prefix(PkOwned(b"Maria".to_vec()))
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -411,10 +418,16 @@ mod test {
         assert_eq!(data1, marias[0].1);
         assert_eq!(data3, marias[1].1);
 
-        // FIXME! The rest of the key is a mess
+        // The rest of the key is a mess, but can be parsed
         let key_size = marias[0].0.len();
         let pk_size = pk1.len();
         let offset = key_size - pk_size;
+
+        // (encoded) ages
+        assert_eq!(42u32.to_be_bytes(), &marias[0].0[2..offset]);
+        assert_eq!(24u32.to_be_bytes(), &marias[1].0[2..offset]);
+
+        // pks
         assert_eq!(pk1, &marias[0].0[offset..]);
         assert_eq!(pk3, &marias[1].0[offset..]);
     }
