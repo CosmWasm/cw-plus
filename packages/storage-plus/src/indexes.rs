@@ -6,15 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{from_slice, Binary, Order, StdError, StdResult, Storage, KV};
 
+use crate::helpers::namespaces_with_key;
 use crate::keys::EmptyPrefix;
 use crate::map::Map;
 use crate::prefix::range_with_prefix;
 use crate::{Bound, PkOwned, Prefix, Prefixer, PrimaryKey, U32Key};
-use std::marker::PhantomData;
-
-/// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
-// FIXME: Re-introduce this for MultiIndex
-// const MARKER: bool = true;
 
 pub fn index_string(data: &str) -> PkOwned {
     PkOwned(data.as_bytes().to_vec())
@@ -51,13 +47,14 @@ where
 pub struct MultiIndex<'a, K, T> {
     index: fn(&T, Vec<u8>) -> K,
     idx_namespace: &'a [u8],
-    idx_map: Map<'a, K, T>,
-    // note, we collapse the pk - combining everything under the namespace - even if it is composite
-    pk_map: Map<'a, &'a [u8], T>,
-    idx_type: PhantomData<K>,
+    idx_map: Map<'a, K, u32>,
+    pk_namespace: &'a [u8],
 }
 
-impl<'a, K, T> MultiIndex<'a, K, T> {
+impl<'a, K, T> MultiIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
     // TODO: make this a const fn
     pub fn new(
         idx_fn: fn(&T, Vec<u8>) -> K,
@@ -66,12 +63,35 @@ impl<'a, K, T> MultiIndex<'a, K, T> {
     ) -> Self {
         MultiIndex {
             index: idx_fn,
-            pk_map: Map::new(pk_namespace),
             idx_namespace: idx_namespace.as_bytes(),
             idx_map: Map::new(idx_namespace),
-            idx_type: PhantomData,
+            pk_namespace: pk_namespace.as_bytes(),
         }
     }
+}
+
+fn deserialize_multi_kv<T: DeserializeOwned>(
+    store: &dyn Storage,
+    pk_namespace: &[u8],
+    kv: KV,
+) -> StdResult<KV<T>> {
+    let (key, pk_len) = kv;
+
+    // Deserialize pk_len
+    let pk_len = from_slice::<u32>(pk_len.as_slice())?;
+
+    // Recover pk from last part of k
+    let offset = key.len() - pk_len as usize;
+    let pk = &key[offset..];
+
+    let full_key = namespaces_with_key(&[pk_namespace], pk);
+
+    let v = store
+        .get(&full_key)
+        .ok_or_else(|| StdError::generic_err("pk not found"))?;
+    let v = from_slice::<T>(&v)?;
+
+    Ok((pk.into(), v))
 }
 
 impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>
@@ -81,7 +101,7 @@ where
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data, pk.to_vec());
-        self.idx_map.save(store, idx, &data)
+        self.idx_map.save(store, idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
@@ -98,7 +118,7 @@ where
 {
     // FIXME?: Use range() syntax / return values
     // FIXME?: Move to Prefix<T> for ergonomics
-    // FIXME: Add pk recovery from composite keys
+    // FIXME: Recover pk from (last part of) k
     pub fn pks<'c>(
         &self,
         store: &'c dyn Storage,
@@ -128,7 +148,12 @@ where
     // }
 
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new(self.idx_namespace, &p.prefix())
+        Prefix::new_de_fn(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv,
+        )
     }
 
     // #[cfg(test)]
@@ -235,7 +260,9 @@ where
     K: PrimaryKey<'a>,
 {
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), deserialize_unique_kv)
+        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv(kv)
+        })
     }
 
     /// returns all items that match this secondary index, always by pk Ascending

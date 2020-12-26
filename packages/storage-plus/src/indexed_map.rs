@@ -156,10 +156,10 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_string, index_string_tuple, index_tuple, MultiIndex, UniqueIndex};
+    use crate::indexes::{index_string_tuple, MultiIndex, UniqueIndex};
     use crate::{index_triple, PkOwned, U32Key};
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{MemoryStorage, Order};
+    use cosmwasm_std::Order;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -429,22 +429,13 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Sorted by age descending
+        // Pks (sorted by age descending)
+        assert_eq!(pk1, marias[0].0);
+        assert_eq!(pk3, marias[1].0);
+
+        // Data
         assert_eq!(data1, marias[0].1);
         assert_eq!(data3, marias[1].1);
-
-        // The rest of the key is a mess, but can be parsed
-        let key_size = marias[0].0.len();
-        let pk_size = pk1.len();
-        let offset = key_size - pk_size;
-
-        // (encoded) ages
-        assert_eq!(42u32.to_be_bytes(), &marias[0].0[2..offset]);
-        assert_eq!(24u32.to_be_bytes(), &marias[1].0[2..offset]);
-
-        // pks
-        assert_eq!(pk1, &marias[0].0[offset..]);
-        assert_eq!(pk3, &marias[1].0[offset..]);
     }
 
     #[test]
