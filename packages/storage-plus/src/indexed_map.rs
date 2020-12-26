@@ -156,8 +156,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_string_tuple, MultiIndex, UniqueIndex};
-    use crate::{index_triple, PkOwned, U32Key};
+    use crate::indexes::{index_string_tuple, index_triple, MultiIndex, UniqueIndex};
+    use crate::{PkOwned, U32Key};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::Order;
     use serde::{Deserialize, Serialize};
@@ -215,7 +215,6 @@ mod test {
         IndexedMap::new("data", indexes)
     }
 
-    /*
     #[test]
     fn store_and_load_by_index() {
         let mut store = MockStorage::new();
@@ -232,6 +231,7 @@ mod test {
 
         let data2 = Data {
             name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
             age: 13,
         };
         let pk2: &[u8] = b"5628";
@@ -239,6 +239,7 @@ mod test {
 
         let data3 = Data {
             name: "Maria".to_string(),
+            last_name: "Young".to_string(),
             age: 24,
         };
         let pk3: &[u8] = b"5629";
@@ -246,6 +247,7 @@ mod test {
 
         let data4 = Data {
             name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
             age: 12,
         };
         let pk4: &[u8] = b"5630";
@@ -258,19 +260,22 @@ mod test {
         let count = map
             .idx
             .name
-            .all_items(&store, &index_string("Maria"))
-            .unwrap()
+            .prefix(PkOwned(b"Maria".to_vec()))
+            .range(&store, None, None, Order::Ascending)
+            .collect::<Vec<_>>()
             .len();
         assert_eq!(2, count);
 
         // TODO: we load by wrong keys - get full storage key!
 
         // load it by secondary index (we must know how to compute this)
-        // let marias: StdResult<Vec<_>> = map
-        let marias = map
+        // let marias: Vec<_>> = map
+        let marias: Vec<_> = map
             .idx
             .name
-            .all_items(&store, &index_string("Maria"))
+            .prefix(PkOwned(b"Maria".to_vec()))
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<_>>()
             .unwrap();
         assert_eq!(2, marias.len());
         let (k, v) = &marias[0];
@@ -281,8 +286,9 @@ mod test {
         let count = map
             .idx
             .name
-            .all_items(&store, &index_string("Marib"))
-            .unwrap()
+            .prefix(PkOwned(b"Marib".to_vec()))
+            .range(&store, None, None, Order::Ascending)
+            .collect::<Vec<_>>()
             .len();
         assert_eq!(0, count);
 
@@ -290,8 +296,9 @@ mod test {
         let count = map
             .idx
             .name
-            .all_items(&store, &index_string("Mari`"))
-            .unwrap()
+            .prefix(PkOwned(b"Mari`".to_vec()))
+            .range(&store, None, None, Order::Ascending)
+            .collect::<Vec<_>>()
             .len();
         assert_eq!(0, count);
 
@@ -299,23 +306,23 @@ mod test {
         let count = map
             .idx
             .name
-            .all_items(&store, &index_string("Maria5"))
-            .unwrap()
+            .prefix(PkOwned(b"Maria5".to_vec()))
+            .range(&store, None, None, Order::Ascending)
+            .collect::<Vec<_>>()
             .len();
         assert_eq!(0, count);
 
         // match on proper age
         let proper = U32Key::new(42);
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
-        assert_eq!(pk.to_vec(), aged.0);
-        assert_eq!(data, aged.1);
+        assert_eq!(pk1.to_vec(), aged.0);
+        assert_eq!(data1, aged.1);
 
         // no match on wrong age
         let too_old = U32Key::new(43);
         let aged = map.idx.age.item(&store, too_old).unwrap();
         assert_eq!(None, aged);
     }
-    */
 
     #[test]
     fn range_simple_key_by_multi_index() {
