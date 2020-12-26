@@ -9,7 +9,6 @@ use cosmwasm_std::{from_slice, Binary, Order, StdError, StdResult, Storage, KV};
 use crate::helpers::namespaces_with_key;
 use crate::keys::EmptyPrefix;
 use crate::map::Map;
-use crate::prefix::range_with_prefix;
 use crate::{Bound, PkOwned, Prefix, Prefixer, PrimaryKey, U32Key};
 
 pub fn index_string(data: &str) -> PkOwned {
@@ -31,7 +30,7 @@ pub fn index_string_tuple(data1: &str, data2: &str) -> (PkOwned, PkOwned) {
 // 2 main variants:
 //  * store (namespace, index_name, idx_value, key) -> b"1" - allows many and references pk
 //  * store (namespace, index_name, idx_value) -> {key, value} - allows one and copies pk and data
-//  // this would be the primary key - we abstract that too???
+//  // this would be the primary key
 //  * store (namespace, index_name, pk) -> value - allows one with data
 //
 // Note: we cannot store traits with generic functions inside `Box<dyn Index>`,
@@ -116,37 +115,6 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    // FIXME?: Use range() syntax / return values
-    // FIXME?: Move to Prefix<T> for ergonomics
-    // FIXME: Recover pk from (last part of) k
-    pub fn pks<'c>(
-        &self,
-        store: &'c dyn Storage,
-        prefix: Prefix<T>,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
-        Box::new(mapped)
-    }
-
-    /// returns all items that match this secondary index, always by pk Ascending
-    // pub fn items<'c>(
-    //     &'c self,
-    //     store: &'c dyn Storage,
-    //     idx: &[u8],
-    //     min: Option<Bound>,
-    //     max: Option<Bound>,
-    //     order: Order,
-    // ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-    //     let mapped = self.pks(store, idx, min, max, order).map(move |pk| {
-    //         let v = self.pk_map.load(store, &pk)?;
-    //         Ok((pk, v))
-    //     });
-    //     Box::new(mapped)
-    // }
-
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new_de_fn(
             self.idx_namespace,
@@ -156,21 +124,48 @@ where
         )
     }
 
-    // #[cfg(test)]
-    // pub fn count<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> usize {
-    //     self.pks(store, idx, None, None, Order::Ascending).count()
-    // }
+    // FIXME?: Move to Prefix<T> for ergonomics
+    pub fn pks<'c>(
+        &self,
+        store: &'c dyn Storage,
+        p: K::Prefix,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<Vec<u8>>> + 'c>
+    where
+        T: 'c,
+    {
+        let prefix = self.prefix(p);
+        let mapped = prefix.range(store, min, max, order).map(|res| {
+            let t = res?;
+            Ok(t.0)
+        });
+        Box::new(mapped)
+    }
 
-    // #[cfg(test)]
-    // pub fn all_pks<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> Vec<Vec<u8>> {
-    //     self.pks(store, idx, None, None, Order::Ascending).collect()
-    // }
+    #[cfg(test)]
+    pub fn count<'c>(&self, store: &'c dyn Storage, p: K::Prefix) -> usize {
+        self.pks(store, p, None, None, Order::Ascending).count()
+    }
 
-    // #[cfg(test)]
-    // pub fn all_items<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> StdResult<Vec<KV<T>>> {
-    //     self.items(store, idx, None, None, Order::Ascending)
-    //         .collect()
-    // }
+    #[cfg(test)]
+    pub fn all_pks<'c>(&self, store: &'c dyn Storage, p: K::Prefix) -> Vec<Vec<u8>> {
+        self.pks(store, p, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<Vec<u8>>>>()
+            .unwrap()
+    }
+
+    #[cfg(test)]
+    pub fn all_items<'c>(
+        &self,
+        store: &'c dyn Storage,
+        prefix: K::Prefix,
+    ) -> StdResult<Vec<KV<T>>> {
+        self.prefix(prefix)
+            .range(store, None, None, Order::Ascending)
+            .collect()
+    }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
@@ -187,8 +182,8 @@ where
         store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::KV<T>>> + 'c>
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
     where
         T: 'c,
     {
@@ -289,7 +284,7 @@ where
         store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
-        order: cosmwasm_std::Order,
+        order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
     where
         T: 'c,

@@ -159,7 +159,7 @@ mod test {
     use crate::indexes::{index_string_tuple, index_triple, MultiIndex, UniqueIndex};
     use crate::{PkOwned, U32Key};
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::Order;
+    use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -546,7 +546,6 @@ mod test {
         map.save(&mut store, pk4, &data4).unwrap_err();
     }
 
-    /*
     #[test]
     fn remove_and_update_reflected_on_indexes() {
         let mut store = MockStorage::new();
@@ -558,7 +557,13 @@ mod test {
          -> usize {
             map.idx
                 .name
-                .pks(store, &index_string(name), None, None, Order::Ascending)
+                .pks(
+                    store,
+                    PkOwned(name.as_bytes().to_vec()),
+                    None,
+                    None,
+                    Order::Ascending,
+                )
                 .count()
         };
 
@@ -606,7 +611,6 @@ mod test {
         assert_eq!(name_count(&map, &store, "Fred"), 0);
         assert_eq!(name_count(&map, &store, "Mary"), 1);
     }
-     */
 
     #[test]
     fn unique_index_simple_key_range() {
