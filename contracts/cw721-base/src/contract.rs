@@ -497,7 +497,6 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
-    // Pass prefix to pks
     let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
