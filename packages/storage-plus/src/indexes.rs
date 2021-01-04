@@ -27,12 +27,6 @@ pub fn index_string_tuple(data1: &str, data2: &str) -> (PkOwned, PkOwned) {
     (index_string(data1), index_string(data2))
 }
 
-// 2 main variants:
-//  * store (namespace, index_name, idx_value, key) -> b"1" - allows many and references pk
-//  * store (namespace, index_name, idx_value) -> {key, value} - allows one and copies pk and data
-//  // this would be the primary key
-//  * store (namespace, index_name, pk) -> value - allows one with data
-//
 // Note: we cannot store traits with generic functions inside `Box<dyn Index>`,
 // so I pull S: Storage to a top-level
 pub trait Index<T>
@@ -43,6 +37,17 @@ where
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()>;
 }
 
+/// MultiIndex stores (namespace, index_name, idx_value, pk) -> b"pk_len".
+/// Allows many values per index, and references pk.
+/// The associated primary key value is stored in the main (pk_namespace) map,
+/// which stores (namespace, pk_namespace, pk) -> value.
+///
+/// The stored pk_len is used to recover the pk from the index namespace, and perform
+/// the secondary load of the associated value from the main map.
+///
+/// The MultiIndex definition must include a field for the pk. That is, the MultiIndex K value
+/// is always a n-tuple (n >= 2) and its last element must be the pk.
+/// The index function must therefore put the pk as last element, when generating the index.
 pub struct MultiIndex<'a, K, T> {
     index: fn(&T, Vec<u8>) -> K,
     idx_namespace: &'a [u8],
@@ -198,6 +203,8 @@ pub(crate) struct UniqueRef<T> {
     value: T,
 }
 
+/// UniqueIndex stores (namespace, index_name, idx_value) -> {key, value}
+/// Allows one value per index (i.e. unique) and copies pk and data
 pub struct UniqueIndex<'a, K, T> {
     index: fn(&T) -> K,
     idx_map: Map<'a, K, UniqueRef<T>>,
