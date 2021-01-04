@@ -26,6 +26,7 @@ pub trait PrimaryKey<'a>: Clone {
 type Pk0 = ();
 type Pk1<'a> = &'a [u8];
 type Pk2<'a, T = &'a [u8], U = &'a [u8]> = (T, U);
+type Pk3<'a, T = &'a [u8], U = &'a [u8], V = &'a [u8]> = (T, U, V);
 
 type PkStr<'a> = &'a str;
 
@@ -74,6 +75,33 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
     }
 }
 
+// use generics for combining there - so we can use &[u8], PkOwned, or IntKey
+impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>>
+    PrimaryKey<'a> for (T, U, V)
+{
+    type Prefix = T;
+
+    fn key(&self) -> Vec<&[u8]> {
+        let mut keys = self.0.key();
+        keys.extend(&self.1.key());
+        keys.extend(&self.2.key());
+        keys
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        let l1 = decode_length(&serialized[0..2]);
+        let first = &serialized[2..2 + l1];
+        let l2 = decode_length(&serialized[2 + l1..2 + l1 + 2]);
+        let second = &serialized[2 + l1 + 2..2 + l1 + 2 + l2];
+        let third = &serialized[2 + l1 + 2 + l2..];
+        (
+            T::parse_key(first),
+            U::parse_key(second),
+            V::parse_key(third),
+        )
+    }
+}
+
 // pub trait Prefixer<'a>: Copy {
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
@@ -95,6 +123,12 @@ impl<'a> Prefixer<'a> for Pk1<'a> {
 impl<'a> Prefixer<'a> for Pk2<'a> {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self.0, self.1]
+    }
+}
+
+impl<'a> Prefixer<'a> for Pk3<'a> {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![self.0, self.1, self.2]
     }
 }
 
@@ -316,6 +350,15 @@ mod test {
         let joined = key.joined_key();
         assert_eq!(4 + 6 + 2, joined.len());
         let parsed = Pk2::parse_key(&joined);
+        assert_eq!(key, parsed);
+    }
+
+    #[test]
+    fn parse_joined_keys_pk3() {
+        let key: Pk3 = (b"four", b"square", b"cinco");
+        let joined = key.joined_key();
+        assert_eq!(4 + 6 + 5 + 2 * (3 - 1), joined.len());
+        let parsed = Pk3::parse_key(&joined);
         assert_eq!(key, parsed);
     }
 
