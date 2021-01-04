@@ -46,18 +46,8 @@ where
         self.key(k).save(store, data)
     }
 
-    pub fn save_raw(&self, store: &mut dyn Storage, k: &[u8], data: &T) -> StdResult<()> {
-        let path = Path::<T>::new(self.namespace, &[k]);
-        path.save(store, data)
-    }
-
     pub fn remove(&self, store: &mut dyn Storage, k: K) {
         self.key(k).remove(store)
-    }
-
-    pub fn remove_raw(&self, store: &mut dyn Storage, k: &[u8]) {
-        let path = Path::<T>::new(self.namespace, &[k]);
-        path.remove(store)
     }
 
     /// load will return an error if no data is set at the given key, or on parse error
