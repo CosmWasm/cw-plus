@@ -118,6 +118,8 @@ mod test {
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
+    const TRIPLE: Map<(&[u8], &[u8], &[u8]), u64> = Map::new("triple");
+
     #[test]
     fn create_path() {
         let path = PEOPLE.key(b"john");
@@ -130,10 +132,22 @@ mod test {
         let path = ALLOWANCE.key((b"john", b"maria"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
-        assert_eq!("allow".len() + "john".len() + "maria".len() + 4, key.len());
+        assert_eq!("allow".len() + "john".len() + "maria".len() + 2 * 2, key.len());
         assert_eq!(b"allow".to_vec().as_slice(), &key[2..7]);
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
+
+        let path = TRIPLE.key((b"john", b"maria", b"pedro"));
+        let key = path.deref();
+        // this should be prefixed(allow) || prefixed(john) || maria
+        assert_eq!(
+            "triple".len() + "john".len() + "maria".len() + b"pedro".len() + 2 * 3,
+            key.len()
+        );
+        assert_eq!(b"triple".to_vec().as_slice(), &key[2..8]);
+        assert_eq!(b"john".to_vec().as_slice(), &key[10..14]);
+        assert_eq!(b"maria".to_vec().as_slice(), &key[16..21]);
+        assert_eq!(b"pedro".to_vec().as_slice(), &key[21..]);
     }
 
     #[test]
@@ -177,6 +191,25 @@ mod test {
 
         // matches under a proper copy
         let same = ALLOWANCE.load(&store, (b"owner", b"spender")).unwrap();
+        assert_eq!(1234, same);
+    }
+
+    #[test]
+    fn triple_keys() {
+        let mut store = MockStorage::new();
+
+        // save and load on a triple composite key
+        let triple = TRIPLE.key((b"owner", b"spender", b"recipient"));
+        assert_eq!(None, triple.may_load(&store).unwrap());
+        triple.save(&mut store, &1234).unwrap();
+        assert_eq!(1234, triple.load(&store).unwrap());
+
+        // not under other key
+        let different = TRIPLE.may_load(&store, (b"owners", b"spender", b"ecipient")).unwrap();
+        assert_eq!(None, different);
+
+        // matches under a proper copy
+        let same = TRIPLE.load(&store, (b"owner", b"spender", b"recipient")).unwrap();
         assert_eq!(1234, same);
     }
 
@@ -234,6 +267,35 @@ mod test {
         assert_eq!(
             all,
             vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_triple_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys, one under different owner
+        TRIPLE
+            .save(&mut store, (b"owner", b"spender", b"recipient"), &1000)
+            .unwrap();
+        TRIPLE
+            .save(&mut store, (b"owner", b"spender", b"recipient2"), &3000)
+            .unwrap();
+        TRIPLE
+            .save(&mut store, (b"owner2", b"spender", b"recipient"), &5000)
+            .unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = TRIPLE
+            .prefix((b"owner", b"spender"))
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"recipient".to_vec(), 1000), (b"recipient2".to_vec(), 3000)]
         );
     }
 
