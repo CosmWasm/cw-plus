@@ -104,6 +104,7 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
+    use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -118,7 +119,7 @@ mod test {
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
-    const TRIPLE: Map<(&[u8], &[u8], &[u8]), u64> = Map::new("triple");
+    const TRIPLE: Map<(&[u8], U8Key, &str), u64> = Map::new("triple");
 
     #[test]
     fn create_path() {
@@ -140,17 +141,17 @@ mod test {
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
 
-        let path = TRIPLE.key((b"john", b"maria", b"pedro"));
+        let path = TRIPLE.key((b"john", 8u8.into(), "pedro"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!(
-            "triple".len() + "john".len() + "maria".len() + b"pedro".len() + 2 * 3,
+            "triple".len() + "john".len() + 1 + "pedro".len() + 2 * 3,
             key.len()
         );
         assert_eq!(b"triple".to_vec().as_slice(), &key[2..8]);
         assert_eq!(b"john".to_vec().as_slice(), &key[10..14]);
-        assert_eq!(b"maria".to_vec().as_slice(), &key[16..21]);
-        assert_eq!(b"pedro".to_vec().as_slice(), &key[21..]);
+        assert_eq!(8u8.to_be_bytes(), &key[16..17]);
+        assert_eq!(b"pedro".to_vec().as_slice(), &key[17..]);
     }
 
     #[test]
@@ -202,20 +203,20 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on a triple composite key
-        let triple = TRIPLE.key((b"owner", b"spender", b"recipient"));
+        let triple = TRIPLE.key((b"owner", 10u8.into(), "recipient"));
         assert_eq!(None, triple.may_load(&store).unwrap());
         triple.save(&mut store, &1234).unwrap();
         assert_eq!(1234, triple.load(&store).unwrap());
 
         // not under other key
         let different = TRIPLE
-            .may_load(&store, (b"owners", b"spender", b"ecipient"))
+            .may_load(&store, (b"owners", 10u8.into(), "ecipient"))
             .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
         let same = TRIPLE
-            .load(&store, (b"owner", b"spender", b"recipient"))
+            .load(&store, (b"owner", 10u8.into(), "recipient"))
             .unwrap();
         assert_eq!(1234, same);
     }
@@ -284,18 +285,18 @@ mod test {
 
         // save and load on three keys, one under different owner
         TRIPLE
-            .save(&mut store, (b"owner", b"spender", b"recipient"), &1000)
+            .save(&mut store, (b"owner", 9u8.into(), "recipient"), &1000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", b"spender", b"recipient2"), &3000)
+            .save(&mut store, (b"owner", 9u8.into(), "recipient2"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner2", b"spender", b"recipient"), &5000)
+            .save(&mut store, (b"owner2", 9u8.into(), "recipient"), &5000)
             .unwrap();
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix((b"owner", b"spender"))
+            .prefix((b"owner", 9u8.into()))
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
