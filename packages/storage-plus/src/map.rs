@@ -104,7 +104,7 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
-    use crate::{U64Key, U8Key};
+    use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -119,7 +119,7 @@ mod test {
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
-    const INT_KEYS: Map<(U8Key, U64Key), u64> = Map::new("integers_tuple");
+    const TRIPLE: Map<(&[u8], U8Key, &str), u64> = Map::new("triple");
 
     #[test]
     fn create_path() {
@@ -133,10 +133,25 @@ mod test {
         let path = ALLOWANCE.key((b"john", b"maria"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
-        assert_eq!("allow".len() + "john".len() + "maria".len() + 4, key.len());
+        assert_eq!(
+            "allow".len() + "john".len() + "maria".len() + 2 * 2,
+            key.len()
+        );
         assert_eq!(b"allow".to_vec().as_slice(), &key[2..7]);
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
+
+        let path = TRIPLE.key((b"john", 8u8.into(), "pedro"));
+        let key = path.deref();
+        // this should be prefixed(allow) || prefixed(john) || maria
+        assert_eq!(
+            "triple".len() + "john".len() + 1 + "pedro".len() + 2 * 3,
+            key.len()
+        );
+        assert_eq!(b"triple".to_vec().as_slice(), &key[2..8]);
+        assert_eq!(b"john".to_vec().as_slice(), &key[10..14]);
+        assert_eq!(8u8.to_be_bytes(), &key[16..17]);
+        assert_eq!(b"pedro".to_vec().as_slice(), &key[17..]);
     }
 
     #[test]
@@ -184,21 +199,25 @@ mod test {
     }
 
     #[test]
-    fn composite_integer_keys() {
+    fn triple_keys() {
         let mut store = MockStorage::new();
 
-        // save and load on a composite key
-        let test = INT_KEYS.key((U8Key::new(2), U64Key::new(12345)));
-        assert_eq!(None, test.may_load(&store).unwrap());
-        test.save(&mut store, &1234).unwrap();
-        assert_eq!(1234, test.load(&store).unwrap());
+        // save and load on a triple composite key
+        let triple = TRIPLE.key((b"owner", 10u8.into(), "recipient"));
+        assert_eq!(None, triple.may_load(&store).unwrap());
+        triple.save(&mut store, &1234).unwrap();
+        assert_eq!(1234, triple.load(&store).unwrap());
 
         // not under other key
-        let different = INT_KEYS.may_load(&store, (2.into(), 12346.into())).unwrap();
+        let different = TRIPLE
+            .may_load(&store, (b"owners", 10u8.into(), "ecipient"))
+            .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
-        let same = INT_KEYS.load(&store, (2.into(), 12345.into())).unwrap();
+        let same = TRIPLE
+            .load(&store, (b"owner", 10u8.into(), "recipient"))
+            .unwrap();
         assert_eq!(1234, same);
     }
 
@@ -293,23 +312,23 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_int_composite_key() {
+    fn range_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
-        INT_KEYS
-            .save(&mut store, (1.into(), 123456.into()), &1000)
+        TRIPLE
+            .save(&mut store, (b"owner", 9u8.into(), "recipient"), &1000)
             .unwrap();
-        INT_KEYS
-            .save(&mut store, (1.into(), 123457.into()), &3000)
+        TRIPLE
+            .save(&mut store, (b"owner", 9u8.into(), "recipient2"), &3000)
             .unwrap();
-        INT_KEYS
-            .save(&mut store, (2.into(), 123456.into()), &5000)
+        TRIPLE
+            .save(&mut store, (b"owner2", 9u8.into(), "recipient"), &5000)
             .unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = INT_KEYS
-            .prefix(1.into())
+        let all: StdResult<Vec<_>> = TRIPLE
+            .prefix((b"owner", 9u8.into()))
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -317,8 +336,8 @@ mod test {
         assert_eq!(
             all,
             vec![
-                (123456u64.to_be_bytes().to_vec(), 1000),
-                (123457u64.to_be_bytes().to_vec(), 3000)
+                (b"recipient".to_vec(), 1000),
+                (b"recipient2".to_vec(), 3000)
             ]
         );
     }
