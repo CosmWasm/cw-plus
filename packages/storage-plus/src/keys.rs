@@ -79,7 +79,9 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>>
     PrimaryKey<'a> for (T, U, V)
 {
-    type Prefix = T;
+    // FIXME: Generalize
+    // type Prefix = (T, U);
+    type Prefix = Pk2<'a>;
 
     fn key(&self) -> Vec<&[u8]> {
         let mut keys = self.0.key();
