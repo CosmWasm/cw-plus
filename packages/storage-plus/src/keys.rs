@@ -370,6 +370,17 @@ mod test {
     }
 
     #[test]
+    fn parse_joined_keys_pk3_alt() {
+        type K<'a> = (&'a str, U64Key, &'a str);
+
+        let key: K = ("one", 222.into(), "three");
+        let joined = key.joined_key();
+        assert_eq!(3 + 8 + 5 + 2 * 2, joined.len());
+        let parsed = K::parse_key(&joined);
+        assert_eq!(key, parsed);
+    }
+
+    #[test]
     fn parse_joined_keys_int() {
         let key: U64Key = 12345678.into();
         let joined = key.joined_key();
@@ -380,11 +391,33 @@ mod test {
 
     #[test]
     fn parse_joined_keys_string_int() {
-        let key: (U32Key, &str) = (54321.into(), "random");
+        type K<'a> = (U32Key, &'a str);
+
+        let key: K = (54321.into(), "random");
         let joined = key.joined_key();
         assert_eq!(2 + 4 + 6, joined.len());
-        let parsed = <(U32Key, &str)>::parse_key(&joined);
+        let parsed = K::parse_key(&joined);
         assert_eq!(key, parsed);
         assert_eq!("random", parsed.1);
+    }
+
+    #[test]
+    fn proper_prefixes() {
+        let simple: &str = "hello";
+        assert_eq!(simple.prefix(), vec![b"hello"]);
+
+        let pair: (U32Key, &[u8]) = (12345.into(), b"random");
+        let one: Vec<u8> = vec![0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let triple: (&str, U32Key, &[u8]) = ("begin", 12345.into(), b"end");
+        let one: Vec<u8> = b"begin".to_vec();
+        let two: Vec<u8> = vec![0, 0, 48, 57];
+        let three: Vec<u8> = b"end".to_vec();
+        assert_eq!(
+            triple.prefix(),
+            vec![one.as_slice(), two.as_slice(), three.as_slice()]
+        );
     }
 }
