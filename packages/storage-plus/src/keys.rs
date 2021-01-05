@@ -22,16 +22,8 @@ pub trait PrimaryKey<'a>: Clone {
     fn parse_key(serialized: &'a [u8]) -> Self;
 }
 
-// optional type aliases to refer to them easier
-type Pk0 = ();
-type Pk1<'a> = &'a [u8];
-type Pk2<'a, T = &'a [u8], U = &'a [u8]> = (T, U);
-type Pk3<'a, T = &'a [u8], U = &'a [u8], V = &'a [u8]> = (T, U, V);
-
-type PkStr<'a> = &'a str;
-
-impl<'a> PrimaryKey<'a> for Pk1<'a> {
-    type Prefix = Pk0;
+impl<'a> PrimaryKey<'a> for &'a [u8] {
+    type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         // this is simple, we don't add more prefixes
@@ -44,8 +36,8 @@ impl<'a> PrimaryKey<'a> for Pk1<'a> {
 }
 
 // Provide a string version of this to raw encode strings
-impl<'a> PrimaryKey<'a> for PkStr<'a> {
-    type Prefix = Pk0;
+impl<'a> PrimaryKey<'a> for &'a str {
+    type Prefix = ();
 
     fn key<'b>(&'b self) -> Vec<&'b [u8]> {
         // this is simple, we don't add more prefixes
@@ -79,9 +71,7 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>>
     PrimaryKey<'a> for (T, U, V)
 {
-    // FIXME: Generalize
-    // type Prefix = (T, U);
-    type Prefix = Pk2<'a>;
+    type Prefix = (T, U);
 
     fn key(&self) -> Vec<&[u8]> {
         let mut keys = self.0.key();
@@ -110,32 +100,37 @@ pub trait Prefixer<'a> {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]>;
 }
 
-impl<'a> Prefixer<'a> for Pk0 {
+impl<'a> Prefixer<'a> for () {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![]
     }
 }
 
-impl<'a> Prefixer<'a> for Pk1<'a> {
+impl<'a> Prefixer<'a> for &'a [u8] {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self]
     }
 }
 
-impl<'a> Prefixer<'a> for Pk2<'a> {
+impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
-        vec![self.0, self.1]
+        let mut res = self.0.prefix();
+        res.extend(self.1.prefix().into_iter());
+        res
     }
 }
 
-impl<'a> Prefixer<'a> for Pk3<'a> {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.0, self.1, self.2]
+impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T, U, V) {
+    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+        let mut res = self.0.prefix();
+        res.extend(self.1.prefix().into_iter());
+        res.extend(self.2.prefix().into_iter());
+        res
     }
 }
 
 // Provide a string version of this to raw encode strings
-impl<'a> Prefixer<'a> for PkStr<'a> {
+impl<'a> Prefixer<'a> for &'a str {
     fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
         vec![self.as_bytes()]
     }
@@ -281,19 +276,23 @@ mod test {
 
     #[test]
     fn str_key_works() {
-        let k: &str = "hello";
+        type K<'a> = &'a str;
+
+        let k: K = "hello";
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!("hello".as_bytes(), path[0]);
 
         let joined = k.joined_key();
-        let parsed = PkStr::parse_key(&joined);
+        let parsed = K::parse_key(&joined);
         assert_eq!(parsed, "hello");
     }
 
     #[test]
     fn nested_str_key_works() {
-        let k: (&str, &[u8]) = ("hello", b"world");
+        type K<'a> = (&'a str, &'a [u8]);
+
+        let k: K = ("hello", b"world");
         let path = k.key();
         assert_eq!(2, path.len());
         assert_eq!("hello".as_bytes(), path[0]);
@@ -339,28 +338,34 @@ mod test {
 
     #[test]
     fn parse_joined_keys_pk1() {
-        let key: Pk1 = b"four";
+        type K<'a> = &'a [u8];
+
+        let key: K = b"four";
         let joined = key.joined_key();
         assert_eq!(key, joined.as_slice());
-        let parsed = Pk1::parse_key(&joined);
+        let parsed = K::parse_key(&joined);
         assert_eq!(key, parsed);
     }
 
     #[test]
     fn parse_joined_keys_pk2() {
-        let key: Pk2 = (b"four", b"square");
+        type K<'a> = (&'a [u8], &'a [u8]);
+
+        let key: K = (b"four", b"square");
         let joined = key.joined_key();
         assert_eq!(4 + 6 + 2, joined.len());
-        let parsed = Pk2::parse_key(&joined);
+        let parsed = K::parse_key(&joined);
         assert_eq!(key, parsed);
     }
 
     #[test]
     fn parse_joined_keys_pk3() {
-        let key: Pk3 = (b"four", b"square", b"cinco");
+        type K<'a> = (&'a str, U32Key, &'a [u8]);
+
+        let key: K = ("four", 15.into(), b"cinco");
         let joined = key.joined_key();
-        assert_eq!(4 + 6 + 5 + 2 * (3 - 1), joined.len());
-        let parsed = Pk3::parse_key(&joined);
+        assert_eq!(4 + 4 + 5 + 2 * 2, joined.len());
+        let parsed = K::parse_key(&joined);
         assert_eq!(key, parsed);
     }
 
