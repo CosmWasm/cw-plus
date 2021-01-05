@@ -132,7 +132,10 @@ mod test {
         let path = ALLOWANCE.key((b"john", b"maria"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
-        assert_eq!("allow".len() + "john".len() + "maria".len() + 2 * 2, key.len());
+        assert_eq!(
+            "allow".len() + "john".len() + "maria".len() + 2 * 2,
+            key.len()
+        );
         assert_eq!(b"allow".to_vec().as_slice(), &key[2..7]);
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
@@ -205,11 +208,15 @@ mod test {
         assert_eq!(1234, triple.load(&store).unwrap());
 
         // not under other key
-        let different = TRIPLE.may_load(&store, (b"owners", b"spender", b"ecipient")).unwrap();
+        let different = TRIPLE
+            .may_load(&store, (b"owners", b"spender", b"ecipient"))
+            .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
-        let same = TRIPLE.load(&store, (b"owner", b"spender", b"recipient")).unwrap();
+        let same = TRIPLE
+            .load(&store, (b"owner", b"spender", b"recipient"))
+            .unwrap();
         assert_eq!(1234, same);
     }
 
@@ -295,7 +302,10 @@ mod test {
         assert_eq!(2, all.len());
         assert_eq!(
             all,
-            vec![(b"recipient".to_vec(), 1000), (b"recipient2".to_vec(), 3000)]
+            vec![
+                (b"recipient".to_vec(), 1000),
+                (b"recipient2".to_vec(), 3000)
+            ]
         );
     }
 
