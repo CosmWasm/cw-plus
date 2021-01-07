@@ -2,7 +2,7 @@
 
 This is a simple implementation of the [cw3 spec](../../packages/cw3/README.md).
 It is a multisig with a fixed set of addresses created upon initialization.
-Each address may have the same weight (K of N) or some may have extra voting
+Each address may have the same weight (K of N), or some may have extra voting
 power. This works much like the native Cosmos SDK multisig, except that rather
 than aggregating the signatures off chain and submitting the final result,
 we aggregate the approvals on-chain.
@@ -39,7 +39,7 @@ Once a proposal is "Passed", anyone may submit an "Execute" message. This will
 trigger the proposal to send all stored messages from the proposal and update
 it's state to "Executed", so it cannot run again. (Note if the execution fails
 for any reason - out of gas, insufficient funds, etc - the state update will
-be reverted and it will remain "Passed" so you can try again).
+be reverted, and it will remain "Passed", so you can try again).
 
 Once a proposal has expired without passing, anyone can submit a "Close"
 message to mark it closed. This has no effect beyond cleaning up the UI/database.
@@ -62,4 +62,4 @@ sha256sum cw3_fixed_multisig.wasm
 ```
 
 Or for a production-ready (optimized) build, run a build command in the
-the repository root: https://github.com/CosmWasm/cosmwasm-plus#compiling.
+repository root: https://github.com/CosmWasm/cosmwasm-plus#compiling.

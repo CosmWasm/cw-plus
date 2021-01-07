@@ -1,23 +1,23 @@
 # CW3 Flexible Multisig
 
-This builds on [cw3-fixed-multisig](../cw3-fixed-multisig) with a more 
+This builds on [cw3-fixed-multisig](../cw3-fixed-multisig) with a more
 powerful implementation of the [cw3 spec](../../packages/cw3/README.md).
-It is a multisig contract that is backed by a 
+It is a multisig contract that is backed by a
 [cw4 (group)](../../packages/cw4/README.md) contract, which independently
 maintains the voter set.
 
 This provides 2 main advantages:
 
 * You can create two different multisigs with different voting thresholds
-  backed by the same group. Thus, you can have a 50% vote and a 67% vote
+  backed by the same group. Thus, you can have a 50% vote, and a 67% vote
   that always use the same voter set, but can take other actions.
 * TODO: It allows dynamic multisig groups. Since the group can change,
   we can set one of the multisigs as the admin of the group contract,
   and the
 
 
-Besides the dynamic voting set, the main difference with the native 
-Cosmos SDK multisig, is that it aggregates the signatures on chain with
+In addition to the dynamic voting set, the main difference with the native
+Cosmos SDK multisig, is that it aggregates the signatures on chain, with
 visible proposals (like `x/gov` in the Cosmos SDK), rather than requiring
 signers to share signatures off chain.
 
@@ -26,10 +26,10 @@ signers to share signatures off chain.
 The first step to create such a multisig is to instantiate a cw4 contract
 with the desired member set. For now, this only is supported by
 [cw4-group](../cw4-group), but we will add a token-weighted group contract
-(TODO). 
+(TODO).
 
 If you create a `cw4-group` contract and want a multisig to be able
-to modify it's own group, do the following in multiple transactions:
+to modify its own group, do the following in multiple transactions:
 
   * init cw4-group, with your personal key as admin
   * init a multisig pointing to the group
@@ -41,7 +41,7 @@ and depends on an external driver (hard to impossible to script such a
 self-deploying contract on-chain). (TODO: document better).
 
 When creating the multisig, you must set the required weight to pass a vote
-as well as the max/default voting period. (TODO: allow more threshold types) 
+as well as the max/default voting period. (TODO: allow more threshold types)
 
 ## Handle Process
 
@@ -59,7 +59,7 @@ Once a proposal is "Passed", anyone may submit an "Execute" message. This will
 trigger the proposal to send all stored messages from the proposal and update
 it's state to "Executed", so it cannot run again. (Note if the execution fails
 for any reason - out of gas, insufficient funds, etc - the state update will
-be reverted and it will remain "Passed" so you can try again).
+be reverted, and it will remain "Passed", so you can try again).
 
 Once a proposal has expired without passing, anyone can submit a "Close"
 message to mark it closed. This has no effect beyond cleaning up the UI/database.
@@ -72,7 +72,7 @@ open, this will calculate incorrect values (future PR).
 
 You will need Rust 1.44.1+ with `wasm32-unknown-unknown` target installed.
 
-You can run unit tests on this via: 
+You can run unit tests on this via:
 
 `cargo test`
 
@@ -85,5 +85,5 @@ ls -l cw3_fixed_multisig.wasm
 sha256sum cw3_fixed_multisig.wasm
 ```
 
-Or for a production-ready (optimized) build, run a build command in the
+Or for a production-ready (optimized) build, run a build command in
 the repository root: https://github.com/CosmWasm/cosmwasm-plus#compiling.
