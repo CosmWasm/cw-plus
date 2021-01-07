@@ -46,7 +46,7 @@ We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/mast
 you can use to test out any contracts.
 
 **Warning** None of these contracts have been audited and no liability is
-assumed for the use of any of this code. They are provided to turbo-start
+assumed for the use of this code. They are provided to turbo-start
 your projects.
 
 **Note** All code in pre-1.0 packages is in "draft" form, meaning it may
@@ -59,7 +59,7 @@ cleaner (before: `expires: {at_height: {height: 12345}}` after
 
 The most reusable components are the various cwXYZ specifications under
 `packages`. Each one defines a standard interface for different domains,
-eg. [cw20](./packages/cw20/README.md) for fungible tokens, 
+e.g. [cw20](./packages/cw20/README.md) for fungible tokens, 
 [cw721](./packages/cw721/README.md) for non-fungible tokens, 
 [cw1](./packages/cw1/README.md) for  "proxy contracts", etc. 
 The interface comes with a human description in the READMEs, as well
@@ -79,7 +79,7 @@ or [create a pull request](https://github.com/CosmWasm/cosmwasm-plus/pulls) on t
 ## Contracts
 
 We provide sample contracts that either implement or consume these 
-specifications to both provide examples, as well as provide a basis
+specifications to both provide examples, and provide a basis
 for code you can extend for more custom contacts, without worrying
 about reinventing the wheel each time.
 For example [`cw20-base`](./contracts/cw20-base) is a basic implementation
@@ -89,25 +89,60 @@ contract you want to build on it.
 CW1 Proxy Contracts:
 
 * [`cw1-whitelist`](./contracts/cw1-whitelist) a minimal implementation of `cw1`
-mainly designed for reference
+mainly designed for reference.
 * [`cw1-subkeys`](./contracts/cw1-subkeys) a simple, but useful implementation,
 which lets us use a proxy contract to provide "allowances" for native tokens
-without modifying the `bank` module
+without modifying the `bank` module.
+
+CW3 Multisig:
+
+* [`cw3-fixed-multisig`](./contracts/cw3-fixed-multisig) a simple implementation of the
+[cw3 spec](./packages/cw3/README.md). It is a multisig with a fixed set of addresses,
+created upon initialization.
+Each address may have the same weight (K of N), or some may have extra voting
+power. This works much like the native Cosmos SDK multisig, except that rather
+than aggregating the signatures off chain and submitting the final result,
+we aggregate the approvals on-chain.
+* [`cw3-flex-multisig`](./contracts/cw3-flex-multisig) builds on cw3-fixed-multisig,
+with a more powerful implementation of the cw3 spec. It's a multisig contract
+backed by a cw4 (group) contract, which independently maintains the voter set.
+
+CW4 Group:
+
+* [`cw4-group`](./contracts/cw4-group) a basic implementation of the
+[cw4 spec](./packages/cw4/README.md). It handles elected membership, by admin or multisig.
+It fulfills all elements of the spec, including raw query lookups,
+and is designed to be used as a backing storage for [cw3 compliant contracts](./packages/cw3/README.md).
+* [`cw4-stake`](./contracts/cw4-stake) a second implementation of the
+[cw4 spec](./packages/cw4/README.md). It fulfills all elements of the spec, including raw query lookups,
+and is designed to be used as a backing storage for [cw3 compliant contracts](./packages/cw3/README.md).
+It provides a similar API to [`cw4-group`], but rather than appointing members,
+their membership and weight are based on the number of staked tokens they have.
 
 CW20 Fungible Tokens:
 
 * [`cw20-base`](./contracts/cw20-base) a straightforward, but complete
 implementation of the cw20 spec along with all extensions. Can be deployed
-as-is, or imported by other contracts
+as-is, or imported by other contracts.
+* [`cw20-atomic-swap`](./contracts/cw20-atomic-swap) an implementation of atomic swaps for
+both native and cw20 tokens.
+* [`cw20-bonding`](./contracts/cw20-bonding) a smart contract implementing arbitrary bonding curves,
+which can use native and cw20 tokens as reserve tokens.
 * [`cw20-staking`](./contracts/cw20-staking) provides staking derivatives,
 staking native tokens on your behalf and minting cw20 tokens that can
 be used to claim them. It uses `cw20-base` for all the cw20 logic and
 only implements the interactions with the staking module and accounting
-for prices
+for prices.
 * [`cw20-escrow`](./contracts/cw20-escrow) is a basic escrow contract 
 (arbiter can release or refund tokens) that is compatible with all native
 and cw20 tokens. This is a good example to show how to interact with
 cw20 tokens.
+
+CW721 Non-fungible Tokens:
+
+* [`cw721-base`](./contracts/cw721-base) a base implementation of a cw721 NFT contract.
+It implements the [CW721 spec](./packages/cw721/README.md) and is designed to be deployed as is,
+or imported into other contracts to easily build cw721-compatible NFTs with custom logic.
 
 ## Compiling
 
@@ -143,4 +178,3 @@ Contracts that are "ready to deploy" may be licensed under AGPL 3.0 to
 encourage anyone using them to contribute back any improvements they
 make. This is common practice for actual projects running on Ethereum,
 like Uniswap or Maker DAO.
-
