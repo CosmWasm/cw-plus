@@ -1,13 +1,13 @@
 # CW4 Stake
 
 This is a second implementation of the [cw4 spec](../../packages/cw4/README.md).
-It fufills all elements of the spec, including the raw query lookups,
-and it is designed to be used as a backing storage for 
+It fulfills all elements of the spec, including the raw query lookups,
+and is designed to be used as a backing storage for 
 [cw3 compliant contracts](../../packages/cw3/README.md).
 
 It provides a similar API to [`cw4-group`] (which handles elected membership),
 but rather than appointing members (by admin or multisig), their
-membership and weight is based on the number of tokens they have staked.
+membership and weight are based on the number of tokens they have staked.
 This is similar to many DAOs.
 
 Only one denom can be bonded with both `min_bond` as the minimum amount
