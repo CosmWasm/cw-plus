@@ -46,10 +46,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
+name = "cosmwasm-derive"
+version = "0.13.0"
+source = "git+https://github.com/CosmWasm/cosmwasm.git?branch=derive-entry-point#2388e20a891763b6a9b104011da79dd3820afef9"
+dependencies = [
+ "syn",
+]
+
+[[package]]
 name = "cosmwasm-schema"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c676425ca6e74d97158133c88f10d7866043ade46ea452f228cb237729443411"
+source = "git+https://github.com/CosmWasm/cosmwasm.git?branch=derive-entry-point#2388e20a891763b6a9b104011da79dd3820afef9"
 dependencies = [
  "schemars",
  "serde_json",
@@ -58,10 +65,10 @@ dependencies = [
 [[package]]
 name = "cosmwasm-std"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a55b3ed0131c73ecfd4b0f895af4057dcc8a4f54b2691724e37e7a55434143b"
+source = "git+https://github.com/CosmWasm/cosmwasm.git?branch=derive-entry-point#2388e20a891763b6a9b104011da79dd3820afef9"
 dependencies = [
  "base64",
+ "cosmwasm-derive",
  "schemars",
  "serde",
  "serde-json-wasm",
@@ -71,8 +78,7 @@ dependencies = [
 [[package]]
 name = "cosmwasm-storage"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c87be325c542a26e09e15fc0fa504a01ad2436026d529fc74e3d7451aceee2"
+source = "git+https://github.com/CosmWasm/cosmwasm.git?branch=derive-entry-point#2388e20a891763b6a9b104011da79dd3820afef9"
 dependencies = [
  "cosmwasm-std",
  "serde",

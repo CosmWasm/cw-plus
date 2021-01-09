@@ -13,6 +13,6 @@ documentation = "https://docs.cosmwasm.com"
 iterator = ["cosmwasm-std/iterator"]
 
 [dependencies]
-cosmwasm-std = { version = "0.13.0" }
+cosmwasm-std = { git = "https://github.com/CosmWasm/cosmwasm.git", branch = "derive-entry-point" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
