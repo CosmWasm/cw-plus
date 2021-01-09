@@ -16,6 +16,6 @@ iterator = ["cosmwasm-std/iterator"]
 
 [dependencies]
 cw0 = { path = "../../packages/cw0", version = "0.4.0" }
-cosmwasm-std = { version = "0.12.2" }
+cosmwasm-std = { version = "0.13.0" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
