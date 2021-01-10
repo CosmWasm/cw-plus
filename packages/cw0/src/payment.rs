@@ -4,9 +4,9 @@ use thiserror::Error;
 /// returns an error if any coins were sent
 pub fn nonpayable(info: &MessageInfo) -> Result<(), PaymentError> {
     if info.sent_funds.is_empty() {
-        Err(PaymentError::NonPayable {})
-    } else {
         Ok(())
+    } else {
+        Err(PaymentError::NonPayable {})
     }
 }
 

@@ -17,7 +17,7 @@ use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
 use crate::msg::{CurveFn, CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE, CURVE_TYPE};
-use cw0::must_pay;
+use cw0::{must_pay, nonpayable};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
@@ -26,9 +26,10 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
+    nonpayable(&info)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // store token info using cw20-base format
@@ -173,6 +174,7 @@ pub fn handle_sell(
     curve_fn: CurveFn,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
+    nonpayable(&info)?;
     let receiver = info.sender.clone();
     // do all the work
     let mut res = do_sell(deps, env, info, curve_fn, receiver, amount)?;
@@ -190,6 +192,7 @@ pub fn handle_sell_from(
     owner: HumanAddr,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
+    nonpayable(&info)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
 
