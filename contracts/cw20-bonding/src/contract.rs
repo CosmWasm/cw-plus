@@ -17,6 +17,7 @@ use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
 use crate::msg::{CurveFn, CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE, CURVE_TYPE};
+use cw0::{must_pay, nonpayable};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
@@ -25,9 +26,10 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn init(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InitMsg,
 ) -> Result<InitResponse, ContractError> {
+    nonpayable(&info)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // store token info using cw20-base format
@@ -134,21 +136,7 @@ pub fn handle_buy(
 ) -> Result<HandleResponse, ContractError> {
     let mut state = CURVE_STATE.load(deps.storage)?;
 
-    // ensure the sent denom was proper
-    let payment = match info.sent_funds.len() {
-        0 => Err(ContractError::NoFunds {}),
-        1 => {
-            if info.sent_funds[0].denom == state.reserve_denom {
-                Ok(info.sent_funds[0].amount)
-            } else {
-                Err(ContractError::MissingDenom(state.reserve_denom.clone()))
-            }
-        }
-        _ => Err(ContractError::ExtraDenoms(state.reserve_denom.clone())),
-    }?;
-    if payment.is_zero() {
-        return Err(ContractError::NoFunds {});
-    }
+    let payment = must_pay(&info, &state.reserve_denom)?;
 
     // calculate how many tokens can be purchased with this and mint them
     let curve = curve_fn(state.decimals);
@@ -186,6 +174,7 @@ pub fn handle_sell(
     curve_fn: CurveFn,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
+    nonpayable(&info)?;
     let receiver = info.sender.clone();
     // do all the work
     let mut res = do_sell(deps, env, info, curve_fn, receiver, amount)?;
@@ -203,6 +192,7 @@ pub fn handle_sell_from(
     owner: HumanAddr,
     amount: Uint128,
 ) -> Result<HandleResponse, ContractError> {
+    nonpayable(&info)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
 
@@ -314,6 +304,7 @@ mod tests {
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, Decimal};
+    use cw0::PaymentError;
 
     const DENOM: &str = "satoshi";
     const CREATOR: &str = "creator";
@@ -449,17 +440,17 @@ mod tests {
         let info = mock_info(INVESTOR, &[]);
         let buy = HandleMsg::Buy {};
         let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
-        assert_eq!(err, ContractError::NoFunds {});
+        assert_eq!(err, PaymentError::NoFunds {}.into());
 
         // fails when wrong tokens sent
         let info = mock_info(INVESTOR, &coins(1234567, "wei"));
         let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
-        assert_eq!(err, ContractError::MissingDenom(DENOM.into()));
+        assert_eq!(err, PaymentError::MissingDenom(DENOM.into()).into());
 
         // fails when too many tokens sent
         let info = mock_info(INVESTOR, &[coin(3400022, DENOM), coin(1234567, "wei")]);
         let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
-        assert_eq!(err, ContractError::ExtraDenoms(DENOM.into()));
+        assert_eq!(err, PaymentError::ExtraDenom("wei".to_string()).into());
     }
 
     #[test]
