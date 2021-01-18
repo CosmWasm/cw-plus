@@ -158,6 +158,7 @@ pub fn handle_unbond(
     })
 }
 
+#[allow(const_item_mutation)]
 fn update_membership(
     storage: &mut dyn Storage,
     sender: HumanAddr,
