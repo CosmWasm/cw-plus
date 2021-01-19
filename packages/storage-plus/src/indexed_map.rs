@@ -457,7 +457,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name_age
-            .prefix(PkOwned(b"Maria".to_vec()))
+            .sub_prefix(PkOwned(b"Maria".to_vec()))
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();

@@ -129,6 +129,15 @@ where
         )
     }
 
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+        Prefix::new_de_fn(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv,
+        )
+    }
+
     // FIXME?: Move to Prefix<T> for ergonomics
     pub fn pks<'c>(
         &self,
