@@ -61,7 +61,7 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&mut self, store: &mut dyn Storage, action: A) -> Result<T, E>
+    pub fn update<A, E>(&self, store: &mut dyn Storage, action: A) -> Result<T, E>
     where
         A: FnOnce(T) -> Result<T, E>,
         E: From<StdError>,

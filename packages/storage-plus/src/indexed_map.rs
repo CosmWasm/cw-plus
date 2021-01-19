@@ -54,12 +54,12 @@ where
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
-    pub fn save(&mut self, store: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
+    pub fn save(&self, store: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
         let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, Some(data), old_data.as_ref())
     }
 
-    pub fn remove(&mut self, store: &mut dyn Storage, key: K) -> StdResult<()> {
+    pub fn remove(&self, store: &mut dyn Storage, key: K) -> StdResult<()> {
         let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, None, old_data.as_ref())
     }
@@ -68,7 +68,7 @@ where
     /// and is used to properly update the index. This is used by save, replace, and update
     /// and can be called directly if you want to optimize
     pub fn replace(
-        &mut self,
+        &self,
         store: &mut dyn Storage,
         key: K,
         data: Option<&T>,
@@ -96,7 +96,7 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&mut self, store: &mut dyn Storage, key: K, action: A) -> Result<T, E>
+    pub fn update<A, E>(&self, store: &mut dyn Storage, key: K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
@@ -192,7 +192,7 @@ mod test {
     #[test]
     fn store_and_load_by_index() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
         let data = Data {
@@ -270,7 +270,7 @@ mod test {
     #[test]
     fn unique_index_enforced() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // first data
         let data1 = Data {
@@ -325,7 +325,7 @@ mod test {
     #[test]
     fn remove_and_update_reflected_on_indexes() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         let name_count = |map: &IndexedMap<&[u8], Data, DataIndexes>,
                           store: &MemoryStorage,
