@@ -355,7 +355,7 @@ mod test {
     #[test]
     fn range_simple_key_by_multi_index() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
         let data1 = Data {
@@ -419,7 +419,7 @@ mod test {
                 "data__name_age",
             ),
         };
-        let mut map = IndexedMap::new("data", indexes);
+        let map = IndexedMap::new("data", indexes);
 
         // save data
         let data1 = Data {
@@ -588,10 +588,10 @@ mod test {
     #[test]
     fn unique_index_simple_key_range() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
-        let (pks, datas) = save_data(&mut store, &mut map);
+        let (pks, datas) = save_data(&mut store, &map);
 
         let res: StdResult<Vec<_>> = map
             .idx
@@ -619,10 +619,10 @@ mod test {
     #[test]
     fn unique_index_composite_key_range() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
-        let (pks, datas) = save_data(&mut store, &mut map);
+        let (pks, datas) = save_data(&mut store, &map);
 
         let res: StdResult<Vec<_>> = map
             .idx

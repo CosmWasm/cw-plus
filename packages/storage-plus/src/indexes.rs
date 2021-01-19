@@ -268,7 +268,9 @@ where
     }
 
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), deserialize_unique_kv)
+        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv(kv)
+        })
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
