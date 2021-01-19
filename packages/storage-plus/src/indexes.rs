@@ -121,7 +121,7 @@ where
     K: PrimaryKey<'a>,
 {
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new_de_fn(
+        Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
@@ -130,7 +130,7 @@ where
     }
 
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new_de_fn(
+        Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
@@ -271,13 +271,13 @@ where
     K: PrimaryKey<'a>,
 {
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }
 
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }

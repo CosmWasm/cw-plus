@@ -73,10 +73,12 @@ where
     T: Serialize + DeserializeOwned,
 {
     pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
-        Prefix::new_de_fn(top_name, sub_names, &[], |_, _, kv| deserialize_kv(kv))
+        Prefix::with_deserialization_function(top_name, sub_names, &[], |_, _, kv| {
+            deserialize_kv(kv)
+        })
     }
 
-    pub fn new_de_fn(
+    pub fn with_deserialization_function(
         top_name: &[u8],
         sub_names: &[&[u8]],
         pk_name: &[u8],
