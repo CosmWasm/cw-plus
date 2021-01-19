@@ -126,6 +126,11 @@ where
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
+
+    // use sub_prefix to scan -> range
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
