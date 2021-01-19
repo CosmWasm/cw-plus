@@ -203,7 +203,7 @@ mod test {
 
     fn save_data<'a>(
         store: &mut MockStorage,
-        map: &mut IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>>,
+        map: &IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>>,
     ) -> (Vec<&'a [u8]>, Vec<Data>) {
         let mut pks = vec![];
         let mut datas = vec![];
@@ -258,7 +258,7 @@ mod test {
         let map = build_map();
 
         // save data
-        let (pks, datas) = save_data(&mut store, &mut map);
+        let (pks, datas) = save_data(&mut store, &map);
         let pk = pks[0];
         let data = &datas[0];
 
@@ -333,7 +333,7 @@ mod test {
         let map = build_map();
 
         // save data
-        let (pks, datas) = save_data(&mut store, &mut map);
+        let (pks, datas) = save_data(&mut store, &map);
 
         // different name, different last name, same age => error
         let data5 = Data {
@@ -374,10 +374,10 @@ mod test {
     #[test]
     fn unique_index_enforced_composite_key() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
-        save_data(&mut store, &mut map);
+        save_data(&mut store, &map);
 
         // same name, same lastname => error
         let data5 = Data {
@@ -406,7 +406,7 @@ mod test {
         };
 
         // save data
-        let (pks, _) = save_data(&mut store, &mut map);
+        let (pks, _) = save_data(&mut store, &map);
 
         // find 2 Marias, 1 John, and no Mary
         assert_eq!(name_count(&map, &store, "Maria"), 2);
