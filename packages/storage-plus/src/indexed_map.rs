@@ -54,12 +54,12 @@ where
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
-    pub fn save(&mut self, store: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
+    pub fn save(&self, store: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
         let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, Some(data), old_data.as_ref())
     }
 
-    pub fn remove(&mut self, store: &mut dyn Storage, key: K) -> StdResult<()> {
+    pub fn remove(&self, store: &mut dyn Storage, key: K) -> StdResult<()> {
         let old_data = self.may_load(store, key.clone())?;
         self.replace(store, key, None, old_data.as_ref())
     }
@@ -68,7 +68,7 @@ where
     /// and is used to properly update the index. This is used by save, replace, and update
     /// and can be called directly if you want to optimize
     pub fn replace(
-        &mut self,
+        &self,
         store: &mut dyn Storage,
         key: K,
         data: Option<&T>,
@@ -96,7 +96,7 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&mut self, store: &mut dyn Storage, key: K, action: A) -> Result<T, E>
+    pub fn update<A, E>(&self, store: &mut dyn Storage, key: K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
@@ -124,6 +124,11 @@ where
 
     // use prefix to scan -> range
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
+
+    // use sub_prefix to scan -> range
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 }
@@ -217,7 +222,7 @@ mod test {
 
     fn save_data<'a>(
         store: &mut MockStorage,
-        map: &mut IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>>,
+        map: &IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>>,
     ) -> (Vec<&'a [u8]>, Vec<Data>) {
         let mut pks = vec![];
         let mut datas = vec![];
@@ -269,10 +274,10 @@ mod test {
     #[test]
     fn store_and_load_by_index() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
-        let (pks, datas) = save_data(&mut store, &mut map);
+        let (pks, datas) = save_data(&mut store, &map);
         let pk = pks[0];
         let data = &datas[0];
 
@@ -471,10 +476,10 @@ mod test {
     #[test]
     fn unique_index_enforced() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
-        let (pks, datas) = save_data(&mut store, &mut map);
+        let (pks, datas) = save_data(&mut store, &map);
 
         // different name, different last name, same age => error
         let data5 = Data {
@@ -515,10 +520,10 @@ mod test {
     #[test]
     fn unique_index_enforced_composite_key() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         // save data
-        save_data(&mut store, &mut map);
+        save_data(&mut store, &map);
 
         // same name, same lastname => error
         let data5 = Data {
@@ -534,7 +539,7 @@ mod test {
     #[test]
     fn remove_and_update_reflected_on_indexes() {
         let mut store = MockStorage::new();
-        let mut map = build_map();
+        let map = build_map();
 
         let name_count = |map: &IndexedMap<&[u8], Data, DataIndexes>,
                           store: &MemoryStorage,
@@ -553,7 +558,7 @@ mod test {
         };
 
         // save data
-        let (pks, _) = save_data(&mut store, &mut map);
+        let (pks, _) = save_data(&mut store, &map);
 
         // find 2 Marias, 1 John, and no Mary
         assert_eq!(name_count(&map, &store, "Maria"), 2);

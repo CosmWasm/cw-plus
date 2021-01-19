@@ -42,6 +42,11 @@ where
         Prefix::new(self.namespace, &p.prefix())
     }
 
+    #[cfg(feature = "iterator")]
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+        Prefix::new(self.namespace, &p.prefix())
+    }
+
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {
         self.key(k).save(store, data)
     }
@@ -104,6 +109,8 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
+    #[cfg(feature = "iterator")]
+    use crate::iter_helpers::to_length_prefixed;
     use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
@@ -323,6 +330,9 @@ mod test {
             .save(&mut store, (b"owner", 9u8.into(), "recipient2"), &3000)
             .unwrap();
         TRIPLE
+            .save(&mut store, (b"owner", 10u8.into(), "recipient3"), &3000)
+            .unwrap();
+        TRIPLE
             .save(&mut store, (b"owner2", 9u8.into(), "recipient"), &5000)
             .unwrap();
 
@@ -338,6 +348,32 @@ mod test {
             vec![
                 (b"recipient".to_vec(), 1000),
                 (b"recipient2".to_vec(), 3000)
+            ]
+        );
+
+        // let's iterate over a sub prefix
+        let all: StdResult<Vec<_>> = TRIPLE
+            .sub_prefix(b"owner")
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        // FIXME: range() works, but remaining keys are still encoded
+        assert_eq!(
+            all,
+            vec![
+                (
+                    [to_length_prefixed(b"\x09"), b"recipient".to_vec()].concat(),
+                    1000
+                ),
+                (
+                    [to_length_prefixed(b"\x09"), b"recipient2".to_vec()].concat(),
+                    3000
+                ),
+                (
+                    [to_length_prefixed(b"\x0a"), b"recipient3".to_vec()].concat(),
+                    3000
+                )
             ]
         );
     }

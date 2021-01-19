@@ -7,9 +7,10 @@ use crate::Endian;
 // pub trait PrimaryKey<'a>: Copy {
 pub trait PrimaryKey<'a>: Clone {
     type Prefix: Prefixer<'a>;
+    type SubPrefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
-    fn key<'b>(&'b self) -> Vec<&'b [u8]>;
+    fn key(&self) -> Vec<&[u8]>;
 
     fn joined_key(&self) -> Vec<u8> {
         let keys = self.key();
@@ -24,8 +25,9 @@ pub trait PrimaryKey<'a>: Clone {
 
 impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Prefix = ();
+    type SubPrefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
         vec![self]
     }
@@ -38,8 +40,9 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
 // Provide a string version of this to raw encode strings
 impl<'a> PrimaryKey<'a> for &'a str {
     type Prefix = ();
+    type SubPrefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
         vec![self.as_bytes()]
     }
@@ -52,8 +55,9 @@ impl<'a> PrimaryKey<'a> for &'a str {
 // use generics for combining there - so we can use &[u8], PkOwned, or IntKey
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U) {
     type Prefix = T;
+    type SubPrefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn key(&self) -> Vec<&[u8]> {
         let mut keys = self.0.key();
         keys.extend(&self.1.key());
         keys
@@ -72,6 +76,7 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: 
     PrimaryKey<'a> for (T, U, V)
 {
     type Prefix = (T, U);
+    type SubPrefix = T;
 
     fn key(&self) -> Vec<&[u8]> {
         let mut keys = self.0.key();
@@ -97,23 +102,23 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: 
 // pub trait Prefixer<'a>: Copy {
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]>;
+    fn prefix(&self) -> Vec<&[u8]>;
 }
 
 impl<'a> Prefixer<'a> for () {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         vec![]
     }
 }
 
 impl<'a> Prefixer<'a> for &'a [u8] {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         vec![self]
     }
 }
 
 impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         let mut res = self.0.prefix();
         res.extend(self.1.prefix().into_iter());
         res
@@ -121,7 +126,7 @@ impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
 }
 
 impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T, U, V) {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         let mut res = self.0.prefix();
         res.extend(self.1.prefix().into_iter());
         res.extend(self.2.prefix().into_iter());
@@ -131,7 +136,7 @@ impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T,
 
 // Provide a string version of this to raw encode strings
 impl<'a> Prefixer<'a> for &'a str {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         vec![self.as_bytes()]
     }
 }
@@ -151,8 +156,9 @@ pub struct PkOwned(pub Vec<u8>);
 
 impl<'a> PrimaryKey<'a> for PkOwned {
     type Prefix = ();
+    type SubPrefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn key(&self) -> Vec<&[u8]> {
         vec![&self.0]
     }
 
@@ -162,7 +168,7 @@ impl<'a> PrimaryKey<'a> for PkOwned {
 }
 
 impl<'a> Prefixer<'a> for PkOwned {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         vec![&self.0]
     }
 }
@@ -170,8 +176,9 @@ impl<'a> Prefixer<'a> for PkOwned {
 // this auto-implements PrimaryKey for all the IntKey types (and more!)
 impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
     type Prefix = ();
+    type SubPrefix = ();
 
-    fn key<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn key(&self) -> Vec<&[u8]> {
         self.as_ref().key()
     }
 
@@ -182,7 +189,7 @@ impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
 
 // this auto-implements Prefixer for all the IntKey types (and more!)
 impl<'a, T: AsRef<PkOwned>> Prefixer<'a> for T {
-    fn prefix<'b>(&'b self) -> Vec<&'b [u8]> {
+    fn prefix(&self) -> Vec<&[u8]> {
         self.as_ref().prefix()
     }
 }

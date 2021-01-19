@@ -267,6 +267,10 @@ where
         })
     }
 
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), deserialize_unique_kv)
+    }
+
     /// returns all items that match this secondary index, always by pk Ascending
     pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<KV<T>>> {
         let data = self
