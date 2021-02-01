@@ -8,11 +8,12 @@ use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
+use cw20::{Balance};
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg, StakedResponse};
-use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
+use crate::state::{Config, GenericBalance, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-stake";
@@ -58,7 +59,7 @@ pub fn handle(
         HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::AddHook { addr } => Ok(HOOKS.handle_add_hook(&ADMIN, deps, info, addr)?),
         HandleMsg::RemoveHook { addr } => Ok(HOOKS.handle_remove_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::Bond {} => handle_bond(deps, env, info),
+        HandleMsg::Bond {} => handle_bond(deps, env, Balance::from(info.sent_funds), &info.sender),
         HandleMsg::Unbond { tokens: amount } => handle_unbond(deps, env, info, amount),
         HandleMsg::Claim {} => handle_claim(deps, env, info),
     }
@@ -67,37 +68,70 @@ pub fn handle(
 pub fn handle_bond(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    amount: Balance,
+    sender: &HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
     // ensure the sent denom was proper
     // NOTE: those clones are not needed (if we move denom, we return early),
     // but the compiler cannot see that (yet...)
-    let sent = match info.sent_funds.len() {
-        0 => Err(ContractError::NoFunds {}),
-        1 => {
-            if info.sent_funds[0].denom == cfg.denom {
-                Ok(info.sent_funds[0].amount)
-            } else {
-                Err(ContractError::MissingDenom(cfg.denom.clone()))
+    let sent_funds = match amount {
+        Balance::Native(balance) => {
+            GenericBalance {
+                native: balance.0,
+                cw20: vec![],
             }
+        },
+        Balance::Cw20(token) => {
+            GenericBalance {
+                native: vec![],
+                cw20: vec![token],
+            }
+        },
+    };
+
+    let cfg_denom = match config.denom {
+        Balance::Native(balance) => {
+            GenericBalance {
+                native: balance.0,
+                cw20: vec![],
+            }
+        },
+        Balance::Cw20(token) => {
+            GenericBalance {
+                native: vec![],
+                cw20: vec![token],
+            }
+        },
+    };
+
+    if cfg_denom.native.len() > 0 && sent_funds.native.len() > 0{
+        if cfg_denom.native[0].denom == sent_funds.native[0].denom {
+            Ok(sent_funds.native[0].amount)
+        } else {
+            Err(ContractError::MissingDenom(cfg_denom.native[0].denom.clone()))
         }
-        _ => Err(ContractError::ExtraDenoms(cfg.denom.clone())),
-    }?;
-    if sent.is_zero() {
+    } else if cfg_denom.cw20.len() > 0 && sent_funds.cw20.len() > 0{
+        if cfg_denom.cw20[0].address == sent_funds.cw20[0].address {
+            Ok(sent_funds.cw20[0].amount)
+        } else {
+            Err(ContractError::Unauthorized {})
+        }
+    }
+    else {
         return Err(ContractError::NoFunds {});
     }
 
     // update the sender's stake
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
+    let sender_raw = deps.api.canonical_address(sender)?;
     let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
         Ok(stake.unwrap_or_default() + sent)
     })?;
 
     let messages = update_membership(
         deps.storage,
-        info.sender.clone(),
+        sender.clone(),
         &sender_raw,
         new_stake,
         &cfg,
@@ -107,7 +141,7 @@ pub fn handle_bond(
     let attributes = vec![
         attr("action", "bond"),
         attr("amount", sent),
-        attr("sender", info.sender),
+        attr("sender", sender),
     ];
     Ok(HandleResponse {
         messages,
