@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError, CanonicalAddr};
+use cosmwasm_std::{CanonicalAddr, StdError};
 use thiserror::Error;
 
 use cw_controllers::{AdminError, HookError};

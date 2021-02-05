@@ -1,13 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use cosmwasm_std::Coin;
 use cosmwasm_std::Uint128;
 use cw0::Duration;
+use cw20::{Balance, Cw20Coin};
 use cw4::TOTAL_KEY;
 use cw_controllers::{Admin, Claims, Hooks};
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
-use cw20::{Balance, Cw20Coin};
-use cosmwasm_std::Coin;
 
 pub const CLAIMS: Claims = Claims::new("claims");
 
