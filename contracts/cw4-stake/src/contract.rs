@@ -1,7 +1,4 @@
-use cosmwasm_std::{
-    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128,
-};
+use cosmwasm_std::{attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128, StdError};
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
 use cw4::{
@@ -91,7 +88,7 @@ pub fn handle_bond(
         },
     };
 
-    let cfg_denom = match config.denom {
+    let cfg_denom = match cfg.denom.clone() {
         Balance::Native(balance) => {
             GenericBalance {
                 native: balance.0,
@@ -105,18 +102,36 @@ pub fn handle_bond(
             }
         },
     };
-
+    let sent;
     if cfg_denom.native.len() > 0 && sent_funds.native.len() > 0{
-        if cfg_denom.native[0].denom == sent_funds.native[0].denom {
-            Ok(sent_funds.native[0].amount)
-        } else {
-            Err(ContractError::MissingDenom(cfg_denom.native[0].denom.clone()))
+        sent = match sent_funds.native.len() {
+            0 => Err(ContractError::NoFunds {}),
+            1 => {
+                if sent_funds.native[0].denom == cfg_denom.native[0].denom {
+                    Ok(sent_funds.native[0].amount)
+                } else {
+                    Err(ContractError::MissingDenom(cfg_denom.native[0].denom.clone()))
+                }
+            }
+            _ => Err(ContractError::ExtraDenoms(cfg_denom.native[0].denom.clone())),
+        }?;
+        if sent.is_zero() {
+            return Err(ContractError::NoFunds {});
         }
     } else if cfg_denom.cw20.len() > 0 && sent_funds.cw20.len() > 0{
-        if cfg_denom.cw20[0].address == sent_funds.cw20[0].address {
-            Ok(sent_funds.cw20[0].amount)
-        } else {
-            Err(ContractError::Unauthorized {})
+        sent = match sent_funds.cw20.len() {
+            0 => Err(ContractError::NoFunds {}),
+            1 => {
+                if sent_funds.cw20[0].address == cfg_denom.cw20[0].address {
+                    Ok(sent_funds.cw20[0].amount)
+                } else {
+                    Err(ContractError::MissingAddress(cfg_denom.cw20[0].address.clone()))
+                }
+            }
+            _ => Err(ContractError::ExtraAddresses(cfg_denom.cw20[0].address.clone())),
+        }?;
+        if sent.is_zero() {
+            return Err(ContractError::NoFunds {});
         }
     }
     else {
@@ -247,9 +262,30 @@ pub fn handle_claim(
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let amount = coins(release.u128(), config.denom);
+    let cfg_denom = match config.denom {
+      Balance::Native(balance) => {
+          GenericBalance {
+              native: balance.0,
+              cw20: vec![]
+          }
+      },
+        Balance::Cw20(token) => {
+            GenericBalance {
+                native: vec![],
+                cw20: vec![token]
+            }
+        }
+    };
+    let amount;
+    if cfg_denom.native.len() > 0 {
+        amount = coins(release.u128(), cfg_denom.native[0].denom.clone());
+    } else if cfg_denom.cw20.len() > 0{
+        unimplemented!("The CW20 coins release functionality is in progress");
+    }
+    else {
+        return Err(ContractError::ExtraDenoms(String::from("Sent unsupported denoms")))
+    }
     let amount_str = coins_to_string(&amount);
-
     let messages = vec![BankMsg::Send {
         from_address: env.contract.address,
         to_address: info.sender.clone(),
@@ -305,7 +341,14 @@ pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse>
     let stake = STAKE
         .may_load(deps.storage, &address_raw)?
         .unwrap_or_default();
-    let denom = CONFIG.load(deps.storage)?.denom;
+    let denom = match CONFIG.load(deps.storage)?.denom {
+        Balance::Native(balance) => {
+            balance.0[0].denom.clone()
+        },
+        _ => {
+            return Err(StdError::generic_err("The stake for CW20 is not yet implemented"))
+        }
+    };
     Ok(StakedResponse {
         stake: coin(stake.u128(), denom),
     })
@@ -354,15 +397,15 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, Api, StdError, Storage};
-    use cw0::Duration;
+    use cw0::{Duration, NativeBalance};
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
+    use cw20::{Balance};
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
     const USER2: &str = "else";
     const USER3: &str = "funny";
-
     const DENOM: &str = "stake";
     const TOKENS_PER_WEIGHT: Uint128 = Uint128(1_000);
     const MIN_BOND: Uint128 = Uint128(5_000);
@@ -384,7 +427,14 @@ mod tests {
         unbonding_period: Duration,
     ) {
         let msg = InitMsg {
-            denom: DENOM.to_string(),
+            denom: Balance::Native(NativeBalance(vec![Coin {
+                denom: String::from("stake"),
+                amount: Uint128(24_000)
+            },
+            Coin {
+                denom: String::from("stake"),
+                amount: Uint128(32_000)
+            },])),
             tokens_per_weight,
             min_bond,
             unbonding_period,
