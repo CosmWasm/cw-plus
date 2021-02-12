@@ -29,3 +29,6 @@ thiserror = { version = "1.0.20" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.13.2" }
+cw20 = { path = "../../packages/cw20", version = "0.5.0" }
+cw20-base = { path = "../cw20-base", version = "0.5.0", features = ["library"] }
+cw-multi-test = { path = "../../packages/multi-test", version = "0.5.0" }
