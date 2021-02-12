@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use crate::contract::{handle, init, query};
 use crate::msg::{HandleMsg, InitMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
