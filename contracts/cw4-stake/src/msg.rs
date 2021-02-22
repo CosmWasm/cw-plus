@@ -1,15 +1,15 @@
+use cosmwasm_std::{Coin, HumanAddr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, HumanAddr, Uint128};
 use cw0::Duration;
-use cw20::Balance;
+use cw20::Denom;
 pub use cw_controllers::ClaimsResponse;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InitMsg {
     /// denom of the token to stake
-    pub denom: Balance,
+    pub denom: Denom,
     pub tokens_per_weight: Uint128,
     pub min_bond: Uint128,
     pub unbonding_period: Duration,

@@ -66,9 +66,10 @@ pub enum PaymentError {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use cosmwasm_std::testing::mock_info;
     use cosmwasm_std::{coin, coins};
+    use cosmwasm_std::testing::mock_info;
+
+    use super::*;
 
     const SENDER: &str = "sender";
 

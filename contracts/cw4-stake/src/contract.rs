@@ -1,11 +1,12 @@
 use cosmwasm_std::{
-    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdError, StdResult, Storage,
+    attr, BankMsg, Binary, CanonicalAddr, coin, Coin, coins, CosmosMsg, Deps, DepsMut, Env,
+    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdError, StdResult, Storage, to_binary,
     Uint128,
 };
-use cw0::maybe_canonical;
+
+use cw0::{maybe_canonical, NativeBalance};
+use cw20::{Balance, Denom};
 use cw2::set_contract_version;
-use cw20::Balance;
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
@@ -14,7 +15,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg, StakedResponse};
-use crate::state::{Config, GenericBalance, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
+use crate::state::{ADMIN, CLAIMS, Config, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-stake";
@@ -60,7 +61,7 @@ pub fn handle(
         HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::AddHook { addr } => Ok(HOOKS.handle_add_hook(&ADMIN, deps, info, addr)?),
         HandleMsg::RemoveHook { addr } => Ok(HOOKS.handle_remove_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::Bond {} => handle_bond(deps, env, Balance::from(info.sent_funds), &info.sender),
+        HandleMsg::Bond {} => handle_bond(deps, env, Balance::from(info.sent_funds), info.sender),
         HandleMsg::Unbond { tokens: amount } => handle_unbond(deps, env, info, amount),
         HandleMsg::Claim {} => handle_claim(deps, env, info),
     }
@@ -70,81 +71,23 @@ pub fn handle_bond(
     deps: DepsMut,
     env: Env,
     amount: Balance,
-    sender: &HumanAddr,
+    sender: HumanAddr,
 ) -> Result<HandleResponse, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
-
-    // ensure the sent denom was proper
-    // NOTE: those clones are not needed (if we move denom, we return early),
-    // but the compiler cannot see that (yet...)
-    let sent_funds = match amount {
-        Balance::Native(balance) => GenericBalance {
-            native: balance.0,
-            cw20: vec![],
-        },
-        Balance::Cw20(token) => GenericBalance {
-            native: vec![],
-            cw20: vec![token],
-        },
-    };
-
-    let cfg_denom = match cfg.denom.clone() {
-        Balance::Native(balance) => GenericBalance {
-            native: balance.0,
-            cw20: vec![],
-        },
-        Balance::Cw20(token) => GenericBalance {
-            native: vec![],
-            cw20: vec![token],
-        },
-    };
-    let sent;
-    if !cfg_denom.native.is_empty() && !sent_funds.native.is_empty() {
-        sent = match sent_funds.native.len() {
-            0 => Err(ContractError::NoFunds {}),
-            1 => {
-                if sent_funds.native[0].denom == cfg_denom.native[0].denom {
-                    Ok(sent_funds.native[0].amount)
-                } else {
-                    Err(ContractError::MissingDenom(
-                        cfg_denom.native[0].denom.clone(),
-                    ))
-                }
-            }
-            _ => Err(ContractError::ExtraDenoms(
-                cfg_denom.native[0].denom.clone(),
-            )),
-        }?;
-        if sent.is_zero() {
-            return Err(ContractError::NoFunds {});
+    let amount = match (&cfg.denom, &amount) {
+        (Denom::Native(want), Balance::Native(have)) => must_pay_funds(have, want),
+        (Denom::Cw20(want), Balance::Cw20(have)) => if want == &have.address {
+            Ok(have.amount)
+        } else {
+            Err(ContractError::InvalidDenom(deps.api.human_address(&want)?))
         }
-    } else if !cfg_denom.cw20.is_empty() && !sent_funds.cw20.is_empty() {
-        sent = match sent_funds.cw20.len() {
-            0 => Err(ContractError::NoFunds {}),
-            1 => {
-                if sent_funds.cw20[0].address == cfg_denom.cw20[0].address {
-                    Ok(sent_funds.cw20[0].amount)
-                } else {
-                    Err(ContractError::MissingAddress(
-                        cfg_denom.cw20[0].address.clone(),
-                    ))
-                }
-            }
-            _ => Err(ContractError::ExtraAddresses(
-                cfg_denom.cw20[0].address.clone(),
-            )),
-        }?;
-        if sent.is_zero() {
-            return Err(ContractError::NoFunds {});
-        }
-    } else {
-        return Err(ContractError::NoFunds {});
-    }
+        _ => Err(ContractError::MixedNativeAndCw20("Invalid address or denom".to_string())),
+    }?;
 
     // update the sender's stake
-    let sender_raw = deps.api.canonical_address(sender)?;
+    let sender_raw = deps.api.canonical_address(&sender)?;
     let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
-        Ok(stake.unwrap_or_default() + sent)
+        Ok(stake.unwrap_or_default() + amount)
     })?;
 
     let messages = update_membership(
@@ -158,7 +101,7 @@ pub fn handle_bond(
 
     let attributes = vec![
         attr("action", "bond"),
-        attr("amount", sent),
+        attr("amount", amount),
         attr("sender", sender),
     ];
     Ok(HandleResponse {
@@ -167,6 +110,7 @@ pub fn handle_bond(
         data: None,
     })
 }
+
 
 pub fn handle_unbond(
     deps: DepsMut,
@@ -208,6 +152,22 @@ pub fn handle_unbond(
         attributes,
         data: None,
     })
+}
+
+pub fn must_pay_funds(balance: &NativeBalance, denom: &String) -> Result<Uint128, ContractError> {
+    match balance.0.len() {
+        0 => Err(ContractError::NoFunds {}),
+        1 => {
+            let balance = &balance.0;
+            let payment = balance[0].amount;
+            if &balance[0].denom == denom {
+                Ok(payment)
+            } else {
+                Err(ContractError::MissingDenom(denom.clone()))
+            }
+        }
+        _ => Err(ContractError::ExtraDenoms(denom.clone()))
+    }
 }
 
 fn update_membership(
@@ -265,20 +225,10 @@ pub fn handle_claim(
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let cfg_denom = match config.denom {
-        Balance::Native(balance) => GenericBalance {
-            native: balance.0,
-            cw20: vec![],
-        },
-        Balance::Cw20(token) => GenericBalance {
-            native: vec![],
-            cw20: vec![token],
-        },
-    };
     let amount;
-    if !cfg_denom.native.is_empty() {
-        amount = coins(release.u128(), cfg_denom.native[0].denom.clone());
-    } else if !cfg_denom.cw20.is_empty() {
+    if let Denom::Native(denom) = &config.denom {
+        amount = coins(release.u128(), denom);
+    } else if let Denom::Cw20(_canonical_addr) = &config.denom {
         unimplemented!("The CW20 coins release functionality is in progress");
     } else {
         return Err(ContractError::ExtraDenoms(String::from(
@@ -290,8 +240,7 @@ pub fn handle_claim(
         from_address: env.contract.address,
         to_address: info.sender.clone(),
         amount,
-    }
-    .into()];
+    }.into()];
 
     let attributes = vec![
         attr("action", "claim"),
@@ -342,11 +291,11 @@ pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse>
         .may_load(deps.storage, &address_raw)?
         .unwrap_or_default();
     let denom = match CONFIG.load(deps.storage)?.denom {
-        Balance::Native(balance) => balance.0[0].denom.clone(),
+        Denom::Native(want) => want.clone(),
         _ => {
             return Err(StdError::generic_err(
                 "The stake for CW20 is not yet implemented",
-            ))
+            ));
         }
     };
     Ok(StakedResponse {
@@ -394,13 +343,17 @@ fn list_members(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use cosmwasm_std::{Api, from_slice, StdError, Storage};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, Api, StdError, Storage};
-    use cw0::{Duration, NativeBalance};
-    use cw20::Balance;
+
+    use cw0::Duration;
+    use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
+
+    use crate::error::ContractError;
+
+    use super::*;
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
@@ -427,16 +380,7 @@ mod tests {
         unbonding_period: Duration,
     ) {
         let msg = InitMsg {
-            denom: Balance::Native(NativeBalance(vec![
-                Coin {
-                    denom: String::from("stake"),
-                    amount: Uint128(24_000),
-                },
-                Coin {
-                    denom: String::from("stake"),
-                    amount: Uint128(32_000),
-                },
-            ])),
+            denom: Denom::Native("stake".to_string()),
             tokens_per_weight,
             min_bond,
             unbonding_period,
@@ -610,9 +554,9 @@ mod tests {
         let err = handle(deps.as_mut(), env, info, msg).unwrap_err();
         match err {
             ContractError::Std(StdError::Underflow {
-                minuend,
-                subtrahend,
-            }) => {
+                                   minuend,
+                                   subtrahend,
+                               }) => {
                 assert_eq!(minuend.as_str(), "5000");
                 assert_eq!(subtrahend.as_str(), "5100");
             }
@@ -699,7 +643,7 @@ mod tests {
             mock_info(USER1, &[]),
             HandleMsg::Claim {},
         )
-        .unwrap_err();
+            .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
 
         // now mature first section, withdraw that
@@ -712,7 +656,7 @@ mod tests {
             mock_info(USER1, &[]),
             HandleMsg::Claim {},
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
@@ -720,7 +664,7 @@ mod tests {
                 to_address: USER1.into(),
                 amount: coins(4_500, DENOM),
             }
-            .into()]
+                .into()]
         );
 
         // second releases partially
@@ -730,7 +674,7 @@ mod tests {
             mock_info(USER2, &[]),
             HandleMsg::Claim {},
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
@@ -738,7 +682,7 @@ mod tests {
                 to_address: USER2.into(),
                 amount: coins(2_600, DENOM),
             }
-            .into()]
+                .into()]
         );
 
         // but the third one cannot release
@@ -748,7 +692,7 @@ mod tests {
             mock_info(USER3, &[]),
             HandleMsg::Claim {},
         )
-        .unwrap_err();
+            .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
 
         // claims updated properly
@@ -775,7 +719,7 @@ mod tests {
             mock_info(USER2, &[]),
             HandleMsg::Claim {},
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
@@ -784,7 +728,7 @@ mod tests {
                 // 1_345 + 600 + 1_005
                 amount: coins(2_950, DENOM),
             }
-            .into()]
+                .into()]
         );
         assert_eq!(get_claims(deps.as_ref(), USER2), vec![]);
     }
@@ -813,7 +757,7 @@ mod tests {
             user_info.clone(),
             add_msg.clone(),
         )
-        .unwrap_err();
+            .unwrap_err();
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // admin can add it, and it appears in the query
@@ -824,7 +768,7 @@ mod tests {
             admin_info.clone(),
             add_msg.clone(),
         )
-        .unwrap();
+            .unwrap();
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract1.clone()]);
 
@@ -838,7 +782,7 @@ mod tests {
             admin_info.clone(),
             remove_msg.clone(),
         )
-        .unwrap_err();
+            .unwrap_err();
         assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
@@ -856,7 +800,7 @@ mod tests {
             admin_info.clone(),
             add_msg.clone(),
         )
-        .unwrap_err();
+            .unwrap_err();
         assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
@@ -869,7 +813,7 @@ mod tests {
             user_info.clone(),
             remove_msg.clone(),
         )
-        .unwrap_err();
+            .unwrap_err();
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // remove the original
@@ -879,7 +823,7 @@ mod tests {
             admin_info.clone(),
             remove_msg.clone(),
         )
-        .unwrap();
+            .unwrap();
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract2.clone()]);
     }

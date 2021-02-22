@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, StdError};
+use cosmwasm_std::{HumanAddr, StdError};
 use thiserror::Error;
 
 use cw_controllers::{AdminError, HookError};
@@ -27,10 +27,10 @@ pub enum ContractError {
     ExtraDenoms(String),
 
     #[error("Must send valid address to stake")]
-    MissingAddress(CanonicalAddr),
+    InvalidDenom(HumanAddr),
 
-    #[error("Sent unsupported addresses, must send canonical address to stake")]
-    ExtraAddresses(CanonicalAddr),
+    #[error("Missed address or denom")]
+    MixedNativeAndCw20(String),
 
     #[error("No funds sent")]
     NoFunds {},

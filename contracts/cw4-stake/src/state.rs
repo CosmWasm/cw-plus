@@ -1,10 +1,10 @@
+use cosmwasm_std::Coin;
+use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Coin;
-use cosmwasm_std::Uint128;
 use cw0::Duration;
-use cw20::{Balance, Cw20Coin};
+use cw20::{Balance, Cw20Coin, Denom};
 use cw4::TOTAL_KEY;
 use cw_controllers::{Admin, Claims, Hooks};
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
@@ -14,7 +14,7 @@ pub const CLAIMS: Claims = Claims::new("claims");
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
     /// denom of the token to stake
-    pub denom: Balance,
+    pub denom: Denom,
     pub tokens_per_weight: Uint128,
     pub min_bond: Uint128,
     pub unbonding_period: Duration,
