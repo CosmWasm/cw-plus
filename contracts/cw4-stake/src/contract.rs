@@ -1,12 +1,12 @@
 use cosmwasm_std::{
-    attr, BankMsg, Binary, CanonicalAddr, coin, Coin, coins, CosmosMsg, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdError, StdResult, Storage, to_binary,
+    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
+    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdError, StdResult, Storage,
     Uint128,
 };
 
 use cw0::{maybe_canonical, NativeBalance};
-use cw20::{Balance, Denom};
 use cw2::set_contract_version;
+use cw20::{Balance, Denom};
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
@@ -15,7 +15,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg, StakedResponse};
-use crate::state::{ADMIN, CLAIMS, Config, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
+use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-stake";
@@ -76,12 +76,16 @@ pub fn handle_bond(
     let cfg = CONFIG.load(deps.storage)?;
     let amount = match (&cfg.denom, &amount) {
         (Denom::Native(want), Balance::Native(have)) => must_pay_funds(have, want),
-        (Denom::Cw20(want), Balance::Cw20(have)) => if want == &have.address {
-            Ok(have.amount)
-        } else {
-            Err(ContractError::InvalidDenom(deps.api.human_address(&want)?))
+        (Denom::Cw20(want), Balance::Cw20(have)) => {
+            if want == &have.address {
+                Ok(have.amount)
+            } else {
+                Err(ContractError::InvalidDenom(deps.api.human_address(&want)?))
+            }
         }
-        _ => Err(ContractError::MixedNativeAndCw20("Invalid address or denom".to_string())),
+        _ => Err(ContractError::MixedNativeAndCw20(
+            "Invalid address or denom".to_string(),
+        )),
     }?;
 
     // update the sender's stake
@@ -110,7 +114,6 @@ pub fn handle_bond(
         data: None,
     })
 }
-
 
 pub fn handle_unbond(
     deps: DepsMut,
@@ -154,19 +157,19 @@ pub fn handle_unbond(
     })
 }
 
-pub fn must_pay_funds(balance: &NativeBalance, denom: &String) -> Result<Uint128, ContractError> {
+pub fn must_pay_funds(balance: &NativeBalance, denom: &str) -> Result<Uint128, ContractError> {
     match balance.0.len() {
         0 => Err(ContractError::NoFunds {}),
         1 => {
             let balance = &balance.0;
             let payment = balance[0].amount;
-            if &balance[0].denom == denom {
+            if balance[0].denom == denom {
                 Ok(payment)
             } else {
-                Err(ContractError::MissingDenom(denom.clone()))
+                Err(ContractError::MissingDenom(denom.to_string()))
             }
         }
-        _ => Err(ContractError::ExtraDenoms(denom.clone()))
+        _ => Err(ContractError::ExtraDenoms(denom.to_string())),
     }
 }
 
@@ -240,7 +243,8 @@ pub fn handle_claim(
         from_address: env.contract.address,
         to_address: info.sender.clone(),
         amount,
-    }.into()];
+    }
+    .into()];
 
     let attributes = vec![
         attr("action", "claim"),
@@ -291,7 +295,7 @@ pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse>
         .may_load(deps.storage, &address_raw)?
         .unwrap_or_default();
     let denom = match CONFIG.load(deps.storage)?.denom {
-        Denom::Native(want) => want.clone(),
+        Denom::Native(want) => want,
         _ => {
             return Err(StdError::generic_err(
                 "The stake for CW20 is not yet implemented",
@@ -343,9 +347,8 @@ fn list_members(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{Api, from_slice, StdError, Storage};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-
+    use cosmwasm_std::{from_slice, Api, StdError, Storage};
     use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
@@ -554,9 +557,9 @@ mod tests {
         let err = handle(deps.as_mut(), env, info, msg).unwrap_err();
         match err {
             ContractError::Std(StdError::Underflow {
-                                   minuend,
-                                   subtrahend,
-                               }) => {
+                minuend,
+                subtrahend,
+            }) => {
                 assert_eq!(minuend.as_str(), "5000");
                 assert_eq!(subtrahend.as_str(), "5100");
             }
@@ -643,7 +646,7 @@ mod tests {
             mock_info(USER1, &[]),
             HandleMsg::Claim {},
         )
-            .unwrap_err();
+        .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
 
         // now mature first section, withdraw that
@@ -656,7 +659,7 @@ mod tests {
             mock_info(USER1, &[]),
             HandleMsg::Claim {},
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
@@ -664,7 +667,7 @@ mod tests {
                 to_address: USER1.into(),
                 amount: coins(4_500, DENOM),
             }
-                .into()]
+            .into()]
         );
 
         // second releases partially
@@ -674,7 +677,7 @@ mod tests {
             mock_info(USER2, &[]),
             HandleMsg::Claim {},
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
@@ -682,7 +685,7 @@ mod tests {
                 to_address: USER2.into(),
                 amount: coins(2_600, DENOM),
             }
-                .into()]
+            .into()]
         );
 
         // but the third one cannot release
@@ -692,7 +695,7 @@ mod tests {
             mock_info(USER3, &[]),
             HandleMsg::Claim {},
         )
-            .unwrap_err();
+        .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
 
         // claims updated properly
@@ -719,7 +722,7 @@ mod tests {
             mock_info(USER2, &[]),
             HandleMsg::Claim {},
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
@@ -728,7 +731,7 @@ mod tests {
                 // 1_345 + 600 + 1_005
                 amount: coins(2_950, DENOM),
             }
-                .into()]
+            .into()]
         );
         assert_eq!(get_claims(deps.as_ref(), USER2), vec![]);
     }
@@ -757,7 +760,7 @@ mod tests {
             user_info.clone(),
             add_msg.clone(),
         )
-            .unwrap_err();
+        .unwrap_err();
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // admin can add it, and it appears in the query
@@ -768,7 +771,7 @@ mod tests {
             admin_info.clone(),
             add_msg.clone(),
         )
-            .unwrap();
+        .unwrap();
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract1.clone()]);
 
@@ -782,7 +785,7 @@ mod tests {
             admin_info.clone(),
             remove_msg.clone(),
         )
-            .unwrap_err();
+        .unwrap_err();
         assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
@@ -800,7 +803,7 @@ mod tests {
             admin_info.clone(),
             add_msg.clone(),
         )
-            .unwrap_err();
+        .unwrap_err();
         assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
@@ -813,7 +816,7 @@ mod tests {
             user_info.clone(),
             remove_msg.clone(),
         )
-            .unwrap_err();
+        .unwrap_err();
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // remove the original
@@ -823,7 +826,7 @@ mod tests {
             admin_info.clone(),
             remove_msg.clone(),
         )
-            .unwrap();
+        .unwrap();
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract2.clone()]);
     }

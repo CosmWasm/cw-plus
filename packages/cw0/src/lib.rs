@@ -4,10 +4,9 @@ pub use pagination::{
 pub use payment::{may_pay, must_pay, nonpayable, PaymentError};
 
 pub use crate::balance::NativeBalance;
-pub use crate::expiration::{DAY, Duration, Expiration, HOUR, WEEK};
+pub use crate::expiration::{Duration, Expiration, DAY, HOUR, WEEK};
 
 mod balance;
 mod expiration;
 mod pagination;
 mod payment;
-

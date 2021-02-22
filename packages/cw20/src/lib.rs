@@ -13,11 +13,11 @@ pub use crate::receiver::Cw20ReceiveMsg;
 
 mod balance;
 mod coin;
+mod denom;
 mod helpers;
 mod msg;
 mod query;
 mod receiver;
-mod denom;
 
 #[cfg(test)]
 mod tests {
