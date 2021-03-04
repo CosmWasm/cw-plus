@@ -91,7 +91,7 @@ pub fn handle_propose(
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
         .may_load(deps.storage, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
+        .ok_or(ContractError::Unauthorized {})?;
 
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -155,7 +155,7 @@ pub fn handle_vote(
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
         .may_load(deps.storage, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
+        .ok_or(ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;

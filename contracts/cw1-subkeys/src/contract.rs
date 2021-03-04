@@ -86,7 +86,7 @@ where
                 CosmosMsg::Staking(staking_msg) => {
                     let permissions = permissions(deps.storage);
                     let perm = permissions.may_load(owner_raw.as_slice())?;
-                    let perm = perm.ok_or_else(|| ContractError::NotAllowed {})?;
+                    let perm = perm.ok_or(ContractError::NotAllowed {})?;
 
                     check_staking_permissions(staking_msg, perm)?;
                 }
@@ -96,7 +96,7 @@ where
                 }) => {
                     let mut allowances = allowances(deps.storage);
                     let allow = allowances.may_load(owner_raw.as_slice())?;
-                    let mut allowance = allow.ok_or_else(|| ContractError::NoAllowance {})?;
+                    let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
                     allowances.save(owner_raw.as_slice(), &allowance)?;
@@ -220,7 +220,7 @@ where
     let allowance =
         allowances(deps.storage).update::<_, ContractError>(spender_raw.as_slice(), |allow| {
             // Fail fast
-            let mut allowance = allow.ok_or_else(|| ContractError::NoAllowance {})?;
+            let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
             if let Some(exp) = expires {
                 allowance.expires = exp;
             }

@@ -92,7 +92,7 @@ pub fn handle_propose(
     let vote_power = cfg
         .group_addr
         .is_member(&deps.querier, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
+        .ok_or(ContractError::Unauthorized {})?;
 
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
@@ -164,7 +164,7 @@ pub fn handle_vote(
     let vote_power = cfg
         .group_addr
         .member_at_height(&deps.querier, info.sender.clone(), prop.start_height)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
+        .ok_or(ContractError::Unauthorized {})?;
 
     // cast vote if no vote previously cast
     BALLOTS.update(
