@@ -47,7 +47,7 @@ impl GenericBalance {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Escrow {
     /// arbiter can decide to approve or refund the escrow
     pub arbiter: CanonicalAddr,
@@ -132,7 +132,10 @@ mod tests {
             arbiter: CanonicalAddr(Binary(b"arb".to_vec())),
             recipient: CanonicalAddr(Binary(b"recip".to_vec())),
             source: CanonicalAddr(Binary(b"source".to_vec())),
-            ..Escrow::default()
+            end_height: None,
+            end_time: None,
+            balance: Default::default(),
+            cw20_whitelist: vec![],
         }
     }
 

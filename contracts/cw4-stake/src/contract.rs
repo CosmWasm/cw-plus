@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult, Storage, Uint128,
+    Env, HumanAddr, MessageInfo, Order, Response, StdResult, Storage, Uint128,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
@@ -25,7 +25,7 @@ pub fn init(
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     ADMIN.set(deps.branch(), msg.admin)?;
 
@@ -44,7 +44,7 @@ pub fn init(
     CONFIG.save(deps.storage, &config)?;
     TOTAL.save(deps.storage, &0)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -53,7 +53,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::AddHook { addr } => Ok(HOOKS.handle_add_hook(&ADMIN, deps, info, addr)?),
@@ -64,21 +64,17 @@ pub fn handle(
     }
 }
 
-pub fn handle_bond(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+pub fn handle_bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
     // ensure the sent denom was proper
     // NOTE: those clones are not needed (if we move denom, we return early),
     // but the compiler cannot see that (yet...)
-    let sent = match info.sent_funds.len() {
+    let sent = match info.funds.len() {
         0 => Err(ContractError::NoFunds {}),
         1 => {
-            if info.sent_funds[0].denom == cfg.denom {
-                Ok(info.sent_funds[0].amount)
+            if info.funds[0].denom == cfg.denom {
+                Ok(info.funds[0].amount)
             } else {
                 Err(ContractError::MissingDenom(cfg.denom.clone()))
             }
@@ -109,7 +105,8 @@ pub fn handle_bond(
         attr("amount", sent),
         attr("sender", info.sender),
     ];
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages,
         attributes,
         data: None,
@@ -121,7 +118,7 @@ pub fn handle_unbond(
     env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // reduce the sender's stake - aborting if insufficient
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
@@ -151,7 +148,8 @@ pub fn handle_unbond(
         attr("amount", amount),
         attr("sender", info.sender),
     ];
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages,
         attributes,
         data: None,
@@ -201,11 +199,7 @@ fn calc_weight(stake: Uint128, cfg: &Config) -> Option<u64> {
     }
 }
 
-pub fn handle_claim(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+pub fn handle_claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let release = CLAIMS.claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
     if release.is_zero() {
@@ -217,7 +211,6 @@ pub fn handle_claim(
     let amount_str = coins_to_string(&amount);
 
     let messages = vec![BankMsg::Send {
-        from_address: env.contract.address,
         to_address: info.sender.clone(),
         amount,
     }
@@ -228,7 +221,8 @@ pub fn handle_claim(
         attr("tokens", amount_str),
         attr("sender", info.sender),
     ];
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages,
         attributes,
         data: None,
@@ -630,7 +624,6 @@ mod tests {
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
-                from_address: env3.contract.address.clone(),
                 to_address: USER1.into(),
                 amount: coins(4_500, DENOM),
             }
@@ -648,7 +641,6 @@ mod tests {
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
-                from_address: env3.contract.address.clone(),
                 to_address: USER2.into(),
                 amount: coins(2_600, DENOM),
             }
@@ -693,7 +685,6 @@ mod tests {
         assert_eq!(
             res.messages,
             vec![BankMsg::Send {
-                from_address: env4.contract.address.clone(),
                 to_address: USER2.into(),
                 // 1_345 + 600 + 1_005
                 amount: coins(2_950, DENOM),

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, StdError, StdResult, KV,
+    attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order,
+    Response, StdError, StdResult, KV,
 };
 
 use cw0::maybe_canonical;
@@ -21,7 +21,7 @@ use cw_storage_plus::{Bound, PkOwned};
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let info = ContractInfoResponse {
@@ -31,7 +31,7 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
     CONTRACT_INFO.save(deps.storage, &info)?;
     let minter = deps.api.canonical_address(&msg.minter)?;
     MINTER.save(deps.storage, &minter)?;
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -39,7 +39,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Mint(msg) => handle_mint(deps, env, info, msg),
         HandleMsg::Approve {
@@ -71,7 +71,7 @@ pub fn handle_mint(
     _env: Env,
     info: MessageInfo,
     msg: MintMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let minter = MINTER.load(deps.storage)?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
@@ -94,7 +94,8 @@ pub fn handle_mint(
 
     increment_tokens(deps.storage)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "mint"),
@@ -111,10 +112,11 @@ pub fn handle_transfer_nft(
     info: MessageInfo,
     recipient: HumanAddr,
     token_id: String,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     _transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "transfer_nft"),
@@ -133,7 +135,7 @@ pub fn handle_send_nft(
     contract: HumanAddr,
     token_id: String,
     msg: Option<Binary>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // Transfer token
     _transfer_nft(deps, &env, &info, &contract, &token_id)?;
 
@@ -144,7 +146,8 @@ pub fn handle_send_nft(
     };
 
     // Send message
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![send.into_cosmos_msg(contract.clone())?],
         attributes: vec![
             attr("action", "send_nft"),
@@ -180,10 +183,11 @@ pub fn handle_approve(
     spender: HumanAddr,
     token_id: String,
     expires: Option<Expiration>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "approve"),
@@ -201,10 +205,11 @@ pub fn handle_revoke(
     info: MessageInfo,
     spender: HumanAddr,
     token_id: String,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "revoke"),
@@ -263,7 +268,7 @@ pub fn handle_approve_all(
     info: MessageInfo,
     operator: HumanAddr,
     expires: Option<Expiration>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // reject expired data as invalid
     let expires = expires.unwrap_or_default();
     if expires.is_expired(&env.block) {
@@ -275,7 +280,8 @@ pub fn handle_approve_all(
     let operator_raw = deps.api.canonical_address(&operator)?;
     OPERATORS.save(deps.storage, (&sender_raw, &operator_raw), &expires)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "approve_all"),
@@ -291,12 +297,13 @@ pub fn handle_revoke_all(
     _env: Env,
     info: MessageInfo,
     operator: HumanAddr,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let operator_raw = deps.api.canonical_address(&operator)?;
     OPERATORS.remove(deps.storage, (&sender_raw, &operator_raw));
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "revoke_all"),
@@ -754,7 +761,8 @@ mod tests {
 
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "transfer_nft"),
@@ -823,7 +831,8 @@ mod tests {
         // and make sure this is the request sent by the contract
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![expected],
                 attributes: vec![
                     attr("action", "send_nft"),
@@ -867,7 +876,8 @@ mod tests {
         let res = handle(deps.as_mut(), mock_env(), owner, approve_msg).unwrap();
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "approve"),
@@ -980,7 +990,8 @@ mod tests {
         let res = handle(deps.as_mut(), mock_env(), owner, approve_all_msg).unwrap();
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "approve_all"),

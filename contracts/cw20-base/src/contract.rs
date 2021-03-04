@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
+    attr, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -20,12 +20,7 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    mut deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(mut deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -55,7 +50,7 @@ pub fn init(
         mint,
     };
     token_info(deps.storage).save(&data)?;
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
@@ -74,7 +69,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Transfer { recipient, amount } => {
             handle_transfer(deps, env, info, recipient, amount)
@@ -117,7 +112,7 @@ pub fn handle_transfer(
     info: MessageInfo,
     recipient: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -134,7 +129,8 @@ pub fn handle_transfer(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "transfer"),
@@ -152,7 +148,7 @@ pub fn handle_burn(
     _env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -170,7 +166,8 @@ pub fn handle_burn(
         Ok(info)
     })?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "burn"),
@@ -188,7 +185,7 @@ pub fn handle_mint(
     info: MessageInfo,
     recipient: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -216,7 +213,8 @@ pub fn handle_mint(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "mint"),
@@ -235,7 +233,7 @@ pub fn handle_send(
     contract: HumanAddr,
     amount: Uint128,
     msg: Option<Binary>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -269,7 +267,8 @@ pub fn handle_send(
     }
     .into_cosmos_msg(contract)?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![msg],
         attributes: attrs,
         data: None,
@@ -332,7 +331,7 @@ pub fn migrate(
     _env: Env,
     _info: MessageInfo,
     _msg: MigrateMsg,
-) -> StdResult<MigrateResponse> {
+) -> StdResult<Response> {
     let old_version = get_contract_version(deps.storage)?;
     if old_version.contract != CONTRACT_NAME {
         return Err(StdError::generic_err(format!(
@@ -355,7 +354,7 @@ pub fn migrate(
 
     // once we have "migrated", set the new version and return success
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(MigrateResponse::default())
+    Ok(Response::default())
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, StdResult, Uint128,
+    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
+    StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -28,7 +28,7 @@ pub fn init(
     env: Env,
     info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -52,7 +52,7 @@ pub fn init(
 
     CURVE_TYPE.save(deps.storage, &msg.curve_type)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -60,7 +60,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // default implementation stores curve info as enum, you can do something else in a derived
     // contract and just pass in your custom curve to do_handle
     let curve_type = CURVE_TYPE.load(deps.storage)?;
@@ -77,7 +77,7 @@ pub fn do_handle(
     info: MessageInfo,
     msg: HandleMsg,
     curve_fn: CurveFn,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Buy {} => handle_buy(deps, env, info, curve_fn),
 
@@ -133,7 +133,7 @@ pub fn handle_buy(
     env: Env,
     info: MessageInfo,
     curve_fn: CurveFn,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut state = CURVE_STATE.load(deps.storage)?;
 
     let payment = must_pay(&info, &state.reserve_denom)?;
@@ -149,12 +149,13 @@ pub fn handle_buy(
     // call into cw20-base to mint the token, call as self as no one else is allowed
     let sub_info = MessageInfo {
         sender: env.contract.address.clone(),
-        sent_funds: vec![],
+        funds: vec![],
     };
     handle_mint(deps, env, sub_info, info.sender.clone(), minted)?;
 
     // bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "buy"),
@@ -173,7 +174,7 @@ pub fn handle_sell(
     info: MessageInfo,
     curve_fn: CurveFn,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     let receiver = info.sender.clone();
     // do all the work
@@ -191,7 +192,7 @@ pub fn handle_sell_from(
     curve_fn: CurveFn,
     owner: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
@@ -203,7 +204,7 @@ pub fn handle_sell_from(
     let receiver = info.sender;
     let owner_info = MessageInfo {
         sender: owner,
-        sent_funds: info.sent_funds,
+        funds: info.funds,
     };
     let mut res = do_sell(deps, env, owner_info, curve_fn, receiver.clone(), amount)?;
 
@@ -222,7 +223,7 @@ fn do_sell(
     // receiver is the one who gains (same for handle_sell, diff for handle_sell_from)
     receiver: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // burn from the caller, this ensures there are tokens to cover this
     handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
 
@@ -237,11 +238,11 @@ fn do_sell(
 
     // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
     let msg = BankMsg::Send {
-        from_address: env.contract.address,
         to_address: receiver,
         amount: coins(released.u128(), state.reserve_denom),
     };
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![msg.into()],
         attributes: vec![
             attr("from", info.sender),
@@ -302,7 +303,7 @@ pub fn query_curve_info(deps: Deps, curve_fn: CurveFn) -> StdResult<CurveInfoRes
 mod tests {
     use super::*;
     use crate::msg::CurveType;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, Decimal};
     use cw0::PaymentError;
 
@@ -493,7 +494,6 @@ mod tests {
         assert_eq!(
             &res.messages[0],
             &BankMsg::Send {
-                from_address: MOCK_CONTRACT_ADDR.into(),
                 to_address: INVESTOR.into(),
                 amount: coins(1_500_000_000, DENOM),
             }
@@ -609,7 +609,6 @@ mod tests {
         assert_eq!(
             &res.messages[0],
             &BankMsg::Send {
-                from_address: MOCK_CONTRACT_ADDR.into(),
                 to_address: alice.into(),
                 amount: coins(1_500, DENOM),
             }

@@ -5,7 +5,7 @@ use cosmwasm_std::{Binary, BlockInfo, CanonicalAddr, Order, StdError, StdResult,
 use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
 use cw20::{Balance, Expiration};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AtomicSwap {
     /// This is the sha-256 hash of the preimage
     pub hash: Binary,
@@ -66,8 +66,9 @@ mod tests {
         AtomicSwap {
             recipient: CanonicalAddr(Binary(b"recip".to_vec())),
             source: CanonicalAddr(Binary(b"source".to_vec())),
+            expires: Default::default(),
             hash: Binary("hash".into()),
-            ..AtomicSwap::default()
+            balance: Default::default(),
         }
     }
 

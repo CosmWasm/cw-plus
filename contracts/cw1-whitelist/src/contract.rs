@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult,
+    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env, HumanAddr,
+    MessageInfo, Response, StdResult,
 };
 use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
@@ -16,14 +16,14 @@ use crate::state::{admin_list, admin_list_read, AdminList};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = AdminList {
         admins: map_canonical(deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
     admin_list(deps.storage).save(&cfg)?;
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn map_canonical(api: &dyn Api, admins: &[HumanAddr]) -> StdResult<Vec<CanonicalAddr>> {
@@ -44,7 +44,7 @@ pub fn handle(
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     match msg {
         HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
         HandleMsg::Freeze {} => handle_freeze(deps, env, info),
@@ -57,14 +57,14 @@ pub fn handle_execute<T>(
     _env: Env,
     info: MessageInfo,
     msgs: Vec<CosmosMsg<T>>,
-) -> Result<HandleResponse<T>, ContractError>
+) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     if !can_execute(deps.as_ref(), &info.sender)? {
         Err(ContractError::Unauthorized {})
     } else {
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.messages = msgs;
         res.attributes = vec![attr("action", "execute")];
         Ok(res)
@@ -75,7 +75,7 @@ pub fn handle_freeze(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut cfg = admin_list_read(deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
@@ -83,7 +83,7 @@ pub fn handle_freeze(
         cfg.mutable = false;
         admin_list(deps.storage).save(&cfg)?;
 
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.attributes = vec![attr("action", "freeze")];
         Ok(res)
     }
@@ -94,7 +94,7 @@ pub fn handle_update_admins(
     _env: Env,
     info: MessageInfo,
     admins: Vec<HumanAddr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut cfg = admin_list_read(deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
@@ -102,7 +102,7 @@ pub fn handle_update_admins(
         cfg.admins = map_canonical(deps.api, &admins)?;
         admin_list(deps.storage).save(&cfg)?;
 
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.attributes = vec![attr("action", "update_admins")];
         Ok(res)
     }
@@ -142,7 +142,7 @@ pub fn query_can_execute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
 
     #[test]
@@ -243,7 +243,6 @@ mod tests {
         let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: bob.clone(),
                 amount: coins(10000, "DAI"),
             }
@@ -293,7 +292,6 @@ mod tests {
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: anyone.clone(),
             amount: coins(12345, "ushell"),
         });

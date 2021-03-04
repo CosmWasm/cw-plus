@@ -4,7 +4,7 @@ use std::ops::{AddAssign, Sub};
 
 use cosmwasm_std::{
     attr, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StakingMsg, StdError, StdResult,
+    HumanAddr, MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
 };
 use cw0::{calc_range_start_human, Expiration};
 use cw1::CanExecuteResponse;
@@ -28,12 +28,7 @@ use crate::state::{
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    mut deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(mut deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
     let result = whitelist_init(deps.branch(), env, info, msg)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(result)
@@ -46,7 +41,7 @@ pub fn handle(
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     match msg {
         HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
         HandleMsg::Freeze {} => Ok(handle_freeze(deps, env, info)?),
@@ -73,7 +68,7 @@ pub fn handle_execute<T>(
     _env: Env,
     info: MessageInfo,
     msgs: Vec<CosmosMsg<T>>,
-) -> Result<HandleResponse<T>, ContractError>
+) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -81,7 +76,7 @@ where
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(owner_raw) {
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.messages = msgs;
         res.attributes = vec![attr("action", "execute"), attr("owner", info.sender)];
         Ok(res)
@@ -96,7 +91,6 @@ where
                     check_staking_permissions(staking_msg, perm)?;
                 }
                 CosmosMsg::Bank(BankMsg::Send {
-                    from_address: _,
                     to_address: _,
                     amount,
                 }) => {
@@ -113,7 +107,8 @@ where
             }
         }
         // Relay messages
-        let res = HandleResponse {
+        let res = Response {
+            submessages: vec![],
             messages: msgs,
             attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
             data: None,
@@ -147,6 +142,9 @@ pub fn check_staking_permissions(
                 return Err(ContractError::WithdrawPerm {});
             }
         }
+        s => {
+            panic!("Unsupported staking message: {:?}", s)
+        }
     }
     Ok(true)
 }
@@ -158,7 +156,7 @@ pub fn handle_increase_allowance<T>(
     spender: HumanAddr,
     amount: Coin,
     expires: Option<Expiration>,
-) -> Result<HandleResponse<T>, ContractError>
+) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -182,7 +180,8 @@ where
         Ok(allowance)
     })?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
@@ -203,7 +202,7 @@ pub fn handle_decrease_allowance<T>(
     spender: HumanAddr,
     amount: Coin,
     expires: Option<Expiration>,
-) -> Result<HandleResponse<T>, ContractError>
+) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -232,7 +231,8 @@ where
         allowances(deps.storage).remove(spender_raw.as_slice());
     }
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
@@ -252,7 +252,7 @@ pub fn handle_set_permissions<T>(
     info: MessageInfo,
     spender: HumanAddr,
     perm: Permissions,
-) -> Result<HandleResponse<T>, ContractError>
+) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -268,7 +268,8 @@ where
     }
     permissions(deps.storage).save(spender_raw.as_slice(), &perm)?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "set_permissions"),
@@ -412,7 +413,7 @@ pub fn query_all_permissions(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, Api, StakingMsg};
 
     use cw0::NativeBalance;
@@ -1152,7 +1153,6 @@ mod tests {
 
         // Create Send message
         let msgs = vec![BankMsg::Send {
-            from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
             to_address: spender2.clone(),
             amount: coins(1000, "token1"),
         }
@@ -1469,12 +1469,10 @@ mod tests {
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: anyone.clone(),
             amount: coins(12345, "ushell"),
         });
         let send_msg_large = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: anyone.clone(),
             amount: coins(1234567, "ushell"),
         });

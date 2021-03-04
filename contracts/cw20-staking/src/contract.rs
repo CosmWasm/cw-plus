@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, QuerierWrapper, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
+    attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HumanAddr, MessageInfo,
+    QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -30,7 +30,7 @@ pub fn init(
     env: Env,
     info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // ensure the validator is registered
@@ -70,7 +70,7 @@ pub fn init(
     let supply = Supply::default();
     total_supply(deps.storage).save(&supply)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -78,7 +78,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Bond {} => bond(deps, env, info),
         HandleMsg::Unbond { amount } => unbond(deps, env, info, amount),
@@ -163,12 +163,12 @@ fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
     }
 }
 
-pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
+pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     // ensure we have the proper denom
     let invest = invest_info_read(deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
     let payment = info
-        .sent_funds
+        .funds
         .iter()
         .find(|x| x.denom == invest.bond_denom)
         .ok_or_else(|| ContractError::EmptyBalance {
@@ -197,12 +197,13 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse
     // call into cw20-base to mint the token, call as self as no one else is allowed
     let sub_info = MessageInfo {
         sender: env.contract.address.clone(),
-        sent_funds: vec![],
+        funds: vec![],
     };
     handle_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
 
     // bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![StakingMsg::Delegate {
             validator: invest.validator,
             amount: payment.clone(),
@@ -224,7 +225,7 @@ pub fn unbond(
     env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     let invest = invest_info_read(deps.storage).load()?;
@@ -243,7 +244,7 @@ pub fn unbond(
     if tax > Uint128(0) {
         let sub_info = MessageInfo {
             sender: env.contract.address.clone(),
-            sent_funds: vec![],
+            funds: vec![],
         };
         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
         let human_owner = deps.api.human_address(&invest.owner)?;
@@ -276,7 +277,8 @@ pub fn unbond(
     )?;
 
     // unbond them
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![StakingMsg::Undelegate {
             validator: invest.validator,
             amount: coin(unbond.u128(), &invest.bond_denom),
@@ -293,7 +295,7 @@ pub fn unbond(
     Ok(res)
 }
 
-pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
+pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     // find how many tokens the contract has
     let invest = invest_info_read(deps.storage).load()?;
     let mut balance = deps
@@ -320,9 +322,9 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleRespons
 
     // transfer tokens to the sender
     balance.amount = to_send;
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![BankMsg::Send {
-            from_address: env.contract.address,
             to_address: info.sender.clone(),
             amount: vec![balance],
         }
@@ -340,17 +342,14 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleRespons
 /// reinvest will withdraw all pending rewards,
 /// then issue a callback to itself via _bond_all_tokens
 /// to reinvest the new earnings (and anything else that accumulated)
-pub fn reinvest(
-    deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response, ContractError> {
     let contract_addr = env.contract.address;
     let invest = invest_info_read(deps.storage).load()?;
     let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
 
     // and bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![
             StakingMsg::Withdraw {
                 validator: invest.validator,
@@ -374,7 +373,7 @@ pub fn _bond_all_tokens(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // this is just meant as a call-back to ourself
     if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
@@ -397,12 +396,13 @@ pub fn _bond_all_tokens(
     }) {
         Ok(_) => {}
         // if it is below the minimum, we do a no-op (do not revert other state from withdrawal)
-        Err(StdError::Underflow { .. }) => return Ok(HandleResponse::default()),
+        Err(StdError::Underflow { .. }) => return Ok(Response::default()),
         Err(e) => return Err(ContractError::Std(e)),
     }
 
     // and bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![StakingMsg::Delegate {
             validator: invest.validator,
             amount: balance.clone(),
@@ -886,13 +886,8 @@ mod tests {
         assert_eq!(1, res.messages.len());
         let payout = &res.messages[0];
         match payout {
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address,
-                to_address,
-                amount,
-            }) => {
+            CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
                 assert_eq!(amount, &coins(540, "ustake"));
-                assert_eq!(from_address.as_str(), MOCK_CONTRACT_ADDR);
                 assert_eq!(to_address, &bob);
             }
             _ => panic!("Unexpected message: {:?}", payout),

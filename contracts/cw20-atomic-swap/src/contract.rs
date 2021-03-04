@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult, WasmMsg,
+    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, HumanAddr,
+    MessageInfo, Response, StdResult, WasmMsg,
 };
 use sha2::{Digest, Sha256};
 
@@ -19,15 +19,10 @@ use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, _msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // No setup
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -35,10 +30,10 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Create(msg) => {
-            let sent_funds = info.sent_funds.clone();
+            let sent_funds = info.funds.clone();
             try_create(deps, env, info, msg, Balance::from(sent_funds))
         }
         HandleMsg::Release { id, preimage } => try_release(deps, env, id, preimage),
@@ -52,7 +47,7 @@ pub fn try_receive(
     env: Env,
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
         Some(bin) => Ok(from_binary(&bin)?),
         None => Err(ContractError::NoData {}),
@@ -64,7 +59,7 @@ pub fn try_receive(
     // we need to update the info... so the original sender is the one authorizing with these tokens
     let orig_info = MessageInfo {
         sender: wrapper.sender,
-        sent_funds: info.sent_funds,
+        funds: info.funds,
     };
     match msg {
         ReceiveMsg::Create(create) => {
@@ -79,7 +74,7 @@ pub fn try_create(
     info: MessageInfo,
     msg: CreateMsg,
     balance: Balance,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if !is_valid_name(&msg.id) {
         return Err(ContractError::InvalidId {});
     }
@@ -112,7 +107,7 @@ pub fn try_create(
         Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
 
-    let mut res = HandleResponse::default();
+    let mut res = Response::default();
     res.attributes = vec![
         attr("action", "create"),
         attr("id", msg.id),
@@ -127,7 +122,7 @@ pub fn try_release(
     env: Env,
     id: String,
     preimage: String,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
     if swap.is_expired(&env.block) {
         return Err(ContractError::Expired {});
@@ -144,8 +139,9 @@ pub fn try_release(
     atomic_swaps(deps.storage).remove(id.as_bytes());
 
     // Send all tokens out
-    let msgs = send_tokens(deps.api, &env.contract.address, &rcpt, swap.balance)?;
-    Ok(HandleResponse {
+    let msgs = send_tokens(deps.api, &rcpt, swap.balance)?;
+    Ok(Response {
+        submessages: vec![],
         messages: msgs,
         attributes: vec![
             attr("action", "release"),
@@ -157,7 +153,7 @@ pub fn try_release(
     })
 }
 
-pub fn try_refund(deps: DepsMut, env: Env, id: String) -> Result<HandleResponse, ContractError> {
+pub fn try_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, ContractError> {
     let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
     // Anyone can try to refund, as long as the contract is expired
     if !swap.is_expired(&env.block) {
@@ -169,8 +165,9 @@ pub fn try_refund(deps: DepsMut, env: Env, id: String) -> Result<HandleResponse,
     // We delete the swap
     atomic_swaps(deps.storage).remove(id.as_bytes());
 
-    let msgs = send_tokens(deps.api, &env.contract.address, &rcpt, swap.balance)?;
-    Ok(HandleResponse {
+    let msgs = send_tokens(deps.api, &rcpt, swap.balance)?;
+    Ok(Response {
+        submessages: vec![],
         messages: msgs,
         attributes: vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)],
         data: None,
@@ -190,19 +187,13 @@ fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
     }
 }
 
-fn send_tokens(
-    api: &dyn Api,
-    from: &HumanAddr,
-    to: &HumanAddr,
-    amount: Balance,
-) -> StdResult<Vec<CosmosMsg>> {
+fn send_tokens(api: &dyn Api, to: &HumanAddr, amount: Balance) -> StdResult<Vec<CosmosMsg>> {
     if amount.is_empty() {
         Ok(vec![])
     } else {
         match amount {
             Balance::Native(coins) => {
                 let msg = BankMsg::Send {
-                    from_address: from.into(),
                     to_address: to.into(),
                     amount: coins.into_vec(),
                 };
@@ -272,7 +263,7 @@ fn query_list(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, Uint128};
 
     use cw20::Expiration;
@@ -538,7 +529,6 @@ mod tests {
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: create.recipient,
                 amount: balance,
             })
@@ -614,7 +604,6 @@ mod tests {
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: sender,
                 amount: balance,
             })
@@ -831,7 +820,6 @@ mod tests {
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: native_rcpt,
                 amount: native_coins,
             })

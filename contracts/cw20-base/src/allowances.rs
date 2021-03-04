@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    MessageInfo, StdResult, Storage, Uint128,
+    attr, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
+    StdResult, Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
@@ -14,7 +14,7 @@ pub fn handle_increase_allowance(
     spender: HumanAddr,
     amount: Uint128,
     expires: Option<Expiration>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
@@ -34,7 +34,8 @@ pub fn handle_increase_allowance(
         },
     )?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
@@ -54,7 +55,7 @@ pub fn handle_decrease_allowance(
     spender: HumanAddr,
     amount: Uint128,
     expires: Option<Expiration>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
@@ -76,7 +77,8 @@ pub fn handle_decrease_allowance(
         allowances(deps.storage, owner_raw).remove(spender_raw.as_slice());
     }
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
@@ -120,7 +122,7 @@ pub fn handle_transfer_from(
     owner: HumanAddr,
     recipient: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
@@ -137,7 +139,8 @@ pub fn handle_transfer_from(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "transfer_from"),
@@ -158,7 +161,7 @@ pub fn handle_burn_from(
     info: MessageInfo,
     owner: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
 
@@ -176,7 +179,8 @@ pub fn handle_burn_from(
         Ok(meta)
     })?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "burn_from"),
@@ -197,7 +201,7 @@ pub fn handle_send_from(
     contract: HumanAddr,
     amount: Uint128,
     msg: Option<Binary>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let rcpt_raw = deps.api.canonical_address(&contract)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
@@ -232,7 +236,8 @@ pub fn handle_send_from(
     }
     .into_cosmos_msg(contract)?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![msg],
         attributes: attrs,
         data: None,

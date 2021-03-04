@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult,
+    HumanAddr, MessageInfo, Order, Response, StdResult,
 };
 
 use cw0::{maybe_canonical, Expiration};
@@ -29,7 +29,7 @@ pub fn init(
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // we just convert to canonical to check if this is a valid format
     if deps.api.canonical_address(&msg.group_addr).is_err() {
         return Err(ContractError::InvalidGroup {
@@ -50,7 +50,7 @@ pub fn init(
     };
     CONFIG.save(deps.storage, &cfg)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -58,7 +58,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     match msg {
         HandleMsg::Propose {
             title,
@@ -84,7 +84,7 @@ pub fn handle_propose(
     msgs: Vec<CosmosMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let cfg = CONFIG.load(deps.storage)?;
@@ -127,7 +127,8 @@ pub fn handle_propose(
     };
     BALLOTS.save(deps.storage, (id.into(), &raw_sender), &ballot)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
@@ -145,7 +146,7 @@ pub fn handle_vote(
     info: MessageInfo,
     proposal_id: u64,
     vote: Vote,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let cfg = CONFIG.load(deps.storage)?;
@@ -183,7 +184,8 @@ pub fn handle_vote(
     prop.update_status(&env.block);
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
@@ -200,7 +202,7 @@ pub fn handle_execute(
     _env: Env,
     info: MessageInfo,
     proposal_id: u64,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -215,7 +217,8 @@ pub fn handle_execute(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: prop.msgs,
         attributes: vec![
             attr("action", "execute"),
@@ -231,7 +234,7 @@ pub fn handle_close(
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -249,7 +252,8 @@ pub fn handle_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
@@ -265,7 +269,7 @@ pub fn handle_membership_hook(
     _env: Env,
     info: MessageInfo,
     _diffs: Vec<MemberDiff>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // This is now a no-op
     // But we leave the authorization check as a demo
     let cfg = CONFIG.load(deps.storage)?;
@@ -273,7 +277,7 @@ pub fn handle_membership_hook(
         return Err(ContractError::Unauthorized {});
     }
 
-    Ok(HandleResponse::default())
+    Ok(Response::default())
 }
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -585,9 +589,8 @@ mod tests {
         (flex_addr, group_addr)
     }
 
-    fn proposal_info(flex_addr: &HumanAddr) -> (Vec<CosmosMsg<Empty>>, String, String) {
+    fn proposal_info() -> (Vec<CosmosMsg<Empty>>, String, String) {
         let bank_msg = BankMsg::Send {
-            from_address: flex_addr.clone(),
             to_address: SOMEBODY.into(),
             amount: coins(1, "BTC"),
         };
@@ -597,8 +600,8 @@ mod tests {
         (msgs, title, description)
     }
 
-    fn pay_somebody_proposal(flex_addr: &HumanAddr) -> HandleMsg {
-        let (msgs, title, description) = proposal_info(flex_addr);
+    fn pay_somebody_proposal() -> HandleMsg {
+        let (msgs, title, description) = proposal_info();
         HandleMsg::Propose {
             title,
             description,
@@ -699,7 +702,7 @@ mod tests {
             false,
         );
 
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         // Only voters can propose
         let res = app.execute_contract(SOMEBODY, &flex_addr, &proposal, &[]);
         assert_eq!(res.unwrap_err(), ContractError::Unauthorized {}.to_string());
@@ -800,7 +803,7 @@ mod tests {
         );
 
         // create proposal with 1 vote power
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER1, &flex_addr, &proposal, &[])
             .unwrap();
@@ -808,7 +811,7 @@ mod tests {
 
         // another proposal immediately passes
         app.update_block(next_block);
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER3, &flex_addr, &proposal, &[])
             .unwrap();
@@ -818,7 +821,7 @@ mod tests {
         app.update_block(expire(voting_period));
 
         // add one more open proposal, 2 votes
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER2, &flex_addr, &proposal, &[])
             .unwrap();
@@ -847,7 +850,7 @@ mod tests {
         assert_eq!(expected_info, info);
 
         // ensure the common features are set
-        let (expected_msgs, expected_title, expected_description) = proposal_info(&flex_addr);
+        let (expected_msgs, expected_title, expected_description) = proposal_info();
         for prop in res.proposals {
             assert_eq!(prop.title, expected_title);
             assert_eq!(prop.description, expected_description);
@@ -865,7 +868,7 @@ mod tests {
             .unwrap();
         assert_eq!(1, res.proposals.len());
 
-        let (msgs, title, description) = proposal_info(&flex_addr);
+        let (msgs, title, description) = proposal_info();
         let expected = ProposalResponse {
             id: proposal_id3,
             title,
@@ -896,7 +899,7 @@ mod tests {
         );
 
         // create proposal with 0 vote power
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(OWNER, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1052,7 +1055,7 @@ mod tests {
         assert_eq!(contract_bal, coin(10, "BTC"));
 
         // create proposal with 0 vote power
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(OWNER, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1133,7 +1136,7 @@ mod tests {
         );
 
         // create proposal with 0 vote power
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(OWNER, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1186,7 +1189,7 @@ mod tests {
         );
 
         // VOTER1 starts a proposal to send some tokens (1/4 votes)
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER1, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1247,7 +1250,7 @@ mod tests {
         app.update_block(|block| block.height += 3);
 
         // make a second proposal
-        let proposal2 = pay_somebody_proposal(&flex_addr);
+        let proposal2 = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER1, &flex_addr, &proposal2, &[])
             .unwrap();
@@ -1334,7 +1337,7 @@ mod tests {
         app.update_block(|b| b.height += 1);
 
         // VOTER1 starts a proposal to send some tokens
-        let cash_proposal = pay_somebody_proposal(&flex_addr);
+        let cash_proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER1, &flex_addr, &cash_proposal, &[])
             .unwrap();
@@ -1388,7 +1391,7 @@ mod tests {
         assert_eq!(prop_status(&app, cash_proposal_id), Status::Passed);
 
         // but cannot open a new one
-        let cash_proposal = pay_somebody_proposal(&flex_addr);
+        let cash_proposal = pay_somebody_proposal();
         let err = app
             .execute_contract(VOTER3, &flex_addr, &cash_proposal, &[])
             .unwrap_err();
@@ -1422,7 +1425,7 @@ mod tests {
         );
 
         // VOTER3 starts a proposal to send some tokens (3/5 votes)
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER3, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1466,7 +1469,7 @@ mod tests {
         assert_eq!(prop_status(&app), Status::Passed);
 
         // new proposal can be passed single-handedly by newbie
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(newbie, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1504,7 +1507,7 @@ mod tests {
         );
 
         // VOTER3 starts a proposal to send some tokens (3 votes)
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER3, &flex_addr, &proposal, &[])
             .unwrap();
@@ -1573,7 +1576,7 @@ mod tests {
         );
 
         // create proposal
-        let proposal = pay_somebody_proposal(&flex_addr);
+        let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(VOTER5, &flex_addr, &proposal, &[])
             .unwrap();

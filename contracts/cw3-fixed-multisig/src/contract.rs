@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult,
+    HumanAddr, MessageInfo, Order, Response, StdResult,
 };
 
 use cw0::{maybe_canonical, Expiration};
@@ -28,7 +28,7 @@ pub fn init(
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if msg.required_weight == 0 {
         return Err(ContractError::ZeroWeight {});
     }
@@ -55,7 +55,7 @@ pub fn init(
         let key = deps.api.canonical_address(&voter.addr)?;
         VOTERS.save(deps.storage, &key, &voter.weight)?;
     }
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle(
@@ -63,7 +63,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     match msg {
         HandleMsg::Propose {
             title,
@@ -86,7 +86,7 @@ pub fn handle_propose(
     msgs: Vec<CosmosMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
@@ -131,7 +131,8 @@ pub fn handle_propose(
     };
     BALLOTS.save(deps.storage, (id.into(), &raw_sender), &ballot)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
@@ -149,7 +150,7 @@ pub fn handle_vote(
     info: MessageInfo,
     proposal_id: u64,
     vote: Vote,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
@@ -188,7 +189,8 @@ pub fn handle_vote(
         PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
@@ -205,7 +207,7 @@ pub fn handle_execute(
     _env: Env,
     info: MessageInfo,
     proposal_id: u64,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -220,7 +222,8 @@ pub fn handle_execute(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: prop.msgs,
         attributes: vec![
             attr("action", "execute"),
@@ -236,7 +239,7 @@ pub fn handle_close(
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -254,7 +257,8 @@ pub fn handle_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
@@ -457,7 +461,7 @@ fn list_voters(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, from_binary, BankMsg};
 
     use cw0::Duration;
@@ -500,7 +504,7 @@ mod tests {
         info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
-    ) -> Result<InitResponse<Empty>, ContractError> {
+    ) -> Result<Response<Empty>, ContractError> {
         // Init a contract with voters
         let voters = vec![
             voter(&info.sender, 0),
@@ -617,7 +621,6 @@ mod tests {
         setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -664,7 +667,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
@@ -683,7 +687,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
@@ -708,7 +713,6 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -756,7 +760,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -826,7 +831,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -862,7 +868,6 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -900,7 +905,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -930,7 +936,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: msgs,
                 attributes: vec![
                     attr("action", "execute"),
@@ -965,7 +972,6 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -1025,7 +1031,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "close"),

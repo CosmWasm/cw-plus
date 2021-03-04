@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, Order, StdResult,
+    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order,
+    Response, StdResult,
 };
 use cw0::maybe_canonical;
 use cw2::set_contract_version;
@@ -25,10 +25,10 @@ pub fn init(
     env: Env,
     _info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     create(deps, msg.admin, msg.members, env.block.height)?;
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 // create is the init logic with set_contract_version removed so it can more
@@ -58,7 +58,7 @@ pub fn handle(
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
         HandleMsg::UpdateMembers { add, remove } => {
@@ -75,7 +75,7 @@ pub fn handle_update_members(
     info: MessageInfo,
     add: Vec<Member>,
     remove: Vec<HumanAddr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let attributes = vec![
         attr("action", "update_members"),
         attr("added", add.len()),
@@ -87,7 +87,8 @@ pub fn handle_update_members(
     let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
     let messages = HOOKS.prepare_hooks(deps.storage, |h| diff.clone().into_cosmos_msg(h))?;
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages,
         attributes,
         data: None,
