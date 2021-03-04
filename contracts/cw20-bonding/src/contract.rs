@@ -225,7 +225,7 @@ fn do_sell(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // burn from the caller, this ensures there are tokens to cover this
-    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+    handle_burn(deps.branch(), env, info.clone(), amount)?;
 
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
