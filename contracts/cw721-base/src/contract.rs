@@ -15,7 +15,7 @@ use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
     increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS,
 };
-use cw_storage_plus::Bound;
+use cw_storage_plus::{Bound, PkOwned};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -497,14 +497,22 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let owner_raw = deps.api.canonical_address(&owner)?;
-    let tokens: Result<Vec<String>, _> = tokens()
+    let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
-        .pks(deps.storage, &owner_raw, start, None, Order::Ascending)
+        .pks(
+            deps.storage,
+            PkOwned(owner_raw.into()),
+            start,
+            None,
+            Order::Ascending,
+        )
         .take(limit)
-        .map(String::from_utf8)
         .collect();
-    let tokens = tokens.map_err(StdError::invalid_utf8)?;
+    let pks = res?;
+
+    let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
+    let tokens = res.map_err(StdError::invalid_utf8)?;
     Ok(TokensResponse { tokens })
 }
 
