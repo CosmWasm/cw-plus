@@ -72,7 +72,7 @@ impl<'a> Hooks<'a> {
             .collect()
     }
 
-    pub fn handle_add_hook(
+    pub fn execute_add_hook(
         &self,
         admin: &Admin,
         deps: DepsMut,
@@ -95,7 +95,7 @@ impl<'a> Hooks<'a> {
         })
     }
 
-    pub fn handle_remove_hook(
+    pub fn execute_remove_hook(
         &self,
         admin: &Admin,
         deps: DepsMut,

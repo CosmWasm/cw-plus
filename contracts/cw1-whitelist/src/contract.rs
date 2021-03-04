@@ -37,7 +37,7 @@ fn map_human(api: &dyn Api, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr
     admins.iter().map(|addr| api.human_address(addr)).collect()
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -46,13 +46,13 @@ pub fn handle(
     msg: HandleMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
-        HandleMsg::Freeze {} => handle_freeze(deps, env, info),
-        HandleMsg::UpdateAdmins { admins } => handle_update_admins(deps, env, info, admins),
+        HandleMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
+        HandleMsg::Freeze {} => execute_freeze(deps, env, info),
+        HandleMsg::UpdateAdmins { admins } => execute_update_admins(deps, env, info, admins),
     }
 }
 
-pub fn handle_execute<T>(
+pub fn execute_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -71,7 +71,7 @@ where
     }
 }
 
-pub fn handle_freeze(
+pub fn execute_freeze(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -89,7 +89,7 @@ pub fn handle_freeze(
     }
 }
 
-pub fn handle_update_admins(
+pub fn execute_update_admins(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -175,7 +175,7 @@ mod tests {
             admins: vec![anyone.clone()],
         };
         let info = mock_info(&anyone, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, msg);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -186,7 +186,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
         };
         let info = mock_info(&alice, &[]);
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -197,7 +197,7 @@ mod tests {
 
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {});
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {});
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -205,7 +205,7 @@ mod tests {
 
         // but bob can
         let info = mock_info(&bob, &[]);
-        handle(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
@@ -217,7 +217,7 @@ mod tests {
             admins: vec![alice.clone()],
         };
         let info = mock_info(&alice, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, msg);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -256,11 +256,11 @@ mod tests {
         ];
 
         // make some nice message
-        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
+        let execute_msg = HandleMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
         let info = mock_info(&bob, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -268,7 +268,7 @@ mod tests {
 
         // but carl can
         let info = mock_info(&carl, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }

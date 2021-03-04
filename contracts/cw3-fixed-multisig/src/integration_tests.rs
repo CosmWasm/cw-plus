@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::contract::{handle, init, query};
+use crate::contract::{execute, init, query};
 use crate::msg::{HandleMsg, InitMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{from_binary, to_binary, HumanAddr, Uint128, WasmMsg, WasmQuery};
@@ -19,13 +19,13 @@ fn mock_app() -> App {
 }
 
 pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(handle, init, query);
+    let contract = ContractWrapper::new(execute, init, query);
     Box::new(contract)
 }
 
 pub fn contract_cw20() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(
-        cw20_base::contract::handle,
+        cw20_base::contract::execute,
         cw20_base::contract::init,
         cw20_base::contract::query,
     );

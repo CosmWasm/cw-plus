@@ -53,7 +53,7 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -65,17 +65,17 @@ pub fn handle(
             description,
             msgs,
             latest,
-        } => handle_propose(deps, env, info, title, description, msgs, latest),
-        HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, info, proposal_id, vote),
-        HandleMsg::Execute { proposal_id } => handle_execute(deps, env, info, proposal_id),
-        HandleMsg::Close { proposal_id } => handle_close(deps, env, info, proposal_id),
+        } => execute_propose(deps, env, info, title, description, msgs, latest),
+        HandleMsg::Vote { proposal_id, vote } => execute_vote(deps, env, info, proposal_id, vote),
+        HandleMsg::Execute { proposal_id } => execute_execute(deps, env, info, proposal_id),
+        HandleMsg::Close { proposal_id } => execute_close(deps, env, info, proposal_id),
         HandleMsg::MemberChangedHook(MemberChangedHookMsg { diffs }) => {
-            handle_membership_hook(deps, env, info, diffs)
+            execute_membership_hook(deps, env, info, diffs)
         }
     }
 }
 
-pub fn handle_propose(
+pub fn execute_propose(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -140,7 +140,7 @@ pub fn handle_propose(
     })
 }
 
-pub fn handle_vote(
+pub fn execute_vote(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -197,7 +197,7 @@ pub fn handle_vote(
     })
 }
 
-pub fn handle_execute(
+pub fn execute_execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -229,7 +229,7 @@ pub fn handle_execute(
     })
 }
 
-pub fn handle_close(
+pub fn execute_close(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -264,7 +264,7 @@ pub fn handle_close(
     })
 }
 
-pub fn handle_membership_hook(
+pub fn execute_membership_hook(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -477,7 +477,7 @@ mod tests {
 
     pub fn contract_flex() -> Box<dyn Contract> {
         let contract = ContractWrapper::new(
-            crate::contract::handle,
+            crate::contract::execute,
             crate::contract::init,
             crate::contract::query,
         );
@@ -486,7 +486,7 @@ mod tests {
 
     pub fn contract_group() -> Box<dyn Contract> {
         let contract = ContractWrapper::new(
-            cw4_group::contract::handle,
+            cw4_group::contract::execute,
             cw4_group::contract::init,
             cw4_group::contract::query,
         );
@@ -1175,7 +1175,7 @@ mod tests {
 
     // uses the power from the beginning of the voting period
     #[test]
-    fn handle_group_changes_from_external() {
+    fn execute_group_changes_from_external() {
         let mut app = mock_app();
 
         let required_weight = 4;
@@ -1304,7 +1304,7 @@ mod tests {
     // similar to above - simpler case, but shows that one proposals can
     // trigger the action
     #[test]
-    fn handle_group_changes_from_proposal() {
+    fn execute_group_changes_from_proposal() {
         let mut app = mock_app();
 
         let required_weight = 4;

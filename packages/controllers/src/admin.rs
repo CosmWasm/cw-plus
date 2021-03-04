@@ -66,7 +66,7 @@ impl<'a> Admin<'a> {
         }
     }
 
-    pub fn handle_update_admin(
+    pub fn execute_update_admin(
         &self,
         deps: DepsMut,
         info: MessageInfo,
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_query() {
+    fn test_execute_query() {
         let mut deps = mock_dependencies(&[]);
 
         // initial setup
@@ -168,14 +168,14 @@ mod tests {
         let info = mock_info(&imposter, &[]);
         let new_admin = Some(friend.clone());
         let err = control
-            .handle_update_admin(deps.as_mut(), info, new_admin.clone())
+            .execute_update_admin(deps.as_mut(), info, new_admin.clone())
             .unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // owner can update
         let info = mock_info(&owner, &[]);
         let res = control
-            .handle_update_admin(deps.as_mut(), info, new_admin)
+            .execute_update_admin(deps.as_mut(), info, new_admin)
             .unwrap();
         assert_eq!(0, res.messages.len());
 

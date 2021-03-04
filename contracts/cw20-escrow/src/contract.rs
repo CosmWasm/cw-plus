@@ -22,22 +22,24 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, _msg: InitMsg) -> StdR
     Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Create(msg) => try_create(deps, msg, Balance::from(info.funds), &info.sender),
-        HandleMsg::Approve { id } => try_approve(deps, env, info, id),
-        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(info.funds)),
-        HandleMsg::Refund { id } => try_refund(deps, env, info, id),
-        HandleMsg::Receive(msg) => try_receive(deps, info, msg),
+        HandleMsg::Create(msg) => {
+            execute_create(deps, msg, Balance::from(info.funds), &info.sender)
+        }
+        HandleMsg::Approve { id } => execute_approve(deps, env, info, id),
+        HandleMsg::TopUp { id } => execute_top_up(deps, id, Balance::from(info.funds)),
+        HandleMsg::Refund { id } => execute_refund(deps, env, info, id),
+        HandleMsg::Receive(msg) => execute_receive(deps, info, msg),
     }
 }
 
-pub fn try_receive(
+pub fn execute_receive(
     deps: DepsMut,
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
@@ -51,12 +53,12 @@ pub fn try_receive(
         amount: wrapper.amount,
     });
     match msg {
-        ReceiveMsg::Create(msg) => try_create(deps, msg, balance, &wrapper.sender),
-        ReceiveMsg::TopUp { id } => try_top_up(deps, id, balance),
+        ReceiveMsg::Create(msg) => execute_create(deps, msg, balance, &wrapper.sender),
+        ReceiveMsg::TopUp { id } => execute_top_up(deps, id, balance),
     }
 }
 
-pub fn try_create(
+pub fn execute_create(
     deps: DepsMut,
     msg: CreateMsg,
     balance: Balance,
@@ -106,7 +108,11 @@ pub fn try_create(
     Ok(res)
 }
 
-pub fn try_top_up(deps: DepsMut, id: String, balance: Balance) -> Result<Response, ContractError> {
+pub fn execute_top_up(
+    deps: DepsMut,
+    id: String,
+    balance: Balance,
+) -> Result<Response, ContractError> {
     if balance.is_empty() {
         return Err(ContractError::EmptyBalance {});
     }
@@ -130,7 +136,7 @@ pub fn try_top_up(deps: DepsMut, id: String, balance: Balance) -> Result<Respons
     Ok(res)
 }
 
-pub fn try_approve(
+pub fn execute_approve(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -162,7 +168,7 @@ pub fn try_approve(
     }
 }
 
-pub fn try_refund(
+pub fn execute_refund(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -308,7 +314,7 @@ mod tests {
         let balance = coins(100, "tokens");
         let info = mock_info(&sender, &balance);
         let msg = HandleMsg::Create(create.clone());
-        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -332,7 +338,7 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(
@@ -346,7 +352,7 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -380,7 +386,7 @@ mod tests {
         let token_contract = HumanAddr::from("my-cw20-token");
         let info = mock_info(&token_contract, &[]);
         let msg = HandleMsg::Receive(receive.clone());
-        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -410,7 +416,7 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         let send_msg = Cw20HandleMsg::Transfer {
@@ -429,7 +435,7 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -505,7 +511,7 @@ mod tests {
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
         let info = mock_info(&sender, &balance);
         let msg = HandleMsg::Create(create.clone());
-        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -515,7 +521,7 @@ mod tests {
         let top_up = HandleMsg::TopUp {
             id: create.id.clone(),
         };
-        let res = handle(deps.as_mut(), mock_env(), info, top_up).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
@@ -530,7 +536,7 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&bar_token, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, top_up).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
@@ -546,7 +552,7 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&baz_token, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, top_up);
+        let res = execute(deps.as_mut(), mock_env(), info, top_up);
         match res.unwrap_err() {
             ContractError::NotInWhitelist {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -563,14 +569,14 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&foo_token, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, top_up).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(3, res.messages.len());
 

@@ -53,23 +53,23 @@ pub fn create(
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.handle_update_admin(deps, info, admin)?),
+        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
         HandleMsg::UpdateMembers { add, remove } => {
-            handle_update_members(deps, env, info, add, remove)
+            execute_update_members(deps, env, info, add, remove)
         }
-        HandleMsg::AddHook { addr } => Ok(HOOKS.handle_add_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::RemoveHook { addr } => Ok(HOOKS.handle_remove_hook(&ADMIN, deps, info, addr)?),
+        HandleMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
+        HandleMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
     }
 }
 
-pub fn handle_update_members(
+pub fn execute_update_members(
     mut deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -95,7 +95,7 @@ pub fn handle_update_members(
     })
 }
 
-// the logic from handle_update_members extracted for easier import
+// the logic from execute_update_members extracted for easier import
 pub fn update_members(
     deps: DepsMut,
     height: u64,
@@ -390,7 +390,7 @@ mod tests {
 
         // non-admin cannot add hook
         let user_info = mock_info(USER1, &[]);
-        let err = handle(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             user_info.clone(),
@@ -401,7 +401,7 @@ mod tests {
 
         // admin can add it, and it appears in the query
         let admin_info = mock_info(INIT_ADMIN, &[]);
-        let _ = handle(
+        let _ = execute(
             deps.as_mut(),
             mock_env(),
             admin_info.clone(),
@@ -415,7 +415,7 @@ mod tests {
         let remove_msg = HandleMsg::RemoveHook {
             addr: contract2.clone(),
         };
-        let err = handle(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             admin_info.clone(),
@@ -428,12 +428,12 @@ mod tests {
         let add_msg2 = HandleMsg::AddHook {
             addr: contract2.clone(),
         };
-        let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
+        let _ = execute(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
 
         // cannot re-add an existing contract
-        let err = handle(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             admin_info.clone(),
@@ -446,7 +446,7 @@ mod tests {
         let remove_msg = HandleMsg::RemoveHook {
             addr: contract1.clone(),
         };
-        let err = handle(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             user_info.clone(),
@@ -456,7 +456,7 @@ mod tests {
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // remove the original
-        let _ = handle(
+        let _ = execute(
             deps.as_mut(),
             mock_env(),
             admin_info.clone(),
@@ -487,7 +487,7 @@ mod tests {
             addr: contract2.clone(),
         };
         for msg in vec![add_msg, add_msg2] {
-            let _ = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+            let _ = execute(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
         }
 
         // make some changes - add 3, remove 2, and update 1
@@ -507,7 +507,7 @@ mod tests {
 
         // admin updates properly
         assert_users(&deps, Some(11), Some(6), None, None);
-        let res = handle(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), admin_info.clone(), msg).unwrap();
         assert_users(&deps, Some(20), None, Some(5), None);
 
         // ensure 2 messages for the 2 hooks
@@ -541,7 +541,7 @@ mod tests {
         let member2: u64 = from_slice(&member2_raw).unwrap();
         assert_eq!(6, member2);
 
-        // and handle misses
+        // and execute misses
         let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
         let member3_raw = deps.storage.get(&member_key(&member3_canon));
         assert_eq!(None, member3_raw);

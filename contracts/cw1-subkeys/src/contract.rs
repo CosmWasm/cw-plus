@@ -9,7 +9,7 @@ use cosmwasm_std::{
 use cw0::{calc_range_start_human, Expiration};
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
-    contract::{handle_freeze, handle_update_admins, init as whitelist_init, query_admin_list},
+    contract::{execute_freeze, execute_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
     state::admin_list_read,
 };
@@ -34,7 +34,7 @@ pub fn init(mut deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> Std
     Ok(result)
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -43,27 +43,27 @@ pub fn handle(
     msg: HandleMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
-        HandleMsg::Freeze {} => Ok(handle_freeze(deps, env, info)?),
-        HandleMsg::UpdateAdmins { admins } => Ok(handle_update_admins(deps, env, info, admins)?),
+        HandleMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
+        HandleMsg::Freeze {} => Ok(execute_freeze(deps, env, info)?),
+        HandleMsg::UpdateAdmins { admins } => Ok(execute_update_admins(deps, env, info, admins)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_increase_allowance(deps, env, info, spender, amount, expires),
+        } => execute_increase_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_decrease_allowance(deps, env, info, spender, amount, expires),
+        } => execute_decrease_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::SetPermissions {
             spender,
             permissions,
-        } => handle_set_permissions(deps, env, info, spender, permissions),
+        } => execute_set_permissions(deps, env, info, spender, permissions),
     }
 }
 
-pub fn handle_execute<T>(
+pub fn execute_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -149,7 +149,7 @@ pub fn check_staking_permissions(
     Ok(true)
 }
 
-pub fn handle_increase_allowance<T>(
+pub fn execute_increase_allowance<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -195,7 +195,7 @@ where
     Ok(res)
 }
 
-pub fn handle_decrease_allowance<T>(
+pub fn execute_decrease_allowance<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -246,7 +246,7 @@ where
     Ok(res)
 }
 
-pub fn handle_set_permissions<T>(
+pub fn execute_set_permissions<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -448,7 +448,7 @@ mod tests {
                     amount: amount.clone(),
                     expires: Some(expiration.clone()),
                 };
-                handle(deps.branch(), mock_env(), info.clone(), msg).unwrap();
+                execute(deps.branch(), mock_env(), info.clone(), msg).unwrap();
             }
         }
     }
@@ -649,14 +649,14 @@ mod tests {
             spender: spender1.clone(),
             permissions: god_mode,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
 
         let setup_perm_msg2 = HandleMsg::SetPermissions {
             spender: spender2.clone(),
             // default is no permission
             permissions: Default::default(),
         };
-        handle(deps.as_mut(), mock_env(), info, setup_perm_msg2).unwrap();
+        execute(deps.as_mut(), mock_env(), info, setup_perm_msg2).unwrap();
 
         let permissions = query_permissions(deps.as_ref(), spender1.clone()).unwrap();
         assert_eq!(permissions, god_mode);
@@ -725,19 +725,19 @@ mod tests {
             spender: spender1.clone(),
             permissions: god_mode,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
 
         let setup_perm_msg2 = HandleMsg::SetPermissions {
             spender: spender2.clone(),
             permissions: noob_mode,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
 
         let setup_perm_msg3 = HandleMsg::SetPermissions {
             spender: spender3.clone(),
             permissions: noob_mode,
         };
-        handle(deps.as_mut(), mock_env(), info, setup_perm_msg3).unwrap();
+        execute(deps.as_mut(), mock_env(), info, setup_perm_msg3).unwrap();
 
         // let's try pagination
         let permissions = query_all_permissions(deps.as_ref(), None, Some(2))
@@ -807,7 +807,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: new_admins.clone(),
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let config = query_admin_list(deps.as_ref()).unwrap();
@@ -824,7 +824,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![admin3.clone()],
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify admin3 is now the sole admin
         let config = query_admin_list(deps.as_ref()).unwrap();
@@ -841,7 +841,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![admin3.clone(), owner.clone()],
         };
-        let res = handle(deps.as_mut(), mock_env(), info, msg);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
 
         // Verify it fails (admin3 is now the owner)
         assert!(res.is_err());
@@ -852,7 +852,7 @@ mod tests {
         let msg = HandleMsg::UpdateAdmins {
             admins: vec![admin3.clone(), owner.clone()],
         };
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Verify
         let config = query_admin_list(deps.as_ref()).unwrap();
@@ -914,7 +914,7 @@ mod tests {
             amount: allow1.clone(),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender1.clone()).unwrap();
@@ -932,7 +932,7 @@ mod tests {
             amount: allow3.clone(),
             expires: Some(expires_height.clone()),
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender2.clone()).unwrap();
@@ -950,7 +950,7 @@ mod tests {
             amount: allow1.clone(),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender3.clone()).unwrap();
@@ -968,7 +968,7 @@ mod tests {
             amount: allow2.clone(),
             expires: Some(expires_time.clone()),
         };
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender4.clone()).unwrap();
@@ -1027,7 +1027,7 @@ mod tests {
             amount: allow3.clone(),
             expires: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), msg);
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
 
         // Verify
         assert!(res.is_err());
@@ -1047,7 +1047,7 @@ mod tests {
             amount: allow2.clone(),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender2.clone()).unwrap();
@@ -1065,7 +1065,7 @@ mod tests {
             amount: coin(amount1 / 2, denom1),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender1.clone()).unwrap();
@@ -1086,7 +1086,7 @@ mod tests {
             amount: allow1.clone(),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender2.clone()).unwrap();
@@ -1098,7 +1098,7 @@ mod tests {
             amount: allow1.clone(),
             expires: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), msg);
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
 
         // Verify
         assert!(res.is_err());
@@ -1109,7 +1109,7 @@ mod tests {
             amount: coin(amount1 * 10, denom1),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // Verify
         let allowance = query_allowance(deps.as_ref(), spender1.clone()).unwrap();
@@ -1158,11 +1158,11 @@ mod tests {
         }
         .into()];
 
-        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
+        let execute_msg = HandleMsg::Execute { msgs: msgs.clone() };
 
         // spender2 cannot spend funds (no initial allowance)
         let info = mock_info(&spender2, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
         match res.unwrap_err() {
             ContractError::NoAllowance { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -1170,7 +1170,7 @@ mod tests {
 
         // But spender1 can (he has enough funds)
         let info = mock_info(&spender1, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), handle_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), execute_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(
             res.attributes,
@@ -1178,7 +1178,7 @@ mod tests {
         );
 
         // And then cannot (not enough funds anymore)
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("unexpected error: {}", e),
@@ -1186,7 +1186,7 @@ mod tests {
 
         // Owner / admins can do anything (at the contract level)
         let info = mock_info(&owner.clone(), &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(
             res.attributes,
@@ -1195,12 +1195,12 @@ mod tests {
 
         // For admins, even other message types are allowed
         let other_msgs = vec![CosmosMsg::Custom(Empty {})];
-        let handle_msg = HandleMsg::Execute {
+        let execute_msg = HandleMsg::Execute {
             msgs: other_msgs.clone(),
         };
 
         let info = mock_info(&owner, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
         assert_eq!(res.messages, other_msgs);
         assert_eq!(
             res.attributes,
@@ -1209,7 +1209,7 @@ mod tests {
 
         // But not for mere mortals
         let info = mock_info(&spender1, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
         match res.unwrap_err() {
             ContractError::MessageTypeRejected { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -1250,7 +1250,7 @@ mod tests {
             spender: spender1.clone(),
             permissions: god_mode,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
 
         let setup_perm_msg2 = HandleMsg::SetPermissions {
             spender: spender2.clone(),
@@ -1258,7 +1258,7 @@ mod tests {
             permissions: Default::default(),
         };
         // default is no permission
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
 
         let msg_delegate = vec![StakingMsg::Delegate {
             validator: HumanAddr::from("validator1"),
@@ -1292,7 +1292,7 @@ mod tests {
         // spender1 can execute
         for msg in &msgs {
             let info = mock_info(&spender1, &[]);
-            let res = handle(
+            let res = execute(
                 deps.as_mut(),
                 mock_env(),
                 info,
@@ -1304,7 +1304,7 @@ mod tests {
         // spender2 cannot execute (no permission)
         for msg in &msgs {
             let info = mock_info(&spender2, &[]);
-            let res = handle(
+            let res = execute(
                 deps.as_mut(),
                 mock_env(),
                 info.clone(),
@@ -1324,9 +1324,9 @@ mod tests {
                 withdraw: false,
             },
         };
-        handle(deps.as_mut(), mock_env(), info, setup_perm_msg3).unwrap();
+        execute(deps.as_mut(), mock_env(), info, setup_perm_msg3).unwrap();
         let info = mock_info(&spender3, &[]);
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             mock_env(),
             info.clone(),
@@ -1336,7 +1336,7 @@ mod tests {
         );
         // FIXME need better error check here
         assert!(res.is_err());
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             mock_env(),
             info.clone(),
@@ -1345,7 +1345,7 @@ mod tests {
             },
         );
         assert!(res.is_ok());
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             mock_env(),
             info.clone(),
@@ -1354,7 +1354,7 @@ mod tests {
             },
         );
         assert!(res.is_ok());
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             mock_env(),
             info,
@@ -1404,14 +1404,14 @@ mod tests {
             spender: spender1.clone(),
             permissions: perm,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg).unwrap();
 
         let setup_allowance_msg = HandleMsg::IncreaseAllowance {
             spender: spender1.clone(),
             amount: coin.clone(),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_allowance_msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_allowance_msg).unwrap();
 
         let res_perm = query_permissions(deps.as_ref(), spender1.clone()).unwrap();
         assert_eq!(perm, res_perm);
@@ -1424,13 +1424,13 @@ mod tests {
             amount: coin.clone(),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), info.clone(), setup_allowance_msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), setup_allowance_msg).unwrap();
 
         let setup_perm_msg = HandleMsg::SetPermissions {
             spender: spender2.clone(),
             permissions: perm,
         };
-        handle(deps.as_mut(), mock_env(), info, setup_perm_msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, setup_perm_msg).unwrap();
 
         let res_perm = query_permissions(deps.as_ref(), spender2.clone()).unwrap();
         assert_eq!(perm, res_perm);

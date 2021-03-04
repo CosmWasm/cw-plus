@@ -58,7 +58,7 @@ pub fn init(
     Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -70,14 +70,14 @@ pub fn handle(
             description,
             msgs,
             latest,
-        } => handle_propose(deps, env, info, title, description, msgs, latest),
-        HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, info, proposal_id, vote),
-        HandleMsg::Execute { proposal_id } => handle_execute(deps, env, info, proposal_id),
-        HandleMsg::Close { proposal_id } => handle_close(deps, env, info, proposal_id),
+        } => execute_propose(deps, env, info, title, description, msgs, latest),
+        HandleMsg::Vote { proposal_id, vote } => execute_vote(deps, env, info, proposal_id, vote),
+        HandleMsg::Execute { proposal_id } => execute_execute(deps, env, info, proposal_id),
+        HandleMsg::Close { proposal_id } => execute_close(deps, env, info, proposal_id),
     }
 }
 
-pub fn handle_propose(
+pub fn execute_propose(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -144,7 +144,7 @@ pub fn handle_propose(
     })
 }
 
-pub fn handle_vote(
+pub fn execute_vote(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -202,7 +202,7 @@ pub fn handle_vote(
     })
 }
 
-pub fn handle_execute(
+pub fn execute_execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -234,7 +234,7 @@ pub fn handle_execute(
     })
 }
 
-pub fn handle_close(
+pub fn execute_close(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -634,7 +634,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info, proposal.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, proposal.clone());
 
         // Verify
         assert!(res.is_err());
@@ -651,7 +651,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = handle(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
+        let res = execute(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
 
         // Verify
         assert!(res.is_err());
@@ -662,7 +662,7 @@ mod tests {
 
         // Proposal from voter works
         let info = mock_info(VOTER3, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -682,7 +682,7 @@ mod tests {
 
         // Proposal from voter with enough vote power directly passes
         let info = mock_info(VOTER4, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
 
         // Verify
         assert_eq!(
@@ -723,7 +723,7 @@ mod tests {
             msgs,
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -733,7 +733,7 @@ mod tests {
             proposal_id,
             vote: Vote::Yes,
         };
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -744,7 +744,7 @@ mod tests {
 
         // Only voters can vote
         let info = mock_info(SOMEBODY, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -755,7 +755,7 @@ mod tests {
 
         // But voter1 can
         let info = mock_info(VOTER1, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -786,7 +786,7 @@ mod tests {
             vote: Vote::No,
         };
         let info = mock_info(VOTER2, &[]);
-        handle(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
 
         // Cast a Veto vote
         let veto_vote = HandleMsg::Vote {
@@ -794,13 +794,13 @@ mod tests {
             vote: Vote::Veto,
         };
         let info = mock_info(VOTER3, &[]);
-        handle(deps.as_mut(), mock_env(), info.clone(), veto_vote).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), veto_vote).unwrap();
 
         // Verify
         assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
 
         // Once voted, votes cannot be changed
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -815,7 +815,7 @@ mod tests {
             Duration::Time(duration) => mock_env_time(duration + 1),
             Duration::Height(duration) => mock_env_height(duration + 1),
         };
-        let res = handle(deps.as_mut(), env, info, no_vote);
+        let res = execute(deps.as_mut(), env, info, no_vote);
 
         // Verify
         assert!(res.is_err());
@@ -826,7 +826,7 @@ mod tests {
 
         // Vote it again, so it passes
         let info = mock_info(VOTER4, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
@@ -846,7 +846,7 @@ mod tests {
 
         // non-Open proposals cannot be voted
         let info = mock_info(VOTER5, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote);
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote);
 
         // Verify
         assert!(res.is_err());
@@ -878,14 +878,14 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Only Passed can be executed
         let execution = HandleMsg::Execute { proposal_id };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), execution.clone());
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), execution.clone());
 
         // Verify
         assert!(res.is_err());
@@ -900,7 +900,7 @@ mod tests {
             vote: Vote::Yes,
         };
         let info = mock_info(VOTER3, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), vote).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), vote).unwrap();
 
         // Verify
         assert_eq!(
@@ -920,7 +920,7 @@ mod tests {
 
         // In passing: Try to close Passed fails
         let closing = HandleMsg::Close { proposal_id };
-        let res = handle(deps.as_mut(), mock_env(), info, closing);
+        let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
@@ -931,7 +931,7 @@ mod tests {
 
         // Execute works. Anybody can execute Passed proposals
         let info = mock_info(SOMEBODY, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
 
         // Verify
         assert_eq!(
@@ -950,7 +950,7 @@ mod tests {
 
         // In passing: Try to close Executed fails
         let closing = HandleMsg::Close { proposal_id };
-        let res = handle(deps.as_mut(), mock_env(), info, closing);
+        let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
@@ -982,7 +982,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -993,7 +993,7 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
 
         // Non-expired proposals cannot be closed
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), closing.clone());
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), closing.clone());
 
         // Verify
         assert!(res.is_err());
@@ -1011,7 +1011,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -1020,7 +1020,7 @@ mod tests {
 
         // Close expired works
         let env = mock_env_height(1234567);
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             env,
             mock_info(SOMEBODY, &[]),
@@ -1044,7 +1044,7 @@ mod tests {
         );
 
         // Trying to close it again fails
-        let res = handle(deps.as_mut(), mock_env(), info, closing);
+        let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
