@@ -743,7 +743,8 @@ jobs:
           command: cargo fmt -- --check
       - run:
           name: Clippy linting on workspace
-          command: cargo clippy -- -D warnings
+          # Silence false positive `field_reassing_with_default` (https://github.com/rust-lang/rust-clippy/issues/6545)
+          command: cargo clippy -- -D warnings -A clippy::field_reassign_with_default
       - save_cache:
           paths:
             - /usr/local/cargo/registry
