@@ -57,7 +57,7 @@ fn init_payout(
 
 fn handle_payout(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     _msg: EmptyMsg,
 ) -> Result<Response, StdError> {
