@@ -139,16 +139,9 @@ impl Bank for SimpleBank {
         msg: BankMsg,
     ) -> Result<(), String> {
         match msg {
-            BankMsg::Send {
-                from_address,
-                to_address,
-                amount,
-            } => {
-                if sender != from_address {
-                    Err("Sender must equal from_address".into())
-                } else {
-                    self.send(storage, from_address, to_address, amount)
-                }
+            BankMsg::Send { to_address, amount } => self.send(storage, sender, to_address, amount),
+            m => {
+                panic!("Unsupported bank message: {:?}", m)
             }
         }
     }
@@ -168,6 +161,9 @@ impl Bank for SimpleBank {
                     .unwrap_or_else(|| coin(0, denom));
                 let res = BalanceResponse { amount };
                 Ok(to_binary(&res).map_err(|e| e.to_string())?)
+            }
+            q => {
+                panic!("Unsupported bank query: {:?}", q)
             }
         }
     }
@@ -278,7 +274,6 @@ mod test {
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
         let msg = BankMsg::Send {
-            from_address: owner.clone(),
             to_address: rcpt.clone(),
             amount: to_send.clone(),
         };
@@ -293,7 +288,6 @@ mod test {
 
         // cannot send too much
         let msg = BankMsg::Send {
-            from_address: owner.clone(),
             to_address: rcpt.clone(),
             amount: coins(20, "btc"),
         };

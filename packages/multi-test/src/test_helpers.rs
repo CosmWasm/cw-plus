@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::wasm::{Contract, ContractWrapper};
 use cosmwasm_std::{
     attr, from_slice, to_binary, to_vec, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty,
-    Env, HandleResponse, InitResponse, MessageInfo, StdError,
+    Env, MessageInfo, Response, StdError,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -15,7 +15,7 @@ fn init_error(
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<InitResponse, StdError> {
+) -> Result<Response, StdError> {
     Err(StdError::generic_err("Init failed"))
 }
 
@@ -24,7 +24,7 @@ fn handle_error(
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<HandleResponse, StdError> {
+) -> Result<Response, StdError> {
     Err(StdError::generic_err("Handle failed"))
 }
 
@@ -49,10 +49,10 @@ fn init_payout(
     _env: Env,
     _info: MessageInfo,
     msg: PayoutMessage,
-) -> Result<InitResponse, StdError> {
+) -> Result<Response, StdError> {
     let bin = to_vec(&msg)?;
     deps.storage.set(PAYOUT_KEY, &bin);
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 fn handle_payout(
@@ -60,17 +60,17 @@ fn handle_payout(
     env: Env,
     info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<HandleResponse, StdError> {
+) -> Result<Response, StdError> {
     // always try to payout what was set originally
     let bin = deps.storage.get(PAYOUT_KEY).unwrap();
     let payout: PayoutMessage = from_slice(&bin)?;
     let msg = BankMsg::Send {
-        from_address: env.contract.address,
         to_address: info.sender,
         amount: vec![payout.payout],
     }
     .into();
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![msg],
         attributes: vec![attr("action", "payout")],
         data: None,
@@ -105,9 +105,9 @@ fn init_reflect(
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<InitResponse, StdError> {
+) -> Result<Response, StdError> {
     deps.storage.set(REFLECT_KEY, &[1]);
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 fn handle_reflect(
@@ -115,14 +115,15 @@ fn handle_reflect(
     _env: Env,
     _info: MessageInfo,
     msg: ReflectMessage,
-) -> Result<HandleResponse, StdError> {
+) -> Result<Response, StdError> {
     let old = match deps.storage.get(REFLECT_KEY) {
         Some(bz) => bz[0],
         None => 0,
     };
     deps.storage.set(REFLECT_KEY, &[old + 1]);
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: msg.messages,
         attributes: vec![],
         data: None,

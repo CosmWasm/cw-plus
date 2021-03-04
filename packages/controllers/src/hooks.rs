@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    attr, CosmosMsg, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult,
-    Storage,
+    attr, CosmosMsg, Deps, DepsMut, HumanAddr, MessageInfo, Response, StdError, StdResult, Storage,
 };
 use cw_storage_plus::Item;
 
@@ -79,7 +78,7 @@ impl<'a> Hooks<'a> {
         deps: DepsMut,
         info: MessageInfo,
         addr: HumanAddr,
-    ) -> Result<HandleResponse, HookError> {
+    ) -> Result<Response, HookError> {
         admin.assert_admin(deps.as_ref(), &info.sender)?;
         self.add_hook(deps.storage, addr.clone())?;
 
@@ -88,7 +87,8 @@ impl<'a> Hooks<'a> {
             attr("hook", addr),
             attr("sender", info.sender),
         ];
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages: vec![],
             attributes,
             data: None,
@@ -101,7 +101,7 @@ impl<'a> Hooks<'a> {
         deps: DepsMut,
         info: MessageInfo,
         addr: HumanAddr,
-    ) -> Result<HandleResponse, HookError> {
+    ) -> Result<Response, HookError> {
         admin.assert_admin(deps.as_ref(), &info.sender)?;
         self.remove_hook(deps.storage, addr.clone())?;
 
@@ -110,7 +110,8 @@ impl<'a> Hooks<'a> {
             attr("hook", addr),
             attr("sender", info.sender),
         ];
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages: vec![],
             attributes,
             data: None,
