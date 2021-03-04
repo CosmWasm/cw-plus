@@ -124,8 +124,10 @@
   ],
   "definitions": {
     "BankMsg": {
+      "description": "The message types of the bank module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/bank/v1beta1/tx.proto",
       "anyOf": [
         {
+          "description": "Sends native tokens from the contract to the given address.\n\nThis is translated to a [MsgSend](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/bank/v1beta1/tx.proto#L19-L28). `from_address` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "send"
@@ -135,7 +137,6 @@
               "type": "object",
               "required": [
                 "amount",
-                "from_address",
                 "to_address"
               ],
               "properties": {
@@ -144,9 +145,6 @@
                   "items": {
                     "$ref": "#/definitions/Coin"
                   }
-                },
-                "from_address": {
-                  "$ref": "#/definitions/HumanAddr"
                 },
                 "to_address": {
                   "$ref": "#/definitions/HumanAddr"
@@ -320,8 +318,10 @@
       }
     },
     "StakingMsg": {
+      "description": "The message types of the staking module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto",
       "anyOf": [
         {
+          "description": "This is translated to a [MsgDelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L81-L90). `delegator_address` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "delegate"
@@ -345,6 +345,7 @@
           }
         },
         {
+          "description": "This is translated to a [MsgUndelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L112-L121). `delegator_address` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "undelegate"
@@ -368,6 +369,7 @@
           }
         },
         {
+          "description": "This is translated to a [MsgSetWithdrawAddress](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L29-L37) followed by a [MsgWithdrawDelegatorReward](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L42-L50). `delegator_address` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "withdraw"
@@ -398,6 +400,7 @@
           }
         },
         {
+          "description": "This is translated to a [MsgBeginRedelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L95-L105). `delegator_address` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "redelegate"
@@ -439,9 +442,10 @@
       ]
     },
     "WasmMsg": {
+      "description": "The message types of the wasm module.\n\nSee https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto",
       "anyOf": [
         {
-          "description": "this dispatches a call to another contract at a known address (with known ABI)",
+          "description": "Dispatches a call to another contract at a known address (with known ABI).\n\nThis is translated to a [MsgExecuteContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L68-L78). `sender` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "execute"
@@ -459,7 +463,7 @@
                   "$ref": "#/definitions/HumanAddr"
                 },
                 "msg": {
-                  "description": "msg is the json-encoded HandleMsg struct (as raw Binary)",
+                  "description": "msg is the json-encoded ExecuteMsg struct (as raw Binary)",
                   "allOf": [
                     {
                       "$ref": "#/definitions/Binary"
@@ -477,7 +481,7 @@
           }
         },
         {
-          "description": "this instantiates a new contracts from previously uploaded wasm code",
+          "description": "Instantiates a new contracts from previously uploaded Wasm code.\n\nThis is translated to a [MsgInstantiateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L47-L61). `sender` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "instantiate"
@@ -487,6 +491,7 @@
               "type": "object",
               "required": [
                 "code_id",
+                "label",
                 "msg",
                 "send"
               ],
@@ -497,11 +502,8 @@
                   "minimum": 0.0
                 },
                 "label": {
-                  "description": "optional human-readbale label for the contract",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "description": "A human-readbale label for the contract",
+                  "type": "string"
                 },
                 "msg": {
                   "description": "msg is the json-encoded InitMsg struct (as raw Binary)",
@@ -516,6 +518,42 @@
                   "items": {
                     "$ref": "#/definitions/Coin"
                   }
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "Migrates a given contracts to use new wasm code. Passes a MigrateMsg to allow us to customize behavior.\n\nOnly the contract admin (as defined in wasmd), if any, is able to make this call.\n\nThis is translated to a [MsgMigrateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L86-L96). `sender` is automatically filled with the current contract's address.",
+          "type": "object",
+          "required": [
+            "migrate"
+          ],
+          "properties": {
+            "migrate": {
+              "type": "object",
+              "required": [
+                "contract_addr",
+                "msg",
+                "new_code_id"
+              ],
+              "properties": {
+                "contract_addr": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "msg": {
+                  "description": "msg is the json-encoded MigrateMsg struct that will be passed to the new code",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/Binary"
+                    }
+                  ]
+                },
+                "new_code_id": {
+                  "description": "the code_id of the new logic to place in the given contract",
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
                 }
               }
             }
