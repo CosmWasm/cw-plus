@@ -420,8 +420,8 @@ mod test {
         let poor = get_balance(&router, &rcpt);
         assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
 
-        // cannot send from other account
-        router.execute(rcpt.clone(), msg).unwrap_err();
+        // can send from other account (but funds will be deducted from sender)
+        router.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
         let msg = BankMsg::Send {

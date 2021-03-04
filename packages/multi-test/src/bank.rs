@@ -283,8 +283,8 @@ mod test {
         let poor = bank.get_balance(&store, rcpt.clone()).unwrap();
         assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
 
-        // cannot send from other account
-        bank.handle(&mut store, rcpt.clone(), msg).unwrap_err();
+        // can send from any account with funds
+        bank.handle(&mut store, rcpt.clone(), msg).unwrap();
 
         // cannot send too much
         let msg = BankMsg::Send {
