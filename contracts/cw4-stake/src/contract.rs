@@ -229,15 +229,13 @@ pub fn handle_claim(
 
     let config = CONFIG.load(deps.storage)?;
     let amount;
-    if let Denom::Native(denom) = &config.denom {
-        amount = coins(release.u128(), denom);
-    } else if let Denom::Cw20(_canonical_addr) = &config.denom {
-        unimplemented!("The CW20 coins release functionality is in progress");
-    } else {
-        return Err(ContractError::ExtraDenoms(String::from(
-            "Sent unsupported denoms",
-        )));
+    match &config.denom {
+        Denom::Native(denom) => amount = coins(release.u128(), denom),
+        Denom::Cw20(_canonical_addr) => {
+            unimplemented!("The CW20 coins release functionality is in progress")
+        }
     }
+
     let amount_str = coins_to_string(&amount);
     let messages = vec![BankMsg::Send {
         from_address: env.contract.address,
