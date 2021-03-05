@@ -4,8 +4,8 @@ use std::ops::Deref;
 
 use crate::transactions::{RepLog, StorageTransaction};
 use cosmwasm_std::{
-    from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HandleResponse,
-    HumanAddr, InitResponse, MessageInfo, Querier, QuerierWrapper, Storage, WasmQuery,
+    from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HumanAddr, MessageInfo,
+    Querier, QuerierWrapper, Response, Storage, WasmQuery,
 };
 
 /// Interface to call into a Contract
@@ -16,7 +16,7 @@ pub trait Contract {
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<HandleResponse, String>;
+    ) -> Result<Response, String>;
 
     fn init(
         &self,
@@ -24,7 +24,7 @@ pub trait Contract {
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<InitResponse, String>;
+    ) -> Result<Response, String>;
 
     fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
 }
@@ -44,8 +44,8 @@ where
     E2: std::fmt::Display,
     E3: std::fmt::Display,
 {
-    handle_fn: ContractFn<T1, HandleResponse, E1>,
-    init_fn: ContractFn<T2, InitResponse, E2>,
+    handle_fn: ContractFn<T1, Response, E1>,
+    init_fn: ContractFn<T2, Response, E2>,
     query_fn: QueryFn<T3, E3>,
 }
 
@@ -59,8 +59,8 @@ where
     E3: std::fmt::Display,
 {
     pub fn new(
-        handle_fn: ContractFn<T1, HandleResponse, E1>,
-        init_fn: ContractFn<T2, InitResponse, E2>,
+        handle_fn: ContractFn<T1, Response, E1>,
+        init_fn: ContractFn<T2, Response, E2>,
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
@@ -86,7 +86,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<HandleResponse, String> {
+    ) -> Result<Response, String> {
         let msg: T1 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.handle_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
@@ -98,7 +98,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<InitResponse, String> {
+    ) -> Result<Response, String> {
         let msg: T2 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.init_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
@@ -180,6 +180,9 @@ impl WasmRouter {
                 self.query_smart(contract_addr, querier, msg.into())
             }
             WasmQuery::Raw { contract_addr, key } => self.query_raw(contract_addr, &key),
+            q => {
+                panic!("Unsupported wasm query: {:?}", q)
+            }
         }
     }
 
@@ -331,7 +334,7 @@ impl<'a> WasmCache<'a> {
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<HandleResponse, String> {
+    ) -> Result<Response, String> {
         let parent = &self.router.handlers;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
@@ -358,7 +361,7 @@ impl<'a> WasmCache<'a> {
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<InitResponse, String> {
+    ) -> Result<Response, String> {
         let parent = &self.router.handlers;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
@@ -530,12 +533,7 @@ mod test {
             .unwrap();
         assert_eq!(1, res.messages.len());
         match &res.messages[0] {
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address,
-                to_address,
-                amount,
-            }) => {
-                assert_eq!(from_address, &contract_addr);
+            CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
                 assert_eq!(to_address.as_str(), "foobar");
                 assert_eq!(amount.as_slice(), &[payout.clone()]);
             }

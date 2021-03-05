@@ -25,7 +25,7 @@ cw2 = { path = "../../packages/cw2", version = "0.5.0" }
 cw20 = { path = "../../packages/cw20", version = "0.5.0" }
 cw20-base = { path = "../../contracts/cw20-base", version = "0.5.0", features = ["library"] }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.5.0" }
-cosmwasm-std = { version = "0.13.2", features = ["staking"] }
+cosmwasm-std = { version = "0.14.0-alpha2", features = ["staking"] }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
@@ -33,4 +33,4 @@ rust_decimal = { version = "1.8.1" }
 num-integer = { version = "0.1.44" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.13.2" }
+cosmwasm-schema = { version = "0.14.0-alpha2" }

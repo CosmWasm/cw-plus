@@ -3,7 +3,7 @@ use thiserror::Error;
 
 /// returns an error if any coins were sent
 pub fn nonpayable(info: &MessageInfo) -> Result<(), PaymentError> {
-    if info.sent_funds.is_empty() {
+    if info.funds.is_empty() {
         Ok(())
     } else {
         Err(PaymentError::NonPayable {})
@@ -13,11 +13,11 @@ pub fn nonpayable(info: &MessageInfo) -> Result<(), PaymentError> {
 /// Requires exactly one denom sent, which matches the requested denom.
 /// Returns the amount if only one denom and non-zero amount. Errors otherwise.
 pub fn must_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError> {
-    match info.sent_funds.len() {
+    match info.funds.len() {
         0 => Err(PaymentError::NoFunds {}),
         1 => {
-            if info.sent_funds[0].denom == denom {
-                let payment = info.sent_funds[0].amount;
+            if info.funds[0].denom == denom {
+                let payment = info.funds[0].amount;
                 if payment.is_zero() {
                     Err(PaymentError::NoFunds {})
                 } else {
@@ -29,7 +29,7 @@ pub fn must_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError
         }
         _ => {
             // find first mis-match
-            let wrong = info.sent_funds.iter().find(|c| c.denom != denom).unwrap();
+            let wrong = info.funds.iter().find(|c| c.denom != denom).unwrap();
             Err(PaymentError::ExtraDenom(wrong.denom.to_string()))
         }
     }
@@ -38,13 +38,13 @@ pub fn must_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError
 /// Similar to must_pay, but it any payment is optional. Returns an error if a different
 /// denom was sent. Otherwise, returns the amount of `denom` sent, or 0 if nothing sent.
 pub fn may_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError> {
-    if info.sent_funds.is_empty() {
+    if info.funds.is_empty() {
         Ok(Uint128(0))
-    } else if info.sent_funds.len() == 1 && info.sent_funds[0].denom == denom {
-        Ok(info.sent_funds[0].amount)
+    } else if info.funds.len() == 1 && info.funds[0].denom == denom {
+        Ok(info.funds[0].amount)
     } else {
         // find first mis-match
-        let wrong = info.sent_funds.iter().find(|c| c.denom != denom).unwrap();
+        let wrong = info.funds.iter().find(|c| c.denom != denom).unwrap();
         Err(PaymentError::ExtraDenom(wrong.denom.to_string()))
     }
 }

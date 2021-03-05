@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    attr, CanonicalAddr, Deps, DepsMut, HandleResponse, HumanAddr, MessageInfo, StdError, StdResult,
+    attr, CanonicalAddr, Deps, DepsMut, HumanAddr, MessageInfo, Response, StdError, StdResult,
 };
 use cw0::maybe_canonical;
 use cw_storage_plus::Item;
@@ -66,12 +66,12 @@ impl<'a> Admin<'a> {
         }
     }
 
-    pub fn handle_update_admin(
+    pub fn execute_update_admin(
         &self,
         deps: DepsMut,
         info: MessageInfo,
         new_admin: Option<HumanAddr>,
-    ) -> Result<HandleResponse, AdminError> {
+    ) -> Result<Response, AdminError> {
         self.assert_admin(deps.as_ref(), &info.sender)?;
 
         let admin_str = match new_admin.as_ref() {
@@ -86,7 +86,8 @@ impl<'a> Admin<'a> {
 
         self.set(deps, new_admin)?;
 
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages: vec![],
             attributes,
             data: None,
@@ -149,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_query() {
+    fn test_execute_query() {
         let mut deps = mock_dependencies(&[]);
 
         // initial setup
@@ -167,14 +168,14 @@ mod tests {
         let info = mock_info(&imposter, &[]);
         let new_admin = Some(friend.clone());
         let err = control
-            .handle_update_admin(deps.as_mut(), info, new_admin.clone())
+            .execute_update_admin(deps.as_mut(), info, new_admin.clone())
             .unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // owner can update
         let info = mock_info(&owner, &[]);
         let res = control
-            .handle_update_admin(deps.as_mut(), info, new_admin)
+            .execute_update_admin(deps.as_mut(), info, new_admin)
             .unwrap();
         assert_eq!(0, res.messages.len());
 

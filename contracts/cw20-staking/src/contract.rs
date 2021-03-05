@@ -1,15 +1,15 @@
 use cosmwasm_std::{
-    attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, QuerierWrapper, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
+    attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HumanAddr, MessageInfo,
+    QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
 use cw20_base::allowances::{
-    handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
-    handle_transfer_from, query_allowance,
+    execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
+    execute_transfer_from, query_allowance,
 };
 use cw20_base::contract::{
-    handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
+    execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
@@ -30,7 +30,7 @@ pub fn init(
     env: Env,
     info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // ensure the validator is registered
@@ -47,7 +47,7 @@ pub fn init(
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply: Uint128(0),
-        // set self as minter, so we can properly handle mint and burn
+        // set self as minter, so we can properly execute mint and burn
         mint: Some(MinterData {
             minter: deps.api.canonical_address(&env.contract.address)?,
             cap: None,
@@ -70,15 +70,15 @@ pub fn init(
     let supply = Supply::default();
     total_supply(deps.storage).save(&supply)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Bond {} => bond(deps, env, info),
         HandleMsg::Unbond { amount } => unbond(deps, env, info, amount),
@@ -88,44 +88,44 @@ pub fn handle(
 
         // these all come from cw20-base to implement the cw20 standard
         HandleMsg::Transfer { recipient, amount } => {
-            Ok(handle_transfer(deps, env, info, recipient, amount)?)
+            Ok(execute_transfer(deps, env, info, recipient, amount)?)
         }
-        HandleMsg::Burn { amount } => Ok(handle_burn(deps, env, info, amount)?),
+        HandleMsg::Burn { amount } => Ok(execute_burn(deps, env, info, amount)?),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => Ok(handle_send(deps, env, info, contract, amount, msg)?),
+        } => Ok(execute_send(deps, env, info, contract, amount, msg)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => Ok(handle_increase_allowance(
+        } => Ok(execute_increase_allowance(
             deps, env, info, spender, amount, expires,
         )?),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => Ok(handle_decrease_allowance(
+        } => Ok(execute_decrease_allowance(
             deps, env, info, spender, amount, expires,
         )?),
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => Ok(handle_transfer_from(
+        } => Ok(execute_transfer_from(
             deps, env, info, owner, recipient, amount,
         )?),
         HandleMsg::BurnFrom { owner, amount } => {
-            Ok(handle_burn_from(deps, env, info, owner, amount)?)
+            Ok(execute_burn_from(deps, env, info, owner, amount)?)
         }
         HandleMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => Ok(handle_send_from(
+        } => Ok(execute_send_from(
             deps, env, info, owner, contract, amount, msg,
         )?),
     }
@@ -163,12 +163,12 @@ fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
     }
 }
 
-pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
+pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     // ensure we have the proper denom
     let invest = invest_info_read(deps.storage).load()?;
     // payment finds the proper coin (or throws an error)
     let payment = info
-        .sent_funds
+        .funds
         .iter()
         .find(|x| x.denom == invest.bond_denom)
         .ok_or_else(|| ContractError::EmptyBalance {
@@ -197,12 +197,13 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse
     // call into cw20-base to mint the token, call as self as no one else is allowed
     let sub_info = MessageInfo {
         sender: env.contract.address.clone(),
-        sent_funds: vec![],
+        funds: vec![],
     };
-    handle_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
+    execute_mint(deps, env, sub_info, info.sender.clone(), to_mint)?;
 
     // bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![StakingMsg::Delegate {
             validator: invest.validator,
             amount: payment.clone(),
@@ -224,7 +225,7 @@ pub fn unbond(
     env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     let invest = invest_info_read(deps.storage).load()?;
@@ -239,15 +240,15 @@ pub fn unbond(
     let tax = amount * invest.exit_tax;
 
     // burn from the original caller
-    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+    execute_burn(deps.branch(), env.clone(), info.clone(), amount)?;
     if tax > Uint128(0) {
         let sub_info = MessageInfo {
             sender: env.contract.address.clone(),
-            sent_funds: vec![],
+            funds: vec![],
         };
         // call into cw20-base to mint tokens to owner, call as self as no one else is allowed
         let human_owner = deps.api.human_address(&invest.owner)?;
-        handle_mint(deps.branch(), env.clone(), sub_info, human_owner, tax)?;
+        execute_mint(deps.branch(), env.clone(), sub_info, human_owner, tax)?;
     }
 
     // re-calculate bonded to ensure we have real values
@@ -276,7 +277,8 @@ pub fn unbond(
     )?;
 
     // unbond them
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![StakingMsg::Undelegate {
             validator: invest.validator,
             amount: coin(unbond.u128(), &invest.bond_denom),
@@ -293,7 +295,7 @@ pub fn unbond(
     Ok(res)
 }
 
-pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleResponse, ContractError> {
+pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     // find how many tokens the contract has
     let invest = invest_info_read(deps.storage).load()?;
     let mut balance = deps
@@ -320,9 +322,9 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleRespons
 
     // transfer tokens to the sender
     balance.amount = to_send;
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![BankMsg::Send {
-            from_address: env.contract.address,
             to_address: info.sender.clone(),
             amount: vec![balance],
         }
@@ -340,17 +342,14 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<HandleRespons
 /// reinvest will withdraw all pending rewards,
 /// then issue a callback to itself via _bond_all_tokens
 /// to reinvest the new earnings (and anything else that accumulated)
-pub fn reinvest(
-    deps: DepsMut,
-    env: Env,
-    _info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response, ContractError> {
     let contract_addr = env.contract.address;
     let invest = invest_info_read(deps.storage).load()?;
     let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
 
     // and bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![
             StakingMsg::Withdraw {
                 validator: invest.validator,
@@ -374,7 +373,7 @@ pub fn _bond_all_tokens(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // this is just meant as a call-back to ourself
     if info.sender != env.contract.address {
         return Err(ContractError::Unauthorized {});
@@ -397,12 +396,13 @@ pub fn _bond_all_tokens(
     }) {
         Ok(_) => {}
         // if it is below the minimum, we do a no-op (do not revert other state from withdrawal)
-        Err(StdError::Underflow { .. }) => return Ok(HandleResponse::default()),
+        Err(StdError::Underflow { .. }) => return Ok(Response::default()),
         Err(e) => return Err(ContractError::Std(e)),
     }
 
     // and bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![StakingMsg::Delegate {
             validator: invest.validator,
             amount: balance.clone(),
@@ -624,7 +624,7 @@ mod tests {
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
 
         // try to bond and make sure we trigger delegation
-        let res = handle(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
         let delegate = &res.messages[0];
         match delegate {
@@ -666,7 +666,7 @@ mod tests {
         let bob = HumanAddr::from("bob");
         let bond_msg = HandleMsg::Bond {};
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
-        let res = handle(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
 
         // update the querier with new bond
@@ -677,7 +677,7 @@ mod tests {
         let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(500, "ustake"));
-        let _ = handle(deps.as_mut(), mock_env(), info, rebond_msg).unwrap();
+        let _ = execute(deps.as_mut(), mock_env(), info, rebond_msg).unwrap();
 
         // update the querier with new bond
         set_delegation(&mut deps.querier, 1500, "ustake");
@@ -693,7 +693,7 @@ mod tests {
         let alice = HumanAddr::from("alice");
         let bond_msg = HandleMsg::Bond {};
         let info = mock_info(&alice, &[coin(3000, "ustake")]);
-        let res = handle(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
 
         // update the querier with new bond
@@ -727,7 +727,7 @@ mod tests {
         let info = mock_info(&bob, &[coin(500, "photon")]);
 
         // try to bond and make sure we trigger delegation
-        let res = handle(deps.as_mut(), mock_env(), info, bond_msg);
+        let res = execute(deps.as_mut(), mock_env(), info, bond_msg);
         match res.unwrap_err() {
             ContractError::EmptyBalance { .. } => {}
             e => panic!("Expected wrong denom error, got: {:?}", e),
@@ -751,7 +751,7 @@ mod tests {
         let bob = HumanAddr::from("bob");
         let bond_msg = HandleMsg::Bond {};
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
-        let res = handle(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
 
         // update the querier with new bond
@@ -763,7 +763,7 @@ mod tests {
         let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(500, "ustake"));
-        let _ = handle(deps.as_mut(), mock_env(), info, rebond_msg).unwrap();
+        let _ = execute(deps.as_mut(), mock_env(), info, rebond_msg).unwrap();
 
         // update the querier with new bond, lower balance
         set_delegation(&mut deps.querier, 1500, "ustake");
@@ -774,7 +774,7 @@ mod tests {
             amount: Uint128(600),
         };
         let info = mock_info(&creator, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, unbond_msg);
+        let res = execute(deps.as_mut(), mock_env(), info, unbond_msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("unexpected error: {}", e),
@@ -791,7 +791,7 @@ mod tests {
         let bobs_balance = Uint128(400);
         let env = mock_env();
         let info = mock_info(&bob, &[]);
-        let res = handle(deps.as_mut(), env.clone(), info, unbond_msg).unwrap();
+        let res = execute(deps.as_mut(), env.clone(), info, unbond_msg).unwrap();
         assert_eq!(1, res.messages.len());
         let delegate = &res.messages[0];
         match delegate {
@@ -838,7 +838,7 @@ mod tests {
         // bond some tokens
         let bob = HumanAddr::from("bob");
         let info = mock_info(&bob, &coins(1000, "ustake"));
-        handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
         set_delegation(&mut deps.querier, 1000, "ustake");
 
         // unbond part of them
@@ -847,7 +847,7 @@ mod tests {
         };
         let env = mock_env();
         let info = mock_info(&bob, &[]);
-        handle(deps.as_mut(), env.clone(), info.clone(), unbond_msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info.clone(), unbond_msg).unwrap();
         set_delegation(&mut deps.querier, 460, "ustake");
 
         // ensure claims are proper
@@ -861,7 +861,7 @@ mod tests {
         // bob cannot exercise claims without enough balance
         let claim_ready = later(&env, (DAY * 3 + HOUR).unwrap());
         let too_soon = later(&env, DAY);
-        let fail = handle(
+        let fail = execute(
             deps.as_mut(),
             claim_ready.clone(),
             info.clone(),
@@ -872,11 +872,11 @@ mod tests {
         // provide the balance, but claim not yet mature - also prohibited
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(540, "ustake"));
-        let fail = handle(deps.as_mut(), too_soon, info.clone(), HandleMsg::Claim {});
+        let fail = execute(deps.as_mut(), too_soon, info.clone(), HandleMsg::Claim {});
         assert!(fail.is_err(), "{:?}", fail);
 
         // this should work with cash and claims ready
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             claim_ready,
             info.clone(),
@@ -886,13 +886,8 @@ mod tests {
         assert_eq!(1, res.messages.len());
         let payout = &res.messages[0];
         match payout {
-            CosmosMsg::Bank(BankMsg::Send {
-                from_address,
-                to_address,
-                amount,
-            }) => {
+            CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
                 assert_eq!(amount, &coins(540, "ustake"));
-                assert_eq!(from_address.as_str(), MOCK_CONTRACT_ADDR);
                 assert_eq!(to_address, &bob);
             }
             _ => panic!("Unexpected message: {:?}", payout),
@@ -920,7 +915,7 @@ mod tests {
 
         // bond some tokens to create a balance
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
-        handle(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
 
         // bob got 1000 DRV for 1000 stake at a 1.0 ratio
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(1000));
@@ -931,7 +926,7 @@ mod tests {
             recipient: carl.clone(),
             amount: Uint128(200),
         };
-        handle(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(800));
         assert_eq!(get_balance(deps.as_ref(), &carl), Uint128(200));
 
@@ -941,7 +936,7 @@ mod tests {
             amount: Uint128(350),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(800));
         assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(0));
         assert_eq!(
@@ -958,7 +953,7 @@ mod tests {
             amount: Uint128(250),
         };
         let alice_info = mock_info(&alice, &[]);
-        handle(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
+        execute(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
         assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(250));
         assert_eq!(
@@ -972,13 +967,13 @@ mod tests {
         let burn_too_much = HandleMsg::Burn {
             amount: Uint128(1000),
         };
-        let failed = handle(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
+        let failed = execute(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
         assert!(failed.is_err());
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
         let burn = HandleMsg::Burn {
             amount: Uint128(130),
         };
-        handle(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(420));
     }
 }

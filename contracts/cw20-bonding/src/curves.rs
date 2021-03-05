@@ -44,7 +44,7 @@ pub fn decimal<T: Into<u128>>(num: T, scale: u32) -> Decimal {
 /// StdDecimal stores as a u128 with 18 decimal points of precision
 fn decimal_to_std(x: Decimal) -> StdDecimal {
     // this seems straight-forward (if inefficient), converting via string representation
-    // TODO: handle errors better? Result?
+    // TODO: execute errors better? Result?
     StdDecimal::from_str(&x.to_string()).unwrap()
 
     // // maybe a better approach doing math, not sure about rounding
@@ -220,14 +220,14 @@ impl DecimalPlaces {
     pub fn to_reserve(&self, reserve: Decimal) -> Uint128 {
         let factor = decimal(10u128.pow(self.reserve), 0);
         let out = reserve * factor;
-        // TODO: handle overflow better? Result?
+        // TODO: execute overflow better? Result?
         out.floor().to_u128().unwrap().into()
     }
 
     pub fn to_supply(&self, supply: Decimal) -> Uint128 {
         let factor = decimal(10u128.pow(self.supply), 0);
         let out = supply * factor;
-        // TODO: handle overflow better? Result?
+        // TODO: execute overflow better? Result?
         out.floor().to_u128().unwrap().into()
     }
 

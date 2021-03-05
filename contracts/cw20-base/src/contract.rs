@@ -1,14 +1,14 @@
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr, InitResponse,
-    MessageInfo, MigrateResponse, StdError, StdResult, Uint128,
+    attr, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response, StdError,
+    StdResult, Uint128,
 };
 
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{BalanceResponse, Cw20CoinHuman, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
-    handle_burn_from, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
-    handle_transfer_from, query_allowance,
+    execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
+    execute_transfer_from, query_allowance,
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
@@ -20,12 +20,7 @@ use crate::state::{balances, balances_read, token_info, token_info_read, MinterD
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    mut deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(mut deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -55,7 +50,7 @@ pub fn init(
         mint,
     };
     token_info(deps.storage).save(&data)?;
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
@@ -69,55 +64,55 @@ pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdRes
     Ok(total_supply)
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Transfer { recipient, amount } => {
-            handle_transfer(deps, env, info, recipient, amount)
+            execute_transfer(deps, env, info, recipient, amount)
         }
-        HandleMsg::Burn { amount } => handle_burn(deps, env, info, amount),
+        HandleMsg::Burn { amount } => execute_burn(deps, env, info, amount),
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => handle_send(deps, env, info, contract, amount, msg),
-        HandleMsg::Mint { recipient, amount } => handle_mint(deps, env, info, recipient, amount),
+        } => execute_send(deps, env, info, contract, amount, msg),
+        HandleMsg::Mint { recipient, amount } => execute_mint(deps, env, info, recipient, amount),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_increase_allowance(deps, env, info, spender, amount, expires),
+        } => execute_increase_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => handle_decrease_allowance(deps, env, info, spender, amount, expires),
+        } => execute_decrease_allowance(deps, env, info, spender, amount, expires),
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => handle_transfer_from(deps, env, info, owner, recipient, amount),
-        HandleMsg::BurnFrom { owner, amount } => handle_burn_from(deps, env, info, owner, amount),
+        } => execute_transfer_from(deps, env, info, owner, recipient, amount),
+        HandleMsg::BurnFrom { owner, amount } => execute_burn_from(deps, env, info, owner, amount),
         HandleMsg::SendFrom {
             owner,
             contract,
             amount,
             msg,
-        } => handle_send_from(deps, env, info, owner, contract, amount, msg),
+        } => execute_send_from(deps, env, info, owner, contract, amount, msg),
     }
 }
 
-pub fn handle_transfer(
+pub fn execute_transfer(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     recipient: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -134,7 +129,8 @@ pub fn handle_transfer(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "transfer"),
@@ -147,12 +143,12 @@ pub fn handle_transfer(
     Ok(res)
 }
 
-pub fn handle_burn(
+pub fn execute_burn(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -170,7 +166,8 @@ pub fn handle_burn(
         Ok(info)
     })?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "burn"),
@@ -182,13 +179,13 @@ pub fn handle_burn(
     Ok(res)
 }
 
-pub fn handle_mint(
+pub fn execute_mint(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     recipient: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -216,7 +213,8 @@ pub fn handle_mint(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "mint"),
@@ -228,14 +226,14 @@ pub fn handle_mint(
     Ok(res)
 }
 
-pub fn handle_send(
+pub fn execute_send(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     contract: HumanAddr,
     amount: Uint128,
     msg: Option<Binary>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
@@ -269,7 +267,8 @@ pub fn handle_send(
     }
     .into_cosmos_msg(contract)?;
 
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![msg],
         attributes: attrs,
         data: None,
@@ -327,12 +326,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
     Ok(minter)
 }
 
-pub fn migrate(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _msg: MigrateMsg,
-) -> StdResult<MigrateResponse> {
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
     let old_version = get_contract_version(deps.storage)?;
     if old_version.contract != CONTRACT_NAME {
         return Err(StdError::generic_err(format!(
@@ -355,7 +349,7 @@ pub fn migrate(
 
     // once we have "migrated", set the new version and return success
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(MigrateResponse::default())
+    Ok(Response::default())
 }
 
 #[cfg(test)]
@@ -558,7 +552,7 @@ mod tests {
 
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = handle(deps.as_mut(), env, info, msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), env, info, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(get_balance(deps.as_ref(), &genesis), amount);
         assert_eq!(get_balance(deps.as_ref(), &winner), prize);
@@ -570,7 +564,7 @@ mod tests {
         };
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = handle(deps.as_mut(), env, info, msg.clone());
+        let res = execute(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -584,7 +578,7 @@ mod tests {
         };
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = handle(deps.as_mut(), env, info, msg.clone());
+        let res = execute(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::CannotExceedCap {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -608,7 +602,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr::from("anyone else"), &[]);
         let env = mock_env();
-        let res = handle(deps.as_mut(), env, info, msg.clone());
+        let res = execute(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("expected unauthorized error, got {}", e),
@@ -626,7 +620,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr::from("genesis"), &[]);
         let env = mock_env();
-        let res = handle(deps.as_mut(), env, info, msg.clone());
+        let res = execute(deps.as_mut(), env, info, msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("expected unauthorized error, got {}", e),
@@ -731,7 +725,7 @@ mod tests {
             recipient: addr2.clone(),
             amount: Uint128::zero(),
         };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -744,7 +738,7 @@ mod tests {
             recipient: addr2.clone(),
             amount: too_much,
         };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -757,7 +751,7 @@ mod tests {
             recipient: addr1.clone(),
             amount: transfer,
         };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -770,7 +764,7 @@ mod tests {
             recipient: addr2.clone(),
             amount: transfer,
         };
-        let res = handle(deps.as_mut(), env, info, msg).unwrap();
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
         let remainder = (amount1 - transfer).unwrap();
@@ -798,7 +792,7 @@ mod tests {
         let msg = HandleMsg::Burn {
             amount: Uint128::zero(),
         };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -812,7 +806,7 @@ mod tests {
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
         let msg = HandleMsg::Burn { amount: too_much };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -826,7 +820,7 @@ mod tests {
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
         let msg = HandleMsg::Burn { amount: burn };
-        let res = handle(deps.as_mut(), env, info, msg).unwrap();
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
         let remainder = (amount1 - burn).unwrap();
@@ -857,7 +851,7 @@ mod tests {
             amount: Uint128::zero(),
             msg: Some(send_msg.clone()),
         };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::InvalidZeroAmount {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -871,7 +865,7 @@ mod tests {
             amount: too_much,
             msg: Some(send_msg.clone()),
         };
-        let res = handle(deps.as_mut(), env, info, msg);
+        let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
             e => panic!("Unexpected error: {}", e),
@@ -885,7 +879,7 @@ mod tests {
             amount: transfer,
             msg: Some(send_msg.clone()),
         };
-        let res = handle(deps.as_mut(), env, info, msg).unwrap();
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 1);
 
         // ensure proper send message sent
@@ -932,9 +926,8 @@ mod tests {
         );
 
         // run the migration
-        let info = mock_info(HumanAddr::from("admin"), &[]);
         let env = mock_env();
-        migrate(deps.as_mut(), env, info, MigrateMsg {}).unwrap();
+        migrate(deps.as_mut(), env, MigrateMsg {}).unwrap();
 
         // make sure the version is updated
         assert_eq!(

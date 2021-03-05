@@ -4,8 +4,8 @@ use serde::Serialize;
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractResult,
-    CosmosMsg, Empty, HandleResponse, HumanAddr, InitResponse, MessageInfo, Querier, QuerierResult,
-    QuerierWrapper, QueryRequest, SystemError, SystemResult, WasmMsg,
+    CosmosMsg, Empty, HumanAddr, MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest,
+    Response, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
@@ -17,7 +17,7 @@ pub struct AppResponse {
     pub data: Option<Binary>,
 }
 
-// This can be InitResponse, HandleResponse, MigrationResponse
+// This can be Response, Response, MigrationResponse
 #[derive(Default, Clone)]
 pub struct ActionResponse {
     // TODO: allow T != Empty
@@ -26,8 +26,8 @@ pub struct ActionResponse {
     pub data: Option<Binary>,
 }
 
-impl From<HandleResponse<Empty>> for ActionResponse {
-    fn from(input: HandleResponse<Empty>) -> Self {
+impl From<Response<Empty>> for ActionResponse {
+    fn from(input: Response<Empty>) -> Self {
         ActionResponse {
             messages: input.messages,
             attributes: input.attributes,
@@ -37,7 +37,7 @@ impl From<HandleResponse<Empty>> for ActionResponse {
 }
 
 impl ActionResponse {
-    fn init(input: InitResponse<Empty>, address: HumanAddr) -> Self {
+    fn init(input: Response<Empty>, address: HumanAddr) -> Self {
         ActionResponse {
             messages: input.messages,
             attributes: input.attributes,
@@ -149,7 +149,7 @@ impl App {
             code_id,
             msg: init_msg,
             send: send_funds.to_vec(),
-            label: Some(label.into()),
+            label: label.into(),
         }
         .into();
         let res = self.execute(sender.into(), msg)?;
@@ -302,7 +302,7 @@ impl<'a> AppCache<'a> {
                 // then call the contract
                 let info = MessageInfo {
                     sender,
-                    sent_funds: send,
+                    funds: send,
                 };
                 let res =
                     self.wasm
@@ -321,7 +321,7 @@ impl<'a> AppCache<'a> {
                 // then call the contract
                 let info = MessageInfo {
                     sender,
-                    sent_funds: send,
+                    funds: send,
                 };
                 let res = self
                     .wasm
@@ -330,6 +330,12 @@ impl<'a> AppCache<'a> {
                     contract_addr.clone(),
                     ActionResponse::init(res, contract_addr),
                 ))
+            }
+            WasmMsg::Migrate { .. } => {
+                unimplemented!()
+            }
+            m => {
+                panic!("Unsupported wasm message: {:?}", m)
             }
         }
     }
@@ -343,7 +349,6 @@ impl<'a> AppCache<'a> {
         if !amount.is_empty() {
             let sender: HumanAddr = sender.into();
             let msg = BankMsg::Send {
-                from_address: sender.clone(),
                 to_address: recipient.into(),
                 amount: amount.to_vec(),
             };
@@ -405,7 +410,6 @@ mod test {
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
         let msg: CosmosMsg = BankMsg::Send {
-            from_address: owner.clone(),
             to_address: rcpt.clone(),
             amount: to_send.clone(),
         }
@@ -416,12 +420,11 @@ mod test {
         let poor = get_balance(&router, &rcpt);
         assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
 
-        // cannot send from other account
-        router.execute(rcpt.clone(), msg).unwrap_err();
+        // can send from other account (but funds will be deducted from sender)
+        router.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
         let msg = BankMsg::Send {
-            from_address: owner.clone(),
             to_address: rcpt.clone(),
             amount: coins(20, "btc"),
         }
@@ -575,7 +578,6 @@ mod test {
 
         // sending 7 eth works
         let msg = BankMsg::Send {
-            from_address: reflect_addr.clone(),
             to_address: random.clone(),
             amount: coins(7, "eth"),
         }
@@ -600,13 +602,11 @@ mod test {
 
         // sending 8 eth, then 3 btc should fail both
         let msg = BankMsg::Send {
-            from_address: reflect_addr.clone(),
             to_address: random.clone(),
             amount: coins(8, "eth"),
         }
         .into();
         let msg2 = BankMsg::Send {
-            from_address: reflect_addr.clone(),
             to_address: random.clone(),
             amount: coins(3, "btc"),
         }

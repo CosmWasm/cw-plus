@@ -68,7 +68,7 @@ pub struct MinterResponse {
     pub cap: Option<Uint128>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AllowanceInfo {
     pub spender: HumanAddr,
     pub allowance: Uint128,

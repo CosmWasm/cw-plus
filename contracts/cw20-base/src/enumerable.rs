@@ -64,7 +64,7 @@ mod tests {
     use cosmwasm_std::{coins, DepsMut, Uint128};
     use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
-    use crate::contract::{handle, init, query_token_info};
+    use crate::contract::{execute, init, query_token_info};
     use crate::msg::{HandleMsg, InitMsg};
 
     // this will set up the init for other tests
@@ -110,7 +110,7 @@ mod tests {
             amount: allow1,
             expires: Some(expires.clone()),
         };
-        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // set allowance with no expiration
         let allow2 = Uint128(54321);
@@ -119,7 +119,7 @@ mod tests {
             amount: allow2,
             expires: None,
         };
-        handle(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // query list gets 2
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
@@ -164,7 +164,7 @@ mod tests {
         // put money everywhere (to create balanaces)
         let info = mock_info(acct1.clone(), &[]);
         let env = mock_env();
-        handle(
+        execute(
             deps.as_mut(),
             env.clone(),
             info.clone(),
@@ -174,7 +174,7 @@ mod tests {
             },
         )
         .unwrap();
-        handle(
+        execute(
             deps.as_mut(),
             env.clone(),
             info.clone(),
@@ -184,7 +184,7 @@ mod tests {
             },
         )
         .unwrap();
-        handle(
+        execute(
             deps.as_mut(),
             env.clone(),
             info.clone(),
