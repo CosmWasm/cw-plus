@@ -309,7 +309,8 @@ dependencies = [
  "cw2",
  "cw20",
  "cw20-base",
- "num-integer",
+ "integer-cbrt",
+ "integer-sqrt",
  "rust_decimal",
  "schemars",
  "serde",
@@ -622,6 +623,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "integer-cbrt"
+version = "0.1.0"
+source = "git+https://github.com/maurolacy/integer-cbrt-rs?branch=main#7477cd8c532e1e971f4b2763607c9f506774de39"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "integer-sqrt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -643,16 +661,6 @@ name = "libc"
 version = "0.2.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "265d751d31d6780a3f956bb5b8022feba2d94eeee5a84ba64f4212eedca42213"
-
-[[package]]
-name = "num-integer"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
-dependencies = [
- "autocfg",
- "num-traits",
-]
 
 [[package]]
 name = "num-traits"

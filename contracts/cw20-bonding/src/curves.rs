@@ -1,4 +1,5 @@
-use num_integer::Roots;
+use integer_cbrt::IntegerCubeRoot;
+use integer_sqrt::IntegerSquareRoot;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use schemars::JsonSchema;
@@ -180,7 +181,7 @@ fn square_root(square: Decimal) -> Decimal {
     let extended = extended.floor().to_u128().unwrap();
 
     // take square root, and build a decimal again
-    let root = extended.sqrt();
+    let root = extended.integer_sqrt();
     decimal(root, EXTRA_DIGITS / 2)
 }
 
@@ -196,7 +197,7 @@ fn cube_root(cube: Decimal) -> Decimal {
     let extended = extended.floor().to_u128().unwrap();
 
     // take cube root, and build a decimal again
-    let root = extended.cbrt();
+    let root = extended.integer_cbrt();
     decimal(root, EXTRA_DIGITS / 3)
 }
 
