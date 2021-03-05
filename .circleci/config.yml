@@ -55,6 +55,9 @@ jobs:
           env: RUST_BACKTRACE=1
           command: cargo unit-test --locked
       - run:
+          name: Integration Tests
+          command: cargo test --test integration --locked
+      - run:
           name: Build and run schema generator
           command: cargo schema --locked
       - run:
