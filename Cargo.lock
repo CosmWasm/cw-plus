@@ -624,8 +624,9 @@ dependencies = [
 
 [[package]]
 name = "integer-cbrt"
-version = "0.1.0"
-source = "git+https://github.com/maurolacy/integer-cbrt-rs?branch=main#7477cd8c532e1e971f4b2763607c9f506774de39"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d23ffca13f42099a68c7eca261b911e483b10e1b92e965e99748eaba538ff43d"
 dependencies = [
  "num-traits",
 ]
