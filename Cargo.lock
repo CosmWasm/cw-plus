@@ -987,9 +987,9 @@ dependencies = [
 
 [[package]]
 name = "integer-cbrt"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d23ffca13f42099a68c7eca261b911e483b10e1b92e965e99748eaba538ff43d"
+checksum = "151bce4481ba7da831c7d12c32353cc79c73bf79732e343b92786e4cbbb2948c"
 dependencies = [
  "num-traits",
 ]
