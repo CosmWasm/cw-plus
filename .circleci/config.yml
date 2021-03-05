@@ -55,9 +55,6 @@ jobs:
           env: RUST_BACKTRACE=1
           command: cargo unit-test --locked
       - run:
-          name: Integration Tests
-          command: cargo test --test integration --locked
-      - run:
           name: Build and run schema generator
           command: cargo schema --locked
       - run:
@@ -343,6 +340,11 @@ jobs:
       - run:
           name: Build and run schema generator
           command: cargo schema --locked
+      - run:
+          name: Integration Tests
+          command: |
+            cargo build --release --target wasm32-unknown-unknown --locked
+            cargo test --test integration --locked
       - run:
           name: Ensure checked-in schemas are up-to-date
           command: |
