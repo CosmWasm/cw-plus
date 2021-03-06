@@ -13,6 +13,7 @@ workflows:
       - contract_cw20_base
       - contract_cw20_bonding
       - contract_cw20_escrow
+      - contract_cw20_ics20
       - contract_cw20_staking
       - contract_cw721_base
       - package_controllers
@@ -389,6 +390,47 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-cw20-escrow-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
+
+  contract_cw20_ics20:
+    docker:
+      - image: rust:1.50.0
+    working_directory: ~/project/contracts/cw20-ics20
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version
+      - restore_cache:
+          keys:
+            - cargocache-cw20-ics20-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Unit Tests
+          env: RUST_BACKTRACE=1
+          command: cargo unit-test --locked
+      - run:
+          name: Build and run schema generator
+          command: cargo schema --locked
+      - run:
+          name: Integration Tests
+          command: |
+            rustup target add wasm32-unknown-unknown
+            cargo build --release --target wasm32-unknown-unknown --locked
+            cargo test --test integration --locked
+      - run:
+          name: Ensure checked-in schemas are up-to-date
+          command: |
+            CHANGES_IN_REPO=$(git status --porcelain)
+            if [[ -n "$CHANGES_IN_REPO" ]]; then
+              echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
+              git status && git --no-pager diff
+              exit 1
+            fi
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-cw20-ics20-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
 
   contract_cw20_staking:
     docker:

@@ -331,6 +331,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20-ics20"
+version = "0.5.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cosmwasm-storage",
+ "cw-multi-test",
+ "cw0",
+ "cw2",
+ "cw20",
+ "cw20-base",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw20-staking"
 version = "0.5.0"
 dependencies = [
