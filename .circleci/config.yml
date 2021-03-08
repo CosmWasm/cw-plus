@@ -779,8 +779,8 @@ jobs:
           name: Install compile_module
           # Uses --debug for performance/speed
           # FIXME: Change when `compile_module` (part of `cosmwasm-0.14.0`) is published
-          #command: cargo install --debug --example compile_module -- cosmwasm-vm
-          command: cargo install --debug --git https://github.com/CosmWasm/cosmwasm --branch=contract-sanity-checking --example compile_module -- cosmwasm-vm
+          #command: cargo install --debug --features iterator --example compile_module -- cosmwasm-vm
+          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --branch=contract-sanity-checking --example compile_module -- cosmwasm-vm
       - save_cache:
           paths:
             - /usr/local/cargo/registry
