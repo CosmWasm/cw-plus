@@ -6,28 +6,27 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{from_slice, Binary, Order, StdError, StdResult, Storage, KV};
 
+use crate::helpers::namespaces_with_key;
 use crate::keys::EmptyPrefix;
 use crate::map::Map;
-use crate::prefix::range_with_prefix;
-use crate::{Bound, PkOwned, Prefix, Prefixer, PrimaryKey};
+use crate::{Bound, PkOwned, Prefix, Prefixer, PrimaryKey, U32Key};
 
-/// MARKER is stored in the multi-index as value, but we only look at the key (which is pk)
-const MARKER: u32 = 1;
+pub fn index_string(data: &str) -> PkOwned {
+    PkOwned(data.as_bytes().to_vec())
+}
 
-pub fn index_string(data: &str) -> Vec<u8> {
-    data.as_bytes().to_vec()
+pub fn index_tuple(name: &str, age: u32) -> (PkOwned, U32Key) {
+    (index_string(name), U32Key::new(age))
+}
+
+pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (PkOwned, U32Key, PkOwned) {
+    (index_string(name), U32Key::new(age), PkOwned(pk))
 }
 
 pub fn index_string_tuple(data1: &str, data2: &str) -> (PkOwned, PkOwned) {
-    (PkOwned(index_string(data1)), PkOwned(index_string(data2)))
+    (index_string(data1), index_string(data2))
 }
 
-// 2 main variants:
-//  * store (namespace, index_name, idx_value, key) -> b"1" - allows many and references pk
-//  * store (namespace, index_name, idx_value) -> {key, value} - allows one and copies pk and data
-//  // this would be the primary key - we abstract that too???
-//  * store (namespace, index_name, pk) -> value - allows one with data
-//
 // Note: we cannot store traits with generic functions inside `Box<dyn Index>`,
 // so I pull S: Storage to a top-level
 pub trait Index<T>
@@ -38,87 +37,171 @@ where
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()>;
 }
 
-pub struct MultiIndex<'a, T> {
-    index: fn(&T) -> Vec<u8>,
-    idx_map: Map<'a, (&'a [u8], &'a [u8]), u32>,
-    // note, we collapse the pk - combining everything under the namespace - even if it is composite
-    pk_map: Map<'a, &'a [u8], T>,
+/// MultiIndex stores (namespace, index_name, idx_value, pk) -> b"pk_len".
+/// Allows many values per index, and references pk.
+/// The associated primary key value is stored in the main (pk_namespace) map,
+/// which stores (namespace, pk_namespace, pk) -> value.
+///
+/// The stored pk_len is used to recover the pk from the index namespace, and perform
+/// the secondary load of the associated value from the main map.
+///
+/// The MultiIndex definition must include a field for the pk. That is, the MultiIndex K value
+/// is always a n-tuple (n >= 2) and its last element must be the pk.
+/// The index function must therefore put the pk as last element, when generating the index.
+pub struct MultiIndex<'a, K, T> {
+    index: fn(&T, Vec<u8>) -> K,
+    idx_namespace: &'a [u8],
+    idx_map: Map<'a, K, u32>,
+    pk_namespace: &'a [u8],
 }
 
-impl<'a, T> MultiIndex<'a, T> {
+impl<'a, K, T> MultiIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
     // TODO: make this a const fn
-    pub fn new(idx_fn: fn(&T) -> Vec<u8>, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
+    pub fn new(
+        idx_fn: fn(&T, Vec<u8>) -> K,
+        pk_namespace: &'a str,
+        idx_namespace: &'a str,
+    ) -> Self {
         MultiIndex {
             index: idx_fn,
-            pk_map: Map::new(pk_namespace),
+            idx_namespace: idx_namespace.as_bytes(),
             idx_map: Map::new(idx_namespace),
+            pk_namespace: pk_namespace.as_bytes(),
         }
     }
 }
 
-impl<'a, T> Index<T> for MultiIndex<'a, T>
+fn deserialize_multi_kv<T: DeserializeOwned>(
+    store: &dyn Storage,
+    pk_namespace: &[u8],
+    kv: KV,
+) -> StdResult<KV<T>> {
+    let (key, pk_len) = kv;
+
+    // Deserialize pk_len
+    let pk_len = from_slice::<u32>(pk_len.as_slice())?;
+
+    // Recover pk from last part of k
+    let offset = key.len() - pk_len as usize;
+    let pk = &key[offset..];
+
+    let full_key = namespaces_with_key(&[pk_namespace], pk);
+
+    let v = store
+        .get(&full_key)
+        .ok_or_else(|| StdError::generic_err("pk not found"))?;
+    let v = from_slice::<T>(&v)?;
+
+    Ok((pk.into(), v))
+}
+
+impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data);
-        self.idx_map.save(store, (&idx, &pk), &MARKER)
+        let idx = (self.index)(data, pk.to_vec());
+        self.idx_map.save(store, idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data);
-        self.idx_map.remove(store, (&idx, &pk));
+        let idx = (self.index)(old_data, pk.to_vec());
+        self.idx_map.remove(store, idx);
         Ok(())
     }
 }
 
-impl<'a, T> MultiIndex<'a, T>
+impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
 {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv,
+        )
+    }
+
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv,
+        )
+    }
+
+    // FIXME?: Move to Prefix<T> for ergonomics
     pub fn pks<'c>(
         &self,
         store: &'c dyn Storage,
-        idx: &[u8],
+        p: K::Prefix,
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        let prefix = self.idx_map.prefix(idx);
-        let mapped = range_with_prefix(store, &prefix, min, max, order).map(|(k, _)| k);
-        Box::new(mapped)
-    }
-
-    /// returns all items that match this secondary index, always by pk Ascending
-    pub fn items<'c>(
-        &'c self,
-        store: &'c dyn Storage,
-        idx: &[u8],
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c> {
-        let mapped = self.pks(store, idx, min, max, order).map(move |pk| {
-            let v = self.pk_map.load(store, &pk)?;
-            Ok((pk, v))
+    ) -> Box<dyn Iterator<Item = StdResult<Vec<u8>>> + 'c>
+    where
+        T: 'c,
+    {
+        let prefix = self.prefix(p);
+        let mapped = prefix.range(store, min, max, order).map(|res| {
+            let t = res?;
+            Ok(t.0)
         });
         Box::new(mapped)
     }
 
     #[cfg(test)]
-    pub fn count<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> usize {
-        self.pks(store, idx, None, None, Order::Ascending).count()
+    pub fn count<'c>(&self, store: &'c dyn Storage, p: K::Prefix) -> usize {
+        self.pks(store, p, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
-    pub fn all_pks<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> Vec<Vec<u8>> {
-        self.pks(store, idx, None, None, Order::Ascending).collect()
+    pub fn all_pks<'c>(&self, store: &'c dyn Storage, p: K::Prefix) -> Vec<Vec<u8>> {
+        self.pks(store, p, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<Vec<u8>>>>()
+            .unwrap()
     }
 
     #[cfg(test)]
-    pub fn all_items<'c>(&self, store: &'c dyn Storage, idx: &[u8]) -> StdResult<Vec<KV<T>>> {
-        self.items(store, idx, None, None, Order::Ascending)
+    pub fn all_items<'c>(
+        &self,
+        store: &'c dyn Storage,
+        prefix: K::Prefix,
+    ) -> StdResult<Vec<KV<T>>> {
+        self.prefix(prefix)
+            .range(store, None, None, Order::Ascending)
             .collect()
+    }
+}
+
+// short-cut for simple keys, rather than .prefix(()).range(...)
+impl<'a, K, T> MultiIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
+    K::Prefix: EmptyPrefix,
+{
+    // I would prefer not to copy code from Prefix, but no other way
+    // with lifetimes (create Prefix inside function and return ref = no no)
+    pub fn range<'c>(
+        &'c self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.prefix(K::Prefix::new()).range(store, min, max, order)
     }
 }
 
@@ -129,6 +212,8 @@ pub(crate) struct UniqueRef<T> {
     value: T,
 }
 
+/// UniqueIndex stores (namespace, index_name, idx_value) -> {key, value}
+/// Allows one value per index (i.e. unique) and copies pk and data
 pub struct UniqueIndex<'a, K, T> {
     index: fn(&T) -> K,
     idx_map: Map<'a, K, UniqueRef<T>>,
@@ -186,11 +271,15 @@ where
     K: PrimaryKey<'a>,
 {
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), deserialize_unique_kv)
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv(kv)
+        })
     }
 
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new_de_fn(self.idx_namespace, &p.prefix(), deserialize_unique_kv)
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv(kv)
+        })
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
@@ -217,7 +306,7 @@ where
         store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
-        order: cosmwasm_std::Order,
+        order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
     where
         T: 'c,

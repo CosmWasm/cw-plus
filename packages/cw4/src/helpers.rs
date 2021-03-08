@@ -63,12 +63,12 @@ impl Cw4Contract {
         .into())
     }
 
-    fn encode_raw_query<T: Into<Binary>>(&self, key: T) -> StdResult<QueryRequest<Empty>> {
-        Ok(WasmQuery::Raw {
+    fn encode_raw_query<T: Into<Binary>>(&self, key: T) -> QueryRequest<Empty> {
+        WasmQuery::Raw {
             contract_addr: self.addr(),
             key: key.into(),
         }
-        .into())
+        .into()
     }
 
     /// Show the hooks
@@ -80,7 +80,7 @@ impl Cw4Contract {
 
     /// Read the total weight
     pub fn total_weight(&self, querier: &QuerierWrapper) -> StdResult<u64> {
-        let query = self.encode_raw_query(TOTAL_KEY.as_bytes())?;
+        let query = self.encode_raw_query(TOTAL_KEY.as_bytes());
         querier.query(&query)
     }
 
@@ -91,7 +91,7 @@ impl Cw4Contract {
         addr: &CanonicalAddr,
     ) -> StdResult<Option<u64>> {
         let path = member_key(addr.as_slice());
-        let query = self.encode_raw_query(path)?;
+        let query = self.encode_raw_query(path);
 
         // We have to copy the logic of Querier.query to handle the empty case, and not
         // try to decode empty result into a u64.

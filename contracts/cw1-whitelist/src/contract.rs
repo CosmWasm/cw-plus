@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult,
+    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env, HumanAddr,
+    MessageInfo, Response, StdResult,
 };
 use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
@@ -16,14 +16,14 @@ use crate::state::{admin_list, admin_list_read, AdminList};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = AdminList {
         admins: map_canonical(deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
     admin_list(deps.storage).save(&cfg)?;
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn map_canonical(api: &dyn Api, admins: &[HumanAddr]) -> StdResult<Vec<CanonicalAddr>> {
@@ -37,45 +37,45 @@ fn map_human(api: &dyn Api, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr
     admins.iter().map(|addr| api.human_address(addr)).collect()
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
     msg: HandleMsg<Empty>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => handle_execute(deps, env, info, msgs),
-        HandleMsg::Freeze {} => handle_freeze(deps, env, info),
-        HandleMsg::UpdateAdmins { admins } => handle_update_admins(deps, env, info, admins),
+        HandleMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
+        HandleMsg::Freeze {} => execute_freeze(deps, env, info),
+        HandleMsg::UpdateAdmins { admins } => execute_update_admins(deps, env, info, admins),
     }
 }
 
-pub fn handle_execute<T>(
+pub fn execute_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     msgs: Vec<CosmosMsg<T>>,
-) -> Result<HandleResponse<T>, ContractError>
+) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     if !can_execute(deps.as_ref(), &info.sender)? {
         Err(ContractError::Unauthorized {})
     } else {
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.messages = msgs;
         res.attributes = vec![attr("action", "execute")];
         Ok(res)
     }
 }
 
-pub fn handle_freeze(
+pub fn execute_freeze(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut cfg = admin_list_read(deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
@@ -83,18 +83,18 @@ pub fn handle_freeze(
         cfg.mutable = false;
         admin_list(deps.storage).save(&cfg)?;
 
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.attributes = vec![attr("action", "freeze")];
         Ok(res)
     }
 }
 
-pub fn handle_update_admins(
+pub fn execute_update_admins(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     admins: Vec<HumanAddr>,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut cfg = admin_list_read(deps.storage).load()?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
@@ -102,7 +102,7 @@ pub fn handle_update_admins(
         cfg.admins = map_canonical(deps.api, &admins)?;
         admin_list(deps.storage).save(&cfg)?;
 
-        let mut res = HandleResponse::default();
+        let mut res = Response::default();
         res.attributes = vec![attr("action", "update_admins")];
         Ok(res)
     }
@@ -142,7 +142,7 @@ pub fn query_can_execute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
 
     #[test]
@@ -175,7 +175,7 @@ mod tests {
             admins: vec![anyone.clone()],
         };
         let info = mock_info(&anyone, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, msg);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -186,7 +186,7 @@ mod tests {
             admins: vec![alice.clone(), bob.clone()],
         };
         let info = mock_info(&alice, &[]);
-        handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -197,7 +197,7 @@ mod tests {
 
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {});
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {});
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -205,7 +205,7 @@ mod tests {
 
         // but bob can
         let info = mock_info(&bob, &[]);
-        handle(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
@@ -217,7 +217,7 @@ mod tests {
             admins: vec![alice.clone()],
         };
         let info = mock_info(&alice, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, msg);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -243,7 +243,6 @@ mod tests {
         let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: bob.clone(),
                 amount: coins(10000, "DAI"),
             }
@@ -257,11 +256,11 @@ mod tests {
         ];
 
         // make some nice message
-        let handle_msg = HandleMsg::Execute { msgs: msgs.clone() };
+        let execute_msg = HandleMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
         let info = mock_info(&bob, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -269,7 +268,7 @@ mod tests {
 
         // but carl can
         let info = mock_info(&carl, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, handle_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }
@@ -293,7 +292,6 @@ mod tests {
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: anyone.clone(),
             amount: coins(12345, "ushell"),
         });

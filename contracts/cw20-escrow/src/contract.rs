@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, StdResult, WasmMsg,
+    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, HumanAddr,
+    MessageInfo, Response, StdResult, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -16,39 +16,34 @@ use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, GenericBalance
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    _msg: InitMsg,
-) -> StdResult<InitResponse> {
+pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, _msg: InitMsg) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // no setup
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
         HandleMsg::Create(msg) => {
-            try_create(deps, msg, Balance::from(info.sent_funds), &info.sender)
+            execute_create(deps, msg, Balance::from(info.funds), &info.sender)
         }
-        HandleMsg::Approve { id } => try_approve(deps, env, info, id),
-        HandleMsg::TopUp { id } => try_top_up(deps, id, Balance::from(info.sent_funds)),
-        HandleMsg::Refund { id } => try_refund(deps, env, info, id),
-        HandleMsg::Receive(msg) => try_receive(deps, info, msg),
+        HandleMsg::Approve { id } => execute_approve(deps, env, info, id),
+        HandleMsg::TopUp { id } => execute_top_up(deps, id, Balance::from(info.funds)),
+        HandleMsg::Refund { id } => execute_refund(deps, env, info, id),
+        HandleMsg::Receive(msg) => execute_receive(deps, info, msg),
     }
 }
 
-pub fn try_receive(
+pub fn execute_receive(
     deps: DepsMut,
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let msg: ReceiveMsg = match wrapper.msg {
         Some(bin) => Ok(from_binary(&bin)?),
         None => Err(ContractError::NoData {}),
@@ -58,17 +53,17 @@ pub fn try_receive(
         amount: wrapper.amount,
     });
     match msg {
-        ReceiveMsg::Create(msg) => try_create(deps, msg, balance, &wrapper.sender),
-        ReceiveMsg::TopUp { id } => try_top_up(deps, id, balance),
+        ReceiveMsg::Create(msg) => execute_create(deps, msg, balance, &wrapper.sender),
+        ReceiveMsg::TopUp { id } => execute_top_up(deps, id, balance),
     }
 }
 
-pub fn try_create(
+pub fn execute_create(
     deps: DepsMut,
     msg: CreateMsg,
     balance: Balance,
     sender: &HumanAddr,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if balance.is_empty() {
         return Err(ContractError::EmptyBalance {});
     }
@@ -108,16 +103,16 @@ pub fn try_create(
         Some(_) => Err(ContractError::AlreadyInUse {}),
     })?;
 
-    let mut res = HandleResponse::default();
+    let mut res = Response::default();
     res.attributes = vec![attr("action", "create"), attr("id", msg.id)];
     Ok(res)
 }
 
-pub fn try_top_up(
+pub fn execute_top_up(
     deps: DepsMut,
     id: String,
     balance: Balance,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if balance.is_empty() {
         return Err(ContractError::EmptyBalance {});
     }
@@ -136,17 +131,17 @@ pub fn try_top_up(
     // and save
     escrows(deps.storage).save(id.as_bytes(), &escrow)?;
 
-    let mut res = HandleResponse::default();
+    let mut res = Response::default();
     res.attributes = vec![attr("action", "top_up"), attr("id", id)];
     Ok(res)
 }
 
-pub fn try_approve(
+pub fn execute_approve(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     id: String,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
 
@@ -161,10 +156,11 @@ pub fn try_approve(
         let rcpt = deps.api.human_address(&escrow.recipient)?;
 
         // send all tokens out
-        let messages = send_tokens(deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
+        let messages = send_tokens(deps.api, &rcpt, &escrow.balance)?;
 
         let attributes = vec![attr("action", "approve"), attr("id", id), attr("to", rcpt)];
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages,
             attributes,
             data: None,
@@ -172,12 +168,12 @@ pub fn try_approve(
     }
 }
 
-pub fn try_refund(
+pub fn execute_refund(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     id: String,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // this fails is no escrow there
     let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
 
@@ -191,10 +187,11 @@ pub fn try_refund(
         let rcpt = deps.api.human_address(&escrow.source)?;
 
         // send all tokens out
-        let messages = send_tokens(deps.api, &env.contract.address, &rcpt, &escrow.balance)?;
+        let messages = send_tokens(deps.api, &rcpt, &escrow.balance)?;
 
         let attributes = vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)];
-        Ok(HandleResponse {
+        Ok(Response {
+            submessages: vec![],
             messages,
             attributes,
             data: None,
@@ -204,7 +201,6 @@ pub fn try_refund(
 
 fn send_tokens(
     api: &dyn Api,
-    from: &HumanAddr,
     to: &HumanAddr,
     balance: &GenericBalance,
 ) -> StdResult<Vec<CosmosMsg>> {
@@ -213,7 +209,6 @@ fn send_tokens(
         vec![]
     } else {
         vec![BankMsg::Send {
-            from_address: from.into(),
             to_address: to.into(),
             amount: native_balance.to_vec(),
         }
@@ -289,7 +284,7 @@ fn query_list(deps: Deps) -> StdResult<ListResponse> {
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
 
     use crate::msg::HandleMsg::TopUp;
@@ -319,7 +314,7 @@ mod tests {
         let balance = coins(100, "tokens");
         let info = mock_info(&sender, &balance);
         let msg = HandleMsg::Create(create.clone());
-        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -343,13 +338,12 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: create.recipient,
                 amount: balance,
             })
@@ -358,7 +352,7 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -392,7 +386,7 @@ mod tests {
         let token_contract = HumanAddr::from("my-cw20-token");
         let info = mock_info(&token_contract, &[]);
         let msg = HandleMsg::Receive(receive.clone());
-        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -422,7 +416,7 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         let send_msg = Cw20HandleMsg::Transfer {
@@ -441,7 +435,7 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -517,7 +511,7 @@ mod tests {
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
         let info = mock_info(&sender, &balance);
         let msg = HandleMsg::Create(create.clone());
-        let res = handle(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -527,7 +521,7 @@ mod tests {
         let top_up = HandleMsg::TopUp {
             id: create.id.clone(),
         };
-        let res = handle(deps.as_mut(), mock_env(), info, top_up).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
@@ -542,7 +536,7 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&bar_token, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, top_up).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
@@ -558,7 +552,7 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&baz_token, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, top_up);
+        let res = execute(deps.as_mut(), mock_env(), info, top_up);
         match res.unwrap_err() {
             ContractError::NotInWhitelist {} => {}
             e => panic!("Unexpected error: {}", e),
@@ -575,14 +569,14 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&foo_token, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, top_up).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(3, res.messages.len());
 
@@ -590,7 +584,6 @@ mod tests {
         assert_eq!(
             res.messages[0],
             CosmosMsg::Bank(BankMsg::Send {
-                from_address: HumanAddr::from(MOCK_CONTRACT_ADDR),
                 to_address: create.recipient.clone(),
                 amount: vec![coin(100, "fee"), coin(500, "stake"), coin(250, "random")],
             })

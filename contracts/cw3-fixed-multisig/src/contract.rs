@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HandleResponse, HumanAddr, InitResponse, MessageInfo, Order, StdResult,
+    HumanAddr, MessageInfo, Order, Response, StdResult,
 };
 
 use cw0::{maybe_canonical, Expiration};
@@ -28,7 +28,7 @@ pub fn init(
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     if msg.required_weight == 0 {
         return Err(ContractError::ZeroWeight {});
     }
@@ -55,29 +55,29 @@ pub fn init(
         let key = deps.api.canonical_address(&voter.addr)?;
         VOTERS.save(deps.storage, &key, &voter.weight)?;
     }
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     match msg {
         HandleMsg::Propose {
             title,
             description,
             msgs,
             latest,
-        } => handle_propose(deps, env, info, title, description, msgs, latest),
-        HandleMsg::Vote { proposal_id, vote } => handle_vote(deps, env, info, proposal_id, vote),
-        HandleMsg::Execute { proposal_id } => handle_execute(deps, env, info, proposal_id),
-        HandleMsg::Close { proposal_id } => handle_close(deps, env, info, proposal_id),
+        } => execute_propose(deps, env, info, title, description, msgs, latest),
+        HandleMsg::Vote { proposal_id, vote } => execute_vote(deps, env, info, proposal_id, vote),
+        HandleMsg::Execute { proposal_id } => execute_execute(deps, env, info, proposal_id),
+        HandleMsg::Close { proposal_id } => execute_close(deps, env, info, proposal_id),
     }
 }
 
-pub fn handle_propose(
+pub fn execute_propose(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -86,12 +86,12 @@ pub fn handle_propose(
     msgs: Vec<CosmosMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
         .may_load(deps.storage, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
+        .ok_or(ContractError::Unauthorized {})?;
 
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -131,7 +131,8 @@ pub fn handle_propose(
     };
     BALLOTS.save(deps.storage, (id.into(), &raw_sender), &ballot)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
@@ -143,18 +144,18 @@ pub fn handle_propose(
     })
 }
 
-pub fn handle_vote(
+pub fn execute_vote(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
     vote: Vote,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
     let raw_sender = deps.api.canonical_address(&info.sender)?;
     let vote_power = VOTERS
         .may_load(deps.storage, &raw_sender)?
-        .ok_or_else(|| ContractError::Unauthorized {})?;
+        .ok_or(ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -188,7 +189,8 @@ pub fn handle_vote(
         PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
     }
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
@@ -200,12 +202,12 @@ pub fn handle_vote(
     })
 }
 
-pub fn handle_execute(
+pub fn execute_execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
     proposal_id: u64,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -220,7 +222,8 @@ pub fn handle_execute(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: prop.msgs,
         attributes: vec![
             attr("action", "execute"),
@@ -231,12 +234,12 @@ pub fn handle_execute(
     })
 }
 
-pub fn handle_close(
+pub fn execute_close(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     proposal_id: u64,
-) -> Result<HandleResponse<Empty>, ContractError> {
+) -> Result<Response<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
@@ -254,7 +257,8 @@ pub fn handle_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
@@ -457,7 +461,7 @@ fn list_voters(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, from_binary, BankMsg};
 
     use cw0::Duration;
@@ -500,7 +504,7 @@ mod tests {
         info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
-    ) -> Result<InitResponse<Empty>, ContractError> {
+    ) -> Result<Response<Empty>, ContractError> {
         // Init a contract with voters
         let voters = vec![
             voter(&info.sender, 0),
@@ -617,7 +621,6 @@ mod tests {
         setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -631,7 +634,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info, proposal.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, proposal.clone());
 
         // Verify
         assert!(res.is_err());
@@ -648,7 +651,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = handle(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
+        let res = execute(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
 
         // Verify
         assert!(res.is_err());
@@ -659,12 +662,13 @@ mod tests {
 
         // Proposal from voter works
         let info = mock_info(VOTER3, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap();
 
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
@@ -678,12 +682,13 @@ mod tests {
 
         // Proposal from voter with enough vote power directly passes
         let info = mock_info(VOTER4, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
 
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
@@ -708,7 +713,6 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -719,7 +723,7 @@ mod tests {
             msgs,
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -729,7 +733,7 @@ mod tests {
             proposal_id,
             vote: Vote::Yes,
         };
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -740,7 +744,7 @@ mod tests {
 
         // Only voters can vote
         let info = mock_info(SOMEBODY, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone());
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -751,12 +755,13 @@ mod tests {
 
         // But voter1 can
         let info = mock_info(VOTER1, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -781,7 +786,7 @@ mod tests {
             vote: Vote::No,
         };
         let info = mock_info(VOTER2, &[]);
-        handle(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
 
         // Cast a Veto vote
         let veto_vote = HandleMsg::Vote {
@@ -789,13 +794,13 @@ mod tests {
             vote: Vote::Veto,
         };
         let info = mock_info(VOTER3, &[]);
-        handle(deps.as_mut(), mock_env(), info.clone(), veto_vote).unwrap();
+        execute(deps.as_mut(), mock_env(), info.clone(), veto_vote).unwrap();
 
         // Verify
         assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
 
         // Once voted, votes cannot be changed
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
 
         // Verify
         assert!(res.is_err());
@@ -810,7 +815,7 @@ mod tests {
             Duration::Time(duration) => mock_env_time(duration + 1),
             Duration::Height(duration) => mock_env_height(duration + 1),
         };
-        let res = handle(deps.as_mut(), env, info, no_vote);
+        let res = execute(deps.as_mut(), env, info, no_vote);
 
         // Verify
         assert!(res.is_err());
@@ -821,12 +826,13 @@ mod tests {
 
         // Vote it again, so it passes
         let info = mock_info(VOTER4, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap();
 
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -840,7 +846,7 @@ mod tests {
 
         // non-Open proposals cannot be voted
         let info = mock_info(VOTER5, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info, yes_vote);
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote);
 
         // Verify
         assert!(res.is_err());
@@ -862,7 +868,6 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -873,14 +878,14 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Only Passed can be executed
         let execution = HandleMsg::Execute { proposal_id };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), execution.clone());
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), execution.clone());
 
         // Verify
         assert!(res.is_err());
@@ -895,12 +900,13 @@ mod tests {
             vote: Vote::Yes,
         };
         let info = mock_info(VOTER3, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), vote).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), vote).unwrap();
 
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -914,7 +920,7 @@ mod tests {
 
         // In passing: Try to close Passed fails
         let closing = HandleMsg::Close { proposal_id };
-        let res = handle(deps.as_mut(), mock_env(), info, closing);
+        let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
@@ -925,12 +931,13 @@ mod tests {
 
         // Execute works. Anybody can execute Passed proposals
         let info = mock_info(SOMEBODY, &[]);
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
 
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: msgs,
                 attributes: vec![
                     attr("action", "execute"),
@@ -943,7 +950,7 @@ mod tests {
 
         // In passing: Try to close Executed fails
         let closing = HandleMsg::Close { proposal_id };
-        let res = handle(deps.as_mut(), mock_env(), info, closing);
+        let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());
@@ -965,7 +972,6 @@ mod tests {
 
         // Propose
         let bank_msg = BankMsg::Send {
-            from_address: MOCK_CONTRACT_ADDR.into(),
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
@@ -976,7 +982,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -987,7 +993,7 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
 
         // Non-expired proposals cannot be closed
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), closing.clone());
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), closing.clone());
 
         // Verify
         assert!(res.is_err());
@@ -1005,7 +1011,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = handle(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -1014,7 +1020,7 @@ mod tests {
 
         // Close expired works
         let env = mock_env_height(1234567);
-        let res = handle(
+        let res = execute(
             deps.as_mut(),
             env,
             mock_info(SOMEBODY, &[]),
@@ -1025,7 +1031,8 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            HandleResponse {
+            Response {
+                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "close"),
@@ -1037,7 +1044,7 @@ mod tests {
         );
 
         // Trying to close it again fails
-        let res = handle(deps.as_mut(), mock_env(), info, closing);
+        let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
         assert!(res.is_err());

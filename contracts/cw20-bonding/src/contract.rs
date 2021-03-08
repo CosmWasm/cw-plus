@@ -1,15 +1,15 @@
 use cosmwasm_std::{
-    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HandleResponse, HumanAddr,
-    InitResponse, MessageInfo, StdResult, Uint128,
+    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
+    StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
 use cw20_base::allowances::{
-    deduct_allowance, handle_decrease_allowance, handle_increase_allowance, handle_send_from,
-    handle_transfer_from, query_allowance,
+    deduct_allowance, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
+    execute_transfer_from, query_allowance,
 };
 use cw20_base::contract::{
-    handle_burn, handle_mint, handle_send, handle_transfer, query_balance, query_token_info,
+    execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
 };
 use cw20_base::state::{token_info, MinterData, TokenInfo};
 
@@ -28,7 +28,7 @@ pub fn init(
     env: Env,
     info: MessageInfo,
     msg: InitMsg,
-) -> Result<InitResponse, ContractError> {
+) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -38,7 +38,7 @@ pub fn init(
         symbol: msg.symbol,
         decimals: msg.decimals,
         total_supply: Uint128(0),
-        // set self as minter, so we can properly handle mint and burn
+        // set self as minter, so we can properly execute mint and burn
         mint: Some(MinterData {
             minter: deps.api.canonical_address(&env.contract.address)?,
             cap: None,
@@ -52,69 +52,69 @@ pub fn init(
 
     CURVE_TYPE.save(deps.storage, &msg.curve_type)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
-pub fn handle(
+pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // default implementation stores curve info as enum, you can do something else in a derived
-    // contract and just pass in your custom curve to do_handle
+    // contract and just pass in your custom curve to do_execute
     let curve_type = CURVE_TYPE.load(deps.storage)?;
     let curve_fn = curve_type.to_curve_fn();
-    do_handle(deps, env, info, msg, curve_fn)
+    do_execute(deps, env, info, msg, curve_fn)
 }
 
 /// We pull out logic here, so we can import this from another contract and set a different Curve.
 /// This contacts sets a curve with an enum in InitMsg and stored in state, but you may want to
 /// use custom math not included - make this easily reusable
-pub fn do_handle(
+pub fn do_execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
     curve_fn: CurveFn,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Buy {} => handle_buy(deps, env, info, curve_fn),
+        HandleMsg::Buy {} => execute_buy(deps, env, info, curve_fn),
 
         // we override these from cw20
-        HandleMsg::Burn { amount } => Ok(handle_sell(deps, env, info, curve_fn, amount)?),
+        HandleMsg::Burn { amount } => Ok(execute_sell(deps, env, info, curve_fn, amount)?),
         HandleMsg::BurnFrom { owner, amount } => {
-            Ok(handle_sell_from(deps, env, info, curve_fn, owner, amount)?)
+            Ok(execute_sell_from(deps, env, info, curve_fn, owner, amount)?)
         }
 
         // these all come from cw20-base to implement the cw20 standard
         HandleMsg::Transfer { recipient, amount } => {
-            Ok(handle_transfer(deps, env, info, recipient, amount)?)
+            Ok(execute_transfer(deps, env, info, recipient, amount)?)
         }
         HandleMsg::Send {
             contract,
             amount,
             msg,
-        } => Ok(handle_send(deps, env, info, contract, amount, msg)?),
+        } => Ok(execute_send(deps, env, info, contract, amount, msg)?),
         HandleMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
-        } => Ok(handle_increase_allowance(
+        } => Ok(execute_increase_allowance(
             deps, env, info, spender, amount, expires,
         )?),
         HandleMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
-        } => Ok(handle_decrease_allowance(
+        } => Ok(execute_decrease_allowance(
             deps, env, info, spender, amount, expires,
         )?),
         HandleMsg::TransferFrom {
             owner,
             recipient,
             amount,
-        } => Ok(handle_transfer_from(
+        } => Ok(execute_transfer_from(
             deps, env, info, owner, recipient, amount,
         )?),
         HandleMsg::SendFrom {
@@ -122,18 +122,18 @@ pub fn do_handle(
             contract,
             amount,
             msg,
-        } => Ok(handle_send_from(
+        } => Ok(execute_send_from(
             deps, env, info, owner, contract, amount, msg,
         )?),
     }
 }
 
-pub fn handle_buy(
+pub fn execute_buy(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     curve_fn: CurveFn,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     let mut state = CURVE_STATE.load(deps.storage)?;
 
     let payment = must_pay(&info, &state.reserve_denom)?;
@@ -149,12 +149,13 @@ pub fn handle_buy(
     // call into cw20-base to mint the token, call as self as no one else is allowed
     let sub_info = MessageInfo {
         sender: env.contract.address.clone(),
-        sent_funds: vec![],
+        funds: vec![],
     };
-    handle_mint(deps, env, sub_info, info.sender.clone(), minted)?;
+    execute_mint(deps, env, sub_info, info.sender.clone(), minted)?;
 
     // bond them to the validator
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "buy"),
@@ -167,13 +168,13 @@ pub fn handle_buy(
     Ok(res)
 }
 
-pub fn handle_sell(
+pub fn execute_sell(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     curve_fn: CurveFn,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     let receiver = info.sender.clone();
     // do all the work
@@ -184,14 +185,14 @@ pub fn handle_sell(
     Ok(res)
 }
 
-pub fn handle_sell_from(
+pub fn execute_sell_from(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     curve_fn: CurveFn,
     owner: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&info.sender)?;
@@ -203,7 +204,7 @@ pub fn handle_sell_from(
     let receiver = info.sender;
     let owner_info = MessageInfo {
         sender: owner,
-        sent_funds: info.sent_funds,
+        funds: info.funds,
     };
     let mut res = do_sell(deps, env, owner_info, curve_fn, receiver.clone(), amount)?;
 
@@ -219,12 +220,12 @@ fn do_sell(
     // info.sender is the one burning tokens
     info: MessageInfo,
     curve_fn: CurveFn,
-    // receiver is the one who gains (same for handle_sell, diff for handle_sell_from)
+    // receiver is the one who gains (same for execute_sell, diff for execute_sell_from)
     receiver: HumanAddr,
     amount: Uint128,
-) -> Result<HandleResponse, ContractError> {
+) -> Result<Response, ContractError> {
     // burn from the caller, this ensures there are tokens to cover this
-    handle_burn(deps.branch(), env.clone(), info.clone(), amount)?;
+    execute_burn(deps.branch(), env, info.clone(), amount)?;
 
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
@@ -237,11 +238,11 @@ fn do_sell(
 
     // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
     let msg = BankMsg::Send {
-        from_address: env.contract.address,
         to_address: receiver,
         amount: coins(released.u128(), state.reserve_denom),
     };
-    let res = HandleResponse {
+    let res = Response {
+        submessages: vec![],
         messages: vec![msg.into()],
         attributes: vec![
             attr("from", info.sender),
@@ -255,7 +256,7 @@ fn do_sell(
 
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     // default implementation stores curve info as enum, you can do something else in a derived
-    // contract and just pass in your custom curve to do_handle
+    // contract and just pass in your custom curve to do_execute
     let curve_type = CURVE_TYPE.load(deps.storage)?;
     let curve_fn = curve_type.to_curve_fn();
     do_query(deps, env, msg, curve_fn)
@@ -302,7 +303,7 @@ pub fn query_curve_info(deps: Deps, curve_fn: CurveFn) -> StdResult<CurveInfoRes
 mod tests {
     use super::*;
     use crate::msg::CurveType;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, Decimal};
     use cw0::PaymentError;
 
@@ -389,7 +390,7 @@ mod tests {
         // succeeds with proper token (5 BTC = 5*10^8 satoshi)
         let info = mock_info(INVESTOR, &coins(500_000_000, DENOM));
         let buy = HandleMsg::Buy {};
-        handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
 
         // bob got 1000 EPOXY (10.00)
         assert_eq!(get_balance(deps.as_ref(), INVESTOR), Uint128(1000));
@@ -401,7 +402,7 @@ mod tests {
             recipient: BUYER.into(),
             amount: Uint128(1000),
         };
-        handle(deps.as_mut(), mock_env(), info, send).unwrap();
+        execute(deps.as_mut(), mock_env(), info, send).unwrap();
 
         // ensure balances updated
         assert_eq!(get_balance(deps.as_ref(), INVESTOR), Uint128(0));
@@ -409,7 +410,7 @@ mod tests {
 
         // second stake needs more to get next 1000 EPOXY
         let info = mock_info(INVESTOR, &coins(1_500_000_000, DENOM));
-        handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
 
         // ensure balances updated
         assert_eq!(get_balance(deps.as_ref(), INVESTOR), Uint128(1000));
@@ -439,17 +440,17 @@ mod tests {
         // fails when no tokens sent
         let info = mock_info(INVESTOR, &[]);
         let buy = HandleMsg::Buy {};
-        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
         assert_eq!(err, PaymentError::NoFunds {}.into());
 
         // fails when wrong tokens sent
         let info = mock_info(INVESTOR, &coins(1234567, "wei"));
-        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
         assert_eq!(err, PaymentError::MissingDenom(DENOM.into()).into());
 
         // fails when too many tokens sent
         let info = mock_info(INVESTOR, &[coin(3400022, DENOM), coin(1234567, "wei")]);
-        let err = handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
         assert_eq!(err, PaymentError::ExtraDenom("wei".to_string()).into());
     }
 
@@ -465,7 +466,7 @@ mod tests {
         // succeeds with proper token (20 BTC = 20*10^8 satoshi)
         let info = mock_info(INVESTOR, &coins(2_000_000_000, DENOM));
         let buy = HandleMsg::Buy {};
-        handle(deps.as_mut(), mock_env(), info, buy).unwrap();
+        execute(deps.as_mut(), mock_env(), info, buy).unwrap();
 
         // bob got 2000 EPOXY (20.00)
         assert_eq!(get_balance(deps.as_ref(), INVESTOR), Uint128(2000));
@@ -475,7 +476,7 @@ mod tests {
         let burn = HandleMsg::Burn {
             amount: Uint128(3000),
         };
-        let err = handle(deps.as_mut(), mock_env(), info, burn).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, burn).unwrap_err();
         assert_eq!("Cannot subtract 3000 from 2000", err.to_string().as_str());
 
         // burn 1000 EPOXY to get back 15BTC (*10^8)
@@ -483,7 +484,7 @@ mod tests {
         let burn = HandleMsg::Burn {
             amount: Uint128(1000),
         };
-        let res = handle(deps.as_mut(), mock_env(), info, burn).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, burn).unwrap();
 
         // balance is lower
         assert_eq!(get_balance(deps.as_ref(), INVESTOR), Uint128(1000));
@@ -493,7 +494,6 @@ mod tests {
         assert_eq!(
             &res.messages[0],
             &BankMsg::Send {
-                from_address: MOCK_CONTRACT_ADDR.into(),
                 to_address: INVESTOR.into(),
                 amount: coins(1_500_000_000, DENOM),
             }
@@ -528,7 +528,7 @@ mod tests {
         // spend 45_000 uatom for 30_000_000 EPOXY
         let info = mock_info(bob, &coins(45_000, DENOM));
         let buy = HandleMsg::Buy {};
-        handle(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
 
         // check balances
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(30_000_000));
@@ -540,7 +540,7 @@ mod tests {
             recipient: carl.into(),
             amount: Uint128(2_000_000),
         };
-        handle(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(28_000_000));
         assert_eq!(get_balance(deps.as_ref(), carl), Uint128(2_000_000));
 
@@ -550,7 +550,7 @@ mod tests {
             amount: Uint128(35_000_000),
             expires: None,
         };
-        handle(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(28_000_000));
         assert_eq!(get_balance(deps.as_ref(), alice), Uint128(0));
         assert_eq!(
@@ -567,7 +567,7 @@ mod tests {
             amount: Uint128(25_000_000),
         };
         let alice_info = mock_info(alice, &[]);
-        handle(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
+        execute(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(3_000_000));
         assert_eq!(get_balance(deps.as_ref(), alice), Uint128(25_000_000));
         assert_eq!(get_balance(deps.as_ref(), carl), Uint128(2_000_000));
@@ -586,7 +586,7 @@ mod tests {
             owner: bob.into(),
             amount: Uint128(3_300_000),
         };
-        let err = handle(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
         assert_eq!(
             "Cannot subtract 3300000 from 3000000",
             err.to_string().as_str()
@@ -598,7 +598,7 @@ mod tests {
             owner: bob.into(),
             amount: Uint128(1_000_000),
         };
-        let res = handle(deps.as_mut(), mock_env(), info, burn_from).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, burn_from).unwrap();
 
         // bob balance is lower, not alice
         assert_eq!(get_balance(deps.as_ref(), alice), Uint128(25_000_000));
@@ -609,7 +609,6 @@ mod tests {
         assert_eq!(
             &res.messages[0],
             &BankMsg::Send {
-                from_address: MOCK_CONTRACT_ADDR.into(),
                 to_address: alice.into(),
                 amount: coins(1_500, DENOM),
             }

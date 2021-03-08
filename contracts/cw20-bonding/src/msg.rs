@@ -23,7 +23,7 @@ pub struct InitMsg {
 
     /// enum to store the curve parameters used for this contract
     /// if you want to add a custom Curve, you should make a new contract that imports this one.
-    /// write a custom `init`, and then dispatch `your::handle` -> `cw20_bonding::do_handle` with
+    /// write a custom `init`, and then dispatch `your::execute` -> `cw20_bonding::do_execute` with
     /// your custom curve as a parameter (and same with `query` -> `do_query`)
     pub curve_type: CurveType,
 }

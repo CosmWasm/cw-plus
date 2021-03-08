@@ -17,7 +17,7 @@ fn mock_app() -> App {
 
 pub fn contract_escrow() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(
-        crate::contract::handle,
+        crate::contract::execute,
         crate::contract::init,
         crate::contract::query,
     );
@@ -26,7 +26,7 @@ pub fn contract_escrow() -> Box<dyn Contract> {
 
 pub fn contract_cw20() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(
-        cw20_base::contract::handle,
+        cw20_base::contract::execute,
         cw20_base::contract::init,
         cw20_base::contract::query,
     );

@@ -1,4 +1,5 @@
-use num_integer::Roots;
+use integer_cbrt::IntegerCubeRoot;
+use integer_sqrt::IntegerSquareRoot;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use schemars::JsonSchema;
@@ -44,7 +45,7 @@ pub fn decimal<T: Into<u128>>(num: T, scale: u32) -> Decimal {
 /// StdDecimal stores as a u128 with 18 decimal points of precision
 fn decimal_to_std(x: Decimal) -> StdDecimal {
     // this seems straight-forward (if inefficient), converting via string representation
-    // TODO: handle errors better? Result?
+    // TODO: execute errors better? Result?
     StdDecimal::from_str(&x.to_string()).unwrap()
 
     // // maybe a better approach doing math, not sure about rounding
@@ -180,7 +181,7 @@ fn square_root(square: Decimal) -> Decimal {
     let extended = extended.floor().to_u128().unwrap();
 
     // take square root, and build a decimal again
-    let root = extended.sqrt();
+    let root = extended.integer_sqrt();
     decimal(root, EXTRA_DIGITS / 2)
 }
 
@@ -196,7 +197,7 @@ fn cube_root(cube: Decimal) -> Decimal {
     let extended = extended.floor().to_u128().unwrap();
 
     // take cube root, and build a decimal again
-    let root = extended.cbrt();
+    let root = extended.integer_cbrt();
     decimal(root, EXTRA_DIGITS / 3)
 }
 
@@ -220,14 +221,14 @@ impl DecimalPlaces {
     pub fn to_reserve(&self, reserve: Decimal) -> Uint128 {
         let factor = decimal(10u128.pow(self.reserve), 0);
         let out = reserve * factor;
-        // TODO: handle overflow better? Result?
+        // TODO: execute overflow better? Result?
         out.floor().to_u128().unwrap().into()
     }
 
     pub fn to_supply(&self, supply: Decimal) -> Uint128 {
         let factor = decimal(10u128.pow(self.supply), 0);
         let out = supply * factor;
-        // TODO: handle overflow better? Result?
+        // TODO: execute overflow better? Result?
         out.floor().to_u128().unwrap().into()
     }
 
