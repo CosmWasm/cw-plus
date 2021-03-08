@@ -526,8 +526,8 @@ version = "0.5.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-multi-test",
+ "cw-storage-plus",
  "cw0",
  "cw2",
  "cw20",

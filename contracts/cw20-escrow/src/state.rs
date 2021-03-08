@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Api, CanonicalAddr, Coin, Env, HumanAddr, Order, StdError, StdResult, Storage};
-use cosmwasm_storage::{bucket, bucket_read, prefixed_read, Bucket, ReadonlyBucket};
+use cw_storage_plus::Map;
 
 use cw20::{Balance, Cw20Coin};
 
@@ -93,23 +93,13 @@ impl Escrow {
     }
 }
 
-pub const PREFIX_ESCROW: &[u8] = b"escrow";
-
-pub fn escrows(storage: &mut dyn Storage) -> Bucket<Escrow> {
-    bucket(storage, PREFIX_ESCROW)
-}
-
-pub fn escrows_read(storage: &dyn Storage) -> ReadonlyBucket<Escrow> {
-    bucket_read(storage, PREFIX_ESCROW)
-}
+pub const ESCROWS: Map<&str, Escrow> = Map::new("escrow");
 
 /// This returns the list of ids for all registered escrows
 pub fn all_escrow_ids(storage: &dyn Storage) -> StdResult<Vec<String>> {
-    prefixed_read(storage, PREFIX_ESCROW)
-        .range(None, None, Order::Ascending)
-        .map(|(k, _)| {
-            String::from_utf8(k).map_err(|_| StdError::invalid_utf8("parsing escrow key"))
-        })
+    ESCROWS
+        .keys(storage, None, None, Order::Ascending)
+        .map(|k| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("parsing escrow key")))
         .collect()
 }
 
@@ -142,15 +132,13 @@ mod tests {
     #[test]
     fn all_escrow_ids_in_order() {
         let mut storage = MockStorage::new();
-        escrows(&mut storage)
-            .save("lazy".as_bytes(), &dummy_escrow())
+        ESCROWS
+            .save(&mut storage, &"lazy", &dummy_escrow())
             .unwrap();
-        escrows(&mut storage)
-            .save("assign".as_bytes(), &dummy_escrow())
+        ESCROWS
+            .save(&mut storage, &"assign", &dummy_escrow())
             .unwrap();
-        escrows(&mut storage)
-            .save("zen".as_bytes(), &dummy_escrow())
-            .unwrap();
+        ESCROWS.save(&mut storage, &"zen", &dummy_escrow()).unwrap();
 
         let ids = all_escrow_ids(&storage).unwrap();
         assert_eq!(3, ids.len());

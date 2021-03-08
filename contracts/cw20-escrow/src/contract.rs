@@ -10,7 +10,7 @@ use crate::error::ContractError;
 use crate::msg::{
     CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
-use crate::state::{all_escrow_ids, escrows, escrows_read, Escrow, GenericBalance};
+use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
@@ -98,7 +98,7 @@ pub fn execute_create(
     };
 
     // try to store it, fail if the id was already in use
-    escrows(deps.storage).update(msg.id.as_bytes(), |existing| match existing {
+    ESCROWS.update(deps.storage, &msg.id, |existing| match existing {
         None => Ok(escrow),
         Some(_) => Err(ContractError::AlreadyInUse {}),
     })?;
@@ -117,7 +117,7 @@ pub fn execute_top_up(
         return Err(ContractError::EmptyBalance {});
     }
     // this fails is no escrow there
-    let mut escrow = escrows_read(deps.storage).load(id.as_bytes())?;
+    let mut escrow = ESCROWS.load(deps.storage, &id)?;
 
     if let Balance::Cw20(token) = &balance {
         // ensure the token is on the whitelist
@@ -129,7 +129,7 @@ pub fn execute_top_up(
     escrow.balance.add_tokens(balance);
 
     // and save
-    escrows(deps.storage).save(id.as_bytes(), &escrow)?;
+    ESCROWS.save(deps.storage, &id, &escrow)?;
 
     let mut res = Response::default();
     res.attributes = vec![attr("action", "top_up"), attr("id", id)];
@@ -143,7 +143,7 @@ pub fn execute_approve(
     id: String,
 ) -> Result<Response, ContractError> {
     // this fails is no escrow there
-    let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
+    let escrow = ESCROWS.load(deps.storage, &id)?;
 
     if deps.api.canonical_address(&info.sender)? != escrow.arbiter {
         Err(ContractError::Unauthorized {})
@@ -151,7 +151,7 @@ pub fn execute_approve(
         Err(ContractError::Expired {})
     } else {
         // we delete the escrow
-        escrows(deps.storage).remove(id.as_bytes());
+        ESCROWS.remove(deps.storage, &id);
 
         let rcpt = deps.api.human_address(&escrow.recipient)?;
 
@@ -175,14 +175,14 @@ pub fn execute_refund(
     id: String,
 ) -> Result<Response, ContractError> {
     // this fails is no escrow there
-    let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
+    let escrow = ESCROWS.load(deps.storage, &id)?;
 
     // the arbiter can send anytime OR anyone can send after expiration
     if !escrow.is_expired(&env) && deps.api.canonical_address(&info.sender)? != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else {
         // we delete the escrow
-        escrows(deps.storage).remove(id.as_bytes());
+        ESCROWS.remove(deps.storage, &id);
 
         let rcpt = deps.api.human_address(&escrow.source)?;
 
@@ -243,7 +243,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
-    let escrow = escrows_read(deps.storage).load(id.as_bytes())?;
+    let escrow = ESCROWS.load(deps.storage, &id)?;
 
     let cw20_whitelist = escrow.human_whitelist(deps.api)?;
 
