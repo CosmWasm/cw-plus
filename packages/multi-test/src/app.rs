@@ -331,12 +331,8 @@ impl<'a> AppCache<'a> {
                     ActionResponse::init(res, contract_addr),
                 ))
             }
-            WasmMsg::Migrate { .. } => {
-                unimplemented!()
-            }
-            m => {
-                panic!("Unsupported wasm message: {:?}", m)
-            }
+            WasmMsg::Migrate { .. } => unimplemented!(),
+            m => panic!("Unsupported wasm message: {:?}", m),
         }
     }
 

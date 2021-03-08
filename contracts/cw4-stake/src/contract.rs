@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HumanAddr, MessageInfo, Order, Response, StdResult, StdError, Storage, Uint128,
+    Env, HumanAddr, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cw0::{maybe_canonical, NativeBalance};
@@ -57,7 +57,6 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-
         HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
         HandleMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
         HandleMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
@@ -67,7 +66,12 @@ pub fn execute(
     }
 }
 
-pub fn execute_bond(deps: DepsMut, env: Env, amount: Balance, sender: HumanAddr) -> Result<Response, ContractError> {
+pub fn execute_bond(
+    deps: DepsMut,
+    env: Env,
+    amount: Balance,
+    sender: HumanAddr,
+) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
     // ensure the sent denom was proper
@@ -558,11 +562,12 @@ mod tests {
             ContractError::Std(StdError::Underflow {
                 minuend,
                 subtrahend,
+                backtrace,
             }) => {
                 assert_eq!(minuend.as_str(), "5000");
                 assert_eq!(subtrahend.as_str(), "5100");
             }
-            e => panic!("Unexpected error: {}", e),
+            e => panic!("Unexpected error: {:?}", e),
         }
     }
 

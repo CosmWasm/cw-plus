@@ -140,9 +140,7 @@ impl Bank for SimpleBank {
     ) -> Result<(), String> {
         match msg {
             BankMsg::Send { to_address, amount } => self.send(storage, sender, to_address, amount),
-            m => {
-                panic!("Unsupported bank message: {:?}", m)
-            }
+            m => panic!("Unsupported bank message: {:?}", m),
         }
     }
 
@@ -162,9 +160,7 @@ impl Bank for SimpleBank {
                 let res = BalanceResponse { amount };
                 Ok(to_binary(&res).map_err(|e| e.to_string())?)
             }
-            q => {
-                panic!("Unsupported bank query: {:?}", q)
-            }
+            q => panic!("Unsupported bank query: {:?}", q),
         }
     }
 
