@@ -562,7 +562,6 @@ mod tests {
             ContractError::Std(StdError::Underflow {
                 minuend,
                 subtrahend,
-                backtrace,
             }) => {
                 assert_eq!(minuend.as_str(), "5000");
                 assert_eq!(subtrahend.as_str(), "5100");
