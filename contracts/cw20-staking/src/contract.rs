@@ -11,13 +11,11 @@ use cw20_base::allowances::{
 use cw20_base::contract::{
     execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
 };
-use cw20_base::state::{token_info, MinterData, TokenInfo};
+use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
-use crate::state::{
-    invest_info, invest_info_read, total_supply, total_supply_read, InvestmentInfo, Supply, CLAIMS,
-};
+use crate::state::{InvestmentInfo, Supply, CLAIMS, INVESTMENT, TOTAL_SUPPLY};
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
 
@@ -53,7 +51,7 @@ pub fn init(
             cap: None,
         }),
     };
-    token_info(deps.storage).save(&data)?;
+    TOKEN_INFO.save(deps.storage, &data)?;
 
     let denom = deps.querier.query_bonded_denom()?;
     let invest = InvestmentInfo {
@@ -64,11 +62,11 @@ pub fn init(
         validator: msg.validator,
         min_withdrawal: msg.min_withdrawal,
     };
-    invest_info(deps.storage).save(&invest)?;
+    INVESTMENT.save(deps.storage, &invest)?;
 
     // set supply to 0
     let supply = Supply::default();
-    total_supply(deps.storage).save(&supply)?;
+    TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     Ok(Response::default())
 }
@@ -165,7 +163,7 @@ fn assert_bonds(supply: &Supply, bonded: Uint128) -> Result<(), ContractError> {
 
 pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     // ensure we have the proper denom
-    let invest = invest_info_read(deps.storage).load()?;
+    let invest = INVESTMENT.load(deps.storage)?;
     // payment finds the proper coin (or throws an error)
     let payment = info
         .funds
@@ -179,8 +177,7 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
     let bonded = get_bonded(&deps.querier, &env.contract.address)?;
 
     // calculate to_mint and update total supply
-    let mut totals = total_supply(deps.storage);
-    let mut supply = totals.load()?;
+    let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
     // TODO: this is just a safety assertion - do we keep it, or remove caching?
     // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
     // have expensive queries everywhere
@@ -192,7 +189,7 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
     };
     supply.bonded = bonded + payment.amount;
     supply.issued += to_mint;
-    totals.save(&supply)?;
+    TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     // call into cw20-base to mint the token, call as self as no one else is allowed
     let sub_info = MessageInfo {
@@ -228,7 +225,7 @@ pub fn unbond(
 ) -> Result<Response, ContractError> {
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
-    let invest = invest_info_read(deps.storage).load()?;
+    let invest = INVESTMENT.load(deps.storage)?;
     // ensure it is big enough to care
     if amount < invest.min_withdrawal {
         return Err(ContractError::UnbondTooSmall {
@@ -257,8 +254,7 @@ pub fn unbond(
 
     // calculate how many native tokens this is worth and update supply
     let remainder = (amount - tax)?;
-    let mut totals = total_supply(deps.storage);
-    let mut supply = totals.load()?;
+    let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
     // TODO: this is just a safety assertion - do we keep it, or remove caching?
     // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
     // have expensive queries everywhere
@@ -267,7 +263,7 @@ pub fn unbond(
     supply.bonded = (bonded - unbond)?;
     supply.issued = (supply.issued - remainder)?;
     supply.claims += unbond;
-    totals.save(&supply)?;
+    TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
     CLAIMS.create_claim(
         deps.storage,
@@ -297,7 +293,7 @@ pub fn unbond(
 
 pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     // find how many tokens the contract has
-    let invest = invest_info_read(deps.storage).load()?;
+    let invest = INVESTMENT.load(deps.storage)?;
     let mut balance = deps
         .querier
         .query_balance(&env.contract.address, &invest.bond_denom)?;
@@ -315,7 +311,7 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
     }
 
     // update total supply (lower claim)
-    total_supply(deps.storage).update(|mut supply| -> StdResult<_> {
+    TOTAL_SUPPLY.update(deps.storage, |mut supply| -> StdResult<_> {
         supply.claims = (supply.claims - to_send)?;
         Ok(supply)
     })?;
@@ -344,7 +340,7 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
 /// to reinvest the new earnings (and anything else that accumulated)
 pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response, ContractError> {
     let contract_addr = env.contract.address;
-    let invest = invest_info_read(deps.storage).load()?;
+    let invest = INVESTMENT.load(deps.storage)?;
     let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
 
     // and bond them to the validator
@@ -380,14 +376,14 @@ pub fn _bond_all_tokens(
     }
 
     // find how many tokens we have to bond
-    let invest = invest_info_read(deps.storage).load()?;
+    let invest = INVESTMENT.load(deps.storage)?;
     let mut balance = deps
         .querier
         .query_balance(&env.contract.address, &invest.bond_denom)?;
 
     // we deduct pending claims from our account balance before reinvesting.
     // if there is not enough funds, we just return a no-op
-    match total_supply(deps.storage).update(|mut supply| -> StdResult<_> {
+    match TOTAL_SUPPLY.update(deps.storage, |mut supply| -> StdResult<_> {
         balance.amount = (balance.amount - supply.claims)?;
         // this just triggers the "no op" case if we don't have min_withdrawal left to reinvest
         (balance.amount - invest.min_withdrawal)?;
@@ -429,8 +425,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub fn query_investment(deps: Deps) -> StdResult<InvestmentResponse> {
-    let invest = invest_info_read(deps.storage).load()?;
-    let supply = total_supply_read(deps.storage).load()?;
+    let invest = INVESTMENT.load(deps.storage)?;
+    let supply = TOTAL_SUPPLY.load(deps.storage)?;
 
     let res = InvestmentResponse {
         owner: deps.api.human_address(&invest.owner)?,

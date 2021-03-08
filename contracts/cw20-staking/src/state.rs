@@ -1,15 +1,12 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, Storage, Uint128};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
+use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, Uint128};
 use cw0::Duration;
 use cw_controllers::Claims;
+use cw_storage_plus::Item;
 
 pub const CLAIMS: Claims = Claims::new("claims");
-
-pub const KEY_INVESTMENT: &[u8] = b"invest";
-pub const KEY_TOTAL_SUPPLY: &[u8] = b"total_supply";
 
 /// Investment info is fixed at initialization, and is used to control the function of the contract
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -42,18 +39,5 @@ pub struct Supply {
     pub claims: Uint128,
 }
 
-pub fn invest_info(storage: &mut dyn Storage) -> Singleton<InvestmentInfo> {
-    singleton(storage, KEY_INVESTMENT)
-}
-
-pub fn invest_info_read(storage: &dyn Storage) -> ReadonlySingleton<InvestmentInfo> {
-    singleton_read(storage, KEY_INVESTMENT)
-}
-
-pub fn total_supply(storage: &mut dyn Storage) -> Singleton<Supply> {
-    singleton(storage, KEY_TOTAL_SUPPLY)
-}
-
-pub fn total_supply_read(storage: &dyn Storage) -> ReadonlySingleton<Supply> {
-    singleton_read(storage, KEY_TOTAL_SUPPLY)
-}
+pub const INVESTMENT: Item<InvestmentInfo> = Item::new("invest");
+pub const TOTAL_SUPPLY: Item<Supply> = Item::new("total_supply");

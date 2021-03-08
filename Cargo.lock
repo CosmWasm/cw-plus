@@ -543,8 +543,8 @@ version = "0.5.0"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cosmwasm-storage",
  "cw-controllers",
+ "cw-storage-plus",
  "cw0",
  "cw2",
  "cw20",
