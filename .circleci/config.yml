@@ -792,7 +792,7 @@ jobs:
             for W in ./target/wasm32-unknown-unknown/release/*.wasm
             do
               echo -n "Compiling `basename $W`... "
-              compile_module $W || exit $?
+              compile_module $W
             done
 
   package_multi_test:
