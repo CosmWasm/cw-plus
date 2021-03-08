@@ -327,13 +327,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Api, CosmosMsg, Order, StdError, WasmMsg};
-
-    use cw2::ContractVersion;
-    use cw20::{AllowanceResponse, Expiration};
-
-    use crate::migrations::generate_v01_test_data;
-    use crate::state::allowances_read;
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, WasmMsg};
 
     use super::*;
 
@@ -881,104 +875,5 @@ mod tests {
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
         );
-    }
-
-    #[test]
-    fn migrate_from_v01() {
-        let mut deps = mock_dependencies(&[]);
-
-        generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
-        // make sure this really is 0.1.0
-        assert_eq!(
-            get_contract_version(&mut deps.storage).unwrap(),
-            ContractVersion {
-                contract: CONTRACT_NAME.to_string(),
-                version: "v0.1.0".to_string(),
-            }
-        );
-
-        // run the migration
-        let env = mock_env();
-        migrate(deps.as_mut(), env, MigrateMsg {}).unwrap();
-
-        // make sure the version is updated
-        assert_eq!(
-            get_contract_version(&mut deps.storage).unwrap(),
-            ContractVersion {
-                contract: CONTRACT_NAME.to_string(),
-                version: CONTRACT_VERSION.to_string(),
-            }
-        );
-
-        // check all the data (against the spec in generate_v01_test_data)
-        let info = token_info_read(&mut deps.storage).load().unwrap();
-        assert_eq!(
-            info,
-            TokenInfo {
-                name: "Sample Coin".to_string(),
-                symbol: "SAMP".to_string(),
-                decimals: 2,
-                total_supply: Uint128(777777),
-                mint: None,
-            }
-        );
-
-        // 2 users
-        let user1 = deps
-            .api
-            .canonical_address(&HumanAddr::from("user1"))
-            .unwrap();
-        let user2 = deps
-            .api
-            .canonical_address(&HumanAddr::from("user2"))
-            .unwrap();
-
-        let bal = balances_read(&mut deps.storage);
-        assert_eq!(2, bal.range(None, None, Order::Descending).count());
-        assert_eq!(bal.load(user1.as_slice()).unwrap(), Uint128(123456));
-        assert_eq!(bal.load(user2.as_slice()).unwrap(), Uint128(654321));
-
-        let spender1 = deps
-            .api
-            .canonical_address(&HumanAddr::from("spender1"))
-            .unwrap();
-        let spender2 = deps
-            .api
-            .canonical_address(&HumanAddr::from("spender2"))
-            .unwrap();
-
-        let num_allows = allowances_read(&mut deps.storage, &user1)
-            .range(None, None, Order::Ascending)
-            .count();
-        assert_eq!(num_allows, 1);
-        let allow = allowances_read(&mut deps.storage, &user1)
-            .load(spender1.as_slice())
-            .unwrap();
-        let expect = AllowanceResponse {
-            allowance: Uint128(5000),
-            expires: Expiration::AtHeight(5000),
-        };
-        assert_eq!(allow, expect);
-
-        let num_allows = allowances_read(&mut deps.storage, &user2)
-            .range(None, None, Order::Ascending)
-            .count();
-        assert_eq!(num_allows, 2);
-        let allow = allowances_read(&mut deps.storage, &user2)
-            .load(spender1.as_slice())
-            .unwrap();
-        let expect = AllowanceResponse {
-            allowance: Uint128(15000),
-            expires: Expiration::AtTime(1598647517),
-        };
-        assert_eq!(allow, expect);
-        let allow = allowances_read(&mut deps.storage, &user2)
-            .load(spender2.as_slice())
-            .unwrap();
-        let expect = AllowanceResponse {
-            allowance: Uint128(77777),
-            expires: Expiration::Never {},
-        };
-        assert_eq!(allow, expect);
     }
 }
