@@ -6,12 +6,12 @@ use cosmwasm_std::{
     attr, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
     HumanAddr, MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
 };
-use cw0::{calc_range_start_human, Expiration};
+use cw0::{maybe_canonical, Expiration};
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{execute_freeze, execute_update_admins, init as whitelist_init, query_admin_list},
     msg::InitMsg,
-    state::admin_list_read,
+    state::ADMIN_LIST,
 };
 use cw2::set_contract_version;
 
@@ -20,9 +20,8 @@ use crate::msg::{
     AllAllowancesResponse, AllPermissionsResponse, AllowanceInfo, HandleMsg, PermissionsInfo,
     QueryMsg,
 };
-use crate::state::{
-    allowances, allowances_read, permissions, permissions_read, Allowance, Permissions,
-};
+use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
+use cw_storage_plus::Bound;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
@@ -72,7 +71,7 @@ pub fn execute_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(owner_raw) {
@@ -84,22 +83,19 @@ where
         for msg in &msgs {
             match msg {
                 CosmosMsg::Staking(staking_msg) => {
-                    let permissions = permissions(deps.storage);
-                    let perm = permissions.may_load(owner_raw.as_slice())?;
+                    let perm = PERMISSIONS.may_load(deps.storage, &owner_raw)?;
                     let perm = perm.ok_or(ContractError::NotAllowed {})?;
-
                     check_staking_permissions(staking_msg, perm)?;
                 }
                 CosmosMsg::Bank(BankMsg::Send {
                     to_address: _,
                     amount,
                 }) => {
-                    let mut allowances = allowances(deps.storage);
-                    let allow = allowances.may_load(owner_raw.as_slice())?;
+                    let allow = ALLOWANCES.may_load(deps.storage, &owner_raw)?;
                     let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
                     // Decrease allowance
                     allowance.balance = allowance.balance.sub(amount.clone())?;
-                    allowances.save(owner_raw.as_slice(), &allowance)?;
+                    ALLOWANCES.save(deps.storage, &owner_raw, &allowance)?;
                 }
                 _ => {
                     return Err(ContractError::MessageTypeRejected {});
@@ -158,7 +154,7 @@ pub fn execute_increase_allowance<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
@@ -169,7 +165,7 @@ where
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    allowances(deps.storage).update::<_, StdError>(spender_raw.as_slice(), |allow| {
+    ALLOWANCES.update::<_, StdError>(deps.storage, &spender_raw, |allow| {
         let mut allowance = allow.unwrap_or_default();
         if let Some(exp) = expires {
             allowance.expires = exp;
@@ -204,7 +200,7 @@ pub fn execute_decrease_allowance<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
@@ -215,18 +211,17 @@ where
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let allowance =
-        allowances(deps.storage).update::<_, ContractError>(spender_raw.as_slice(), |allow| {
-            // Fail fast
-            let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
-            if let Some(exp) = expires {
-                allowance.expires = exp;
-            }
-            allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
-            Ok(allowance)
-        })?;
+    let allowance = ALLOWANCES.update::<_, ContractError>(deps.storage, &spender_raw, |allow| {
+        // Fail fast
+        let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
+        if let Some(exp) = expires {
+            allowance.expires = exp;
+        }
+        allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
+        Ok(allowance)
+    })?;
     if allowance.balance.is_empty() {
-        allowances(deps.storage).remove(spender_raw.as_slice());
+        ALLOWANCES.remove(deps.storage, &spender_raw);
     }
 
     let res = Response {
@@ -254,7 +249,7 @@ pub fn execute_set_permissions<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     let spender_raw = &deps.api.canonical_address(&spender)?;
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
 
@@ -264,7 +259,7 @@ where
     if spender_raw == owner_raw {
         return Err(ContractError::CannotSetOwnAccount {});
     }
-    permissions(deps.storage).save(spender_raw.as_slice(), &perm)?;
+    PERMISSIONS.save(deps.storage, &spender_raw, &perm)?;
 
     let res = Response {
         submessages: vec![],
@@ -298,8 +293,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 // if the subkey has no allowance, return an empty struct (not an error)
 pub fn query_allowance(deps: Deps, spender: HumanAddr) -> StdResult<Allowance> {
     let subkey = deps.api.canonical_address(&spender)?;
-    let allow = allowances_read(deps.storage)
-        .may_load(subkey.as_slice())?
+    let allow = ALLOWANCES
+        .may_load(deps.storage, &subkey)?
         .unwrap_or_default();
     Ok(allow)
 }
@@ -307,8 +302,8 @@ pub fn query_allowance(deps: Deps, spender: HumanAddr) -> StdResult<Allowance> {
 // if the subkey has no permissions, return an empty struct (not an error)
 pub fn query_permissions(deps: Deps, spender: HumanAddr) -> StdResult<Permissions> {
     let subkey = deps.api.canonical_address(&spender)?;
-    let permissions = permissions_read(deps.storage)
-        .may_load(subkey.as_slice())?
+    let permissions = PERMISSIONS
+        .may_load(deps.storage, &subkey)?
         .unwrap_or_default();
     Ok(permissions)
 }
@@ -326,14 +321,14 @@ fn query_can_execute(
 // this can just return booleans and the query_can_execute wrapper creates the struct once, not on every path
 fn can_execute(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool> {
     let owner_raw = deps.api.canonical_address(&sender)?;
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     if cfg.is_admin(&owner_raw) {
         return Ok(true);
     }
     match msg {
         CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
             // now we check if there is enough allowance for this message
-            let allowance = allowances_read(deps.storage).may_load(owner_raw.as_slice())?;
+            let allowance = ALLOWANCES.may_load(deps.storage, &owner_raw)?;
             match allowance {
                 // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
                 Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
@@ -341,7 +336,7 @@ fn can_execute(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool>
             }
         }
         CosmosMsg::Staking(staking_msg) => {
-            let perm_opt = permissions_read(deps.storage).may_load(owner_raw.as_slice())?;
+            let perm_opt = PERMISSIONS.may_load(deps.storage, &owner_raw)?;
             match perm_opt {
                 Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
                 None => Ok(false),
@@ -365,11 +360,12 @@ pub fn query_all_allowances(
     limit: Option<u32>,
 ) -> StdResult<AllAllowancesResponse> {
     let limit = calc_limit(limit);
-    let range_start = calc_range_start_human(deps.api, start_after)?;
+    let canon = maybe_canonical(deps.api, start_after)?;
+    let start = canon.map(Bound::exclusive);
 
     let api = &deps.api;
-    let res: StdResult<Vec<AllowanceInfo>> = allowances_read(deps.storage)
-        .range(range_start.as_deref(), None, Order::Ascending)
+    let res: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             item.and_then(|(k, allow)| {
@@ -391,11 +387,12 @@ pub fn query_all_permissions(
     limit: Option<u32>,
 ) -> StdResult<AllPermissionsResponse> {
     let limit = calc_limit(limit);
-    let range_start = calc_range_start_human(deps.api, start_after)?;
+    let canon = maybe_canonical(deps.api, start_after)?;
+    let start = canon.map(Bound::exclusive);
 
     let api = &deps.api;
-    let res: StdResult<Vec<PermissionsInfo>> = permissions_read(deps.storage)
-        .range(range_start.as_deref(), None, Order::Ascending)
+    let res: StdResult<Vec<PermissionsInfo>> = PERMISSIONS
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             item.and_then(|(k, perm)| {
@@ -1463,7 +1460,7 @@ mod tests {
         };
 
         let spender_raw = &deps.api.canonical_address(&spender).unwrap();
-        let _ = permissions(&mut deps.storage).save(spender_raw.as_slice(), &perm);
+        let _ = PERMISSIONS.save(&mut deps.storage, &spender_raw, &perm);
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
