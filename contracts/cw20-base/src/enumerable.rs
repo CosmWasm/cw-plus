@@ -49,12 +49,10 @@ pub fn query_all_accounts(
     let start = canon.map(Bound::exclusive);
 
     let api = &deps.api;
-
-    // FIXME: expose way to optimize this to just get keys
     let accounts: StdResult<Vec<_>> = BALANCES
-        .range(deps.storage, start, None, Order::Ascending)
+        .keys(deps.storage, start, None, Order::Ascending)
+        .map(|key| api.human_address(&key.into()))
         .take(limit)
-        .map(|r| api.human_address(&CanonicalAddr::from(r?.0)))
         .collect();
 
     Ok(AllAccountsResponse {
