@@ -142,9 +142,7 @@ pub fn check_staking_permissions(
                 return Err(ContractError::WithdrawPerm {});
             }
         }
-        s => {
-            panic!("Unsupported staking message: {:?}", s)
-        }
+        s => panic!("Unsupported staking message: {:?}", s),
     }
     Ok(true)
 }

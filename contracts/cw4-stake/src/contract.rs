@@ -1,9 +1,11 @@
 use cosmwasm_std::{
     attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HumanAddr, MessageInfo, Order, Response, StdResult, Storage, Uint128,
+    Env, HumanAddr, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
-use cw0::maybe_canonical;
+
+use cw0::{maybe_canonical, NativeBalance};
 use cw2::set_contract_version;
+use cw20::{Balance, Denom};
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
@@ -58,42 +60,46 @@ pub fn execute(
         HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
         HandleMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
         HandleMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::Bond {} => execute_bond(deps, env, info),
+        HandleMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
         HandleMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
         HandleMsg::Claim {} => execute_claim(deps, env, info),
     }
 }
 
-pub fn execute_bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+pub fn execute_bond(
+    deps: DepsMut,
+    env: Env,
+    amount: Balance,
+    sender: HumanAddr,
+) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
     // ensure the sent denom was proper
     // NOTE: those clones are not needed (if we move denom, we return early),
     // but the compiler cannot see that (yet...)
-    let sent = match info.funds.len() {
-        0 => Err(ContractError::NoFunds {}),
-        1 => {
-            if info.funds[0].denom == cfg.denom {
-                Ok(info.funds[0].amount)
+    let amount = match (&cfg.denom, &amount) {
+        (Denom::Native(want), Balance::Native(have)) => must_pay_funds(have, want),
+        (Denom::Cw20(want), Balance::Cw20(have)) => {
+            if want == &have.address {
+                Ok(have.amount)
             } else {
-                Err(ContractError::MissingDenom(cfg.denom.clone()))
+                Err(ContractError::InvalidDenom(deps.api.human_address(&want)?))
             }
         }
-        _ => Err(ContractError::ExtraDenoms(cfg.denom.clone())),
+        _ => Err(ContractError::MixedNativeAndCw20(
+            "Invalid address or denom".to_string(),
+        )),
     }?;
-    if sent.is_zero() {
-        return Err(ContractError::NoFunds {});
-    }
 
     // update the sender's stake
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
+    let sender_raw = deps.api.canonical_address(&sender)?;
     let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
-        Ok(stake.unwrap_or_default() + sent)
+        Ok(stake.unwrap_or_default() + amount)
     })?;
 
     let messages = update_membership(
         deps.storage,
-        info.sender.clone(),
+        sender.clone(),
         &sender_raw,
         new_stake,
         &cfg,
@@ -102,8 +108,8 @@ pub fn execute_bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respon
 
     let attributes = vec![
         attr("action", "bond"),
-        attr("amount", sent),
-        attr("sender", info.sender),
+        attr("amount", amount),
+        attr("sender", sender),
     ];
     Ok(Response {
         submessages: vec![],
@@ -154,6 +160,22 @@ pub fn execute_unbond(
         attributes,
         data: None,
     })
+}
+
+pub fn must_pay_funds(balance: &NativeBalance, denom: &str) -> Result<Uint128, ContractError> {
+    match balance.0.len() {
+        0 => Err(ContractError::NoFunds {}),
+        1 => {
+            let balance = &balance.0;
+            let payment = balance[0].amount;
+            if balance[0].denom == denom {
+                Ok(payment)
+            } else {
+                Err(ContractError::MissingDenom(denom.to_string()))
+            }
+        }
+        _ => Err(ContractError::ExtraDenoms(denom.to_string())),
+    }
 }
 
 fn update_membership(
@@ -211,9 +233,15 @@ pub fn execute_claim(
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let amount = coins(release.u128(), config.denom);
-    let amount_str = coins_to_string(&amount);
+    let amount;
+    match &config.denom {
+        Denom::Native(denom) => amount = coins(release.u128(), denom),
+        Denom::Cw20(_canonical_addr) => {
+            unimplemented!("The CW20 coins release functionality is in progress")
+        }
+    }
 
+    let amount_str = coins_to_string(&amount);
     let messages = vec![BankMsg::Send {
         to_address: info.sender.clone(),
         amount,
@@ -269,7 +297,14 @@ pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse>
     let stake = STAKE
         .may_load(deps.storage, &address_raw)?
         .unwrap_or_default();
-    let denom = CONFIG.load(deps.storage)?.denom;
+    let denom = match CONFIG.load(deps.storage)?.denom {
+        Denom::Native(want) => want,
+        _ => {
+            return Err(StdError::generic_err(
+                "The stake for CW20 is not yet implemented",
+            ));
+        }
+    };
     Ok(StakedResponse {
         stake: coin(stake.u128(), denom),
     })
@@ -315,18 +350,21 @@ fn list_members(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_slice, Api, StdError, Storage};
     use cw0::Duration;
+    use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
+
+    use crate::error::ContractError;
+
+    use super::*;
 
     const INIT_ADMIN: &str = "juan";
     const USER1: &str = "somebody";
     const USER2: &str = "else";
     const USER3: &str = "funny";
-
     const DENOM: &str = "stake";
     const TOKENS_PER_WEIGHT: Uint128 = Uint128(1_000);
     const MIN_BOND: Uint128 = Uint128(5_000);
@@ -348,7 +386,7 @@ mod tests {
         unbonding_period: Duration,
     ) {
         let msg = InitMsg {
-            denom: DENOM.to_string(),
+            denom: Denom::Native("stake".to_string()),
             tokens_per_weight,
             min_bond,
             unbonding_period,
@@ -528,7 +566,7 @@ mod tests {
                 assert_eq!(minuend.as_str(), "5000");
                 assert_eq!(subtrahend.as_str(), "5100");
             }
-            e => panic!("Unexpected error: {}", e),
+            e => panic!("Unexpected error: {:?}", e),
         }
     }
 

@@ -21,7 +21,11 @@
     },
     "denom": {
       "description": "denom of the token to stake",
-      "type": "string"
+      "allOf": [
+        {
+          "$ref": "#/definitions/Denom"
+        }
+      ]
     },
     "min_bond": {
       "$ref": "#/definitions/Uint128"
@@ -34,6 +38,39 @@
     }
   },
   "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "CanonicalAddr": {
+      "$ref": "#/definitions/Binary"
+    },
+    "Denom": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "native"
+          ],
+          "properties": {
+            "native": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "cw20"
+          ],
+          "properties": {
+            "cw20": {
+              "$ref": "#/definitions/CanonicalAddr"
+            }
+          }
+        }
+      ]
+    },
     "Duration": {
       "description": "Duration is a delta of time. You can add it to a BlockInfo or Expiration to move that further in the future. Note that an height-based Duration and a time-based Expiration cannot be combined",
       "anyOf": [

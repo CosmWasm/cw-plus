@@ -180,9 +180,7 @@ impl WasmRouter {
                 self.query_smart(contract_addr, querier, msg.into())
             }
             WasmQuery::Raw { contract_addr, key } => self.query_raw(contract_addr, &key),
-            q => {
-                panic!("Unsupported wasm query: {:?}", q)
-            }
+            q => panic!("Unsupported wasm query: {:?}", q),
         }
     }
 
