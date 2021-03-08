@@ -777,6 +777,9 @@ jobs:
           command: cargo build --release --target wasm32-unknown-unknown --locked
       - run:
           name: Install compile_module
+          # Uses --debug fopr performance/speed
+          # FIXME: Change when `compile_module` (cosmwasm-0.14.0) is published
+          #command: cargo install --debug --example compile_module -- cosmwasm-vm
           command: cargo install --debug --git https://github.com/CosmWasm/cosmwasm --branch=contract-sanity-checking --example compile_module -- cosmwasm-vm
       - save_cache:
           paths:
