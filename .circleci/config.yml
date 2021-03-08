@@ -759,9 +759,10 @@ jobs:
             - target/debug/deps
           key: cargocache-v2-lint-rust:1.50.0-{{ checksum "Cargo.lock" }}
 
-  # this runs one time on the top level to ensure all contracts compile properly into wasm
-  # we don't run the wasm build and the reuse a lot of the same dependencies, so this should speed up CI time
-  # for all the other tests
+  # This runs one time on the top level to ensure all contracts compile properly into wasm.
+  # We don't run the wasm build per contract build, and then reuse a lot of the same dependencies, so this speeds up CI time
+  # for all the other tests.
+  # We also compile the resultant wasm files, to sanity check them.
   wasm-build:
     docker:
       - image: rust:1.50.0
@@ -780,11 +781,22 @@ jobs:
       - run:
           name: Build Wasm Release
           command: cargo build --release --target wasm32-unknown-unknown --locked
+      - run:
+          name: Install compile_module
+          command: cargo install --debug --git https://github.com/CosmWasm/cosmwasm --branch=contract-sanity-checking --example compile_module -- cosmwasm-vm
       - save_cache:
           paths:
             - /usr/local/cargo/registry
             - target
           key: cargocache-wasm-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Compile wasm files
+          command: |
+            for W in ./target/wasm32-unknown-unknown/release/*.wasm
+            do
+              echo -n "Compiling `basename $W`... "
+              compile_module $W || exit $?
+            done
 
   package_multi_test:
     docker:
