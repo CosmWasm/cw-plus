@@ -1,13 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Storage, Uint128};
+use cosmwasm_std::{CanonicalAddr, Uint128};
 use cw_storage_plus::{Item, Map};
 
-use cosmwasm_storage::{
-    bucket, bucket_read, singleton, singleton_read, Bucket, ReadonlyBucket,
-    ReadonlyPrefixedStorage, ReadonlySingleton, Singleton,
-};
 use cw20::AllowanceResponse;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -33,6 +29,6 @@ impl TokenInfo {
     }
 }
 
-const TOKEN_INFO: Item<TokenInfo> = Item::new("token_info");
-const BALANCES: Map<&[u8], Uint128> = Map::new("balance");
-const ALLOWANCES: Map<(&[u8], &[u8]), AllowanceResponse> = Map::new("allowance");
+pub const TOKEN_INFO: Item<TokenInfo> = Item::new("token_info");
+pub const BALANCES: Map<&[u8], Uint128> = Map::new("balance");
+pub const ALLOWANCES: Map<(&[u8], &[u8]), AllowanceResponse> = Map::new("allowance");
