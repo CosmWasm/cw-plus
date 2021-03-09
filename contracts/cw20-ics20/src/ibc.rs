@@ -10,7 +10,7 @@ use cosmwasm_std::{
 };
 
 use crate::amount::Amount;
-use crate::error::ContractError;
+use crate::error::{ContractError, Never};
 use crate::state::{ChannelInfo, CHANNEL_INFO, CHANNEL_STATE};
 use cw20::Cw20HandleMsg;
 
@@ -42,10 +42,16 @@ pub enum Ics20Ack {
     Error(String),
 }
 
-// create a serialize success message
-fn ack_success() -> StdResult<Binary> {
+// create a serialized success message
+fn ack_success() -> Binary {
     let res = Ics20Ack::Result(b"1".into());
-    to_binary(&res)
+    to_binary(&res).unwrap()
+}
+
+// create a serialized error message
+fn ack_fail(err: String) -> Binary {
+    let res = Ics20Ack::Error(err);
+    to_binary(&res).unwrap()
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -118,11 +124,37 @@ pub fn ibc_packet_receive(
     deps: DepsMut,
     _env: Env,
     packet: IbcPacket,
-) -> Result<IbcReceiveResponse, ContractError> {
-    // TODO: don't let error leak
+) -> Result<IbcReceiveResponse, Never> {
+    let res = match do_ibc_packet_receive(deps, packet) {
+        Ok(msg) => {
+            let to_send = Amount::from_parts(msg.denom, msg.amount.into());
+            let msg = send_amount(to_send, HumanAddr::from(msg.receiver));
+            IbcReceiveResponse {
+                acknowledgement: ack_success(),
+                messages: vec![msg],
+                // TODO: similar event messages like ibctransfer module
+                attributes: vec![attr("action", "receive")],
+            }
+        }
+        Err(err) => {
+            IbcReceiveResponse {
+                acknowledgement: ack_fail(err.to_string()),
+                messages: vec![],
+                // TODO: similar event messages like ibctransfer module
+                attributes: vec![attr("action", "receive")],
+            }
+        }
+    };
+
+    // if we have funds, now send the tokens to the requested recipient
+    Ok(res)
+}
+
+// this does the work of ibc_packet_receive, we wrap it to turn errors into acknowledgements
+fn do_ibc_packet_receive(deps: DepsMut, packet: IbcPacket) -> Result<Ics20Packet, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
     let channel = packet.dest.channel_id;
-    let denom = msg.denom;
+    let denom = msg.denom.clone();
     let amount = Uint128::from(msg.amount);
     CHANNEL_STATE.update(
         deps.storage,
@@ -135,17 +167,7 @@ pub fn ibc_packet_receive(
             Ok(cur)
         },
     )?;
-
-    // if we have funds, now send the tokens to the requested recipient
-    let to_send = Amount::from_parts(denom, amount);
-    let msg = send_amount(to_send, HumanAddr::from(msg.receiver))?;
-    let res = IbcReceiveResponse {
-        acknowledgement: ack_success()?,
-        messages: vec![msg],
-        // TODO: similar event messages like ibctransfer module
-        attributes: vec![attr("action", "receive")],
-    };
-    Ok(res)
+    Ok(msg)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -199,7 +221,7 @@ fn on_packet_failure(
     let msg: Ics20Packet = from_binary(&packet.data)?;
 
     let amount = Amount::from_parts(msg.denom, msg.amount.into());
-    let msg = send_amount(amount, HumanAddr::from(msg.sender))?;
+    let msg = send_amount(amount, HumanAddr::from(msg.sender));
     let res = IbcBasicResponse {
         messages: vec![msg],
         // TODO: similar event messages like ibctransfer module
@@ -208,13 +230,13 @@ fn on_packet_failure(
     Ok(res)
 }
 
-fn send_amount(amount: Amount, recipient: HumanAddr) -> StdResult<CosmosMsg> {
+fn send_amount(amount: Amount, recipient: HumanAddr) -> CosmosMsg {
     match amount {
-        Amount::Native(coin) => Ok(BankMsg::Send {
+        Amount::Native(coin) => BankMsg::Send {
             to_address: recipient,
             amount: vec![coin],
         }
-        .into()),
+        .into(),
         Amount::Cw20(coin) => {
             let msg = Cw20HandleMsg::Transfer {
                 recipient,
@@ -222,10 +244,10 @@ fn send_amount(amount: Amount, recipient: HumanAddr) -> StdResult<CosmosMsg> {
             };
             let exec = WasmMsg::Execute {
                 contract_addr: coin.address,
-                msg: to_binary(&msg)?,
+                msg: to_binary(&msg).unwrap(),
                 send: vec![],
             };
-            Ok(exec.into())
+            exec.into()
         }
     }
 }
@@ -237,11 +259,7 @@ mod test {
 
     use crate::contract::query_channel;
     use cosmwasm_std::testing::mock_env;
-    use cosmwasm_std::{to_vec, IbcEndpoint};
-
-    // fn mock_packet() -> Packet {
-    //     unimplemented!();
-    // }
+    use cosmwasm_std::{coins, to_vec, IbcEndpoint};
 
     fn cw20_payment(amount: u128, address: &str, recipient: &str) -> CosmosMsg {
         let msg = Cw20HandleMsg::Transfer {
@@ -256,16 +274,13 @@ mod test {
         exec.into()
     }
 
-    #[test]
-    fn check_ack_json() {
-        let success = Ics20Ack::Result(b"1".into());
-        let fail = Ics20Ack::Error("bad coin".into());
-
-        let success_json = String::from_utf8(to_vec(&success).unwrap()).unwrap();
-        assert_eq!(r#"{"result":"MQ=="}"#, success_json.as_str());
-
-        let fail_json = String::from_utf8(to_vec(&fail).unwrap()).unwrap();
-        assert_eq!(r#"{"error":"bad coin"}"#, fail_json.as_str());
+    #[allow(dead_code)]
+    fn native_payment(amount: u128, denom: &str, recipient: &str) -> CosmosMsg {
+        BankMsg::Send {
+            to_address: recipient.into(),
+            amount: coins(amount, denom),
+        }
+        .into()
     }
 
     fn mock_sent_packet(my_channel: &str, amount: u64, denom: &str, sender: &str) -> IbcPacket {
@@ -319,6 +334,18 @@ mod test {
     }
 
     #[test]
+    fn check_ack_json() {
+        let success = Ics20Ack::Result(b"1".into());
+        let fail = Ics20Ack::Error("bad coin".into());
+
+        let success_json = String::from_utf8(to_vec(&success).unwrap()).unwrap();
+        assert_eq!(r#"{"result":"MQ=="}"#, success_json.as_str());
+
+        let fail_json = String::from_utf8(to_vec(&fail).unwrap()).unwrap();
+        assert_eq!(r#"{"error":"bad coin"}"#, fail_json.as_str());
+    }
+
+    #[test]
     fn send_receive_cw20() {
         let send_channel = "channel-9";
         let mut deps = setup(&["channel-1", "channel-7", send_channel]);
@@ -333,13 +360,15 @@ mod test {
             mock_receive_packet(send_channel, 1876543210, cw20_denom, "local-rcpt");
 
         // cannot receive this denom yet
-        let err = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap_err();
-        // TODO: should return success, with error encoded in IbcAck
-        assert_eq!(err, ContractError::InsufficientFunds {});
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap();
+        assert!(res.messages.is_empty());
+        let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
+        let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
+        assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
         let ack = IbcAcknowledgement {
-            acknowledgement: ack_success().unwrap(),
+            acknowledgement: ack_success(),
             original_packet: sent_packet.clone(),
         };
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
@@ -351,9 +380,10 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
 
         // cannot receive more than we sent
-        let err = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap_err();
-        // TODO: should return success, with error encoded in IbcAck
-        assert_eq!(err, ContractError::InsufficientFunds {});
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap();
+        assert!(res.messages.is_empty());
+        let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
+        assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet).unwrap();

@@ -13,6 +13,18 @@
           "$ref": "#/definitions/Cw20ReceiveMsg"
         }
       }
+    },
+    {
+      "description": "This allows us to transfer *exactly one* native token",
+      "type": "object",
+      "required": [
+        "transfer"
+      ],
+      "properties": {
+        "transfer": {
+          "$ref": "#/definitions/TransferMsg"
+        }
+      }
     }
   ],
   "definitions": {
@@ -48,6 +60,33 @@
     },
     "HumanAddr": {
       "type": "string"
+    },
+    "TransferMsg": {
+      "description": "This is the message we accept via Receive",
+      "type": "object",
+      "required": [
+        "channel",
+        "remote_address"
+      ],
+      "properties": {
+        "channel": {
+          "description": "The local channel to send the packets on",
+          "type": "string"
+        },
+        "remote_address": {
+          "description": "The remote address to send to Don't use HumanAddress as this will likely have a different Bech32 prefix than we use and cannot be validated locally",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "How long the packet lives in seconds. If not specified, use default_timeout",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
     },
     "Uint128": {
       "type": "string"
