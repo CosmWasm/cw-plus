@@ -1,4 +1,4 @@
-use cosmwasm_std::{MessageInfo, Uint128};
+use cosmwasm_std::{Coin, MessageInfo, Uint128};
 use thiserror::Error;
 
 /// returns an error if any coins were sent
@@ -10,28 +10,31 @@ pub fn nonpayable(info: &MessageInfo) -> Result<(), PaymentError> {
     }
 }
 
-/// Requires exactly one denom sent, which matches the requested denom.
-/// Returns the amount if only one denom and non-zero amount. Errors otherwise.
-pub fn must_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError> {
+/// If exactly one coin was sent, returns it regardless of denom.
+/// Returns error if 0 or 2+ coins were sent
+pub fn one_coin(info: &MessageInfo) -> Result<Coin, PaymentError> {
     match info.funds.len() {
         0 => Err(PaymentError::NoFunds {}),
         1 => {
-            if info.funds[0].denom == denom {
-                let payment = info.funds[0].amount;
-                if payment.is_zero() {
-                    Err(PaymentError::NoFunds {})
-                } else {
-                    Ok(payment)
-                }
+            let coin = &info.funds[0];
+            if coin.amount.is_zero() {
+                Err(PaymentError::NoFunds {})
             } else {
-                Err(PaymentError::MissingDenom(denom.to_string()))
+                Ok(coin.clone())
             }
         }
-        _ => {
-            // find first mis-match
-            let wrong = info.funds.iter().find(|c| c.denom != denom).unwrap();
-            Err(PaymentError::ExtraDenom(wrong.denom.to_string()))
-        }
+        _ => Err(PaymentError::MultipleDenoms {}),
+    }
+}
+
+/// Requires exactly one denom sent, which matches the requested denom.
+/// Returns the amount if only one denom and non-zero amount. Errors otherwise.
+pub fn must_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError> {
+    let coin = one_coin(info)?;
+    if coin.denom != denom {
+        Err(PaymentError::MissingDenom(denom.to_string()))
+    } else {
+        Ok(coin.amount)
     }
 }
 
@@ -56,6 +59,9 @@ pub enum PaymentError {
 
     #[error("Received unsupported denom '{0}'")]
     ExtraDenom(String),
+
+    #[error("Sent more than one denomination")]
+    MultipleDenoms {},
 
     #[error("No funds sent")]
     NoFunds {},
@@ -125,6 +131,6 @@ mod test {
         assert_eq!(err, PaymentError::MissingDenom(atom.to_string()));
 
         let err = must_pay(&mixed_payment, atom).unwrap_err();
-        assert_eq!(err, PaymentError::ExtraDenom("wei".to_string()));
+        assert_eq!(err, PaymentError::MultipleDenoms {});
     }
 }
