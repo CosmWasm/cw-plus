@@ -756,7 +756,7 @@ jobs:
   # This runs one time on the top level to ensure all contracts compile properly into wasm.
   # We don't run the wasm build per contract build, and then reuse a lot of the same dependencies, so this speeds up CI time
   # for all the other tests.
-  # We also compile the resultant wasm files, as a sanity check.
+  # We also sanity-check the resultant wasm files.
   wasm-build:
     docker:
       - image: rust:1.50.0
@@ -776,11 +776,11 @@ jobs:
           name: Build Wasm Release
           command: cargo build --release --target wasm32-unknown-unknown --locked
       - run:
-          name: Install compile_module
-          # Uses --debug for performance/speed
-          # FIXME: Change when `compile_module` (part of `cosmwasm-0.14.0`) is published
-          #command: cargo install --debug --features iterator --example compile_module -- cosmwasm-vm
-          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --branch=contract-sanity-checking --example compile_module -- cosmwasm-vm
+          name: Install check_contract
+          # Uses --debug for compilation speed
+          # FIXME: Change when `check_contract` (part of `cosmwasm-0.14.0`) is published
+          #command: cargo install --debug --features iterator --example check_contract -- cosmwasm-vm
+          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --branch=contract-sanity-checking --example check_contract -- cosmwasm-vm
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -791,8 +791,8 @@ jobs:
           command: |
             for W in ./target/wasm32-unknown-unknown/release/*.wasm
             do
-              echo -n "Compiling `basename $W`... "
-              compile_module $W
+              echo -n "Checking `basename $W`... "
+              check_contract $W
             done
 
   package_multi_test:
