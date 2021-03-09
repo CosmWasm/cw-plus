@@ -19,7 +19,8 @@ pub struct InitMsg {
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
-    // TODO: also add Transfer(TransferMsg) to support native tokens
+    /// This allows us to transfer *exactly one* native token
+    Transfer(TransferMsg),
 }
 
 /// This is the message we accept via Receive

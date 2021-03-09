@@ -13,6 +13,7 @@ use crate::msg::{
     ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, PortResponse, QueryMsg, TransferMsg,
 };
 use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
+use cw0::one_coin;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
@@ -42,6 +43,10 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
+        ExecuteMsg::Transfer(msg) => {
+            let coin = one_coin(&info)?;
+            execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
+        }
     }
 }
 

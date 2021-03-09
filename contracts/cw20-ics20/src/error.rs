@@ -1,12 +1,17 @@
-use cosmwasm_std::StdError;
 use std::num::TryFromIntError;
 use std::string::FromUtf8Error;
 use thiserror::Error;
+
+use cosmwasm_std::StdError;
+use cw0::PaymentError;
 
 #[derive(Error, Debug)]
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    Payment(#[from] PaymentError),
 
     #[error("No data in ReceiveMsg")]
     NoData {},
