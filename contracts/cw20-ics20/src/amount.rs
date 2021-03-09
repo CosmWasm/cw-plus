@@ -14,7 +14,7 @@ pub enum Amount {
 }
 
 impl Amount {
-    // TODO: write test here
+    // TODO: write test for this
     pub fn from_parts(denom: String, amount: Uint128) -> Self {
         if denom.starts_with("cw20:") {
             let address = denom.get(5..).unwrap().into();
@@ -24,6 +24,22 @@ impl Amount {
         }
     }
 
+    pub fn cw20(amount: u128, addr: &str) -> Self {
+        Amount::Cw20(Cw20CoinHuman {
+            address: addr.into(),
+            amount: Uint128(amount),
+        })
+    }
+
+    pub fn native(amount: u128, denom: &str) -> Self {
+        Amount::Native(Coin {
+            denom: denom.to_string(),
+            amount: Uint128(amount),
+        })
+    }
+}
+
+impl Amount {
     pub fn denom(&self) -> String {
         match self {
             Amount::Native(c) => c.denom.clone(),
