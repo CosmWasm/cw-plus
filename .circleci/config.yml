@@ -774,7 +774,12 @@ jobs:
           command: rustup target add wasm32-unknown-unknown
       - run:
           name: Build Wasm Release
-          command: cargo build --release --target wasm32-unknown-unknown --locked
+          command: |
+            for C in ./contracts/*/
+            do
+              echo -n "Compiling `basename $C`... "
+              (cd $C && cargo build --release --target wasm32-unknown-unknown --locked)
+            done
       - run:
           name: Install check_contract
           # Uses --debug for compilation speed
