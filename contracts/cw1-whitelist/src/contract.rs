@@ -10,7 +10,7 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{admin_list, admin_list_read, AdminList};
+use crate::state::{AdminList, ADMIN_LIST};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
@@ -22,7 +22,7 @@ pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdRe
         admins: map_canonical(deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
-    admin_list(deps.storage).save(&cfg)?;
+    ADMIN_LIST.save(deps.storage, &cfg)?;
     Ok(Response::default())
 }
 
@@ -76,12 +76,12 @@ pub fn execute_freeze(
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let mut cfg = admin_list_read(deps.storage).load()?;
+    let mut cfg = ADMIN_LIST.load(deps.storage)?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.mutable = false;
-        admin_list(deps.storage).save(&cfg)?;
+        ADMIN_LIST.save(deps.storage, &cfg)?;
 
         let mut res = Response::default();
         res.attributes = vec![attr("action", "freeze")];
@@ -95,12 +95,12 @@ pub fn execute_update_admins(
     info: MessageInfo,
     admins: Vec<HumanAddr>,
 ) -> Result<Response, ContractError> {
-    let mut cfg = admin_list_read(deps.storage).load()?;
+    let mut cfg = ADMIN_LIST.load(deps.storage)?;
     if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.admins = map_canonical(deps.api, &admins)?;
-        admin_list(deps.storage).save(&cfg)?;
+        ADMIN_LIST.save(deps.storage, &cfg)?;
 
         let mut res = Response::default();
         res.attributes = vec![attr("action", "update_admins")];
@@ -109,7 +109,7 @@ pub fn execute_update_admins(
 }
 
 fn can_execute(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
     Ok(can)
 }
@@ -122,7 +122,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub fn query_admin_list(deps: Deps) -> StdResult<AdminListResponse> {
-    let cfg = admin_list_read(deps.storage).load()?;
+    let cfg = ADMIN_LIST.load(deps.storage)?;
     Ok(AdminListResponse {
         admins: map_human(deps.api, &cfg.admins)?,
         mutable: cfg.mutable,
