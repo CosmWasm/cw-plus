@@ -115,42 +115,6 @@ pub fn execute_transfer(
     Ok(res)
 }
 
-// fn send_tokens(
-//     api: &dyn Api,
-//     to: &HumanAddr,
-//     balance: &GenericBalance,
-// ) -> StdResult<Vec<CosmosMsg>> {
-//     let native_balance = &balance.native;
-//     let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
-//         vec![]
-//     } else {
-//         vec![BankMsg::Send {
-//             to_address: to.into(),
-//             amount: native_balance.to_vec(),
-//         }
-//         .into()]
-//     };
-//
-//     let cw20_balance = &balance.cw20;
-//     let cw20_msgs: StdResult<Vec<_>> = cw20_balance
-//         .iter()
-//         .map(|c| {
-//             let msg = Cw20HandleMsg::Transfer {
-//                 recipient: to.into(),
-//                 amount: c.amount,
-//             };
-//             let exec = WasmMsg::Execute {
-//                 contract_addr: api.human_address(&c.address)?,
-//                 msg: to_binary(&msg)?,
-//                 send: vec![],
-//             };
-//             Ok(exec.into())
-//         })
-//         .collect();
-//     msgs.append(&mut cw20_msgs?);
-//     Ok(msgs)
-// }
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {

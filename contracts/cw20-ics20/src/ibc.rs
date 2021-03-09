@@ -3,12 +3,16 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::error::ContractError;
-use crate::state::{ChannelInfo, CHANNEL_INFO};
 use cosmwasm_std::{
-    entry_point, Binary, DepsMut, Env, IbcAcknowledgement, IbcBasicResponse, IbcChannel, IbcOrder,
-    IbcPacket, IbcReceiveResponse,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, DepsMut, Env, HumanAddr,
+    IbcAcknowledgement, IbcBasicResponse, IbcChannel, IbcOrder, IbcPacket, IbcReceiveResponse,
+    StdResult, Uint128, WasmMsg,
 };
+
+use crate::amount::Amount;
+use crate::error::ContractError;
+use crate::state::{ChannelInfo, CHANNEL_INFO, CHANNEL_STATE};
+use cw20::Cw20HandleMsg;
 
 pub const ICS20_VERSION: &str = "ics20-1";
 pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
@@ -38,7 +42,7 @@ pub enum Ics20Ack {
     Error(String),
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 /// enforces ordering and versioning constraints
 pub fn ibc_channel_open(
     _deps: DepsMut,
@@ -49,7 +53,7 @@ pub fn ibc_channel_open(
     Ok(())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 /// record the channel in CHANNEL_INFO
 pub fn ibc_channel_connect(
     deps: DepsMut,
@@ -90,7 +94,7 @@ fn enforce_order_and_version(channel: &IbcChannel) -> Result<(), ContractError> 
     Ok(())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn ibc_channel_close(
     _deps: DepsMut,
     _env: Env,
@@ -101,7 +105,7 @@ pub fn ibc_channel_close(
     unimplemented!();
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 /// Check to see if we have any balance here
 /// We should not return an error if possible, but rather an acknowledgement of failure
 pub fn ibc_packet_receive(
@@ -112,24 +116,84 @@ pub fn ibc_packet_receive(
     unimplemented!();
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 /// check if success or failure and update balance, or return funds
 pub fn ibc_packet_ack(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
-    _ack: IbcAcknowledgement,
+    ack: IbcAcknowledgement,
 ) -> Result<IbcBasicResponse, ContractError> {
-    unimplemented!();
+    // TODO: don't let error leak
+    let msg: Ics20Ack = from_binary(&ack.acknowledgement)?;
+    match msg {
+        Ics20Ack::Result(_) => on_packet_success(deps, ack.original_packet),
+        Ics20Ack::Error(err) => on_packet_failure(deps, ack.original_packet, err),
+    }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 /// return fund to original sender (same as failure in ibc_packet_ack)
 pub fn ibc_packet_timeout(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
-    _packet: IbcPacket,
+    packet: IbcPacket,
 ) -> Result<IbcBasicResponse, ContractError> {
-    unimplemented!();
+    // TODO: don't let error leak
+    on_packet_failure(deps, packet, "timeout".to_string())
+}
+
+// update the balance stored on this (channel, denom) index
+fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
+    let msg: Ics20Packet = from_binary(&packet.data)?;
+    let channel = packet.src.channel_id;
+    let denom = msg.denom;
+    let amount = Uint128::from(msg.amount);
+    CHANNEL_STATE.update(deps.storage, (&channel, &denom), |orig| -> StdResult<_> {
+        let mut state = orig.unwrap_or_default();
+        state.outstanding += amount;
+        state.total_sent += amount;
+        Ok(state)
+    })?;
+    Ok(IbcBasicResponse::default())
+}
+
+// return the tokens to sender
+fn on_packet_failure(
+    _deps: DepsMut,
+    packet: IbcPacket,
+    err: String,
+) -> Result<IbcBasicResponse, ContractError> {
+    let msg: Ics20Packet = from_binary(&packet.data)?;
+
+    let amount = Amount::from_parts(msg.denom, msg.amount.into());
+    let msg = send_amount(amount, HumanAddr::from(msg.sender))?;
+    let res = IbcBasicResponse {
+        messages: vec![msg],
+        attributes: vec![attr("ibc_error", err)],
+    };
+    Ok(res)
+}
+
+fn send_amount(amount: Amount, recipient: HumanAddr) -> StdResult<CosmosMsg> {
+    match amount {
+        Amount::Native(coin) => Ok(BankMsg::Send {
+            to_address: recipient,
+            amount: vec![coin],
+        }
+        .into()),
+        Amount::Cw20(coin) => {
+            let msg = Cw20HandleMsg::Transfer {
+                recipient,
+                amount: coin.amount,
+            };
+            let exec = WasmMsg::Execute {
+                contract_addr: coin.address,
+                msg: to_binary(&msg)?,
+                send: vec![],
+            };
+            Ok(exec.into())
+        }
+    }
 }
 
 #[cfg(test)]

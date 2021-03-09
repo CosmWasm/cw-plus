@@ -12,10 +12,10 @@ pub const CONFIG: Item<Config> = Item::new("ics20_config");
 pub const CHANNEL_INFO: Map<&str, ChannelInfo> = Map::new("channel_info");
 
 // indexed by (channel_id, denom) maintaining the balance of the channel in that currency
-pub const CHANNEL_STATE: Map<(&str, &str), Balance> = Map::new("channel_balance");
+pub const CHANNEL_STATE: Map<(&str, &str), ChannelState> = Map::new("channel_state");
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
-pub struct Balance {
+pub struct ChannelState {
     pub outstanding: Uint128,
     pub total_sent: Uint128,
 }
