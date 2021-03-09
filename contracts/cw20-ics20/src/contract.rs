@@ -63,7 +63,7 @@ pub fn execute_receive(
         None => return Err(ContractError::NoData {}),
     };
     let amount = Amount::Cw20(Cw20CoinHuman {
-        address: info.sender.clone(),
+        address: info.sender,
         amount: wrapper.amount,
     });
     execute_transfer(deps, env, msg, amount, wrapper.sender)

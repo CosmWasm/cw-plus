@@ -24,7 +24,7 @@ pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
 pub struct Ics20Packet {
     // the token denomination to be transferred
     pub denom: String,
-    // TODO: is this encoded as a string?
+    // TODO: is this encoded as a string? check real ics20 packets
     pub amount: u64,
     // the sender address
     pub sender: String,
@@ -82,9 +82,7 @@ pub fn ibc_channel_connect(
     };
     CHANNEL_INFO.save(deps.storage, &info.id, &info)?;
 
-    // TODO: add events/attributes here?
-    let res = IbcBasicResponse::default();
-    Ok(res)
+    Ok(IbcBasicResponse::default())
 }
 
 fn enforce_order_and_version(channel: &IbcChannel) -> Result<(), ContractError> {
@@ -177,7 +175,7 @@ pub fn ibc_packet_ack(
     _env: Env,
     ack: IbcAcknowledgement,
 ) -> Result<IbcBasicResponse, ContractError> {
-    // TODO: don't let error leak
+    // TODO: trap error like in receive?
     let msg: Ics20Ack = from_binary(&ack.acknowledgement)?;
     match msg {
         Ics20Ack::Result(_) => on_packet_success(deps, ack.original_packet),
@@ -192,7 +190,7 @@ pub fn ibc_packet_timeout(
     _env: Env,
     packet: IbcPacket,
 ) -> Result<IbcBasicResponse, ContractError> {
-    // TODO: don't let error leak
+    // TODO: trap error like in receive?
     on_packet_failure(deps, packet, "timeout".to_string())
 }
 
