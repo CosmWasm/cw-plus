@@ -231,8 +231,15 @@ fn send_amount(amount: Amount, recipient: HumanAddr) -> StdResult<CosmosMsg> {
 
 #[cfg(test)]
 mod test {
-    use crate::ibc::Ics20Ack;
-    use cosmwasm_std::to_vec;
+    use super::*;
+    use crate::contract::*;
+
+    use cosmwasm_std::testing::{
+        mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
+    };
+    use cosmwasm_std::{to_vec, IbcEndpoint, OwnedDeps, StdError};
+
+    use crate::msg::{ChannelResponse, InitMsg, ListChannelsResponse, QueryMsg};
 
     #[test]
     fn check_ack_json() {
@@ -244,5 +251,100 @@ mod test {
 
         let fail_json = String::from_utf8(to_vec(&fail).unwrap()).unwrap();
         assert_eq!(r#"{"error":"bad coin"}"#, fail_json.as_str());
+    }
+
+    const DEFAULT_TIMEOUT: u64 = 3600; // 1 hourExecuteMsg,
+    const CONTRACT_PORT: &str = "ibc:wasm1234567890abcdef";
+    const REMOTE_PORT: &str = "transfer";
+    const CONNECTION_ID: &str = "connection-2";
+
+    fn mock_channel(channel_id: &str) -> IbcChannel {
+        IbcChannel {
+            endpoint: IbcEndpoint {
+                port_id: CONTRACT_PORT.into(),
+                channel_id: channel_id.into(),
+            },
+            counterparty_endpoint: IbcEndpoint {
+                port_id: REMOTE_PORT.into(),
+                channel_id: format!("{}5", channel_id),
+            },
+            order: ICS20_ORDERING,
+            version: ICS20_VERSION.into(),
+            counterparty_version: None,
+            connection_id: CONNECTION_ID.into(),
+        }
+    }
+
+    fn mock_channel_info(channel_id: &str) -> ChannelInfo {
+        ChannelInfo {
+            id: channel_id.to_string(),
+            counterparty_endpoint: IbcEndpoint {
+                port_id: REMOTE_PORT.into(),
+                channel_id: format!("{}5", channel_id),
+            },
+            connection_id: CONNECTION_ID.into(),
+        }
+    }
+
+    // we simulate init and ack here
+    fn add_channel(mut deps: DepsMut, channel_id: &str) {
+        let mut channel = mock_channel(channel_id);
+        ibc_channel_open(deps.branch(), mock_env(), channel.clone()).unwrap();
+        channel.counterparty_version = Some(ICS20_VERSION.into());
+        ibc_channel_connect(deps.branch(), mock_env(), channel).unwrap();
+    }
+
+    fn setup(channels: &[&str]) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
+        let mut deps = mock_dependencies(&[]);
+
+        // init an empty contract
+        let init_msg = InitMsg {
+            default_timeout: DEFAULT_TIMEOUT,
+        };
+        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        for channel in channels {
+            add_channel(deps.as_mut(), channel);
+        }
+        deps
+    }
+
+    #[test]
+    fn setup_and_query() {
+        let deps = setup(&["channel-3", "channel-7"]);
+
+        let raw_list = query(deps.as_ref(), mock_env(), QueryMsg::ListChannels {}).unwrap();
+        let list_res: ListChannelsResponse = from_binary(&raw_list).unwrap();
+        assert_eq!(2, list_res.channels.len());
+        assert_eq!(mock_channel_info("channel-3"), list_res.channels[0]);
+        assert_eq!(mock_channel_info("channel-7"), list_res.channels[1]);
+
+        let raw_channel = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Channel {
+                id: "channel-3".to_string(),
+            },
+        )
+        .unwrap();
+        let chan_res: ChannelResponse = from_binary(&raw_channel).unwrap();
+        assert_eq!(chan_res.info, mock_channel_info("channel-3"));
+        assert_eq!(0, chan_res.total_sent.len());
+        assert_eq!(0, chan_res.balances.len());
+
+        let not_found = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Channel {
+                id: "channel-10".to_string(),
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            not_found,
+            StdError::not_found("cw20_ics20::state::ChannelInfo")
+        );
     }
 }
