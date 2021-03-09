@@ -25,6 +25,9 @@ pub enum ContractError {
 
     #[error("Only supports unordered channel")]
     OnlyOrderedChannel {},
+
+    #[error("Insufficient funds to redeem voucher on channel")]
+    InsufficientFunds {},
 }
 
 impl From<FromUtf8Error> for ContractError {

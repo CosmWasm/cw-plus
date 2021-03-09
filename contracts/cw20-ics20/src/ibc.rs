@@ -42,6 +42,12 @@ pub enum Ics20Ack {
     Error(String),
 }
 
+// create a serialize success message
+fn ack_success() -> StdResult<Binary> {
+    let res = Ics20Ack::Result(b"1".into());
+    to_binary(&res)
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 /// enforces ordering and versioning constraints
 pub fn ibc_channel_open(
@@ -109,11 +115,36 @@ pub fn ibc_channel_close(
 /// Check to see if we have any balance here
 /// We should not return an error if possible, but rather an acknowledgement of failure
 pub fn ibc_packet_receive(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
-    _packet: IbcPacket,
+    packet: IbcPacket,
 ) -> Result<IbcReceiveResponse, ContractError> {
-    unimplemented!();
+    // TODO: don't let error leak
+    let msg: Ics20Packet = from_binary(&packet.data)?;
+    let channel = packet.src.channel_id;
+    let denom = msg.denom;
+    let amount = Uint128::from(msg.amount);
+    CHANNEL_STATE.update(
+        deps.storage,
+        (&channel, &denom),
+        |orig| -> Result<_, ContractError> {
+            // this will return error if we don't have the funds there to cover the request (or no denom registered)
+            let mut cur = orig.ok_or(ContractError::InsufficientFunds {})?;
+            cur.outstanding = (cur.outstanding - amount)?;
+            Ok(cur)
+        },
+    )?;
+
+    // if we have funds, now send the tokens to the requested recipient
+    let to_send = Amount::from_parts(denom, amount);
+    let msg = send_amount(to_send, HumanAddr::from(msg.receiver))?;
+    let res = IbcReceiveResponse {
+        acknowledgement: ack_success()?,
+        messages: vec![msg],
+        // TODO: similar event messages like ibctransfer module
+        attributes: vec![attr("action", "receive")],
+    };
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -154,6 +185,7 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         state.total_sent += amount;
         Ok(state)
     })?;
+    // TODO: similar event messages like ibctransfer module
     Ok(IbcBasicResponse::default())
 }
 
@@ -169,6 +201,7 @@ fn on_packet_failure(
     let msg = send_amount(amount, HumanAddr::from(msg.sender))?;
     let res = IbcBasicResponse {
         messages: vec![msg],
+        // TODO: similar event messages like ibctransfer module
         attributes: vec![attr("ibc_error", err)],
     };
     Ok(res)
