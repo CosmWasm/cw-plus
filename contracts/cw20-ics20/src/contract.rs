@@ -152,6 +152,16 @@ fn query_port(deps: Deps) -> StdResult<PortResponse> {
     Ok(PortResponse { port_id })
 }
 
+fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
+    let channels: StdResult<Vec<_>> = CHANNEL_INFO
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|r| r.map(|(_, v)| v))
+        .collect();
+    Ok(ListChannelsResponse {
+        channels: channels?,
+    })
+}
+
 fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     let info = CHANNEL_INFO.load(deps.storage, &id)?;
     // this returns Vec<(outstanding, total)>
@@ -176,17 +186,7 @@ fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     })
 }
 
-fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
-    let channels: StdResult<Vec<_>> = CHANNEL_INFO
-        .range(deps.storage, None, None, Order::Ascending)
-        .map(|r| Ok(r?.1))
-        .collect();
-    Ok(ListChannelsResponse {
-        channels: channels?,
-    })
-}
-
-#[cfg(test)]
+#[cfg(target_arch = "arm")]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
