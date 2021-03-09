@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use cw20_ics20::msg::{DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg};
+use cw20_ics20::msg::{ InitMsg, ExecuteMsg, QueryMsg, TransferMsg, PortResponse, ChannelResponse, ListChannelsResponse};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
@@ -12,9 +12,10 @@ fn main() {
     remove_schemas(&out_dir).unwrap();
 
     export_schema(&schema_for!(InitMsg), &out_dir);
-    export_schema(&schema_for!(HandleMsg), &out_dir);
+    export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
-    export_schema(&schema_for!(ReceiveMsg), &out_dir);
-    export_schema(&schema_for!(DetailsResponse), &out_dir);
-    export_schema(&schema_for!(ListResponse), &out_dir);
+    export_schema(&schema_for!(TransferMsg), &out_dir);
+    export_schema(&schema_for!(ChannelResponse), &out_dir);
+    export_schema(&schema_for!(ListChannelsResponse), &out_dir);
+    export_schema(&schema_for!(PortResponse), &out_dir);
 }

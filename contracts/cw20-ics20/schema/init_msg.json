@@ -1,5 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "InitMsg",
-  "type": "object"
+  "type": "object",
+  "required": [
+    "default_timeout"
+  ],
+  "properties": {
+    "default_timeout": {
+      "description": "default timeout for ics20 packets, specified in seconds",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  }
 }

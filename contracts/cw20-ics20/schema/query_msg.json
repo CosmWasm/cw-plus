@@ -3,25 +3,37 @@
   "title": "QueryMsg",
   "anyOf": [
     {
-      "description": "Show all open escrows. Return type is ListResponse.",
+      "description": "Return the port ID bound by this contract. Returns PortResponse",
       "type": "object",
       "required": [
-        "list"
+        "port"
       ],
       "properties": {
-        "list": {
+        "port": {
           "type": "object"
         }
       }
     },
     {
-      "description": "Returns the details of the named escrow, error if not created Return type: DetailsResponse.",
+      "description": "Show all channels we have connected to. Return type is ListChannelsResponse.",
       "type": "object",
       "required": [
-        "details"
+        "list_channels"
       ],
       "properties": {
-        "details": {
+        "list_channels": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Returns the details of the name channel, error if not created Return type: ChannelResponse.",
+      "type": "object",
+      "required": [
+        "channel"
+      ],
+      "properties": {
+        "channel": {
           "type": "object",
           "required": [
             "id"

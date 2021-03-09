@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ListChannelsResponse",
+  "type": "object",
+  "required": [
+    "channels"
+  ],
+  "properties": {
+    "channels": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ChannelInfo"
+      }
+    }
+  },
+  "definitions": {
+    "ChannelInfo": {
+      "type": "object",
+      "required": [
+        "connection_id",
+        "counterparty_endpoint",
+        "id"
+      ],
+      "properties": {
+        "connection_id": {
+          "description": "the connection this exists on (you can use to query client/consensus info)",
+          "type": "string"
+        },
+        "counterparty_endpoint": {
+          "description": "the remote channel/port we connect to",
+          "allOf": [
+            {
+              "$ref": "#/definitions/IbcEndpoint"
+            }
+          ]
+        },
+        "id": {
+          "description": "id of this channel",
+          "type": "string"
+        }
+      }
+    },
+    "IbcEndpoint": {
+      "type": "object",
+      "required": [
+        "channel_id",
+        "port_id"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string"
+        },
+        "port_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

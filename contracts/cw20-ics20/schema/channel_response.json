@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChannelResponse",
+  "type": "object",
+  "required": [
+    "balances",
+    "info",
+    "total_sent"
+  ],
+  "properties": {
+    "balances": {
+      "description": "how many tokens we currently have pending over this channel",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Amount"
+      }
+    },
+    "info": {
+      "description": "information on the channel's connection",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ChannelInfo"
+        }
+      ]
+    },
+    "total_sent": {
+      "description": "the total number of tokens that have been sent over this channel (even if many have been returned, so balanace is low)",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Amount"
+      }
+    }
+  },
+  "definitions": {
+    "Amount": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "native"
+          ],
+          "properties": {
+            "native": {
+              "$ref": "#/definitions/Coin"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "cw20"
+          ],
+          "properties": {
+            "cw20": {
+              "$ref": "#/definitions/Cw20CoinHuman"
+            }
+          }
+        }
+      ]
+    },
+    "ChannelInfo": {
+      "type": "object",
+      "required": [
+        "connection_id",
+        "counterparty_endpoint",
+        "id"
+      ],
+      "properties": {
+        "connection_id": {
+          "description": "the connection this exists on (you can use to query client/consensus info)",
+          "type": "string"
+        },
+        "counterparty_endpoint": {
+          "description": "the remote channel/port we connect to",
+          "allOf": [
+            {
+              "$ref": "#/definitions/IbcEndpoint"
+            }
+          ]
+        },
+        "id": {
+          "description": "id of this channel",
+          "type": "string"
+        }
+      }
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "Cw20CoinHuman": {
+      "type": "object",
+      "required": [
+        "address",
+        "amount"
+      ],
+      "properties": {
+        "address": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "IbcEndpoint": {
+      "type": "object",
+      "required": [
+        "channel_id",
+        "port_id"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string"
+        },
+        "port_id": {
+          "type": "string"
+        }
+      }
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}
