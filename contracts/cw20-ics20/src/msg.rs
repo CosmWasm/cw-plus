@@ -1,8 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult, Uint128};
-
 use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -64,10 +62,10 @@ pub struct ChannelResponse {
     /// information on the channel's connection
     pub info: ChannelInfo,
     /// how many tokens we currently have pending over this channel
-    pub balance: Uint128,
+    pub balance: Vec<Cw20CoinHuman>,
     /// the total number of tokens that have been sent over this channel
     /// (even if many have been returned, so balanace is low)
-    pub total_sent: Uint128,
+    pub total_sent: Vec<Cw20CoinHuman>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
