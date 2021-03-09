@@ -4,7 +4,6 @@ use cosmwasm_std::{
 };
 use sha2::{Digest, Sha256};
 
-use cw0::calc_range_start_string;
 use cw2::set_contract_version;
 use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
@@ -13,7 +12,8 @@ use crate::msg::{
     is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse,
     QueryMsg, ReceiveMsg,
 };
-use crate::state::{all_swap_ids, atomic_swaps, atomic_swaps_read, AtomicSwap};
+use crate::state::{all_swap_ids, AtomicSwap, SWAPS};
+use cw_storage_plus::Bound;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
@@ -102,7 +102,7 @@ pub fn execute_create(
     };
 
     // Try to store it, fail if the id already exists (unmodifiable swaps)
-    atomic_swaps(deps.storage).update(msg.id.as_bytes(), |existing| match existing {
+    SWAPS.update(deps.storage, &msg.id, |existing| match existing {
         None => Ok(swap),
         Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
@@ -123,7 +123,7 @@ pub fn execute_release(
     id: String,
     preimage: String,
 ) -> Result<Response, ContractError> {
-    let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
+    let swap = SWAPS.load(deps.storage, &id)?;
     if swap.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
@@ -136,7 +136,7 @@ pub fn execute_release(
     let rcpt = deps.api.human_address(&swap.recipient)?;
 
     // Delete the swap
-    atomic_swaps(deps.storage).remove(id.as_bytes());
+    SWAPS.remove(deps.storage, &id);
 
     // Send all tokens out
     let msgs = send_tokens(deps.api, &rcpt, swap.balance)?;
@@ -154,7 +154,7 @@ pub fn execute_release(
 }
 
 pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, ContractError> {
-    let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
+    let swap = SWAPS.load(deps.storage, &id)?;
     // Anyone can try to refund, as long as the contract is expired
     if !swap.is_expired(&env.block) {
         return Err(ContractError::NotExpired {});
@@ -163,7 +163,7 @@ pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, C
     let rcpt = deps.api.human_address(&swap.source)?;
 
     // We delete the swap
-    atomic_swaps(deps.storage).remove(id.as_bytes());
+    SWAPS.remove(deps.storage, &id);
 
     let msgs = send_tokens(deps.api, &rcpt, swap.balance)?;
     Ok(Response {
@@ -223,7 +223,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
-    let swap = atomic_swaps_read(deps.storage).load(id.as_bytes())?;
+    let swap = SWAPS.load(deps.storage, &id)?;
 
     // Convert balance to human balance
     let balance_human = match swap.balance {
@@ -254,8 +254,9 @@ fn query_list(
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<ListResponse> {
-    let start = calc_range_start_string(start_after);
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = start_after.map(|s| Bound::exclusive(s.as_bytes()));
+
     Ok(ListResponse {
         swaps: all_swap_ids(deps.storage, start, limit)?,
     })

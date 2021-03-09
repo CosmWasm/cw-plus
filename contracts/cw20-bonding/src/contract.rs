@@ -11,7 +11,7 @@ use cw20_base::allowances::{
 use cw20_base::contract::{
     execute_burn, execute_mint, execute_send, execute_transfer, query_balance, query_token_info,
 };
-use cw20_base::state::{token_info, MinterData, TokenInfo};
+use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
@@ -44,7 +44,7 @@ pub fn init(
             cap: None,
         }),
     };
-    token_info(deps.storage).save(&data)?;
+    TOKEN_INFO.save(deps.storage, &data)?;
 
     let places = DecimalPlaces::new(msg.decimals, msg.reserve_decimals);
     let supply = CurveState::new(msg.reserve_denom, places);

@@ -3,7 +3,7 @@ use cosmwasm_std::{
     StdResult, Uint128,
 };
 
-use cw2::{get_contract_version, set_contract_version};
+use cw2::set_contract_version;
 use cw20::{BalanceResponse, Cw20CoinHuman, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
@@ -12,9 +12,8 @@ use crate::allowances::{
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
-use crate::migrations::migrate_v01_to_v02;
-use crate::msg::{HandleMsg, InitMsg, MigrateMsg, QueryMsg};
-use crate::state::{balances, balances_read, token_info, token_info_read, MinterData, TokenInfo};
+use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -49,16 +48,15 @@ pub fn init(mut deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> S
         total_supply,
         mint,
     };
-    token_info(deps.storage).save(&data)?;
+    TOKEN_INFO.save(deps.storage, &data)?;
     Ok(Response::default())
 }
 
 pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
     let mut total_supply = Uint128::zero();
-    let mut store = balances(deps.storage);
     for row in accounts {
         let raw_address = deps.api.canonical_address(&row.address)?;
-        store.save(raw_address.as_slice(), &row.amount)?;
+        BALANCES.save(deps.storage, &raw_address, &row.amount)?;
         total_supply += row.amount;
     }
     Ok(total_supply)
@@ -120,12 +118,12 @@ pub fn execute_transfer(
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
-    let mut accounts = balances(deps.storage);
-    accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
+    BALANCES.update(deps.storage, &sender_raw, |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(
-        rcpt_raw.as_slice(),
+    BALANCES.update(
+        deps.storage,
+        &rcpt_raw,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -156,12 +154,11 @@ pub fn execute_burn(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // lower balance
-    let mut accounts = balances(deps.storage);
-    accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
+    BALANCES.update(deps.storage, &sender_raw, |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    token_info(deps.storage).update(|mut info| -> StdResult<_> {
+    TOKEN_INFO.update(deps.storage, |mut info| -> StdResult<_> {
         info.total_supply = (info.total_supply - amount)?;
         Ok(info)
     })?;
@@ -190,7 +187,7 @@ pub fn execute_mint(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let mut config = token_info_read(deps.storage).load()?;
+    let mut config = TOKEN_INFO.load(deps.storage)?;
     if config.mint.is_none()
         || config.mint.as_ref().unwrap().minter != deps.api.canonical_address(&info.sender)?
     {
@@ -204,12 +201,13 @@ pub fn execute_mint(
             return Err(ContractError::CannotExceedCap {});
         }
     }
-    token_info(deps.storage).save(&config)?;
+    TOKEN_INFO.save(deps.storage, &config)?;
 
     // add amount to recipient balance
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
-    balances(deps.storage).update(
-        rcpt_raw.as_slice(),
+    BALANCES.update(
+        deps.storage,
+        &rcpt_raw,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -242,12 +240,12 @@ pub fn execute_send(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // move the tokens to the contract
-    let mut accounts = balances(deps.storage);
-    accounts.update(sender_raw.as_slice(), |balance: Option<Uint128>| {
+    BALANCES.update(deps.storage, &sender_raw, |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(
-        rcpt_raw.as_slice(),
+    BALANCES.update(
+        deps.storage,
+        &rcpt_raw,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -297,14 +295,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn query_balance(deps: Deps, address: HumanAddr) -> StdResult<BalanceResponse> {
     let addr_raw = deps.api.canonical_address(&address)?;
-    let balance = balances_read(deps.storage)
-        .may_load(addr_raw.as_slice())?
+    let balance = BALANCES
+        .may_load(deps.storage, &addr_raw)?
         .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }
 
 pub fn query_token_info(deps: Deps) -> StdResult<TokenInfoResponse> {
-    let info = token_info_read(deps.storage).load()?;
+    let info = TOKEN_INFO.load(deps.storage)?;
     let res = TokenInfoResponse {
         name: info.name,
         symbol: info.symbol,
@@ -315,7 +313,7 @@ pub fn query_token_info(deps: Deps) -> StdResult<TokenInfoResponse> {
 }
 
 pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
-    let meta = token_info_read(deps.storage).load()?;
+    let meta = TOKEN_INFO.load(deps.storage)?;
     let minter = match meta.mint {
         Some(m) => Some(MinterResponse {
             minter: deps.api.human_address(&m.minter)?,
@@ -326,42 +324,10 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
     Ok(minter)
 }
 
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    let old_version = get_contract_version(deps.storage)?;
-    if old_version.contract != CONTRACT_NAME {
-        return Err(StdError::generic_err(format!(
-            "This is {}, cannot migrate from {}",
-            CONTRACT_NAME, old_version.contract
-        )));
-    }
-    // note: v0.1.0 were not auto-generated and started with v0.
-    // more recent versions do not have the v prefix
-    if old_version.version.starts_with("v0.1.") {
-        migrate_v01_to_v02(deps.storage)?;
-    } else if old_version.version.starts_with("0.2") {
-        // no migration between 0.2 and 0.3, correct?
-    } else {
-        return Err(StdError::generic_err(format!(
-            "Unknown version {}",
-            old_version.version
-        )));
-    }
-
-    // once we have "migrated", set the new version and return success
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(Response::default())
-}
-
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Api, CosmosMsg, Order, StdError, WasmMsg};
-
-    use cw2::ContractVersion;
-    use cw20::{AllowanceResponse, Expiration};
-
-    use crate::migrations::generate_v01_test_data;
-    use crate::state::allowances_read;
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, WasmMsg};
 
     use super::*;
 
@@ -909,104 +875,5 @@ mod tests {
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
         );
-    }
-
-    #[test]
-    fn migrate_from_v01() {
-        let mut deps = mock_dependencies(&[]);
-
-        generate_v01_test_data(&mut deps.storage, &deps.api).unwrap();
-        // make sure this really is 0.1.0
-        assert_eq!(
-            get_contract_version(&mut deps.storage).unwrap(),
-            ContractVersion {
-                contract: CONTRACT_NAME.to_string(),
-                version: "v0.1.0".to_string(),
-            }
-        );
-
-        // run the migration
-        let env = mock_env();
-        migrate(deps.as_mut(), env, MigrateMsg {}).unwrap();
-
-        // make sure the version is updated
-        assert_eq!(
-            get_contract_version(&mut deps.storage).unwrap(),
-            ContractVersion {
-                contract: CONTRACT_NAME.to_string(),
-                version: CONTRACT_VERSION.to_string(),
-            }
-        );
-
-        // check all the data (against the spec in generate_v01_test_data)
-        let info = token_info_read(&mut deps.storage).load().unwrap();
-        assert_eq!(
-            info,
-            TokenInfo {
-                name: "Sample Coin".to_string(),
-                symbol: "SAMP".to_string(),
-                decimals: 2,
-                total_supply: Uint128(777777),
-                mint: None,
-            }
-        );
-
-        // 2 users
-        let user1 = deps
-            .api
-            .canonical_address(&HumanAddr::from("user1"))
-            .unwrap();
-        let user2 = deps
-            .api
-            .canonical_address(&HumanAddr::from("user2"))
-            .unwrap();
-
-        let bal = balances_read(&mut deps.storage);
-        assert_eq!(2, bal.range(None, None, Order::Descending).count());
-        assert_eq!(bal.load(user1.as_slice()).unwrap(), Uint128(123456));
-        assert_eq!(bal.load(user2.as_slice()).unwrap(), Uint128(654321));
-
-        let spender1 = deps
-            .api
-            .canonical_address(&HumanAddr::from("spender1"))
-            .unwrap();
-        let spender2 = deps
-            .api
-            .canonical_address(&HumanAddr::from("spender2"))
-            .unwrap();
-
-        let num_allows = allowances_read(&mut deps.storage, &user1)
-            .range(None, None, Order::Ascending)
-            .count();
-        assert_eq!(num_allows, 1);
-        let allow = allowances_read(&mut deps.storage, &user1)
-            .load(spender1.as_slice())
-            .unwrap();
-        let expect = AllowanceResponse {
-            allowance: Uint128(5000),
-            expires: Expiration::AtHeight(5000),
-        };
-        assert_eq!(allow, expect);
-
-        let num_allows = allowances_read(&mut deps.storage, &user2)
-            .range(None, None, Order::Ascending)
-            .count();
-        assert_eq!(num_allows, 2);
-        let allow = allowances_read(&mut deps.storage, &user2)
-            .load(spender1.as_slice())
-            .unwrap();
-        let expect = AllowanceResponse {
-            allowance: Uint128(15000),
-            expires: Expiration::AtTime(1598647517),
-        };
-        assert_eq!(allow, expect);
-        let allow = allowances_read(&mut deps.storage, &user2)
-            .load(spender2.as_slice())
-            .unwrap();
-        let expect = AllowanceResponse {
-            allowance: Uint128(77777),
-            expires: Expiration::Never {},
-        };
-        assert_eq!(allow, expect);
     }
 }

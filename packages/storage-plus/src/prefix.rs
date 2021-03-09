@@ -110,6 +110,21 @@ where
             .map(move |kv| (de_fn)(store, &*pk_name, kv));
         Box::new(mapped)
     }
+
+    pub fn keys<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a>
+    where
+        T: 'a,
+    {
+        let mapped =
+            range_with_prefix(store, &self.storage_prefix, min, max, order).map(|(k, _)| k);
+        Box::new(mapped)
+    }
 }
 
 pub fn range_with_prefix<'a>(

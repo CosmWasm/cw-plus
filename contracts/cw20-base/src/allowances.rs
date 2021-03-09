@@ -5,7 +5,7 @@ use cosmwasm_std::{
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
-use crate::state::{allowances, allowances_read, balances, token_info};
+use crate::state::{ALLOWANCES, BALANCES, TOKEN_INFO};
 
 pub fn execute_increase_allowance(
     deps: DepsMut,
@@ -22,8 +22,9 @@ pub fn execute_increase_allowance(
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    allowances(deps.storage, owner_raw).update(
-        spender_raw.as_slice(),
+    ALLOWANCES.update(
+        deps.storage,
+        (&owner_raw, &spender_raw),
         |allow| -> StdResult<_> {
             let mut val = allow.unwrap_or_default();
             if let Some(exp) = expires {
@@ -56,25 +57,24 @@ pub fn execute_decrease_allowance(
     amount: Uint128,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
-    let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&info.sender)?;
-
-    if spender_raw == owner_raw {
+    if spender == info.sender {
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
+    let spender_raw = &deps.api.canonical_address(&spender)?;
+    let owner_raw = &deps.api.canonical_address(&info.sender)?;
+
     // load value and delete if it hits 0, or update otherwise
-    let mut bucket = allowances(deps.storage, owner_raw);
-    let mut allowance = bucket.load(spender_raw.as_slice())?;
+    let mut allowance = ALLOWANCES.load(deps.storage, (&owner_raw, &spender_raw))?;
     if amount < allowance.allowance {
         // update the new amount
         allowance.allowance = (allowance.allowance - amount)?;
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
-        bucket.save(spender_raw.as_slice(), &allowance)?;
+        ALLOWANCES.save(deps.storage, (&owner_raw, &spender_raw), &allowance)?;
     } else {
-        allowances(deps.storage, owner_raw).remove(spender_raw.as_slice());
+        ALLOWANCES.remove(deps.storage, (&owner_raw, &spender_raw));
     }
 
     let res = Response {
@@ -82,7 +82,7 @@ pub fn execute_decrease_allowance(
         messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
-            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("owner", info.sender),
             attr("spender", spender),
             attr("amount", amount),
         ],
@@ -99,7 +99,7 @@ pub fn deduct_allowance(
     block: &BlockInfo,
     amount: Uint128,
 ) -> Result<AllowanceResponse, ContractError> {
-    allowances(storage, owner).update(spender.as_slice(), |current| {
+    ALLOWANCES.update(storage, (&owner, &spender), |current| {
         match current {
             Some(mut a) => {
                 if a.expires.is_expired(block) {
@@ -130,12 +130,12 @@ pub fn execute_transfer_from(
     // deduct allowance before doing anything else have enough allowance
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
-    let mut accounts = balances(deps.storage);
-    accounts.update(owner_raw.as_slice(), |balance: Option<Uint128>| {
+    BALANCES.update(deps.storage, &owner_raw, |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(
-        rcpt_raw.as_slice(),
+    BALANCES.update(
+        deps.storage,
+        &rcpt_raw,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -169,12 +169,11 @@ pub fn execute_burn_from(
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     // lower balance
-    let mut accounts = balances(deps.storage);
-    accounts.update(owner_raw.as_slice(), |balance: Option<Uint128>| {
+    BALANCES.update(deps.storage, &owner_raw, |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
     // reduce total_supply
-    token_info(deps.storage).update(|mut meta| -> StdResult<_> {
+    TOKEN_INFO.update(deps.storage, |mut meta| -> StdResult<_> {
         meta.total_supply = (meta.total_supply - amount)?;
         Ok(meta)
     })?;
@@ -210,27 +209,26 @@ pub fn execute_send_from(
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     // move the tokens to the contract
-    let mut accounts = balances(deps.storage);
-    accounts.update(owner_raw.as_slice(), |balance: Option<Uint128>| {
+    BALANCES.update(deps.storage, &owner_raw, |balance: Option<Uint128>| {
         balance.unwrap_or_default() - amount
     })?;
-    accounts.update(
-        rcpt_raw.as_slice(),
+    BALANCES.update(
+        deps.storage,
+        &rcpt_raw,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let spender = deps.api.human_address(&spender_raw)?;
     let attrs = vec![
         attr("action", "send_from"),
         attr("from", &owner),
         attr("to", &contract),
-        attr("by", &spender),
+        attr("by", &info.sender),
         attr("amount", amount),
     ];
 
     // create a send message
     let msg = Cw20ReceiveMsg {
-        sender: spender,
+        sender: info.sender,
         amount,
         msg,
     }
@@ -252,8 +250,8 @@ pub fn query_allowance(
 ) -> StdResult<AllowanceResponse> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let spender_raw = deps.api.canonical_address(&spender)?;
-    let allowance = allowances_read(deps.storage, &owner_raw)
-        .may_load(spender_raw.as_slice())?
+    let allowance = ALLOWANCES
+        .may_load(deps.storage, (&owner_raw, &spender_raw))?
         .unwrap_or_default();
     Ok(allowance)
 }

@@ -1,8 +1,9 @@
 use cosmwasm_std::{CanonicalAddr, Deps, HumanAddr, Order, StdResult};
-use cw0::calc_range_start_human;
+use cw0::maybe_canonical;
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
-use crate::state::{allowances_read, balances_prefix_read};
+use crate::state::{ALLOWANCES, BALANCES};
+use cw_storage_plus::Bound;
 
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
@@ -16,11 +17,13 @@ pub fn query_all_allowances(
 ) -> StdResult<AllAllowancesResponse> {
     let owner_raw = deps.api.canonical_address(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start_human(deps.api, start_after)?;
-    let api = &deps.api;
+    let canon = maybe_canonical(deps.api, start_after)?;
+    let start = canon.map(Bound::exclusive);
 
-    let allowances: StdResult<Vec<AllowanceInfo>> = allowances_read(deps.storage, &owner_raw)
-        .range(start.as_deref(), None, Order::Ascending)
+    let api = &deps.api;
+    let allowances: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
+        .prefix(&owner_raw)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (k, v) = item?;
@@ -42,13 +45,14 @@ pub fn query_all_accounts(
     limit: Option<u32>,
 ) -> StdResult<AllAccountsResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = calc_range_start_human(deps.api, start_after)?;
-    let api = &deps.api;
+    let canon = maybe_canonical(deps.api, start_after)?;
+    let start = canon.map(Bound::exclusive);
 
-    let accounts: StdResult<Vec<_>> = balances_prefix_read(deps.storage)
-        .range(start.as_deref(), None, Order::Ascending)
+    let api = &deps.api;
+    let accounts: StdResult<Vec<_>> = BALANCES
+        .keys(deps.storage, start, None, Order::Ascending)
+        .map(|key| api.human_address(&key.into()))
         .take(limit)
-        .map(|(k, _)| api.human_address(&CanonicalAddr::from(k)))
         .collect();
 
     Ok(AllAccountsResponse {
