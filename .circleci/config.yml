@@ -777,7 +777,7 @@ jobs:
           command: |
             for C in ./contracts/*/
             do
-              echo -n "Compiling `basename $C`... "
+              echo "Compiling `basename $C`..."
               (cd $C && cargo build --release --target wasm32-unknown-unknown --locked)
             done
       - run:
@@ -792,7 +792,7 @@ jobs:
             - target
           key: cargocache-wasm-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
-          name: Compile wasm files
+          name: Check wasm contracts
           command: |
             for W in ./target/wasm32-unknown-unknown/release/*.wasm
             do
