@@ -13,7 +13,7 @@ use crate::msg::{
     ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, PortResponse, QueryMsg, TransferMsg,
 };
 use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
-use cw0::one_coin;
+use cw0::{nonpayable, one_coin};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
@@ -56,6 +56,8 @@ pub fn execute_receive(
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    nonpayable(&info)?;
+
     let msg: TransferMsg = match wrapper.msg {
         Some(bin) => from_binary(&bin)?,
         None => return Err(ContractError::NoData {}),
@@ -64,7 +66,7 @@ pub fn execute_receive(
         address: info.sender.clone(),
         amount: wrapper.amount,
     });
-    execute_transfer(deps, env, msg, amount, info.sender)
+    execute_transfer(deps, env, msg, amount, wrapper.sender)
 }
 
 pub fn execute_transfer(
@@ -169,339 +171,164 @@ fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     })
 }
 
-#[cfg(target_arch = "arm")]
-mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
-
-    use crate::msg::HandleMsg::TopUp;
-
+#[cfg(test)]
+mod test {
     use super::*;
+    use crate::test_helpers::*;
+
+    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::{coin, coins, CosmosMsg, IbcMsg, StdError, Uint128};
+
+    use cw0::PaymentError;
 
     #[test]
-    fn happy_path_native() {
-        let mut deps = mock_dependencies(&[]);
+    fn setup_and_query() {
+        let deps = setup(&["channel-3", "channel-7"]);
 
-        // init an empty contract
-        let init_msg = InitMsg {};
-        let info = mock_info(&HumanAddr::from("anyone"), &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-        assert_eq!(0, res.messages.len());
+        let raw_list = query(deps.as_ref(), mock_env(), QueryMsg::ListChannels {}).unwrap();
+        let list_res: ListChannelsResponse = from_binary(&raw_list).unwrap();
+        assert_eq!(2, list_res.channels.len());
+        assert_eq!(mock_channel_info("channel-3"), list_res.channels[0]);
+        assert_eq!(mock_channel_info("channel-7"), list_res.channels[1]);
 
-        // create an escrow
-        let create = CreateMsg {
-            id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
-            end_time: None,
-            end_height: Some(123456),
-            cw20_whitelist: None,
-        };
-        let sender = HumanAddr::from("source");
-        let balance = coins(100, "tokens");
-        let info = mock_info(&sender, &balance);
-        let msg = HandleMsg::Create(create.clone());
-        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        let raw_channel = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Channel {
+                id: "channel-3".to_string(),
+            },
+        )
+        .unwrap();
+        let chan_res: ChannelResponse = from_binary(&raw_channel).unwrap();
+        assert_eq!(chan_res.info, mock_channel_info("channel-3"));
+        assert_eq!(0, chan_res.total_sent.len());
+        assert_eq!(0, chan_res.balances.len());
 
-        // ensure the details is what we expect
-        let details = query_details(deps.as_ref(), "foobar".to_string()).unwrap();
+        let not_found = query(
+            deps.as_ref(),
+            mock_env(),
+            QueryMsg::Channel {
+                id: "channel-10".to_string(),
+            },
+        )
+        .unwrap_err();
         assert_eq!(
-            details,
-            DetailsResponse {
-                id: "foobar".to_string(),
-                arbiter: HumanAddr::from("arbitrate"),
-                recipient: HumanAddr::from("recd"),
-                source: HumanAddr::from("source"),
-                end_height: Some(123456),
-                end_time: None,
-                native_balance: balance.clone(),
-                cw20_balance: vec![],
-                cw20_whitelist: vec![],
+            not_found,
+            StdError::not_found("cw20_ics20::state::ChannelInfo")
+        );
+    }
+
+    #[test]
+    fn proper_checks_on_execute_native() {
+        let send_channel = "channel-5";
+        let mut deps = setup(&[send_channel, "channel-10"]);
+
+        let mut transfer = TransferMsg {
+            channel: send_channel.to_string(),
+            remote_address: "foreign-address".to_string(),
+            timeout: None,
+        };
+
+        // works with proper funds
+        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(1, res.messages.len());
+        if let CosmosMsg::Ibc(IbcMsg::SendPacket {
+            channel_id,
+            data,
+            timeout_timestamp,
+            timeout_block,
+        }) = &res.messages[0]
+        {
+            assert!(timeout_block.is_none());
+            assert!(timeout_timestamp.is_some());
+            assert_eq!(
+                timeout_timestamp.unwrap() / 1_000_000_000,
+                mock_env().block.time + DEFAULT_TIMEOUT
+            );
+            assert_eq!(channel_id.as_str(), send_channel);
+            let msg: Ics20Packet = from_binary(data).unwrap();
+            assert_eq!(msg.amount, 1234567u64);
+            assert_eq!(msg.denom.as_str(), "ucosm");
+            assert_eq!(msg.sender.as_str(), "foobar");
+            assert_eq!(msg.receiver.as_str(), "foreign-address");
+        } else {
+            panic!("Unexpected return message: {:?}", res.messages[0]);
+        }
+
+        // reject with no funds
+        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let info = mock_info("foobar", &[]);
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Payment(PaymentError::NoFunds {}));
+
+        // reject with multiple tokens funds
+        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let info = mock_info("foobar", &[coin(1234567, "ucosm"), coin(54321, "uatom")]);
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Payment(PaymentError::MultipleDenoms {}));
+
+        // reject with bad channel id
+        transfer.channel = "channel-45".to_string();
+        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(
+            err,
+            ContractError::NoSuchChannel {
+                id: "channel-45".to_string()
             }
         );
+    }
 
-        // approve it
-        let id = create.id.clone();
-        let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+    #[test]
+    fn proper_checks_on_execute_cw20() {
+        let send_channel = "channel-15";
+        let mut deps = setup(&["channel-3", send_channel]);
+
+        let cw20_addr = "my-token";
+        let transfer = TransferMsg {
+            channel: send_channel.to_string(),
+            remote_address: "foreign-address".to_string(),
+            timeout: Some(7777),
+        };
+        let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: "my-account".into(),
+            amount: Uint128(888777666),
+            msg: Some(to_binary(&transfer).unwrap()),
+        });
+
+        // works with proper funds
+        let info = mock_info(cw20_addr, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(attr("action", "approve"), res.attributes[0]);
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
-                to_address: create.recipient,
-                amount: balance,
-            })
-        );
-
-        // second attempt fails (not found)
-        let id = create.id.clone();
-        let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
-    }
-
-    #[test]
-    fn happy_path_cw20() {
-        let mut deps = mock_dependencies(&[]);
-
-        // init an empty contract
-        let init_msg = InitMsg {};
-        let info = mock_info(&HumanAddr::from("anyone"), &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // create an escrow
-        let create = CreateMsg {
-            id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
-            end_time: None,
-            end_height: None,
-            cw20_whitelist: Some(vec![HumanAddr::from("other-token")]),
-        };
-        let receive = Cw20ReceiveMsg {
-            sender: HumanAddr::from("source"),
-            amount: Uint128(100),
-            msg: Some(to_binary(&HandleMsg::Create(create.clone())).unwrap()),
-        };
-        let token_contract = HumanAddr::from("my-cw20-token");
-        let info = mock_info(&token_contract, &[]);
-        let msg = HandleMsg::Receive(receive.clone());
-        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
-
-        // ensure the whitelist is what we expect
-        let details = query_details(deps.as_ref(), "foobar".to_string()).unwrap();
-        assert_eq!(
-            details,
-            DetailsResponse {
-                id: "foobar".to_string(),
-                arbiter: HumanAddr::from("arbitrate"),
-                recipient: HumanAddr::from("recd"),
-                source: HumanAddr::from("source"),
-                end_height: None,
-                end_time: None,
-                native_balance: vec![],
-                cw20_balance: vec![Cw20CoinHuman {
-                    address: HumanAddr::from("my-cw20-token"),
-                    amount: Uint128(100),
-                }],
-                cw20_whitelist: vec![
-                    HumanAddr::from("other-token"),
-                    HumanAddr::from("my-cw20-token")
-                ],
-            }
-        );
-
-        // approve it
-        let id = create.id.clone();
-        let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
-        assert_eq!(1, res.messages.len());
-        assert_eq!(attr("action", "approve"), res.attributes[0]);
-        let send_msg = Cw20HandleMsg::Transfer {
-            recipient: create.recipient,
-            amount: receive.amount,
-        };
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: token_contract,
-                msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
-            })
-        );
-
-        // second attempt fails (not found)
-        let id = create.id.clone();
-        let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
-    }
-
-    #[test]
-    fn add_tokens_proper() {
-        let mut tokens = GenericBalance::default();
-        tokens.add_tokens(Balance::from(vec![coin(123, "atom"), coin(789, "eth")]));
-        tokens.add_tokens(Balance::from(vec![coin(456, "atom"), coin(12, "btc")]));
-        assert_eq!(
-            tokens.native,
-            vec![coin(579, "atom"), coin(789, "eth"), coin(12, "btc")]
-        );
-    }
-
-    #[test]
-    fn add_cw_tokens_proper() {
-        let mut tokens = GenericBalance::default();
-        let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
-        let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
-        tokens.add_tokens(Balance::Cw20(Cw20Coin {
-            address: foo_token.clone(),
-            amount: Uint128(12345),
-        }));
-        tokens.add_tokens(Balance::Cw20(Cw20Coin {
-            address: bar_token.clone(),
-            amount: Uint128(777),
-        }));
-        tokens.add_tokens(Balance::Cw20(Cw20Coin {
-            address: foo_token.clone(),
-            amount: Uint128(23400),
-        }));
-        assert_eq!(
-            tokens.cw20,
-            vec![
-                Cw20Coin {
-                    address: foo_token,
-                    amount: Uint128(35745),
-                },
-                Cw20Coin {
-                    address: bar_token,
-                    amount: Uint128(777),
-                }
-            ]
-        );
-    }
-
-    #[test]
-    fn top_up_mixed_tokens() {
-        let mut deps = mock_dependencies(&[]);
-
-        // init an empty contract
-        let init_msg = InitMsg {};
-        let info = mock_info(&HumanAddr::from("anyone"), &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // only accept these tokens
-        let whitelist = vec![HumanAddr::from("bar_token"), HumanAddr::from("foo_token")];
-
-        // create an escrow with 2 native tokens
-        let create = CreateMsg {
-            id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
-            end_time: None,
-            end_height: None,
-            cw20_whitelist: Some(whitelist),
-        };
-        let sender = HumanAddr::from("source");
-        let balance = vec![coin(100, "fee"), coin(200, "stake")];
-        let info = mock_info(&sender, &balance);
-        let msg = HandleMsg::Create(create.clone());
-        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
-
-        // top it up with 2 more native tokens
-        let extra_native = vec![coin(250, "random"), coin(300, "stake")];
-        let info = mock_info(&sender, &extra_native);
-        let top_up = HandleMsg::TopUp {
-            id: create.id.clone(),
-        };
-        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "top_up"), res.attributes[0]);
-
-        // top up with one foreign token
-        let bar_token = HumanAddr::from("bar_token");
-        let base = TopUp {
-            id: create.id.clone(),
-        };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
-            amount: Uint128(7890),
-            msg: Some(to_binary(&base).unwrap()),
-        });
-        let info = mock_info(&bar_token, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "top_up"), res.attributes[0]);
-
-        // top with a foreign token not on the whitelist
-        // top up with one foreign token
-        let baz_token = HumanAddr::from("baz_token");
-        let base = TopUp {
-            id: create.id.clone(),
-        };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
-            amount: Uint128(7890),
-            msg: Some(to_binary(&base).unwrap()),
-        });
-        let info = mock_info(&baz_token, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, top_up);
-        match res.unwrap_err() {
-            ContractError::NotInWhitelist {} => {}
-            e => panic!("Unexpected error: {}", e),
+        if let CosmosMsg::Ibc(IbcMsg::SendPacket {
+            channel_id,
+            data,
+            timeout_timestamp,
+            timeout_block,
+        }) = &res.messages[0]
+        {
+            assert!(timeout_block.is_none());
+            assert!(timeout_timestamp.is_some());
+            assert_eq!(
+                timeout_timestamp.unwrap() / 1_000_000_000,
+                mock_env().block.time + 7777
+            );
+            assert_eq!(channel_id.as_str(), send_channel);
+            let msg: Ics20Packet = from_binary(data).unwrap();
+            assert_eq!(msg.amount, 888777666u64);
+            assert_eq!(msg.denom, format!("cw20:{}", cw20_addr));
+            assert_eq!(msg.sender.as_str(), "my-account");
+            assert_eq!(msg.receiver.as_str(), "foreign-address");
+        } else {
+            panic!("Unexpected return message: {:?}", res.messages[0]);
         }
 
-        // top up with second foreign token
-        let foo_token = HumanAddr::from("foo_token");
-        let base = TopUp {
-            id: create.id.clone(),
-        };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
-            amount: Uint128(888),
-            msg: Some(to_binary(&base).unwrap()),
-        });
-        let info = mock_info(&foo_token, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
-        assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "top_up"), res.attributes[0]);
-
-        // approve it
-        let id = create.id.clone();
-        let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
-        assert_eq!(attr("action", "approve"), res.attributes[0]);
-        assert_eq!(3, res.messages.len());
-
-        // first message releases all native coins
-        assert_eq!(
-            res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
-                to_address: create.recipient.clone(),
-                amount: vec![coin(100, "fee"), coin(500, "stake"), coin(250, "random")],
-            })
-        );
-
-        // second one release bar cw20 token
-        let send_msg = Cw20HandleMsg::Transfer {
-            recipient: create.recipient.clone(),
-            amount: Uint128(7890),
-        };
-        assert_eq!(
-            res.messages[1],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: bar_token,
-                msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
-            })
-        );
-
-        // third one release foo cw20 token
-        let send_msg = Cw20HandleMsg::Transfer {
-            recipient: create.recipient.clone(),
-            amount: Uint128(888),
-        };
-        assert_eq!(
-            res.messages[2],
-            CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: foo_token,
-                msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
-            })
-        );
+        // reject with tokens funds
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Payment(PaymentError::NonPayable {}));
     }
 }
