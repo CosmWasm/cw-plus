@@ -1,123 +1,76 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult};
+use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult, Uint128};
 
 use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InitMsg {}
+pub struct InitMsg {
+    /// default timeout for ics20 packets, specified in seconds
+    pub default_timeout: u64,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
-    Create(CreateMsg),
-    /// Adds all sent native tokens to the contract
-    TopUp {
-        id: String,
-    },
-    /// Approve sends all tokens to the recipient.
-    /// Only the arbiter can do this
-    Approve {
-        /// id is a human-readable name for the escrow from create
-        id: String,
-    },
-    /// Refund returns all remaining tokens to the original sender,
-    /// The arbiter can do this any time, or anyone can do this after a timeout
-    Refund {
-        /// id is a human-readable name for the escrow from create
-        id: String,
-    },
+pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
+    // TODO: also add Transfer(TransferMsg) to support native tokens
 }
 
+/// This is the message we accept via Receive
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ReceiveMsg {
-    Create(CreateMsg),
-    /// Adds all sent native tokens to the contract
-    TopUp {
-        id: String,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct CreateMsg {
-    /// id is a human-readable name for the escrow to use later
-    /// 3-20 bytes of utf-8 text
-    pub id: String,
-    /// arbiter can decide to approve or refund the escrow
-    pub arbiter: HumanAddr,
-    /// if approved, funds go to the recipient
-    pub recipient: HumanAddr,
-    /// When end height set and block height exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_height: Option<u64>,
-    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and
-    /// block time exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_time: Option<u64>,
-    /// Besides any possible tokens sent with the CreateMsg, this is a list of all cw20 token addresses
-    /// that are accepted by the escrow during a top-up. This is required to avoid a DoS attack by topping-up
-    /// with an invalid cw20 contract. See https://github.com/CosmWasm/cosmwasm-plus/issues/19
-    pub cw20_whitelist: Option<Vec<HumanAddr>>,
-}
-
-impl CreateMsg {
-    pub fn canonical_whitelist(&self, api: &dyn Api) -> StdResult<Vec<CanonicalAddr>> {
-        match self.cw20_whitelist.as_ref() {
-            Some(v) => v.iter().map(|h| api.canonical_address(h)).collect(),
-            None => Ok(vec![]),
-        }
-    }
-}
-
-pub fn is_valid_name(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    if bytes.len() < 3 || bytes.len() > 20 {
-        return false;
-    }
-    true
+pub struct TransferMsg {
+    /// The local channel to send the packets on
+    pub channel: String,
+    /// The remote address to send to
+    /// Don't use HumanAddress as this will likely have a different Bech32 prefix than we use
+    /// and cannot be validated locally
+    pub remote_address: String,
+    /// How long the packet lives in seconds. If not specified, use default_timeout
+    pub timeout: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    /// Show all open escrows. Return type is ListResponse.
-    List {},
-    /// Returns the details of the named escrow, error if not created
-    /// Return type: DetailsResponse.
-    Details { id: String },
+    /// Return the port ID bound by this contract. Returns PortResponse
+    Port {},
+    /// Show all channels we have connected to. Return type is ListChannelsResponse.
+    ListChannels {},
+    /// Returns the details of the name channel, error if not created
+    /// Return type: ChannelResponse.
+    Channel { id: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ListResponse {
-    /// list all registered ids
-    pub escrows: Vec<String>,
+pub struct ListChannelsResponse {
+    pub escrows: Vec<ChannelInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct DetailsResponse {
-    /// id of this escrow
+pub struct ChannelInfo {
+    /// id of this channel
     pub id: String,
-    /// arbiter can decide to approve or refund the escrow
-    pub arbiter: HumanAddr,
-    /// if approved, funds go to the recipient
-    pub recipient: HumanAddr,
-    /// if refunded, funds go to the source
-    pub source: HumanAddr,
-    /// When end height set and block height exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_height: Option<u64>,
-    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and
-    /// block time exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_time: Option<u64>,
-    /// Balance in native tokens
-    pub native_balance: Vec<Coin>,
-    /// Balance in cw20 tokens
-    pub cw20_balance: Vec<Cw20CoinHuman>,
-    /// Whitelisted cw20 tokens
-    pub cw20_whitelist: Vec<HumanAddr>,
+    /// the remote channel/port we connect to
+    pub counterparty_endpoint: IbcEndpoint,
+    /// the connection this exists on (you can use to query client/consensus info)
+    pub connection_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ChannelResponse {
+    /// information on the channel's connection
+    pub info: ChannelInfo,
+    /// how many tokens we currently have pending over this channel
+    pub balance: Uint128,
+    /// the total number of tokens that have been sent over this channel
+    /// (even if many have been returned, so balanace is low)
+    pub total_sent: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct PortResponse {
+    pub port: String,
 }
