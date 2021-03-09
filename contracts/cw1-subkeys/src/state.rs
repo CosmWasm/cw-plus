@@ -35,4 +35,4 @@ pub struct Allowance {
 }
 
 pub const PERMISSIONS: Map<&[u8], Permissions> = Map::new("permissions");
-pub const ALLOWANCES: Map<&[u8], Allowance> = Map::new("permissions");
+pub const ALLOWANCES: Map<&[u8], Allowance> = Map::new("allowances");
