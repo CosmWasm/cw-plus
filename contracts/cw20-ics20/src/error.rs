@@ -19,6 +19,12 @@ pub enum ContractError {
 
     #[error("Amount larger than 2**64, not supported by ics20 packets")]
     AmountOverflow {},
+
+    #[error("Only supports channel with ibc version ics20-1, got {version}")]
+    InvalidIbcVersion { version: String },
+
+    #[error("Only supports unordered channel")]
+    OnlyOrderedChannel {},
 }
 
 impl From<FromUtf8Error> for ContractError {

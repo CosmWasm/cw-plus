@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, IbcMsg, IbcQuery, MessageInfo,
-    Order, PortIdResponse, Response, StdResult,
+    attr, entry_point, from_binary, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, IbcMsg,
+    IbcQuery, MessageInfo, Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::set_contract_version;
@@ -18,6 +18,7 @@ use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn init(
     deps: DepsMut,
     _env: Env,
@@ -32,6 +33,7 @@ pub fn init(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -103,9 +105,13 @@ pub fn execute_transfer(
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
 
     // send response
-    let mut res = Response::default();
-    res.messages = vec![msg.into()];
-    // res.attributes = vec![attr("action", "create"), attr("id", msg.id)];
+    let res = Response {
+        submessages: vec![],
+        messages: vec![msg.into()],
+        // TODO: more
+        attributes: vec![attr("action", "transfer")],
+        data: None,
+    };
     Ok(res)
 }
 
@@ -145,6 +151,7 @@ pub fn execute_transfer(
 //     Ok(msgs)
 // }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Port {} => to_binary(&query_port(deps)?),
