@@ -1,8 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::error::ContractError;
 use cosmwasm_std::{Coin, Uint128};
 use cw20::Cw20CoinHuman;
+use std::convert::TryInto;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -27,6 +29,15 @@ impl Amount {
             Amount::Native(c) => c.denom.clone(),
             Amount::Cw20(c) => format!("cw20:{}", c.address.as_str()),
         }
+    }
+
+    /// convert the amount into u64
+    pub fn u64_amount(&self) -> Result<u64, ContractError> {
+        let value = match self {
+            Amount::Native(c) => c.amount,
+            Amount::Cw20(c) => c.amount,
+        };
+        Ok(value.u128().try_into()?)
     }
 
     pub fn is_empty(&self) -> bool {

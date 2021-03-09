@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
-    PortIdResponse, Response, StdResult,
+    from_binary, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, IbcMsg, IbcQuery, MessageInfo,
+    Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::set_contract_version;
@@ -8,6 +8,7 @@ use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
 use crate::amount::Amount;
 use crate::error::ContractError;
+use crate::ibc::Ics20Packet;
 use crate::msg::{
     ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, PortResponse, QueryMsg, TransferMsg,
 };
@@ -53,10 +54,10 @@ pub fn execute_receive(
         None => return Err(ContractError::NoData {}),
     };
     let amount = Amount::Cw20(Cw20CoinHuman {
-        address: info.sender,
+        address: info.sender.clone(),
         amount: wrapper.amount,
     });
-    execute_transfer(deps, env, msg, amount)
+    execute_transfer(deps, env, msg, amount, info.sender)
 }
 
 pub fn execute_transfer(
@@ -64,6 +65,7 @@ pub fn execute_transfer(
     env: Env,
     msg: TransferMsg,
     amount: Amount,
+    sender: HumanAddr,
 ) -> Result<Response, ContractError> {
     if amount.is_empty() {
         return Err(ContractError::NoFunds {});
@@ -83,7 +85,12 @@ pub fn execute_transfer(
     let timeout = (env.block.time + timeout_delta) * 1_000_000_000;
 
     // build ics20 packet
-    let packet = "TODO";
+    let packet = Ics20Packet {
+        denom: amount.denom(),
+        amount: amount.u64_amount()?,
+        sender: sender.into(),
+        receiver: msg.remote_address,
+    };
 
     // prepare message
     let msg = IbcMsg::SendPacket {
