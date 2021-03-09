@@ -1,24 +1,33 @@
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, HumanAddr,
-    MessageInfo, Response, StdResult, WasmMsg,
+    from_binary, to_binary, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
+    PortIdResponse, Response, StdResult,
 };
 
 use cw2::set_contract_version;
-use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
+use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::msg::{
-    CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
+    ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, PortResponse, QueryMsg, TransferMsg,
 };
-use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
+use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
+const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, _msg: InitMsg) -> StdResult<Response> {
+pub fn init(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InitMsg,
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    // no setup
+    let cfg = Config {
+        default_timeout: msg.default_timeout,
+    };
+    CONFIG.save(deps.storage, &cfg)?;
     Ok(Response::default())
 }
 
@@ -26,259 +35,154 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Create(msg) => {
-            execute_create(deps, msg, Balance::from(info.funds), &info.sender)
-        }
-        HandleMsg::Approve { id } => execute_approve(deps, env, info, id),
-        HandleMsg::TopUp { id } => execute_top_up(deps, id, Balance::from(info.funds)),
-        HandleMsg::Refund { id } => execute_refund(deps, env, info, id),
-        HandleMsg::Receive(msg) => execute_receive(deps, info, msg),
+        ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
     }
 }
 
 pub fn execute_receive(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    let msg: ReceiveMsg = match wrapper.msg {
-        Some(bin) => Ok(from_binary(&bin)?),
-        None => Err(ContractError::NoData {}),
-    }?;
-    let balance = Balance::Cw20(Cw20Coin {
-        address: deps.api.canonical_address(&info.sender)?,
+    let msg: TransferMsg = match wrapper.msg {
+        Some(bin) => from_binary(&bin)?,
+        None => return Err(ContractError::NoData {}),
+    };
+    let amount = Amount::Cw20(Cw20CoinHuman {
+        address: info.sender,
         amount: wrapper.amount,
     });
-    match msg {
-        ReceiveMsg::Create(msg) => execute_create(deps, msg, balance, &wrapper.sender),
-        ReceiveMsg::TopUp { id } => execute_top_up(deps, id, balance),
-    }
+    execute_transfer(deps, env, msg, amount)
 }
 
-pub fn execute_create(
+pub fn execute_transfer(
     deps: DepsMut,
-    msg: CreateMsg,
-    balance: Balance,
-    sender: &HumanAddr,
+    env: Env,
+    msg: TransferMsg,
+    amount: Amount,
 ) -> Result<Response, ContractError> {
-    if balance.is_empty() {
-        return Err(ContractError::EmptyBalance {});
+    if amount.is_empty() {
+        return Err(ContractError::NoFunds {});
+    }
+    // ensure the requested channel is registered
+    // FIXME: add a .has method to map to make this faster
+    if CHANNEL_INFO.may_load(deps.storage, &msg.channel)?.is_none() {
+        return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
 
-    let mut cw20_whitelist = msg.canonical_whitelist(deps.api)?;
+    // delta from user is in seconds
+    let timeout_delta = match msg.timeout {
+        Some(t) => t,
+        None => CONFIG.load(deps.storage)?.default_timeout,
+    };
+    // timeout is in nanoseconds
+    let timeout = (env.block.time + timeout_delta) * 1_000_000_000;
 
-    let escrow_balance = match balance {
-        Balance::Native(balance) => GenericBalance {
-            native: balance.0,
-            cw20: vec![],
-        },
-        Balance::Cw20(token) => {
-            // make sure the token sent is on the whitelist by default
-            if !cw20_whitelist.iter().any(|t| t == &token.address) {
-                cw20_whitelist.push(token.address.clone())
-            }
-            GenericBalance {
-                native: vec![],
-                cw20: vec![token],
-            }
-        }
+    // build ics20 packet
+    let packet = "TODO";
+
+    // prepare message
+    let msg = IbcMsg::SendPacket {
+        channel_id: msg.channel,
+        data: to_binary(&packet)?,
+        timeout_block: None,
+        timeout_timestamp: Some(timeout),
     };
 
-    let escrow = Escrow {
-        arbiter: deps.api.canonical_address(&msg.arbiter)?,
-        recipient: deps.api.canonical_address(&msg.recipient)?,
-        source: deps.api.canonical_address(&sender)?,
-        end_height: msg.end_height,
-        end_time: msg.end_time,
-        balance: escrow_balance,
-        cw20_whitelist,
-    };
+    // Note: we update local state when we get ack - do not count this transfer towards anything until acked
 
-    // try to store it, fail if the id was already in use
-    ESCROWS.update(deps.storage, &msg.id, |existing| match existing {
-        None => Ok(escrow),
-        Some(_) => Err(ContractError::AlreadyInUse {}),
-    })?;
-
+    // send response
     let mut res = Response::default();
-    res.attributes = vec![attr("action", "create"), attr("id", msg.id)];
+    res.messages = vec![msg.into()];
+    // res.attributes = vec![attr("action", "create"), attr("id", msg.id)];
     Ok(res)
 }
 
-pub fn execute_top_up(
-    deps: DepsMut,
-    id: String,
-    balance: Balance,
-) -> Result<Response, ContractError> {
-    if balance.is_empty() {
-        return Err(ContractError::EmptyBalance {});
-    }
-    // this fails is no escrow there
-    let mut escrow = ESCROWS.load(deps.storage, &id)?;
-
-    if let Balance::Cw20(token) = &balance {
-        // ensure the token is on the whitelist
-        if !escrow.cw20_whitelist.iter().any(|t| t == &token.address) {
-            return Err(ContractError::NotInWhitelist {});
-        }
-    };
-
-    escrow.balance.add_tokens(balance);
-
-    // and save
-    ESCROWS.save(deps.storage, &id, &escrow)?;
-
-    let mut res = Response::default();
-    res.attributes = vec![attr("action", "top_up"), attr("id", id)];
-    Ok(res)
-}
-
-pub fn execute_approve(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: String,
-) -> Result<Response, ContractError> {
-    // this fails is no escrow there
-    let escrow = ESCROWS.load(deps.storage, &id)?;
-
-    if deps.api.canonical_address(&info.sender)? != escrow.arbiter {
-        Err(ContractError::Unauthorized {})
-    } else if escrow.is_expired(&env) {
-        Err(ContractError::Expired {})
-    } else {
-        // we delete the escrow
-        ESCROWS.remove(deps.storage, &id);
-
-        let rcpt = deps.api.human_address(&escrow.recipient)?;
-
-        // send all tokens out
-        let messages = send_tokens(deps.api, &rcpt, &escrow.balance)?;
-
-        let attributes = vec![attr("action", "approve"), attr("id", id), attr("to", rcpt)];
-        Ok(Response {
-            submessages: vec![],
-            messages,
-            attributes,
-            data: None,
-        })
-    }
-}
-
-pub fn execute_refund(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: String,
-) -> Result<Response, ContractError> {
-    // this fails is no escrow there
-    let escrow = ESCROWS.load(deps.storage, &id)?;
-
-    // the arbiter can send anytime OR anyone can send after expiration
-    if !escrow.is_expired(&env) && deps.api.canonical_address(&info.sender)? != escrow.arbiter {
-        Err(ContractError::Unauthorized {})
-    } else {
-        // we delete the escrow
-        ESCROWS.remove(deps.storage, &id);
-
-        let rcpt = deps.api.human_address(&escrow.source)?;
-
-        // send all tokens out
-        let messages = send_tokens(deps.api, &rcpt, &escrow.balance)?;
-
-        let attributes = vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)];
-        Ok(Response {
-            submessages: vec![],
-            messages,
-            attributes,
-            data: None,
-        })
-    }
-}
-
-fn send_tokens(
-    api: &dyn Api,
-    to: &HumanAddr,
-    balance: &GenericBalance,
-) -> StdResult<Vec<CosmosMsg>> {
-    let native_balance = &balance.native;
-    let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
-        vec![]
-    } else {
-        vec![BankMsg::Send {
-            to_address: to.into(),
-            amount: native_balance.to_vec(),
-        }
-        .into()]
-    };
-
-    let cw20_balance = &balance.cw20;
-    let cw20_msgs: StdResult<Vec<_>> = cw20_balance
-        .iter()
-        .map(|c| {
-            let msg = Cw20HandleMsg::Transfer {
-                recipient: to.into(),
-                amount: c.amount,
-            };
-            let exec = WasmMsg::Execute {
-                contract_addr: api.human_address(&c.address)?,
-                msg: to_binary(&msg)?,
-                send: vec![],
-            };
-            Ok(exec.into())
-        })
-        .collect();
-    msgs.append(&mut cw20_msgs?);
-    Ok(msgs)
-}
+// fn send_tokens(
+//     api: &dyn Api,
+//     to: &HumanAddr,
+//     balance: &GenericBalance,
+// ) -> StdResult<Vec<CosmosMsg>> {
+//     let native_balance = &balance.native;
+//     let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
+//         vec![]
+//     } else {
+//         vec![BankMsg::Send {
+//             to_address: to.into(),
+//             amount: native_balance.to_vec(),
+//         }
+//         .into()]
+//     };
+//
+//     let cw20_balance = &balance.cw20;
+//     let cw20_msgs: StdResult<Vec<_>> = cw20_balance
+//         .iter()
+//         .map(|c| {
+//             let msg = Cw20HandleMsg::Transfer {
+//                 recipient: to.into(),
+//                 amount: c.amount,
+//             };
+//             let exec = WasmMsg::Execute {
+//                 contract_addr: api.human_address(&c.address)?,
+//                 msg: to_binary(&msg)?,
+//                 send: vec![],
+//             };
+//             Ok(exec.into())
+//         })
+//         .collect();
+//     msgs.append(&mut cw20_msgs?);
+//     Ok(msgs)
+// }
 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::List {} => to_binary(&query_list(deps)?),
-        QueryMsg::Details { id } => to_binary(&query_details(deps, id)?),
+        QueryMsg::Port {} => to_binary(&query_port(deps)?),
+        QueryMsg::ListChannels {} => to_binary(&query_list(deps)?),
+        QueryMsg::Channel { id } => to_binary(&query_channel(deps, id)?),
     }
 }
 
-fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
-    let escrow = ESCROWS.load(deps.storage, &id)?;
-
-    let cw20_whitelist = escrow.human_whitelist(deps.api)?;
-
-    // transform tokens
-    let native_balance = escrow.balance.native;
-
-    let cw20_balance: StdResult<Vec<_>> = escrow
-        .balance
-        .cw20
-        .into_iter()
-        .map(|token| {
-            Ok(Cw20CoinHuman {
-                address: deps.api.human_address(&token.address)?,
-                amount: token.amount,
-            })
-        })
-        .collect();
-
-    let details = DetailsResponse {
-        id,
-        arbiter: deps.api.human_address(&escrow.arbiter)?,
-        recipient: deps.api.human_address(&escrow.recipient)?,
-        source: deps.api.human_address(&escrow.source)?,
-        end_height: escrow.end_height,
-        end_time: escrow.end_time,
-        native_balance,
-        cw20_balance: cw20_balance?,
-        cw20_whitelist,
-    };
-    Ok(details)
+fn query_port(deps: Deps) -> StdResult<PortResponse> {
+    let query = IbcQuery::PortId {}.into();
+    let PortIdResponse { port_id } = deps.querier.query(&query)?;
+    Ok(PortResponse { port_id })
 }
 
-fn query_list(deps: Deps) -> StdResult<ListResponse> {
-    Ok(ListResponse {
-        escrows: all_escrow_ids(deps.storage)?,
+fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
+    let info = CHANNEL_INFO.load(deps.storage, &id)?;
+    // this returns Vec<(outstanding, total)>
+    let state: StdResult<Vec<_>> = CHANNEL_STATE
+        .prefix(&id)
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|r| {
+            let (k, v) = r?;
+            let denom = String::from_utf8(k)?;
+            let outstanding = Amount::from_parts(denom.clone(), v.outstanding);
+            let total = Amount::from_parts(denom, v.total_sent);
+            Ok((outstanding, total))
+        })
+        .collect();
+    // we want (Vec<outstanding>, Vec<total>)
+    let (balances, total_sent) = state?.into_iter().unzip();
+
+    Ok(ChannelResponse {
+        info,
+        balances,
+        total_sent,
+    })
+}
+
+fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
+    let channels: StdResult<Vec<_>> = CHANNEL_INFO
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|r| Ok(r?.1))
+        .collect();
+    Ok(ListChannelsResponse {
+        channels: channels?,
     })
 }
 

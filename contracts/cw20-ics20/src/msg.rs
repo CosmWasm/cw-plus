@@ -1,7 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
+use cw20::Cw20ReceiveMsg;
+
+use crate::amount::Amount;
+use crate::state::ChannelInfo;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InitMsg {
@@ -44,17 +47,7 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ListChannelsResponse {
-    pub escrows: Vec<ChannelInfo>,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ChannelInfo {
-    /// id of this channel
-    pub id: String,
-    /// the remote channel/port we connect to
-    pub counterparty_endpoint: IbcEndpoint,
-    /// the connection this exists on (you can use to query client/consensus info)
-    pub connection_id: String,
+    pub channels: Vec<ChannelInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -62,13 +55,13 @@ pub struct ChannelResponse {
     /// information on the channel's connection
     pub info: ChannelInfo,
     /// how many tokens we currently have pending over this channel
-    pub balance: Vec<Cw20CoinHuman>,
+    pub balances: Vec<Amount>,
     /// the total number of tokens that have been sent over this channel
     /// (even if many have been returned, so balanace is low)
-    pub total_sent: Vec<Cw20CoinHuman>,
+    pub total_sent: Vec<Amount>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct PortResponse {
-    pub port: String,
+    pub port_id: String,
 }
