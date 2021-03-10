@@ -455,7 +455,7 @@ mod tests {
         // fails when too many tokens sent
         let info = mock_info(INVESTOR, &[coin(3400022, DENOM), coin(1234567, "wei")]);
         let err = execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
-        assert_eq!(err, PaymentError::ExtraDenom("wei".to_string()).into());
+        assert_eq!(err, PaymentError::MultipleDenoms {}.into());
     }
 
     #[test]

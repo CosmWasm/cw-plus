@@ -13,6 +13,7 @@ workflows:
       - contract_cw20_base
       - contract_cw20_bonding
       - contract_cw20_escrow
+      - contract_cw20_ics20
       - contract_cw20_staking
       - contract_cw721_base
       - package_controllers
@@ -52,7 +53,8 @@ jobs:
             - cargocache-cw1-subkeys-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -87,7 +89,8 @@ jobs:
             - cargocache-cw1-whitelist-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -125,7 +128,8 @@ jobs:
           command: rustup target add wasm32-unknown-unknown
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -160,7 +164,8 @@ jobs:
             - cargocache-cw3-fixed-multisig-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -195,7 +200,8 @@ jobs:
             - cargocache-cw3-flex-multisig-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -230,7 +236,8 @@ jobs:
             - cargocache-cw4-group-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -265,7 +272,8 @@ jobs:
             - cargocache-cw4-stake-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -300,7 +308,8 @@ jobs:
             - cargocache-cw20-base-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -335,7 +344,8 @@ jobs:
             - cargocache-cw20-bonding-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -370,7 +380,8 @@ jobs:
             - cargocache-cw20-escrow-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -390,6 +401,42 @@ jobs:
             - target
           key: cargocache-cw20-escrow-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
 
+  contract_cw20_ics20:
+    docker:
+      - image: rust:1.50.0
+    working_directory: ~/project/contracts/cw20-ics20
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version
+      - restore_cache:
+          keys:
+            - cargocache-cw20-ics20-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Unit Tests
+          environment:
+            RUST_BACKTRACE: 1
+          command: cargo unit-test --locked
+      - run:
+          name: Build and run schema generator
+          command: cargo schema --locked
+      - run:
+          name: Ensure checked-in schemas are up-to-date
+          command: |
+            CHANGES_IN_REPO=$(git status --porcelain)
+            if [[ -n "$CHANGES_IN_REPO" ]]; then
+              echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
+              git status && git --no-pager diff
+              exit 1
+            fi
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-cw20-ics20-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
+
   contract_cw20_staking:
     docker:
       - image: rust:1.50.0
@@ -405,7 +452,8 @@ jobs:
             - cargocache-cw20-staking-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -440,7 +488,8 @@ jobs:
             - cargocache-cw721-base-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator

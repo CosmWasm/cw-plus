@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "anyOf": [
+    {
+      "description": "Return the port ID bound by this contract. Returns PortResponse",
+      "type": "object",
+      "required": [
+        "port"
+      ],
+      "properties": {
+        "port": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Show all channels we have connected to. Return type is ListChannelsResponse.",
+      "type": "object",
+      "required": [
+        "list_channels"
+      ],
+      "properties": {
+        "list_channels": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Returns the details of the name channel, error if not created Return type: ChannelResponse.",
+      "type": "object",
+      "required": [
+        "channel"
+      ],
+      "properties": {
+        "channel": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
