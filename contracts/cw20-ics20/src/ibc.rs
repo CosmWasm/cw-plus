@@ -125,23 +125,33 @@ pub fn ibc_packet_receive(
 ) -> Result<IbcReceiveResponse, Never> {
     let res = match do_ibc_packet_receive(deps, packet) {
         Ok(msg) => {
+            // build attributes first so we don't have to clone msg below
+            // similar event messages like ibctransfer module
+            let attributes = vec![
+                attr("action", "receive"),
+                attr("sender", &msg.sender),
+                attr("receiver", &msg.receiver),
+                attr("denom", &msg.denom),
+                attr("amount", &msg.amount),
+                attr("success", "true"),
+            ];
             let to_send = Amount::from_parts(msg.denom, msg.amount.into());
             let msg = send_amount(to_send, HumanAddr::from(msg.receiver));
             IbcReceiveResponse {
                 acknowledgement: ack_success(),
                 messages: vec![msg],
-                // TODO: similar event messages like ibctransfer module
-                attributes: vec![attr("action", "receive")],
+                attributes,
             }
         }
-        Err(err) => {
-            IbcReceiveResponse {
-                acknowledgement: ack_fail(err.to_string()),
-                messages: vec![],
-                // TODO: similar event messages like ibctransfer module
-                attributes: vec![attr("action", "receive")],
-            }
-        }
+        Err(err) => IbcReceiveResponse {
+            acknowledgement: ack_fail(err.to_string()),
+            messages: vec![],
+            attributes: vec![
+                attr("action", "receive"),
+                attr("success", "false"),
+                attr("error", err),
+            ],
+        },
     };
 
     // if we have funds, now send the tokens to the requested recipient
@@ -197,6 +207,16 @@ pub fn ibc_packet_timeout(
 // update the balance stored on this (channel, denom) index
 fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
+    // similar event messages like ibctransfer module
+    let attributes = vec![
+        attr("action", "acknowledge"),
+        attr("sender", &msg.sender),
+        attr("receiver", &msg.receiver),
+        attr("denom", &msg.denom),
+        attr("amount", &msg.amount),
+        attr("success", "true"),
+    ];
+
     let channel = packet.src.channel_id;
     let denom = msg.denom;
     let amount = Uint128::from(msg.amount);
@@ -206,8 +226,11 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         state.total_sent += amount;
         Ok(state)
     })?;
-    // TODO: similar event messages like ibctransfer module
-    Ok(IbcBasicResponse::default())
+
+    Ok(IbcBasicResponse {
+        messages: vec![],
+        attributes,
+    })
 }
 
 // return the tokens to sender
@@ -217,13 +240,22 @@ fn on_packet_failure(
     err: String,
 ) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
+    // similar event messages like ibctransfer module
+    let attributes = vec![
+        attr("action", "acknowledge"),
+        attr("sender", &msg.sender),
+        attr("receiver", &msg.receiver),
+        attr("denom", &msg.denom),
+        attr("amount", &msg.amount),
+        attr("success", "false"),
+        attr("error", err),
+    ];
 
     let amount = Amount::from_parts(msg.denom, msg.amount.into());
     let msg = send_amount(amount, HumanAddr::from(msg.sender));
     let res = IbcBasicResponse {
         messages: vec![msg],
-        // TODO: similar event messages like ibctransfer module
-        attributes: vec![attr("ibc_error", err)],
+        attributes,
     };
     Ok(res)
 }

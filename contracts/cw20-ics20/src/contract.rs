@@ -110,13 +110,20 @@ pub fn execute_transfer(
     };
 
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
+    // similar event messages like ibctransfer module
+    let attributes = vec![
+        attr("action", "transfer"),
+        attr("sender", &packet.sender),
+        attr("receiver", &packet.receiver),
+        attr("denom", &packet.denom),
+        attr("amount", &packet.amount),
+    ];
 
     // send response
     let res = Response {
         submessages: vec![],
         messages: vec![msg.into()],
-        // TODO: more
-        attributes: vec![attr("action", "transfer")],
+        attributes,
         data: None,
     };
     Ok(res)
