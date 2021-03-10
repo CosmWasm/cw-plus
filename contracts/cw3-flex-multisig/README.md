@@ -21,7 +21,7 @@ Cosmos SDK multisig, is that it aggregates the signatures on chain, with
 visible proposals (like `x/gov` in the Cosmos SDK), rather than requiring
 signers to share signatures off chain.
 
-## Init
+## Instantiation
 
 The first step to create such a multisig is to instantiate a cw4 contract
 with the desired member set. For now, this only is supported by
@@ -31,8 +31,8 @@ with the desired member set. For now, this only is supported by
 If you create a `cw4-group` contract and want a multisig to be able
 to modify its own group, do the following in multiple transactions:
 
-  * init cw4-group, with your personal key as admin
-  * init a multisig pointing to the group
+  * instantiate cw4-group, with your personal key as admin
+  * instantiate a multisig pointing to the group
   * `AddHook{multisig}` on the group contract
   * `UpdateAdmin{multisig}` on the group contract
 
@@ -43,7 +43,7 @@ self-deploying contract on-chain). (TODO: document better).
 When creating the multisig, you must set the required weight to pass a vote
 as well as the max/default voting period. (TODO: allow more threshold types)
 
-## Handle Process
+## Execution Process
 
 First, a registered voter must submit a proposal. This also includes the
 first "Yes" vote on the proposal by the proposer. The proposer can set

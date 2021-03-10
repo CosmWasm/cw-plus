@@ -16,10 +16,10 @@ Implements:
 The `HandleMsg` and `QueryMsg` implementations follow the [CW721 spec](../../packages/cw721/README.md) and are described there.
 Beyond that, we make a few additions:
 
-* `InitMsg` takes name and symbol (for metadata), as well as a **Minter** address. This is a special address that has full 
+* `InstantiateMsg` takes name and symbol (for metadata), as well as a **Minter** address. This is a special address that has full 
 power to mint new NFTs (but not modify existing ones)
 * `HandleMsg::Mint{token_id, owner, name, description, image}` - creates a new token with given owner and metadata. It can only be called by
-the Minter set in `init`.
+the Minter set in `instantiate`.
 * `QueryMsg::Minter{}` - returns the minter address for this contract.
 
 It requires all tokens to have defined metadata in the standard format (with no extensions). For generic NFTs this may
@@ -60,7 +60,7 @@ Basically, you just need to write your handle function and import
 This allows you to use custom `HandleMsg` and `QueryMsg` with your additional
 calls, but then use the underlying implementation for the standard cw721
 messages you want to support. The same with `QueryMsg`. You will most
-likely want to write a custom, domain-specific `init`.
+likely want to write a custom, domain-specific `instantiate`.
 
 **TODO: add example when written**
 

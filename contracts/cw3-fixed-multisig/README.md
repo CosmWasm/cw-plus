@@ -1,7 +1,7 @@
 # CW3 Fixed Multisig
 
 This is a simple implementation of the [cw3 spec](../../packages/cw3/README.md).
-It is a multisig with a fixed set of addresses created upon initialization.
+It is a multisig with a fixed set of addresses created upon instatiation.
 Each address may have the same weight (K of N), or some may have extra voting
 power. This works much like the native Cosmos SDK multisig, except that rather
 than aggregating the signatures off chain and submitting the final result,
@@ -13,7 +13,7 @@ as updating the multisig set, different voting rules for the same group
 with different permissions, and even allow token-weighted voting. All through
 the same client interface.
 
-## Init
+## Instantiation
 
 To create the multisig, you must pass in a set of `HumanAddr` with a weight
 for each one, as well as a required weight to pass a proposal. To create
@@ -23,7 +23,7 @@ Note that 0 *is an allowed weight*. This doesn't give any voting rights, but
 it does allow that key to submit proposals that can later be approved by the
 voters. Any address not in the voter set cannot submit a proposal.
 
-## Handle Process
+## Execution Process
 
 First, a registered voter must submit a proposal. This also includes the
 first "Yes" vote on the proposal by the proposer. The proposer can set
