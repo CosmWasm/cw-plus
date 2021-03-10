@@ -12,14 +12,19 @@ use crate::allowances::{
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(mut deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
+pub fn instantiate(
+    mut deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -335,15 +340,15 @@ mod tests {
         query_balance(deps, address.into()).unwrap().balance
     }
 
-    // this will set up the init for other tests
-    fn do_init_with_minter(
+    // this will set up the instantiation for other tests
+    fn do_instantiate_with_minter(
         deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
         minter: &HumanAddr,
         cap: Option<Uint128>,
     ) -> TokenInfoResponse {
-        _do_init(
+        _do_instantiate(
             deps,
             addr,
             amount,
@@ -354,19 +359,19 @@ mod tests {
         )
     }
 
-    // this will set up the init for other tests
-    fn do_init(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
-        _do_init(deps, addr, amount, None)
+    // this will set up the instantiation for other tests
+    fn do_instantiate(deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
+        _do_instantiate(deps, addr, amount, None)
     }
 
-    // this will set up the init for other tests
-    fn _do_init(
+    // this will set up the instantiation for other tests
+    fn _do_instantiate(
         mut deps: DepsMut,
         addr: &HumanAddr,
         amount: Uint128,
         mint: Option<MinterResponse>,
     ) -> TokenInfoResponse {
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
@@ -378,7 +383,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps.branch(), env, info, init_msg).unwrap();
+        let res = instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         let meta = query_token_info(deps.as_ref()).unwrap();
@@ -397,10 +402,10 @@ mod tests {
     }
 
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128::from(11223344u128);
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
@@ -412,7 +417,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -428,12 +433,12 @@ mod tests {
     }
 
     #[test]
-    fn init_mintable() {
+    fn instantiate_mintable() {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
         let limit = Uint128(511223344);
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
@@ -448,7 +453,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -471,12 +476,12 @@ mod tests {
     }
 
     #[test]
-    fn init_mintable_over_cap() {
+    fn instantiate_mintable_over_cap() {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
         let limit = Uint128(11223300);
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
@@ -491,7 +496,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg);
+        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg);
         match res.unwrap_err() {
             StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Initial supply greater than cap"),
             e => panic!("Unexpected error: {}", e),
@@ -506,7 +511,7 @@ mod tests {
         let amount = Uint128(11223344);
         let minter = HumanAddr::from("asmodat");
         let limit = Uint128(511223344);
-        do_init_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
+        do_instantiate_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
         let winner = HumanAddr::from("lucky");
@@ -554,7 +559,7 @@ mod tests {
     #[test]
     fn others_cannot_mint() {
         let mut deps = mock_dependencies(&[]);
-        do_init_with_minter(
+        do_instantiate_with_minter(
             deps.as_mut(),
             &HumanAddr::from("genesis"),
             Uint128(1234),
@@ -578,7 +583,7 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut(), &HumanAddr::from("genesis"), Uint128(1234));
+        do_instantiate(deps.as_mut(), &HumanAddr::from("genesis"), Uint128(1234));
 
         let msg = HandleMsg::Mint {
             recipient: HumanAddr::from("lucky"),
@@ -594,13 +599,13 @@ mod tests {
     }
 
     #[test]
-    fn init_multiple_accounts() {
+    fn instantiate_multiple_accounts() {
         let mut deps = mock_dependencies(&[]);
         let amount1 = Uint128::from(11223344u128);
         let addr1 = HumanAddr::from("addr0001");
         let amount2 = Uint128::from(7890987u128);
         let addr2 = HumanAddr::from("addr0002");
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             name: "Bash Shell".to_string(),
             symbol: "BASH".to_string(),
             decimals: 6,
@@ -618,7 +623,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = init(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -640,7 +645,7 @@ mod tests {
         let addr1 = HumanAddr::from("addr0001");
         let amount1 = Uint128::from(12340000u128);
 
-        let expected = do_init(deps.as_mut(), &addr1, amount1);
+        let expected = do_instantiate(deps.as_mut(), &addr1, amount1);
 
         // check meta query
         let loaded = query_token_info(deps.as_ref()).unwrap();
@@ -682,7 +687,7 @@ mod tests {
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(deps.as_mut(), &addr1, amount1);
+        do_instantiate(deps.as_mut(), &addr1, amount1);
 
         // cannot transfer nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -750,7 +755,7 @@ mod tests {
         let burn = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
 
-        do_init(deps.as_mut(), &addr1, amount1);
+        do_instantiate(deps.as_mut(), &addr1, amount1);
 
         // cannot burn nothing
         let info = mock_info(addr1.clone(), &[]);
@@ -807,7 +812,7 @@ mod tests {
         let too_much = Uint128::from(12340321u128);
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
-        do_init(deps.as_mut(), &addr1, amount1);
+        do_instantiate(deps.as_mut(), &addr1, amount1);
 
         // cannot send nothing
         let info = mock_info(addr1.clone(), &[]);

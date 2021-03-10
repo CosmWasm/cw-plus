@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 backtraces = ["cosmwasm-std/backtraces"]
-# use library feature to disable all init/handle/query exports
+# use library feature to disable all instantiate/execute/query exports
 library = []
 
 [dependencies]

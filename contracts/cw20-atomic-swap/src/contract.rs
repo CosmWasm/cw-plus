@@ -9,8 +9,8 @@ use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
-    is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse,
-    QueryMsg, ReceiveMsg,
+    is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InstantiateMsg,
+    ListResponse, QueryMsg, ReceiveMsg,
 };
 use crate::state::{all_swap_ids, AtomicSwap, SWAPS};
 use cw_storage_plus::Bound;
@@ -19,7 +19,12 @@ use cw_storage_plus::Bound;
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, _msg: InitMsg) -> StdResult<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // No setup
     Ok(Response::default())
@@ -294,13 +299,13 @@ mod tests {
     }
 
     #[test]
-    fn test_init() {
+    fn test_instantiate() {
         let mut deps = mock_dependencies(&[]);
 
-        // Init an empty contract
-        let init_msg = InitMsg {};
+        // Instantiate an empty contract
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info("anyone", &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
@@ -309,7 +314,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
         let sender = HumanAddr::from("sender0001");
         let balance = coins(100, "tokens");
@@ -443,7 +448,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
         let sender = HumanAddr::from("sender0001");
         let balance = coins(1000, "tokens");
@@ -548,7 +553,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
         let sender = HumanAddr::from("sender0001");
         let balance = coins(1000, "tokens");
@@ -623,7 +628,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let info = mock_info("anyone", &[]);
-        init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
         let sender1 = HumanAddr::from("sender0001");
         let sender2 = HumanAddr::from("sender0002");
@@ -714,7 +719,7 @@ mod tests {
 
         // Create the contract
         let info = mock_info("anyone", &[]);
-        let res = init(deps.as_mut(), mock_env(), info, InitMsg {}).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
         assert_eq!(0, res.messages.len());
 
         // Native side (offer)

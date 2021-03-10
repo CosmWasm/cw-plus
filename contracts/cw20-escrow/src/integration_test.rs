@@ -5,7 +5,7 @@ use cosmwasm_std::{coins, to_binary, HumanAddr, Uint128};
 use cw20::{Cw20CoinHuman, Cw20Contract, Cw20HandleMsg};
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
-use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InitMsg, QueryMsg, ReceiveMsg};
+use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
 
 fn mock_app() -> App {
     let env = mock_env();
@@ -18,7 +18,7 @@ fn mock_app() -> App {
 pub fn contract_escrow() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(
         crate::contract::execute,
-        crate::contract::init,
+        crate::contract::instantiate,
         crate::contract::query,
     );
     Box::new(contract)
@@ -27,7 +27,7 @@ pub fn contract_escrow() -> Box<dyn Contract> {
 pub fn contract_cw20() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(
         cw20_base::contract::execute,
-        cw20_base::contract::init,
+        cw20_base::contract::instantiate,
         cw20_base::contract::query,
     );
     Box::new(contract)
@@ -47,7 +47,7 @@ fn escrow_happy_path_cw20_tokens() {
 
     // set up cw20 contract with some tokens
     let cw20_id = router.store_code(contract_cw20());
-    let msg = cw20_base::msg::InitMsg {
+    let msg = cw20_base::msg::InstantiateMsg {
         name: "Cash Money".to_string(),
         symbol: "CASH".to_string(),
         decimals: 2,
@@ -64,7 +64,7 @@ fn escrow_happy_path_cw20_tokens() {
     // set up reflect contract
     let escrow_id = router.store_code(contract_escrow());
     let escrow_addr = router
-        .instantiate_contract(escrow_id, &owner, &InitMsg {}, &[], "Escrow")
+        .instantiate_contract(escrow_id, &owner, &InstantiateMsg {}, &[], "Escrow")
         .unwrap();
 
     // they are different

@@ -6,7 +6,7 @@ use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult};
 use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InitMsg {}
+pub struct InstantiateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]

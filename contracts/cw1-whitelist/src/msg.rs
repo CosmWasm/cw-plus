@@ -5,7 +5,7 @@ use std::fmt;
 use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     pub admins: Vec<HumanAddr>,
     pub mutable: bool,
 }

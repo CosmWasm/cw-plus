@@ -15,7 +15,7 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
-use crate::msg::{CurveFn, CurveInfoResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{CurveFn, CurveInfoResponse, HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE, CURVE_TYPE};
 use cw0::{must_pay, nonpayable};
 
@@ -23,11 +23,11 @@ use cw0::{must_pay, nonpayable};
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     nonpayable(&info)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -69,8 +69,8 @@ pub fn execute(
 }
 
 /// We pull out logic here, so we can import this from another contract and set a different Curve.
-/// This contacts sets a curve with an enum in InitMsg and stored in state, but you may want to
-/// use custom math not included - make this easily reusable
+/// This contacts sets a curve with an enum in InstantiateMsg and stored in state, but you may want
+/// to use custom math not included - make this easily reusable
 pub fn do_execute(
     deps: DepsMut,
     env: Env,
@@ -263,8 +263,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 /// We pull out logic here, so we can import this from another contract and set a different Curve.
-/// This contacts sets a curve with an enum in InitMsg and stored in state, but you may want to
-/// use custom math not included - make this easily reusable
+/// This contacts sets a curve with an enum in InstantitateMsg and stored in state, but you may want
+/// to use custom math not included - make this easily reusable
 pub fn do_query(deps: Deps, _env: Env, msg: QueryMsg, curve_fn: CurveFn) -> StdResult<Binary> {
     match msg {
         // custom queries
@@ -286,7 +286,7 @@ pub fn query_curve_info(deps: Deps, curve_fn: CurveFn) -> StdResult<CurveInfoRes
         decimals,
     } = CURVE_STATE.load(deps.storage)?;
 
-    // This we can get from the local digits stored in init
+    // This we can get from the local digits stored in instantiate
     let curve = curve_fn(decimals);
     let spot_price = curve.spot_price(supply);
 
@@ -312,8 +312,12 @@ mod tests {
     const INVESTOR: &str = "investor";
     const BUYER: &str = "buyer";
 
-    fn default_init(decimals: u8, reserve_decimals: u8, curve_type: CurveType) -> InitMsg {
-        InitMsg {
+    fn default_instantiate(
+        decimals: u8,
+        reserve_decimals: u8,
+        curve_type: CurveType,
+    ) -> InstantiateMsg {
+        InstantiateMsg {
             name: "Bonded".to_string(),
             symbol: "EPOXY".to_string(),
             decimals,
@@ -330,16 +334,16 @@ mod tests {
     fn setup_test(deps: DepsMut, decimals: u8, reserve_decimals: u8, curve_type: CurveType) {
         // this matches `linear_curve` test case from curves.rs
         let creator = HumanAddr::from(CREATOR);
-        let msg = default_init(decimals, reserve_decimals, curve_type.clone());
+        let msg = default_instantiate(decimals, reserve_decimals, curve_type.clone());
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps, mock_env(), info, msg.clone()).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps, mock_env(), info, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
 
         // this matches `linear_curve` test case from curves.rs
@@ -348,11 +352,11 @@ mod tests {
             slope: Uint128(1),
             scale: 1,
         };
-        let msg = default_init(2, 8, curve_type.clone());
+        let msg = default_instantiate(2, 8, curve_type.clone());
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
         // token info is proper

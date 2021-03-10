@@ -15,7 +15,7 @@ use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
     next_id, parse_id, Ballot, Config, Proposal, Votes, BALLOTS, CONFIG, PROPOSALS,
 };
@@ -24,11 +24,11 @@ use crate::state::{
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     // we just convert to canonical to check if this is a valid format
     if deps.api.canonical_address(&msg.group_addr).is_err() {
@@ -478,7 +478,7 @@ mod tests {
     pub fn contract_flex() -> Box<dyn Contract> {
         let contract = ContractWrapper::new(
             crate::contract::execute,
-            crate::contract::init,
+            crate::contract::instantiate,
             crate::contract::query,
         );
         Box::new(contract)
@@ -487,7 +487,7 @@ mod tests {
     pub fn contract_group() -> Box<dyn Contract> {
         let contract = ContractWrapper::new(
             cw4_group::contract::execute,
-            cw4_group::contract::init,
+            cw4_group::contract::instantiate,
             cw4_group::contract::query,
         );
         Box::new(contract)
@@ -502,9 +502,9 @@ mod tests {
     }
 
     // uploads code and returns address of group contract
-    fn init_group(app: &mut App, members: Vec<Member>) -> HumanAddr {
+    fn instantiate_group(app: &mut App, members: Vec<Member>) -> HumanAddr {
         let group_id = app.store_code(contract_group());
-        let msg = cw4_group::msg::InitMsg {
+        let msg = cw4_group::msg::InstantiateMsg {
             admin: Some(OWNER.into()),
             members,
         };
@@ -512,14 +512,14 @@ mod tests {
             .unwrap()
     }
 
-    fn init_flex(
+    fn instantiate_flex(
         app: &mut App,
         group: HumanAddr,
         threshold: Threshold,
         max_voting_period: Duration,
     ) -> HumanAddr {
         let flex_id = app.store_code(contract_flex());
-        let msg = crate::msg::InitMsg {
+        let msg = crate::msg::InstantiateMsg {
             group_addr: group,
             threshold,
             max_voting_period,
@@ -528,7 +528,7 @@ mod tests {
             .unwrap()
     }
 
-    // this will set up both contracts, initializing the group with
+    // this will set up both contracts, instantiating the group with
     // all voters defined above, and the multisig pointing to it and given threshold criteria.
     // Returns (multisig address, group address).
     fn setup_test_case_fixed(
@@ -556,7 +556,7 @@ mod tests {
         init_funds: Vec<Coin>,
         multisig_as_group_admin: bool,
     ) -> (HumanAddr, HumanAddr) {
-        // 1. Initialize group contract with members (and OWNER as admin)
+        // 1. Instantiate group contract with members (and OWNER as admin)
         let members = vec![
             member(OWNER, 0),
             member(VOTER1, 1),
@@ -565,11 +565,11 @@ mod tests {
             member(VOTER4, 4),
             member(VOTER5, 5),
         ];
-        let group_addr = init_group(app, members);
+        let group_addr = instantiate_group(app, members);
         app.update_block(next_block);
 
         // 2. Set up Multisig backed by this group
-        let flex_addr = init_flex(app, group_addr.clone(), threshold, max_voting_period);
+        let flex_addr = instantiate_flex(app, group_addr.clone(), threshold, max_voting_period);
         app.update_block(next_block);
 
         // 3. (Optional) Set the multisig as the group owner
@@ -611,22 +611,28 @@ mod tests {
     }
 
     #[test]
-    fn test_init_works() {
+    fn test_instantiate_works() {
         let mut app = mock_app();
 
         // make a simple group
-        let group_addr = init_group(&mut app, vec![member(OWNER, 1)]);
+        let group_addr = instantiate_group(&mut app, vec![member(OWNER, 1)]);
         let flex_id = app.store_code(contract_flex());
 
         let max_voting_period = Duration::Time(1234567);
 
         // Zero required weight fails
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             group_addr: group_addr.clone(),
             threshold: Threshold::AbsoluteCount { weight: 0 },
             max_voting_period,
         };
-        let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "zero required weight");
+        let res = app.instantiate_contract(
+            flex_id,
+            OWNER,
+            &instantiate_msg,
+            &[],
+            "zero required weight",
+        );
 
         // Verify
         assert_eq!(
@@ -635,12 +641,18 @@ mod tests {
         );
 
         // Total weight less than required weight not allowed
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             group_addr: group_addr.clone(),
             threshold: Threshold::AbsoluteCount { weight: 100 },
             max_voting_period,
         };
-        let res = app.instantiate_contract(flex_id, OWNER, &init_msg, &[], "high required weight");
+        let res = app.instantiate_contract(
+            flex_id,
+            OWNER,
+            &instantiate_msg,
+            &[],
+            "high required weight",
+        );
 
         // Verify
         assert_eq!(
@@ -649,13 +661,13 @@ mod tests {
         );
 
         // All valid
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             group_addr: group_addr.clone(),
             threshold: Threshold::AbsoluteCount { weight: 1 },
             max_voting_period,
         };
         let flex_addr = app
-            .instantiate_contract(flex_id, OWNER, &init_msg, &[], "all good")
+            .instantiate_contract(flex_id, OWNER, &instantiate_msg, &[], "all good")
             .unwrap();
 
         // Verify contract version set properly

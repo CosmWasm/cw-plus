@@ -11,7 +11,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
 // version info for migration info
@@ -20,18 +20,18 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     create(deps, msg.admin, msg.members, env.block.height)?;
     Ok(Response::default())
 }
 
-// create is the init logic with set_contract_version removed so it can more
+// create is the instantiation logic with set_contract_version removed so it can more
 // easily be imported in other contracts
 pub fn create(
     mut deps: DepsMut,
@@ -205,8 +205,8 @@ mod tests {
     const USER2: &str = "else";
     const USER3: &str = "funny";
 
-    fn do_init(deps: DepsMut) {
-        let msg = InitMsg {
+    fn do_instantiate(deps: DepsMut) {
+        let msg = InstantiateMsg {
             admin: Some(INIT_ADMIN.into()),
             members: vec![
                 Member {
@@ -220,13 +220,13 @@ mod tests {
             ],
         };
         let info = mock_info("creator", &[]);
-        init(deps, mock_env(), info, msg).unwrap();
+        instantiate(deps, mock_env(), info, msg).unwrap();
     }
 
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         // it worked, let's query the state
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn try_member_queries() {
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
         assert_eq!(member1.weight, Some(11));
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn add_new_remove_old_member() {
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         // add a new one and remove existing one
         let add = vec![Member {
@@ -311,11 +311,11 @@ mod tests {
         .unwrap_err();
         assert_eq!(err, AdminError::NotAdmin {}.into());
 
-        // Test the values from init
+        // Test the values from instantiate
         assert_users(&deps, Some(11), Some(6), None, None);
         // Note all values were set at height, the beginning of that block was all None
         assert_users(&deps, None, None, None, Some(height));
-        // This will get us the values at the start of the block after init (expected initial values)
+        // This will get us the values at the start of the block after instantiate (expected initial values)
         assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
 
         // admin updates properly
@@ -332,7 +332,7 @@ mod tests {
     fn add_old_remove_new_member() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         // add a new one and remove existing one
         let add = vec![Member {
@@ -351,7 +351,7 @@ mod tests {
     fn add_and_remove_same_member() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         // USER1 is updated and remove in the same call, we should remove this an add member3
         let add = vec![
@@ -376,7 +376,7 @@ mod tests {
     fn add_remove_hooks() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn hooks_fire() {
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
@@ -528,7 +528,7 @@ mod tests {
     fn raw_queries_work() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut());
+        do_instantiate(deps.as_mut());
 
         // get total from raw key
         let total_raw = deps.storage.get(TOTAL_KEY.as_bytes()).unwrap();

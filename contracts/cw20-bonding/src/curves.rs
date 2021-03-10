@@ -204,7 +204,7 @@ fn cube_root(cube: Decimal) -> Decimal {
 /// DecimalPlaces should be passed into curve constructors
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, JsonSchema, Default)]
 pub struct DecimalPlaces {
-    /// Number of decimal places for the supply token (this is what was passed in cw20-base init
+    /// Number of decimal places for the supply token (this is what was passed in cw20-base instantiate
     pub supply: u32,
     /// Number of decimal places for the reserve token (eg. 6 for uatom, 9 for nstep, 18 for wei)
     pub reserve: u32,

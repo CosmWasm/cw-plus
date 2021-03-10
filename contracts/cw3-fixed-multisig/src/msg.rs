@@ -6,7 +6,7 @@ use cw0::{Duration, Expiration};
 use cw3::Vote;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     pub voters: Vec<Voter>,
     pub required_weight: u64,
     pub max_voting_period: Duration,
