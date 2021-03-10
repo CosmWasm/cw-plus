@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use crate::contract::{execute, init, query};
-use crate::msg::{HandleMsg, InitMsg, Voter};
+use crate::contract::{execute, instantiate, query};
+use crate::msg::{HandleMsg, InstantiateMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{from_binary, to_binary, HumanAddr, Uint128, WasmMsg, WasmQuery};
 use cw0::Duration;
@@ -19,14 +19,14 @@ fn mock_app() -> App {
 }
 
 pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(execute, init, query);
+    let contract = ContractWrapper::new(execute, instantiate, query);
     Box::new(contract)
 }
 
 pub fn contract_cw20() -> Box<dyn Contract> {
     let contract = ContractWrapper::new(
         cw20_base::contract::execute,
-        cw20_base::contract::init,
+        cw20_base::contract::instantiate,
         cw20_base::contract::query,
     );
     Box::new(contract)
@@ -43,7 +43,7 @@ fn cw3_controls_cw20() {
     let addr1 = HumanAddr::from("addr1");
     let addr2 = HumanAddr::from("addr2");
     let addr3 = HumanAddr::from("addr3");
-    let cw3_init_msg = InitMsg {
+    let cw3_instantiate_msg = InstantiateMsg {
         voters: vec![
             Voter {
                 addr: addr1.clone(),
@@ -63,13 +63,19 @@ fn cw3_controls_cw20() {
     };
 
     let multisig_addr = router
-        .instantiate_contract(cw3_id, &addr1.clone(), &cw3_init_msg, &[], "Consortium")
+        .instantiate_contract(
+            cw3_id,
+            &addr1.clone(),
+            &cw3_instantiate_msg,
+            &[],
+            "Consortium",
+        )
         .unwrap();
 
     // setup cw20 as cw3 multisig admin
     let cw20_id = router.store_code(contract_cw20());
 
-    let cw20_init_msg = cw20_base::msg::InitMsg {
+    let cw20_instantiate_msg = cw20_base::msg::InstantiateMsg {
         name: "Consortium Token".parse().unwrap(),
         symbol: "CST".parse().unwrap(),
         decimals: 6,
@@ -80,7 +86,13 @@ fn cw3_controls_cw20() {
         }),
     };
     let cw20_addr = router
-        .instantiate_contract(cw20_id, &multisig_addr, &cw20_init_msg, &[], "Consortium")
+        .instantiate_contract(
+            cw20_id,
+            &multisig_addr,
+            &cw20_instantiate_msg,
+            &[],
+            "Consortium",
+        )
         .unwrap();
 
     // mint some cw20 tokens according to proposal result

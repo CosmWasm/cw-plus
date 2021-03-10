@@ -7,7 +7,7 @@ use cw20::Expiration;
 pub use cw_controllers::ClaimsResponse;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// name of the derivative token
     pub name: String,
     /// symbol / ticker of the derivative token

@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     pub name: String,
     pub symbol: String,
     pub decimals: u8,
@@ -12,7 +12,7 @@ pub struct InitMsg {
     pub mint: Option<MinterResponse>,
 }
 
-impl InitMsg {
+impl InstantiateMsg {
     pub fn get_cap(&self) -> Option<Uint128> {
         self.mint.as_ref().and_then(|v| v.cap)
     }

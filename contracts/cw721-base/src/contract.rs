@@ -11,7 +11,7 @@ use cw721::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, MintMsg, MinterResponse, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
     increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS,
 };
@@ -21,7 +21,12 @@ use cw_storage_plus::{Bound, PkOwned};
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let info = ContractInfoResponse {
@@ -591,21 +596,21 @@ mod tests {
     const SYMBOL: &str = "MGK";
 
     fn setup_contract(deps: DepsMut) {
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
             minter: MINTER.into(),
         };
         let info = mock_info("creator", &[]);
-        let res = init(deps, mock_env(), info, msg).unwrap();
+        let res = instantiate(deps, mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
 
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
             minter: MINTER.into(),
@@ -613,7 +618,7 @@ mod tests {
         let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
-        let res = init(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state

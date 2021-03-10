@@ -8,7 +8,7 @@ use cw3::{ThresholdResponse, Vote};
 use cw4::MemberChangedHookMsg;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     // this is the group contract that contains the member list
     pub group_addr: HumanAddr,
     pub threshold: Threshold,

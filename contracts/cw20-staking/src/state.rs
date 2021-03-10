@@ -8,7 +8,7 @@ use cw_storage_plus::Item;
 
 pub const CLAIMS: Claims = Claims::new("claims");
 
-/// Investment info is fixed at initialization, and is used to control the function of the contract
+/// Investment info is fixed at instatiation, and is used to control the function of the contract
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InvestmentInfo {
     /// owner created the contract and takes a cut

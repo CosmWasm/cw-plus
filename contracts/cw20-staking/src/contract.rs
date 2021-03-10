@@ -14,7 +14,7 @@ use cw20_base::contract::{
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, InvestmentResponse, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, InvestmentResponse, QueryMsg};
 use crate::state::{InvestmentInfo, Supply, CLAIMS, INVESTMENT, TOTAL_SUPPLY};
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -23,11 +23,11 @@ const FALLBACK_RATIO: Decimal = Decimal::one();
 const CONTRACT_NAME: &str = "crates.io:cw20-staking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
@@ -502,8 +502,8 @@ mod tests {
 
     const DEFAULT_VALIDATOR: &str = "default-validator";
 
-    fn default_init(tax_percent: u64, min_withdrawal: u128) -> InitMsg {
-        InitMsg {
+    fn default_instantiate(tax_percent: u64, min_withdrawal: u128) -> InstantiateMsg {
+        InstantiateMsg {
             name: "Cool Derivative".to_string(),
             symbol: "DRV".to_string(),
             decimals: 9,
@@ -523,13 +523,13 @@ mod tests {
     }
 
     #[test]
-    fn initialization_with_missing_validator() {
+    fn instantiation_with_missing_validator() {
         let mut deps = mock_dependencies(&[]);
         deps.querier
             .update_staking("ustake", &[sample_validator("john")], &[]);
 
         let creator = HumanAddr::from("creator");
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             name: "Cool Derivative".to_string(),
             symbol: "DRV".to_string(),
             decimals: 9,
@@ -540,8 +540,8 @@ mod tests {
         };
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, msg.clone());
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg.clone());
         match res.unwrap_err() {
             ContractError::NotInValidatorSet { .. } => {}
             _ => panic!("expected unregistered validator error"),
@@ -549,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
         deps.querier.update_staking(
             "ustake",
@@ -562,7 +562,7 @@ mod tests {
         );
 
         let creator = HumanAddr::from("creator");
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             name: "Cool Derivative".to_string(),
             symbol: "DRV".to_string(),
             decimals: 0,
@@ -573,8 +573,8 @@ mod tests {
         };
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
         assert_eq!(0, res.messages.len());
 
         // token info is proper
@@ -607,11 +607,11 @@ mod tests {
         set_validator(&mut deps.querier);
 
         let creator = HumanAddr::from("creator");
-        let init_msg = default_init(2, 50);
+        let instantiate_msg = default_instantiate(2, 50);
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // let's bond some tokens now
@@ -651,11 +651,11 @@ mod tests {
         set_validator(&mut deps.querier);
 
         let creator = HumanAddr::from("creator");
-        let init_msg = default_init(2, 50);
+        let instantiate_msg = default_instantiate(2, 50);
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // let's bond some tokens now
@@ -710,11 +710,11 @@ mod tests {
         set_validator(&mut deps.querier);
 
         let creator = HumanAddr::from("creator");
-        let init_msg = default_init(2, 50);
+        let instantiate_msg = default_instantiate(2, 50);
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // let's bond some tokens now
@@ -736,11 +736,11 @@ mod tests {
         set_validator(&mut deps.querier);
 
         let creator = HumanAddr::from("creator");
-        let init_msg = default_init(10, 50);
+        let instantiate_msg = default_instantiate(10, 50);
         let info = mock_info(&creator, &[]);
 
-        // make sure we can init with this
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        // make sure we can instantiate with this
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // let's bond some tokens now
@@ -827,9 +827,9 @@ mod tests {
 
         // create contract
         let creator = HumanAddr::from("creator");
-        let init_msg = default_init(10, 50);
+        let instantiate_msg = default_instantiate(10, 50);
         let info = mock_info(&creator, &[]);
-        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         // bond some tokens
         let bob = HumanAddr::from("bob");
@@ -905,9 +905,9 @@ mod tests {
 
         // create the contract
         let creator = HumanAddr::from("creator");
-        let init_msg = default_init(2, 50);
+        let instantiate_msg = default_instantiate(2, 50);
         let info = mock_info(&creator, &[]);
-        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         // bond some tokens to create a balance
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);

@@ -68,12 +68,12 @@ mod tests {
     use cosmwasm_std::{coins, DepsMut, Uint128};
     use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
-    use crate::contract::{execute, init, query_token_info};
-    use crate::msg::{HandleMsg, InitMsg};
+    use crate::contract::{execute, instantiate, query_token_info};
+    use crate::msg::{HandleMsg, InstantiateMsg};
 
-    // this will set up the init for other tests
-    fn do_init(mut deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
-        let init_msg = InitMsg {
+    // this will set up the instantiation for other tests
+    fn do_instantiate(mut deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
+        let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
@@ -85,7 +85,7 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        init(deps.branch(), env, info, init_msg).unwrap();
+        instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
     }
 
@@ -100,7 +100,7 @@ mod tests {
 
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        do_init(deps.as_mut(), &owner, Uint128(12340000));
+        do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
 
         // no allowance to start
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
@@ -163,7 +163,7 @@ mod tests {
         let acct4 = HumanAddr::from("aaaardvark");
         let expected_order = [acct2.clone(), acct1.clone(), acct3.clone(), acct4.clone()];
 
-        do_init(deps.as_mut(), &acct1, Uint128(12340000));
+        do_instantiate(deps.as_mut(), &acct1, Uint128(12340000));
 
         // put money everywhere (to create balanaces)
         let info = mock_info(acct1.clone(), &[]);

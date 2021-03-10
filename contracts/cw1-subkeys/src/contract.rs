@@ -9,8 +9,11 @@ use cosmwasm_std::{
 use cw0::{maybe_canonical, Expiration};
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
-    contract::{execute_freeze, execute_update_admins, init as whitelist_init, query_admin_list},
-    msg::InitMsg,
+    contract::{
+        execute_freeze, execute_update_admins, instantiate as whitelist_instantiate,
+        query_admin_list,
+    },
+    msg::InstantiateMsg,
     state::ADMIN_LIST,
 };
 use cw2::set_contract_version;
@@ -27,8 +30,13 @@ use cw_storage_plus::Bound;
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(mut deps: DepsMut, env: Env, info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
-    let result = whitelist_init(deps.branch(), env, info, msg)?;
+pub fn instantiate(
+    mut deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<Response> {
+    let result = whitelist_instantiate(deps.branch(), env, info, msg)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(result)
 }
@@ -419,7 +427,7 @@ mod tests {
 
     use super::*;
 
-    // this will set up the init for other tests
+    // this will set up instantiation for other tests
     fn setup_test_case(
         mut deps: DepsMut,
         info: &MessageInfo,
@@ -428,12 +436,12 @@ mod tests {
         allowances: &[Coin],
         expirations: &[Expiration],
     ) {
-        // Init a contract with admins
-        let init_msg = InitMsg {
+        // Instantiate a contract with admins
+        let instantiate_msg = InstantiateMsg {
             admins: admins.to_vec(),
             mutable: true,
         };
-        init(deps.branch(), mock_env(), info.clone(), init_msg).unwrap();
+        instantiate(deps.branch(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         // Add subkeys with initial allowances
         for (spender, expiration) in spenders.iter().zip(expirations) {
@@ -633,12 +641,12 @@ mod tests {
         };
 
         let info = mock_info(owner.clone(), &[]);
-        // Init a contract with admins
-        let init_msg = InitMsg {
+        // Instantiate a contract with admins
+        let instantiate_msg = InstantiateMsg {
             admins: admins.clone(),
             mutable: true,
         };
-        init(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         let setup_perm_msg1 = HandleMsg::SetPermissions {
             spender: spender1.clone(),
@@ -709,12 +717,12 @@ mod tests {
 
         let info = mock_info(owner, &[]);
 
-        // Init a contract with admins
-        let init_msg = InitMsg {
+        // Instantiate a contract with admins
+        let instantiate_msg = InstantiateMsg {
             admins: admins.clone(),
             mutable: true,
         };
-        init(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         let setup_perm_msg1 = HandleMsg::SetPermissions {
             spender: spender1.clone(),
@@ -1234,12 +1242,12 @@ mod tests {
         };
 
         let info = mock_info(owner.clone(), &[]);
-        // Init a contract with admins
-        let init_msg = InitMsg {
+        // Instantiate a contract with admins
+        let instantiate_msg = InstantiateMsg {
             admins: admins.clone(),
             mutable: true,
         };
-        init(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         let setup_perm_msg1 = HandleMsg::SetPermissions {
             spender: spender1.clone(),
@@ -1387,12 +1395,12 @@ mod tests {
         };
 
         let info = mock_info(owner.clone(), &[]);
-        // Init a contract with admins
-        let init_msg = InitMsg {
+        // Instantiate a contract with admins
+        let instantiate_msg = InstantiateMsg {
             admins: admins.clone(),
             mutable: true,
         };
-        init(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         // setup permission and then allowance and check if changed
         let setup_perm_msg = HandleMsg::SetPermissions {

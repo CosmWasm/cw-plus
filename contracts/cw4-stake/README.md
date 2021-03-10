@@ -21,7 +21,7 @@ be used for voting, nor claimed by the original owner. Only after the period
 can you get your tokens back. This liquidity loss is the "skin in the game"
 provided by staking to this contract.
 
-## Init
+## Instantiation
 
 **TODO**
 
@@ -29,7 +29,7 @@ To create it, you must pass in a list of members, as well as an optional
 `admin`, if you wish it to be mutable.
 
 ```rust
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// denom of the token to stake
     pub stake: String,
     pub tokens_per_weight: u64,

@@ -13,7 +13,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg, StakedResponse};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
@@ -22,11 +22,11 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-pub fn init(
+pub fn instantiate(
     mut deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     ADMIN.set(deps.branch(), msg.admin)?;
@@ -370,8 +370,8 @@ mod tests {
     const MIN_BOND: Uint128 = Uint128(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
 
-    fn default_init(deps: DepsMut) {
-        do_init(
+    fn default_instantiate(deps: DepsMut) {
+        do_instantiate(
             deps,
             TOKENS_PER_WEIGHT,
             MIN_BOND,
@@ -379,13 +379,13 @@ mod tests {
         )
     }
 
-    fn do_init(
+    fn do_instantiate(
         deps: DepsMut,
         tokens_per_weight: Uint128,
         min_bond: Uint128,
         unbonding_period: Duration,
     ) {
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             denom: Denom::Native("stake".to_string()),
             tokens_per_weight,
             min_bond,
@@ -393,7 +393,7 @@ mod tests {
             admin: Some(INIT_ADMIN.into()),
         };
         let info = mock_info("creator", &[]);
-        init(deps, mock_env(), info, msg).unwrap();
+        instantiate(deps, mock_env(), info, msg).unwrap();
     }
 
     fn bond(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
@@ -425,9 +425,9 @@ mod tests {
     }
 
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
 
         // it worked, let's query the state
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn bond_stake_adds_membership() {
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
         let height = mock_env().block.height;
 
         // Assert original weights
@@ -527,7 +527,7 @@ mod tests {
     #[test]
     fn unbond_stake_update_membership() {
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
         let height = mock_env().block.height;
 
         // ensure it rounds down, and respects cut-off
@@ -574,7 +574,7 @@ mod tests {
     fn raw_queries_work() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
         // Set values as (11, 6, None)
         bond(deps.as_mut(), 11_000, 6_000, 0, 1);
 
@@ -602,7 +602,7 @@ mod tests {
     #[test]
     fn unbond_claim_workflow() {
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
 
         // create some data
         bond(deps.as_mut(), 12_000, 7_500, 4_000, 1);
@@ -740,7 +740,7 @@ mod tests {
     fn add_remove_hooks() {
         // add will over-write and remove have no effect
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
@@ -834,7 +834,7 @@ mod tests {
     #[test]
     fn hooks_fire() {
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
@@ -888,7 +888,7 @@ mod tests {
     #[test]
     fn only_bond_valid_coins() {
         let mut deps = mock_dependencies(&[]);
-        default_init(deps.as_mut());
+        default_instantiate(deps.as_mut());
 
         // cannot bond with 0 coins
         let info = mock_info(HumanAddr::from(USER1), &[]);
@@ -918,7 +918,7 @@ mod tests {
     fn ensure_bonding_edge_cases() {
         // use min_bond 0, tokens_per_weight 500
         let mut deps = mock_dependencies(&[]);
-        do_init(deps.as_mut(), Uint128(100), Uint128(0), Duration::Height(5));
+        do_instantiate(deps.as_mut(), Uint128(100), Uint128(0), Duration::Height(5));
 
         // setting 50 tokens, gives us Some(0) weight
         // even setting to 1 token

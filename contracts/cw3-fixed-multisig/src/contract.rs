@@ -14,7 +14,7 @@ use cw3::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
     next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS, VOTERS,
 };
@@ -23,11 +23,11 @@ use crate::state::{
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(
+pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     if msg.required_weight == 0 {
         return Err(ContractError::ZeroWeight {});
@@ -498,14 +498,14 @@ mod tests {
         }
     }
 
-    // this will set up the init for other tests
+    // this will set up the instantiation for other tests
     fn setup_test_case(
         deps: DepsMut,
         info: MessageInfo,
         required_weight: u64,
         max_voting_period: Duration,
     ) -> Result<Response<Empty>, ContractError> {
-        // Init a contract with voters
+        // Instantiate a contract with voters
         let voters = vec![
             voter(&info.sender, 0),
             voter(VOTER1, 1),
@@ -515,12 +515,12 @@ mod tests {
             voter(VOTER5, 5),
         ];
 
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             voters,
             required_weight,
             max_voting_period,
         };
-        init(deps, mock_env(), info, init_msg)
+        instantiate(deps, mock_env(), info, instantiate_msg)
     }
 
     fn get_tally(deps: Deps, proposal_id: u64) -> u64 {
@@ -542,19 +542,19 @@ mod tests {
     }
 
     #[test]
-    fn test_init_works() {
+    fn test_instantiate_works() {
         let mut deps = mock_dependencies(&[]);
         let info = mock_info(OWNER, &[]);
 
         let max_voting_period = Duration::Time(1234567);
 
         // No voters fails
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             voters: vec![],
             required_weight: 1,
             max_voting_period,
         };
-        let res = init(deps.as_mut(), mock_env(), info.clone(), init_msg);
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg);
 
         // Verify
         assert!(res.is_err());
@@ -564,12 +564,12 @@ mod tests {
         }
 
         // Zero required weight fails
-        let init_msg = InitMsg {
+        let instantiate_msg = InstantiateMsg {
             voters: vec![voter(OWNER, 1)],
             required_weight: 0,
             max_voting_period,
         };
-        let res = init(deps.as_mut(), mock_env(), info.clone(), init_msg);
+        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg);
 
         // Verify
         assert!(res.is_err());

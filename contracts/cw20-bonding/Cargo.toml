@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 backtraces = ["cosmwasm-std/backtraces"]
-# use library feature to disable all init/handle/query exports
+# use library feature to disable all instantiate/execute/query exports
 library = []
 
 [dependencies]
@@ -25,7 +25,7 @@ cw2 = { path = "../../packages/cw2", version = "0.5.0" }
 cw20 = { path = "../../packages/cw20", version = "0.5.0" }
 cw20-base = { path = "../../contracts/cw20-base", version = "0.5.0", features = ["library"] }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.5.0" }
-cosmwasm-std = { version = "0.14.0-alpha2", features = ["staking"] }
+cosmwasm-std = { version = "0.14.0-beta1", features = ["staking"] }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
@@ -34,4 +34,4 @@ integer-sqrt = { version = "0.1.5" }
 integer-cbrt = { version = "0.1" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.14.0-alpha2" }
+cosmwasm-schema = { version = "0.14.0-beta1" }

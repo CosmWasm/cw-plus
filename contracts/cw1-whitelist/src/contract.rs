@@ -9,14 +9,19 @@ use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{AdminListResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{AdminListResponse, HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{AdminList, ADMIN_LIST};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InitMsg) -> StdResult<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = AdminList {
         admins: map_canonical(deps.api, &msg.admins)?,
@@ -146,7 +151,7 @@ mod tests {
     use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
 
     #[test]
-    fn init_and_modify_config() {
+    fn instantiate_and_modify_config() {
         let mut deps = mock_dependencies(&[]);
 
         let alice = HumanAddr::from("alice");
@@ -155,13 +160,13 @@ mod tests {
 
         let anyone = HumanAddr::from("anyone");
 
-        // init the contract
-        let init_msg = InitMsg {
+        // instantiate the contract
+        let instantiate_msg = InstantiateMsg {
             admins: vec![alice.clone(), bob.clone(), carl.clone()],
             mutable: true,
         };
         let info = mock_info(&anyone, &[]);
-        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
@@ -232,13 +237,13 @@ mod tests {
         let bob = HumanAddr::from("bob");
         let carl = HumanAddr::from("carl");
 
-        // init the contract
-        let init_msg = InitMsg {
+        // instantiate the contract
+        let instantiate_msg = InstantiateMsg {
             admins: vec![alice.clone(), carl.clone()],
             mutable: false,
         };
         let info = mock_info(&bob, &[]);
-        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
         let msgs = vec![
@@ -282,13 +287,13 @@ mod tests {
 
         let anyone = HumanAddr::from("anyone");
 
-        // init the contract
-        let init_msg = InitMsg {
+        // instantiate the contract
+        let instantiate_msg = InstantiateMsg {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
         };
         let info = mock_info(&anyone, &[]);
-        init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {

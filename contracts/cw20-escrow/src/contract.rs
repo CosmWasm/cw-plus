@@ -8,7 +8,7 @@ use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
-    CreateMsg, DetailsResponse, HandleMsg, InitMsg, ListResponse, QueryMsg, ReceiveMsg,
+    CreateMsg, DetailsResponse, HandleMsg, InstantiateMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
 use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
 
@@ -16,7 +16,12 @@ use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
 const CONTRACT_NAME: &str = "crates.io:cw20-escrow";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn init(deps: DepsMut, _env: Env, _info: MessageInfo, _msg: InitMsg) -> StdResult<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _msg: InstantiateMsg,
+) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // no setup
     Ok(Response::default())
@@ -295,10 +300,10 @@ mod tests {
     fn happy_path_native() {
         let mut deps = mock_dependencies(&[]);
 
-        // init an empty contract
-        let init_msg = InitMsg {};
+        // instantiate an empty contract
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info(&HumanAddr::from("anyone"), &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // create an escrow
@@ -363,10 +368,10 @@ mod tests {
     fn happy_path_cw20() {
         let mut deps = mock_dependencies(&[]);
 
-        // init an empty contract
-        let init_msg = InitMsg {};
+        // instantiate an empty contract
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info(&HumanAddr::from("anyone"), &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // create an escrow
@@ -489,10 +494,10 @@ mod tests {
     fn top_up_mixed_tokens() {
         let mut deps = mock_dependencies(&[]);
 
-        // init an empty contract
-        let init_msg = InitMsg {};
+        // instantiate an empty contract
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info(&HumanAddr::from("anyone"), &[]);
-        let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // only accept these tokens

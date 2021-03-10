@@ -7,7 +7,7 @@ use cw20::Denom;
 pub use cw_controllers::ClaimsResponse;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// denom of the token to stake
     pub denom: Denom,
     pub tokens_per_weight: Uint128,
