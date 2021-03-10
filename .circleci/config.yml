@@ -53,7 +53,8 @@ jobs:
             - cargocache-cw1-subkeys-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -88,7 +89,8 @@ jobs:
             - cargocache-cw1-whitelist-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -126,7 +128,8 @@ jobs:
           command: rustup target add wasm32-unknown-unknown
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -161,7 +164,8 @@ jobs:
             - cargocache-cw3-fixed-multisig-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -196,7 +200,8 @@ jobs:
             - cargocache-cw3-flex-multisig-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -231,7 +236,8 @@ jobs:
             - cargocache-cw4-group-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -266,7 +272,8 @@ jobs:
             - cargocache-cw4-stake-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -301,7 +308,8 @@ jobs:
             - cargocache-cw20-base-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -336,7 +344,8 @@ jobs:
             - cargocache-cw20-bonding-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -371,7 +380,8 @@ jobs:
             - cargocache-cw20-escrow-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -406,7 +416,8 @@ jobs:
             - cargocache-cw20-ics20-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -441,7 +452,8 @@ jobs:
             - cargocache-cw20-staking-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
@@ -476,7 +488,8 @@ jobs:
             - cargocache-cw721-base-rust:1.50.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Unit Tests
-          env: RUST_BACKTRACE=1
+          environment:
+            RUST_BACKTRACE: 1
           command: cargo unit-test --locked
       - run:
           name: Build and run schema generator
