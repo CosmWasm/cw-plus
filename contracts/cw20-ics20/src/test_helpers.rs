@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::contract::init;
+use crate::contract::instantiate;
 use crate::ibc::{ibc_channel_connect, ibc_channel_open, ICS20_ORDERING, ICS20_VERSION};
 use crate::state::ChannelInfo;
 
@@ -44,7 +44,7 @@ pub fn mock_channel_info(channel_id: &str) -> ChannelInfo {
     }
 }
 
-// we simulate init and ack here
+// we simulate instantiate and ack here
 pub fn add_channel(mut deps: DepsMut, channel_id: &str) {
     let mut channel = mock_channel(channel_id);
     ibc_channel_open(deps.branch(), mock_env(), channel.clone()).unwrap();
@@ -55,12 +55,12 @@ pub fn add_channel(mut deps: DepsMut, channel_id: &str) {
 pub fn setup(channels: &[&str]) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
     let mut deps = mock_dependencies(&[]);
 
-    // init an empty contract
-    let init_msg = InitMsg {
+    // instantiate an empty contract
+    let instantiate_msg = InitMsg {
         default_timeout: DEFAULT_TIMEOUT,
     };
     let info = mock_info(&HumanAddr::from("anyone"), &[]);
-    let res = init(deps.as_mut(), mock_env(), info, init_msg).unwrap();
+    let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
     assert_eq!(0, res.messages.len());
 
     for channel in channels {
