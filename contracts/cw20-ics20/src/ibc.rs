@@ -22,14 +22,33 @@ pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
 /// This is compatible with the JSON serialization
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Ics20Packet {
-    // the token denomination to be transferred
+    /// amount of tokens to transfer is encoded as a string, but limited to u64 max
+    pub amount: Uint128,
+    /// the token denomination to be transferred
     pub denom: String,
-    // TODO: is this encoded as a string? check real ics20 packets
-    pub amount: u64,
-    // the sender address
-    pub sender: String,
-    // the recipient address on the destination chain
+    /// the recipient address on the destination chain
     pub receiver: String,
+    /// the sender address
+    pub sender: String,
+}
+
+impl Ics20Packet {
+    pub fn new<T: Into<String>>(amount: Uint128, denom: T, sender: &str, receiver: &str) -> Self {
+        Ics20Packet {
+            denom: denom.into(),
+            amount,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), ContractError> {
+        if self.amount.u128() > (u64::MAX as u128) {
+            Err(ContractError::AmountOverflow {})
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// This is a generic ICS acknowledgement format.
@@ -132,7 +151,7 @@ pub fn ibc_packet_receive(
                 attr("sender", &msg.sender),
                 attr("receiver", &msg.receiver),
                 attr("denom", &msg.denom),
-                attr("amount", &msg.amount),
+                attr("amount", msg.amount),
                 attr("success", "true"),
             ];
             let to_send = Amount::from_parts(msg.denom, msg.amount.into());
@@ -163,7 +182,7 @@ fn do_ibc_packet_receive(deps: DepsMut, packet: IbcPacket) -> Result<Ics20Packet
     let msg: Ics20Packet = from_binary(&packet.data)?;
     let channel = packet.dest.channel_id;
     let denom = msg.denom.clone();
-    let amount = Uint128::from(msg.amount);
+    let amount = msg.amount;
     CHANNEL_STATE.update(
         deps.storage,
         (&channel, &denom),
@@ -213,13 +232,13 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         attr("sender", &msg.sender),
         attr("receiver", &msg.receiver),
         attr("denom", &msg.denom),
-        attr("amount", &msg.amount),
+        attr("amount", msg.amount),
         attr("success", "true"),
     ];
 
     let channel = packet.src.channel_id;
     let denom = msg.denom;
-    let amount = Uint128::from(msg.amount);
+    let amount = msg.amount;
     CHANNEL_STATE.update(deps.storage, (&channel, &denom), |orig| -> StdResult<_> {
         let mut state = orig.unwrap_or_default();
         state.outstanding += amount;
@@ -291,6 +310,33 @@ mod test {
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_std::{coins, to_vec, IbcEndpoint};
 
+    #[test]
+    fn check_ack_json() {
+        let success = Ics20Ack::Result(b"1".into());
+        let fail = Ics20Ack::Error("bad coin".into());
+
+        let success_json = String::from_utf8(to_vec(&success).unwrap()).unwrap();
+        assert_eq!(r#"{"result":"MQ=="}"#, success_json.as_str());
+
+        let fail_json = String::from_utf8(to_vec(&fail).unwrap()).unwrap();
+        assert_eq!(r#"{"error":"bad coin"}"#, fail_json.as_str());
+    }
+
+    #[test]
+    fn check_packet_json() {
+        let packet = Ics20Packet::new(
+            Uint128(12345),
+            "ucosm",
+            "cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n",
+            "wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc",
+        );
+        // Example message generated from the SDK
+        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n"}"#;
+
+        let encdoded = String::from_utf8(to_vec(&packet).unwrap()).unwrap();
+        assert_eq!(expected, encdoded.as_str());
+    }
+
     fn cw20_payment(amount: u128, address: &str, recipient: &str) -> CosmosMsg {
         let msg = Cw20HandleMsg::Transfer {
             recipient: recipient.into(),
@@ -313,10 +359,10 @@ mod test {
         .into()
     }
 
-    fn mock_sent_packet(my_channel: &str, amount: u64, denom: &str, sender: &str) -> IbcPacket {
+    fn mock_sent_packet(my_channel: &str, amount: u128, denom: &str, sender: &str) -> IbcPacket {
         let data = Ics20Packet {
             denom: denom.into(),
-            amount,
+            amount: amount.into(),
             sender: sender.to_string(),
             receiver: "remote-rcpt".to_string(),
         };
@@ -337,13 +383,13 @@ mod test {
     }
     fn mock_receive_packet(
         my_channel: &str,
-        amount: u64,
+        amount: u128,
         denom: &str,
         receiver: &str,
     ) -> IbcPacket {
         let data = Ics20Packet {
             denom: denom.into(),
-            amount,
+            amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
         };
@@ -361,18 +407,6 @@ mod test {
             timeout_block: None,
             timeout_timestamp: Some(1665321069000000000u64),
         }
-    }
-
-    #[test]
-    fn check_ack_json() {
-        let success = Ics20Ack::Result(b"1".into());
-        let fail = Ics20Ack::Error("bad coin".into());
-
-        let success_json = String::from_utf8(to_vec(&success).unwrap()).unwrap();
-        assert_eq!(r#"{"result":"MQ=="}"#, success_json.as_str());
-
-        let fail_json = String::from_utf8(to_vec(&fail).unwrap()).unwrap();
-        assert_eq!(r#"{"error":"bad coin"}"#, fail_json.as_str());
     }
 
     #[test]

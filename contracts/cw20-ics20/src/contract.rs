@@ -94,12 +94,13 @@ pub fn execute_transfer(
     let timeout = (env.block.time + timeout_delta) * 1_000_000_000;
 
     // build ics20 packet
-    let packet = Ics20Packet {
-        denom: amount.denom(),
-        amount: amount.u64_amount()?,
-        sender: sender.into(),
-        receiver: msg.remote_address,
-    };
+    let packet = Ics20Packet::new(
+        amount.amount(),
+        amount.denom(),
+        &sender,
+        &msg.remote_address,
+    );
+    packet.validate()?;
 
     // prepare message
     let msg = IbcMsg::SendPacket {
@@ -257,7 +258,7 @@ mod test {
             );
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
-            assert_eq!(msg.amount, 1234567u64);
+            assert_eq!(msg.amount, Uint128(1234567));
             assert_eq!(msg.denom.as_str(), "ucosm");
             assert_eq!(msg.sender.as_str(), "foobar");
             assert_eq!(msg.receiver.as_str(), "foreign-address");
@@ -326,7 +327,7 @@ mod test {
             );
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
-            assert_eq!(msg.amount, 888777666u64);
+            assert_eq!(msg.amount, Uint128(888777666));
             assert_eq!(msg.denom, format!("cw20:{}", cw20_addr));
             assert_eq!(msg.sender.as_str(), "my-account");
             assert_eq!(msg.receiver.as_str(), "foreign-address");

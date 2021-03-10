@@ -47,13 +47,16 @@ impl Amount {
         }
     }
 
-    /// convert the amount into u64
-    pub fn u64_amount(&self) -> Result<u64, ContractError> {
-        let value = match self {
+    pub fn amount(&self) -> Uint128 {
+        match self {
             Amount::Native(c) => c.amount,
             Amount::Cw20(c) => c.amount,
-        };
-        Ok(value.u128().try_into()?)
+        }
+    }
+
+    /// convert the amount into u64
+    pub fn u64_amount(&self) -> Result<u64, ContractError> {
+        Ok(self.amount().u128().try_into()?)
     }
 
     pub fn is_empty(&self) -> bool {
