@@ -350,7 +350,6 @@ mod test {
         exec.into()
     }
 
-    #[allow(dead_code)]
     fn native_payment(amount: u128, denom: &str, recipient: &str) -> CosmosMsg {
         BankMsg::Send {
             to_address: recipient.into(),
@@ -463,5 +462,59 @@ mod test {
         let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
         assert_eq!(state.balances, vec![Amount::cw20(111111111, cw20_addr)]);
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
+    }
+
+    #[test]
+    fn send_receive_native() {
+        let send_channel = "channel-9";
+        let mut deps = setup(&["channel-1", "channel-7", send_channel]);
+
+        let denom = "uatom";
+
+        // prepare some mock packets
+        let sent_packet = mock_sent_packet(send_channel, 987654321, denom, "local-sender");
+        let recv_packet = mock_receive_packet(send_channel, 876543210, denom, "local-rcpt");
+        let recv_high_packet = mock_receive_packet(send_channel, 1876543210, denom, "local-rcpt");
+
+        // cannot receive this denom yet
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap();
+        assert!(res.messages.is_empty());
+        let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
+        let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
+        assert_eq!(ack, no_funds);
+
+        // we get a success cache (ack) for a send
+        let ack = IbcAcknowledgement {
+            acknowledgement: ack_success(),
+            original_packet: sent_packet.clone(),
+        };
+        let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // query channel state|_|
+        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        assert_eq!(state.balances, vec![Amount::native(987654321, denom)]);
+        assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
+
+        // cannot receive more than we sent
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap();
+        assert!(res.messages.is_empty());
+        let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
+        assert_eq!(ack, no_funds);
+
+        // we can receive less than we sent
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet).unwrap();
+        assert_eq!(1, res.messages.len());
+        assert_eq!(
+            native_payment(876543210, denom, "local-rcpt"),
+            res.messages[0]
+        );
+        let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
+        matches!(ack, Ics20Ack::Result(_));
+
+        // query channel state
+        let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
+        assert_eq!(state.balances, vec![Amount::native(111111111, denom)]);
+        assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
     }
 }
