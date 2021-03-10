@@ -154,7 +154,7 @@ pub fn ibc_packet_receive(
                 attr("amount", msg.amount),
                 attr("success", "true"),
             ];
-            let to_send = Amount::from_parts(msg.denom, msg.amount.into());
+            let to_send = Amount::from_parts(msg.denom, msg.amount);
             let msg = send_amount(to_send, HumanAddr::from(msg.receiver));
             IbcReceiveResponse {
                 acknowledgement: ack_success(),
@@ -270,7 +270,7 @@ fn on_packet_failure(
         attr("error", err),
     ];
 
-    let amount = Amount::from_parts(msg.denom, msg.amount.into());
+    let amount = Amount::from_parts(msg.denom, msg.amount);
     let msg = send_amount(amount, HumanAddr::from(msg.sender));
     let res = IbcBasicResponse {
         messages: vec![msg],
