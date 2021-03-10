@@ -1,0 +1,226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cw1155HandleMsg",
+  "anyOf": [
+    {
+      "description": "TransferFrom is a base message to move tokens if `env.sender` has sufficient pre-approval.",
+      "type": "object",
+      "required": [
+        "transfer_from"
+      ],
+      "properties": {
+        "transfer_from": {
+          "type": "object",
+          "required": [
+            "token_id",
+            "value"
+          ],
+          "properties": {
+            "from": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "SendFrom is a base message to move tokens to contract if `env.sender` has sufficient pre-approval.",
+      "type": "object",
+      "required": [
+        "send_from"
+      ],
+      "properties": {
+        "send_from": {
+          "type": "object",
+          "required": [
+            "contract",
+            "token_id",
+            "value"
+          ],
+          "properties": {
+            "contract": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "from": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "msg": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "BatchTransferFrom is a base message to move tokens to another account without triggering actions",
+      "type": "object",
+      "required": [
+        "batch_transfer_from"
+      ],
+      "properties": {
+        "batch_transfer_from": {
+          "type": "object",
+          "required": [
+            "batch",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "batch": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ],
+                "maxItems": 2,
+                "minItems": 2
+              }
+            },
+            "from": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "to": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "BatchSendFrom is a base message to move tokens to another to without triggering actions",
+      "type": "object",
+      "required": [
+        "batch_send_from"
+      ],
+      "properties": {
+        "batch_send_from": {
+          "type": "object",
+          "required": [
+            "batch",
+            "contract",
+            "from"
+          ],
+          "properties": {
+            "batch": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ],
+                "maxItems": 2,
+                "minItems": 2
+              }
+            },
+            "contract": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "from": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "msg": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Enable or disable approval for a third party (\"operator\") to manage all of the caller's tokens.",
+      "type": "object",
+      "required": [
+        "set_approval_for_all"
+      ],
+      "properties": {
+        "set_approval_for_all": {
+          "type": "object",
+          "required": [
+            "approved",
+            "operator"
+          ],
+          "properties": {
+            "approved": {
+              "type": "boolean"
+            },
+            "operator": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}
