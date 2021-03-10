@@ -11,7 +11,7 @@ work properly if I am migrating from a `cw20-base` contract. But how
 can the new contract know what format the data was stored.
 
 This is where CW2 comes in. It specifies on special Singleton to
-be stored on disk by all contracts on `init`. When the `migrate`
+be stored on disk by all contracts on `instantiate`. When the `migrate`
 function is called, then the new contract can read that data and
 see if this is an expected contract we can migrate from. And also
 contain extra version information if we support multiple migrate

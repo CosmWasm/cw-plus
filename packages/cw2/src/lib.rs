@@ -25,7 +25,7 @@ pub fn get_contract_version(store: &dyn Storage) -> StdResult<ContractVersion> {
     CONTRACT.load(store)
 }
 
-/// set_contract_version should be used in init to store the original version, and after a successful
+/// set_contract_version should be used in instantiate to store the original version, and after a successful
 /// migrate to update it
 pub fn set_contract_version<T: Into<String>, U: Into<String>>(
     store: &mut dyn Storage,

@@ -18,10 +18,10 @@ charged the instantiation overhead for each contract.
 
 ## Messages
 
-We define an `InitMsg{admin, members}` to make it easy to set up a group
+We define an `InstantiateMsg{admin, members}` to make it easy to set up a group
 as part of another flow. Implementations should work with this setup,
 but may add extra `Option<T>` fields for non-essential extensions to
-configure in the `init` phase.
+configure in the `instantiate` phase.
 
 There are three messages supported by a group contract:
 
@@ -40,7 +40,7 @@ Only the `admin` may execute any of these function. Thus, by omitting an
 If we include one, it may often be desired to be a `cw3` contract that
 uses this group contract as a group. This leads to a bit of chicken-and-egg
 problem, but we cover how to instantiate that in 
-[`cw3-flexible-multisig`](../../contracts/cw3-flexible-multisig/README.md#init).
+[`cw3-flexible-multisig`](../../contracts/cw3-flexible-multisig/README.md#instantiation).
 
 ## Queries
 
