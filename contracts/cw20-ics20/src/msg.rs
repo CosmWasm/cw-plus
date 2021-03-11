@@ -8,11 +8,14 @@ use cw20::Cw20ReceiveMsg;
 use crate::amount::Amount;
 use crate::state::ChannelInfo;
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct InitMsg {
     /// default timeout for ics20 packets, specified in seconds
     pub default_timeout: u64,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+pub struct MigrateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
