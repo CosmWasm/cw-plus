@@ -1,6 +1,6 @@
 [package]
 name = "cw2"
-version = "0.5.0"
+version = "0.6.0-alpha1"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Definition and types for the CosmWasm-2 interface"
@@ -11,6 +11,6 @@ documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
 cosmwasm-std = { version = "0.14.0-beta1" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.5.0" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.0-alpha1" }
 schemars = "0.7"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
