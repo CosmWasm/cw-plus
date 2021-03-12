@@ -37,6 +37,18 @@ pub enum ContractError {
 
     #[error("Insufficient funds to redeem voucher on channel")]
     InsufficientFunds {},
+
+    #[error("Only accepts tokens that originate on this chain, not native tokens of remote chain")]
+    NoForeignTokens {},
+
+    #[error("Parsed port from denom ({port}) doesn't match packet")]
+    FromOtherPort { port: String },
+
+    #[error("Parsed channel from denom ({channel}) doesn't match packet")]
+    FromOtherChannel { channel: String },
+
+    #[error("Cannot migrate from different contract type: {previous_contract}")]
+    CannotMigrate { previous_contract: String },
 }
 
 impl From<FromUtf8Error> for ContractError {

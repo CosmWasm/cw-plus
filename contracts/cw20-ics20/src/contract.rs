@@ -3,14 +3,15 @@ use cosmwasm_std::{
     IbcQuery, MessageInfo, Order, PortIdResponse, Response, StdResult,
 };
 
-use cw2::set_contract_version;
+use cw2::{get_contract_version, set_contract_version};
 use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
 
 use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
 use crate::msg::{
-    ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, PortResponse, QueryMsg, TransferMsg,
+    ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg,
+    TransferMsg,
 };
 use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 use cw0::{nonpayable, one_coin};
@@ -128,6 +129,17 @@ pub fn execute_transfer(
         data: None,
     };
     Ok(res)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    let version = get_contract_version(deps.storage)?;
+    if version.contract != CONTRACT_NAME {
+        return Err(ContractError::CannotMigrate {
+            previous_contract: version.contract,
+        });
+    }
+    Ok(Response::default())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

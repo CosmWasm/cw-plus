@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, DepsMut, Env, HumanAddr,
-    IbcAcknowledgement, IbcBasicResponse, IbcChannel, IbcOrder, IbcPacket, IbcReceiveResponse,
-    StdResult, Uint128, WasmMsg,
+    IbcAcknowledgement, IbcBasicResponse, IbcChannel, IbcEndpoint, IbcOrder, IbcPacket,
+    IbcReceiveResponse, StdResult, Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
@@ -142,19 +142,23 @@ pub fn ibc_packet_receive(
     _env: Env,
     packet: IbcPacket,
 ) -> Result<IbcReceiveResponse, Never> {
-    let res = match do_ibc_packet_receive(deps, packet) {
+    let res = match do_ibc_packet_receive(deps, &packet) {
         Ok(msg) => {
             // build attributes first so we don't have to clone msg below
             // similar event messages like ibctransfer module
+
+            // This cannot fail as we parse it in do_ibc_packet_receive. Best to pass the data somehow?
+            let denom = parse_voucher_denom(&msg.denom, &packet.src).unwrap();
+
             let attributes = vec![
                 attr("action", "receive"),
                 attr("sender", &msg.sender),
                 attr("receiver", &msg.receiver),
-                attr("denom", &msg.denom),
+                attr("denom", denom),
                 attr("amount", msg.amount),
                 attr("success", "true"),
             ];
-            let to_send = Amount::from_parts(msg.denom, msg.amount);
+            let to_send = Amount::from_parts(denom.into(), msg.amount);
             let msg = send_amount(to_send, HumanAddr::from(msg.receiver));
             IbcReceiveResponse {
                 acknowledgement: ack_success(),
@@ -179,15 +183,44 @@ pub fn ibc_packet_receive(
     Ok(res)
 }
 
+// Returns local denom if the denom is an encoded voucher from the expected endpoint
+// Otherwise, error
+fn parse_voucher_denom<'a>(
+    voucher_denom: &'a str,
+    remote_endpoint: &IbcEndpoint,
+) -> Result<&'a str, ContractError> {
+    let split_denom: Vec<&str> = voucher_denom.splitn(3, '/').collect();
+    if split_denom.len() != 3 {
+        return Err(ContractError::NoForeignTokens {});
+    }
+    // a few more sanity checks
+    if split_denom[0] != remote_endpoint.port_id {
+        return Err(ContractError::FromOtherPort {
+            port: split_denom[0].into(),
+        });
+    }
+    if split_denom[1] != remote_endpoint.channel_id {
+        return Err(ContractError::FromOtherChannel {
+            channel: split_denom[1].into(),
+        });
+    }
+
+    Ok(split_denom[2])
+}
+
 // this does the work of ibc_packet_receive, we wrap it to turn errors into acknowledgements
-fn do_ibc_packet_receive(deps: DepsMut, packet: IbcPacket) -> Result<Ics20Packet, ContractError> {
+fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packet, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
-    let channel = packet.dest.channel_id;
-    let denom = msg.denom.clone();
+    let channel = packet.dest.channel_id.clone();
+
+    // If the token originated on the remote chain, it looks like "ucosm".
+    // If it originated on our chain, it looks like "port/channel/ucosm".
+    let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
+
     let amount = msg.amount;
     CHANNEL_STATE.update(
         deps.storage,
-        (&channel, &denom),
+        (&channel, denom),
         |orig| -> Result<_, ContractError> {
             // this will return error if we don't have the funds there to cover the request (or no denom registered)
             let mut cur = orig.ok_or(ContractError::InsufficientFunds {})?;
@@ -391,11 +424,13 @@ mod test {
         receiver: &str,
     ) -> IbcPacket {
         let data = Ics20Packet {
-            denom: denom.into(),
+            // this is returning a foreign (our) token, thus denom is <port>/<channel>/<denom>
+            denom: format!("{}/{}/{}", REMOTE_PORT, "channel-1234", denom),
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
         };
+        print!("Packet denom: {}", &data.denom);
         IbcPacket {
             data: to_binary(&data).unwrap(),
             src: IbcEndpoint {
