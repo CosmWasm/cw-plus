@@ -41,23 +41,14 @@ pub fn execute(
             to,
             token_id,
             value,
-        } => execute_transfer_from(deps, env, info, from, to, token_id, value, None),
+        } => execute_transfer_from(deps, info, from, to, token_id, value, None),
         Cw1155HandleMsg::SendFrom {
             from,
             contract,
             token_id,
             value,
             msg,
-        } => execute_transfer_from(
-            deps,
-            env,
-            info,
-            from,
-            Some(contract),
-            token_id,
-            value,
-            Some(msg),
-        ),
+        } => execute_transfer_from(deps, info, from, Some(contract), token_id, value, Some(msg)),
         Cw1155HandleMsg::BatchTransferFrom { from, to, batch } => {
             execute_batch_transfer_from(deps, env, info, from, to, batch, None)
         }
@@ -75,7 +66,6 @@ pub fn execute(
 
 fn execute_transfer_from_inner(
     deps: &mut DepsMut,
-    _env: &Env,
     info: &MessageInfo,
     from: Option<HumanAddr>,
     to: Option<HumanAddr>,
@@ -134,7 +124,6 @@ fn execute_transfer_from_inner(
 
 pub fn execute_transfer_from(
     mut deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     from: Option<HumanAddr>,
     to: Option<HumanAddr>,
@@ -166,12 +155,12 @@ pub fn execute_transfer_from(
         }
     }
 
-    execute_transfer_from_inner(&mut deps, &env, &info, from, to, token_id, amount, msg)
+    execute_transfer_from_inner(&mut deps, &info, from, to, token_id, amount, msg)
 }
 
 pub fn execute_batch_transfer_from(
     mut deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     from: HumanAddr,
     to: HumanAddr,
@@ -191,7 +180,6 @@ pub fn execute_batch_transfer_from(
     for (token_id, amount) in batch.into_iter() {
         let sub_rsp = execute_transfer_from_inner(
             &mut deps,
-            &env,
             &info,
             Some(from.clone()),
             Some(to.clone()),
