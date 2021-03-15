@@ -264,3 +264,145 @@ pub fn query(deps: Deps, _env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+
+    use super::*;
+
+    #[test]
+    fn mint_approve_and_transfer() {
+        let token = "token1".to_owned();
+        let minter: HumanAddr = "minter".into();
+        let user1: HumanAddr = "user1".into();
+        let user2: HumanAddr = "user2".into();
+
+        let mut deps = mock_dependencies(&[]);
+        let msg = InitMsg {
+            minter: minter.clone(),
+        };
+        let res = instantiate(deps.as_mut(), mock_env(), mock_info("operator", &[]), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // mint
+        let rsp = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(minter.clone(), &[]),
+            Cw1155HandleMsg::TransferFrom {
+                from: None,
+                to: Some(user1.clone()),
+                token_id: token.clone(),
+                value: 1u64.into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            rsp,
+            Response {
+                attributes: vec![
+                    attr("action", "transfer"),
+                    attr("token_id", &token),
+                    attr("amount", 1u64),
+                    attr("to", &user1),
+                ],
+                ..Response::default()
+            }
+        );
+
+        // query balance
+        assert_eq!(
+            to_binary(&BalanceResponse {
+                balance: 1u64.into()
+            }),
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::Balance {
+                    owner: user1.clone(),
+                    token_id: token.clone(),
+                }
+            ),
+        );
+
+        let transfer_msg = Cw1155HandleMsg::TransferFrom {
+            from: Some(user1.clone()),
+            to: Some(user2.clone()),
+            token_id: token.clone(),
+            value: 1u64.into(),
+        };
+
+        // not approved yet
+        assert!(matches!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                transfer_msg.clone(),
+            ),
+            Err(ContractError::Unauthorized {})
+        ));
+
+        // approve
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(user1.clone(), &[]),
+            Cw1155HandleMsg::SetApprovalForAll {
+                operator: minter.clone(),
+                approved: true,
+            },
+        )
+        .unwrap();
+
+        // transfer
+        assert_eq!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                transfer_msg.clone(),
+            )
+            .unwrap(),
+            Response {
+                attributes: vec![
+                    attr("action", "transfer"),
+                    attr("token_id", &token),
+                    attr("amount", 1u64),
+                    attr("from", &user1),
+                    attr("to", &user2),
+                ],
+                ..Response::default()
+            }
+        );
+
+        // query balance
+        assert_eq!(
+            to_binary(&BalanceResponse {
+                balance: 1u64.into()
+            }),
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::Balance {
+                    owner: user2.clone(),
+                    token_id: token.clone(),
+                }
+            ),
+        );
+        assert_eq!(
+            to_binary(&BalanceResponse {
+                balance: 0u64.into()
+            }),
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::Balance {
+                    owner: user1.clone(),
+                    token_id: token.clone(),
+                }
+            ),
+        )
+    }
+}
