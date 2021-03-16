@@ -261,10 +261,12 @@ mod tests {
 
     #[test]
     fn mint_approve_and_transfer() {
-        let token = "token1".to_owned();
+        let token1 = "token1".to_owned();
+        let token2 = "token2".to_owned();
         let minter: HumanAddr = "minter".into();
         let user1: HumanAddr = "user1".into();
         let user2: HumanAddr = "user2".into();
+        let receiver: HumanAddr = "receive_contract".into();
 
         let mut deps = mock_dependencies(&[]);
         let msg = InitMsg {
@@ -273,25 +275,36 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), mock_info("operator", &[]), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // mint
-        let rsp = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info(minter.clone(), &[]),
-            Cw1155HandleMsg::TransferFrom {
-                from: None,
-                to: Some(user1.clone()),
-                token_id: token.clone(),
-                value: 1u64.into(),
-            },
-        )
-        .unwrap();
+        // invalid mint
+        let mint_msg = Cw1155HandleMsg::TransferFrom {
+            from: None,
+            to: Some(user1.clone()),
+            token_id: token1.clone(),
+            value: 1u64.into(),
+        };
+        assert!(matches!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(user1.clone(), &[]),
+                mint_msg.clone(),
+            ),
+            Err(ContractError::Unauthorized {})
+        ));
+
+        // valid mint
         assert_eq!(
-            rsp,
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                mint_msg,
+            )
+            .unwrap(),
             Response {
                 attributes: vec![
                     attr("action", "transfer"),
-                    attr("token_id", &token),
+                    attr("token_id", &token1),
                     attr("amount", 1u64),
                     attr("to", &user1),
                 ],
@@ -309,7 +322,7 @@ mod tests {
                 mock_env(),
                 Cw1155QueryMsg::Balance {
                     owner: user1.clone(),
-                    token_id: token.clone(),
+                    token_id: token1.clone(),
                 }
             ),
         );
@@ -317,7 +330,7 @@ mod tests {
         let transfer_msg = Cw1155HandleMsg::TransferFrom {
             from: Some(user1.clone()),
             to: Some(user2.clone()),
-            token_id: token.clone(),
+            token_id: token1.clone(),
             value: 1u64.into(),
         };
 
@@ -356,7 +369,7 @@ mod tests {
             Response {
                 attributes: vec![
                     attr("action", "transfer"),
-                    attr("token_id", &token),
+                    attr("token_id", &token1),
                     attr("amount", 1u64),
                     attr("from", &user1),
                     attr("to", &user2),
@@ -367,30 +380,235 @@ mod tests {
 
         // query balance
         assert_eq!(
-            to_binary(&BalanceResponse {
-                balance: 1u64.into()
-            }),
             query(
                 deps.as_ref(),
                 mock_env(),
                 Cw1155QueryMsg::Balance {
                     owner: user2.clone(),
-                    token_id: token.clone(),
+                    token_id: token1.clone(),
                 }
             ),
+            to_binary(&BalanceResponse {
+                balance: 1u64.into()
+            }),
         );
         assert_eq!(
-            to_binary(&BalanceResponse {
-                balance: 0u64.into()
-            }),
             query(
                 deps.as_ref(),
                 mock_env(),
                 Cw1155QueryMsg::Balance {
                     owner: user1.clone(),
-                    token_id: token.clone(),
+                    token_id: token1.clone(),
                 }
             ),
+            to_binary(&BalanceResponse {
+                balance: 0u64.into()
+            }),
+        );
+
+        // mint token2
+        assert_eq!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                Cw1155HandleMsg::TransferFrom {
+                    from: None,
+                    to: Some(user2.clone()),
+                    token_id: token2.clone(),
+                    value: 1u64.into(),
+                },
+            )
+            .unwrap(),
+            Response {
+                attributes: vec![
+                    attr("action", "transfer"),
+                    attr("token_id", &token2),
+                    attr("amount", 1u64),
+                    attr("to", &user2),
+                ],
+                ..Response::default()
+            }
+        );
+
+        // invalid batch transfer, (user2 not approved yet)
+        let batch_transfer_msg = Cw1155HandleMsg::BatchTransferFrom {
+            from: user2.clone(),
+            to: user1.clone(),
+            batch: vec![(token1.clone(), 1u64.into()), (token2.clone(), 1u64.into())],
+        };
+        assert!(matches!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                batch_transfer_msg.clone(),
+            ),
+            Err(ContractError::Unauthorized {}),
+        ));
+
+        // user2 approve
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(user2.clone(), &[]),
+            Cw1155HandleMsg::SetApprovalForAll {
+                operator: minter.clone(),
+                approved: true,
+            },
         )
+        .unwrap();
+
+        // valid batch transfer
+        assert_eq!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                batch_transfer_msg,
+            )
+            .unwrap(),
+            Response {
+                attributes: vec![
+                    attr("action", "transfer"),
+                    attr("token_id", &token1),
+                    attr("amount", 1u64),
+                    attr("from", &user2),
+                    attr("to", &user1),
+                    attr("action", "transfer"),
+                    attr("token_id", &token2),
+                    attr("amount", 1u64),
+                    attr("from", &user2),
+                    attr("to", &user1),
+                ],
+                ..Response::default()
+            },
+        );
+
+        // batch query
+        assert_eq!(
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::BatchBalance {
+                    owner: user1.clone(),
+                    token_ids: vec![token1.clone(), token2.clone()],
+                }
+            ),
+            to_binary(&BatchBalanceResponse {
+                balances: vec![1u64.into(), 1u64.into()]
+            }),
+        );
+
+        // mint to contract
+        assert_eq!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                Cw1155HandleMsg::SendFrom {
+                    from: None,
+                    contract: receiver.clone(),
+                    token_id: token1.clone(),
+                    value: 1u64.into(),
+                    msg: None,
+                },
+            )
+            .unwrap(),
+            Response {
+                messages: vec![Cw1155ReceiveMsg {
+                    operator: minter.clone(),
+                    from: None,
+                    amount: 1u64.into(),
+                    token_id: token1.clone(),
+                    msg: None,
+                }
+                .into_cosmos_msg(receiver.clone())
+                .unwrap(),],
+                attributes: vec![
+                    attr("action", "transfer"),
+                    attr("token_id", &token1),
+                    attr("amount", 1u64),
+                    attr("to", &receiver),
+                ],
+                ..Response::default()
+            }
+        );
+
+        // BatchSendFrom
+        assert_eq!(
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(minter.clone(), &[]),
+                Cw1155HandleMsg::BatchSendFrom {
+                    from: user1.clone(),
+                    contract: receiver.clone(),
+                    batch: vec![(token1.clone(), 1u64.into()), (token2.clone(), 1u64.into())],
+                    msg: None,
+                },
+            )
+            .unwrap(),
+            Response {
+                messages: vec![
+                    Cw1155ReceiveMsg {
+                        operator: minter.clone(),
+                        from: Some(user1.clone()),
+                        amount: 1u64.into(),
+                        token_id: token1.clone(),
+                        msg: None,
+                    }
+                    .into_cosmos_msg(receiver.clone())
+                    .unwrap(),
+                    Cw1155ReceiveMsg {
+                        operator: minter.clone(),
+                        from: Some(user1.clone()),
+                        amount: 1u64.into(),
+                        token_id: token2.clone(),
+                        msg: None,
+                    }
+                    .into_cosmos_msg(receiver.clone())
+                    .unwrap(),
+                ],
+                attributes: vec![
+                    attr("action", "transfer"),
+                    attr("token_id", &token1),
+                    attr("amount", 1u64),
+                    attr("from", &user1),
+                    attr("to", &receiver),
+                    attr("action", "transfer"),
+                    attr("token_id", &token2),
+                    attr("amount", 1u64),
+                    attr("from", &user1),
+                    attr("to", &receiver),
+                ],
+                ..Response::default()
+            }
+        );
+
+        // user2 dis-approve
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(user2.clone(), &[]),
+            Cw1155HandleMsg::SetApprovalForAll {
+                operator: minter.clone(),
+                approved: false,
+            },
+        )
+        .unwrap();
+
+        // query approval status
+        assert_eq!(
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::ApprovedForAll {
+                    owner: user2.clone(),
+                    spender: minter.clone(),
+                }
+            ),
+            to_binary(&ApprovedForAllResponse { approved: false }),
+        );
     }
 }
