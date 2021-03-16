@@ -7,11 +7,3 @@ pub use crate::receiver::{Cw1155BatchReceiveMsg, Cw1155ReceiveMsg};
 mod msg;
 mod query;
 mod receiver;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
