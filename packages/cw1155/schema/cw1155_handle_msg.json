@@ -3,7 +3,7 @@
   "title": "Cw1155HandleMsg",
   "anyOf": [
     {
-      "description": "TransferFrom is a base message to move tokens if `env.sender` has sufficient pre-approval.",
+      "description": "TransferFrom is a base message to move tokens, if `env.sender` has sufficient pre-approval.",
       "type": "object",
       "required": [
         "transfer_from"
@@ -104,9 +104,7 @@
         "batch_transfer_from": {
           "type": "object",
           "required": [
-            "batch",
-            "from",
-            "to"
+            "batch"
           ],
           "properties": {
             "batch": {
@@ -126,10 +124,24 @@
               }
             },
             "from": {
-              "$ref": "#/definitions/HumanAddr"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "to": {
-              "$ref": "#/definitions/HumanAddr"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }
@@ -146,8 +158,7 @@
           "type": "object",
           "required": [
             "batch",
-            "contract",
-            "from"
+            "contract"
           ],
           "properties": {
             "batch": {
@@ -170,7 +181,14 @@
               "$ref": "#/definitions/HumanAddr"
             },
             "from": {
-              "$ref": "#/definitions/HumanAddr"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "msg": {
               "anyOf": [
