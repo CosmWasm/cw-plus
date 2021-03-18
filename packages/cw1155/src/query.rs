@@ -23,9 +23,27 @@ pub enum Cw1155QueryMsg {
         owner: HumanAddr,
         spender: HumanAddr,
     },
+
+    /// With MetaData Extension.
     /// Query metadata of token
     /// Return type: TokenInfoResponse.
     TokenInfo { token_id: TokenId },
+
+    /// With Enumerable extension.
+    /// Returns all tokens owned by the given address, [] if unset.
+    /// Return type: TokensResponse.
+    Tokens {
+        owner: HumanAddr,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
+    /// With Enumerable extension.
+    /// Requires pagination. Lists all token_ids controlled by the contract.
+    /// Return type: TokensResponse.
+    AllTokens {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -47,4 +65,12 @@ pub struct ApprovedForAllResponse {
 pub struct TokenInfoResponse {
     /// Should be a url point to a json file
     pub url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct TokensResponse {
+    /// Contains all token_ids in lexicographical ordering
+    /// If there are more than `limit`, use `start_from` in future queries
+    /// to achieve pagination.
+    pub tokens: Vec<TokenId>,
 }

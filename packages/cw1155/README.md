@@ -3,6 +3,9 @@
 CW1155 is a specification for managing multiple tokens based on CosmWasm.
 The name and design is based on Ethereum's ERC1155 standard.
 
+The specification is split into multiple sections, a contract may only
+implement some of this functionality, but must implement the base.
+
 Design decisions:
 
 - Fungible tokens and non-fungible tokens are treated equally, non-fungible tokens just have one max supply.
@@ -17,11 +20,11 @@ Design decisions:
 
 ### Messages
 
-`TransferFrom{from, to, token_id, value}` - This transfers some amount of tokens between two accounts. The operator should have approval from the source account.
+`TransferFrom{from, to, token_id, value}` - This transfers some amount of tokens between two accounts. The operator should either be the `from` account or have approval from it.
 
 `SendFrom{from, to, token_id, value, msg}` - This transfers some amount of tokens between two accounts. `to` 
 must be an address controlled by a smart contract, which implements
-the `CW1155Receiver` interface. The operator should have approval from the source account. The `msg` will be passed to the recipient contract, along with the other fields.
+the `CW1155Receiver` interface. The operator should eitherbe the `from` account or have approval from it. The `msg` will be passed to the recipient contract, along with the other fields.
 
 `BatchTransferFrom{from, to, batch}` - Batched version of `TransferFrom` which can handle multiple types of tokens at once.
 
@@ -38,8 +41,6 @@ tokens and applies to any future token that the owner receives as well.
 
 `ApprovedForAll{ owner, spender }` - Query if `spender` has the permission to transfer or send tokens owned by `msg.sender`.
 
-`TokenInfo{ token_id }` - Query metadata url of `token_id`.
-
 ### Receiver
 
 Any contract wish to receive CW1155 tokens must implement `Cw1155ReceiveMsg` and `Cw1155BatchReceiveMsg`.
@@ -52,12 +53,39 @@ Any contract wish to receive CW1155 tokens must implement `Cw1155ReceiveMsg` and
 
 - `transfer(from, to, token_id, value)`
 
-  `from`/`to` are optional, no `from` attribute means minting, no `to` attribute means burning.
+  `from`/`to` are optional, no `from` attribute means minting, no `to` attribute means burning, but they mustn't be neglected at the same time.
 
-- `token_info(url, token_id)`
 
-  Metadata url of `token_id` is changed, `url` should point to a json file.
+## Metadata
 
-## Metadata and Enumerable
+### Queries
 
-[TODO] ERC1155 suggests that metadata and enumerable should be indexed from events log, to save some on-chain storage. Should we define standard events like ERC1155?
+`TokenInfo{ token_id }` - Query metadata url of `token_id`.
+
+### Events
+
+`token_info(url, token_id)`
+
+Metadata url of `token_id` is changed, `url` should point to a json file.
+
+## Enumerable
+
+### Queries
+
+Pagination is acheived via `start_after` and `limit`. Limit is a request
+set by the client, if unset, the contract will automatically set it to
+`DefaultLimit` (suggested 10). If set, it will be used up to a `MaxLimit`
+value (suggested 30). Contracts can define other `DefaultLimit` and `MaxLimit`
+values without violating the CW1155 spec, and clients should not rely on
+any particular values.
+
+If `start_after` is unset, the query returns the first results, ordered by
+lexogaphically by `token_id`. If `start_after` is set, then it returns the
+first `limit` tokens *after* the given one. This allows straight-forward 
+pagination by taking the last result returned (a `token_id`) and using it
+as the `start_after` value in a future query. 
+
+`Tokens{owner, start_after, limit}` - List all token_ids that belong to a given owner.
+Return type is `TokensResponse{tokens: Vec<token_id>}`.
+
+`AllTokens{start_after, limit}` - Requires pagination. Lists all token_ids controlled by the contract.
