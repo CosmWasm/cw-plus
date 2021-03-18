@@ -30,16 +30,20 @@ the `CW1155Receiver` interface. The operator should eitherbe the `from` account 
 
 `BatchSendFrom{from, contract, batch, msg}` - Batched version of `SendFrom` which can handle multiple types of tokens at once.
 
-`SetApprovalForAll { operator, approved }` - Grant or revoke  `operator` the permission to transfer or send all tokens owned by `msg.sender`. This approval is tied to the owner, not the
-tokens and applies to any future token that the owner receives as well.
+`ApproveAll{ operator, expires }` - Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit.
+
+`RevokeAll { operator }` - Remove previously granted ApproveAll permission
 
 ### Queries
 
 `Balance { owner, token_id }` - Query the balance of `owner` on perticular type of token, default to `0` when record not exist.
 
-`BatchBalance { owner, token_ids }` - Query the balance of `owner` on multiple types of tokens, batched version of `Balance`
+`BatchBalance { owner, token_ids }` - Query the balance of `owner` on multiple types of tokens, batched version of `Balance`.
 
-`ApprovedForAll{ owner, spender }` - Query if `spender` has the permission to transfer or send tokens owned by `msg.sender`.
+`ApprovedForAll{owner, include_expired, start_after, limit}` - List all operators that can
+access all of the owner's tokens. Return type is `ApprovedForAllResponse`.
+If `include_expired` is set, show expired owners in the results, otherwise,
+ignore them. If query for some specific operator, set `start_after` to the operator, and set limit to 1.
 
 ### Receiver
 

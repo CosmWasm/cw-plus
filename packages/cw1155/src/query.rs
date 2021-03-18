@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{HumanAddr, Uint128};
+use cw0::Expiration;
 
 use crate::msg::TokenId;
 
@@ -17,11 +18,14 @@ pub enum Cw1155QueryMsg {
         owner: HumanAddr,
         token_ids: Vec<TokenId>,
     },
-    /// Query the approval status of an operator for a given owner
+    /// List all operators that can access all of the owner's tokens.
     /// Return type: ApprovedForAllResponse.
     ApprovedForAll {
         owner: HumanAddr,
-        spender: HumanAddr,
+        /// unset or false will filter out expired approvals, you must set to true to see them
+        include_expired: Option<bool>,
+        start_after: Option<HumanAddr>,
+        limit: Option<u32>,
     },
 
     /// With MetaData Extension.
@@ -57,8 +61,16 @@ pub struct BatchBalanceResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct Approval {
+    /// Account that can transfer/send the token
+    pub spender: HumanAddr,
+    /// When the Approval expires (maybe Expiration::never)
+    pub expires: Expiration,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ApprovedForAllResponse {
-    pub approved: bool,
+    pub operators: Vec<Approval>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
