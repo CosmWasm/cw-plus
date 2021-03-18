@@ -9,7 +9,9 @@ use crate::msg::TokenId;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Cw1155ReceiveMsg {
+    /// The account that executed the send message
     pub operator: HumanAddr,
+    /// The account that the token transfered from
     pub from: Option<HumanAddr>,
     pub token_id: TokenId,
     pub amount: Uint128,
