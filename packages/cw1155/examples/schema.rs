@@ -18,4 +18,5 @@ fn main() {
     export_schema(&schema_for!(cw1155::BalanceResponse), &out_dir);
     export_schema(&schema_for!(cw1155::BatchBalanceResponse), &out_dir);
     export_schema(&schema_for!(cw1155::ApprovedForAllResponse), &out_dir);
+    export_schema(&schema_for!(cw1155::TokenInfoResponse), &out_dir);
 }

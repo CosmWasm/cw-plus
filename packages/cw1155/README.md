@@ -7,13 +7,11 @@ Design decisions:
 
 - Fungible tokens and non-fungible tokens are treated equally, non-fungible tokens just have one max supply.
 
-- Approval is set or unset to some operator over entire set of tokens. (More nuanced control is defined in [ERC1761](https://eips.ethereum.org/EIPS/eip-1761), do we want to merge them together?)
-
-- Metadata and token enumeration should be done by indexing events off-chain.
+- Approval is set or unset to some operator over entire set of tokens. (More nuanced control is defined in [ERC1761](https://eips.ethereum.org/EIPS/eip-1761), do we want to merge them together?)
 
 - Mint and burn are mixed with transfer/send messages, otherwise, we'll have much more message types, e.g. `Mint`/`MintToContract`/`BatchMint`/`BatchMintToContract`, etc.
 
-  In transfer/send messges, `from`/`to` are optional, a `None` `from` means minting, a `None` `to` means burning, they must not both be `None` at the same time.
+  In transfer/send messges, `from`/`to` are optional, a `None` `from` means minting, a `None` `to` means burning, they must not both be `None` at the same time.
 
 ## Base
 
@@ -40,6 +38,8 @@ tokens and applies to any future token that the owner receives as well.
 
 `ApprovedForAll{ owner, spender }` - Query if `spender` has the permission to transfer or send tokens owned by `msg.sender`.
 
+`TokenInfo{ token_id }` - Query metadata url of `token_id`.
+
 ### Receiver
 
 Any contract wish to receive CW1155 tokens must implement `Cw1155ReceiveMsg` and `Cw1155BatchReceiveMsg`.
@@ -54,9 +54,9 @@ Any contract wish to receive CW1155 tokens must implement `Cw1155ReceiveMsg` and
 
   `from`/`to` are optional, no `from` attribute means minting, no `to` attribute means burning.
 
-- `metadata(url, token_id)`
+- `token_info(url, token_id)`
 
-  Metadata url of `token_id` is changed, `url` should point to a json file.
+  Metadata url of `token_id` is changed, `url` should point to a json file.
 
 ## Metadata and Enumerable
 

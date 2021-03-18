@@ -1,5 +1,7 @@
-use cosmwasm_std::Attribute;
+use cosmwasm_std::Response;
 
+/// This defines a set of attributes which should be added to `Response`.
 pub trait Event {
-    fn write_attributes(&self, attributes: &mut Vec<Attribute>);
+    /// Append attributes to response
+    fn add_attributes(&self, response: &mut Response);
 }

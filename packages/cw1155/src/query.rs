@@ -17,12 +17,15 @@ pub enum Cw1155QueryMsg {
         owner: HumanAddr,
         token_ids: Vec<TokenId>,
     },
-    /// Queries the approval status of an operator for a given owner
+    /// Query the approval status of an operator for a given owner
     /// Return type: ApprovedForAllResponse.
     ApprovedForAll {
         owner: HumanAddr,
         spender: HumanAddr,
     },
+    /// Query metadata of token
+    /// Return type: TokenInfoResponse.
+    TokenInfo { token_id: TokenId },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -38,4 +41,10 @@ pub struct BatchBalanceResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ApprovedForAllResponse {
     pub approved: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct TokenInfoResponse {
+    /// Should be a url point to a json file
+    pub url: String,
 }
