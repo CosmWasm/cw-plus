@@ -13,6 +13,7 @@
       "$ref": "#/definitions/Uint128"
     },
     "from": {
+      "description": "The account that the token transfered from",
       "anyOf": [
         {
           "$ref": "#/definitions/HumanAddr"
@@ -33,7 +34,12 @@
       ]
     },
     "operator": {
-      "$ref": "#/definitions/HumanAddr"
+      "description": "The account that executed the send message",
+      "allOf": [
+        {
+          "$ref": "#/definitions/HumanAddr"
+        }
+      ]
     },
     "token_id": {
       "type": "string"

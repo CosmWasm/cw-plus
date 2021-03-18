@@ -3,7 +3,7 @@
   "title": "Cw1155HandleMsg",
   "anyOf": [
     {
-      "description": "TransferFrom is a base message to move tokens, if `env.sender` has sufficient pre-approval.",
+      "description": "TransferFrom is a base message to move tokens. if `env.sender` is the owner or has sufficient pre-approval.",
       "type": "object",
       "required": [
         "transfer_from"
@@ -47,7 +47,7 @@
       }
     },
     {
-      "description": "SendFrom is a base message to move tokens to contract if `env.sender` has sufficient pre-approval.",
+      "description": "SendFrom is a base message to move tokens to contract. if `env.sender` is the owner or has sufficient pre-approval.",
       "type": "object",
       "required": [
         "send_from"
@@ -95,7 +95,7 @@
       }
     },
     {
-      "description": "BatchTransferFrom is a base message to move tokens to another account without triggering actions",
+      "description": "BatchTransferFrom is a base message to move tokens to another account without triggering actions. if `env.sender` is the owner or has sufficient pre-approval.",
       "type": "object",
       "required": [
         "batch_transfer_from"
@@ -148,7 +148,7 @@
       }
     },
     {
-      "description": "BatchSendFrom is a base message to move tokens to another to without triggering actions",
+      "description": "BatchSendFrom is a base message to move tokens to another to without triggering actions. if `env.sender` is the owner or has sufficient pre-approval.",
       "type": "object",
       "required": [
         "batch_send_from"
@@ -205,22 +205,48 @@
       }
     },
     {
-      "description": "Enable or disable approval for a third party (\"operator\") to manage all of the caller's tokens.",
+      "description": "Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit",
       "type": "object",
       "required": [
-        "set_approval_for_all"
+        "approve_all"
       ],
       "properties": {
-        "set_approval_for_all": {
+        "approve_all": {
           "type": "object",
           "required": [
-            "approved",
             "operator"
           ],
           "properties": {
-            "approved": {
-              "type": "boolean"
+            "expires": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
+            "operator": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Remove previously granted ApproveAll permission",
+      "type": "object",
+      "required": [
+        "revoke_all"
+      ],
+      "properties": {
+        "revoke_all": {
+          "type": "object",
+          "required": [
+            "operator"
+          ],
+          "properties": {
             "operator": {
               "$ref": "#/definitions/HumanAddr"
             }
@@ -233,6 +259,51 @@
     "Binary": {
       "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
       "type": "string"
+    },
+    "Expiration": {
+      "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
     },
     "HumanAddr": {
       "type": "string"
