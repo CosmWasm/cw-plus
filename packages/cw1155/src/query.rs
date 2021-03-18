@@ -27,6 +27,12 @@ pub enum Cw1155QueryMsg {
         start_after: Option<HumanAddr>,
         limit: Option<u32>,
     },
+    /// Query approved status `owner` granted to `operator`.
+    /// Return type: ApprovedForAllItemResponse
+    ApprovedForAllItem {
+        owner: HumanAddr,
+        operator: HumanAddr,
+    },
 
     /// With MetaData Extension.
     /// Query metadata of token
@@ -71,6 +77,11 @@ pub struct Approval {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ApprovedForAllResponse {
     pub operators: Vec<Approval>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ApprovedForAllItemResponse {
+    pub approved: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

@@ -43,7 +43,9 @@ the `CW1155Receiver` interface. The operator should eitherbe the `from` account 
 `ApprovedForAll{owner, include_expired, start_after, limit}` - List all operators that can
 access all of the owner's tokens. Return type is `ApprovedForAllResponse`.
 If `include_expired` is set, show expired owners in the results, otherwise,
-ignore them. If query for some specific operator, set `start_after` to the operator, and set limit to 1.
+ignore them.
+
+`ApprovedForAllItem{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is `ApprovedForAllItemResponse`.
 
 ### Receiver
 

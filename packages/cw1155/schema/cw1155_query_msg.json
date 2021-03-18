@@ -99,6 +99,30 @@
       }
     },
     {
+      "description": "Query approved status `owner` granted to `operator`. Return type: ApprovedForAllItemResponse",
+      "type": "object",
+      "required": [
+        "approved_for_all_item"
+      ],
+      "properties": {
+        "approved_for_all_item": {
+          "type": "object",
+          "required": [
+            "operator",
+            "owner"
+          ],
+          "properties": {
+            "operator": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "With MetaData Extension. Query metadata of token Return type: TokenInfoResponse.",
       "type": "object",
       "required": [
