@@ -2,7 +2,7 @@
  * This is a set of helpers meant for use with @cosmjs/cli
  * With these you can easily use the cw20 contract without worrying about forming messages and parsing queries.
  * 
- * Usage: npx @cosmjs/cli@^0.23 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.24 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
  * 
  * Create a client:
  *   const client = await useOptions(hackatomOptions).setup(password);
@@ -13,8 +13,13 @@
  * 
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
-
-const path = require("path");
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { CosmWasmFeeTable } from "@cosmjs/cosmwasm-launchpad";
+import { makeCosmoshubPath, Secp256k1HdWallet, GasPrice, GasLimits } from "@cosmjs/launchpad";
+import { Slip10RawIndex } from "@cosmjs/crypto";
+import axios from "axios";
+import path from "path";
+import fs from "fs";
 
 interface Options {
   readonly httpUrl: string
@@ -29,25 +34,31 @@ interface Options {
 }
 
 const hackatomOptions: Options = {
-  httpUrl: 'https://lcd.heldernet.cosmwasm.com',
-  networkId: 'hackatom-wasm',
+  httpUrl: 'https://rpc.cosmwasm.hub.hackatom.org',
+  networkId: 'hackatom-ru',
   gasPrice:  GasPrice.fromString("0.025ucosm"),
-  bech32prefix: 'cosmos',
+  bech32prefix: 'wasm',
   feeToken: 'ucosm',
-  faucetUrl: 'https://faucet.heldernet.cosmwasm.com/credit',
   hdPath: makeCosmoshubPath(0),
-  defaultKeyFile: path.join(process.env.HOME, ".heldernet.key"),
-  gasLimits: {
-    upload: 1500000,
-    init: 600000,
-    register:800000,
-    transfer: 80000,
-  },
+  defaultKeyFile: path.join(process.env.HOME, ".hackatom.key"),
+  gasLimits: {}
 }
 
 interface Network {
-  setup: (password: string, filename?: string) => Promise<SigningCosmWasmClient>
+  setup: (password: string, filename?: string) => Promise<CW20Client>
   recoverMnemonic: (password: string, filename?: string) => Promise<string>
+}
+
+class CW20Client {
+  readonly wallet: Secp256k1HdWallet;
+  readonly client: SigningCosmWasmClient;
+  readonly sender: string;
+
+  public constructor(wallet: Secp256k1HdWallet, client: SigningCosmWasmClient, sender: string) {
+    this.client = client;
+    this.wallet = wallet;
+    this.sender = sender;
+  }
 }
 
 const useOptions = (options: Options): Network => {
@@ -67,24 +78,18 @@ const useOptions = (options: Options): Network => {
     const wallet = await Secp256k1HdWallet.deserialize(encrypted, password);
     return wallet;
   };
-  
+
   const connect = async (
     wallet: Secp256k1HdWallet,
     options: Options
   ): Promise<SigningCosmWasmClient> => {
     const [{ address }] = await wallet.getAccounts();
 
-    const client = new SigningCosmWasmClient(
-      options.httpUrl,
-      address,
-      wallet,
-      hackatomOptions.gasPrice,
-      hackatomOptions.gasLimits,
-    );
-    return client;
+    const clientOptions = { prefix: options.bech32prefix, gasPrice: options.gasPrice};
+    return await SigningCosmWasmClient.connectWithSigner(options.httpUrl, wallet, clientOptions);
   };
 
-  
+
   const hitFaucet = async (
     faucetUrl: string,
     address: string,
@@ -92,22 +97,21 @@ const useOptions = (options: Options): Network => {
   ): Promise<void> => {
     await axios.post(faucetUrl, { ticker, address });
   }
-  
-  const setup = async (password: string, filename?: string): Promise<SigningCosmWasmClient> => {
+
+  const setup = async (password: string, filename?: string): Promise<CW20Client> => {
     const keyfile = filename || options.defaultKeyFile;
     const wallet = await loadOrCreateWallet(hackatomOptions, keyfile, password);
     const client = await connect(wallet, hackatomOptions);
+    const account = (await wallet.getAccounts())[0].address;
 
     // ensure we have some tokens
     if (options.faucetUrl) {
-      const account = await client.getAccount();
       if (!account) {
         console.log(`Getting ${options.feeToken} from faucet`);
-        await hitFaucet(options.faucetUrl, client.senderAddress, options.feeToken);
+        await hitFaucet(options.faucetUrl, account, options.feeToken);
       }
     }
-
-    return client;
+    return new CW20Client(wallet, client, account)
   }
 
 
@@ -130,7 +134,7 @@ interface MintInfo {
   readonly cap?: string // decimal as string
 }
 
-type Expiration = {readonly at_height: number} | {readonly at_time: number} | {readonly never: {}}; 
+type Expiration = {readonly at_height: number} | {readonly at_time: number} | {readonly never: {}};
 
 interface AllowanceResponse {
   readonly allowance: string;  // integer as string
@@ -180,75 +184,75 @@ interface CW20Contract {
   // instantiates a cw20 contract
   // codeId must come from a previous deploy
   // label is the public name of the contract in listing
-  // if you set admin, you can run migrations on this contract (likely client.senderAddress)
-  instantiate: (codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string) => Promise<CW20Instance>
+  // if you set admin, you can run migrations on this contract (likely client.signerAddress)
+  instantiate: (codeId: number, initMsg: Record<string, unknown>, label: string, adminAddr?: string) => Promise<CW20Instance>
 
   use: (contractAddress: string) => CW20Instance
 }
 
 
-const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
+const CW20 = (cw20Client: CW20Client): CW20Contract => {
   const use = (contractAddress: string): CW20Instance => {
     const balance = async (account?: string): Promise<string> => {
-      const address = account || client.senderAddress;  
-      const result = await client.queryContractSmart(contractAddress, {balance: { address }});
+      const address = account || (await cw20Client.wallet.getAccounts())[0].address;
+      const result = await cw20Client.client.queryContractSmart(contractAddress, {balance: { address }});
       return result.balance;
     };
 
     const allowance = async (owner: string, spender: string): Promise<AllowanceResponse> => {
-      return client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
+      return cw20Client.client.queryContractSmart(contractAddress, {allowance: { owner, spender }});
     };
 
     const allAllowances = async (owner: string, startAfter?: string, limit?: number): Promise<AllAllowancesResponse> => {
-      return client.queryContractSmart(contractAddress, {all_allowances: { owner, start_after: startAfter, limit }});
+      return cw20Client.client.queryContractSmart(contractAddress, {all_allowances: { owner, start_after: startAfter, limit }});
     };
 
     const allAccounts = async (startAfter?: string, limit?: number): Promise<readonly string[]> => {
-      const accounts: AllAccountsResponse = await client.queryContractSmart(contractAddress, {all_accounts: { start_after: startAfter, limit }});
+      const accounts: AllAccountsResponse = await cw20Client.client.queryContractSmart(contractAddress, {all_accounts: { start_after: startAfter, limit }});
       return accounts.accounts;
     };
 
     const tokenInfo = async (): Promise<any> => {
-      return client.queryContractSmart(contractAddress, {token_info: { }});
+      return cw20Client.client.queryContractSmart(contractAddress, {token_info: { }});
     };
 
     const minter = async (): Promise<any> => {
-      return client.queryContractSmart(contractAddress, {minter: { }});
+      return cw20Client.client.queryContractSmart(contractAddress, {minter: { }});
     };
 
     // mints tokens, returns transactionHash
     const mint = async (recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(contractAddress, {mint: {recipient, amount}});
+      const result = await cw20Client.client.execute(cw20Client.sender, contractAddress, {mint: {recipient, amount}});
       return result.transactionHash;
     }
 
     // transfers tokens, returns transactionHash
     const transfer = async (recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(contractAddress, {transfer: {recipient, amount}});
+      const result = await cw20Client.client.execute(cw20Client.sender, contractAddress, {transfer: {recipient, amount}});
       return result.transactionHash;
     }
 
     // burns tokens, returns transactionHash
     const burn = async (amount: string): Promise<string> => {
-      const result = await client.execute(contractAddress, {burn: {amount}});
+      const result = await cw20Client.client.execute(cw20Client.sender, contractAddress, {burn: {amount}});
       return result.transactionHash;
     }
 
     const increaseAllowance = async (spender: string, amount: string): Promise<string> => {
-      const result = await client.execute(contractAddress, {increase_allowance: {spender, amount}});
+      const result = await cw20Client.client.execute(cw20Client.sender, contractAddress, {increase_allowance: {spender, amount}});
       return result.transactionHash;
     }
 
     const decreaseAllowance = async (spender: string, amount: string): Promise<string> => {
-      const result = await client.execute(contractAddress, {decrease_allowance: {spender, amount}});
+      const result = await cw20Client.client.execute(cw20Client.sender, contractAddress, {decrease_allowance: {spender, amount}});
       return result.transactionHash;
     }
 
     const transferFrom = async (owner: string, recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(contractAddress, {transfer_from: {owner, recipient, amount}});
+      const result = await cw20Client.client.execute(cw20Client.sender, contractAddress, {transfer_from: {owner, recipient, amount}});
       return result.transactionHash;
     }
-    
+
     return {
       contractAddress,
       balance,
@@ -273,20 +277,21 @@ const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
     }
     return r.data
   }
-  
+
   const upload = async (): Promise<number> => {
     const meta = {
-      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.4.0/contracts/cw20-base",
+      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.6.0-alpha1/contracts/cw20-base",
       builder: "cosmwasm/workspace-optimizer:0.10.7"
     };
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.4.0/cw20_base.wasm";
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.0-alpha1/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(wasm, meta);
+    const result = await cw20Client.client.upload(cw20Client.sender, wasm, meta);
     return result.codeId;
   }
 
-  const instantiate = async (codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string): Promise<CW20Instance> => {
-    const result = await client.instantiate(codeId, initMsg, label, { memo: `Init ${label}`, admin});
+  const instantiate = async (codeId: number, initMsg: Record<string, unknown>, label: string, adminAddr?: string): Promise<CW20Instance> => {
+    const admin = adminAddr || cw20Client.sender;
+    const result = await cw20Client.client.instantiate(cw20Client.sender, codeId, initMsg, label, { memo: `memo`, admin: admin});
     return use(result.contractAddress);
   }
 
