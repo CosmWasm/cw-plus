@@ -28,8 +28,8 @@ pub enum Cw1155QueryMsg {
         limit: Option<u32>,
     },
     /// Query approved status `owner` granted to `operator`.
-    /// Return type: ApprovedForAllItemResponse
-    ApprovedForAllItem {
+    /// Return type: IsApprovedForAllResponse
+    IsApprovedForAll {
         owner: HumanAddr,
         operator: HumanAddr,
     },
@@ -80,7 +80,7 @@ pub struct ApprovedForAllResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ApprovedForAllItemResponse {
+pub struct IsApprovedForAllResponse {
     pub approved: bool,
 }
 

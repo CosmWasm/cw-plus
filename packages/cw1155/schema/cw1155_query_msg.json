@@ -99,13 +99,13 @@
       }
     },
     {
-      "description": "Query approved status `owner` granted to `operator`. Return type: ApprovedForAllItemResponse",
+      "description": "Query approved status `owner` granted to `operator`. Return type: IsApprovedForAllResponse",
       "type": "object",
       "required": [
-        "approved_for_all_item"
+        "is_approved_for_all"
       ],
       "properties": {
-        "approved_for_all_item": {
+        "is_approved_for_all": {
           "type": "object",
           "required": [
             "operator",
