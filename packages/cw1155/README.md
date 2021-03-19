@@ -10,42 +10,51 @@ Design decisions:
 
 - Fungible tokens and non-fungible tokens are treated equally, non-fungible tokens just have one max supply.
 
-- Approval is set or unset to some operator over entire set of tokens. (More nuanced control is defined in [ERC1761](https://eips.ethereum.org/EIPS/eip-1761), do we want to merge them together?)
+- Approval is set or unset to some operator over entire set of tokens. (More nuanced control is defined in
+  [ERC1761](https://eips.ethereum.org/EIPS/eip-1761), do we want to merge them together?)
 
-- Mint and burn are mixed with transfer/send messages, otherwise, we'll have much more message types, e.g. `Mint`/`MintToContract`/`BatchMint`/`BatchMintToContract`, etc.
+- Mint and burn are mixed with transfer/send messages, otherwise, we'll have much more message types, e.g.
+  `Mint`/`MintToContract`/`BatchMint`/`BatchMintToContract`, etc.
 
-  In transfer/send messges, `from`/`to` are optional, a `None` `from` means minting, a `None` `to` means burning, they must not both be `None` at the same time.
+  In transfer/send messges, `from`/`to` are optional, a `None` `from` means minting, a `None` `to` means burning, they
+must not both be `None` at the same time.
 
 ## Base
 
 ### Messages
 
-`TransferFrom{from, to, token_id, value}` - This transfers some amount of tokens between two accounts. The operator should either be the `from` account or have approval from it.
+`TransferFrom{from, to, token_id, value}` - This transfers some amount of tokens between two accounts. The operator
+should either be the `from` account or have approval from it.
 
 `SendFrom{from, to, token_id, value, msg}` - This transfers some amount of tokens between two accounts. `to` 
-must be an address controlled by a smart contract, which implements
-the `CW1155Receiver` interface. The operator should eitherbe the `from` account or have approval from it. The `msg` will be passed to the recipient contract, along with the other fields.
+must be an address controlled by a smart contract, which implements the `CW1155Receiver` interface. The operator should
+either be the `from` account or have approval from it. The `msg` will be passed to the recipient contract, along with
+the other fields.
 
 `BatchTransferFrom{from, to, batch}` - Batched version of `TransferFrom` which can handle multiple types of tokens at once.
 
-`BatchSendFrom{from, contract, batch, msg}` - Batched version of `SendFrom` which can handle multiple types of tokens at once.
+`BatchSendFrom{from, contract, batch, msg}` - Batched version of `SendFrom` which can handle multiple types of tokens at
+once.
 
-`ApproveAll{ operator, expires }` - Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit.
+`ApproveAll{ operator, expires }` - Allows operator to transfer / send any token from the owner's account. If expiration
+is set, then this allowance has a time/height limit.
 
 `RevokeAll { operator }` - Remove previously granted ApproveAll permission
 
 ### Queries
 
-`Balance { owner, token_id }` - Query the balance of `owner` on perticular type of token, default to `0` when record not exist.
+`Balance { owner, token_id }` - Query the balance of `owner` on perticular type of token, default to `0` when record not
+exist.
 
-`BatchBalance { owner, token_ids }` - Query the balance of `owner` on multiple types of tokens, batched version of `Balance`.
+`BatchBalance { owner, token_ids }` - Query the balance of `owner` on multiple types of tokens, batched version of
+`Balance`.
 
-`ApprovedForAll{owner, include_expired, start_after, limit}` - List all operators that can
-access all of the owner's tokens. Return type is `ApprovedForAllResponse`.
-If `include_expired` is set, show expired owners in the results, otherwise,
-ignore them.
+`ApprovedForAll{owner, include_expired, start_after, limit}` - List all operators that can access all of the owner's
+tokens. Return type is `ApprovedForAllResponse`.  If `include_expired` is set, show expired owners in the results,
+otherwise, ignore them.
 
-`ApprovedForAllItem{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is `ApprovedForAllItemResponse`.
+`ApprovedForAllItem{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is
+`ApprovedForAllItemResponse`.
 
 ### Receiver
 
@@ -59,7 +68,8 @@ Any contract wish to receive CW1155 tokens must implement `Cw1155ReceiveMsg` and
 
 - `transfer(from, to, token_id, value)`
 
-  `from`/`to` are optional, no `from` attribute means minting, no `to` attribute means burning, but they mustn't be neglected at the same time.
+  `from`/`to` are optional, no `from` attribute means minting, no `to` attribute means burning, but they mustn't be
+neglected at the same time.
 
 
 ## Metadata
