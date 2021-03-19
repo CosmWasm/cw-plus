@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BatchBalanceResponse",
+  "type": "object",
+  "required": [
+    "balances"
+  ],
+  "properties": {
+    "balances": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Uint128"
+      }
+    }
+  },
+  "definitions": {
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}

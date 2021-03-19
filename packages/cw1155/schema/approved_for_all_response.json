@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ApprovedForAllResponse",
+  "type": "object",
+  "required": [
+    "operators"
+  ],
+  "properties": {
+    "operators": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Approval"
+      }
+    }
+  },
+  "definitions": {
+    "Approval": {
+      "type": "object",
+      "required": [
+        "expires",
+        "spender"
+      ],
+      "properties": {
+        "expires": {
+          "description": "When the Approval expires (maybe Expiration::never)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            }
+          ]
+        },
+        "spender": {
+          "description": "Account that can transfer/send the token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "Expiration": {
+      "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
+      "anyOf": [
+        {
+          "description": "AtHeight will expire when `env.block.height` >= height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "AtTime will expire when `env.block.time` >= time",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "Never will never expire. Used to express the empty variant",
+          "type": "object",
+          "required": [
+            "never"
+          ],
+          "properties": {
+            "never": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
+}
