@@ -15,7 +15,7 @@ pub struct Cw1155ReceiveMsg {
     pub from: Option<HumanAddr>,
     pub token_id: TokenId,
     pub amount: Uint128,
-    pub msg: Option<Binary>,
+    pub msg: Binary,
 }
 
 impl Cw1155ReceiveMsg {
@@ -44,7 +44,7 @@ pub struct Cw1155BatchReceiveMsg {
     pub operator: HumanAddr,
     pub from: Option<HumanAddr>,
     pub batch: Vec<(TokenId, Uint128)>,
-    pub msg: Option<Binary>,
+    pub msg: Binary,
 }
 
 impl Cw1155BatchReceiveMsg {

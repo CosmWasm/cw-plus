@@ -5,6 +5,7 @@
   "type": "object",
   "required": [
     "batch",
+    "msg",
     "operator"
   ],
   "properties": {
@@ -35,14 +36,7 @@
       ]
     },
     "msg": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Binary"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/definitions/Binary"
     },
     "operator": {
       "$ref": "#/definitions/HumanAddr"

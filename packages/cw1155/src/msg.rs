@@ -9,43 +9,54 @@ pub type TokenId = String;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw1155HandleMsg {
-    /// TransferFrom is a base message to move tokens.
-    /// if `env.sender` is the owner or has sufficient pre-approval.
-    TransferFrom {
-        // `None` means minting
-        from: Option<HumanAddr>,
-        // `None` means burning
-        to: Option<HumanAddr>,
-        token_id: TokenId,
-        value: Uint128,
-    },
-    /// SendFrom is a base message to move tokens to contract.
+    /// SendFrom is a base message to move tokens,
     /// if `env.sender` is the owner or has sufficient pre-approval.
     SendFrom {
-        // `None` means minting
-        from: Option<HumanAddr>,
-        contract: HumanAddr,
+        from: HumanAddr,
+        /// If `to` is not contract, `msg` should be `None`
+        to: HumanAddr,
         token_id: TokenId,
         value: Uint128,
+        /// `None` means don't call the receiver interface
         msg: Option<Binary>,
     },
-    /// BatchTransferFrom is a base message to move tokens to another account without triggering actions.
-    /// if `env.sender` is the owner or has sufficient pre-approval.
-    BatchTransferFrom {
-        // `None` means minting
-        from: Option<HumanAddr>,
-        // `None` means burning
-        to: Option<HumanAddr>,
-        batch: Vec<(TokenId, Uint128)>,
-    },
-    /// BatchSendFrom is a base message to move tokens to another to without triggering actions.
+    /// BatchSendFrom is a base message to move multiple types of tokens in batch,
     /// if `env.sender` is the owner or has sufficient pre-approval.
     BatchSendFrom {
-        // `None` means minting
-        from: Option<HumanAddr>,
-        contract: HumanAddr,
+        from: HumanAddr,
+        /// if `to` is not contract, `msg` should be `None`
+        to: HumanAddr,
         batch: Vec<(TokenId, Uint128)>,
+        /// `None` means don't call the receiver interface
         msg: Option<Binary>,
+    },
+    /// Mint is a base message to mint tokens.
+    Mint {
+        /// If `to` is not contract, `msg` should be `None`
+        to: HumanAddr,
+        token_id: TokenId,
+        value: Uint128,
+        /// `None` means don't call the receiver interface
+        msg: Option<Binary>,
+    },
+    /// BatchMint is a base message to mint multiple types of tokens in batch.
+    BatchMint {
+        /// If `to` is not contract, `msg` should be `None`
+        to: HumanAddr,
+        batch: Vec<(TokenId, Uint128)>,
+        /// `None` means don't call the receiver interface
+        msg: Option<Binary>,
+    },
+    /// Burn is a base message to burn tokens.
+    Burn {
+        from: HumanAddr,
+        token_id: TokenId,
+        value: Uint128,
+    },
+    /// BatchBurn is a base message to burn multiple types of tokens in batch.
+    BatchBurn {
+        from: HumanAddr,
+        batch: Vec<(TokenId, Uint128)>,
     },
     /// Allows operator to transfer / send any token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit

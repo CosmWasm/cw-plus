@@ -3,51 +3,7 @@
   "title": "Cw1155HandleMsg",
   "anyOf": [
     {
-      "description": "TransferFrom is a base message to move tokens. if `env.sender` is the owner or has sufficient pre-approval.",
-      "type": "object",
-      "required": [
-        "transfer_from"
-      ],
-      "properties": {
-        "transfer_from": {
-          "type": "object",
-          "required": [
-            "token_id",
-            "value"
-          ],
-          "properties": {
-            "from": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "to": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "token_id": {
-              "type": "string"
-            },
-            "value": {
-              "$ref": "#/definitions/Uint128"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "SendFrom is a base message to move tokens to contract. if `env.sender` is the owner or has sufficient pre-approval.",
+      "description": "SendFrom is a base message to move tokens, if `env.sender` is the owner or has sufficient pre-approval.",
       "type": "object",
       "required": [
         "send_from"
@@ -56,25 +12,17 @@
         "send_from": {
           "type": "object",
           "required": [
-            "contract",
+            "from",
+            "to",
             "token_id",
             "value"
           ],
           "properties": {
-            "contract": {
+            "from": {
               "$ref": "#/definitions/HumanAddr"
             },
-            "from": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "msg": {
+              "description": "`None` means don't call the receiver interface",
               "anyOf": [
                 {
                   "$ref": "#/definitions/Binary"
@@ -84,6 +32,14 @@
                 }
               ]
             },
+            "to": {
+              "description": "If `to` is not contract, `msg` should be `None`",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
             "token_id": {
               "type": "string"
             },
@@ -95,60 +51,7 @@
       }
     },
     {
-      "description": "BatchTransferFrom is a base message to move tokens to another account without triggering actions. if `env.sender` is the owner or has sufficient pre-approval.",
-      "type": "object",
-      "required": [
-        "batch_transfer_from"
-      ],
-      "properties": {
-        "batch_transfer_from": {
-          "type": "object",
-          "required": [
-            "batch"
-          ],
-          "properties": {
-            "batch": {
-              "type": "array",
-              "items": {
-                "type": "array",
-                "items": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "$ref": "#/definitions/Uint128"
-                  }
-                ],
-                "maxItems": 2,
-                "minItems": 2
-              }
-            },
-            "from": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "to": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "BatchSendFrom is a base message to move tokens to another to without triggering actions. if `env.sender` is the owner or has sufficient pre-approval.",
+      "description": "BatchSendFrom is a base message to move multiple types of tokens in batch, if `env.sender` is the owner or has sufficient pre-approval.",
       "type": "object",
       "required": [
         "batch_send_from"
@@ -158,7 +61,8 @@
           "type": "object",
           "required": [
             "batch",
-            "contract"
+            "from",
+            "to"
           ],
           "properties": {
             "batch": {
@@ -177,20 +81,11 @@
                 "minItems": 2
               }
             },
-            "contract": {
+            "from": {
               "$ref": "#/definitions/HumanAddr"
             },
-            "from": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "msg": {
+              "description": "`None` means don't call the receiver interface",
               "anyOf": [
                 {
                   "$ref": "#/definitions/Binary"
@@ -199,6 +94,176 @@
                   "type": "null"
                 }
               ]
+            },
+            "to": {
+              "description": "if `to` is not contract, `msg` should be `None`",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Mint is a base message to mint tokens.",
+      "type": "object",
+      "required": [
+        "mint"
+      ],
+      "properties": {
+        "mint": {
+          "type": "object",
+          "required": [
+            "to",
+            "token_id",
+            "value"
+          ],
+          "properties": {
+            "msg": {
+              "description": "`None` means don't call the receiver interface",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "description": "If `to` is not contract, `msg` should be `None`",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "BatchMint is a base message to mint multiple types of tokens in batch.",
+      "type": "object",
+      "required": [
+        "batch_mint"
+      ],
+      "properties": {
+        "batch_mint": {
+          "type": "object",
+          "required": [
+            "batch",
+            "to"
+          ],
+          "properties": {
+            "batch": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ],
+                "maxItems": 2,
+                "minItems": 2
+              }
+            },
+            "msg": {
+              "description": "`None` means don't call the receiver interface",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "to": {
+              "description": "If `to` is not contract, `msg` should be `None`",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Burn is a base message to burn tokens.",
+      "type": "object",
+      "required": [
+        "burn"
+      ],
+      "properties": {
+        "burn": {
+          "type": "object",
+          "required": [
+            "from",
+            "token_id",
+            "value"
+          ],
+          "properties": {
+            "from": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "BatchBurn is a base message to burn multiple types of tokens in batch.",
+      "type": "object",
+      "required": [
+        "batch_burn"
+      ],
+      "properties": {
+        "batch_burn": {
+          "type": "object",
+          "required": [
+            "batch",
+            "from"
+          ],
+          "properties": {
+            "batch": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  }
+                ],
+                "maxItems": 2,
+                "minItems": 2
+              }
+            },
+            "from": {
+              "$ref": "#/definitions/HumanAddr"
             }
           }
         }

@@ -23,18 +23,23 @@ must not both be `None` at the same time.
 
 ### Messages
 
-`TransferFrom{from, to, token_id, value}` - This transfers some amount of tokens between two accounts. The operator
-should either be the `from` account or have approval from it.
+`SendFrom{from, to, token_id, value, msg}` - This transfers some amount of tokens between two accounts. If `to` is an
+address controlled by a smart contract, it must implement the `CW1155Receiver` interface, `msg` will be passed to it
+along with other fields, otherwise, `msg` should be `None`. The operator should either be the `from` account or have
+approval from it.
 
-`SendFrom{from, to, token_id, value, msg}` - This transfers some amount of tokens between two accounts. `to` 
-must be an address controlled by a smart contract, which implements the `CW1155Receiver` interface. The operator should
-either be the `from` account or have approval from it. The `msg` will be passed to the recipient contract, along with
-the other fields.
+`BatchSendFrom{from, to, batch: Vec<(token_id, value)>, msg}` - Batched version of `SendFrom` which can handle multiple
+types of tokens at once.
 
-`BatchTransferFrom{from, to, batch}` - Batched version of `TransferFrom` which can handle multiple types of tokens at once.
+`Mint {to, token_id, value, msg}` - This mints some tokens to `to` account, If `to` is controlled by a smart contract,
+it should implement `CW1155Receiver` interface, `msg` will be passed to it along with other fields, otherwise, `msg`
+should be `None`.
 
-`BatchSendFrom{from, contract, batch, msg}` - Batched version of `SendFrom` which can handle multiple types of tokens at
-once.
+`BatchMint {to, batch: Vec<(token_id, value)>, msg}` - Batched version of `Mint`.
+
+`Burn {from, token_id, value}` - This burns some tokens from `from` account.
+
+`BatchBurn {from, batch: Vec<(token_id, value)>}` - Batched version of `Burn`.
 
 `ApproveAll{ operator, expires }` - Allows operator to transfer / send any token from the owner's account. If expiration
 is set, then this allowance has a time/height limit.
@@ -53,7 +58,7 @@ exist.
 tokens. Return type is `ApprovedForAllResponse`.  If `include_expired` is set, show expired owners in the results,
 otherwise, ignore them.
 
-`ApprovedForAllItem{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is
+`ApprovedForAllItem{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is
 `ApprovedForAllItemResponse`.
 
 ### Receiver

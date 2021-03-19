@@ -5,6 +5,7 @@
   "type": "object",
   "required": [
     "amount",
+    "msg",
     "operator",
     "token_id"
   ],
@@ -24,14 +25,7 @@
       ]
     },
     "msg": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Binary"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/definitions/Binary"
     },
     "operator": {
       "description": "The account that executed the send message",
