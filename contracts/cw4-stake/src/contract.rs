@@ -13,7 +13,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, StakedResponse};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
@@ -54,15 +54,15 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
-        HandleMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
-        HandleMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
-        HandleMsg::Claim {} => execute_claim(deps, env, info),
+        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
+        ExecuteMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
+        ExecuteMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
+        ExecuteMsg::Claim {} => execute_claim(deps, env, info),
     }
 }
 
@@ -402,7 +402,7 @@ mod tests {
 
         for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
             if *stake != 0 {
-                let msg = HandleMsg::Bond {};
+                let msg = ExecuteMsg::Bond {};
                 let info = mock_info(HumanAddr::from(*addr), &coins(*stake, DENOM));
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
@@ -415,7 +415,7 @@ mod tests {
 
         for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
             if *stake != 0 {
-                let msg = HandleMsg::Unbond {
+                let msg = ExecuteMsg::Unbond {
                     tokens: Uint128(*stake),
                 };
                 let info = mock_info(HumanAddr::from(*addr), &[]);
@@ -551,7 +551,7 @@ mod tests {
         assert_users(deps.as_ref(), Some(8), Some(5), Some(5), Some(height + 4)); // after second bond
 
         // error if try to unbond more than stake (USER2 has 5000 staked)
-        let msg = HandleMsg::Unbond {
+        let msg = ExecuteMsg::Unbond {
             tokens: Uint128(5100),
         };
         let mut env = mock_env();
@@ -647,7 +647,7 @@ mod tests {
             deps.as_mut(),
             env2.clone(),
             mock_info(USER1, &[]),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         )
         .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
@@ -660,7 +660,7 @@ mod tests {
             deps.as_mut(),
             env3.clone(),
             mock_info(USER1, &[]),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(
@@ -677,7 +677,7 @@ mod tests {
             deps.as_mut(),
             env3.clone(),
             mock_info(USER2, &[]),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(
@@ -694,7 +694,7 @@ mod tests {
             deps.as_mut(),
             env3.clone(),
             mock_info(USER3, &[]),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         )
         .unwrap_err();
         assert_eq!(err, ContractError::NothingToClaim {});
@@ -721,7 +721,7 @@ mod tests {
             deps.as_mut(),
             env4.clone(),
             mock_info(USER2, &[]),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(
@@ -748,7 +748,7 @@ mod tests {
         let contract1 = HumanAddr::from("hook1");
         let contract2 = HumanAddr::from("hook2");
 
-        let add_msg = HandleMsg::AddHook {
+        let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
 
@@ -776,7 +776,7 @@ mod tests {
         assert_eq!(hooks.hooks, vec![contract1.clone()]);
 
         // cannot remove a non-registered contract
-        let remove_msg = HandleMsg::RemoveHook {
+        let remove_msg = ExecuteMsg::RemoveHook {
             addr: contract2.clone(),
         };
         let err = execute(
@@ -789,7 +789,7 @@ mod tests {
         assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
-        let add_msg2 = HandleMsg::AddHook {
+        let add_msg2 = ExecuteMsg::AddHook {
             addr: contract2.clone(),
         };
         let _ = execute(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
@@ -807,7 +807,7 @@ mod tests {
         assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
-        let remove_msg = HandleMsg::RemoveHook {
+        let remove_msg = ExecuteMsg::RemoveHook {
             addr: contract1.clone(),
         };
         let err = execute(
@@ -844,10 +844,10 @@ mod tests {
 
         // register 2 hooks
         let admin_info = mock_info(INIT_ADMIN, &[]);
-        let add_msg = HandleMsg::AddHook {
+        let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
-        let add_msg2 = HandleMsg::AddHook {
+        let add_msg2 = ExecuteMsg::AddHook {
             addr: contract2.clone(),
         };
         for msg in vec![add_msg, add_msg2] {
@@ -857,7 +857,7 @@ mod tests {
         // check firing on bond
         assert_users(deps.as_ref(), None, None, None, None);
         let info = mock_info(USER1, &coins(13_800, DENOM));
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
         assert_users(deps.as_ref(), Some(13), None, None, None);
 
         // ensure messages for each of the 2 hooks
@@ -869,7 +869,7 @@ mod tests {
         assert_eq!(res.messages, vec![msg1, msg2]);
 
         // check firing on unbond
-        let msg = HandleMsg::Unbond {
+        let msg = ExecuteMsg::Unbond {
             tokens: Uint128(7_300),
         };
         let info = mock_info(USER1, &[]);
@@ -892,12 +892,12 @@ mod tests {
 
         // cannot bond with 0 coins
         let info = mock_info(HumanAddr::from(USER1), &[]);
-        let err = execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::NoFunds {});
 
         // cannot bond with incorrect denom
         let info = mock_info(HumanAddr::from(USER1), &[coin(500, "FOO")]);
-        let err = execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::MissingDenom(DENOM.to_string()));
 
         // cannot bond with 2 coins (even if one is correct)
@@ -905,13 +905,13 @@ mod tests {
             HumanAddr::from(USER1),
             &[coin(1234, DENOM), coin(5000, "BAR")],
         );
-        let err = execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::ExtraDenoms(DENOM.to_string()));
 
         // can bond with just the proper denom
         // cannot bond with incorrect denom
         let info = mock_info(HumanAddr::from(USER1), &[coin(500, DENOM)]);
-        execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
     }
 
     #[test]

@@ -16,12 +16,12 @@ pub struct InstantiateMsg {
     pub minter: HumanAddr,
 }
 
-/// This is like Cw721HandleMsg but we add a Mint command for an owner
+/// This is like Cw721ExecuteMsg but we add a Mint command for an owner
 /// to make this stand-alone. You will likely want to remove mint and
 /// use other control logic in any contract that inherits this.
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Transfer is a base message to move a token to another account without triggering actions
     TransferNft {
         recipient: HumanAddr,

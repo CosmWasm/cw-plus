@@ -12,7 +12,7 @@ use cosmwasm_std::{
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{ChannelInfo, CHANNEL_INFO, CHANNEL_STATE};
-use cw20::Cw20HandleMsg;
+use cw20::Cw20ExecuteMsg;
 
 pub const ICS20_VERSION: &str = "ics20-1";
 pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
@@ -324,7 +324,7 @@ fn send_amount(amount: Amount, recipient: HumanAddr) -> CosmosMsg {
         }
         .into(),
         Amount::Cw20(coin) => {
-            let msg = Cw20HandleMsg::Transfer {
+            let msg = Cw20ExecuteMsg::Transfer {
                 recipient,
                 amount: coin.amount,
             };
@@ -375,7 +375,7 @@ mod test {
     }
 
     fn cw20_payment(amount: u128, address: &str, recipient: &str) -> CosmosMsg {
-        let msg = Cw20HandleMsg::Transfer {
+        let msg = Cw20ExecuteMsg::Transfer {
             recipient: recipient.into(),
             amount: Uint128(amount),
         };

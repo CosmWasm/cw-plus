@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::contract::{execute, instantiate, query};
-use crate::msg::{HandleMsg, InstantiateMsg, Voter};
+use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{from_binary, to_binary, HumanAddr, Uint128, WasmMsg, WasmQuery};
 use cw0::Duration;
@@ -98,7 +98,7 @@ fn cw3_controls_cw20() {
     // mint some cw20 tokens according to proposal result
     let mint_recipient = HumanAddr::from("recipient");
     let mint_amount = Uint128(1000);
-    let cw20_mint_msg = cw20_base::msg::HandleMsg::Mint {
+    let cw20_mint_msg = cw20_base::msg::ExecuteMsg::Mint {
         recipient: mint_recipient.clone(),
         amount: mint_amount,
     };
@@ -108,7 +108,7 @@ fn cw3_controls_cw20() {
         msg: to_binary(&cw20_mint_msg).unwrap(),
         send: vec![],
     };
-    let propose_msg = HandleMsg::Propose {
+    let propose_msg = ExecuteMsg::Propose {
         title: "Mint tokens".to_string(),
         description: "Need to mint tokens".to_string(),
         msgs: vec![execute_mint_msg.into()],
@@ -120,7 +120,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // second votes
-    let vote2_msg = HandleMsg::Vote {
+    let vote2_msg = ExecuteMsg::Vote {
         proposal_id: 1,
         vote: Vote::Yes,
     };
@@ -129,7 +129,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // only 1 vote and msg mint fails
-    let execute_proposal_msg = HandleMsg::Execute { proposal_id: 1 };
+    let execute_proposal_msg = ExecuteMsg::Execute { proposal_id: 1 };
     // execute mint
     router
         .execute_contract(

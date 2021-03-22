@@ -12,7 +12,7 @@ use crate::allowances::{
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
 
 // version info for migration info
@@ -71,36 +71,36 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Transfer { recipient, amount } => {
+        ExecuteMsg::Transfer { recipient, amount } => {
             execute_transfer(deps, env, info, recipient, amount)
         }
-        HandleMsg::Burn { amount } => execute_burn(deps, env, info, amount),
-        HandleMsg::Send {
+        ExecuteMsg::Burn { amount } => execute_burn(deps, env, info, amount),
+        ExecuteMsg::Send {
             contract,
             amount,
             msg,
         } => execute_send(deps, env, info, contract, amount, msg),
-        HandleMsg::Mint { recipient, amount } => execute_mint(deps, env, info, recipient, amount),
-        HandleMsg::IncreaseAllowance {
+        ExecuteMsg::Mint { recipient, amount } => execute_mint(deps, env, info, recipient, amount),
+        ExecuteMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
         } => execute_increase_allowance(deps, env, info, spender, amount, expires),
-        HandleMsg::DecreaseAllowance {
+        ExecuteMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
         } => execute_decrease_allowance(deps, env, info, spender, amount, expires),
-        HandleMsg::TransferFrom {
+        ExecuteMsg::TransferFrom {
             owner,
             recipient,
             amount,
         } => execute_transfer_from(deps, env, info, owner, recipient, amount),
-        HandleMsg::BurnFrom { owner, amount } => execute_burn_from(deps, env, info, owner, amount),
-        HandleMsg::SendFrom {
+        ExecuteMsg::BurnFrom { owner, amount } => execute_burn_from(deps, env, info, owner, amount),
+        ExecuteMsg::SendFrom {
             owner,
             contract,
             amount,
@@ -516,7 +516,7 @@ mod tests {
         // minter can mint coins to some winner
         let winner = HumanAddr::from("lucky");
         let prize = Uint128(222_222_222);
-        let msg = HandleMsg::Mint {
+        let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
             amount: prize,
         };
@@ -529,7 +529,7 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), &winner), prize);
 
         // but cannot mint nothing
-        let msg = HandleMsg::Mint {
+        let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
             amount: Uint128::zero(),
         };
@@ -543,7 +543,7 @@ mod tests {
 
         // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
-        let msg = HandleMsg::Mint {
+        let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
             amount: Uint128(333_222_222),
         };
@@ -567,7 +567,7 @@ mod tests {
             None,
         );
 
-        let msg = HandleMsg::Mint {
+        let msg = ExecuteMsg::Mint {
             recipient: HumanAddr::from("lucky"),
             amount: Uint128(222),
         };
@@ -585,7 +585,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_instantiate(deps.as_mut(), &HumanAddr::from("genesis"), Uint128(1234));
 
-        let msg = HandleMsg::Mint {
+        let msg = ExecuteMsg::Mint {
             recipient: HumanAddr::from("lucky"),
             amount: Uint128(222),
         };
@@ -692,7 +692,7 @@ mod tests {
         // cannot transfer nothing
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Transfer {
+        let msg = ExecuteMsg::Transfer {
             recipient: addr2.clone(),
             amount: Uint128::zero(),
         };
@@ -705,7 +705,7 @@ mod tests {
         // cannot send more than we have
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Transfer {
+        let msg = ExecuteMsg::Transfer {
             recipient: addr2.clone(),
             amount: too_much,
         };
@@ -718,7 +718,7 @@ mod tests {
         // cannot send from empty account
         let info = mock_info(addr2.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Transfer {
+        let msg = ExecuteMsg::Transfer {
             recipient: addr1.clone(),
             amount: transfer,
         };
@@ -731,7 +731,7 @@ mod tests {
         // valid transfer
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Transfer {
+        let msg = ExecuteMsg::Transfer {
             recipient: addr2.clone(),
             amount: transfer,
         };
@@ -760,7 +760,7 @@ mod tests {
         // cannot burn nothing
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Burn {
+        let msg = ExecuteMsg::Burn {
             amount: Uint128::zero(),
         };
         let res = execute(deps.as_mut(), env, info, msg);
@@ -776,7 +776,7 @@ mod tests {
         // cannot burn more than we have
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Burn { amount: too_much };
+        let msg = ExecuteMsg::Burn { amount: too_much };
         let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
@@ -790,7 +790,7 @@ mod tests {
         // valid burn reduces total supply
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Burn { amount: burn };
+        let msg = ExecuteMsg::Burn { amount: burn };
         let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
@@ -817,7 +817,7 @@ mod tests {
         // cannot send nothing
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Send {
+        let msg = ExecuteMsg::Send {
             contract: contract.clone(),
             amount: Uint128::zero(),
             msg: Some(send_msg.clone()),
@@ -831,7 +831,7 @@ mod tests {
         // cannot send more than we have
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Send {
+        let msg = ExecuteMsg::Send {
             contract: contract.clone(),
             amount: too_much,
             msg: Some(send_msg.clone()),
@@ -845,7 +845,7 @@ mod tests {
         // valid transfer
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::Send {
+        let msg = ExecuteMsg::Send {
             contract: contract.clone(),
             amount: transfer,
             msg: Some(send_msg.clone()),

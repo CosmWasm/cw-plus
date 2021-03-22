@@ -265,7 +265,7 @@ mod tests {
     use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
-    use crate::msg::{HandleMsg, InstantiateMsg};
+    use crate::msg::{ExecuteMsg, InstantiateMsg};
 
     fn get_balance<T: Into<HumanAddr>>(deps: Deps, address: T) -> Uint128 {
         query_balance(deps, address.into()).unwrap().balance
@@ -306,7 +306,7 @@ mod tests {
         // set allowance with height expiration
         let allow1 = Uint128(7777);
         let expires = Expiration::AtHeight(5432);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
             expires: Some(expires.clone()),
@@ -326,7 +326,7 @@ mod tests {
         // decrease it a bit with no expire set - stays the same
         let lower = Uint128(4444);
         let allow2 = (allow1 - lower).unwrap();
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
             amount: lower,
             expires: None,
@@ -345,7 +345,7 @@ mod tests {
         let raise = Uint128(87654);
         let allow3 = allow2 + raise;
         let new_expire = Expiration::AtTime(8888888888);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: raise,
             expires: Some(new_expire.clone()),
@@ -361,7 +361,7 @@ mod tests {
         );
 
         // decrease it below 0
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(99988647623876347),
             expires: None,
@@ -399,7 +399,7 @@ mod tests {
         // set allowance with height expiration
         let allow1 = Uint128(7777);
         let expires = Expiration::AtHeight(5432);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
             expires: Some(expires.clone()),
@@ -408,7 +408,7 @@ mod tests {
 
         // set other allowance with no expiration
         let allow2 = Uint128(87654);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow2,
             expires: None,
@@ -442,7 +442,7 @@ mod tests {
         let env = mock_env();
         let allow3 = Uint128(1821);
         let expires3 = Expiration::AtTime(3767626296);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow3,
             expires: Some(expires3.clone()),
@@ -476,7 +476,7 @@ mod tests {
         do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
 
         // self-allowance
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: owner.clone(),
             amount: Uint128(7777),
             expires: None,
@@ -488,7 +488,7 @@ mod tests {
         }
 
         // decrease self-allowance
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: owner.clone(),
             amount: Uint128(7777),
             expires: None,
@@ -512,7 +512,7 @@ mod tests {
 
         // provide an allowance
         let allow1 = Uint128(77777);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
             expires: None,
@@ -523,7 +523,7 @@ mod tests {
 
         // valid transfer of part of the allowance
         let transfer = Uint128(44444);
-        let msg = HandleMsg::TransferFrom {
+        let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
             amount: transfer,
@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(expect, allowance);
 
         // cannot send more than the allowance
-        let msg = HandleMsg::TransferFrom {
+        let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
             amount: Uint128(33443),
@@ -565,7 +565,7 @@ mod tests {
         // let us increase limit, but set the expiration (default env height is 12_345)
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
             expires: Some(Expiration::AtHeight(env.block.height)),
@@ -573,7 +573,7 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // we should now get the expiration error
-        let msg = HandleMsg::TransferFrom {
+        let msg = ExecuteMsg::TransferFrom {
             owner: owner.clone(),
             recipient: rcpt.clone(),
             amount: Uint128(33443),
@@ -598,7 +598,7 @@ mod tests {
 
         // provide an allowance
         let allow1 = Uint128(77777);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
             expires: None,
@@ -609,7 +609,7 @@ mod tests {
 
         // valid burn of part of the allowance
         let transfer = Uint128(44444);
-        let msg = HandleMsg::BurnFrom {
+        let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
             amount: transfer,
         };
@@ -633,7 +633,7 @@ mod tests {
         assert_eq!(expect, allowance);
 
         // cannot burn more than the allowance
-        let msg = HandleMsg::BurnFrom {
+        let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
             amount: Uint128(33443),
         };
@@ -648,7 +648,7 @@ mod tests {
         // let us increase limit, but set the expiration (default env height is 12_345)
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
             expires: Some(Expiration::AtHeight(env.block.height)),
@@ -656,7 +656,7 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // we should now get the expiration error
-        let msg = HandleMsg::BurnFrom {
+        let msg = ExecuteMsg::BurnFrom {
             owner: owner.clone(),
             amount: Uint128(33443),
         };
@@ -682,7 +682,7 @@ mod tests {
 
         // provide an allowance
         let allow1 = Uint128(77777);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
             expires: None,
@@ -693,7 +693,7 @@ mod tests {
 
         // valid send of part of the allowance
         let transfer = Uint128(44444);
-        let msg = HandleMsg::SendFrom {
+        let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
             amount: transfer,
             contract: contract.clone(),
@@ -738,7 +738,7 @@ mod tests {
         assert_eq!(expect, allowance);
 
         // cannot send more than the allowance
-        let msg = HandleMsg::SendFrom {
+        let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
             amount: Uint128(33443),
             contract: contract.clone(),
@@ -755,7 +755,7 @@ mod tests {
         // let us increase limit, but set the expiration to current block (expired)
         let info = mock_info(owner.clone(), &[]);
         let env = mock_env();
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128(1000),
             expires: Some(Expiration::AtHeight(env.block.height)),
@@ -763,7 +763,7 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // we should now get the expiration error
-        let msg = HandleMsg::SendFrom {
+        let msg = ExecuteMsg::SendFrom {
             owner: owner.clone(),
             amount: Uint128(33443),
             contract: contract.clone(),

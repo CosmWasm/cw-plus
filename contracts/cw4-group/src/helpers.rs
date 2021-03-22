@@ -5,7 +5,7 @@ use std::ops::Deref;
 use cosmwasm_std::{to_binary, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 use cw4::{Cw4Contract, Member};
 
-use crate::msg::HandleMsg;
+use crate::msg::ExecuteMsg;
 
 /// Cw4GroupContract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with cw4-group contracts.
@@ -27,7 +27,7 @@ impl Cw4GroupContract {
         Cw4GroupContract(Cw4Contract(addr))
     }
 
-    fn encode_msg(&self, msg: HandleMsg) -> StdResult<CosmosMsg> {
+    fn encode_msg(&self, msg: ExecuteMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),
             msg: to_binary(&msg)?,
@@ -37,7 +37,7 @@ impl Cw4GroupContract {
     }
 
     pub fn update_members(&self, remove: Vec<HumanAddr>, add: Vec<Member>) -> StdResult<CosmosMsg> {
-        let msg = HandleMsg::UpdateMembers { remove, add };
+        let msg = ExecuteMsg::UpdateMembers { remove, add };
         self.encode_msg(msg)
     }
 }

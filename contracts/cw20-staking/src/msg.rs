@@ -30,7 +30,7 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Bond will bond all staking tokens sent with the message and release derivative tokens
     Bond {},
     /// Unbond will "burn" the given amount of derivative tokens and send the unbonded

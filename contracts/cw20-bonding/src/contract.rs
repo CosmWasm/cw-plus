@@ -15,7 +15,7 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
-use crate::msg::{CurveFn, CurveInfoResponse, HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{CurveFn, CurveInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE, CURVE_TYPE};
 use cw0::{must_pay, nonpayable};
 
@@ -59,7 +59,7 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     // default implementation stores curve info as enum, you can do something else in a derived
     // contract and just pass in your custom curve to do_execute
@@ -75,49 +75,49 @@ pub fn do_execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
     curve_fn: CurveFn,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Buy {} => execute_buy(deps, env, info, curve_fn),
+        ExecuteMsg::Buy {} => execute_buy(deps, env, info, curve_fn),
 
         // we override these from cw20
-        HandleMsg::Burn { amount } => Ok(execute_sell(deps, env, info, curve_fn, amount)?),
-        HandleMsg::BurnFrom { owner, amount } => {
+        ExecuteMsg::Burn { amount } => Ok(execute_sell(deps, env, info, curve_fn, amount)?),
+        ExecuteMsg::BurnFrom { owner, amount } => {
             Ok(execute_sell_from(deps, env, info, curve_fn, owner, amount)?)
         }
 
         // these all come from cw20-base to implement the cw20 standard
-        HandleMsg::Transfer { recipient, amount } => {
+        ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
         }
-        HandleMsg::Send {
+        ExecuteMsg::Send {
             contract,
             amount,
             msg,
         } => Ok(execute_send(deps, env, info, contract, amount, msg)?),
-        HandleMsg::IncreaseAllowance {
+        ExecuteMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
         } => Ok(execute_increase_allowance(
             deps, env, info, spender, amount, expires,
         )?),
-        HandleMsg::DecreaseAllowance {
+        ExecuteMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
         } => Ok(execute_decrease_allowance(
             deps, env, info, spender, amount, expires,
         )?),
-        HandleMsg::TransferFrom {
+        ExecuteMsg::TransferFrom {
             owner,
             recipient,
             amount,
         } => Ok(execute_transfer_from(
             deps, env, info, owner, recipient, amount,
         )?),
-        HandleMsg::SendFrom {
+        ExecuteMsg::SendFrom {
             owner,
             contract,
             amount,
@@ -393,7 +393,7 @@ mod tests {
 
         // succeeds with proper token (5 BTC = 5*10^8 satoshi)
         let info = mock_info(INVESTOR, &coins(500_000_000, DENOM));
-        let buy = HandleMsg::Buy {};
+        let buy = ExecuteMsg::Buy {};
         execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
 
         // bob got 1000 EPOXY (10.00)
@@ -402,7 +402,7 @@ mod tests {
 
         // send them all to buyer
         let info = mock_info(INVESTOR, &[]);
-        let send = HandleMsg::Transfer {
+        let send = ExecuteMsg::Transfer {
             recipient: BUYER.into(),
             amount: Uint128(1000),
         };
@@ -443,7 +443,7 @@ mod tests {
 
         // fails when no tokens sent
         let info = mock_info(INVESTOR, &[]);
-        let buy = HandleMsg::Buy {};
+        let buy = ExecuteMsg::Buy {};
         let err = execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
         assert_eq!(err, PaymentError::NoFunds {}.into());
 
@@ -469,7 +469,7 @@ mod tests {
 
         // succeeds with proper token (20 BTC = 20*10^8 satoshi)
         let info = mock_info(INVESTOR, &coins(2_000_000_000, DENOM));
-        let buy = HandleMsg::Buy {};
+        let buy = ExecuteMsg::Buy {};
         execute(deps.as_mut(), mock_env(), info, buy).unwrap();
 
         // bob got 2000 EPOXY (20.00)
@@ -477,7 +477,7 @@ mod tests {
 
         // cannot burn too much
         let info = mock_info(INVESTOR, &[]);
-        let burn = HandleMsg::Burn {
+        let burn = ExecuteMsg::Burn {
             amount: Uint128(3000),
         };
         let err = execute(deps.as_mut(), mock_env(), info, burn).unwrap_err();
@@ -485,7 +485,7 @@ mod tests {
 
         // burn 1000 EPOXY to get back 15BTC (*10^8)
         let info = mock_info(INVESTOR, &[]);
-        let burn = HandleMsg::Burn {
+        let burn = ExecuteMsg::Burn {
             amount: Uint128(1000),
         };
         let res = execute(deps.as_mut(), mock_env(), info, burn).unwrap();
@@ -531,7 +531,7 @@ mod tests {
 
         // spend 45_000 uatom for 30_000_000 EPOXY
         let info = mock_info(bob, &coins(45_000, DENOM));
-        let buy = HandleMsg::Buy {};
+        let buy = ExecuteMsg::Buy {};
         execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
 
         // check balances
@@ -540,7 +540,7 @@ mod tests {
 
         // send coins to carl
         let bob_info = mock_info(bob, &[]);
-        let transfer = HandleMsg::Transfer {
+        let transfer = ExecuteMsg::Transfer {
             recipient: carl.into(),
             amount: Uint128(2_000_000),
         };
@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), carl), Uint128(2_000_000));
 
         // allow alice
-        let allow = HandleMsg::IncreaseAllowance {
+        let allow = ExecuteMsg::IncreaseAllowance {
             spender: alice.into(),
             amount: Uint128(35_000_000),
             expires: None,
@@ -565,7 +565,7 @@ mod tests {
         );
 
         // alice takes some for herself
-        let self_pay = HandleMsg::TransferFrom {
+        let self_pay = ExecuteMsg::TransferFrom {
             owner: bob.into(),
             recipient: alice.into(),
             amount: Uint128(25_000_000),
@@ -586,7 +586,7 @@ mod tests {
         // cannot burn more than they have
 
         let info = mock_info(alice, &[]);
-        let burn_from = HandleMsg::BurnFrom {
+        let burn_from = ExecuteMsg::BurnFrom {
             owner: bob.into(),
             amount: Uint128(3_300_000),
         };
@@ -598,7 +598,7 @@ mod tests {
 
         // burn 1_000_000 EPOXY to get back 1_500 DENOM (constant curve)
         let info = mock_info(alice, &[]);
-        let burn_from = HandleMsg::BurnFrom {
+        let burn_from = ExecuteMsg::BurnFrom {
             owner: bob.into(),
             amount: Uint128(1_000_000),
         };

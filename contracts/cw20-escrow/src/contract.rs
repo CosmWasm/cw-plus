@@ -4,11 +4,11 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
-use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
-    CreateMsg, DetailsResponse, HandleMsg, InstantiateMsg, ListResponse, QueryMsg, ReceiveMsg,
+    CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, ListResponse, QueryMsg, ReceiveMsg,
 };
 use crate::state::{all_escrow_ids, Escrow, GenericBalance, ESCROWS};
 
@@ -31,16 +31,16 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Create(msg) => {
+        ExecuteMsg::Create(msg) => {
             execute_create(deps, msg, Balance::from(info.funds), &info.sender)
         }
-        HandleMsg::Approve { id } => execute_approve(deps, env, info, id),
-        HandleMsg::TopUp { id } => execute_top_up(deps, id, Balance::from(info.funds)),
-        HandleMsg::Refund { id } => execute_refund(deps, env, info, id),
-        HandleMsg::Receive(msg) => execute_receive(deps, info, msg),
+        ExecuteMsg::Approve { id } => execute_approve(deps, env, info, id),
+        ExecuteMsg::TopUp { id } => execute_top_up(deps, id, Balance::from(info.funds)),
+        ExecuteMsg::Refund { id } => execute_refund(deps, env, info, id),
+        ExecuteMsg::Receive(msg) => execute_receive(deps, info, msg),
     }
 }
 
@@ -224,7 +224,7 @@ fn send_tokens(
     let cw20_msgs: StdResult<Vec<_>> = cw20_balance
         .iter()
         .map(|c| {
-            let msg = Cw20HandleMsg::Transfer {
+            let msg = Cw20ExecuteMsg::Transfer {
                 recipient: to.into(),
                 amount: c.amount,
             };
@@ -292,7 +292,7 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
 
-    use crate::msg::HandleMsg::TopUp;
+    use crate::msg::ExecuteMsg::TopUp;
 
     use super::*;
 
@@ -318,7 +318,7 @@ mod tests {
         let sender = HumanAddr::from("source");
         let balance = coins(100, "tokens");
         let info = mock_info(&sender, &balance);
-        let msg = HandleMsg::Create(create.clone());
+        let msg = ExecuteMsg::Create(create.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
@@ -343,7 +343,7 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(
@@ -357,7 +357,7 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -386,11 +386,11 @@ mod tests {
         let receive = Cw20ReceiveMsg {
             sender: HumanAddr::from("source"),
             amount: Uint128(100),
-            msg: Some(to_binary(&HandleMsg::Create(create.clone())).unwrap()),
+            msg: Some(to_binary(&ExecuteMsg::Create(create.clone())).unwrap()),
         };
         let token_contract = HumanAddr::from("my-cw20-token");
         let info = mock_info(&token_contract, &[]);
-        let msg = HandleMsg::Receive(receive.clone());
+        let msg = ExecuteMsg::Receive(receive.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
@@ -421,10 +421,10 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "approve"), res.attributes[0]);
-        let send_msg = Cw20HandleMsg::Transfer {
+        let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: create.recipient,
             amount: receive.amount,
         };
@@ -440,7 +440,7 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id });
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
             e => panic!("Expected NotFound, got {}", e),
@@ -515,7 +515,7 @@ mod tests {
         let sender = HumanAddr::from("source");
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
         let info = mock_info(&sender, &balance);
-        let msg = HandleMsg::Create(create.clone());
+        let msg = ExecuteMsg::Create(create.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
@@ -523,7 +523,7 @@ mod tests {
         // top it up with 2 more native tokens
         let extra_native = vec![coin(250, "random"), coin(300, "stake")];
         let info = mock_info(&sender, &extra_native);
-        let top_up = HandleMsg::TopUp {
+        let top_up = ExecuteMsg::TopUp {
             id: create.id.clone(),
         };
         let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
@@ -535,7 +535,7 @@ mod tests {
         let base = TopUp {
             id: create.id.clone(),
         };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
+        let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: HumanAddr::from("random"),
             amount: Uint128(7890),
             msg: Some(to_binary(&base).unwrap()),
@@ -551,7 +551,7 @@ mod tests {
         let base = TopUp {
             id: create.id.clone(),
         };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
+        let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: HumanAddr::from("random"),
             amount: Uint128(7890),
             msg: Some(to_binary(&base).unwrap()),
@@ -568,7 +568,7 @@ mod tests {
         let base = TopUp {
             id: create.id.clone(),
         };
-        let top_up = HandleMsg::Receive(Cw20ReceiveMsg {
+        let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: HumanAddr::from("random"),
             amount: Uint128(888),
             msg: Some(to_binary(&base).unwrap()),
@@ -581,7 +581,7 @@ mod tests {
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Approve { id }).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap();
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(3, res.messages.len());
 
@@ -595,7 +595,7 @@ mod tests {
         );
 
         // second one release bar cw20 token
-        let send_msg = Cw20HandleMsg::Transfer {
+        let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: create.recipient.clone(),
             amount: Uint128(7890),
         };
@@ -609,7 +609,7 @@ mod tests {
         );
 
         // third one release foo cw20 token
-        let send_msg = Cw20HandleMsg::Transfer {
+        let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: create.recipient.clone(),
             amount: Uint128(888),
         };

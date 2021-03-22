@@ -14,7 +14,7 @@ use cw20_base::contract::{
 use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, InvestmentResponse, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, InvestmentResponse, QueryMsg};
 use crate::state::{InvestmentInfo, Supply, CLAIMS, INVESTMENT, TOTAL_SUPPLY};
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
@@ -75,50 +75,50 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Bond {} => bond(deps, env, info),
-        HandleMsg::Unbond { amount } => unbond(deps, env, info, amount),
-        HandleMsg::Claim {} => claim(deps, env, info),
-        HandleMsg::Reinvest {} => reinvest(deps, env, info),
-        HandleMsg::_BondAllTokens {} => _bond_all_tokens(deps, env, info),
+        ExecuteMsg::Bond {} => bond(deps, env, info),
+        ExecuteMsg::Unbond { amount } => unbond(deps, env, info, amount),
+        ExecuteMsg::Claim {} => claim(deps, env, info),
+        ExecuteMsg::Reinvest {} => reinvest(deps, env, info),
+        ExecuteMsg::_BondAllTokens {} => _bond_all_tokens(deps, env, info),
 
         // these all come from cw20-base to implement the cw20 standard
-        HandleMsg::Transfer { recipient, amount } => {
+        ExecuteMsg::Transfer { recipient, amount } => {
             Ok(execute_transfer(deps, env, info, recipient, amount)?)
         }
-        HandleMsg::Burn { amount } => Ok(execute_burn(deps, env, info, amount)?),
-        HandleMsg::Send {
+        ExecuteMsg::Burn { amount } => Ok(execute_burn(deps, env, info, amount)?),
+        ExecuteMsg::Send {
             contract,
             amount,
             msg,
         } => Ok(execute_send(deps, env, info, contract, amount, msg)?),
-        HandleMsg::IncreaseAllowance {
+        ExecuteMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
         } => Ok(execute_increase_allowance(
             deps, env, info, spender, amount, expires,
         )?),
-        HandleMsg::DecreaseAllowance {
+        ExecuteMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
         } => Ok(execute_decrease_allowance(
             deps, env, info, spender, amount, expires,
         )?),
-        HandleMsg::TransferFrom {
+        ExecuteMsg::TransferFrom {
             owner,
             recipient,
             amount,
         } => Ok(execute_transfer_from(
             deps, env, info, owner, recipient, amount,
         )?),
-        HandleMsg::BurnFrom { owner, amount } => {
+        ExecuteMsg::BurnFrom { owner, amount } => {
             Ok(execute_burn_from(deps, env, info, owner, amount)?)
         }
-        HandleMsg::SendFrom {
+        ExecuteMsg::SendFrom {
             owner,
             contract,
             amount,
@@ -341,7 +341,7 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
 pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response, ContractError> {
     let contract_addr = env.contract.address;
     let invest = INVESTMENT.load(deps.storage)?;
-    let msg = to_binary(&HandleMsg::_BondAllTokens {})?;
+    let msg = to_binary(&ExecuteMsg::_BondAllTokens {})?;
 
     // and bond them to the validator
     let res = Response {
@@ -616,7 +616,7 @@ mod tests {
 
         // let's bond some tokens now
         let bob = HumanAddr::from("bob");
-        let bond_msg = HandleMsg::Bond {};
+        let bond_msg = ExecuteMsg::Bond {};
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
 
         // try to bond and make sure we trigger delegation
@@ -660,7 +660,7 @@ mod tests {
 
         // let's bond some tokens now
         let bob = HumanAddr::from("bob");
-        let bond_msg = HandleMsg::Bond {};
+        let bond_msg = ExecuteMsg::Bond {};
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
         let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
@@ -669,7 +669,7 @@ mod tests {
         set_delegation(&mut deps.querier, 1000, "ustake");
 
         // fake a reinvestment (this must be sent by the contract itself)
-        let rebond_msg = HandleMsg::_BondAllTokens {};
+        let rebond_msg = ExecuteMsg::_BondAllTokens {};
         let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(500, "ustake"));
@@ -687,7 +687,7 @@ mod tests {
 
         // we bond some other tokens and get a different issuance price (maintaining the ratio)
         let alice = HumanAddr::from("alice");
-        let bond_msg = HandleMsg::Bond {};
+        let bond_msg = ExecuteMsg::Bond {};
         let info = mock_info(&alice, &[coin(3000, "ustake")]);
         let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
@@ -719,7 +719,7 @@ mod tests {
 
         // let's bond some tokens now
         let bob = HumanAddr::from("bob");
-        let bond_msg = HandleMsg::Bond {};
+        let bond_msg = ExecuteMsg::Bond {};
         let info = mock_info(&bob, &[coin(500, "photon")]);
 
         // try to bond and make sure we trigger delegation
@@ -745,7 +745,7 @@ mod tests {
 
         // let's bond some tokens now
         let bob = HumanAddr::from("bob");
-        let bond_msg = HandleMsg::Bond {};
+        let bond_msg = ExecuteMsg::Bond {};
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
         let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
@@ -755,7 +755,7 @@ mod tests {
 
         // fake a reinvestment (this must be sent by the contract itself)
         // after this, we see 1000 issues and 1500 bonded (and a price of 1.5)
-        let rebond_msg = HandleMsg::_BondAllTokens {};
+        let rebond_msg = ExecuteMsg::_BondAllTokens {};
         let info = mock_info(MOCK_CONTRACT_ADDR, &[]);
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(500, "ustake"));
@@ -766,7 +766,7 @@ mod tests {
         deps.querier.update_balance(MOCK_CONTRACT_ADDR, vec![]);
 
         // creator now tries to unbond these tokens - this must fail
-        let unbond_msg = HandleMsg::Unbond {
+        let unbond_msg = ExecuteMsg::Unbond {
             amount: Uint128(600),
         };
         let info = mock_info(&creator, &[]);
@@ -779,7 +779,7 @@ mod tests {
         // bob unbonds 600 tokens at 10% tax...
         // 60 are taken and send to the owner
         // 540 are unbonded in exchange for 540 * 1.5 = 810 native tokens
-        let unbond_msg = HandleMsg::Unbond {
+        let unbond_msg = ExecuteMsg::Unbond {
             amount: Uint128(600),
         };
         let owner_cut = Uint128(60);
@@ -834,11 +834,11 @@ mod tests {
         // bond some tokens
         let bob = HumanAddr::from("bob");
         let info = mock_info(&bob, &coins(1000, "ustake"));
-        execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
         set_delegation(&mut deps.querier, 1000, "ustake");
 
         // unbond part of them
-        let unbond_msg = HandleMsg::Unbond {
+        let unbond_msg = ExecuteMsg::Unbond {
             amount: Uint128(600),
         };
         let env = mock_env();
@@ -861,14 +861,14 @@ mod tests {
             deps.as_mut(),
             claim_ready.clone(),
             info.clone(),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         );
         assert!(fail.is_err(), "{:?}", fail);
 
         // provide the balance, but claim not yet mature - also prohibited
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(540, "ustake"));
-        let fail = execute(deps.as_mut(), too_soon, info.clone(), HandleMsg::Claim {});
+        let fail = execute(deps.as_mut(), too_soon, info.clone(), ExecuteMsg::Claim {});
         assert!(fail.is_err(), "{:?}", fail);
 
         // this should work with cash and claims ready
@@ -876,7 +876,7 @@ mod tests {
             deps.as_mut(),
             claim_ready,
             info.clone(),
-            HandleMsg::Claim {},
+            ExecuteMsg::Claim {},
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
@@ -911,14 +911,14 @@ mod tests {
 
         // bond some tokens to create a balance
         let info = mock_info(&bob, &[coin(10, "random"), coin(1000, "ustake")]);
-        execute(deps.as_mut(), mock_env(), info, HandleMsg::Bond {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
 
         // bob got 1000 DRV for 1000 stake at a 1.0 ratio
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(1000));
 
         // send coins to carl
         let bob_info = mock_info(&bob, &[]);
-        let transfer = HandleMsg::Transfer {
+        let transfer = ExecuteMsg::Transfer {
             recipient: carl.clone(),
             amount: Uint128(200),
         };
@@ -927,7 +927,7 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), &carl), Uint128(200));
 
         // allow alice
-        let allow = HandleMsg::IncreaseAllowance {
+        let allow = ExecuteMsg::IncreaseAllowance {
             spender: alice.clone(),
             amount: Uint128(350),
             expires: None,
@@ -943,7 +943,7 @@ mod tests {
         );
 
         // alice takes some for herself
-        let self_pay = HandleMsg::TransferFrom {
+        let self_pay = ExecuteMsg::TransferFrom {
             owner: bob.clone(),
             recipient: alice.clone(),
             amount: Uint128(250),
@@ -960,13 +960,13 @@ mod tests {
         );
 
         // burn some, but not too much
-        let burn_too_much = HandleMsg::Burn {
+        let burn_too_much = ExecuteMsg::Burn {
             amount: Uint128(1000),
         };
         let failed = execute(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
         assert!(failed.is_err());
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
-        let burn = HandleMsg::Burn {
+        let burn = ExecuteMsg::Burn {
             amount: Uint128(130),
         };
         execute(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();

@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Change the admin
     UpdateAdmin { admin: Option<HumanAddr> },
     /// apply a diff to the existing members.

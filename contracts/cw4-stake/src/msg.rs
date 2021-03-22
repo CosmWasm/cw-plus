@@ -20,7 +20,7 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Bond will bond all staking tokens sent with the message and update membership weight
     Bond {},
     /// Unbond will start the unbonding process for the given number of tokens.

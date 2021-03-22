@@ -59,7 +59,7 @@ fn is_valid_symbol(symbol: &str) -> bool {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// Transfer is a base message to move tokens to another account without triggering actions
     Transfer {
         recipient: HumanAddr,

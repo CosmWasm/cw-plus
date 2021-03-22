@@ -2,10 +2,10 @@
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{coins, to_binary, HumanAddr, Uint128};
-use cw20::{Cw20CoinHuman, Cw20Contract, Cw20HandleMsg};
+use cw20::{Cw20CoinHuman, Cw20Contract, Cw20ExecuteMsg};
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
-use crate::msg::{CreateMsg, DetailsResponse, HandleMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
+use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
 
 fn mock_app() -> App {
     let env = mock_env();
@@ -92,7 +92,7 @@ fn escrow_happy_path_cw20_tokens() {
         cw20_whitelist: None,
     });
     let create_bin = to_binary(&create_msg).unwrap();
-    let send_msg = Cw20HandleMsg::Send {
+    let send_msg = Cw20ExecuteMsg::Send {
         contract: escrow_addr.clone(),
         amount: Uint128(1200),
         msg: Some(create_bin),
@@ -126,7 +126,7 @@ fn escrow_happy_path_cw20_tokens() {
     );
 
     // release escrow
-    let approve_msg = HandleMsg::Approve { id: id.clone() };
+    let approve_msg = ExecuteMsg::Approve { id: id.clone() };
     let _ = router
         .execute_contract(&arb, &escrow_addr, &approve_msg, &[])
         .unwrap();

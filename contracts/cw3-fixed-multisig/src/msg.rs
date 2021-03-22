@@ -21,7 +21,7 @@ pub struct Voter {
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     Propose {
         title: String,
         description: String,

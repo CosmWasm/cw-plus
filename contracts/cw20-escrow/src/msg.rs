@@ -10,7 +10,7 @@ pub struct InstantiateMsg {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     Create(CreateMsg),
     /// Adds all sent native tokens to the contract
     TopUp {
