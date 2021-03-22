@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
-    StdResult, Uint128,
+    attr, coins, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HumanAddr,
+    MessageInfo, Response, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -23,6 +23,7 @@ use cw0::{must_pay, nonpayable};
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -55,6 +56,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[entry_point]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -254,6 +256,7 @@ fn do_sell(
     Ok(res)
 }
 
+#[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     // default implementation stores curve info as enum, you can do something else in a derived
     // contract and just pass in your custom curve to do_execute

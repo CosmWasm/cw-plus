@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HumanAddr, MessageInfo, Order, Response, StdResult,
+    attr, entry_point, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut,
+    Empty, Env, HumanAddr, MessageInfo, Order, Response, StdResult,
 };
 
 use cw0::{maybe_canonical, Expiration};
@@ -23,6 +23,7 @@ use crate::state::{
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -58,6 +59,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[entry_point]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -269,6 +271,7 @@ pub fn execute_close(
     })
 }
 
+#[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),

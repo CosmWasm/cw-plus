@@ -1,10 +1,13 @@
 use schemars::JsonSchema;
 use std::fmt;
 
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env, HumanAddr,
     MessageInfo, Response, StdResult,
 };
+
 use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
 
@@ -16,6 +19,7 @@ use crate::state::{AdminList, ADMIN_LIST};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -42,6 +46,7 @@ fn map_human(api: &dyn Api, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr
     admins.iter().map(|addr| api.human_address(addr)).collect()
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -119,6 +124,7 @@ fn can_execute(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
     Ok(can)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
