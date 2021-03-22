@@ -4,7 +4,7 @@ use std::fs::create_dir_all;
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use cw20_atomic_swap::msg::DetailsResponse;
-use cw20_atomic_swap::msg::HandleMsg;
+use cw20_atomic_swap::msg::ExecuteMsg;
 use cw20_atomic_swap::msg::InstantiateMsg;
 use cw20_atomic_swap::msg::ListResponse;
 use cw20_atomic_swap::msg::QueryMsg;
@@ -16,7 +16,7 @@ fn main() {
     remove_schemas(&out_dir).unwrap();
 
     export_schema(&schema_for!(InstantiateMsg), &out_dir);
-    export_schema(&schema_for!(HandleMsg), &out_dir);
+    export_schema(&schema_for!(ExecuteMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(ListResponse), &out_dir);
     export_schema(&schema_for!(DetailsResponse), &out_dir);

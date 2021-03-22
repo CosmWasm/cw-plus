@@ -1,73 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg",
+  "title": "ExecuteMsg",
   "anyOf": [
     {
-      "type": "object",
-      "required": [
-        "propose"
-      ],
-      "properties": {
-        "propose": {
-          "type": "object",
-          "required": [
-            "description",
-            "msgs",
-            "title"
-          ],
-          "properties": {
-            "description": {
-              "type": "string"
-            },
-            "latest": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "msgs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/CosmosMsg_for_Empty"
-              }
-            },
-            "title": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "vote"
-      ],
-      "properties": {
-        "vote": {
-          "type": "object",
-          "required": [
-            "proposal_id",
-            "vote"
-          ],
-          "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "vote": {
-              "$ref": "#/definitions/Vote"
-            }
-          }
-        }
-      }
-    },
-    {
+      "description": "Execute requests the contract to re-dispatch all these messages with the contract's address as sender. Every implementation has it's own logic to determine in",
       "type": "object",
       "required": [
         "execute"
@@ -76,34 +12,49 @@
         "execute": {
           "type": "object",
           "required": [
-            "proposal_id"
+            "msgs"
           ],
           "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
+            "msgs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CosmosMsg_for_Empty"
+              }
             }
           }
         }
       }
     },
     {
+      "description": "Freeze will make a mutable contract immutable, must be called by an admin",
       "type": "object",
       "required": [
-        "close"
+        "freeze"
       ],
       "properties": {
-        "close": {
+        "freeze": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "UpdateAdmins will change the admin set of the contract, must be called by an existing admin, and only works if the contract is mutable",
+      "type": "object",
+      "required": [
+        "update_admins"
+      ],
+      "properties": {
+        "update_admins": {
           "type": "object",
           "required": [
-            "proposal_id"
+            "admins"
           ],
           "properties": {
-            "proposal_id": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
+            "admins": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
             }
           }
         }
@@ -213,51 +164,6 @@
     "Empty": {
       "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
       "type": "object"
-    },
-    "Expiration": {
-      "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-      "anyOf": [
-        {
-          "description": "AtHeight will expire when `env.block.height` >= height",
-          "type": "object",
-          "required": [
-            "at_height"
-          ],
-          "properties": {
-            "at_height": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        },
-        {
-          "description": "AtTime will expire when `env.block.time` >= time",
-          "type": "object",
-          "required": [
-            "at_time"
-          ],
-          "properties": {
-            "at_time": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0
-            }
-          }
-        },
-        {
-          "description": "Never will never expire. Used to express the empty variant",
-          "type": "object",
-          "required": [
-            "never"
-          ],
-          "properties": {
-            "never": {
-              "type": "object"
-            }
-          }
-        }
-      ]
     },
     "HumanAddr": {
       "type": "string"
@@ -376,15 +282,6 @@
     },
     "Uint128": {
       "type": "string"
-    },
-    "Vote": {
-      "type": "string",
-      "enum": [
-        "yes",
-        "no",
-        "abstain",
-        "veto"
-      ]
     },
     "WasmMsg": {
       "description": "The message types of the wasm module.\n\nSee https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto",
