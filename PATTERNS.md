@@ -54,7 +54,7 @@ pub struct InitMsg {
 }
 
 // dispatch (like cw20 send), the callback contract
-// must support a superset of this in HandleMsg
+// must support a superset of this in ExecuteMsg
 pub enum CallbackMsg {
     Instantiated{
         contract: HumanAddr,
@@ -83,7 +83,7 @@ pub fn init(deps: DepsMut,
         messages.push(wasm.into())
     }
     
-    Ok(HandleResponse{
+    Ok(Response{
         messages,
     })
 }
@@ -139,7 +139,7 @@ while a proposal is open.
 * [Definition of the hooks in cw4 spec](https://github.com/CosmWasm/cosmwasm-plus/blob/c5e8fc92c0412fecd6cdd951c2c0261aa3c9445a/packages/cw4/src/hook.rs)
 * [Adding/removing hooks](https://github.com/CosmWasm/cosmwasm-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L156-L190) - which may be refactored into common code
 * [Dispatching updates to all registered hooks](https://github.com/CosmWasm/cosmwasm-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L91-L98)
-* [`cw3-flex-multisig` registers HandleMsg variant](https://github.com/CosmWasm/cosmwasm-plus/blob/db560558c901a2bda933d035dbbc30321c3c66ff/contracts/cw3-flex-multisig/src/msg.rs#L38-L39)
+* [`cw3-flex-multisig` registers ExecuteMsg variant](https://github.com/CosmWasm/cosmwasm-plus/blob/0e58f7ebc24c8a16d27e04a0507bac2e11489d0b/contracts/cw3-flex-multisig/src/msg.rs#L126-L127)
 * [`cw3-flex-multisig` updates state based on the hook](https://github.com/CosmWasm/cosmwasm-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L276-L309)
 
 ### Listeners
