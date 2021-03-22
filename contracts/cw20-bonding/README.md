@@ -14,8 +14,8 @@ This serves three purposes:
 There are two variants - accepting native tokens and accepting cw20 tokens
 as the *reserve* token (this is the token that is input to the bonding curve).
 
-Minting: When the input is sent to the contract (either via `HandleMsg::Buy{}`
-with native tokens, or via `HandleMsg::Receive{}` with cw20 tokens),
+Minting: When the input is sent to the contract (either via `ExecuteMsg::Buy{}`
+with native tokens, or via `ExecuteMsg::Receive{}` with cw20 tokens),
 those tokens remain on the contract and it issues it's own token to the
 sender's account (known as *supply* token).
 
