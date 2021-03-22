@@ -11,7 +11,7 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema(&schema_for!(cw1155::Cw1155HandleMsg), &out_dir);
+    export_schema(&schema_for!(cw1155::Cw1155ExecuteMsg), &out_dir);
     export_schema(&schema_for!(cw1155::Cw1155QueryMsg), &out_dir);
     export_schema(&schema_for!(cw1155::Cw1155ReceiveMsg), &out_dir);
     export_schema(&schema_for!(cw1155::Cw1155BatchReceiveMsg), &out_dir);

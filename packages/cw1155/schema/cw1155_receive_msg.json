@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Cw1155ReceiveMsg",
-  "description": "Cw1155ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg",
+  "description": "Cw1155ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg",
   "type": "object",
   "required": [
     "amount",

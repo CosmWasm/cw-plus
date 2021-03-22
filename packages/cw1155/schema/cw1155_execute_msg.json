@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cw1155HandleMsg",
+  "title": "Cw1155ExecuteMsg",
   "anyOf": [
     {
       "description": "SendFrom is a base message to move tokens, if `env.sender` is the owner or has sufficient pre-approval.",

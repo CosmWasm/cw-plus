@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Cw20HandleMsg",
+  "title": "Cw20ExecuteMsg",
   "anyOf": [
     {
       "description": "Transfer is a base message to move tokens to another account without triggering actions",
