@@ -4,7 +4,7 @@ pub use crate::balance::Balance;
 pub use crate::coin::{Cw20Coin, Cw20CoinHuman};
 pub use crate::denom::Denom;
 pub use crate::helpers::Cw20Contract;
-pub use crate::msg::Cw20HandleMsg;
+pub use crate::msg::Cw20ExecuteMsg;
 pub use crate::query::{
     AllAccountsResponse, AllAllowancesResponse, AllowanceInfo, AllowanceResponse, BalanceResponse,
     Cw20QueryMsg, MinterResponse, TokenInfoResponse,

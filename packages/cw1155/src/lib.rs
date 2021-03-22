@@ -1,4 +1,4 @@
-pub use crate::msg::{Cw1155HandleMsg, TokenId};
+pub use crate::msg::{Cw1155ExecuteMsg, TokenId};
 pub use crate::query::{
     Approval, ApprovedForAllResponse, BalanceResponse, BatchBalanceResponse, Cw1155QueryMsg,
     IsApprovedForAllResponse, TokenInfoResponse, TokensResponse,

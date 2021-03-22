@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{to_binary, Api, CanonicalAddr, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 
-use crate::msg::Cw1HandleMsg;
+use crate::msg::Cw1ExecuteMsg;
 
 /// Cw1Contract is a wrapper around HumanAddr that provides a lot of helpers
 /// for working with this.
@@ -24,7 +24,7 @@ impl Cw1Contract {
     }
 
     pub fn execute<T: Into<Vec<CosmosMsg>>>(&self, msgs: T) -> StdResult<CosmosMsg> {
-        let msg = Cw1HandleMsg::Execute { msgs: msgs.into() };
+        let msg = Cw1ExecuteMsg::Execute { msgs: msgs.into() };
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),
             msg: to_binary(&msg)?,

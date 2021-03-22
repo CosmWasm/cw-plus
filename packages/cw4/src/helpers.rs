@@ -6,7 +6,7 @@ use cosmwasm_std::{
     HumanAddr, QuerierWrapper, QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
 };
 
-use crate::msg::Cw4HandleMsg;
+use crate::msg::Cw4ExecuteMsg;
 use crate::query::HooksResponse;
 use crate::{
     member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY,
@@ -28,7 +28,7 @@ impl Cw4Contract {
         self.0.clone()
     }
 
-    fn encode_msg(&self, msg: Cw4HandleMsg) -> StdResult<CosmosMsg> {
+    fn encode_msg(&self, msg: Cw4ExecuteMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),
             msg: to_binary(&msg)?,
@@ -38,12 +38,12 @@ impl Cw4Contract {
     }
 
     pub fn add_hook(&self, addr: HumanAddr) -> StdResult<CosmosMsg> {
-        let msg = Cw4HandleMsg::AddHook { addr };
+        let msg = Cw4ExecuteMsg::AddHook { addr };
         self.encode_msg(msg)
     }
 
     pub fn remove_hook(&self, addr: HumanAddr) -> StdResult<CosmosMsg> {
-        let msg = Cw4HandleMsg::AddHook { addr };
+        let msg = Cw4ExecuteMsg::AddHook { addr };
         self.encode_msg(msg)
     }
 
@@ -51,7 +51,7 @@ impl Cw4Contract {
         &self,
         admin: Option<HumanAddr>,
     ) -> StdResult<CosmosMsg> {
-        let msg = Cw4HandleMsg::UpdateAdmin { admin };
+        let msg = Cw4ExecuteMsg::UpdateAdmin { admin };
         self.encode_msg(msg)
     }
 

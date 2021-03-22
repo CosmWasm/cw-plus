@@ -7,7 +7,7 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    AllNftInfoResponse, Approval, ApprovedForAllResponse, ContractInfoResponse, Cw721HandleMsg,
+    AllNftInfoResponse, Approval, ApprovedForAllResponse, ContractInfoResponse, Cw721ExecuteMsg,
     Cw721QueryMsg, NftInfoResponse, NumTokensResponse, OwnerOfResponse, TokensResponse,
 };
 
@@ -29,7 +29,7 @@ impl Cw721Contract {
         Ok(Cw721CanonicalContract(canon))
     }
 
-    pub fn call(&self, msg: Cw721HandleMsg) -> StdResult<CosmosMsg> {
+    pub fn call(&self, msg: Cw721ExecuteMsg) -> StdResult<CosmosMsg> {
         let msg = to_binary(&msg)?;
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),

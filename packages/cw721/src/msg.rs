@@ -6,7 +6,7 @@ use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Cw721HandleMsg {
+pub enum Cw721ExecuteMsg {
     /// Transfer is a base message to move a token to another account without triggering actions
     TransferNft {
         recipient: HumanAddr,

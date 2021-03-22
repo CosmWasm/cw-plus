@@ -29,7 +29,7 @@ impl MemberDiff {
     }
 }
 
-/// MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a HandleMsg.
+/// MemberChangedHookMsg should be de/serialized under `MemberChangedHook()` variant in a ExecuteMsg.
 /// This contains a list of all diffs on the given transaction.
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -48,7 +48,7 @@ impl MemberChangedHookMsg {
 
     /// serializes the message
     pub fn into_binary(self) -> StdResult<Binary> {
-        let msg = MemberChangedHandleMsg::MemberChangedHook(self);
+        let msg = MemberChangedExecuteMsg::MemberChangedHook(self);
         to_binary(&msg)
     }
 
@@ -67,6 +67,6 @@ impl MemberChangedHookMsg {
 // This is just a helper to properly serialize the above message
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-enum MemberChangedHandleMsg {
+enum MemberChangedExecuteMsg {
     MemberChangedHook(MemberChangedHookMsg),
 }

@@ -6,7 +6,7 @@ use cosmwasm_std::{CosmosMsg, Empty};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Cw1HandleMsg<T = Empty>
+pub enum Cw1ExecuteMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {

@@ -8,7 +8,7 @@ pub type TokenId = String;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Cw1155HandleMsg {
+pub enum Cw1155ExecuteMsg {
     /// SendFrom is a base message to move tokens,
     /// if `env.sender` is the owner or has sufficient pre-approval.
     SendFrom {

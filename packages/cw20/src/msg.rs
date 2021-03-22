@@ -8,7 +8,7 @@ use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Cw20HandleMsg {
+pub enum Cw20ExecuteMsg {
     /// Transfer is a base message to move tokens to another account without triggering actions
     Transfer {
         recipient: HumanAddr,

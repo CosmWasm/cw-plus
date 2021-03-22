@@ -7,7 +7,7 @@ use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Cw3HandleMsg<T = Empty>
+pub enum Cw3ExecuteMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -59,7 +59,7 @@ mod test {
 
     #[test]
     fn vote_encoding_embedded() {
-        let msg = Cw3HandleMsg::Vote::<Empty> {
+        let msg = Cw3ExecuteMsg::Vote::<Empty> {
             proposal_id: 17,
             vote: Vote::No,
         };
