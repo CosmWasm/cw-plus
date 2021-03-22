@@ -1,42 +1,54 @@
-use cosmwasm_std::{attr, Attribute, HumanAddr, Uint128};
+use cosmwasm_std::{HumanAddr, Response, Uint128};
 use cw0::Event;
 
-use crate::msg::TokenId;
-
+/// Tracks token transfer/mint/burn actions
 pub struct TransferEvent<'a> {
     pub from: Option<&'a HumanAddr>,
     pub to: Option<&'a HumanAddr>,
-    pub token_id: TokenId,
+    pub token_id: &'a str,
     pub amount: Uint128,
 }
 
-impl Event for TransferEvent {
-    fn write_attributes(&self, attributes: &mut Vec<Attribute>) {
-        attributes.extend_from_slice(&[
-            attr("action", "transfer"),
-            attr("token_id", self.token_id),
-            attr("amount", self.amount),
-        ]);
-        if let Some(from) = from {
-            attributes.push(attr("from", from));
+impl<'a> Event for TransferEvent<'a> {
+    fn add_attributes(&self, rsp: &mut Response) {
+        rsp.add_attribute("action", "transfer");
+        rsp.add_attribute("token_id", self.token_id);
+        rsp.add_attribute("amount", self.amount);
+        if let Some(from) = self.from {
+            rsp.add_attribute("from", from.to_string());
         }
-        if let Some(to) = to {
-            attributes.push(attr("to", to));
+        if let Some(to) = self.to {
+            rsp.add_attribute("to", to.to_string());
         }
     }
 }
 
+/// Tracks token metadata changes
 pub struct MetadataEvent<'a> {
     pub url: &'a str,
-    pub token_id: TokenId,
+    pub token_id: &'a str,
 }
 
-impl Event for URLEvent {
-    fn write_attributes(&self, attributes: &mut Vec<Attribute>) {
-        attributes.extend_from_slice(&[
-            attr("action", "set_metadata"),
-            attr("url", self.url),
-            attr("token_id", self.token_id),
-        ]);
+impl<'a> Event for MetadataEvent<'a> {
+    fn add_attributes(&self, rsp: &mut Response) {
+        rsp.add_attribute("action", "set_metadata");
+        rsp.add_attribute("url", self.url);
+        rsp.add_attribute("token_id", self.token_id);
+    }
+}
+
+/// Tracks approve_all status changes
+pub struct ApproveAllEvent<'a> {
+    pub sender: &'a HumanAddr,
+    pub operator: &'a HumanAddr,
+    pub approved: bool,
+}
+
+impl<'a> Event for ApproveAllEvent<'a> {
+    fn add_attributes(&self, rsp: &mut Response) {
+        rsp.add_attribute("action", "approve_all");
+        rsp.add_attribute("sender", self.sender.to_string());
+        rsp.add_attribute("operator", self.operator.to_string());
+        rsp.add_attribute("approved", (self.approved as u32).to_string());
     }
 }
