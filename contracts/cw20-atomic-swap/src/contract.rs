@@ -339,11 +339,7 @@ mod tests {
                 info.clone(),
                 ExecuteMsg::Create(create.clone()),
             );
-            match res {
-                Ok(_) => panic!("expected error"),
-                Err(ContractError::InvalidId {}) => {}
-                Err(e) => panic!("unexpected error: {:?}", e),
-            }
+            assert_eq!(ContractError::InvalidId {}, res.unwrap_err());
         }
 
         // Cannot create, no funds
@@ -360,11 +356,7 @@ mod tests {
             info,
             ExecuteMsg::Create(create.clone()),
         );
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::EmptyBalance {}) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert_eq!(ContractError::EmptyBalance {}, res.unwrap_err());
 
         // Cannot create, expired
         let info = mock_info(&sender, &balance);
@@ -380,11 +372,7 @@ mod tests {
             info,
             ExecuteMsg::Create(create.clone()),
         );
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::Expired) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert_eq!(ContractError::Expired {}, res.unwrap_err());
 
         // Cannot create, invalid hash
         let info = mock_info(&sender, &balance);
@@ -400,13 +388,10 @@ mod tests {
             info,
             ExecuteMsg::Create(create.clone()),
         );
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::ParseError(msg)) => {
-                assert_eq!(msg, "Invalid character \'u\' at position 1".to_string())
-            }
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert_eq!(
+            ContractError::ParseError("Invalid character \'u\' at position 1".into()),
+            res.unwrap_err()
+        );
 
         // Can create, all valid
         let info = mock_info(&sender, &balance);
@@ -441,11 +426,7 @@ mod tests {
             info,
             ExecuteMsg::Create(create.clone()),
         );
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::AlreadyExists {}) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert_eq!(ContractError::AlreadyExists {}, res.unwrap_err());
     }
 
     #[test]
@@ -482,10 +463,9 @@ mod tests {
             preimage: preimage(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::Std(StdError::NotFound { .. })) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
+        match res.unwrap_err() {
+            ContractError::Std(StdError::NotFound { .. }) => {}
+            e => panic!("unexpected error: {:?}", e),
         }
 
         // Cannot release, invalid hash
@@ -494,13 +474,10 @@ mod tests {
             preimage: "bu115h17".to_string(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::ParseError(msg)) => {
-                assert_eq!(msg, "Invalid character \'u\' at position 1".to_string())
-            }
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert_eq!(
+            ContractError::ParseError("Invalid character \'u\' at position 1".to_string()),
+            res.unwrap_err()
+        );
 
         // Cannot release, wrong hash
         let release = ExecuteMsg::Release {
