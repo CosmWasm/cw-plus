@@ -365,7 +365,7 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
+            e => panic!("Expected NotFound, got {:?}", e),
         }
     }
 
@@ -448,7 +448,7 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
         match res.unwrap_err() {
             ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
+            e => panic!("Expected NotFound, got {:?}", e),
         }
     }
 
@@ -563,10 +563,7 @@ mod tests {
         });
         let info = mock_info(&baz_token, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, top_up);
-        match res.unwrap_err() {
-            ContractError::NotInWhitelist {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::NotInWhitelist {}, res.unwrap_err());
 
         // top up with second foreign token
         let foo_token = HumanAddr::from("foo_token");
