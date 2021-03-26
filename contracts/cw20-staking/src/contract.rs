@@ -547,10 +547,12 @@ mod tests {
 
         // make sure we can instantiate with this
         let res = instantiate(deps.as_mut(), mock_env(), info, msg.clone());
-        match res.unwrap_err() {
-            ContractError::NotInValidatorSet { .. } => {}
-            _ => panic!("expected unregistered validator error"),
-        }
+        assert_eq!(
+            ContractError::NotInValidatorSet {
+                validator: "my-validator".into()
+            },
+            res.unwrap_err()
+        );
     }
 
     #[test]
@@ -729,10 +731,12 @@ mod tests {
 
         // try to bond and make sure we trigger delegation
         let res = execute(deps.as_mut(), mock_env(), info, bond_msg);
-        match res.unwrap_err() {
-            ContractError::EmptyBalance { .. } => {}
-            e => panic!("Expected wrong denom error, got: {:?}", e),
-        };
+        assert_eq!(
+            ContractError::EmptyBalance {
+                denom: "ustake".to_string()
+            },
+            res.unwrap_err()
+        );
     }
 
     #[test]
@@ -776,10 +780,10 @@ mod tests {
         };
         let info = mock_info(&creator, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, unbond_msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(
+            ContractError::Std(StdError::underflow(0, 600)),
+            res.unwrap_err()
+        );
 
         // bob unbonds 600 tokens at 10% tax...
         // 60 are taken and send to the owner
