@@ -502,10 +502,10 @@ mod tests {
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
         let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg);
-        match res.unwrap_err() {
-            StdError::GenericErr { msg, .. } => assert_eq!(&msg, "Initial supply greater than cap"),
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(
+            StdError::generic_err("Initial supply greater than cap"),
+            res.unwrap_err()
+        );
     }
 
     #[test]
@@ -541,10 +541,7 @@ mod tests {
         let info = mock_info(&minter, &[]);
         let env = mock_env();
         let res = execute(deps.as_mut(), env, info, msg.clone());
-        match res.unwrap_err() {
-            ContractError::InvalidZeroAmount {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
 
         // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
@@ -555,10 +552,7 @@ mod tests {
         let info = mock_info(&minter, &[]);
         let env = mock_env();
         let res = execute(deps.as_mut(), env, info, msg.clone());
-        match res.unwrap_err() {
-            ContractError::CannotExceedCap {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::CannotExceedCap {}, res.unwrap_err());
     }
 
     #[test]
@@ -579,10 +573,7 @@ mod tests {
         let info = mock_info(&HumanAddr::from("anyone else"), &[]);
         let env = mock_env();
         let res = execute(deps.as_mut(), env, info, msg.clone());
-        match res.unwrap_err() {
-            ContractError::Unauthorized { .. } => {}
-            e => panic!("expected unauthorized error, got {}", e),
-        }
+        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
     }
 
     #[test]
@@ -597,10 +588,7 @@ mod tests {
         let info = mock_info(&HumanAddr::from("genesis"), &[]);
         let env = mock_env();
         let res = execute(deps.as_mut(), env, info, msg.clone());
-        match res.unwrap_err() {
-            ContractError::Unauthorized { .. } => {}
-            e => panic!("expected unauthorized error, got {}", e),
-        }
+        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
     }
 
     #[test]
@@ -702,10 +690,7 @@ mod tests {
             amount: Uint128::zero(),
         };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::InvalidZeroAmount {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
 
         // cannot send more than we have
         let info = mock_info(addr1.clone(), &[]);
@@ -717,7 +702,7 @@ mod tests {
         let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
+            e => panic!("Unexpected error: {:?}", e),
         }
 
         // cannot send from empty account
@@ -730,7 +715,7 @@ mod tests {
         let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
+            e => panic!("Unexpected error: {:?}", e),
         }
 
         // valid transfer
@@ -769,10 +754,7 @@ mod tests {
             amount: Uint128::zero(),
         };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::InvalidZeroAmount {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -785,7 +767,7 @@ mod tests {
         let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
+            e => panic!("Unexpected error: {:?}", e),
         }
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
@@ -828,10 +810,7 @@ mod tests {
             msg: Some(send_msg.clone()),
         };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::InvalidZeroAmount {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
 
         // cannot send more than we have
         let info = mock_info(addr1.clone(), &[]);
@@ -844,7 +823,7 @@ mod tests {
         let res = execute(deps.as_mut(), env, info, msg);
         match res.unwrap_err() {
             ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
+            e => panic!("Unexpected error: {:?}", e),
         }
 
         // valid transfer
