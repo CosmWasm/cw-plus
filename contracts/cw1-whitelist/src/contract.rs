@@ -187,10 +187,7 @@ mod tests {
         };
         let info = mock_info(&anyone, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg);
-        match res.unwrap_err() {
-            ContractError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
 
         // but alice can kick out carl
         let msg = ExecuteMsg::UpdateAdmins {
@@ -209,10 +206,7 @@ mod tests {
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {});
-        match res.unwrap_err() {
-            ContractError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
 
         // but bob can
         let info = mock_info(&bob, &[]);
@@ -229,10 +223,7 @@ mod tests {
         };
         let info = mock_info(&alice, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg);
-        match res.unwrap_err() {
-            ContractError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
     }
 
     #[test]
@@ -272,10 +263,7 @@ mod tests {
         // bob cannot execute them
         let info = mock_info(&bob, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        match res.unwrap_err() {
-            ContractError::Unauthorized { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
 
         // but carl can
         let info = mock_info(&carl, &[]);
