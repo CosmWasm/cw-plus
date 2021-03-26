@@ -127,9 +127,13 @@ pub fn execute_transfer(
     let rcpt_raw = deps.api.canonical_address(&recipient)?;
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
-    BALANCES.update(deps.storage, &sender_raw, |balance: Option<Uint128>| {
-        balance.unwrap_or_default() - amount
-    })?;
+    BALANCES.update(
+        deps.storage,
+        &sender_raw,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
     BALANCES.update(
         deps.storage,
         &rcpt_raw,
@@ -163,12 +167,16 @@ pub fn execute_burn(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // lower balance
-    BALANCES.update(deps.storage, &sender_raw, |balance: Option<Uint128>| {
-        balance.unwrap_or_default() - amount
-    })?;
+    BALANCES.update(
+        deps.storage,
+        &sender_raw,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
     // reduce total_supply
     TOKEN_INFO.update(deps.storage, |mut info| -> StdResult<_> {
-        info.total_supply = (info.total_supply - amount)?;
+        info.total_supply = info.total_supply.checked_sub(amount)?;
         Ok(info)
     })?;
 
@@ -249,9 +257,13 @@ pub fn execute_send(
     let sender_raw = deps.api.canonical_address(&info.sender)?;
 
     // move the tokens to the contract
-    BALANCES.update(deps.storage, &sender_raw, |balance: Option<Uint128>| {
-        balance.unwrap_or_default() - amount
-    })?;
+    BALANCES.update(
+        deps.storage,
+        &sender_raw,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
     BALANCES.update(
         deps.storage,
         &rcpt_raw,
@@ -701,10 +713,7 @@ mod tests {
             amount: too_much,
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // cannot send from empty account
         let info = mock_info(addr2.clone(), &[]);
@@ -714,10 +723,7 @@ mod tests {
             amount: transfer,
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // valid transfer
         let info = mock_info(addr1.clone(), &[]);
@@ -729,7 +735,7 @@ mod tests {
         let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
-        let remainder = (amount1 - transfer).unwrap();
+        let remainder = amount1.checked_sub(transfer).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
         assert_eq!(get_balance(deps.as_ref(), &addr2), transfer);
         assert_eq!(
@@ -766,10 +772,7 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::Burn { amount: too_much };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -782,7 +785,7 @@ mod tests {
         let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
-        let remainder = (amount1 - burn).unwrap();
+        let remainder = amount1.checked_sub(burn).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
@@ -822,10 +825,7 @@ mod tests {
             msg: Some(send_msg.clone()),
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // valid transfer
         let info = mock_info(addr1.clone(), &[]);
@@ -858,7 +858,7 @@ mod tests {
         );
 
         // ensure balance is properly transferred
-        let remainder = (amount1 - transfer).unwrap();
+        let remainder = amount1.checked_sub(transfer).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &addr1), remainder);
         assert_eq!(get_balance(deps.as_ref(), &contract), transfer);
         assert_eq!(

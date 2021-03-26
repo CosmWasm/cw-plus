@@ -257,15 +257,18 @@ pub fn unbond(
     let bonded = get_bonded(&deps.querier, &env.contract.address)?;
 
     // calculate how many native tokens this is worth and update supply
-    let remainder = (amount - tax)?;
+    let remainder = amount.checked_sub(tax).map_err(StdError::overflow)?;
     let mut supply = TOTAL_SUPPLY.load(deps.storage)?;
     // TODO: this is just a safety assertion - do we keep it, or remove caching?
     // in the end supply is just there to cache the (expected) results of get_bonded() so we don't
     // have expensive queries everywhere
     assert_bonds(&supply, bonded)?;
     let unbond = remainder.multiply_ratio(bonded, supply.issued);
-    supply.bonded = (bonded - unbond)?;
-    supply.issued = (supply.issued - remainder)?;
+    supply.bonded = bonded.checked_sub(unbond).map_err(StdError::overflow)?;
+    supply.issued = supply
+        .issued
+        .checked_sub(remainder)
+        .map_err(StdError::overflow)?;
     supply.claims += unbond;
     TOTAL_SUPPLY.save(deps.storage, &supply)?;
 
@@ -316,7 +319,7 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
 
     // update total supply (lower claim)
     TOTAL_SUPPLY.update(deps.storage, |mut supply| -> StdResult<_> {
-        supply.claims = (supply.claims - to_send)?;
+        supply.claims = supply.claims.checked_sub(to_send)?;
         Ok(supply)
     })?;
 
@@ -388,15 +391,15 @@ pub fn _bond_all_tokens(
     // we deduct pending claims from our account balance before reinvesting.
     // if there is not enough funds, we just return a no-op
     match TOTAL_SUPPLY.update(deps.storage, |mut supply| -> StdResult<_> {
-        balance.amount = (balance.amount - supply.claims)?;
+        balance.amount = balance.amount.checked_sub(supply.claims)?;
         // this just triggers the "no op" case if we don't have min_withdrawal left to reinvest
-        (balance.amount - invest.min_withdrawal)?;
+        balance.amount.checked_sub(invest.min_withdrawal)?;
         supply.bonded += balance.amount;
         Ok(supply)
     }) {
         Ok(_) => {}
         // if it is below the minimum, we do a no-op (do not revert other state from withdrawal)
-        Err(StdError::Underflow { .. }) => return Ok(Response::default()),
+        Err(StdError::Overflow { .. }) => return Ok(Response::default()),
         Err(e) => return Err(ContractError::Std(e)),
     }
 
@@ -457,7 +460,10 @@ mod tests {
     use cosmwasm_std::testing::{
         mock_dependencies, mock_env, mock_info, MockQuerier, MOCK_CONTRACT_ADDR,
     };
-    use cosmwasm_std::{coins, Coin, CosmosMsg, Decimal, FullDelegation, Validator};
+    use cosmwasm_std::{
+        coins, Coin, CosmosMsg, Decimal, FullDelegation, OverflowError, OverflowOperation,
+        Validator,
+    };
     use cw0::{Duration, DAY, HOUR, WEEK};
     use cw_controllers::Claim;
 
@@ -780,7 +786,14 @@ mod tests {
         };
         let info = mock_info(&creator, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, unbond_msg).unwrap_err();
-        assert_eq!(err, ContractError::Std(StdError::underflow(0, 600)));
+        assert_eq!(
+            err,
+            ContractError::Std(StdError::overflow(OverflowError::new(
+                OverflowOperation::Sub,
+                0,
+                600
+            )))
+        );
 
         // bob unbonds 600 tokens at 10% tax...
         // 60 are taken and send to the owner

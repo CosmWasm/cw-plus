@@ -132,7 +132,7 @@ pub fn execute_unbond(
     // reduce the sender's stake - aborting if insufficient
     let sender_raw = deps.api.canonical_address(&info.sender)?;
     let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
-        stake.unwrap_or_default() - amount
+        Ok(stake.unwrap_or_default().checked_sub(amount)?)
     })?;
 
     // provide them a claim
@@ -356,7 +356,7 @@ fn list_members(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, Api, StdError, Storage};
+    use cosmwasm_std::{from_slice, Api, OverflowError, OverflowOperation, StdError, Storage};
     use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
@@ -563,7 +563,14 @@ mod tests {
         env.block.height += 5;
         let info = mock_info(USER2, &[]);
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::Std(StdError::underflow(5000, 5100)));
+        assert_eq!(
+            err,
+            ContractError::Std(StdError::overflow(OverflowError::new(
+                OverflowOperation::Sub,
+                5000,
+                5100
+            )))
+        );
     }
 
     #[test]

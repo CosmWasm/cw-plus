@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
-    StdResult, Storage, Uint128,
+    StdError, StdResult, Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
@@ -68,7 +68,10 @@ pub fn execute_decrease_allowance(
     let mut allowance = ALLOWANCES.load(deps.storage, (&owner_raw, &spender_raw))?;
     if amount < allowance.allowance {
         // update the new amount
-        allowance.allowance = (allowance.allowance - amount)?;
+        allowance.allowance = allowance
+            .allowance
+            .checked_sub(amount)
+            .map_err(StdError::overflow)?;
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
@@ -106,7 +109,10 @@ pub fn deduct_allowance(
                     Err(ContractError::Expired {})
                 } else {
                     // deduct the allowance if enough
-                    a.allowance = (a.allowance - amount)?;
+                    a.allowance = a
+                        .allowance
+                        .checked_sub(amount)
+                        .map_err(StdError::overflow)?;
                     Ok(a)
                 }
             }
@@ -130,9 +136,13 @@ pub fn execute_transfer_from(
     // deduct allowance before doing anything else have enough allowance
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
-    BALANCES.update(deps.storage, &owner_raw, |balance: Option<Uint128>| {
-        balance.unwrap_or_default() - amount
-    })?;
+    BALANCES.update(
+        deps.storage,
+        &owner_raw,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
     BALANCES.update(
         deps.storage,
         &rcpt_raw,
@@ -169,12 +179,16 @@ pub fn execute_burn_from(
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     // lower balance
-    BALANCES.update(deps.storage, &owner_raw, |balance: Option<Uint128>| {
-        balance.unwrap_or_default() - amount
-    })?;
+    BALANCES.update(
+        deps.storage,
+        &owner_raw,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
     // reduce total_supply
     TOKEN_INFO.update(deps.storage, |mut meta| -> StdResult<_> {
-        meta.total_supply = (meta.total_supply - amount)?;
+        meta.total_supply = meta.total_supply.checked_sub(amount)?;
         Ok(meta)
     })?;
 
@@ -209,9 +223,13 @@ pub fn execute_send_from(
     deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
 
     // move the tokens to the contract
-    BALANCES.update(deps.storage, &owner_raw, |balance: Option<Uint128>| {
-        balance.unwrap_or_default() - amount
-    })?;
+    BALANCES.update(
+        deps.storage,
+        &owner_raw,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
     BALANCES.update(
         deps.storage,
         &rcpt_raw,
@@ -261,7 +279,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, CosmosMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coins, CosmosMsg, WasmMsg};
     use cw20::{Cw20CoinHuman, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
@@ -325,7 +343,7 @@ mod tests {
 
         // decrease it a bit with no expire set - stays the same
         let lower = Uint128(4444);
-        let allow2 = (allow1 - lower).unwrap();
+        let allow2 = allow1.checked_sub(lower).unwrap();
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender.clone(),
             amount: lower,
@@ -530,14 +548,14 @@ mod tests {
         // make sure money arrived
         assert_eq!(
             get_balance(deps.as_ref(), &owner),
-            (start - transfer).unwrap()
+            start.checked_sub(transfer).unwrap()
         );
         assert_eq!(get_balance(deps.as_ref(), &rcpt), transfer);
 
         // ensure it looks good
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
         let expect = AllowanceResponse {
-            allowance: (allow1 - transfer).unwrap(),
+            allowance: allow1.checked_sub(transfer).unwrap(),
             expires: Expiration::Never {},
         };
         assert_eq!(expect, allowance);
@@ -551,10 +569,7 @@ mod tests {
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // let us increase limit, but set the expiration (default env height is 12_345)
         let info = mock_info(owner.clone(), &[]);
@@ -612,13 +627,13 @@ mod tests {
         // make sure money burnt
         assert_eq!(
             get_balance(deps.as_ref(), &owner),
-            (start - transfer).unwrap()
+            start.checked_sub(transfer).unwrap()
         );
 
         // ensure it looks good
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
         let expect = AllowanceResponse {
-            allowance: (allow1 - transfer).unwrap(),
+            allowance: allow1.checked_sub(transfer).unwrap(),
             expires: Expiration::Never {},
         };
         assert_eq!(expect, allowance);
@@ -631,10 +646,7 @@ mod tests {
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // let us increase limit, but set the expiration (default env height is 12_345)
         let info = mock_info(owner.clone(), &[]);
@@ -713,14 +725,14 @@ mod tests {
         // make sure money sent
         assert_eq!(
             get_balance(deps.as_ref(), &owner),
-            (start - transfer).unwrap()
+            start.checked_sub(transfer).unwrap()
         );
         assert_eq!(get_balance(deps.as_ref(), &contract), transfer);
 
         // ensure it looks good
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
         let expect = AllowanceResponse {
-            allowance: (allow1 - transfer).unwrap(),
+            allowance: allow1.checked_sub(transfer).unwrap(),
             expires: Expiration::Never {},
         };
         assert_eq!(expect, allowance);
@@ -735,10 +747,7 @@ mod tests {
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
-        assert!(matches!(
-            err,
-            ContractError::Std(StdError::Underflow { .. })
-        ));
+        assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // let us increase limit, but set the expiration to current block (expired)
         let info = mock_info(owner.clone(), &[]);

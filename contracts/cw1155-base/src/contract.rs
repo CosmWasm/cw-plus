@@ -103,7 +103,9 @@ fn execute_transfer_inner<'a>(
         BALANCES.update(
             deps.storage,
             (from_raw.as_slice(), token_id),
-            |balance: Option<Uint128>| balance.unwrap_or_default() - amount,
+            |balance: Option<Uint128>| -> StdResult<_> {
+                Ok(balance.unwrap_or_default().checked_sub(amount)?)
+            },
         )?;
     }
 
@@ -112,7 +114,9 @@ fn execute_transfer_inner<'a>(
         BALANCES.update(
             deps.storage,
             (canonical_to.as_slice(), token_id),
-            |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+            |balance: Option<Uint128>| -> StdResult<_> {
+                Ok(balance.unwrap_or_default().checked_add(amount)?)
+            },
         )?;
     }
 
@@ -511,8 +515,8 @@ fn query_all_tokens(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::attr;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{attr, OverflowError, StdError};
 
     use super::*;
 
@@ -1181,19 +1185,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "attempt to add with overflow")]
     fn mint_overflow() {
         let mut deps = mock_dependencies(&[]);
         let token1 = "token1".to_owned();
         let minter: HumanAddr = "minter".into();
         let user1: HumanAddr = "user1".into();
 
-        let env = {
-            let mut env = mock_env();
-            env.block.height = 10;
-            env
-        };
-
+        let env = mock_env();
         let msg = InitMsg {
             minter: minter.clone(),
         };
@@ -1213,17 +1211,22 @@ mod tests {
         )
         .unwrap();
 
-        execute(
-            deps.as_mut(),
-            env.clone(),
-            mock_info(minter.clone(), &[]),
-            Cw1155ExecuteMsg::Mint {
-                to: user1.clone(),
-                token_id: token1.clone(),
-                value: 1u64.into(),
-                msg: None,
-            },
-        )
-        .unwrap();
+        assert!(matches!(
+            execute(
+                deps.as_mut(),
+                env.clone(),
+                mock_info(minter.clone(), &[]),
+                Cw1155ExecuteMsg::Mint {
+                    to: user1.clone(),
+                    token_id: token1.clone(),
+                    value: 1u64.into(),
+                    msg: None,
+                },
+            ),
+            Err(ContractError::Std(StdError::Overflow {
+                source: OverflowError { .. },
+                ..
+            }))
+        ));
     }
 }

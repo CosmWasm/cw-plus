@@ -691,7 +691,7 @@ mod test {
         let err = router
             .execute_contract(&random, &reflect_addr, &msgs, &[])
             .unwrap_err();
-        assert_eq!("Cannot subtract 3 from 0", err.as_str());
+        assert_eq!("Overflow: Cannot Sub with 0 and 3", err.as_str());
 
         // first one should have been rolled-back on error (no second payment)
         let funds = get_balance(&router, &random);

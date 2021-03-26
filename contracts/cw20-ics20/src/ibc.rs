@@ -222,8 +222,10 @@ fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packe
         |orig| -> Result<_, ContractError> {
             // this will return error if we don't have the funds there to cover the request (or no denom registered)
             let mut cur = orig.ok_or(ContractError::InsufficientFunds {})?;
-            cur.outstanding =
-                (cur.outstanding - amount).or(Err(ContractError::InsufficientFunds {}))?;
+            cur.outstanding = cur
+                .outstanding
+                .checked_sub(amount)
+                .or(Err(ContractError::InsufficientFunds {}))?;
             Ok(cur)
         },
     )?;

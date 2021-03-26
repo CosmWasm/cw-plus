@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
-    StdResult, Uint128,
+    StdError, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -146,7 +146,9 @@ pub fn execute_buy(
     let curve = curve_fn(state.decimals);
     state.reserve += payment;
     let new_supply = curve.supply(state.reserve);
-    let minted = (new_supply - state.supply)?;
+    let minted = new_supply
+        .checked_sub(state.supply)
+        .map_err(StdError::overflow)?;
     state.supply = new_supply;
     CURVE_STATE.save(deps.storage, &state)?;
 
@@ -234,9 +236,15 @@ fn do_sell(
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
     let curve = curve_fn(state.decimals);
-    state.supply = (state.supply - amount)?;
+    state.supply = state
+        .supply
+        .checked_sub(amount)
+        .map_err(StdError::overflow)?;
     let new_reserve = curve.reserve(state.supply);
-    let released = (state.reserve - new_reserve)?;
+    let released = state
+        .reserve
+        .checked_sub(new_reserve)
+        .map_err(StdError::overflow)?;
     state.reserve = new_reserve;
     CURVE_STATE.save(deps.storage, &state)?;
 
@@ -309,7 +317,7 @@ mod tests {
     use super::*;
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, Decimal, StdError};
+    use cosmwasm_std::{coin, Decimal, OverflowError, OverflowOperation, StdError};
     use cw0::PaymentError;
 
     const DENOM: &str = "satoshi";
@@ -488,8 +496,8 @@ mod tests {
         let err = execute(deps.as_mut(), mock_env(), info, burn).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
-                2000, 3000
+            ContractError::Base(cw20_base::ContractError::Std(StdError::overflow(
+                OverflowError::new(OverflowOperation::Sub, 2000, 3000)
             )))
         );
 
@@ -603,8 +611,8 @@ mod tests {
         let err = execute(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
-                3000000, 3300000
+            ContractError::Base(cw20_base::ContractError::Std(StdError::overflow(
+                OverflowError::new(OverflowOperation::Sub, 3000000, 3300000)
             )))
         );
 
