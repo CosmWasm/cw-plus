@@ -249,9 +249,9 @@ impl<T: Endian> From<Vec<u8>> for IntKey<T> {
     }
 }
 
-impl<T: Endian> Into<Vec<u8>> for IntKey<T> {
-    fn into(self) -> Vec<u8> {
-        self.wrapped.0
+impl<T: Endian> From<IntKey<T>> for Vec<u8> {
+    fn from(k: IntKey<T>) -> Vec<u8> {
+        k.wrapped.0
     }
 }
 
