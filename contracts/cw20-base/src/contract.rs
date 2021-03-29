@@ -1,3 +1,5 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response, StdError,
     StdResult, Uint128,
@@ -19,6 +21,7 @@ use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     mut deps: DepsMut,
     _env: Env,
@@ -67,6 +70,7 @@ pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdRes
     Ok(total_supply)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -279,6 +283,7 @@ pub fn execute_send(
     Ok(res)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
