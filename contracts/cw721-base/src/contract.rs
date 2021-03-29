@@ -1,6 +1,8 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, entry_point, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HumanAddr,
-    MessageInfo, Order, Response, StdError, StdResult, KV,
+    attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order,
+    Response, StdError, StdResult, KV,
 };
 
 use cw0::maybe_canonical;
@@ -21,7 +23,7 @@ use cw_storage_plus::{Bound, PkOwned};
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -40,7 +42,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -383,7 +385,7 @@ fn check_can_send(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Minter {} => to_binary(&query_minter(deps)?),

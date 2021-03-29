@@ -1,7 +1,8 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, coins, entry_point, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg,
-    Deps, DepsMut, Env, HumanAddr, MessageInfo, Order, Response, StdError, StdResult, Storage,
-    Uint128,
+    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
+    Env, HumanAddr, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cw0::{maybe_canonical, NativeBalance};
@@ -23,7 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     mut deps: DepsMut,
     _env: Env,
@@ -52,7 +53,7 @@ pub fn instantiate(
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -273,7 +274,7 @@ fn coins_to_string(coins: &[Coin]) -> String {
     strings.join(",")
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member {
