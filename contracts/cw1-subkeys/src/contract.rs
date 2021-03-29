@@ -2,6 +2,8 @@ use schemars::JsonSchema;
 use std::fmt;
 use std::ops::{AddAssign, Sub};
 
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
     HumanAddr, MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
@@ -30,6 +32,7 @@ use cw_storage_plus::Bound;
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     mut deps: DepsMut,
     env: Env,
@@ -41,6 +44,7 @@ pub fn instantiate(
     Ok(result)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -283,6 +287,7 @@ where
     Ok(res)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),

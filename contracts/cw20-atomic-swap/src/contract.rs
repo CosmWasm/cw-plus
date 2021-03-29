@@ -1,3 +1,5 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, HumanAddr,
     MessageInfo, Response, StdResult, WasmMsg,
@@ -19,6 +21,7 @@ use cw_storage_plus::Bound;
 const CONTRACT_NAME: &str = "crates.io:cw20-atomic-swap";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -30,6 +33,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -220,6 +224,7 @@ fn send_tokens(api: &dyn Api, to: &HumanAddr, amount: Balance) -> StdResult<Vec<
     }
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::List { start_after, limit } => to_binary(&query_list(deps, start_after, limit)?),

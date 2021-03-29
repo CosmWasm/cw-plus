@@ -1,3 +1,5 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coin, to_binary, BankMsg, Binary, Decimal, Deps, DepsMut, Env, HumanAddr, MessageInfo,
     QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
@@ -23,6 +25,7 @@ const FALLBACK_RATIO: Decimal = Decimal::one();
 const CONTRACT_NAME: &str = "crates.io:cw20-staking";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -71,6 +74,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -410,6 +414,7 @@ pub fn _bond_all_tokens(
     Ok(res)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // custom queries
