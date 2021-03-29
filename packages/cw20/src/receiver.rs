@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, Uint128, WasmMsg};
 
-/// Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg
+/// Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Cw20ReceiveMsg {
@@ -17,7 +17,7 @@ pub struct Cw20ReceiveMsg {
 impl Cw20ReceiveMsg {
     /// serializes the message
     pub fn into_binary(self) -> StdResult<Binary> {
-        let msg = ReceiverHandleMsg::Receive(self);
+        let msg = ReceiverExecuteMsg::Receive(self);
         to_binary(&msg)
     }
 
@@ -36,6 +36,6 @@ impl Cw20ReceiveMsg {
 // This is just a helper to properly serialize the above message
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-enum ReceiverHandleMsg {
+enum ReceiverExecuteMsg {
     Receive(Cw20ReceiveMsg),
 }

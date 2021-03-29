@@ -1,9 +1,21 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg",
+  "title": "ExecuteMsg",
   "anyOf": [
     {
-      "description": "Transfer is a base message to move tokens to another account without triggering actions",
+      "description": "Buy will attempt to purchase as many supply tokens as possible. You must send only reserve tokens in that message",
+      "type": "object",
+      "required": [
+        "buy"
+      ],
+      "properties": {
+        "buy": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "Implements CW20. Transfer is a base message to move tokens to another account without triggering actions",
       "type": "object",
       "required": [
         "transfer"
@@ -27,7 +39,7 @@
       }
     },
     {
-      "description": "Burn is a base message to destroy tokens forever",
+      "description": "Implements CW20. Burn is a base message to destroy tokens forever",
       "type": "object",
       "required": [
         "burn"
@@ -47,7 +59,7 @@
       }
     },
     {
-      "description": "Send is a base message to transfer tokens to a contract and trigger an action on the receiving contract.",
+      "description": "Implements CW20.  Send is a base message to transfer tokens to a contract and trigger an action on the receiving contract.",
       "type": "object",
       "required": [
         "send"
@@ -81,31 +93,7 @@
       }
     },
     {
-      "description": "Only with the \"mintable\" extension. If authorized, creates amount new tokens and adds to the recipient balance.",
-      "type": "object",
-      "required": [
-        "mint"
-      ],
-      "properties": {
-        "mint": {
-          "type": "object",
-          "required": [
-            "amount",
-            "recipient"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "recipient": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Only with \"approval\" extension. Allows spender to access an additional amount tokens from the owner's (env.sender) account. If expires is Some(), overwrites current allowance expiration with this one.",
+      "description": "Implements CW20 \"approval\" extension. Allows spender to access an additional amount tokens from the owner's (env.sender) account. If expires is Some(), overwrites current allowance expiration with this one.",
       "type": "object",
       "required": [
         "increase_allowance"
@@ -139,7 +127,7 @@
       }
     },
     {
-      "description": "Only with \"approval\" extension. Lowers the spender's access of tokens from the owner's (env.sender) account by amount. If expires is Some(), overwrites current allowance expiration with this one.",
+      "description": "Implements CW20 \"approval\" extension. Lowers the spender's access of tokens from the owner's (env.sender) account by amount. If expires is Some(), overwrites current allowance expiration with this one.",
       "type": "object",
       "required": [
         "decrease_allowance"
@@ -173,7 +161,7 @@
       }
     },
     {
-      "description": "Only with \"approval\" extension. Transfers amount tokens from owner -> recipient if `env.sender` has sufficient pre-approval.",
+      "description": "Implements CW20 \"approval\" extension. Transfers amount tokens from owner -> recipient if `env.sender` has sufficient pre-approval.",
       "type": "object",
       "required": [
         "transfer_from"
@@ -201,7 +189,7 @@
       }
     },
     {
-      "description": "Only with \"approval\" extension. Sends amount tokens from owner -> contract if `env.sender` has sufficient pre-approval.",
+      "description": "Implements CW20 \"approval\" extension. Sends amount tokens from owner -> contract if `env.sender` has sufficient pre-approval.",
       "type": "object",
       "required": [
         "send_from"
@@ -239,7 +227,7 @@
       }
     },
     {
-      "description": "Only with \"approval\" extension. Destroys tokens forever",
+      "description": "Implements CW20 \"approval\" extension. Destroys tokens forever",
       "type": "object",
       "required": [
         "burn_from"

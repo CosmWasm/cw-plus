@@ -20,7 +20,7 @@ more advanced cw1 implementations.
 By default, this doesn't support `CustomMsg` in order to be fully generic
 among blockchains. However, all types are Generic over `T`, and this is only
 fixed in `handle`. You can import this contract and just redefine your `handle`
-function, setting a different parameter to `HandleMsg`, and you can produce
+function, setting a different parameter to `ExecuteMsg`, and you can produce
 a chain-specific message.
 
 ## Running this contract

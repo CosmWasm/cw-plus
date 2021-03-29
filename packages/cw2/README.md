@@ -1,7 +1,7 @@
 # CW2 Spec: Contract Info for Migration
 
 Most of the CW* specs are focused on the *public interfaces*
-of the contract. The APIs used for `HandleMsg` or `QueryMsg`.
+of the contract. The APIs used for `ExecuteMsg` or `QueryMsg`.
 However, when we wish to migrate from contract A to contract B,
 contract B needs to be aware somehow of how the *state was encoded*.
 

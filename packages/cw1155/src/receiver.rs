@@ -5,7 +5,7 @@ use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, Uint128, 
 
 use crate::msg::TokenId;
 
-/// Cw1155ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg
+/// Cw1155ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Cw1155ReceiveMsg {
@@ -21,7 +21,7 @@ pub struct Cw1155ReceiveMsg {
 impl Cw1155ReceiveMsg {
     /// serializes the message
     pub fn into_binary(self) -> StdResult<Binary> {
-        let msg = ReceiverHandleMsg::Receive(self);
+        let msg = ReceiverExecuteMsg::Receive(self);
         to_binary(&msg)
     }
 
@@ -37,7 +37,7 @@ impl Cw1155ReceiveMsg {
     }
 }
 
-/// Cw1155BatchReceiveMsg should be de/serialized under `BatchReceive()` variant in a HandleMsg
+/// Cw1155BatchReceiveMsg should be de/serialized under `BatchReceive()` variant in a ExecuteMsg
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Cw1155BatchReceiveMsg {
@@ -50,7 +50,7 @@ pub struct Cw1155BatchReceiveMsg {
 impl Cw1155BatchReceiveMsg {
     /// serializes the message
     pub fn into_binary(self) -> StdResult<Binary> {
-        let msg = ReceiverHandleMsg::BatchReceive(self);
+        let msg = ReceiverExecuteMsg::BatchReceive(self);
         to_binary(&msg)
     }
 
@@ -69,7 +69,7 @@ impl Cw1155BatchReceiveMsg {
 // This is just a helper to properly serialize the above message
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-enum ReceiverHandleMsg {
+enum ReceiverExecuteMsg {
     Receive(Cw1155ReceiveMsg),
     BatchReceive(Cw1155BatchReceiveMsg),
 }

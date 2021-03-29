@@ -69,7 +69,7 @@ mod tests {
     use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_token_info};
-    use crate::msg::{HandleMsg, InstantiateMsg};
+    use crate::msg::{ExecuteMsg, InstantiateMsg};
 
     // this will set up the instantiation for other tests
     fn do_instantiate(mut deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
@@ -109,7 +109,7 @@ mod tests {
         // set allowance with height expiration
         let allow1 = Uint128(7777);
         let expires = Expiration::AtHeight(5432);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender1.clone(),
             amount: allow1,
             expires: Some(expires.clone()),
@@ -118,7 +118,7 @@ mod tests {
 
         // set allowance with no expiration
         let allow2 = Uint128(54321);
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow2,
             expires: None,
@@ -172,7 +172,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             info.clone(),
-            HandleMsg::Transfer {
+            ExecuteMsg::Transfer {
                 recipient: acct2,
                 amount: Uint128(222222),
             },
@@ -182,7 +182,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             info.clone(),
-            HandleMsg::Transfer {
+            ExecuteMsg::Transfer {
                 recipient: acct3,
                 amount: Uint128(333333),
             },
@@ -192,7 +192,7 @@ mod tests {
             deps.as_mut(),
             env.clone(),
             info.clone(),
-            HandleMsg::Transfer {
+            ExecuteMsg::Transfer {
                 recipient: acct4,
                 amount: Uint128(444444),
             },

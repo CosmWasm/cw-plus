@@ -14,7 +14,7 @@ use cw3::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
     next_id, parse_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS, VOTERS,
 };
@@ -62,18 +62,18 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
-        HandleMsg::Propose {
+        ExecuteMsg::Propose {
             title,
             description,
             msgs,
             latest,
         } => execute_propose(deps, env, info, title, description, msgs, latest),
-        HandleMsg::Vote { proposal_id, vote } => execute_vote(deps, env, info, proposal_id, vote),
-        HandleMsg::Execute { proposal_id } => execute_execute(deps, env, info, proposal_id),
-        HandleMsg::Close { proposal_id } => execute_close(deps, env, info, proposal_id),
+        ExecuteMsg::Vote { proposal_id, vote } => execute_vote(deps, env, info, proposal_id, vote),
+        ExecuteMsg::Execute { proposal_id } => execute_execute(deps, env, info, proposal_id),
+        ExecuteMsg::Close { proposal_id } => execute_close(deps, env, info, proposal_id),
     }
 }
 
@@ -628,7 +628,7 @@ mod tests {
 
         // Only voters can propose
         let info = mock_info(SOMEBODY, &[]);
-        let proposal = HandleMsg::Propose {
+        let proposal = ExecuteMsg::Propose {
             title: "Rewarding somebody".to_string(),
             description: "Do we reward her?".to_string(),
             msgs: msgs.clone(),
@@ -645,7 +645,7 @@ mod tests {
 
         // Wrong expiration option fails
         let info = mock_info(OWNER, &[]);
-        let proposal_wrong_exp = HandleMsg::Propose {
+        let proposal_wrong_exp = ExecuteMsg::Propose {
             title: "Rewarding somebody".to_string(),
             description: "Do we reward her?".to_string(),
             msgs: msgs.clone(),
@@ -717,7 +717,7 @@ mod tests {
             amount: vec![coin(1, "BTC")],
         };
         let msgs = vec![CosmosMsg::Bank(bank_msg)];
-        let proposal = HandleMsg::Propose {
+        let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
             msgs,
@@ -729,7 +729,7 @@ mod tests {
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Owner cannot vote (again)
-        let yes_vote = HandleMsg::Vote {
+        let yes_vote = ExecuteMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -781,7 +781,7 @@ mod tests {
         let tally = get_tally(deps.as_ref(), proposal_id);
 
         // Cast a No vote
-        let no_vote = HandleMsg::Vote {
+        let no_vote = ExecuteMsg::Vote {
             proposal_id,
             vote: Vote::No,
         };
@@ -789,7 +789,7 @@ mod tests {
         execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
 
         // Cast a Veto vote
-        let veto_vote = HandleMsg::Vote {
+        let veto_vote = ExecuteMsg::Vote {
             proposal_id,
             vote: Vote::Veto,
         };
@@ -872,7 +872,7 @@ mod tests {
             amount: vec![coin(1, "BTC")],
         };
         let msgs = vec![CosmosMsg::Bank(bank_msg)];
-        let proposal = HandleMsg::Propose {
+        let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
             msgs: msgs.clone(),
@@ -884,7 +884,7 @@ mod tests {
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
         // Only Passed can be executed
-        let execution = HandleMsg::Execute { proposal_id };
+        let execution = ExecuteMsg::Execute { proposal_id };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), execution.clone());
 
         // Verify
@@ -895,7 +895,7 @@ mod tests {
         }
 
         // Vote it, so it passes
-        let vote = HandleMsg::Vote {
+        let vote = ExecuteMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -919,7 +919,7 @@ mod tests {
         );
 
         // In passing: Try to close Passed fails
-        let closing = HandleMsg::Close { proposal_id };
+        let closing = ExecuteMsg::Close { proposal_id };
         let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
@@ -949,7 +949,7 @@ mod tests {
         );
 
         // In passing: Try to close Executed fails
-        let closing = HandleMsg::Close { proposal_id };
+        let closing = ExecuteMsg::Close { proposal_id };
         let res = execute(deps.as_mut(), mock_env(), info, closing);
 
         // Verify
@@ -976,7 +976,7 @@ mod tests {
             amount: vec![coin(1, "BTC")],
         };
         let msgs = vec![CosmosMsg::Bank(bank_msg)];
-        let proposal = HandleMsg::Propose {
+        let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
             msgs: msgs.clone(),
@@ -987,7 +987,7 @@ mod tests {
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
-        let closing = HandleMsg::Close { proposal_id };
+        let closing = ExecuteMsg::Close { proposal_id };
 
         // Anybody can close
         let info = mock_info(SOMEBODY, &[]);
@@ -1005,7 +1005,7 @@ mod tests {
         // Expired proposals can be closed
         let info = mock_info(OWNER, &[]);
 
-        let proposal = HandleMsg::Propose {
+        let proposal = ExecuteMsg::Propose {
             title: "(Try to) pay somebody".to_string(),
             description: "Pay somebody after time?".to_string(),
             msgs: msgs.clone(),
@@ -1016,7 +1016,7 @@ mod tests {
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
 
-        let closing = HandleMsg::Close { proposal_id };
+        let closing = ExecuteMsg::Close { proposal_id };
 
         // Close expired works
         let env = mock_env_height(1234567);

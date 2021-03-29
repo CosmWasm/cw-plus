@@ -18,7 +18,7 @@ funds to the contract at any time.
 
 This contract is meant not just to be functional, but also to work as a simple
 example of an CW20 "Receiver". And demonstrate how the same calls can be fed
-native tokens (via typical `HandleMsg` route), or cw20 tokens (via `Receiver` interface).
+native tokens (via typical `ExecuteMsg` route), or cw20 tokens (via `Receiver` interface).
 
 Both `create` and `top_up` can be called directly (with a payload of native tokens),
 or from a cw20 contract using the [Receiver Interface](../../packages/cw20/README.md#receiver).

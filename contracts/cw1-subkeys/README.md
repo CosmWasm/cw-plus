@@ -25,7 +25,7 @@ on creation, it can be setup with `SetupPermission` message.
 This adds 2 messages beyond the `cw1` spec:
 
 ```rust
-enum HandleMsg {
+enum ExecuteMsg {
     IncreaseAllowance {
         spender: HumanAddr,
         denom: String,

@@ -4,7 +4,7 @@ use std::fs::create_dir_all;
 use cosmwasm_schema::{export_schema, export_schema_with_title, remove_schemas, schema_for};
 
 use cw3::{
-    Cw3HandleMsg, Cw3QueryMsg, ProposalListResponse, ProposalResponse, ThresholdResponse,
+    Cw3ExecuteMsg, Cw3QueryMsg, ProposalListResponse, ProposalResponse, ThresholdResponse,
     VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
 
@@ -14,7 +14,7 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema_with_title(&mut schema_for!(Cw3HandleMsg), &out_dir, "HandleMsg");
+    export_schema_with_title(&mut schema_for!(Cw3ExecuteMsg), &out_dir, "ExecuteMsg");
     export_schema_with_title(&mut schema_for!(Cw3QueryMsg), &out_dir, "QueryMsg");
     export_schema_with_title(
         &mut schema_for!(ProposalResponse),

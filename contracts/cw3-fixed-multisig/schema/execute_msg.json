@@ -1,9 +1,73 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg",
+  "title": "ExecuteMsg",
   "anyOf": [
     {
-      "description": "Execute requests the contract to re-dispatch all these messages with the contract's address as sender. Every implementation has it's own logic to determine in",
+      "type": "object",
+      "required": [
+        "propose"
+      ],
+      "properties": {
+        "propose": {
+          "type": "object",
+          "required": [
+            "description",
+            "msgs",
+            "title"
+          ],
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "latest": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "msgs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/CosmosMsg_for_Empty"
+              }
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "vote"
+      ],
+      "properties": {
+        "vote": {
+          "type": "object",
+          "required": [
+            "proposal_id",
+            "vote"
+          ],
+          "properties": {
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "vote": {
+              "$ref": "#/definitions/Vote"
+            }
+          }
+        }
+      }
+    },
+    {
       "type": "object",
       "required": [
         "execute"
@@ -12,117 +76,13 @@
         "execute": {
           "type": "object",
           "required": [
-            "msgs"
+            "proposal_id"
           ],
           "properties": {
-            "msgs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/CosmosMsg_for_Empty"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Freeze will make a mutable contract immutable, must be called by an admin",
-      "type": "object",
-      "required": [
-        "freeze"
-      ],
-      "properties": {
-        "freeze": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "description": "UpdateAdmins will change the admin set of the contract, must be called by an existing admin, and only works if the contract is mutable",
-      "type": "object",
-      "required": [
-        "update_admins"
-      ],
-      "properties": {
-        "update_admins": {
-          "type": "object",
-          "required": [
-            "admins"
-          ],
-          "properties": {
-            "admins": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/HumanAddr"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Add an allowance to a given subkey (subkey must not be admin)",
-      "type": "object",
-      "required": [
-        "increase_allowance"
-      ],
-      "properties": {
-        "increase_allowance": {
-          "type": "object",
-          "required": [
-            "amount",
-            "spender"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Coin"
-            },
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Decreases an allowance for a given subkey (subkey must not be admin)",
-      "type": "object",
-      "required": [
-        "decrease_allowance"
-      ],
-      "properties": {
-        "decrease_allowance": {
-          "type": "object",
-          "required": [
-            "amount",
-            "spender"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Coin"
-            },
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         }
@@ -131,21 +91,19 @@
     {
       "type": "object",
       "required": [
-        "set_permissions"
+        "close"
       ],
       "properties": {
-        "set_permissions": {
+        "close": {
           "type": "object",
           "required": [
-            "permissions",
-            "spender"
+            "proposal_id"
           ],
           "properties": {
-            "permissions": {
-              "$ref": "#/definitions/Permissions"
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
+            "proposal_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
             }
           }
         }
@@ -304,29 +262,6 @@
     "HumanAddr": {
       "type": "string"
     },
-    "Permissions": {
-      "type": "object",
-      "required": [
-        "delegate",
-        "redelegate",
-        "undelegate",
-        "withdraw"
-      ],
-      "properties": {
-        "delegate": {
-          "type": "boolean"
-        },
-        "redelegate": {
-          "type": "boolean"
-        },
-        "undelegate": {
-          "type": "boolean"
-        },
-        "withdraw": {
-          "type": "boolean"
-        }
-      }
-    },
     "StakingMsg": {
       "description": "The message types of the staking module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto",
       "anyOf": [
@@ -441,6 +376,15 @@
     },
     "Uint128": {
       "type": "string"
+    },
+    "Vote": {
+      "type": "string",
+      "enum": [
+        "yes",
+        "no",
+        "abstain",
+        "veto"
+      ]
     },
     "WasmMsg": {
       "description": "The message types of the wasm module.\n\nSee https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto",

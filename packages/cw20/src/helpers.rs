@@ -9,7 +9,7 @@ use cosmwasm_std::{
 };
 
 use crate::{
-    AllowanceResponse, BalanceResponse, Cw20HandleMsg, Cw20QueryMsg, MinterResponse,
+    AllowanceResponse, BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, MinterResponse,
     TokenInfoResponse,
 };
 
@@ -25,7 +25,7 @@ impl Cw20Contract {
         self.0.clone()
     }
 
-    pub fn call<T: Into<Cw20HandleMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
+    pub fn call<T: Into<Cw20ExecuteMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
         let msg = to_binary(&msg.into())?;
         Ok(WasmMsg::Execute {
             contract_addr: self.addr(),

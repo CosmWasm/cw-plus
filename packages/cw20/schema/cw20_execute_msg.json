@@ -1,46 +1,199 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg",
-  "description": "This is like Cw721HandleMsg but we add a Mint command for an owner to make this stand-alone. You will likely want to remove mint and use other control logic in any contract that inherits this.",
+  "title": "Cw20ExecuteMsg",
   "anyOf": [
     {
-      "description": "Transfer is a base message to move a token to another account without triggering actions",
+      "description": "Transfer is a base message to move tokens to another account without triggering actions",
       "type": "object",
       "required": [
-        "transfer_nft"
+        "transfer"
       ],
       "properties": {
-        "transfer_nft": {
+        "transfer": {
           "type": "object",
           "required": [
-            "recipient",
-            "token_id"
+            "amount",
+            "recipient"
           ],
           "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
             "recipient": {
               "$ref": "#/definitions/HumanAddr"
-            },
-            "token_id": {
-              "type": "string"
             }
           }
         }
       }
     },
     {
-      "description": "Send is a base message to transfer a token to a contract and trigger an action on the receiving contract.",
+      "description": "Burn is a base message to destroy tokens forever",
       "type": "object",
       "required": [
-        "send_nft"
+        "burn"
       ],
       "properties": {
-        "send_nft": {
+        "burn": {
           "type": "object",
           "required": [
-            "contract",
-            "token_id"
+            "amount"
           ],
           "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Send is a base message to transfer tokens to a contract and trigger an action on the receiving contract.",
+      "type": "object",
+      "required": [
+        "send"
+      ],
+      "properties": {
+        "send": {
+          "type": "object",
+          "required": [
+            "amount",
+            "contract"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "contract": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "msg": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Binary"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Only with \"approval\" extension. Allows spender to access an additional amount tokens from the owner's (env.sender) account. If expires is Some(), overwrites current allowance expiration with this one.",
+      "type": "object",
+      "required": [
+        "increase_allowance"
+      ],
+      "properties": {
+        "increase_allowance": {
+          "type": "object",
+          "required": [
+            "amount",
+            "spender"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "expires": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Only with \"approval\" extension. Lowers the spender's access of tokens from the owner's (env.sender) account by amount. If expires is Some(), overwrites current allowance expiration with this one.",
+      "type": "object",
+      "required": [
+        "decrease_allowance"
+      ],
+      "properties": {
+        "decrease_allowance": {
+          "type": "object",
+          "required": [
+            "amount",
+            "spender"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "expires": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Only with \"approval\" extension. Transfers amount tokens from owner -> recipient if `env.sender` has sufficient pre-approval.",
+      "type": "object",
+      "required": [
+        "transfer_from"
+      ],
+      "properties": {
+        "transfer_from": {
+          "type": "object",
+          "required": [
+            "amount",
+            "owner",
+            "recipient"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "recipient": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Only with \"approval\" extension. Sends amount tokens from owner -> contract if `env.sender` has sufficient pre-approval.",
+      "type": "object",
+      "required": [
+        "send_from"
+      ],
+      "properties": {
+        "send_from": {
+          "type": "object",
+          "required": [
+            "amount",
+            "contract",
+            "owner"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
             "contract": {
               "$ref": "#/definitions/HumanAddr"
             },
@@ -54,95 +207,7 @@
                 }
               ]
             },
-            "token_id": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Allows operator to transfer / send the token from the owner's account. If expiration is set, then this allowance has a time/height limit",
-      "type": "object",
-      "required": [
-        "approve"
-      ],
-      "properties": {
-        "approve": {
-          "type": "object",
-          "required": [
-            "spender",
-            "token_id"
-          ],
-          "properties": {
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "token_id": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Remove previously granted Approval",
-      "type": "object",
-      "required": [
-        "revoke"
-      ],
-      "properties": {
-        "revoke": {
-          "type": "object",
-          "required": [
-            "spender",
-            "token_id"
-          ],
-          "properties": {
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "token_id": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit",
-      "type": "object",
-      "required": [
-        "approve_all"
-      ],
-      "properties": {
-        "approve_all": {
-          "type": "object",
-          "required": [
-            "operator"
-          ],
-          "properties": {
-            "expires": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Expiration"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "operator": {
+            "owner": {
               "$ref": "#/definitions/HumanAddr"
             }
           }
@@ -150,19 +215,23 @@
       }
     },
     {
-      "description": "Remove previously granted ApproveAll permission",
+      "description": "Only with \"approval\" extension. Destroys tokens forever",
       "type": "object",
       "required": [
-        "revoke_all"
+        "burn_from"
       ],
       "properties": {
-        "revoke_all": {
+        "burn_from": {
           "type": "object",
           "required": [
-            "operator"
+            "amount",
+            "owner"
           ],
           "properties": {
-            "operator": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "owner": {
               "$ref": "#/definitions/HumanAddr"
             }
           }
@@ -170,14 +239,26 @@
       }
     },
     {
-      "description": "Mint a new NFT, can only be called by the contract minter",
+      "description": "Only with the \"mintable\" extension. If authorized, creates amount new tokens and adds to the recipient balance.",
       "type": "object",
       "required": [
         "mint"
       ],
       "properties": {
         "mint": {
-          "$ref": "#/definitions/MintMsg"
+          "type": "object",
+          "required": [
+            "amount",
+            "recipient"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "recipient": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
         }
       }
     }
@@ -235,45 +316,8 @@
     "HumanAddr": {
       "type": "string"
     },
-    "MintMsg": {
-      "type": "object",
-      "required": [
-        "name",
-        "owner",
-        "token_id"
-      ],
-      "properties": {
-        "description": {
-          "description": "Describes the asset to which this NFT represents (may be empty)",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "image": {
-          "description": "A URI pointing to an image representing the asset",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "name": {
-          "description": "Identifies the asset to which this NFT represents",
-          "type": "string"
-        },
-        "owner": {
-          "description": "The owner of the newly minter NFT",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
-        },
-        "token_id": {
-          "description": "Unique ID of the NFT",
-          "type": "string"
-        }
-      }
+    "Uint128": {
+      "type": "string"
     }
   }
 }

@@ -9,7 +9,7 @@ use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{AdminListResponse, HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{AdminList, ADMIN_LIST};
 
 // version info for migration info
@@ -48,12 +48,12 @@ pub fn execute(
     info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
-    msg: HandleMsg<Empty>,
+    msg: ExecuteMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
-        HandleMsg::Freeze {} => execute_freeze(deps, env, info),
-        HandleMsg::UpdateAdmins { admins } => execute_update_admins(deps, env, info, admins),
+        ExecuteMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
+        ExecuteMsg::Freeze {} => execute_freeze(deps, env, info),
+        ExecuteMsg::UpdateAdmins { admins } => execute_update_admins(deps, env, info, admins),
     }
 }
 
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // anyone cannot modify the contract
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![anyone.clone()],
         };
         let info = mock_info(&anyone, &[]);
@@ -187,7 +187,7 @@ mod tests {
         }
 
         // but alice can kick out carl
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![alice.clone(), bob.clone()],
         };
         let info = mock_info(&alice, &[]);
@@ -202,7 +202,7 @@ mod tests {
 
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {});
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {});
         match res.unwrap_err() {
             ContractError::Unauthorized { .. } => {}
             e => panic!("unexpected error: {}", e),
@@ -210,7 +210,7 @@ mod tests {
 
         // but bob can
         let info = mock_info(&bob, &[]);
-        execute(deps.as_mut(), mock_env(), info, HandleMsg::Freeze {}).unwrap();
+        execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.clone(), bob.clone()],
             mutable: false,
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // and now alice cannot change it again
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![alice.clone()],
         };
         let info = mock_info(&alice, &[]);
@@ -245,7 +245,7 @@ mod tests {
         let info = mock_info(&bob, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
-        let freeze: HandleMsg<Empty> = HandleMsg::Freeze {};
+        let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
                 to_address: bob.clone(),
@@ -261,7 +261,7 @@ mod tests {
         ];
 
         // make some nice message
-        let execute_msg = HandleMsg::Execute { msgs: msgs.clone() };
+        let execute_msg = ExecuteMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
         let info = mock_info(&bob, &[]);

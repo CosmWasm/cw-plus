@@ -20,7 +20,7 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{
-    AllAllowancesResponse, AllPermissionsResponse, AllowanceInfo, HandleMsg, PermissionsInfo,
+    AllAllowancesResponse, AllPermissionsResponse, AllowanceInfo, ExecuteMsg, PermissionsInfo,
     QueryMsg,
 };
 use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
@@ -47,23 +47,23 @@ pub fn execute(
     info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
-    msg: HandleMsg<Empty>,
+    msg: ExecuteMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
-        HandleMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
-        HandleMsg::Freeze {} => Ok(execute_freeze(deps, env, info)?),
-        HandleMsg::UpdateAdmins { admins } => Ok(execute_update_admins(deps, env, info, admins)?),
-        HandleMsg::IncreaseAllowance {
+        ExecuteMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
+        ExecuteMsg::Freeze {} => Ok(execute_freeze(deps, env, info)?),
+        ExecuteMsg::UpdateAdmins { admins } => Ok(execute_update_admins(deps, env, info, admins)?),
+        ExecuteMsg::IncreaseAllowance {
             spender,
             amount,
             expires,
         } => execute_increase_allowance(deps, env, info, spender, amount, expires),
-        HandleMsg::DecreaseAllowance {
+        ExecuteMsg::DecreaseAllowance {
             spender,
             amount,
             expires,
         } => execute_decrease_allowance(deps, env, info, spender, amount, expires),
-        HandleMsg::SetPermissions {
+        ExecuteMsg::SetPermissions {
             spender,
             permissions,
         } => execute_set_permissions(deps, env, info, spender, permissions),
@@ -446,7 +446,7 @@ mod tests {
         // Add subkeys with initial allowances
         for (spender, expiration) in spenders.iter().zip(expirations) {
             for amount in allowances {
-                let msg = HandleMsg::IncreaseAllowance {
+                let msg = ExecuteMsg::IncreaseAllowance {
                     spender: spender.clone(),
                     amount: amount.clone(),
                     expires: Some(expiration.clone()),
@@ -648,13 +648,13 @@ mod tests {
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
-        let setup_perm_msg1 = HandleMsg::SetPermissions {
+        let setup_perm_msg1 = ExecuteMsg::SetPermissions {
             spender: spender1.clone(),
             permissions: god_mode,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
 
-        let setup_perm_msg2 = HandleMsg::SetPermissions {
+        let setup_perm_msg2 = ExecuteMsg::SetPermissions {
             spender: spender2.clone(),
             // default is no permission
             permissions: Default::default(),
@@ -724,19 +724,19 @@ mod tests {
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
-        let setup_perm_msg1 = HandleMsg::SetPermissions {
+        let setup_perm_msg1 = ExecuteMsg::SetPermissions {
             spender: spender1.clone(),
             permissions: god_mode,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
 
-        let setup_perm_msg2 = HandleMsg::SetPermissions {
+        let setup_perm_msg2 = ExecuteMsg::SetPermissions {
             spender: spender2.clone(),
             permissions: noob_mode,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
 
-        let setup_perm_msg3 = HandleMsg::SetPermissions {
+        let setup_perm_msg3 = ExecuteMsg::SetPermissions {
             spender: spender3.clone(),
             permissions: noob_mode,
         };
@@ -807,7 +807,7 @@ mod tests {
 
         // Add a third (new) admin
         let new_admins = vec![owner.clone(), admin2.clone(), admin3.clone()];
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: new_admins.clone(),
         };
         execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
@@ -824,7 +824,7 @@ mod tests {
         );
 
         // Set admin3 as the only admin
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![admin3.clone()],
         };
         execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
@@ -841,7 +841,7 @@ mod tests {
         );
 
         // Try to add owner back
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![admin3.clone(), owner.clone()],
         };
         let res = execute(deps.as_mut(), mock_env(), info, msg);
@@ -852,7 +852,7 @@ mod tests {
         // Connect as admin3
         let info = mock_info(admin3.clone(), &[]);
         // Add owner back
-        let msg = HandleMsg::UpdateAdmins {
+        let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![admin3.clone(), owner.clone()],
         };
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -912,7 +912,7 @@ mod tests {
         );
 
         // Add to spender1 account (expires = None) => don't change Expiration
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender1.clone(),
             amount: allow1.clone(),
             expires: None,
@@ -930,7 +930,7 @@ mod tests {
         );
 
         // Add to spender2 account (expires = Some)
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow3.clone(),
             expires: Some(expires_height.clone()),
@@ -948,7 +948,7 @@ mod tests {
         );
 
         // Add to spender3 (new account) (expires = None) => default Expiration::Never
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender3.clone(),
             amount: allow1.clone(),
             expires: None,
@@ -966,7 +966,7 @@ mod tests {
         );
 
         // Add to spender4 (new account) (expires = Some)
-        let msg = HandleMsg::IncreaseAllowance {
+        let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender4.clone(),
             amount: allow2.clone(),
             expires: Some(expires_time.clone()),
@@ -1025,7 +1025,7 @@ mod tests {
         );
 
         // Subtract from spender1 (existing) account (has none of that denom)
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender1.clone(),
             amount: allow3.clone(),
             expires: None,
@@ -1045,7 +1045,7 @@ mod tests {
         );
 
         // Subtract from spender2 (existing) account (brings denom to 0, other denoms left)
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender2.clone(),
             amount: allow2.clone(),
             expires: None,
@@ -1063,7 +1063,7 @@ mod tests {
         );
 
         // Subtract from spender1 (existing) account (brings denom to > 0)
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender1.clone(),
             amount: coin(amount1 / 2, denom1),
             expires: None,
@@ -1084,7 +1084,7 @@ mod tests {
         );
 
         // Subtract from spender2 (existing) account (brings denom to 0, no other denoms left => should delete Allowance)
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender2.clone(),
             amount: allow1.clone(),
             expires: None,
@@ -1096,7 +1096,7 @@ mod tests {
         assert_eq!(allowance, Allowance::default());
 
         // Subtract from spender2 (empty) account (should error)
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender2.clone(),
             amount: allow1.clone(),
             expires: None,
@@ -1107,7 +1107,7 @@ mod tests {
         assert!(res.is_err());
 
         // Subtract from spender1 (existing) account (underflows denom => should delete denom)
-        let msg = HandleMsg::DecreaseAllowance {
+        let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender1.clone(),
             amount: coin(amount1 * 10, denom1),
             expires: None,
@@ -1161,7 +1161,7 @@ mod tests {
         }
         .into()];
 
-        let execute_msg = HandleMsg::Execute { msgs: msgs.clone() };
+        let execute_msg = ExecuteMsg::Execute { msgs: msgs.clone() };
 
         // spender2 cannot spend funds (no initial allowance)
         let info = mock_info(&spender2, &[]);
@@ -1198,7 +1198,7 @@ mod tests {
 
         // For admins, even other message types are allowed
         let other_msgs = vec![CosmosMsg::Custom(Empty {})];
-        let execute_msg = HandleMsg::Execute {
+        let execute_msg = ExecuteMsg::Execute {
             msgs: other_msgs.clone(),
         };
 
@@ -1249,13 +1249,13 @@ mod tests {
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
-        let setup_perm_msg1 = HandleMsg::SetPermissions {
+        let setup_perm_msg1 = ExecuteMsg::SetPermissions {
             spender: spender1.clone(),
             permissions: god_mode,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
 
-        let setup_perm_msg2 = HandleMsg::SetPermissions {
+        let setup_perm_msg2 = ExecuteMsg::SetPermissions {
             spender: spender2.clone(),
             // default is no permission
             permissions: Default::default(),
@@ -1299,7 +1299,7 @@ mod tests {
                 deps.as_mut(),
                 mock_env(),
                 info,
-                HandleMsg::Execute { msgs: msg.clone() },
+                ExecuteMsg::Execute { msgs: msg.clone() },
             );
             assert!(res.is_ok())
         }
@@ -1311,14 +1311,14 @@ mod tests {
                 deps.as_mut(),
                 mock_env(),
                 info.clone(),
-                HandleMsg::Execute { msgs: msg.clone() },
+                ExecuteMsg::Execute { msgs: msg.clone() },
             );
             assert!(res.is_err())
         }
 
         // test mixed permissions
         let spender3 = HumanAddr::from("spender0003");
-        let setup_perm_msg3 = HandleMsg::SetPermissions {
+        let setup_perm_msg3 = ExecuteMsg::SetPermissions {
             spender: spender3.clone(),
             permissions: Permissions {
                 delegate: false,
@@ -1333,7 +1333,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Execute {
+            ExecuteMsg::Execute {
                 msgs: msg_delegate.clone(),
             },
         );
@@ -1343,7 +1343,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Execute {
+            ExecuteMsg::Execute {
                 msgs: msg_redelegate.clone(),
             },
         );
@@ -1352,7 +1352,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Execute {
+            ExecuteMsg::Execute {
                 msgs: msg_undelegate.clone(),
             },
         );
@@ -1361,7 +1361,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Execute {
+            ExecuteMsg::Execute {
                 msgs: msg_withdraw.clone(),
             },
         );
@@ -1403,13 +1403,13 @@ mod tests {
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         // setup permission and then allowance and check if changed
-        let setup_perm_msg = HandleMsg::SetPermissions {
+        let setup_perm_msg = ExecuteMsg::SetPermissions {
             spender: spender1.clone(),
             permissions: perm,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg).unwrap();
 
-        let setup_allowance_msg = HandleMsg::IncreaseAllowance {
+        let setup_allowance_msg = ExecuteMsg::IncreaseAllowance {
             spender: spender1.clone(),
             amount: coin.clone(),
             expires: None,
@@ -1422,14 +1422,14 @@ mod tests {
         assert_eq!(allow, res_allow);
 
         // setup allowance and then permission and check if changed
-        let setup_allowance_msg = HandleMsg::IncreaseAllowance {
+        let setup_allowance_msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: coin.clone(),
             expires: None,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_allowance_msg).unwrap();
 
-        let setup_perm_msg = HandleMsg::SetPermissions {
+        let setup_perm_msg = ExecuteMsg::SetPermissions {
             spender: spender2.clone(),
             permissions: perm,
         };

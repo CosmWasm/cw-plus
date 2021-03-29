@@ -5,11 +5,11 @@ use cosmwasm_std::{
 use sha2::{Digest, Sha256};
 
 use cw2::set_contract_version;
-use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20HandleMsg, Cw20ReceiveMsg};
+use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
-    is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, HandleMsg, InstantiateMsg,
+    is_valid_name, BalanceHuman, CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg,
     ListResponse, QueryMsg, ReceiveMsg,
 };
 use crate::state::{all_swap_ids, AtomicSwap, SWAPS};
@@ -34,16 +34,16 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::Create(msg) => {
+        ExecuteMsg::Create(msg) => {
             let sent_funds = info.funds.clone();
             execute_create(deps, env, info, msg, Balance::from(sent_funds))
         }
-        HandleMsg::Release { id, preimage } => execute_release(deps, env, id, preimage),
-        HandleMsg::Refund { id } => execute_refund(deps, env, id),
-        HandleMsg::Receive(msg) => execute_receive(deps, env, info, msg),
+        ExecuteMsg::Release { id, preimage } => execute_release(deps, env, id, preimage),
+        ExecuteMsg::Refund { id } => execute_refund(deps, env, id),
+        ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
     }
 }
 
@@ -205,7 +205,7 @@ fn send_tokens(api: &dyn Api, to: &HumanAddr, amount: Balance) -> StdResult<Vec<
                 Ok(vec![msg.into()])
             }
             Balance::Cw20(coin) => {
-                let msg = Cw20HandleMsg::Transfer {
+                let msg = Cw20ExecuteMsg::Transfer {
                     recipient: to.into(),
                     amount: coin.amount,
                 };
@@ -332,7 +332,7 @@ mod tests {
                 deps.as_mut(),
                 mock_env(),
                 info.clone(),
-                HandleMsg::Create(create.clone()),
+                ExecuteMsg::Create(create.clone()),
             );
             match res {
                 Ok(_) => panic!("expected error"),
@@ -353,7 +353,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         );
         match res {
             Ok(_) => panic!("expected error"),
@@ -373,7 +373,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         );
         match res {
             Ok(_) => panic!("expected error"),
@@ -393,7 +393,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         );
         match res {
             Ok(_) => panic!("expected error"),
@@ -415,7 +415,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
@@ -434,7 +434,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         );
         match res {
             Ok(_) => panic!("expected error"),
@@ -464,7 +464,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         )
         .unwrap();
 
@@ -472,7 +472,7 @@ mod tests {
         let info = mock_info("somebody", &[]);
 
         // Cannot release, wrong id
-        let release = HandleMsg::Release {
+        let release = ExecuteMsg::Release {
             id: "swap0002".to_string(),
             preimage: preimage(),
         };
@@ -484,7 +484,7 @@ mod tests {
         }
 
         // Cannot release, invalid hash
-        let release = HandleMsg::Release {
+        let release = ExecuteMsg::Release {
             id: "swap0001".to_string(),
             preimage: "bu115h17".to_string(),
         };
@@ -498,7 +498,7 @@ mod tests {
         }
 
         // Cannot release, wrong hash
-        let release = HandleMsg::Release {
+        let release = ExecuteMsg::Release {
             id: "swap0001".to_string(),
             preimage: hex::encode(b"This is 32 bytes, but incorrect."),
         };
@@ -512,7 +512,7 @@ mod tests {
         // Cannot release, expired
         let env = mock_env_height(123457);
         let info = mock_info("somebody", &[]);
-        let release = HandleMsg::Release {
+        let release = ExecuteMsg::Release {
             id: "swap0001".to_string(),
             preimage: preimage(),
         };
@@ -525,7 +525,7 @@ mod tests {
 
         // Can release, valid id, valid hash, and not expired
         let info = mock_info("somebody", &[]);
-        let release = HandleMsg::Release {
+        let release = ExecuteMsg::Release {
             id: "swap0001".to_string(),
             preimage: preimage(),
         };
@@ -569,7 +569,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Create(create.clone()),
+            ExecuteMsg::Create(create.clone()),
         )
         .unwrap();
 
@@ -577,7 +577,7 @@ mod tests {
         let info = mock_info("somebody", &[]);
 
         // Cannot refund, wrong id
-        let refund = HandleMsg::Refund {
+        let refund = ExecuteMsg::Refund {
             id: "swap0002".to_string(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), refund);
@@ -588,7 +588,7 @@ mod tests {
         }
 
         // Cannot refund, not expired yet
-        let refund = HandleMsg::Refund {
+        let refund = ExecuteMsg::Refund {
             id: "swap0001".to_string(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), refund);
@@ -601,7 +601,7 @@ mod tests {
         // Anyone can refund, if already expired
         let env = mock_env_height(123457);
         let info = mock_info("somebody", &[]);
-        let refund = HandleMsg::Refund {
+        let refund = ExecuteMsg::Refund {
             id: "swap0001".to_string(),
         };
         let res = execute(deps.as_mut(), env.clone(), info.clone(), refund.clone()).unwrap();
@@ -647,7 +647,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Create(create1.clone()),
+            ExecuteMsg::Create(create1.clone()),
         )
         .unwrap();
 
@@ -662,7 +662,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            HandleMsg::Create(create2.clone()),
+            ExecuteMsg::Create(create2.clone()),
         )
         .unwrap();
 
@@ -736,7 +736,7 @@ mod tests {
             expires: Expiration::AtHeight(123456),
         };
         let info = mock_info(&native_sender, &native_coins);
-        let res = execute(deps.as_mut(), mock_env(), info, HandleMsg::Create(create)).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -759,7 +759,7 @@ mod tests {
         let receive = Cw20ReceiveMsg {
             sender: cw20_sender,
             amount: cw20_coin.amount,
-            msg: Some(to_binary(&HandleMsg::Create(create)).unwrap()),
+            msg: Some(to_binary(&ExecuteMsg::Create(create)).unwrap()),
         };
         let token_contract = cw20_coin.address;
         let info = mock_info(&token_contract, &[]);
@@ -767,7 +767,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Receive(receive.clone()),
+            ExecuteMsg::Receive(receive.clone()),
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
@@ -780,7 +780,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            HandleMsg::Release {
+            ExecuteMsg::Release {
                 id: cw20_swap_id.clone(),
                 preimage: preimage(),
             },
@@ -791,7 +791,7 @@ mod tests {
         assert_eq!(attr("id", cw20_swap_id), res.attributes[1]);
 
         // Verify the resulting Cw20 transfer message
-        let send_msg = Cw20HandleMsg::Transfer {
+        let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: cw20_rcpt,
             amount: cw20_coin.amount,
         };
@@ -813,7 +813,7 @@ mod tests {
         assert_eq!("preimage", preimage_attr.key);
         let preimage = preimage_attr.value.clone();
 
-        let release = HandleMsg::Release {
+        let release = ExecuteMsg::Release {
             id: native_swap_id.clone(),
             preimage,
         };

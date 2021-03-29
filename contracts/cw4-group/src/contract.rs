@@ -11,7 +11,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
 // version info for migration info
@@ -57,15 +57,15 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: HandleMsg,
+    msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
-        HandleMsg::UpdateMembers { add, remove } => {
+        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
+        ExecuteMsg::UpdateMembers { add, remove } => {
             execute_update_members(deps, env, info, add, remove)
         }
-        HandleMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
-        HandleMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
     }
 }
 
@@ -384,7 +384,7 @@ mod tests {
         let contract1 = HumanAddr::from("hook1");
         let contract2 = HumanAddr::from("hook2");
 
-        let add_msg = HandleMsg::AddHook {
+        let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
 
@@ -412,7 +412,7 @@ mod tests {
         assert_eq!(hooks.hooks, vec![contract1.clone()]);
 
         // cannot remove a non-registered contract
-        let remove_msg = HandleMsg::RemoveHook {
+        let remove_msg = ExecuteMsg::RemoveHook {
             addr: contract2.clone(),
         };
         let err = execute(
@@ -425,7 +425,7 @@ mod tests {
         assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
-        let add_msg2 = HandleMsg::AddHook {
+        let add_msg2 = ExecuteMsg::AddHook {
             addr: contract2.clone(),
         };
         let _ = execute(deps.as_mut(), mock_env(), admin_info.clone(), add_msg2).unwrap();
@@ -443,7 +443,7 @@ mod tests {
         assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
-        let remove_msg = HandleMsg::RemoveHook {
+        let remove_msg = ExecuteMsg::RemoveHook {
             addr: contract1.clone(),
         };
         let err = execute(
@@ -480,10 +480,10 @@ mod tests {
 
         // register 2 hooks
         let admin_info = mock_info(INIT_ADMIN, &[]);
-        let add_msg = HandleMsg::AddHook {
+        let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
-        let add_msg2 = HandleMsg::AddHook {
+        let add_msg2 = ExecuteMsg::AddHook {
             addr: contract2.clone(),
         };
         for msg in vec![add_msg, add_msg2] {
@@ -503,7 +503,7 @@ mod tests {
             },
         ];
         let remove = vec![USER2.into()];
-        let msg = HandleMsg::UpdateMembers { remove, add };
+        let msg = ExecuteMsg::UpdateMembers { remove, add };
 
         // admin updates properly
         assert_users(&deps, Some(11), Some(6), None, None);
