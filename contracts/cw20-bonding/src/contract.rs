@@ -486,7 +486,12 @@ mod tests {
             amount: Uint128(3000),
         };
         let err = execute(deps.as_mut(), mock_env(), info, burn).unwrap_err();
-        assert_eq!(err, ContractError::Std(StdError::underflow(3000, 2000)));
+        assert_eq!(
+            err,
+            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
+                2000, 3000
+            )))
+        );
 
         // burn 1000 EPOXY to get back 15BTC (*10^8)
         let info = mock_info(INVESTOR, &[]);
@@ -598,7 +603,9 @@ mod tests {
         let err = execute(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Std(StdError::underflow(3300000, 3000000))
+            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
+                3000000, 3300000
+            )))
         );
 
         // burn 1_000_000 EPOXY to get back 1_500 DENOM (constant curve)
