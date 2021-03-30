@@ -87,9 +87,11 @@ where
     let owner_raw = &deps.api.canonical_address(&info.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(owner_raw) {
-        let mut res = Response::default();
-        res.messages = msgs;
-        res.attributes = vec![attr("action", "execute"), attr("owner", info.sender)];
+        let res = Response {
+            messages: msgs,
+            attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
+            ..Response::default()
+        };
         Ok(res)
     } else {
         for msg in &msgs {

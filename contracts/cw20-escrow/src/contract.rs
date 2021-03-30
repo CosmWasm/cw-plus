@@ -112,8 +112,10 @@ pub fn execute_create(
         Some(_) => Err(ContractError::AlreadyInUse {}),
     })?;
 
-    let mut res = Response::default();
-    res.attributes = vec![attr("action", "create"), attr("id", msg.id)];
+    let res = Response {
+        attributes: vec![attr("action", "create"), attr("id", msg.id)],
+        ..Response::default()
+    };
     Ok(res)
 }
 
@@ -140,8 +142,10 @@ pub fn execute_top_up(
     // and save
     ESCROWS.save(deps.storage, &id, &escrow)?;
 
-    let mut res = Response::default();
-    res.attributes = vec![attr("action", "top_up"), attr("id", id)];
+    let res = Response {
+        attributes: vec![attr("action", "top_up"), attr("id", id)],
+        ..Response::default()
+    };
     Ok(res)
 }
 

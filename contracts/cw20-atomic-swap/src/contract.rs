@@ -116,13 +116,15 @@ pub fn execute_create(
         Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
 
-    let mut res = Response::default();
-    res.attributes = vec![
-        attr("action", "create"),
-        attr("id", msg.id),
-        attr("hash", msg.hash),
-        attr("recipient", msg.recipient),
-    ];
+    let res = Response {
+        attributes: vec![
+            attr("action", "create"),
+            attr("id", msg.id),
+            attr("hash", msg.hash),
+            attr("recipient", msg.recipient),
+        ],
+        ..Response::default()
+    };
     Ok(res)
 }
 

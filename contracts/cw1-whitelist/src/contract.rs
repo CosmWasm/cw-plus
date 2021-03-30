@@ -74,9 +74,11 @@ where
     if !can_execute(deps.as_ref(), &info.sender)? {
         Err(ContractError::Unauthorized {})
     } else {
-        let mut res = Response::default();
-        res.messages = msgs;
-        res.attributes = vec![attr("action", "execute")];
+        let res = Response {
+            messages: msgs,
+            attributes: vec![attr("action", "execute")],
+            ..Default::default()
+        };
         Ok(res)
     }
 }
@@ -93,8 +95,10 @@ pub fn execute_freeze(
         cfg.mutable = false;
         ADMIN_LIST.save(deps.storage, &cfg)?;
 
-        let mut res = Response::default();
-        res.attributes = vec![attr("action", "freeze")];
+        let res = Response {
+            attributes: vec![attr("action", "freeze")],
+            ..Default::default()
+        };
         Ok(res)
     }
 }
@@ -112,8 +116,10 @@ pub fn execute_update_admins(
         cfg.admins = map_canonical(deps.api, &admins)?;
         ADMIN_LIST.save(deps.storage, &cfg)?;
 
-        let mut res = Response::default();
-        res.attributes = vec![attr("action", "update_admins")];
+        let res = Response {
+            attributes: vec![attr("action", "update_admins")],
+            ..Default::default()
+        };
         Ok(res)
     }
 }
