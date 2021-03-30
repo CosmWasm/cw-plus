@@ -666,10 +666,7 @@ mod tests {
         // random cannot mint
         let random = mock_info("random", &[]);
         let err = execute(deps.as_mut(), mock_env(), random, mint_msg.clone()).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // minter can mint
         let allowed = mock_info(MINTER, &[]);
@@ -714,10 +711,7 @@ mod tests {
 
         let allowed = mock_info(MINTER, &[]);
         let err = execute(deps.as_mut(), mock_env(), allowed, mint_msg2).unwrap_err();
-        match err {
-            ContractError::Claimed {} => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(err, ContractError::Claimed {});
 
         // list the token_ids
         let tokens = query_all_tokens(deps.as_ref(), None, None).unwrap();
@@ -754,11 +748,7 @@ mod tests {
         };
 
         let err = execute(deps.as_mut(), mock_env(), random, transfer_msg.clone()).unwrap_err();
-
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // owner can
         let random = mock_info("venus", &[]);
@@ -816,10 +806,7 @@ mod tests {
 
         let random = mock_info("random", &[]);
         let err = execute(deps.as_mut(), mock_env(), random, send_msg.clone()).unwrap_err();
-        match err {
-            ContractError::Unauthorized {} => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // but owner can
         let random = mock_info("venus", &[]);

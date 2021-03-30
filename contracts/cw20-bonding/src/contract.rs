@@ -309,7 +309,7 @@ mod tests {
     use super::*;
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, Decimal};
+    use cosmwasm_std::{coin, Decimal, StdError};
     use cw0::PaymentError;
 
     const DENOM: &str = "satoshi";
@@ -486,7 +486,12 @@ mod tests {
             amount: Uint128(3000),
         };
         let err = execute(deps.as_mut(), mock_env(), info, burn).unwrap_err();
-        assert_eq!("Cannot subtract 3000 from 2000", err.to_string().as_str());
+        assert_eq!(
+            err,
+            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
+                2000, 3000
+            )))
+        );
 
         // burn 1000 EPOXY to get back 15BTC (*10^8)
         let info = mock_info(INVESTOR, &[]);
@@ -597,8 +602,10 @@ mod tests {
         };
         let err = execute(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
         assert_eq!(
-            "Cannot subtract 3300000 from 3000000",
-            err.to_string().as_str()
+            err,
+            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
+                3000000, 3300000
+            )))
         );
 
         // burn 1_000_000 EPOXY to get back 1_500 DENOM (constant curve)

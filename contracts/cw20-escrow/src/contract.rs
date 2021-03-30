@@ -362,11 +362,8 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap_err();
+        assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
     }
 
     #[test]
@@ -445,11 +442,8 @@ mod tests {
         // second attempt fails (not found)
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap_err();
+        assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
     }
 
     #[test]
@@ -562,11 +556,8 @@ mod tests {
             msg: Some(to_binary(&base).unwrap()),
         });
         let info = mock_info(&baz_token, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, top_up);
-        match res.unwrap_err() {
-            ContractError::NotInWhitelist {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), mock_env(), info, top_up).unwrap_err();
+        assert_eq!(err, ContractError::NotInWhitelist {});
 
         // top up with second foreign token
         let foo_token = HumanAddr::from("foo_token");

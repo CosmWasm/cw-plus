@@ -1170,11 +1170,8 @@ mod tests {
 
         // spender2 cannot spend funds (no initial allowance)
         let info = mock_info(&spender2, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        match res.unwrap_err() {
-            ContractError::NoAllowance { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::NoAllowance {});
 
         // But spender1 can (he has enough funds)
         let info = mock_info(&spender1, &[]);
@@ -1186,11 +1183,11 @@ mod tests {
         );
 
         // And then cannot (not enough funds anymore)
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        assert!(matches!(
+            err,
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // Owner / admins can do anything (at the contract level)
         let info = mock_info(&owner.clone(), &[]);
@@ -1217,11 +1214,8 @@ mod tests {
 
         // But not for mere mortals
         let info = mock_info(&spender1, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        match res.unwrap_err() {
-            ContractError::MessageTypeRejected { .. } => {}
-            e => panic!("unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::MessageTypeRejected {});
     }
 
     #[test]
