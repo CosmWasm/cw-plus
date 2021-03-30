@@ -1184,10 +1184,10 @@ mod tests {
 
         // And then cannot (not enough funds anymore)
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // Owner / admins can do anything (at the contract level)
         let info = mock_info(&owner.clone(), &[]);

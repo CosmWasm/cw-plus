@@ -562,17 +562,11 @@ mod tests {
         let mut env = mock_env();
         env.block.height += 5;
         let info = mock_info(USER2, &[]);
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        match err {
-            ContractError::Std(StdError::Underflow {
-                minuend,
-                subtrahend,
-            }) => {
-                assert_eq!(minuend.as_str(), "5000");
-                assert_eq!(subtrahend.as_str(), "5100");
-            }
-            e => panic!("Unexpected error: {:?}", e),
-        }
+        let res = execute(deps.as_mut(), env, info, msg);
+        assert_eq!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::underflow(5000, 5100))
+        );
     }
 
     #[test]

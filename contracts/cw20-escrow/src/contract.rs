@@ -363,10 +363,10 @@ mod tests {
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::NotFound { .. })
+        ));
     }
 
     #[test]
@@ -446,10 +446,10 @@ mod tests {
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id });
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::NotFound { .. })
+        ));
     }
 
     #[test]

@@ -503,8 +503,8 @@ mod tests {
         let env = mock_env();
         let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg);
         assert_eq!(
-            StdError::generic_err("Initial supply greater than cap"),
-            res.unwrap_err()
+            res.unwrap_err(),
+            StdError::generic_err("Initial supply greater than cap")
         );
     }
 
@@ -700,10 +700,10 @@ mod tests {
             amount: too_much,
         };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // cannot send from empty account
         let info = mock_info(addr2.clone(), &[]);
@@ -713,10 +713,10 @@ mod tests {
             amount: transfer,
         };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // valid transfer
         let info = mock_info(addr1.clone(), &[]);
@@ -765,10 +765,10 @@ mod tests {
         let env = mock_env();
         let msg = ExecuteMsg::Burn { amount: too_much };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::Underflow { .. })
+        ));
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -821,10 +821,10 @@ mod tests {
             msg: Some(send_msg.clone()),
         };
         let res = execute(deps.as_mut(), env, info, msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // valid transfer
         let info = mock_info(addr1.clone(), &[]);

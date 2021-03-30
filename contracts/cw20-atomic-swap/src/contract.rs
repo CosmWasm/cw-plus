@@ -463,10 +463,10 @@ mod tests {
             preimage: preimage(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::NotFound { .. })
+        ));
 
         // Cannot release, invalid hash
         let release = ExecuteMsg::Release {
@@ -485,11 +485,10 @@ mod tests {
             preimage: hex::encode(b"This is 32 bytes, but incorrect."),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::InvalidPreimage {}) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::InvalidPreimage {}
+        ));
 
         // Cannot release, expired
         let env = mock_env_height(123457);
@@ -499,11 +498,7 @@ mod tests {
             preimage: preimage(),
         };
         let res = execute(deps.as_mut(), env, info, release);
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::Expired) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert!(matches!(res.unwrap_err(), ContractError::Expired));
 
         // Can release, valid id, valid hash, and not expired
         let info = mock_info("somebody", &[]);
@@ -524,10 +519,10 @@ mod tests {
 
         // Cannot release again
         let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::NotFound { .. })
+        ));
     }
 
     #[test]
@@ -563,22 +558,17 @@ mod tests {
             id: "swap0002".to_string(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), refund);
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::Std(StdError::NotFound { .. })) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::NotFound { .. })
+        ));
 
         // Cannot refund, not expired yet
         let refund = ExecuteMsg::Refund {
             id: "swap0001".to_string(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), refund);
-        match res {
-            Ok(_) => panic!("expected error"),
-            Err(ContractError::NotExpired {}) => {}
-            Err(e) => panic!("unexpected error: {:?}", e),
-        }
+        assert!(matches!(res.unwrap_err(), ContractError::NotExpired { .. }));
 
         // Anyone can refund, if already expired
         let env = mock_env_height(123457);
@@ -599,10 +589,10 @@ mod tests {
 
         // Cannot refund again
         let res = execute(deps.as_mut(), env, info, refund);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::NotFound { .. }) => {}
-            e => panic!("Expected NotFound, got {}", e),
-        }
+        assert!(matches!(
+            res.unwrap_err(),
+            ContractError::Std(StdError::NotFound { .. })
+        ));
     }
 
     #[test]
