@@ -77,7 +77,7 @@ where
         let res = Response {
             messages: msgs,
             attributes: vec![attr("action", "execute")],
-            ..Default::default()
+            ..Response::default()
         };
         Ok(res)
     }
@@ -97,7 +97,7 @@ pub fn execute_freeze(
 
         let res = Response {
             attributes: vec![attr("action", "freeze")],
-            ..Default::default()
+            ..Response::default()
         };
         Ok(res)
     }
@@ -118,7 +118,7 @@ pub fn execute_update_admins(
 
         let res = Response {
             attributes: vec![attr("action", "update_admins")],
-            ..Default::default()
+            ..Response::default()
         };
         Ok(res)
     }
