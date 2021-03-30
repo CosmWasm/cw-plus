@@ -333,13 +333,14 @@ mod tests {
                 recipient: HumanAddr::from("rcpt0001"),
                 expires: Expiration::AtHeight(123456),
             };
-            let res = execute(
+            let err = execute(
                 deps.as_mut(),
                 mock_env(),
                 info.clone(),
                 ExecuteMsg::Create(create.clone()),
-            );
-            assert_eq!(ContractError::InvalidId {}, res.unwrap_err());
+            )
+            .unwrap_err();
+            assert_eq!(err, ContractError::InvalidId {});
         }
 
         // Cannot create, no funds
@@ -350,13 +351,14 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let res = execute(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             info,
             ExecuteMsg::Create(create.clone()),
-        );
-        assert_eq!(ContractError::EmptyBalance {}, res.unwrap_err());
+        )
+        .unwrap_err();
+        assert_eq!(err, ContractError::EmptyBalance {});
 
         // Cannot create, expired
         let info = mock_info(&sender, &balance);
@@ -366,13 +368,14 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtTime(1),
         };
-        let res = execute(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             info,
             ExecuteMsg::Create(create.clone()),
-        );
-        assert_eq!(ContractError::Expired {}, res.unwrap_err());
+        )
+        .unwrap_err();
+        assert_eq!(err, ContractError::Expired {});
 
         // Cannot create, invalid hash
         let info = mock_info(&sender, &balance);
@@ -382,15 +385,16 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let res = execute(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             info,
             ExecuteMsg::Create(create.clone()),
-        );
+        )
+        .unwrap_err();
         assert_eq!(
-            ContractError::ParseError("Invalid character \'u\' at position 1".into()),
-            res.unwrap_err()
+            err,
+            ContractError::ParseError("Invalid character \'u\' at position 1".into())
         );
 
         // Can create, all valid
@@ -420,13 +424,14 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let res = execute(
+        let err = execute(
             deps.as_mut(),
             mock_env(),
             info,
             ExecuteMsg::Create(create.clone()),
-        );
-        assert_eq!(ContractError::AlreadyExists {}, res.unwrap_err());
+        )
+        .unwrap_err();
+        assert_eq!(err, ContractError::AlreadyExists {});
     }
 
     #[test]
@@ -462,21 +467,18 @@ mod tests {
             id: "swap0002".to_string(),
             preimage: preimage(),
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        assert!(matches!(
-            res.unwrap_err(),
-            ContractError::Std(StdError::NotFound { .. })
-        ));
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), release).unwrap_err();
+        assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
 
         // Cannot release, invalid hash
         let release = ExecuteMsg::Release {
             id: "swap0001".to_string(),
             preimage: "bu115h17".to_string(),
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), release).unwrap_err();
         assert_eq!(
-            ContractError::ParseError("Invalid character \'u\' at position 1".to_string()),
-            res.unwrap_err()
+            err,
+            ContractError::ParseError("Invalid character \'u\' at position 1".to_string())
         );
 
         // Cannot release, wrong hash
@@ -484,11 +486,8 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: hex::encode(b"This is 32 bytes, but incorrect."),
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        assert!(matches!(
-            res.unwrap_err(),
-            ContractError::InvalidPreimage {}
-        ));
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), release).unwrap_err();
+        assert!(matches!(err, ContractError::InvalidPreimage {}));
 
         // Cannot release, expired
         let env = mock_env_height(123457);
@@ -497,8 +496,8 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: preimage(),
         };
-        let res = execute(deps.as_mut(), env, info, release);
-        assert!(matches!(res.unwrap_err(), ContractError::Expired));
+        let err = execute(deps.as_mut(), env, info, release).unwrap_err();
+        assert!(matches!(err, ContractError::Expired));
 
         // Can release, valid id, valid hash, and not expired
         let info = mock_info("somebody", &[]);
@@ -518,11 +517,8 @@ mod tests {
         );
 
         // Cannot release again
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), release);
-        assert!(matches!(
-            res.unwrap_err(),
-            ContractError::Std(StdError::NotFound { .. })
-        ));
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), release).unwrap_err();
+        assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
     }
 
     #[test]
@@ -557,18 +553,15 @@ mod tests {
         let refund = ExecuteMsg::Refund {
             id: "swap0002".to_string(),
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), refund);
-        assert!(matches!(
-            res.unwrap_err(),
-            ContractError::Std(StdError::NotFound { .. })
-        ));
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), refund).unwrap_err();
+        assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
 
         // Cannot refund, not expired yet
         let refund = ExecuteMsg::Refund {
             id: "swap0001".to_string(),
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), refund);
-        assert!(matches!(res.unwrap_err(), ContractError::NotExpired { .. }));
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), refund).unwrap_err();
+        assert!(matches!(err, ContractError::NotExpired { .. }));
 
         // Anyone can refund, if already expired
         let env = mock_env_height(123457);
@@ -588,11 +581,8 @@ mod tests {
         );
 
         // Cannot refund again
-        let res = execute(deps.as_mut(), env, info, refund);
-        assert!(matches!(
-            res.unwrap_err(),
-            ContractError::Std(StdError::NotFound { .. })
-        ));
+        let err = execute(deps.as_mut(), env, info, refund).unwrap_err();
+        assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
     }
 
     #[test]

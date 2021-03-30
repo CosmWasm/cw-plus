@@ -559,8 +559,9 @@ mod tests {
             required_weight: 1,
             max_voting_period,
         };
-        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg);
-        assert_eq!(ContractError::NoVoters {}, res.unwrap_err());
+        let err =
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap_err();
+        assert_eq!(err, ContractError::NoVoters {});
 
         // Zero required weight fails
         let instantiate_msg = InstantiateMsg {
@@ -568,18 +569,20 @@ mod tests {
             required_weight: 0,
             max_voting_period,
         };
-        let res = instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg);
-        assert_eq!(ContractError::ZeroWeight {}, res.unwrap_err());
+        let err =
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap_err();
+        assert_eq!(err, ContractError::ZeroWeight {});
 
         // Total weight less than required weight not allowed
         let required_weight = 100;
-        let res = setup_test_case(
+        let err = setup_test_case(
             deps.as_mut(),
             info.clone(),
             required_weight,
             max_voting_period,
-        );
-        assert_eq!(ContractError::UnreachableWeight {}, res.unwrap_err());
+        )
+        .unwrap_err();
+        assert_eq!(err, ContractError::UnreachableWeight {});
 
         // All valid
         let required_weight = 1;
@@ -621,8 +624,8 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = execute(deps.as_mut(), mock_env(), info, proposal.clone());
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // Wrong expiration option fails
         let info = mock_info(OWNER, &[]);
@@ -632,8 +635,8 @@ mod tests {
             msgs: msgs.clone(),
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = execute(deps.as_mut(), mock_env(), info, proposal_wrong_exp);
-        assert_eq!(ContractError::WrongExpiration {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, proposal_wrong_exp).unwrap_err();
+        assert_eq!(err, ContractError::WrongExpiration {});
 
         // Proposal from voter works
         let info = mock_info(VOTER3, &[]);
@@ -708,13 +711,13 @@ mod tests {
             proposal_id,
             vote: Vote::Yes,
         };
-        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone());
-        assert_eq!(ContractError::AlreadyVoted {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap_err();
+        assert_eq!(err, ContractError::AlreadyVoted {});
 
         // Only voters can vote
         let info = mock_info(SOMEBODY, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, yes_vote.clone());
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, yes_vote.clone()).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // But voter1 can
         let info = mock_info(VOTER1, &[]);
@@ -763,8 +766,8 @@ mod tests {
         assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
 
         // Once voted, votes cannot be changed
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone());
-        assert_eq!(ContractError::AlreadyVoted {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), yes_vote.clone()).unwrap_err();
+        assert_eq!(err, ContractError::AlreadyVoted {});
         assert_eq!(tally, get_tally(deps.as_ref(), proposal_id));
 
         // Expired proposals cannot be voted
@@ -772,8 +775,8 @@ mod tests {
             Duration::Time(duration) => mock_env_time(duration + 1),
             Duration::Height(duration) => mock_env_height(duration + 1),
         };
-        let res = execute(deps.as_mut(), env, info, no_vote);
-        assert_eq!(ContractError::Expired {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, no_vote).unwrap_err();
+        assert_eq!(err, ContractError::Expired {});
 
         // Vote it again, so it passes
         let info = mock_info(VOTER4, &[]);
@@ -797,8 +800,8 @@ mod tests {
 
         // non-Open proposals cannot be voted
         let info = mock_info(VOTER5, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, yes_vote);
-        assert_eq!(ContractError::NotOpen {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, yes_vote).unwrap_err();
+        assert_eq!(err, ContractError::NotOpen {});
     }
 
     #[test]
@@ -830,8 +833,8 @@ mod tests {
 
         // Only Passed can be executed
         let execution = ExecuteMsg::Execute { proposal_id };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), execution.clone());
-        assert_eq!(ContractError::WrongExecuteStatus {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), execution.clone()).unwrap_err();
+        assert_eq!(err, ContractError::WrongExecuteStatus {});
 
         // Vote it, so it passes
         let vote = ExecuteMsg::Vote {
@@ -859,8 +862,8 @@ mod tests {
 
         // In passing: Try to close Passed fails
         let closing = ExecuteMsg::Close { proposal_id };
-        let res = execute(deps.as_mut(), mock_env(), info, closing);
-        assert_eq!(ContractError::WrongCloseStatus {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, closing).unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {});
 
         // Execute works. Anybody can execute Passed proposals
         let info = mock_info(SOMEBODY, &[]);
@@ -883,8 +886,8 @@ mod tests {
 
         // In passing: Try to close Executed fails
         let closing = ExecuteMsg::Close { proposal_id };
-        let res = execute(deps.as_mut(), mock_env(), info, closing);
-        assert_eq!(ContractError::WrongCloseStatus {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, closing).unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {});
     }
 
     #[test]
@@ -920,8 +923,8 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
 
         // Non-expired proposals cannot be closed
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), closing.clone());
-        assert_eq!(ContractError::NotExpired {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), closing.clone()).unwrap_err();
+        assert_eq!(err, ContractError::NotExpired {});
 
         // Expired proposals can be closed
         let info = mock_info(OWNER, &[]);
@@ -965,7 +968,7 @@ mod tests {
         );
 
         // Trying to close it again fails
-        let res = execute(deps.as_mut(), mock_env(), info, closing);
-        assert_eq!(ContractError::WrongCloseStatus {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, closing).unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {});
     }
 }

@@ -186,8 +186,8 @@ mod tests {
             admins: vec![anyone.clone()],
         };
         let info = mock_info(&anyone, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, msg);
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // but alice can kick out carl
         let msg = ExecuteMsg::UpdateAdmins {
@@ -205,8 +205,8 @@ mod tests {
 
         // carl cannot freeze it
         let info = mock_info(&carl, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {});
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // but bob can
         let info = mock_info(&bob, &[]);
@@ -222,8 +222,8 @@ mod tests {
             admins: vec![alice.clone()],
         };
         let info = mock_info(&alice, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, msg);
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
     }
 
     #[test]
@@ -262,8 +262,8 @@ mod tests {
 
         // bob cannot execute them
         let info = mock_info(&bob, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
 
         // but carl can
         let info = mock_info(&carl, &[]);

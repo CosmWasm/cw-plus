@@ -1170,8 +1170,8 @@ mod tests {
 
         // spender2 cannot spend funds (no initial allowance)
         let info = mock_info(&spender2, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        assert_eq!(ContractError::NoAllowance {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::NoAllowance {});
 
         // But spender1 can (he has enough funds)
         let info = mock_info(&spender1, &[]);
@@ -1183,9 +1183,9 @@ mod tests {
         );
 
         // And then cannot (not enough funds anymore)
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
         assert!(matches!(
-            res.unwrap_err(),
+            err,
             ContractError::Std(StdError::Underflow { .. })
         ));
 
@@ -1214,8 +1214,8 @@ mod tests {
 
         // But not for mere mortals
         let info = mock_info(&spender1, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone());
-        assert_eq!(ContractError::MessageTypeRejected {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::MessageTypeRejected {});
     }
 
     #[test]

@@ -546,12 +546,12 @@ mod tests {
         let info = mock_info(&creator, &[]);
 
         // make sure we can instantiate with this
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg.clone());
+        let err = instantiate(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
         assert_eq!(
+            err,
             ContractError::NotInValidatorSet {
                 validator: "my-validator".into()
-            },
-            res.unwrap_err()
+            }
         );
     }
 
@@ -730,12 +730,12 @@ mod tests {
         let info = mock_info(&bob, &[coin(500, "photon")]);
 
         // try to bond and make sure we trigger delegation
-        let res = execute(deps.as_mut(), mock_env(), info, bond_msg);
+        let err = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap_err();
         assert_eq!(
+            err,
             ContractError::EmptyBalance {
                 denom: "ustake".to_string()
-            },
-            res.unwrap_err()
+            }
         );
     }
 
@@ -779,11 +779,8 @@ mod tests {
             amount: Uint128(600),
         };
         let info = mock_info(&creator, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, unbond_msg);
-        assert_eq!(
-            ContractError::Std(StdError::underflow(0, 600)),
-            res.unwrap_err()
-        );
+        let err = execute(deps.as_mut(), mock_env(), info, unbond_msg).unwrap_err();
+        assert_eq!(err, ContractError::Std(StdError::underflow(0, 600)));
 
         // bob unbonds 600 tokens at 10% tax...
         // 60 are taken and send to the owner

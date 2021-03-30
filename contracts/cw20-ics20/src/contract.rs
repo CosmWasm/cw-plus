@@ -227,7 +227,7 @@ mod test {
         assert_eq!(0, chan_res.total_sent.len());
         assert_eq!(0, chan_res.balances.len());
 
-        let not_found = query(
+        let err = query(
             deps.as_ref(),
             mock_env(),
             QueryMsg::Channel {
@@ -235,10 +235,7 @@ mod test {
             },
         )
         .unwrap_err();
-        assert_eq!(
-            not_found,
-            StdError::not_found("cw20_ics20::state::ChannelInfo")
-        );
+        assert_eq!(err, StdError::not_found("cw20_ics20::state::ChannelInfo"));
     }
 
     #[test]

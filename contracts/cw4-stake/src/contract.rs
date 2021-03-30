@@ -562,11 +562,8 @@ mod tests {
         let mut env = mock_env();
         env.block.height += 5;
         let info = mock_info(USER2, &[]);
-        let res = execute(deps.as_mut(), env, info, msg);
-        assert_eq!(
-            res.unwrap_err(),
-            ContractError::Std(StdError::underflow(5000, 5100))
-        );
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Std(StdError::underflow(5000, 5100)));
     }
 
     #[test]

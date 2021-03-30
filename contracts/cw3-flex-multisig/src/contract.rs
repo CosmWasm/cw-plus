@@ -631,17 +631,16 @@ mod tests {
             threshold: Threshold::AbsoluteCount { weight: 0 },
             max_voting_period,
         };
-        let res = app.instantiate_contract(
-            flex_id,
-            OWNER,
-            &instantiate_msg,
-            &[],
-            "zero required weight",
-        );
-        assert_eq!(
-            ContractError::ZeroThreshold {}.to_string(),
-            res.unwrap_err()
-        );
+        let err = app
+            .instantiate_contract(
+                flex_id,
+                OWNER,
+                &instantiate_msg,
+                &[],
+                "zero required weight",
+            )
+            .unwrap_err();
+        assert_eq!(err, ContractError::ZeroThreshold {}.to_string());
 
         // Total weight less than required weight not allowed
         let instantiate_msg = InstantiateMsg {
@@ -649,17 +648,16 @@ mod tests {
             threshold: Threshold::AbsoluteCount { weight: 100 },
             max_voting_period,
         };
-        let res = app.instantiate_contract(
-            flex_id,
-            OWNER,
-            &instantiate_msg,
-            &[],
-            "high required weight",
-        );
-        assert_eq!(
-            ContractError::UnreachableThreshold {}.to_string(),
-            res.unwrap_err()
-        );
+        let err = app
+            .instantiate_contract(
+                flex_id,
+                OWNER,
+                &instantiate_msg,
+                &[],
+                "high required weight",
+            )
+            .unwrap_err();
+        assert_eq!(err, ContractError::UnreachableThreshold {}.to_string());
 
         // All valid
         let instantiate_msg = InstantiateMsg {
@@ -717,8 +715,10 @@ mod tests {
 
         let proposal = pay_somebody_proposal();
         // Only voters can propose
-        let res = app.execute_contract(SOMEBODY, &flex_addr, &proposal, &[]);
-        assert_eq!(ContractError::Unauthorized {}.to_string(), res.unwrap_err());
+        let err = app
+            .execute_contract(SOMEBODY, &flex_addr, &proposal, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {}.to_string());
 
         // Wrong expiration option fails
         let msgs = match proposal.clone() {
@@ -731,11 +731,10 @@ mod tests {
             msgs,
             latest: Some(Expiration::AtHeight(123456)),
         };
-        let res = app.execute_contract(OWNER, &flex_addr, &proposal_wrong_exp, &[]);
-        assert_eq!(
-            ContractError::WrongExpiration {}.to_string(),
-            res.unwrap_err()
-        );
+        let err = app
+            .execute_contract(OWNER, &flex_addr, &proposal_wrong_exp, &[])
+            .unwrap_err();
+        assert_eq!(err, ContractError::WrongExpiration {}.to_string());
 
         // Proposal from voter works
         let res = app

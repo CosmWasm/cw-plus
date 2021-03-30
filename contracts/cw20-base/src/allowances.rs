@@ -481,11 +481,8 @@ mod tests {
             amount: Uint128(7777),
             expires: None,
         };
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::CannotSetOwnAccount {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert_eq!(err, ContractError::CannotSetOwnAccount {});
 
         // decrease self-allowance
         let msg = ExecuteMsg::DecreaseAllowance {
@@ -493,11 +490,8 @@ mod tests {
             amount: Uint128(7777),
             expires: None,
         };
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::CannotSetOwnAccount {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert_eq!(err, ContractError::CannotSetOwnAccount {});
     }
 
     #[test]
@@ -556,11 +550,11 @@ mod tests {
         };
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert!(matches!(
+            err,
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // let us increase limit, but set the expiration (default env height is 12_345)
         let info = mock_info(owner.clone(), &[]);
@@ -580,11 +574,8 @@ mod tests {
         };
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::Expired {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert_eq!(err, ContractError::Expired {});
     }
 
     #[test]
@@ -639,11 +630,11 @@ mod tests {
         };
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert!(matches!(
+            err,
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // let us increase limit, but set the expiration (default env height is 12_345)
         let info = mock_info(owner.clone(), &[]);
@@ -662,11 +653,8 @@ mod tests {
         };
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::Expired {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert_eq!(err, ContractError::Expired {});
     }
 
     #[test]
@@ -746,11 +734,11 @@ mod tests {
         };
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::Std(StdError::Underflow { .. }) => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert!(matches!(
+            err,
+            ContractError::Std(StdError::Underflow { .. })
+        ));
 
         // let us increase limit, but set the expiration to current block (expired)
         let info = mock_info(owner.clone(), &[]);
@@ -771,10 +759,7 @@ mod tests {
         };
         let info = mock_info(spender.clone(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg);
-        match res.unwrap_err() {
-            ContractError::Expired {} => {}
-            e => panic!("Unexpected error: {}", e),
-        }
+        let err = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap_err();
+        assert_eq!(err, ContractError::Expired {});
     }
 }

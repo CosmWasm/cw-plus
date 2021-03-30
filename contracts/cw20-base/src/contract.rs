@@ -501,9 +501,10 @@ mod tests {
         };
         let info = mock_info(&HumanAddr("creator".to_string()), &[]);
         let env = mock_env();
-        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg);
+        let err =
+            instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap_err();
         assert_eq!(
-            res.unwrap_err(),
+            err,
             StdError::generic_err("Initial supply greater than cap")
         );
     }
@@ -540,8 +541,8 @@ mod tests {
         };
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env, info, msg.clone());
-        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::InvalidZeroAmount {});
 
         // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
@@ -551,8 +552,8 @@ mod tests {
         };
         let info = mock_info(&minter, &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env, info, msg.clone());
-        assert_eq!(ContractError::CannotExceedCap {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::CannotExceedCap {});
     }
 
     #[test]
@@ -572,8 +573,8 @@ mod tests {
         };
         let info = mock_info(&HumanAddr::from("anyone else"), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env, info, msg.clone());
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
     }
 
     #[test]
@@ -587,8 +588,8 @@ mod tests {
         };
         let info = mock_info(&HumanAddr::from("genesis"), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env, info, msg.clone());
-        assert_eq!(ContractError::Unauthorized {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
     }
 
     #[test]
@@ -689,8 +690,8 @@ mod tests {
             recipient: addr2.clone(),
             amount: Uint128::zero(),
         };
-        let res = execute(deps.as_mut(), env, info, msg);
-        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::InvalidZeroAmount {});
 
         // cannot send more than we have
         let info = mock_info(addr1.clone(), &[]);
@@ -699,9 +700,9 @@ mod tests {
             recipient: addr2.clone(),
             amount: too_much,
         };
-        let res = execute(deps.as_mut(), env, info, msg);
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(
-            res.unwrap_err(),
+            err,
             ContractError::Std(StdError::Underflow { .. })
         ));
 
@@ -712,9 +713,9 @@ mod tests {
             recipient: addr1.clone(),
             amount: transfer,
         };
-        let res = execute(deps.as_mut(), env, info, msg);
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(
-            res.unwrap_err(),
+            err,
             ContractError::Std(StdError::Underflow { .. })
         ));
 
@@ -753,8 +754,8 @@ mod tests {
         let msg = ExecuteMsg::Burn {
             amount: Uint128::zero(),
         };
-        let res = execute(deps.as_mut(), env, info, msg);
-        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::InvalidZeroAmount {});
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -764,9 +765,9 @@ mod tests {
         let info = mock_info(addr1.clone(), &[]);
         let env = mock_env();
         let msg = ExecuteMsg::Burn { amount: too_much };
-        let res = execute(deps.as_mut(), env, info, msg);
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(
-            res.unwrap_err(),
+            err,
             ContractError::Std(StdError::Underflow { .. })
         ));
         assert_eq!(
@@ -809,8 +810,8 @@ mod tests {
             amount: Uint128::zero(),
             msg: Some(send_msg.clone()),
         };
-        let res = execute(deps.as_mut(), env, info, msg);
-        assert_eq!(ContractError::InvalidZeroAmount {}, res.unwrap_err());
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::InvalidZeroAmount {});
 
         // cannot send more than we have
         let info = mock_info(addr1.clone(), &[]);
@@ -820,9 +821,9 @@ mod tests {
             amount: too_much,
             msg: Some(send_msg.clone()),
         };
-        let res = execute(deps.as_mut(), env, info, msg);
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(
-            res.unwrap_err(),
+            err,
             ContractError::Std(StdError::Underflow { .. })
         ));
 
