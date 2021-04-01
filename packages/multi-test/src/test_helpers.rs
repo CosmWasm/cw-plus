@@ -6,6 +6,8 @@ use cosmwasm_std::{
     attr, from_slice, to_binary, to_vec, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty,
     Env, MessageInfo, Response, StdError,
 };
+use schemars::JsonSchema;
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EmptyMsg {}
@@ -32,9 +34,18 @@ fn query_error(_deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
     Err(StdError::generic_err("Query failed"))
 }
 
-pub fn contract_error() -> Box<dyn Contract> {
+pub fn contract_error() -> Box<dyn Contract<Empty>> {
     let contract: ContractWrapper<_, _, _, _, _, _, _, String, String> =
         ContractWrapper::new(handle_error, init_error, query_error);
+    Box::new(contract)
+}
+
+pub fn contract_error_custom<C>() -> Box<dyn Contract<C>>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let contract: ContractWrapper<_, _, _, _, _, _, _, String, String> =
+        ContractWrapper::new_with_empty(handle_error, init_error, query_error);
     Box::new(contract)
 }
 
@@ -84,8 +95,16 @@ fn query_payout(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
     Ok(bin.into())
 }
 
-pub fn contract_payout() -> Box<dyn Contract> {
+pub fn contract_payout() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(handle_payout, init_payout, query_payout);
+    Box::new(contract)
+}
+
+pub fn contract_payout_custom<C>() -> Box<dyn Contract<C>>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let contract = ContractWrapper::new_with_empty(handle_payout, init_payout, query_payout);
     Box::new(contract)
 }
 
@@ -141,7 +160,15 @@ fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErr
     to_binary(&res)
 }
 
-pub fn contract_reflect() -> Box<dyn Contract> {
+pub fn contract_reflect() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(handle_reflect, init_reflect, query_reflect);
+    Box::new(contract)
+}
+
+pub fn contract_reflect_custom<C>() -> Box<dyn Contract<C>>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let contract = ContractWrapper::new_with_empty(handle_reflect, init_reflect, query_reflect);
     Box::new(contract)
 }

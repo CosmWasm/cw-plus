@@ -12,7 +12,7 @@ use cosmwasm_std::{
 use crate::transactions::{RepLog, StorageTransaction};
 
 /// Interface to call into a Contract
-pub trait Contract<T = Empty>
+pub trait Contract<T>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -254,9 +254,12 @@ pub fn next_block(block: &mut BlockInfo) {
 
 pub type StorageFactory = fn() -> Box<dyn Storage>;
 
-pub struct WasmRouter {
+pub struct WasmRouter<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     // WasmState - cache this, pass in separate?
-    handlers: HashMap<usize, Box<dyn Contract>>,
+    handlers: HashMap<usize, Box<dyn Contract<C>>>,
     contracts: HashMap<HumanAddr, ContractData>,
     // WasmConst
     block: BlockInfo,
@@ -264,7 +267,10 @@ pub struct WasmRouter {
     storage_factory: StorageFactory,
 }
 
-impl WasmRouter {
+impl<C> WasmRouter<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     pub fn new(api: Box<dyn Api>, block: BlockInfo, storage_factory: StorageFactory) -> Self {
         WasmRouter {
             handlers: HashMap::new(),
@@ -289,13 +295,13 @@ impl WasmRouter {
         self.block.clone()
     }
 
-    pub fn store_code(&mut self, code: Box<dyn Contract>) -> usize {
+    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
         let idx = self.handlers.len() + 1;
         self.handlers.insert(idx, code);
         idx
     }
 
-    pub fn cache(&'_ self) -> WasmCache<'_> {
+    pub fn cache(&'_ self) -> WasmCache<'_, C> {
         WasmCache::new(self)
     }
 
@@ -345,7 +351,7 @@ impl WasmRouter {
         action: F,
     ) -> Result<T, String>
     where
-        F: FnOnce(&Box<dyn Contract>, Deps, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract<C>>, Deps, Env) -> Result<T, String>,
     {
         let contract = self
             .contracts
@@ -379,9 +385,12 @@ impl WasmRouter {
 ///
 /// In Router, we use this exclusively in all the calls in execute (not self.wasm)
 /// In Querier, we use self.wasm
-pub struct WasmCache<'a> {
+pub struct WasmCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     // and this into one with reference
-    router: &'a WasmRouter,
+    router: &'a WasmRouter<C>,
     state: WasmCacheState<'a>,
 }
 
@@ -402,7 +411,10 @@ pub struct WasmOps {
 }
 
 impl WasmOps {
-    pub fn commit(self, router: &mut WasmRouter) {
+    pub fn commit<C>(self, router: &mut WasmRouter<C>)
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         self.new_contracts.into_iter().for_each(|(k, v)| {
             router.contracts.insert(k, v);
         });
@@ -413,8 +425,11 @@ impl WasmOps {
     }
 }
 
-impl<'a> WasmCache<'a> {
-    fn new(router: &'a WasmRouter) -> Self {
+impl<'a, C> WasmCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn new(router: &'a WasmRouter<C>) -> Self {
         WasmCache {
             router,
             state: WasmCacheState {
@@ -457,7 +472,7 @@ impl<'a> WasmCache<'a> {
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response, String> {
+    ) -> Result<Response<C>, String> {
         let parent = &self.router.handlers;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
@@ -484,7 +499,7 @@ impl<'a> WasmCache<'a> {
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response, String> {
+    ) -> Result<Response<C>, String> {
         let parent = &self.router.handlers;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
@@ -576,7 +591,7 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, to_vec, BankMsg, BlockInfo, CosmosMsg, Empty};
 
-    fn mock_router() -> WasmRouter {
+    fn mock_router() -> WasmRouter<Empty> {
         let env = mock_env();
         let api = Box::new(MockApi::default());
         WasmRouter::new(api, env.block, || Box::new(MockStorage::new()))
