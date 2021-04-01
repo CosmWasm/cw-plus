@@ -349,12 +349,10 @@ version = "0.6.0-alpha2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-multi-test",
  "cw-storage-plus",
  "cw0",
  "cw2",
  "cw20",
- "cw20-base",
  "schemars",
  "serde",
  "thiserror",
