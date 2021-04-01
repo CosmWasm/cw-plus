@@ -397,7 +397,8 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<HumanAddr, String> {
 mod test {
     use super::*;
     use crate::test_helpers::{
-        contract_payout, contract_reflect, EmptyMsg, PayoutMessage, ReflectMessage, ReflectResponse,
+        contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
+        PayoutMessage, ReflectMessage, ReflectResponse,
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
@@ -411,7 +412,18 @@ mod test {
         App::new(api, env.block, bank, || Box::new(MockStorage::new()))
     }
 
-    fn get_balance(router: &App, addr: &HumanAddr) -> Vec<Coin> {
+    fn custom_router() -> App<CustomMsg> {
+        let env = mock_env();
+        let api = Box::new(MockApi::default());
+        let bank = SimpleBank {};
+
+        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    }
+
+    fn get_balance<C>(router: &App<C>, addr: &HumanAddr) -> Vec<Coin>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         router.wrap().query_all_balances(addr).unwrap()
     }
 
@@ -509,7 +521,7 @@ mod test {
 
     #[test]
     fn reflect_success() {
-        let mut router = mock_router();
+        let mut router = custom_router();
 
         // set personal balance
         let owner = HumanAddr::from("owner");
@@ -519,7 +531,7 @@ mod test {
             .unwrap();
 
         // set up payout contract
-        let payout_id = router.store_code(contract_payout());
+        let payout_id = router.store_code(contract_payout_custom());
         let msg = PayoutMessage {
             payout: coin(5, "eth"),
         };
@@ -575,7 +587,7 @@ mod test {
 
     #[test]
     fn reflect_error() {
-        let mut router = mock_router();
+        let mut router = custom_router();
 
         // set personal balance
         let owner = HumanAddr::from("owner");

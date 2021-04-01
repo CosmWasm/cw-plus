@@ -1,14 +1,15 @@
 #![cfg(test)]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
-use crate::wasm::{Contract, ContractWrapper};
 use cosmwasm_std::{
     attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
     Response, StdError,
 };
 use cw_storage_plus::Item;
-use schemars::JsonSchema;
-use std::fmt;
+
+use crate::wasm::{Contract, ContractWrapper};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EmptyMsg {}
@@ -41,6 +42,7 @@ pub fn contract_error() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
+#[allow(dead_code)]
 pub fn contract_error_custom<C>() -> Box<dyn Contract<C>>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
@@ -106,25 +108,33 @@ where
     Box::new(contract)
 }
 
+/// This is just a demo place so we can test custom message handling
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(rename = "snake_case")]
+pub enum CustomMsg {
+    SetName { name: String },
+    SetAge { age: u32 },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReflectMessage {
-    pub messages: Vec<CosmosMsg<Empty>>,
+    pub messages: Vec<CosmosMsg<CustomMsg>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReflectResponse {
-    pub count: u8,
+    pub count: u32,
 }
 
-const REFLECT_KEY: &[u8] = b"reflect";
+const REFLECT: Item<u32> = Item::new("reflect");
 
 fn init_reflect(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<Response, StdError> {
-    deps.storage.set(REFLECT_KEY, &[1]);
+) -> Result<Response<CustomMsg>, StdError> {
+    REFLECT.save(deps.storage, &1)?;
     Ok(Response::default())
 }
 
@@ -133,12 +143,8 @@ fn handle_reflect(
     _env: Env,
     _info: MessageInfo,
     msg: ReflectMessage,
-) -> Result<Response, StdError> {
-    let old = match deps.storage.get(REFLECT_KEY) {
-        Some(bz) => bz[0],
-        None => 0,
-    };
-    deps.storage.set(REFLECT_KEY, &[old + 1]);
+) -> Result<Response<CustomMsg>, StdError> {
+    REFLECT.update::<_, StdError>(deps.storage, |old| Ok(old + 1))?;
 
     let res = Response {
         submessages: vec![],
@@ -150,23 +156,12 @@ fn handle_reflect(
 }
 
 fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
-    let count = match deps.storage.get(REFLECT_KEY) {
-        Some(bz) => bz[0],
-        None => 0,
-    };
+    let count = REFLECT.load(deps.storage)?;
     let res = ReflectResponse { count };
     to_binary(&res)
 }
 
-pub fn contract_reflect() -> Box<dyn Contract<Empty>> {
+pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
     let contract = ContractWrapper::new(handle_reflect, init_reflect, query_reflect);
-    Box::new(contract)
-}
-
-pub fn contract_reflect_custom<C>() -> Box<dyn Contract<C>>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
-    let contract = ContractWrapper::new_with_empty(handle_reflect, init_reflect, query_reflect);
     Box::new(contract)
 }
