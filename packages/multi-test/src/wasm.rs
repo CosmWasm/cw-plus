@@ -4,19 +4,24 @@ use std::ops::Deref;
 
 use crate::transactions::{RepLog, StorageTransaction};
 use cosmwasm_std::{
-    from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, HumanAddr, MessageInfo,
-    Querier, QuerierWrapper, Response, Storage, WasmQuery,
+    from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Empty, Env, HumanAddr,
+    MessageInfo, Querier, QuerierWrapper, Response, Storage, WasmQuery,
 };
+use schemars::JsonSchema;
+use std::fmt;
 
 /// Interface to call into a Contract
-pub trait Contract {
+pub trait Contract<T = Empty>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     fn handle(
         &self,
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response, String>;
+    ) -> Result<Response<T>, String>;
 
     fn init(
         &self,
@@ -24,18 +29,19 @@ pub trait Contract {
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response, String>;
+    ) -> Result<Response<T>, String>;
 
     fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
 }
 
-type ContractFn<T, R, E> = fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<R, E>;
+type ContractFn<T, C, E> =
+    fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<Response<C>, E>;
 
 type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// TODO: Allow to customize return values (CustomMsg beyond Empty)
-pub struct ContractWrapper<T1, T2, T3, E1, E2, E3>
+pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
@@ -43,13 +49,14 @@ where
     E1: std::fmt::Display,
     E2: std::fmt::Display,
     E3: std::fmt::Display,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    handle_fn: ContractFn<T1, Response, E1>,
-    init_fn: ContractFn<T2, Response, E2>,
+    handle_fn: ContractFn<T1, C, E1>,
+    init_fn: ContractFn<T2, C, E2>,
     query_fn: QueryFn<T3, E3>,
 }
 
-impl<T1, T2, T3, E1, E2, E3> ContractWrapper<T1, T2, T3, E1, E2, E3>
+impl<T1, T2, T3, E1, E2, E3, C> ContractWrapper<T1, T2, T3, E1, E2, E3, C>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
@@ -57,10 +64,11 @@ where
     E1: std::fmt::Display,
     E2: std::fmt::Display,
     E3: std::fmt::Display,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     pub fn new(
-        handle_fn: ContractFn<T1, Response, E1>,
-        init_fn: ContractFn<T2, Response, E2>,
+        handle_fn: ContractFn<T1, C, E1>,
+        init_fn: ContractFn<T2, C, E2>,
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
@@ -71,7 +79,7 @@ where
     }
 }
 
-impl<T1, T2, T3, E1, E2, E3> Contract for ContractWrapper<T1, T2, T3, E1, E2, E3>
+impl<T1, T2, T3, E1, E2, E3, C> Contract<C> for ContractWrapper<T1, T2, T3, E1, E2, E3, C>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
@@ -79,6 +87,7 @@ where
     E1: std::fmt::Display,
     E2: std::fmt::Display,
     E3: std::fmt::Display,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     fn handle(
         &self,
@@ -86,7 +95,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response, String> {
+    ) -> Result<Response<C>, String> {
         let msg: T1 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.handle_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
@@ -98,7 +107,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response, String> {
+    ) -> Result<Response<C>, String> {
         let msg: T2 = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.init_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
