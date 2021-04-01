@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::wasm::{Contract, ContractWrapper};
 use cosmwasm_std::{
-    attr, from_slice, to_binary, to_vec, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty,
-    Env, MessageInfo, Response, StdError,
+    attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdError,
 };
+use cw_storage_plus::Item;
 use schemars::JsonSchema;
 use std::fmt;
 
@@ -53,8 +54,7 @@ where
 pub struct PayoutMessage {
     pub payout: Coin,
 }
-
-const PAYOUT_KEY: &[u8] = b"payout";
+const PAYOUT: Item<PayoutMessage> = Item::new("payout");
 
 fn init_payout(
     deps: DepsMut,
@@ -62,8 +62,7 @@ fn init_payout(
     _info: MessageInfo,
     msg: PayoutMessage,
 ) -> Result<Response, StdError> {
-    let bin = to_vec(&msg)?;
-    deps.storage.set(PAYOUT_KEY, &bin);
+    PAYOUT.save(deps.storage, &msg)?;
     Ok(Response::default())
 }
 
@@ -74,8 +73,7 @@ fn handle_payout(
     _msg: EmptyMsg,
 ) -> Result<Response, StdError> {
     // always try to payout what was set originally
-    let bin = deps.storage.get(PAYOUT_KEY).unwrap();
-    let payout: PayoutMessage = from_slice(&bin)?;
+    let payout = PAYOUT.load(deps.storage)?;
     let msg = BankMsg::Send {
         to_address: info.sender,
         amount: vec![payout.payout],
@@ -91,8 +89,8 @@ fn handle_payout(
 }
 
 fn query_payout(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
-    let bin = deps.storage.get(PAYOUT_KEY).unwrap();
-    Ok(bin.into())
+    let payout = PAYOUT.load(deps.storage)?;
+    to_binary(&payout)
 }
 
 pub fn contract_payout() -> Box<dyn Contract<Empty>> {

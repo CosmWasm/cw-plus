@@ -178,6 +178,7 @@ name = "cw-multi-test"
 version = "0.6.0-alpha2"
 dependencies = [
  "cosmwasm-std",
+ "cw-storage-plus",
  "cw0",
  "schemars",
  "serde",
