@@ -117,6 +117,11 @@ pub enum CustomMsg {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReflectSudoMsg {
+    pub set_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReflectMessage {
     pub messages: Vec<CosmosMsg<CustomMsg>>,
 }
@@ -155,6 +160,15 @@ fn handle_reflect(
     Ok(res)
 }
 
+fn sudo_reflect(
+    deps: DepsMut,
+    _env: Env,
+    msg: ReflectSudoMsg,
+) -> Result<Response<CustomMsg>, StdError> {
+    REFLECT.save(deps.storage, &msg.set_count)?;
+    Ok(Response::default())
+}
+
 fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
     let count = REFLECT.load(deps.storage)?;
     let res = ReflectResponse { count };
@@ -162,6 +176,7 @@ fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErr
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
-    let contract = ContractWrapper::new(handle_reflect, init_reflect, query_reflect);
+    let contract =
+        ContractWrapper::new_with_sudo(handle_reflect, init_reflect, query_reflect, sudo_reflect);
     Box::new(contract)
 }

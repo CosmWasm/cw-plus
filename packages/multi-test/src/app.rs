@@ -435,7 +435,7 @@ mod test {
     use super::*;
     use crate::test_helpers::{
         contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
-        PayoutMessage, ReflectMessage, ReflectResponse,
+        PayoutMessage, ReflectMessage, ReflectResponse, ReflectSudoMsg,
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
@@ -703,5 +703,34 @@ mod test {
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
         assert_eq!(2, qres.count);
+    }
+
+    #[test]
+    fn sudo_works() {
+        let mut router = custom_router();
+
+        let owner = HumanAddr::from("owner");
+        let reflect_id = router.store_code(contract_reflect());
+        let reflect_addr = router
+            .instantiate_contract(reflect_id, &owner, &EmptyMsg {}, &[], "Reflect")
+            .unwrap();
+
+        // count is 1
+        let ReflectResponse { count } = router
+            .wrap()
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(1, count);
+
+        // sudo
+        let msg = ReflectSudoMsg { set_count: 25 };
+        router.sudo(&reflect_addr, &msg).unwrap();
+
+        // count is 25
+        let ReflectResponse { count } = router
+            .wrap()
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(25, count);
     }
 }
