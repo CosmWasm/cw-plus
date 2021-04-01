@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{coins, to_binary, HumanAddr, Uint128};
+use cosmwasm_std::{coins, to_binary, Empty, HumanAddr, Uint128};
 use cw20::{Cw20CoinHuman, Cw20Contract, Cw20ExecuteMsg};
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
@@ -15,7 +15,7 @@ fn mock_app() -> App {
     App::new(api, env.block, bank, || Box::new(MockStorage::new()))
 }
 
-pub fn contract_escrow() -> Box<dyn Contract> {
+pub fn contract_escrow() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
         crate::contract::execute,
         crate::contract::instantiate,
@@ -24,7 +24,7 @@ pub fn contract_escrow() -> Box<dyn Contract> {
     Box::new(contract)
 }
 
-pub fn contract_cw20() -> Box<dyn Contract> {
+pub fn contract_cw20() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
         cw20_base::contract::execute,
         cw20_base::contract::instantiate,

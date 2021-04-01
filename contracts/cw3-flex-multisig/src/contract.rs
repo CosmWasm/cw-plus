@@ -480,7 +480,7 @@ mod tests {
         }
     }
 
-    pub fn contract_flex() -> Box<dyn Contract> {
+    pub fn contract_flex() -> Box<dyn Contract<Empty>> {
         let contract = ContractWrapper::new(
             crate::contract::execute,
             crate::contract::instantiate,
@@ -489,7 +489,7 @@ mod tests {
         Box::new(contract)
     }
 
-    pub fn contract_group() -> Box<dyn Contract> {
+    pub fn contract_group() -> Box<dyn Contract<Empty>> {
         let contract = ContractWrapper::new(
             cw4_group::contract::execute,
             cw4_group::contract::instantiate,

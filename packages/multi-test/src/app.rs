@@ -3,13 +3,15 @@ use serde::Serialize;
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractResult,
-    CosmosMsg, Empty, HumanAddr, MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest,
-    Response, SystemError, SystemResult, WasmMsg,
+    from_slice, to_binary, to_vec, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
+    ContractResult, CosmosMsg, Empty, HumanAddr, MessageInfo, Querier, QuerierResult,
+    QuerierWrapper, QueryRequest, Response, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
 use crate::wasm::{Contract, StorageFactory, WasmCache, WasmOps, WasmRouter};
+use schemars::JsonSchema;
+use std::fmt;
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
@@ -19,15 +21,21 @@ pub struct AppResponse {
 
 // This can be Response, Response, MigrationResponse
 #[derive(Default, Clone)]
-pub struct ActionResponse {
+pub struct ActionResponse<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     // TODO: allow T != Empty
-    pub messages: Vec<CosmosMsg<Empty>>,
+    pub messages: Vec<CosmosMsg<C>>,
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
 }
 
-impl From<Response<Empty>> for ActionResponse {
-    fn from(input: Response<Empty>) -> Self {
+impl<C> From<Response<C>> for ActionResponse<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn from(input: Response<C>) -> Self {
         ActionResponse {
             messages: input.messages,
             attributes: input.attributes,
@@ -36,8 +44,11 @@ impl From<Response<Empty>> for ActionResponse {
     }
 }
 
-impl ActionResponse {
-    fn init(input: Response<Empty>, address: HumanAddr) -> Self {
+impl<C> ActionResponse<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn init(input: Response<C>, address: HumanAddr) -> Self {
         ActionResponse {
             messages: input.messages,
             attributes: input.attributes,
@@ -46,16 +57,12 @@ impl ActionResponse {
     }
 }
 
-/// Router is a persisted state. You can query this.
-/// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
-/// We offer .execute() as a wrapper around cache, execute, commit/rollback process
-pub struct App {
-    wasm: WasmRouter,
-    bank: BankRouter,
-}
-
-impl Querier for App {
+impl<C> Querier for App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+        // TODO: we need to make a new custom type for queries
         let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
@@ -70,7 +77,24 @@ impl Querier for App {
     }
 }
 
-impl App {
+/// Router is a persisted state. You can query this.
+/// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
+/// We offer .execute() as a wrapper around cache, execute, commit/rollback process.
+///
+/// C is the custom message returned init, handle, sudo (Response<C>).
+/// All contracts must return Response<C> or Response<Empty>
+pub struct App<C = Empty>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    wasm: WasmRouter<C>,
+    bank: BankRouter,
+}
+
+impl<C> App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
     pub fn new<B: Bank + 'static>(
         api: Box<dyn Api>,
         block: BlockInfo,
@@ -83,7 +107,7 @@ impl App {
         }
     }
 
-    pub fn cache(&'_ self) -> AppCache<'_> {
+    pub fn cache(&'_ self) -> AppCache<'_, C> {
         AppCache::new(self)
     }
 
@@ -113,7 +137,7 @@ impl App {
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
         self.wasm.store_code(code) as u64
     }
 
@@ -145,7 +169,7 @@ impl App {
     ) -> Result<HumanAddr, String> {
         // instantiate contract
         let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
-        let msg: CosmosMsg = WasmMsg::Instantiate {
+        let msg: CosmosMsg<C> = WasmMsg::Instantiate {
             code_id,
             msg: init_msg,
             send: send_funds.to_vec(),
@@ -178,11 +202,7 @@ impl App {
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn execute(
-        &mut self,
-        sender: HumanAddr,
-        msg: CosmosMsg<Empty>,
-    ) -> Result<AppResponse, String> {
+    pub fn execute(&mut self, sender: HumanAddr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -194,7 +214,7 @@ impl App {
     pub fn execute_multi(
         &mut self,
         sender: HumanAddr,
-        msgs: Vec<CosmosMsg<Empty>>,
+        msgs: Vec<CosmosMsg<C>>,
     ) -> Result<Vec<AppResponse>, String> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -215,11 +235,35 @@ impl App {
         }
         res
     }
+
+    /// Runs arbitrary CosmosMsg.
+    /// This will create a cache before the execution, so no state changes are persisted if this
+    /// returns an error, but all are persisted on success.
+    pub fn sudo<T: Serialize, U: Into<HumanAddr>>(
+        &mut self,
+        contract_addr: U,
+        msg: &T,
+    ) -> Result<AppResponse, String> {
+        let msg = to_vec(msg).map_err(|e| e.to_string())?;
+        let mut cache = self.cache();
+
+        let res = cache.sudo(contract_addr.into(), msg);
+
+        // this only happens if all messages run successfully
+        if res.is_ok() {
+            let ops = cache.prepare();
+            ops.commit(self);
+        }
+        res
+    }
 }
 
-pub struct AppCache<'a> {
-    router: &'a App,
-    wasm: WasmCache<'a>,
+pub struct AppCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    router: &'a App<C>,
+    wasm: WasmCache<'a, C>,
     bank: BankCache<'a>,
 }
 
@@ -229,14 +273,20 @@ pub struct AppOps {
 }
 
 impl AppOps {
-    pub fn commit(self, router: &mut App) {
+    pub fn commit<C>(self, router: &mut App<C>)
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         self.bank.commit(&mut router.bank);
         self.wasm.commit(&mut router.wasm);
     }
 }
 
-impl<'a> AppCache<'a> {
-    fn new(router: &'a App) -> Self {
+impl<'a, C> AppCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn new(router: &'a App<C>) -> Self {
         AppCache {
             router,
             wasm: router.wasm.cache(),
@@ -260,7 +310,7 @@ impl<'a> AppCache<'a> {
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
-    fn execute(&mut self, sender: HumanAddr, msg: CosmosMsg<Empty>) -> Result<AppResponse, String> {
+    fn execute(&mut self, sender: HumanAddr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.handle_wasm(sender, msg)?;
@@ -285,12 +335,28 @@ impl<'a> AppCache<'a> {
         }
     }
 
+    fn sudo(&mut self, contract_addr: HumanAddr, msg: Vec<u8>) -> Result<AppResponse, String> {
+        let res = self.wasm.sudo(contract_addr.clone(), self.router, msg)?;
+        let mut attributes = res.attributes;
+        // recurse in all messages
+        for resend in res.messages {
+            let subres = self.execute(contract_addr.clone(), resend)?;
+            // ignore the data now, just like in wasmd
+            // append the events
+            attributes.extend_from_slice(&subres.attributes);
+        }
+        Ok(AppResponse {
+            attributes,
+            data: res.data,
+        })
+    }
+
     // this returns the contract address as well, so we can properly resend the data
     fn handle_wasm(
         &mut self,
         sender: HumanAddr,
         msg: WasmMsg,
-    ) -> Result<(HumanAddr, ActionResponse), String> {
+    ) -> Result<(HumanAddr, ActionResponse<C>), String> {
         match msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -368,7 +434,8 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<HumanAddr, String> {
 mod test {
     use super::*;
     use crate::test_helpers::{
-        contract_payout, contract_reflect, EmptyMsg, PayoutMessage, ReflectMessage, ReflectResponse,
+        contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
+        PayoutMessage, ReflectMessage, ReflectResponse, ReflectSudoMsg,
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
@@ -382,7 +449,18 @@ mod test {
         App::new(api, env.block, bank, || Box::new(MockStorage::new()))
     }
 
-    fn get_balance(router: &App, addr: &HumanAddr) -> Vec<Coin> {
+    fn custom_router() -> App<CustomMsg> {
+        let env = mock_env();
+        let api = Box::new(MockApi::default());
+        let bank = SimpleBank {};
+
+        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    }
+
+    fn get_balance<C>(router: &App<C>, addr: &HumanAddr) -> Vec<Coin>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         router.wrap().query_all_balances(addr).unwrap()
     }
 
@@ -480,7 +558,7 @@ mod test {
 
     #[test]
     fn reflect_success() {
-        let mut router = mock_router();
+        let mut router = custom_router();
 
         // set personal balance
         let owner = HumanAddr::from("owner");
@@ -490,7 +568,7 @@ mod test {
             .unwrap();
 
         // set up payout contract
-        let payout_id = router.store_code(contract_payout());
+        let payout_id = router.store_code(contract_payout_custom());
         let msg = PayoutMessage {
             payout: coin(5, "eth"),
         };
@@ -546,7 +624,7 @@ mod test {
 
     #[test]
     fn reflect_error() {
-        let mut router = mock_router();
+        let mut router = custom_router();
 
         // set personal balance
         let owner = HumanAddr::from("owner");
@@ -625,5 +703,34 @@ mod test {
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
         assert_eq!(2, qres.count);
+    }
+
+    #[test]
+    fn sudo_works() {
+        let mut router = custom_router();
+
+        let owner = HumanAddr::from("owner");
+        let reflect_id = router.store_code(contract_reflect());
+        let reflect_addr = router
+            .instantiate_contract(reflect_id, &owner, &EmptyMsg {}, &[], "Reflect")
+            .unwrap();
+
+        // count is 1
+        let ReflectResponse { count } = router
+            .wrap()
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(1, count);
+
+        // sudo
+        let msg = ReflectSudoMsg { set_count: 25 };
+        router.sudo(&reflect_addr, &msg).unwrap();
+
+        // count is 25
+        let ReflectResponse { count } = router
+            .wrap()
+            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .unwrap();
+        assert_eq!(25, count);
     }
 }

@@ -3,7 +3,7 @@
 use crate::contract::{execute, instantiate, query};
 use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{from_binary, to_binary, HumanAddr, Uint128, WasmMsg, WasmQuery};
+use cosmwasm_std::{from_binary, to_binary, Empty, HumanAddr, Uint128, WasmMsg, WasmQuery};
 use cw0::Duration;
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
@@ -18,12 +18,12 @@ fn mock_app() -> App {
     App::new(api, env.block, bank, || Box::new(MockStorage::new()))
 }
 
-pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract> {
+pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(execute, instantiate, query);
     Box::new(contract)
 }
 
-pub fn contract_cw20() -> Box<dyn Contract> {
+pub fn contract_cw20() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
         cw20_base::contract::execute,
         cw20_base::contract::instantiate,
