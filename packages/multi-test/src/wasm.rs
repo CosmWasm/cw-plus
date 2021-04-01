@@ -5,8 +5,8 @@ use std::fmt;
 use std::ops::Deref;
 
 use cosmwasm_std::{
-    from_slice, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Empty, Env, HumanAddr,
-    MessageInfo, Querier, QuerierWrapper, Response, Storage, WasmQuery,
+    from_slice, Api, Binary, BlockInfo, ContractInfo, CosmosMsg, Deps, DepsMut, Empty, Env,
+    HumanAddr, MessageInfo, Querier, QuerierWrapper, Response, Storage, SubMsg, WasmQuery,
 };
 
 use crate::transactions::{RepLog, StorageTransaction};
@@ -39,10 +39,12 @@ where
 
 type ContractFn<T, C, E> =
     fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<Response<C>, E>;
-
 type SudoFn<T, C, E> = fn(deps: DepsMut, env: Env, msg: T) -> Result<Response<C>, E>;
-
 type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
+
+type ContractClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, MessageInfo, T) -> Result<Response<C>, E>>;
+type SudoClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, T) -> Result<Response<C>, E>>;
+type QueryClosure<T, E> = Box<dyn Fn(Deps, Env, T) -> Result<Binary, E>>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// Place T4 and E4 at the end, as we just want default placeholders for most contracts that don't have sudo
@@ -58,21 +60,21 @@ where
     E4: std::fmt::Display,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    handle_fn: ContractFn<T1, C, E1>,
-    init_fn: ContractFn<T2, C, E2>,
-    query_fn: QueryFn<T3, E3>,
-    sudo_fn: Option<SudoFn<T4, C, E4>>,
+    handle_fn: ContractClosure<T1, C, E1>,
+    init_fn: ContractClosure<T2, C, E2>,
+    query_fn: QueryClosure<T3, E3>,
+    sudo_fn: Option<SudoClosure<T4, C, E4>>,
 }
 
 impl<T1, T2, T3, E1, E2, E3, C> ContractWrapper<T1, T2, T3, E1, E2, E3, C>
 where
-    T1: DeserializeOwned,
-    T2: DeserializeOwned,
-    T3: DeserializeOwned,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-    E3: std::fmt::Display,
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    T1: DeserializeOwned + 'static,
+    T2: DeserializeOwned + 'static,
+    T3: DeserializeOwned + 'static,
+    E1: std::fmt::Display + 'static,
+    E2: std::fmt::Display + 'static,
+    E3: std::fmt::Display + 'static,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
         handle_fn: ContractFn<T1, C, E1>,
@@ -80,9 +82,24 @@ where
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
-            handle_fn,
-            init_fn,
-            query_fn,
+            handle_fn: Box::new(handle_fn),
+            init_fn: Box::new(init_fn),
+            query_fn: Box::new(query_fn),
+            sudo_fn: None,
+        }
+    }
+
+    /// this will take a contract that returns Response<Empty> and will "upgrade" it
+    /// to Response<C> if needed to be compatible with a chain-specific extension
+    pub fn new_with_empty(
+        handle_fn: ContractFn<T1, Empty, E1>,
+        init_fn: ContractFn<T2, Empty, E2>,
+        query_fn: QueryFn<T3, E3>,
+    ) -> Self {
+        ContractWrapper {
+            handle_fn: customize_fn(handle_fn),
+            init_fn: customize_fn(init_fn),
+            query_fn: Box::new(query_fn),
             sudo_fn: None,
         }
     }
@@ -90,15 +107,15 @@ where
 
 impl<T1, T2, T3, E1, E2, E3, C, T4, E4> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4>
 where
-    T1: DeserializeOwned,
-    T2: DeserializeOwned,
-    T3: DeserializeOwned,
-    T4: DeserializeOwned,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-    E3: std::fmt::Display,
-    E4: std::fmt::Display,
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    T1: DeserializeOwned + 'static,
+    T2: DeserializeOwned + 'static,
+    T3: DeserializeOwned + 'static,
+    T4: DeserializeOwned + 'static,
+    E1: std::fmt::Display + 'static,
+    E2: std::fmt::Display + 'static,
+    E3: std::fmt::Display + 'static,
+    E4: std::fmt::Display + 'static,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new_with_sudo(
         handle_fn: ContractFn<T1, C, E1>,
@@ -107,11 +124,61 @@ where
         sudo_fn: SudoFn<T4, C, E4>,
     ) -> Self {
         ContractWrapper {
-            handle_fn,
-            init_fn,
-            query_fn,
-            sudo_fn: Some(sudo_fn),
+            handle_fn: Box::new(handle_fn),
+            init_fn: Box::new(init_fn),
+            query_fn: Box::new(query_fn),
+            sudo_fn: Some(Box::new(sudo_fn)),
         }
+    }
+}
+
+fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
+where
+    T: DeserializeOwned + 'static,
+    E: std::fmt::Display + 'static,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let customized =
+        move |deps: DepsMut, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
+            raw_fn(deps, env, info, msg).map(customize_response::<C>)
+        };
+    Box::new(customized)
+}
+
+fn customize_response<C>(resp: Response<Empty>) -> Response<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    Response::<C> {
+        submessages: resp
+            .submessages
+            .into_iter()
+            .map(|x| SubMsg {
+                id: x.id,
+                msg: customize_msg(x.msg),
+                gas_limit: x.gas_limit,
+            })
+            .collect(),
+        messages: resp.messages.into_iter().map(customize_msg::<C>).collect(),
+        attributes: resp.attributes,
+        data: resp.data,
+    }
+}
+
+fn customize_msg<C>(msg: CosmosMsg<Empty>) -> CosmosMsg<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    match msg {
+        CosmosMsg::Wasm(wasm) => CosmosMsg::Wasm(wasm),
+        CosmosMsg::Bank(bank) => CosmosMsg::Bank(bank),
+        CosmosMsg::Staking(staking) => CosmosMsg::Staking(staking),
+        CosmosMsg::Custom(_) => unreachable!(),
+        #[cfg(feature = "stargate")]
+        CosmosMsg::Ibc(ibc) => CosmosMsg::Ibc(ibc),
+        #[cfg(feature = "stargate")]
+        CosmosMsg::Stargate { type_url, value } => CosmosMsg::Stargate { type_url, value },
+        _ => panic!("unknown message variant {:?}", msg),
     }
 }
 
@@ -152,10 +219,13 @@ where
         res.map_err(|e| e.to_string())
     }
 
-    // this will panic if the contract doesn't implement sudo
+    // this returns an error if the contract doesn't implement sudo
     fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<C>, String> {
         let msg: T4 = from_slice(&msg).map_err(|e| e.to_string())?;
-        let res = (self.sudo_fn.unwrap())(deps, env, msg);
+        let res = match &self.sudo_fn {
+            Some(sudo) => sudo(deps, env, msg),
+            None => return Err("sudo not implemented for contract".to_string()),
+        };
         res.map_err(|e| e.to_string())
     }
 

@@ -13,6 +13,7 @@ documentation = "https://docs.cosmwasm.com"
 [features]
 default = ["iterator"]
 iterator = ["cosmwasm-std/iterator"]
+stargate = ["cosmwasm-std/stargate"]
 
 [dependencies]
 cw0 = { path = "../../packages/cw0", version = "0.6.0-alpha2" }
