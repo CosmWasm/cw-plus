@@ -3,9 +3,9 @@ use serde::Serialize;
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractResult,
-    CosmosMsg, Empty, HumanAddr, MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest,
-    Response, SystemError, SystemResult, WasmMsg,
+    from_slice, to_binary, to_vec, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
+    ContractResult, CosmosMsg, Empty, HumanAddr, MessageInfo, Querier, QuerierResult,
+    QuerierWrapper, QueryRequest, Response, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
@@ -235,6 +235,27 @@ where
         }
         res
     }
+
+    /// Runs arbitrary CosmosMsg.
+    /// This will create a cache before the execution, so no state changes are persisted if this
+    /// returns an error, but all are persisted on success.
+    pub fn sudo<T: Serialize, U: Into<HumanAddr>>(
+        &mut self,
+        contract_addr: U,
+        msg: &T,
+    ) -> Result<AppResponse, String> {
+        let msg = to_vec(msg).map_err(|e| e.to_string())?;
+        let mut cache = self.cache();
+
+        let res = cache.sudo(contract_addr.into(), msg);
+
+        // this only happens if all messages run successfully
+        if res.is_ok() {
+            let ops = cache.prepare();
+            ops.commit(self);
+        }
+        res
+    }
 }
 
 pub struct AppCache<'a, C>
@@ -312,6 +333,22 @@ where
             }
             _ => unimplemented!(),
         }
+    }
+
+    fn sudo(&mut self, contract_addr: HumanAddr, msg: Vec<u8>) -> Result<AppResponse, String> {
+        let res = self.wasm.sudo(contract_addr.clone(), self.router, msg)?;
+        let mut attributes = res.attributes;
+        // recurse in all messages
+        for resend in res.messages {
+            let subres = self.execute(contract_addr.clone(), resend)?;
+            // ignore the data now, just like in wasmd
+            // append the events
+            attributes.extend_from_slice(&subres.attributes);
+        }
+        Ok(AppResponse {
+            attributes,
+            data: res.data,
+        })
     }
 
     // this returns the contract address as well, so we can properly resend the data
