@@ -33,7 +33,8 @@ fn query_error(_deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
 }
 
 pub fn contract_error() -> Box<dyn Contract> {
-    let contract = ContractWrapper::new(handle_error, init_error, query_error);
+    let contract: ContractWrapper<_, _, _, _, _, _, _, String, String> =
+        ContractWrapper::new(handle_error, init_error, query_error);
     Box::new(contract)
 }
 
