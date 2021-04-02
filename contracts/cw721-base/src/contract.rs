@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Api, Binary, BlockInfo, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order,
-    Response, StdError, StdResult, KV,
+    Pair, Response, StdError, StdResult,
 };
 
 use cw0::maybe_canonical;
@@ -497,7 +497,7 @@ fn query_all_approvals(
     Ok(ApprovedForAllResponse { operators: res? })
 }
 
-fn parse_approval(api: &dyn Api, item: StdResult<KV<Expiration>>) -> StdResult<cw721::Approval> {
+fn parse_approval(api: &dyn Api, item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approval> {
     item.and_then(|(k, expires)| {
         let spender = api.human_address(&k.into())?;
         Ok(cw721::Approval { spender, expires })

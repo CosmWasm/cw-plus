@@ -1,7 +1,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Api, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order, Response, StdResult,
-    Uint128, KV,
+    to_binary, Api, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order, Pair, Response,
+    StdResult, Uint128,
 };
 use cw_storage_plus::Bound;
 
@@ -449,7 +449,7 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn parse_approval(api: &dyn Api, item: StdResult<KV<Expiration>>) -> StdResult<cw1155::Approval> {
+fn parse_approval(api: &dyn Api, item: StdResult<Pair<Expiration>>) -> StdResult<cw1155::Approval> {
     item.and_then(|(k, expires)| {
         let spender = api.human_address(&k.into())?;
         Ok(cw1155::Approval { spender, expires })
