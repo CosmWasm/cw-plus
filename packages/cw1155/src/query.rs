@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw0::Expiration;
 
 use crate::msg::TokenId;
@@ -11,27 +11,27 @@ use crate::msg::TokenId;
 pub enum Cw1155QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     /// Return type: BalanceResponse.
-    Balance { owner: HumanAddr, token_id: TokenId },
+    Balance { owner: Addr, token_id: TokenId },
     /// Returns the current balance of the given address for a batch of tokens, 0 if unset.
     /// Return type: BatchBalanceResponse.
     BatchBalance {
-        owner: HumanAddr,
+        owner: Addr,
         token_ids: Vec<TokenId>,
     },
     /// List all operators that can access all of the owner's tokens.
     /// Return type: ApprovedForAllResponse.
     ApprovedForAll {
-        owner: HumanAddr,
+        owner: Addr,
         /// unset or false will filter out expired approvals, you must set to true to see them
         include_expired: Option<bool>,
-        start_after: Option<HumanAddr>,
+        start_after: Option<Addr>,
         limit: Option<u32>,
     },
     /// Query approved status `owner` granted to `operator`.
     /// Return type: IsApprovedForAllResponse
     IsApprovedForAll {
-        owner: HumanAddr,
-        operator: HumanAddr,
+        owner: Addr,
+        operator: Addr,
     },
 
     /// With MetaData Extension.
@@ -43,7 +43,7 @@ pub enum Cw1155QueryMsg {
     /// Returns all tokens owned by the given address, [] if unset.
     /// Return type: TokensResponse.
     Tokens {
-        owner: HumanAddr,
+        owner: Addr,
         start_after: Option<String>,
         limit: Option<u32>,
     },
@@ -69,7 +69,7 @@ pub struct BatchBalanceResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Approval {
     /// Account that can transfer/send the token
-    pub spender: HumanAddr,
+    pub spender: Addr,
     /// When the Approval expires (maybe Expiration::never)
     pub expires: Expiration,
 }

@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, HumanAddr, Uint128};
+use cosmwasm_std::{CanonicalAddr, Addr, Uint128};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Cw20Coin {
@@ -17,6 +17,6 @@ impl Cw20Coin {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Cw20CoinHuman {
-    pub address: HumanAddr,
+    pub address: Addr,
     pub amount: Uint128,
 }
