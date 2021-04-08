@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{BlockInfo, CanonicalAddr, Deps, HumanAddr, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, BlockInfo, CanonicalAddr, Deps, StdResult, Storage, Uint128};
 use cw0::Expiration;
 use cw_storage_plus::Map;
 
@@ -86,8 +86,8 @@ impl<'a> Claims<'a> {
         Ok(to_send)
     }
 
-    pub fn query_claims(&self, deps: Deps, address: HumanAddr) -> StdResult<ClaimsResponse> {
-        let address_raw = deps.api.canonical_address(&address)?;
+    pub fn query_claims(&self, deps: Deps, address: Addr) -> StdResult<ClaimsResponse> {
+        let address_raw = deps.api.addr_canonicalize(address.as_ref())?;
         let claims = self
             .0
             .may_load(deps.storage, &address_raw)?
