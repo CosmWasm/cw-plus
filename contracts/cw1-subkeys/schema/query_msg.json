@@ -12,7 +12,8 @@
         "admin_list": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Get the current allowance for the given subkey (how much it can spend) Returns crate::state::Allowance",
@@ -28,11 +29,12 @@
           ],
           "properties": {
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Get the current permissions for the given subkey (how much it can spend) Returns PermissionsInfo",
@@ -48,11 +50,12 @@
           ],
           "properties": {
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Checks permissions of the caller on this proxy. If CanExecute returns true then a call to `Execute` with the same message, before any further state changes, should also succeed.",
@@ -72,11 +75,12 @@
               "$ref": "#/definitions/CosmosMsg_for_Empty"
             },
             "sender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Gets all Allowances for this contract Returns AllAllowancesResponse",
@@ -97,18 +101,15 @@
               "minimum": 0.0
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Gets all Permissions for this contract Returns AllPermissionsResponse",
@@ -129,18 +130,15 @@
               "minimum": 0.0
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -168,11 +166,12 @@
                   }
                 },
                 "to_address": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -206,7 +205,8 @@
             "bank": {
               "$ref": "#/definitions/BankMsg"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -217,7 +217,8 @@
             "custom": {
               "$ref": "#/definitions/Empty"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -228,7 +229,8 @@
             "staking": {
               "$ref": "#/definitions/StakingMsg"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -239,16 +241,14 @@
             "wasm": {
               "$ref": "#/definitions/WasmMsg"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
     "Empty": {
       "description": "An empty struct that serves as a placeholder in different places, such as contracts that don't set a custom message.\n\nIt is designed to be expressable in correct JSON and JSON Schema but contains no meaningful data. Previously we used enums without cases, but those cannot represented as valid JSON Schema (https://github.com/CosmWasm/cosmwasm/issues/451)",
       "type": "object"
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "StakingMsg": {
       "description": "The message types of the staking module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto",
@@ -271,11 +271,12 @@
                   "$ref": "#/definitions/Coin"
                 },
                 "validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "This is translated to a [MsgUndelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L112-L121). `delegator_address` is automatically filled with the current contract's address.",
@@ -295,11 +296,12 @@
                   "$ref": "#/definitions/Coin"
                 },
                 "validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "This is translated to a [MsgSetWithdrawAddress](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L29-L37) followed by a [MsgWithdrawDelegatorReward](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L42-L50). `delegator_address` is automatically filled with the current contract's address.",
@@ -316,21 +318,18 @@
               "properties": {
                 "recipient": {
                   "description": "this is the \"withdraw address\", the one that should receive the rewards if None, then use delegator address",
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/HumanAddr"
-                    },
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "This is translated to a [MsgBeginRedelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L95-L105). `delegator_address` is automatically filled with the current contract's address.",
@@ -351,14 +350,15 @@
                   "$ref": "#/definitions/Coin"
                 },
                 "dst_validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "src_validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -384,7 +384,7 @@
               ],
               "properties": {
                 "contract_addr": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "msg": {
                   "description": "msg is the json-encoded ExecuteMsg struct (as raw Binary)",
@@ -402,7 +402,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Instantiates a new contracts from previously uploaded Wasm code.\n\nThis is translated to a [MsgInstantiateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L47-L61). `sender` is automatically filled with the current contract's address.",
@@ -445,7 +446,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Migrates a given contracts to use new wasm code. Passes a MigrateMsg to allow us to customize behavior.\n\nOnly the contract admin (as defined in wasmd), if any, is able to make this call.\n\nThis is translated to a [MsgMigrateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L86-L96). `sender` is automatically filled with the current contract's address.",
@@ -463,7 +465,7 @@
               ],
               "properties": {
                 "contract_addr": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "msg": {
                   "description": "msg is the json-encoded MigrateMsg struct that will be passed to the new code",
@@ -481,7 +483,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     }
