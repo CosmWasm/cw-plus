@@ -24,11 +24,11 @@ pub const HOOKS: Hooks = Hooks::new("cw4-hooks");
 pub const CONFIG: Item<Config> = Item::new("config");
 pub const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
 
-pub const MEMBERS: SnapshotMap<&[u8], u64> = SnapshotMap::new(
+pub const MEMBERS: SnapshotMap<&str, u64> = SnapshotMap::new(
     cw4::MEMBERS_KEY,
     cw4::MEMBERS_CHECKPOINTS,
     cw4::MEMBERS_CHANGELOG,
     Strategy::EveryBlock,
 );
 
-pub const STAKE: Map<&[u8], Uint128> = Map::new("stake");
+pub const STAKE: Map<&str, Uint128> = Map::new("stake");

@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, HumanAddr, Uint128};
+use cosmwasm_std::{Coin, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
     pub unbonding_period: Duration,
 
     // admin can only add/remove hooks, not change other parameters
-    pub admin: Option<HumanAddr>,
+    pub admin: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -32,11 +32,11 @@ pub enum ExecuteMsg {
     Claim {},
 
     /// Change the admin
-    UpdateAdmin { admin: Option<HumanAddr> },
+    UpdateAdmin { admin: Option<String> },
     /// Add a new hook to be informed of all membership changes. Must be called by Admin
-    AddHook { addr: HumanAddr },
+    AddHook { addr: String },
     /// Remove a hook. Must be called by Admin
-    RemoveHook { addr: HumanAddr },
+    RemoveHook { addr: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -44,11 +44,11 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     /// Claims shows the tokens in process of unbonding for this address
     Claims {
-        address: HumanAddr,
+        address: String,
     },
     // Show the number of tokens currently staked by this address.
     Staked {
-        address: HumanAddr,
+        address: String,
     },
 
     /// Return AdminResponse
@@ -57,12 +57,12 @@ pub enum QueryMsg {
     TotalWeight {},
     /// Returns MembersListResponse
     ListMembers {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Returns MemberResponse
     Member {
-        addr: HumanAddr,
+        addr: String,
         at_height: Option<u64>,
     },
     /// Shows all registered hooks. Returns HooksResponse.

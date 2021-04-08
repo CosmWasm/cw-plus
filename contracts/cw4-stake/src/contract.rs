@@ -1,18 +1,18 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HumanAddr, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
+    attr, coin, coins, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
 
-use cw0::{maybe_canonical, NativeBalance};
+use cw0::{maybe_addr, NativeBalance};
 use cw2::set_contract_version;
 use cw20::{Balance, Denom};
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
-use cw_storage_plus::Bound;
+use cw_storage_plus::{AddrRef, Bound};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, StakedResponse};
@@ -32,7 +32,8 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    ADMIN.set(deps.branch(), msg.admin)?;
+    let api = deps.api;
+    ADMIN.set(deps.branch(), maybe_addr(api, msg.admin)?)?;
 
     // min_bond is at least 1, so 0 stake -> non-membership
     let min_bond = match msg.min_bond {
@@ -60,10 +61,17 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let api = deps.api;
     match msg {
-        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
-        ExecuteMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
-        ExecuteMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::UpdateAdmin { admin } => {
+            Ok(ADMIN.execute_update_admin(deps, info, maybe_addr(api, admin)?)?)
+        }
+        ExecuteMsg::AddHook { addr } => {
+            Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
+        ExecuteMsg::RemoveHook { addr } => {
+            Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
         ExecuteMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
         ExecuteMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
         ExecuteMsg::Claim {} => execute_claim(deps, env, info),
@@ -74,7 +82,7 @@ pub fn execute_bond(
     deps: DepsMut,
     env: Env,
     amount: Balance,
-    sender: HumanAddr,
+    sender: Addr,
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -87,7 +95,7 @@ pub fn execute_bond(
             if want == &have.address {
                 Ok(have.amount)
             } else {
-                Err(ContractError::InvalidDenom(deps.api.human_address(&want)?))
+                Err(ContractError::InvalidDenom(want.into()))
             }
         }
         _ => Err(ContractError::MixedNativeAndCw20(
@@ -96,15 +104,13 @@ pub fn execute_bond(
     }?;
 
     // update the sender's stake
-    let sender_raw = deps.api.canonical_address(&sender)?;
-    let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
+    let new_stake = STAKE.update(deps.storage, sender.as_ref(), |stake| -> StdResult<_> {
         Ok(stake.unwrap_or_default() + amount)
     })?;
 
     let messages = update_membership(
         deps.storage,
         sender.clone(),
-        &sender_raw,
         new_stake,
         &cfg,
         env.block.height,
@@ -130,16 +136,17 @@ pub fn execute_unbond(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // reduce the sender's stake - aborting if insufficient
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
-        Ok(stake.unwrap_or_default().checked_sub(amount)?)
-    })?;
+    let new_stake = STAKE.update(
+        deps.storage,
+        &info.sender.as_ref(),
+        |stake| -> StdResult<_> { Ok(stake.unwrap_or_default().checked_sub(amount)?) },
+    )?;
 
     // provide them a claim
     let cfg = CONFIG.load(deps.storage)?;
     CLAIMS.create_claim(
         deps.storage,
-        &sender_raw,
+        AddrRef::from(&info.sender),
         amount,
         cfg.unbonding_period.after(&env.block),
     )?;
@@ -147,7 +154,6 @@ pub fn execute_unbond(
     let messages = update_membership(
         deps.storage,
         info.sender.clone(),
-        &sender_raw,
         new_stake,
         &cfg,
         env.block.height,
@@ -184,15 +190,14 @@ pub fn must_pay_funds(balance: &NativeBalance, denom: &str) -> Result<Uint128, C
 
 fn update_membership(
     storage: &mut dyn Storage,
-    sender: HumanAddr,
-    sender_raw: &CanonicalAddr,
+    sender: Addr,
     new_stake: Uint128,
     cfg: &Config,
     height: u64,
 ) -> StdResult<Vec<CosmosMsg>> {
     // update their membership weight
     let new = calc_weight(new_stake, cfg);
-    let old = MEMBERS.may_load(storage, sender_raw)?;
+    let old = MEMBERS.may_load(storage, sender.as_ref())?;
 
     // short-circuit if no change
     if new == old {
@@ -200,8 +205,8 @@ fn update_membership(
     }
     // otherwise, record change of weight
     match new.as_ref() {
-        Some(w) => MEMBERS.save(storage, sender_raw, w, height),
-        None => MEMBERS.remove(storage, sender_raw, height),
+        Some(w) => MEMBERS.save(storage, sender.as_ref(), w, height),
+        None => MEMBERS.remove(storage, sender.as_ref(), height),
     }?;
 
     // update total
@@ -230,8 +235,8 @@ pub fn execute_claim(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let release = CLAIMS.claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
+    let release =
+        CLAIMS.claim_tokens(deps.storage, AddrRef::from(&info.sender), &env.block, None)?;
     if release.is_zero() {
         return Err(ContractError::NothingToClaim {});
     }
@@ -247,7 +252,7 @@ pub fn execute_claim(
 
     let amount_str = coins_to_string(&amount);
     let messages = vec![BankMsg::Send {
-        to_address: info.sender.clone(),
+        to_address: info.sender.clone().into(),
         amount,
     }
     .into()];
@@ -285,7 +290,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&list_members(deps, start_after, limit)?)
         }
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
-        QueryMsg::Claims { address } => to_binary(&CLAIMS.query_claims(deps, address)?),
+        QueryMsg::Claims { address } => to_binary(
+            &CLAIMS.query_claims(deps, AddrRef::from(&deps.api.addr_validate(&address)?))?,
+        ),
         QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
@@ -297,10 +304,10 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     Ok(TotalWeightResponse { weight })
 }
 
-pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
+pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
+    let addr = deps.api.addr_validate(&addr)?;
     let stake = STAKE
-        .may_load(deps.storage, &address_raw)?
+        .may_load(deps.storage, addr.as_ref())?
         .unwrap_or_default();
     let denom = match CONFIG.load(deps.storage)?.denom {
         Denom::Native(want) => want,
@@ -315,11 +322,11 @@ pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse>
     })
 }
 
-fn query_member(deps: Deps, addr: HumanAddr, height: Option<u64>) -> StdResult<MemberResponse> {
-    let raw = deps.api.canonical_address(&addr)?;
+fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
+    let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, &raw, h),
-        None => MEMBERS.may_load(deps.storage, &raw),
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, addr.as_ref(), h),
+        None => MEMBERS.may_load(deps.storage, addr.as_ref()),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -330,21 +337,20 @@ const DEFAULT_LIMIT: u32 = 10;
 
 fn list_members(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let addr = maybe_addr(deps.api, start_after)?;
+    let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let api = &deps.api;
     let members: StdResult<Vec<_>> = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
             Ok(Member {
-                addr: api.human_address(&CanonicalAddr::from(key))?,
+                addr: String::from_utf8(key)?,
                 weight,
             })
         })
