@@ -8,17 +8,12 @@
   ],
   "properties": {
     "addr": {
-      "$ref": "#/definitions/HumanAddr"
+      "type": "string"
     },
     "weight": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
-    }
-  },
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
     }
   }
 }

@@ -1,8 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Addr;
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw4QueryMsg {
@@ -12,12 +10,12 @@ pub enum Cw4QueryMsg {
     TotalWeight {},
     /// Returns MembersListResponse
     ListMembers {
-        start_after: Option<Addr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Returns MemberResponse
     Member {
-        addr: Addr,
+        addr: String,
         at_height: Option<u64>,
     },
     /// Shows all registered hooks. Returns HooksResponse.
@@ -26,7 +24,7 @@ pub enum Cw4QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminResponse {
-    pub admin: Option<Addr>,
+    pub admin: Option<String>,
 }
 
 /// A group member has a weight associated with them.
@@ -34,7 +32,7 @@ pub struct AdminResponse {
 /// makes use of the group (eg. voting power)
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Member {
-    pub addr: Addr,
+    pub addr: String,
     pub weight: u64,
 }
 
@@ -55,7 +53,7 @@ pub struct TotalWeightResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct HooksResponse {
-    pub hooks: Vec<Addr>,
+    pub hooks: Vec<String>,
 }
 
 /// TOTAL_KEY is meant for raw queries

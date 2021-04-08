@@ -37,18 +37,20 @@ impl Cw4Contract {
         .into())
     }
 
-    pub fn add_hook(&self, addr: Addr) -> StdResult<CosmosMsg> {
-        let msg = Cw4ExecuteMsg::AddHook { addr };
+    pub fn add_hook<T: Into<String>>(&self, addr: T) -> StdResult<CosmosMsg> {
+        let msg = Cw4ExecuteMsg::AddHook { addr: addr.into() };
         self.encode_msg(msg)
     }
 
-    pub fn remove_hook(&self, addr: Addr) -> StdResult<CosmosMsg> {
-        let msg = Cw4ExecuteMsg::AddHook { addr };
+    pub fn remove_hook<T: Into<String>>(&self, addr: T) -> StdResult<CosmosMsg> {
+        let msg = Cw4ExecuteMsg::AddHook { addr: addr.into() };
         self.encode_msg(msg)
     }
 
-    pub fn update_admin<T: Into<Addr>>(&self, admin: Option<Addr>) -> StdResult<CosmosMsg> {
-        let msg = Cw4ExecuteMsg::UpdateAdmin { admin };
+    pub fn update_admin<T: Into<String>>(&self, admin: Option<T>) -> StdResult<CosmosMsg> {
+        let msg = Cw4ExecuteMsg::UpdateAdmin {
+            admin: admin.map(|x| x.into()),
+        };
         self.encode_msg(msg)
     }
 
@@ -69,7 +71,7 @@ impl Cw4Contract {
     }
 
     /// Show the hooks
-    pub fn hooks(&self, querier: &QuerierWrapper) -> StdResult<Vec<Addr>> {
+    pub fn hooks(&self, querier: &QuerierWrapper) -> StdResult<Vec<String>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Hooks {})?;
         let res: HooksResponse = querier.query(&query)?;
         Ok(res.hooks)
@@ -114,14 +116,14 @@ impl Cw4Contract {
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
-    pub fn member_at_height(
+    pub fn member_at_height<T: Into<String>>(
         &self,
         querier: &QuerierWrapper,
-        member: Addr,
+        member: T,
         height: u64,
     ) -> StdResult<Option<u64>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Member {
-            addr: member,
+            addr: member.into(),
             at_height: Some(height),
         })?;
         let res: MemberResponse = querier.query(&query)?;
@@ -131,7 +133,7 @@ impl Cw4Contract {
     pub fn list_members(
         &self,
         querier: &QuerierWrapper,
-        start_after: Option<Addr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     ) -> StdResult<Vec<Member>> {
         let query = self.encode_smart_query(Cw4QueryMsg::ListMembers { start_after, limit })?;
@@ -140,7 +142,7 @@ impl Cw4Contract {
     }
 
     /// Read the admin
-    pub fn admin(&self, querier: &QuerierWrapper) -> StdResult<Option<Addr>> {
+    pub fn admin(&self, querier: &QuerierWrapper) -> StdResult<Option<String>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Admin {})?;
         let res: AdminResponse = querier.query(&query)?;
         Ok(res.admin)

@@ -12,7 +12,8 @@
         "threshold": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns details of the proposal state. Returns ProposalResponse.",
@@ -34,7 +35,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Iterate over details of all proposals from oldest to newest. Returns ProposalListResponse",
@@ -64,7 +66,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Iterate reverse over details of all proposals, this is useful to easily query only the most recent proposals (to get updates). Returns ProposalListResponse",
@@ -94,7 +97,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Query the vote made by the given voter on `proposal_id`. This should return an error if there is no such proposal. It will return a None value if the proposal exists but the voter did not vote. Returns VoteResponse",
@@ -116,14 +120,15 @@
               "minimum": 0.0
             },
             "voter": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "description": "Iterate (with pagination) over all votes for this proposal. The ordering is arbitrary, unlikely to be sorted by HumanAddr. But ordering is consistent and pagination from the end of each page will cover all votes for the proposal. Returns VoteListResponse",
+      "description": "Iterate (with pagination) over all votes for this proposal. The ordering is arbitrary, unlikely to be sorted by address. But ordering is consistent and pagination from the end of each page will cover all votes for the proposal. Returns VoteListResponse",
       "type": "object",
       "required": [
         "list_votes"
@@ -149,18 +154,15 @@
               "minimum": 0.0
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Voter extension: Returns VoterResponse",
@@ -176,11 +178,12 @@
           ],
           "properties": {
             "address": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "ListVoters extension: Returns VoterListResponse",
@@ -201,23 +204,15 @@
               "minimum": 0.0
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }
