@@ -1,7 +1,7 @@
 pub use cw0::Expiration;
 
 pub use crate::balance::Balance;
-pub use crate::coin::{Cw20Coin, Cw20CoinHuman};
+pub use crate::coin::Cw20Coin;
 pub use crate::denom::Denom;
 pub use crate::helpers::Cw20Contract;
 pub use crate::msg::Cw20ExecuteMsg;

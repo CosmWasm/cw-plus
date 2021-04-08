@@ -33,8 +33,14 @@ impl Cw20Contract {
     }
 
     /// Get token balance for the given address
-    pub fn balance<Q: Querier>(&self, querier: &Q, address: Addr) -> StdResult<Uint128> {
-        let msg = Cw20QueryMsg::Balance { address };
+    pub fn balance<Q: Querier, T: Into<String>>(
+        &self,
+        querier: &Q,
+        address: T,
+    ) -> StdResult<Uint128> {
+        let msg = Cw20QueryMsg::Balance {
+            address: address.into(),
+        };
         let query = WasmQuery::Smart {
             contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
@@ -57,13 +63,16 @@ impl Cw20Contract {
     }
 
     /// Get allowance of spender to use owner's account
-    pub fn allowance<Q: Querier>(
+    pub fn allowance<Q: Querier, T: Into<String>, U: Into<String>>(
         &self,
         querier: &Q,
-        owner: Addr,
-        spender: Addr,
+        owner: T,
+        spender: U,
     ) -> StdResult<AllowanceResponse> {
-        let msg = Cw20QueryMsg::Allowance { owner, spender };
+        let msg = Cw20QueryMsg::Allowance {
+            owner: owner.into(),
+            spender: spender.into(),
+        };
         let query = WasmQuery::Smart {
             contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
