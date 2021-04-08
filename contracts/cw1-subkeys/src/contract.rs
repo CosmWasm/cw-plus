@@ -5,10 +5,10 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HumanAddr, MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
+    attr, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
+    MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
 };
-use cw0::{maybe_canonical, Expiration};
+use cw0::Expiration;
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{
@@ -84,9 +84,8 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    let owner_raw = &deps.api.canonical_address(&info.sender)?;
     // this is the admin behavior (same as cw1-whitelist)
-    if cfg.is_admin(owner_raw) {
+    if cfg.is_admin(info.sender.as_ref()) {
         let res = Response {
             messages: msgs,
             attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
@@ -97,7 +96,7 @@ where
         for msg in &msgs {
             match msg {
                 CosmosMsg::Staking(staking_msg) => {
-                    let perm = PERMISSIONS.may_load(deps.storage, &owner_raw)?;
+                    let perm = PERMISSIONS.may_load(deps.storage, info.sender.clone())?;
                     let perm = perm.ok_or(ContractError::NotAllowed {})?;
                     check_staking_permissions(staking_msg, perm)?;
                 }
@@ -105,11 +104,16 @@ where
                     to_address: _,
                     amount,
                 }) => {
-                    let allow = ALLOWANCES.may_load(deps.storage, &owner_raw)?;
-                    let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
-                    // Decrease allowance
-                    allowance.balance = allowance.balance.sub(amount.clone())?;
-                    ALLOWANCES.save(deps.storage, &owner_raw, &allowance)?;
+                    ALLOWANCES.update::<_, ContractError>(
+                        deps.storage,
+                        info.sender.clone(),
+                        |allow| {
+                            let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
+                            // Decrease allowance
+                            allowance.balance = allowance.balance.sub(amount.clone())?;
+                            Ok(allowance)
+                        },
+                    )?;
                 }
                 _ => {
                     return Err(ContractError::MessageTypeRejected {});
@@ -161,7 +165,7 @@ pub fn execute_increase_allowance<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    spender: HumanAddr,
+    spender: String,
     amount: Coin,
     expires: Option<Expiration>,
 ) -> Result<Response<T>, ContractError>
@@ -169,17 +173,16 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&info.sender)?;
-
-    if !cfg.is_admin(&owner_raw) {
+    if !cfg.is_admin(info.sender.as_ref()) {
         return Err(ContractError::Unauthorized {});
     }
-    if spender_raw == owner_raw {
+
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    if info.sender == spender_addr {
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    ALLOWANCES.update::<_, StdError>(deps.storage, &spender_raw, |allow| {
+    ALLOWANCES.update::<_, StdError>(deps.storage, spender_addr, |allow| {
         let mut allowance = allow.unwrap_or_default();
         if let Some(exp) = expires {
             allowance.expires = exp;
@@ -207,7 +210,7 @@ pub fn execute_decrease_allowance<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    spender: HumanAddr,
+    spender: String,
     amount: Coin,
     expires: Option<Expiration>,
 ) -> Result<Response<T>, ContractError>
@@ -215,27 +218,27 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&info.sender)?;
-
-    if !cfg.is_admin(&owner_raw) {
+    if !cfg.is_admin(info.sender.as_ref()) {
         return Err(ContractError::Unauthorized {});
     }
-    if spender_raw == owner_raw {
+
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    if info.sender == spender_addr {
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let allowance = ALLOWANCES.update::<_, ContractError>(deps.storage, &spender_raw, |allow| {
-        // Fail fast
-        let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
-        if let Some(exp) = expires {
-            allowance.expires = exp;
-        }
-        allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
-        Ok(allowance)
-    })?;
+    let allowance =
+        ALLOWANCES.update::<_, ContractError>(deps.storage, spender_addr.clone(), |allow| {
+            // Fail fast
+            let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
+            if let Some(exp) = expires {
+                allowance.expires = exp;
+            }
+            allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
+            Ok(allowance)
+        })?;
     if allowance.balance.is_empty() {
-        ALLOWANCES.remove(deps.storage, &spender_raw);
+        ALLOWANCES.remove(deps.storage, spender_addr);
     }
 
     let res = Response {
@@ -243,7 +246,7 @@ where
         messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
-            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("owner", info.sender),
             attr("spender", spender),
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
@@ -257,30 +260,29 @@ pub fn execute_set_permissions<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    spender: HumanAddr,
+    spender: String,
     perm: Permissions,
 ) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    let spender_raw = &deps.api.canonical_address(&spender)?;
-    let owner_raw = &deps.api.canonical_address(&info.sender)?;
-
-    if !cfg.is_admin(&owner_raw) {
+    if !cfg.is_admin(info.sender.as_ref()) {
         return Err(ContractError::Unauthorized {});
     }
-    if spender_raw == owner_raw {
+
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    if info.sender == spender_addr {
         return Err(ContractError::CannotSetOwnAccount {});
     }
-    PERMISSIONS.save(deps.storage, &spender_raw, &perm)?;
+    PERMISSIONS.save(deps.storage, spender_addr, &perm)?;
 
     let res = Response {
         submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "set_permissions"),
-            attr("owner", deps.api.human_address(owner_raw)?),
+            attr("owner", info.sender),
             attr("spender", spender),
             attr("permissions", perm),
         ],
@@ -306,44 +308,39 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 // if the subkey has no allowance, return an empty struct (not an error)
-pub fn query_allowance(deps: Deps, spender: HumanAddr) -> StdResult<Allowance> {
-    let subkey = deps.api.canonical_address(&spender)?;
+pub fn query_allowance(deps: Deps, spender: String) -> StdResult<Allowance> {
+    // we can use unchecked here as it is a query - bad value means a miss, we never write it
     let allow = ALLOWANCES
-        .may_load(deps.storage, &subkey)?
+        .may_load(deps.storage, Addr::unchecked(spender))?
         .unwrap_or_default();
     Ok(allow)
 }
 
 // if the subkey has no permissions, return an empty struct (not an error)
-pub fn query_permissions(deps: Deps, spender: HumanAddr) -> StdResult<Permissions> {
-    let subkey = deps.api.canonical_address(&spender)?;
+pub fn query_permissions(deps: Deps, spender: String) -> StdResult<Permissions> {
     let permissions = PERMISSIONS
-        .may_load(deps.storage, &subkey)?
+        .may_load(deps.storage, Addr::unchecked(spender))?
         .unwrap_or_default();
     Ok(permissions)
 }
 
-fn query_can_execute(
-    deps: Deps,
-    sender: HumanAddr,
-    msg: CosmosMsg,
-) -> StdResult<CanExecuteResponse> {
+fn query_can_execute(deps: Deps, sender: String, msg: CosmosMsg) -> StdResult<CanExecuteResponse> {
     Ok(CanExecuteResponse {
         can_execute: can_execute(deps, sender, msg)?,
     })
 }
 
 // this can just return booleans and the query_can_execute wrapper creates the struct once, not on every path
-fn can_execute(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool> {
-    let owner_raw = deps.api.canonical_address(&sender)?;
+fn can_execute(deps: Deps, sender: String, msg: CosmosMsg) -> StdResult<bool> {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    if cfg.is_admin(&owner_raw) {
+    if cfg.is_admin(&sender) {
         return Ok(true);
     }
+
     match msg {
         CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
             // now we check if there is enough allowance for this message
-            let allowance = ALLOWANCES.may_load(deps.storage, &owner_raw)?;
+            let allowance = ALLOWANCES.may_load(deps.storage, Addr::unchecked(sender))?;
             match allowance {
                 // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
                 Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
@@ -351,7 +348,7 @@ fn can_execute(deps: Deps, sender: HumanAddr, msg: CosmosMsg) -> StdResult<bool>
             }
         }
         CosmosMsg::Staking(staking_msg) => {
-            let perm_opt = PERMISSIONS.may_load(deps.storage, &owner_raw)?;
+            let perm_opt = PERMISSIONS.may_load(deps.storage, Addr::unchecked(sender))?;
             match perm_opt {
                 Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
                 None => Ok(false),
@@ -371,21 +368,20 @@ fn calc_limit(request: Option<u32>) -> usize {
 // return a list of all allowances here
 pub fn query_all_allowances(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<AllAllowancesResponse> {
     let limit = calc_limit(limit);
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    // we use raw addresses here....
+    let start = start_after.map(Bound::exclusive);
 
-    let api = &deps.api;
     let res: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             item.and_then(|(k, allow)| {
                 Ok(AllowanceInfo {
-                    spender: api.human_address(&CanonicalAddr::from(k))?,
+                    spender: String::from_utf8(k)?,
                     balance: allow.balance,
                     expires: allow.expires,
                 })
@@ -398,21 +394,19 @@ pub fn query_all_allowances(
 // return a list of all permissions here
 pub fn query_all_permissions(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<AllPermissionsResponse> {
     let limit = calc_limit(limit);
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let start = start_after.map(Bound::exclusive);
 
-    let api = &deps.api;
     let res: StdResult<Vec<PermissionsInfo>> = PERMISSIONS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             item.and_then(|(k, perm)| {
                 Ok(PermissionsInfo {
-                    spender: api.human_address(&CanonicalAddr::from(k))?,
+                    spender: String::from_utf8(k)?,
                     permissions: perm,
                 })
             })
