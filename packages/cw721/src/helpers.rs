@@ -2,8 +2,7 @@ use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Addr, Api, CanonicalAddr, CosmosMsg, Querier, QuerierWrapper, StdResult, WasmMsg,
-    WasmQuery,
+    to_binary, Addr, CosmosMsg, Querier, QuerierWrapper, StdResult, WasmMsg, WasmQuery,
 };
 
 use crate::{
@@ -21,12 +20,6 @@ pub struct Cw721Contract(pub Addr);
 impl Cw721Contract {
     pub fn addr(&self) -> Addr {
         self.0.clone()
-    }
-
-    /// Convert this address to a form fit for storage
-    pub fn canonical<A: Api>(&self, api: &A) -> StdResult<Cw721CanonicalContract> {
-        let canon = api.addr_canonicalize(self.0.as_ref())?;
-        Ok(Cw721CanonicalContract(canon))
     }
 
     pub fn call(&self, msg: Cw721ExecuteMsg) -> StdResult<CosmosMsg> {
@@ -67,12 +60,12 @@ impl Cw721Contract {
         self.query(querier, req)
     }
 
-    pub fn approved_for_all<Q: Querier, T: Into<Addr>>(
+    pub fn approved_for_all<Q: Querier, T: Into<String>>(
         &self,
         querier: &Q,
         owner: T,
         include_expired: bool,
-        start_after: Option<Addr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     ) -> StdResult<Vec<Approval>> {
         let req = Cw721QueryMsg::ApprovedForAll {
@@ -124,7 +117,7 @@ impl Cw721Contract {
     }
 
     /// With enumerable extension
-    pub fn tokens<Q: Querier, T: Into<Addr>>(
+    pub fn tokens<Q: Querier, T: Into<String>>(
         &self,
         querier: &Q,
         owner: T,
@@ -158,18 +151,5 @@ impl Cw721Contract {
     /// returns true if the contract supports the enumerable extension
     pub fn has_enumerable<Q: Querier>(&self, querier: &Q) -> bool {
         self.tokens(querier, self.addr(), None, Some(1)).is_ok()
-    }
-}
-
-/// This is a respresentation of Cw721Contract for storage.
-/// Don't use it directly, just translate to the Cw721Contract when needed.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw721CanonicalContract(pub CanonicalAddr);
-
-impl Cw721CanonicalContract {
-    /// Convert this address to a form fit for usage in messages and queries
-    pub fn human<A: Api>(&self, api: &A) -> StdResult<Cw721Contract> {
-        let human = api.addr_humanize(&self.0)?;
-        Ok(Cw721Contract(human))
     }
 }

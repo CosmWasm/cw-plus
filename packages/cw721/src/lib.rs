@@ -5,7 +5,7 @@ mod receiver;
 
 pub use cw0::Expiration;
 
-pub use crate::helpers::{Cw721CanonicalContract, Cw721Contract};
+pub use crate::helpers::Cw721Contract;
 pub use crate::msg::Cw721ExecuteMsg;
 pub use crate::query::{
     AllNftInfoResponse, Approval, ApprovedForAllResponse, ContractInfoResponse, Cw721QueryMsg,

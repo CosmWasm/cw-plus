@@ -27,7 +27,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "List all operators that can access all of the owner's tokens. Return type: `ApprovedForAllResponse`",
@@ -58,21 +59,18 @@
               "minimum": 0.0
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Total number of tokens issued",
@@ -84,7 +82,8 @@
         "num_tokens": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With MetaData Extension. Returns top-level metadata about the contract: `ContractInfoResponse`",
@@ -96,7 +95,8 @@
         "contract_info": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With MetaData Extension. Returns metadata about one particular token, based on *ERC721 Metadata JSON Schema* but directly from the contract: `NftInfoResponse`",
@@ -116,7 +116,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With MetaData Extension. Returns the result of both `NftInfo` and `OwnerOf` as one query as an optimization for clients: `AllNftInfo`",
@@ -143,7 +144,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With Enumerable extension. Returns all tokens owned by the given address, [] if unset. Return type: TokensResponse.",
@@ -167,7 +169,7 @@
               "minimum": 0.0
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "start_after": {
               "type": [
@@ -177,7 +179,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With Enumerable extension. Requires pagination. Lists all token_ids controlled by the contract. Return type: TokensResponse.",
@@ -205,12 +208,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }
