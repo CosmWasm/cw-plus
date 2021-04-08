@@ -1,30 +1,29 @@
 use cosmwasm_std::{
-    attr, Addr, Binary, BlockInfo, CanonicalAddr, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, Storage, Uint128,
+    attr, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
 use crate::state::{ALLOWANCES, BALANCES, TOKEN_INFO};
+use cw_storage_plus::AddrRef;
 
 pub fn execute_increase_allowance(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    spender: Addr,
+    spender: String,
     amount: Uint128,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
-    let spender_raw = &deps.api.addr_canonicalize(spender.as_ref())?;
-    let owner_raw = &deps.api.addr_canonicalize(info.sender.as_ref())?;
-
-    if spender_raw == owner_raw {
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    if spender_addr == info.sender {
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
     ALLOWANCES.update(
         deps.storage,
-        (&owner_raw, &spender_raw),
+        (AddrRef::new(&info.sender), AddrRef::new(&spender_addr)),
         |allow| -> StdResult<_> {
             let mut val = allow.unwrap_or_default();
             if let Some(exp) = expires {
@@ -40,7 +39,7 @@ pub fn execute_increase_allowance(
         messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
-            attr("owner", deps.api.addr_humanize(owner_raw)?),
+            attr("owner", info.sender),
             attr("spender", spender),
             attr("amount", amount),
         ],
@@ -53,19 +52,18 @@ pub fn execute_decrease_allowance(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    spender: Addr,
+    spender: String,
     amount: Uint128,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
-    if spender == info.sender {
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    if spender_addr == info.sender {
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let spender_raw = &deps.api.addr_canonicalize(spender.as_ref())?;
-    let owner_raw = &deps.api.addr_canonicalize(info.sender.as_ref())?;
-
+    let key = (AddrRef::new(&info.sender), AddrRef::new(&spender_addr));
     // load value and delete if it hits 0, or update otherwise
-    let mut allowance = ALLOWANCES.load(deps.storage, (&owner_raw, &spender_raw))?;
+    let mut allowance = ALLOWANCES.load(deps.storage, key)?;
     if amount < allowance.allowance {
         // update the new amount
         allowance.allowance = allowance
@@ -75,9 +73,9 @@ pub fn execute_decrease_allowance(
         if let Some(exp) = expires {
             allowance.expires = exp;
         }
-        ALLOWANCES.save(deps.storage, (&owner_raw, &spender_raw), &allowance)?;
+        ALLOWANCES.save(deps.storage, key, &allowance)?;
     } else {
-        ALLOWANCES.remove(deps.storage, (&owner_raw, &spender_raw));
+        ALLOWANCES.remove(deps.storage, key);
     }
 
     let res = Response {
@@ -97,12 +95,12 @@ pub fn execute_decrease_allowance(
 // this can be used to update a lower allowance - call bucket.update with proper keys
 pub fn deduct_allowance(
     storage: &mut dyn Storage,
-    owner: &CanonicalAddr,
-    spender: &CanonicalAddr,
+    owner: &Addr,
+    spender: &Addr,
     block: &BlockInfo,
     amount: Uint128,
 ) -> Result<AllowanceResponse, ContractError> {
-    ALLOWANCES.update(storage, (&owner, &spender), |current| {
+    ALLOWANCES.update(storage, (owner.into(), spender.into()), |current| {
         match current {
             Some(mut a) => {
                 if a.expires.is_expired(block) {
@@ -125,27 +123,26 @@ pub fn execute_transfer_from(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    owner: Addr,
-    recipient: Addr,
+    owner: String,
+    recipient: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let rcpt_raw = deps.api.addr_canonicalize(recipient.as_ref())?;
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
-    let spender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let rcpt_addr = deps.api.addr_validate(&recipient)?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
+    deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     BALANCES.update(
         deps.storage,
-        &owner_raw,
+        AddrRef::new(&owner_addr),
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        &rcpt_raw,
+        AddrRef::new(&rcpt_addr),
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -156,7 +153,7 @@ pub fn execute_transfer_from(
             attr("action", "transfer_from"),
             attr("from", owner),
             attr("to", recipient),
-            attr("by", deps.api.addr_humanize(&spender_raw)?),
+            attr("by", info.sender),
             attr("amount", amount),
         ],
         data: None,
@@ -169,19 +166,18 @@ pub fn execute_burn_from(
 
     env: Env,
     info: MessageInfo,
-    owner: Addr,
+    owner: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
-    let spender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
+    deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     // lower balance
     BALANCES.update(
         deps.storage,
-        &owner_raw,
+        AddrRef::from(&owner_addr),
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -198,7 +194,7 @@ pub fn execute_burn_from(
         attributes: vec![
             attr("action", "burn_from"),
             attr("from", owner),
-            attr("by", deps.api.addr_humanize(&spender_raw)?),
+            attr("by", info.sender),
             attr("amount", amount),
         ],
         data: None,
@@ -210,29 +206,28 @@ pub fn execute_send_from(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    owner: Addr,
-    contract: Addr,
+    owner: String,
+    contract: String,
     amount: Uint128,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
-    let rcpt_raw = deps.api.addr_canonicalize(contract.as_ref())?;
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
-    let spender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let rcpt_addr = deps.api.addr_validate(&contract)?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
+    deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     // move the tokens to the contract
     BALANCES.update(
         deps.storage,
-        &owner_raw,
+        AddrRef::from(&owner_addr),
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        &rcpt_raw,
+        AddrRef::from(&rcpt_addr),
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -246,7 +241,7 @@ pub fn execute_send_from(
 
     // create a send message
     let msg = Cw20ReceiveMsg {
-        sender: info.sender,
+        sender: info.sender.into(),
         amount,
         msg,
     }
@@ -261,11 +256,14 @@ pub fn execute_send_from(
     Ok(res)
 }
 
-pub fn query_allowance(deps: Deps, owner: Addr, spender: Addr) -> StdResult<AllowanceResponse> {
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
-    let spender_raw = deps.api.addr_canonicalize(spender.as_ref())?;
+pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<AllowanceResponse> {
+    let owner_addr = deps.api.addr_validate(&owner)?;
+    let spender_addr = deps.api.addr_validate(&spender)?;
     let allowance = ALLOWANCES
-        .may_load(deps.storage, (&owner_raw, &spender_raw))?
+        .may_load(
+            deps.storage,
+            (AddrRef::from(&owner_addr), AddrRef::from(&spender_addr)),
+        )?
         .unwrap_or_default();
     Ok(allowance)
 }
@@ -281,12 +279,12 @@ mod tests {
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
     use crate::msg::{ExecuteMsg, InstantiateMsg};
 
-    fn get_balance<T: Into<Addr>>(deps: Deps, address: T) -> Uint128 {
+    fn get_balance<T: Into<String>>(deps: Deps, address: T) -> Uint128 {
         query_balance(deps, address.into()).unwrap().balance
     }
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, addr: &Addr, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(mut deps: DepsMut, addr: &String, amount: Uint128) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),

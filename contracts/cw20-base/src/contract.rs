@@ -1,12 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
+    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
     Uint128,
 };
 
 use cw2::set_contract_version;
-use cw20::{BalanceResponse, Cw20CoinHuman, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
+use cw20::{BalanceResponse, Cw20Coin, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
 
 use crate::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
@@ -16,6 +16,7 @@ use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
+use cw_storage_plus::AddrRef;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -42,7 +43,7 @@ pub fn instantiate(
 
     let mint = match msg.mint {
         Some(m) => Some(MinterData {
-            minter: deps.api.addr_canonicalize(m.minter.as_ref())?,
+            minter: deps.api.addr_validate(&m.minter)?,
             cap: m.cap,
         }),
         None => None,
@@ -60,11 +61,11 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20CoinHuman]) -> StdResult<Uint128> {
+pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20Coin]) -> StdResult<Uint128> {
     let mut total_supply = Uint128::zero();
     for row in accounts {
-        let raw_address = deps.api.addr_canonicalize(row.address.as_ref())?;
-        BALANCES.save(deps.storage, &raw_address, &row.amount)?;
+        let address = deps.api.addr_validate(&row.address)?;
+        BALANCES.save(deps.storage, AddrRef::new(&address), &row.amount)?;
         total_supply += row.amount;
     }
     Ok(total_supply)
@@ -117,26 +118,25 @@ pub fn execute_transfer(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    recipient: Addr,
+    recipient: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let rcpt_raw = deps.api.addr_canonicalize(recipient.as_ref())?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let rcpt_addr = deps.api.addr_validate(&recipient)?;
 
     BALANCES.update(
         deps.storage,
-        &sender_raw,
+        AddrRef::from(&info.sender),
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        &rcpt_raw,
+        AddrRef::from(&rcpt_addr),
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -145,7 +145,7 @@ pub fn execute_transfer(
         messages: vec![],
         attributes: vec![
             attr("action", "transfer"),
-            attr("from", deps.api.addr_humanize(&sender_raw)?),
+            attr("from", info.sender),
             attr("to", recipient),
             attr("amount", amount),
         ],
@@ -164,12 +164,10 @@ pub fn execute_burn(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-
     // lower balance
     BALANCES.update(
         deps.storage,
-        &sender_raw,
+        AddrRef::from(&info.sender),
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -185,7 +183,7 @@ pub fn execute_burn(
         messages: vec![],
         attributes: vec![
             attr("action", "burn"),
-            attr("from", deps.api.addr_humanize(&sender_raw)?),
+            attr("from", info.sender),
             attr("amount", amount),
         ],
         data: None,
@@ -197,7 +195,7 @@ pub fn execute_mint(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    recipient: Addr,
+    recipient: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
@@ -205,10 +203,7 @@ pub fn execute_mint(
     }
 
     let mut config = TOKEN_INFO.load(deps.storage)?;
-    if config.mint.is_none()
-        || config.mint.as_ref().unwrap().minter
-            != deps.api.addr_canonicalize(info.sender.as_ref())?
-    {
+    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != info.sender {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -222,10 +217,10 @@ pub fn execute_mint(
     TOKEN_INFO.save(deps.storage, &config)?;
 
     // add amount to recipient balance
-    let rcpt_raw = deps.api.addr_canonicalize(recipient.as_ref())?;
+    let rcpt_addr = deps.api.addr_validate(&recipient)?;
     BALANCES.update(
         deps.storage,
-        &rcpt_raw,
+        AddrRef::from(&rcpt_addr),
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -246,7 +241,7 @@ pub fn execute_send(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    contract: Addr,
+    contract: String,
     amount: Uint128,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
@@ -254,34 +249,32 @@ pub fn execute_send(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let rcpt_raw = deps.api.addr_canonicalize(contract.as_ref())?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let rcpt_addr = deps.api.addr_validate(&contract)?;
 
     // move the tokens to the contract
     BALANCES.update(
         deps.storage,
-        &sender_raw,
+        AddrRef::from(&info.sender),
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        &rcpt_raw,
+        AddrRef::from(&rcpt_addr),
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let sender = deps.api.addr_humanize(&sender_raw)?;
     let attrs = vec![
         attr("action", "send"),
-        attr("from", &sender),
+        attr("from", &info.sender),
         attr("to", &contract),
         attr("amount", amount),
     ];
 
     // create a send message
     let msg = Cw20ReceiveMsg {
-        sender,
+        sender: info.sender.into(),
         amount,
         msg,
     }
@@ -316,10 +309,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_balance(deps: Deps, address: Addr) -> StdResult<BalanceResponse> {
-    let addr_raw = deps.api.addr_canonicalize(address.as_ref())?;
+pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> {
     let balance = BALANCES
-        .may_load(deps.storage, &addr_raw)?
+        .may_load(deps.storage, AddrRef::unchecked(&address))?
         .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }
@@ -339,7 +331,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
     let meta = TOKEN_INFO.load(deps.storage)?;
     let minter = match meta.mint {
         Some(m) => Some(MinterResponse {
-            minter: deps.api.addr_humanize(&m.minter)?,
+            minter: m.minter.into(),
             cap: m.cap,
         }),
         None => None,
@@ -393,7 +385,7 @@ mod tests {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
-            initial_balances: vec![Cw20CoinHuman {
+            initial_balances: vec![Cw20Coin {
                 address: addr.clone(),
                 amount,
             }],
@@ -427,7 +419,7 @@ mod tests {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
-            initial_balances: vec![Cw20CoinHuman {
+            initial_balances: vec![Cw20Coin {
                 address: Addr::unchecked("addr0000"),
                 amount,
             }],
@@ -463,7 +455,7 @@ mod tests {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
-            initial_balances: vec![Cw20CoinHuman {
+            initial_balances: vec![Cw20Coin {
                 address: Addr::unchecked("addr0000"),
                 amount,
             }],
@@ -509,7 +501,7 @@ mod tests {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
-            initial_balances: vec![Cw20CoinHuman {
+            initial_balances: vec![Cw20Coin {
                 address: Addr::unchecked("addr0000"),
                 amount,
             }],
@@ -623,11 +615,11 @@ mod tests {
             symbol: "BASH".to_string(),
             decimals: 6,
             initial_balances: vec![
-                Cw20CoinHuman {
+                Cw20Coin {
                     address: addr1.clone(),
                     amount: amount1,
                 },
-                Cw20CoinHuman {
+                Cw20Coin {
                     address: addr2.clone(),
                     amount: amount2,
                 },

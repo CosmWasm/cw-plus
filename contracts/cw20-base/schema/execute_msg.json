@@ -20,11 +20,12 @@
               "$ref": "#/definitions/Uint128"
             },
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Burn is a base message to destroy tokens forever",
@@ -44,7 +45,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Send is a base message to transfer tokens to a contract and trigger an action on the receiving contract.",
@@ -64,7 +66,7 @@
               "$ref": "#/definitions/Uint128"
             },
             "contract": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "anyOf": [
@@ -78,7 +80,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Only with the \"mintable\" extension. If authorized, creates amount new tokens and adds to the recipient balance.",
@@ -98,11 +101,12 @@
               "$ref": "#/definitions/Uint128"
             },
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Only with \"approval\" extension. Allows spender to access an additional amount tokens from the owner's (env.sender) account. If expires is Some(), overwrites current allowance expiration with this one.",
@@ -132,11 +136,12 @@
               ]
             },
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Only with \"approval\" extension. Lowers the spender's access of tokens from the owner's (env.sender) account by amount. If expires is Some(), overwrites current allowance expiration with this one.",
@@ -166,11 +171,12 @@
               ]
             },
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Only with \"approval\" extension. Transfers amount tokens from owner -> recipient if `env.sender` has sufficient pre-approval.",
@@ -191,14 +197,15 @@
               "$ref": "#/definitions/Uint128"
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Only with \"approval\" extension. Sends amount tokens from owner -> contract if `env.sender` has sufficient pre-approval.",
@@ -219,7 +226,7 @@
               "$ref": "#/definitions/Uint128"
             },
             "contract": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "anyOf": [
@@ -232,11 +239,12 @@
               ]
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Only with \"approval\" extension. Destroys tokens forever",
@@ -256,11 +264,12 @@
               "$ref": "#/definitions/Uint128"
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -283,7 +292,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "AtTime will expire when `env.block.time` >= time",
@@ -297,7 +307,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Never will never expire. Used to express the empty variant",
@@ -309,12 +320,10 @@
             "never": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"

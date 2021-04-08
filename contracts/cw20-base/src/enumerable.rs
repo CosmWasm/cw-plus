@@ -1,9 +1,8 @@
-use cosmwasm_std::{Addr, CanonicalAddr, Deps, Order, StdResult};
-use cw0::maybe_canonical;
+use cosmwasm_std::{Deps, Order, StdResult};
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
 use crate::state::{ALLOWANCES, BALANCES};
-use cw_storage_plus::Bound;
+use cw_storage_plus::{AddrRef, Bound};
 
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
@@ -11,24 +10,22 @@ const DEFAULT_LIMIT: u32 = 10;
 
 pub fn query_all_allowances(
     deps: Deps,
-    owner: Addr,
-    start_after: Option<Addr>,
+    owner: String,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<AllAllowancesResponse> {
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let start = start_after.map(Bound::exclusive);
 
-    let api = &deps.api;
     let allowances: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
-        .prefix(&owner_raw)
+        .prefix(AddrRef::new(&owner_addr))
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (k, v) = item?;
             Ok(AllowanceInfo {
-                spender: api.addr_humanize(&CanonicalAddr::from(k))?,
+                spender: String::from_utf8(k)?,
                 allowance: v.allowance,
                 expires: v.expires,
             })
@@ -41,17 +38,15 @@ pub fn query_all_allowances(
 
 pub fn query_all_accounts(
     deps: Deps,
-    start_after: Option<Addr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<AllAccountsResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let start = start_after.map(Bound::exclusive);
 
-    let api = &deps.api;
-    let accounts: StdResult<Vec<_>> = BALANCES
+    let accounts: Result<Vec<_>, _> = BALANCES
         .keys(deps.storage, start, None, Order::Ascending)
-        .map(|key| api.addr_humanize(&key.into()))
+        .map(|key| String::from_utf8(key))
         .take(limit)
         .collect();
 
@@ -72,7 +67,7 @@ mod tests {
     use crate::msg::{ExecuteMsg, InstantiateMsg};
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, addr: &Addr, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(mut deps: DepsMut, addr: &String, amount: Uint128) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -93,10 +88,10 @@ mod tests {
     fn query_all_allowances_works() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let owner = Addr::unchecked("owner");
+        let owner = String::unchecked("owner");
         // these are in alphabetical order different than insert order
-        let spender1 = Addr::unchecked("later");
-        let spender2 = Addr::unchecked("earlier");
+        let spender1 = String::unchecked("later");
+        let spender2 = String::unchecked("earlier");
 
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
@@ -129,7 +124,7 @@ mod tests {
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
-        // first one is spender1 (order of CanonicalAddr uncorrelated with Addr)
+        // first one is spender1 (order of CanonicalAddr uncorrelated with String)
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, Some(1)).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
@@ -157,10 +152,10 @@ mod tests {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // insert order and lexographical order are different
-        let acct1 = Addr::unchecked("acct01");
-        let acct2 = Addr::unchecked("zebra");
-        let acct3 = Addr::unchecked("nice");
-        let acct4 = Addr::unchecked("aaaardvark");
+        let acct1 = String::unchecked("acct01");
+        let acct2 = String::unchecked("zebra");
+        let acct3 = String::unchecked("nice");
+        let acct4 = String::unchecked("aaaardvark");
         let expected_order = [acct2.clone(), acct1.clone(), acct3.clone(), acct4.clone()];
 
         do_instantiate(deps.as_mut(), &acct1, Uint128(12340000));
