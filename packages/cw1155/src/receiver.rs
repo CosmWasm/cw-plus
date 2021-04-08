@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{to_binary, Addr, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
 
 use crate::msg::TokenId;
 
@@ -10,9 +10,9 @@ use crate::msg::TokenId;
 #[serde(rename_all = "snake_case")]
 pub struct Cw1155ReceiveMsg {
     /// The account that executed the send message
-    pub operator: Addr,
+    pub operator: String,
     /// The account that the token transfered from
-    pub from: Option<Addr>,
+    pub from: Option<String>,
     pub token_id: TokenId,
     pub amount: Uint128,
     pub msg: Binary,
@@ -26,7 +26,7 @@ impl Cw1155ReceiveMsg {
     }
 
     /// creates a cosmos_msg sending this struct to the named contract
-    pub fn into_cosmos_msg(self, contract_addr: Addr) -> StdResult<CosmosMsg> {
+    pub fn into_cosmos_msg<T: Into<String>>(self, contract_addr: T) -> StdResult<CosmosMsg> {
         let msg = self.into_binary()?;
         let execute = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
@@ -41,8 +41,8 @@ impl Cw1155ReceiveMsg {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Cw1155BatchReceiveMsg {
-    pub operator: Addr,
-    pub from: Option<Addr>,
+    pub operator: String,
+    pub from: Option<String>,
     pub batch: Vec<(TokenId, Uint128)>,
     pub msg: Binary,
 }
@@ -55,7 +55,7 @@ impl Cw1155BatchReceiveMsg {
     }
 
     /// creates a cosmos_msg sending this struct to the named contract
-    pub fn into_cosmos_msg(self, contract_addr: Addr) -> StdResult<CosmosMsg> {
+    pub fn into_cosmos_msg<T: Into<String>>(self, contract_addr: T) -> StdResult<CosmosMsg> {
         let msg = self.into_binary()?;
         let execute = WasmMsg::Execute {
             contract_addr: contract_addr.into(),

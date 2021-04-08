@@ -17,14 +17,15 @@
           ],
           "properties": {
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "token_id": {
               "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns the current balance of the given address for a batch of tokens, 0 if unset. Return type: BatchBalanceResponse.",
@@ -41,7 +42,7 @@
           ],
           "properties": {
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "token_ids": {
               "type": "array",
@@ -51,7 +52,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "List all operators that can access all of the owner's tokens. Return type: ApprovedForAllResponse.",
@@ -82,21 +84,18 @@
               "minimum": 0.0
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Query approved status `owner` granted to `operator`. Return type: IsApprovedForAllResponse",
@@ -113,14 +112,15 @@
           ],
           "properties": {
             "operator": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With MetaData Extension. Query metadata of token Return type: TokenInfoResponse.",
@@ -140,7 +140,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With Enumerable extension. Returns all tokens owned by the given address, [] if unset. Return type: TokensResponse.",
@@ -164,7 +165,7 @@
               "minimum": 0.0
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "start_after": {
               "type": [
@@ -174,7 +175,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "With Enumerable extension. Requires pagination. Lists all token_ids controlled by the contract. Return type: TokensResponse.",
@@ -202,12 +204,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }

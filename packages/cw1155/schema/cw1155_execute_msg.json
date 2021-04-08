@@ -19,7 +19,7 @@
           ],
           "properties": {
             "from": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "description": "`None` means don't call the receiver interface",
@@ -34,11 +34,7 @@
             },
             "to": {
               "description": "If `to` is not contract, `msg` should be `None`",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "token_id": {
               "type": "string"
@@ -48,7 +44,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "BatchSendFrom is a base message to move multiple types of tokens in batch, if `env.sender` is the owner or has sufficient pre-approval.",
@@ -82,7 +79,7 @@
               }
             },
             "from": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "description": "`None` means don't call the receiver interface",
@@ -97,15 +94,12 @@
             },
             "to": {
               "description": "if `to` is not contract, `msg` should be `None`",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Mint is a base message to mint tokens.",
@@ -135,11 +129,7 @@
             },
             "to": {
               "description": "If `to` is not contract, `msg` should be `None`",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "token_id": {
               "type": "string"
@@ -149,7 +139,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "BatchMint is a base message to mint multiple types of tokens in batch.",
@@ -194,15 +185,12 @@
             },
             "to": {
               "description": "If `to` is not contract, `msg` should be `None`",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Burn is a base message to burn tokens.",
@@ -220,7 +208,7 @@
           ],
           "properties": {
             "from": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "token_id": {
               "type": "string"
@@ -230,7 +218,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "BatchBurn is a base message to burn multiple types of tokens in batch.",
@@ -263,11 +252,12 @@
               }
             },
             "from": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit",
@@ -293,11 +283,12 @@
               ]
             },
             "operator": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Remove previously granted ApproveAll permission",
@@ -313,11 +304,12 @@
           ],
           "properties": {
             "operator": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -340,7 +332,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "AtTime will expire when `env.block.time` >= time",
@@ -354,7 +347,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Never will never expire. Used to express the empty variant",
@@ -366,12 +360,10 @@
             "never": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"

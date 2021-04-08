@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, Addr, Uint128};
+use cosmwasm_std::{Binary, Uint128};
 use cw0::Expiration;
 
 pub type TokenId = String;
@@ -12,9 +12,9 @@ pub enum Cw1155ExecuteMsg {
     /// SendFrom is a base message to move tokens,
     /// if `env.sender` is the owner or has sufficient pre-approval.
     SendFrom {
-        from: Addr,
+        from: String,
         /// If `to` is not contract, `msg` should be `None`
-        to: Addr,
+        to: String,
         token_id: TokenId,
         value: Uint128,
         /// `None` means don't call the receiver interface
@@ -23,9 +23,9 @@ pub enum Cw1155ExecuteMsg {
     /// BatchSendFrom is a base message to move multiple types of tokens in batch,
     /// if `env.sender` is the owner or has sufficient pre-approval.
     BatchSendFrom {
-        from: Addr,
+        from: String,
         /// if `to` is not contract, `msg` should be `None`
-        to: Addr,
+        to: String,
         batch: Vec<(TokenId, Uint128)>,
         /// `None` means don't call the receiver interface
         msg: Option<Binary>,
@@ -33,7 +33,7 @@ pub enum Cw1155ExecuteMsg {
     /// Mint is a base message to mint tokens.
     Mint {
         /// If `to` is not contract, `msg` should be `None`
-        to: Addr,
+        to: String,
         token_id: TokenId,
         value: Uint128,
         /// `None` means don't call the receiver interface
@@ -42,28 +42,28 @@ pub enum Cw1155ExecuteMsg {
     /// BatchMint is a base message to mint multiple types of tokens in batch.
     BatchMint {
         /// If `to` is not contract, `msg` should be `None`
-        to: Addr,
+        to: String,
         batch: Vec<(TokenId, Uint128)>,
         /// `None` means don't call the receiver interface
         msg: Option<Binary>,
     },
     /// Burn is a base message to burn tokens.
     Burn {
-        from: Addr,
+        from: String,
         token_id: TokenId,
         value: Uint128,
     },
     /// BatchBurn is a base message to burn multiple types of tokens in batch.
     BatchBurn {
-        from: Addr,
+        from: String,
         batch: Vec<(TokenId, Uint128)>,
     },
     /// Allows operator to transfer / send any token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit
     ApproveAll {
-        operator: Addr,
+        operator: String,
         expires: Option<Expiration>,
     },
     /// Remove previously granted ApproveAll permission
-    RevokeAll { operator: Addr },
+    RevokeAll { operator: String },
 }
