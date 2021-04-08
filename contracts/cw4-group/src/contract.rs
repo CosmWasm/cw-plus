@@ -1,10 +1,9 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order,
-    Response, StdResult,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
 };
-use cw0::maybe_canonical;
+use cw0::maybe_addr;
 use cw2::set_contract_version;
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
@@ -38,17 +37,20 @@ pub fn instantiate(
 // easily be imported in other contracts
 pub fn create(
     mut deps: DepsMut,
-    admin: Option<HumanAddr>,
+    admin: Option<String>,
     members: Vec<Member>,
     height: u64,
 ) -> Result<(), ContractError> {
-    ADMIN.set(deps.branch(), admin)?;
+    let admin_addr = admin
+        .map(|admin| deps.api.addr_validate(&admin))
+        .transpose()?;
+    ADMIN.set(deps.branch(), admin_addr)?;
 
     let mut total = 0u64;
     for member in members.into_iter() {
         total += member.weight;
-        let raw = deps.api.canonical_address(&member.addr)?;
-        MEMBERS.save(deps.storage, &raw, &member.weight, height)?;
+        let member_addr = deps.api.addr_validate(&member.addr)?;
+        MEMBERS.save(deps.storage, member_addr.as_ref(), &member.weight, height)?;
     }
     TOTAL.save(deps.storage, &total)?;
 
@@ -63,13 +65,22 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let api = deps.api;
     match msg {
-        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
+        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(
+            deps,
+            info,
+            admin.map(|admin| api.addr_validate(&admin)).transpose()?,
+        )?),
         ExecuteMsg::UpdateMembers { add, remove } => {
             execute_update_members(deps, env, info, add, remove)
         }
-        ExecuteMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
-        ExecuteMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::AddHook { addr } => {
+            Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
+        ExecuteMsg::RemoveHook { addr } => {
+            Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
     }
 }
 
@@ -78,7 +89,7 @@ pub fn execute_update_members(
     env: Env,
     info: MessageInfo,
     add: Vec<Member>,
-    remove: Vec<HumanAddr>,
+    remove: Vec<String>,
 ) -> Result<Response, ContractError> {
     let attributes = vec![
         attr("action", "update_members"),
@@ -103,9 +114,9 @@ pub fn execute_update_members(
 pub fn update_members(
     deps: DepsMut,
     height: u64,
-    sender: HumanAddr,
+    sender: Addr,
     to_add: Vec<Member>,
-    to_remove: Vec<HumanAddr>,
+    to_remove: Vec<String>,
 ) -> Result<MemberChangedHookMsg, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &sender)?;
 
@@ -114,23 +125,28 @@ pub fn update_members(
 
     // add all new members and update total
     for add in to_add.into_iter() {
-        let raw = deps.api.canonical_address(&add.addr)?;
-        MEMBERS.update(deps.storage, &raw, height, |old| -> StdResult<_> {
-            total -= old.unwrap_or_default();
-            total += add.weight;
-            diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
-            Ok(add.weight)
-        })?;
+        let add_addr = deps.api.addr_validate(&add.addr)?;
+        MEMBERS.update(
+            deps.storage,
+            add_addr.as_ref(),
+            height,
+            |old| -> StdResult<_> {
+                total -= old.unwrap_or_default();
+                total += add.weight;
+                diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
+                Ok(add.weight)
+            },
+        )?;
     }
 
     for remove in to_remove.into_iter() {
-        let raw = deps.api.canonical_address(&remove)?;
-        let old = MEMBERS.may_load(deps.storage, &raw)?;
+        let remove_addr = deps.api.addr_validate(&remove)?;
+        let old = MEMBERS.may_load(deps.storage, remove_addr.as_ref())?;
         // Only process this if they were actually in the list before
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
             total -= weight;
-            MEMBERS.remove(deps.storage, &raw, height)?;
+            MEMBERS.remove(deps.storage, remove_addr.as_ref(), height)?;
         }
     }
 
@@ -159,11 +175,11 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member(deps: Deps, addr: HumanAddr, height: Option<u64>) -> StdResult<MemberResponse> {
-    let raw = deps.api.canonical_address(&addr)?;
+fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
+    let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, &raw, h),
-        None => MEMBERS.may_load(deps.storage, &raw),
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, addr.as_ref(), h),
+        None => MEMBERS.may_load(deps.storage, addr.as_ref()),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -174,21 +190,20 @@ const DEFAULT_LIMIT: u32 = 10;
 
 fn list_members(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let addr = maybe_addr(deps.api, start_after)?;
+    let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let api = &deps.api;
     let members: StdResult<Vec<_>> = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
             Ok(Member {
-                addr: api.human_address(&CanonicalAddr::from(key))?,
+                addr: String::from_utf8(key)?,
                 weight,
             })
         })
