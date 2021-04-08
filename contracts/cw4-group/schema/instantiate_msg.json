@@ -8,13 +8,9 @@
   "properties": {
     "admin": {
       "description": "The admin is the only account that can update the group state. Omit it to make the group immutable.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        },
-        {
-          "type": "null"
-        }
+      "type": [
+        "string",
+        "null"
       ]
     },
     "members": {
@@ -25,9 +21,6 @@
     }
   },
   "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    },
     "Member": {
       "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
       "type": "object",
@@ -37,7 +30,7 @@
       ],
       "properties": {
         "addr": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "weight": {
           "type": "integer",

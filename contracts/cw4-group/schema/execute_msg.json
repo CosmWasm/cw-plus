@@ -13,18 +13,15 @@
           "type": "object",
           "properties": {
             "admin": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "apply a diff to the existing members. remove is applied after add, so if an address is in both, it is removed",
@@ -49,12 +46,13 @@
             "remove": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/HumanAddr"
+                "type": "string"
               }
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Add a new hook to be informed of all membership changes. Must be called by Admin",
@@ -70,11 +68,12 @@
           ],
           "properties": {
             "addr": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Remove a hook. Must be called by Admin",
@@ -90,17 +89,15 @@
           ],
           "properties": {
             "addr": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    },
     "Member": {
       "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
       "type": "object",
@@ -110,7 +107,7 @@
       ],
       "properties": {
         "addr": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "weight": {
           "type": "integer",
