@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    coin, from_slice, to_binary, to_vec, AllBalanceResponse, BalanceResponse, BankMsg, BankQuery,
-    Binary, Coin, HumanAddr, Storage,
+    coin, from_slice, to_binary, to_vec, Addr, AllBalanceResponse, BalanceResponse, BankMsg,
+    BankQuery, Binary, Coin, Storage,
 };
 
 use crate::transactions::{RepLog, StorageTransaction};
@@ -9,12 +9,7 @@ use cw0::NativeBalance;
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
 pub trait Bank {
-    fn handle(
-        &self,
-        storage: &mut dyn Storage,
-        sender: HumanAddr,
-        msg: BankMsg,
-    ) -> Result<(), String>;
+    fn handle(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String>;
 
     fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String>;
 
@@ -22,7 +17,7 @@ pub trait Bank {
     fn set_balance(
         &self,
         storage: &mut dyn Storage,
-        account: HumanAddr,
+        account: Addr,
         amount: Vec<Coin>,
     ) -> Result<(), String>;
 
@@ -43,7 +38,7 @@ impl BankRouter {
     }
 
     // this is an "admin" function to let us adjust bank accounts
-    pub fn set_balance(&mut self, account: HumanAddr, amount: Vec<Coin>) -> Result<(), String> {
+    pub fn set_balance(&mut self, account: Addr, amount: Vec<Coin>) -> Result<(), String> {
         self.bank
             .set_balance(self.storage.as_mut(), account, amount)
     }
@@ -86,7 +81,7 @@ impl<'a> BankCache<'a> {
         BankOps(self.state.prepare())
     }
 
-    pub fn execute(&mut self, sender: HumanAddr, msg: BankMsg) -> Result<(), String> {
+    pub fn execute(&mut self, sender: Addr, msg: BankMsg) -> Result<(), String> {
         self.router.bank.handle(&mut self.state, sender, msg)
     }
 }
@@ -96,12 +91,8 @@ pub struct SimpleBank {}
 
 impl SimpleBank {
     // this is an "admin" function to let us adjust bank accounts
-    pub fn get_balance(
-        &self,
-        storage: &dyn Storage,
-        account: HumanAddr,
-    ) -> Result<Vec<Coin>, String> {
-        let raw = storage.get(account.as_bytes());
+    pub fn get_balance(&self, storage: &dyn Storage, account: Addr) -> Result<Vec<Coin>, String> {
+        let raw = storage.get(account.as_ref().as_bytes());
         match raw {
             Some(data) => {
                 let balance: NativeBalance = from_slice(&data).map_err(|e| e.to_string())?;
@@ -114,8 +105,8 @@ impl SimpleBank {
     fn send(
         &self,
         storage: &mut dyn Storage,
-        from_address: HumanAddr,
-        to_address: HumanAddr,
+        from_address: Addr,
+        to_address: Addr,
         amount: Vec<Coin>,
     ) -> Result<(), String> {
         let a = self.get_balance(storage, from_address.clone())?;
@@ -132,14 +123,11 @@ impl SimpleBank {
 
 // TODO: use storage-plus when that is on 0.12.. for now just do this by hand
 impl Bank for SimpleBank {
-    fn handle(
-        &self,
-        storage: &mut dyn Storage,
-        sender: HumanAddr,
-        msg: BankMsg,
-    ) -> Result<(), String> {
+    fn handle(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String> {
         match msg {
-            BankMsg::Send { to_address, amount } => self.send(storage, sender, to_address, amount),
+            BankMsg::Send { to_address, amount } => {
+                self.send(storage, sender, Addr::unchecked(to_address), amount)
+            }
             m => panic!("Unsupported bank message: {:?}", m),
         }
     }
@@ -147,12 +135,12 @@ impl Bank for SimpleBank {
     fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String> {
         match request {
             BankQuery::AllBalances { address } => {
-                let amount = self.get_balance(storage, address)?;
+                let amount = self.get_balance(storage, Addr::unchecked(address))?;
                 let res = AllBalanceResponse { amount };
                 Ok(to_binary(&res).map_err(|e| e.to_string())?)
             }
             BankQuery::Balance { address, denom } => {
-                let all_amounts = self.get_balance(storage, address)?;
+                let all_amounts = self.get_balance(storage, Addr::unchecked(address))?;
                 let amount = all_amounts
                     .into_iter()
                     .find(|c| c.denom == denom)
@@ -168,12 +156,12 @@ impl Bank for SimpleBank {
     fn set_balance(
         &self,
         storage: &mut dyn Storage,
-        account: HumanAddr,
+        account: Addr,
         amount: Vec<Coin>,
     ) -> Result<(), String> {
         let mut balance = NativeBalance(amount);
         balance.normalize();
-        let key = account.as_bytes();
+        let key = account.as_ref().as_bytes();
         let value = to_vec(&balance).map_err(|e| e.to_string())?;
         storage.set(key, &value);
         Ok(())
@@ -195,8 +183,8 @@ mod test {
     fn get_set_balance() {
         let mut store = MockStorage::new();
 
-        let owner = HumanAddr::from("owner");
-        let rcpt = HumanAddr::from("receiver");
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("receiver");
         let init_funds = vec![coin(100, "eth"), coin(20, "btc")];
         let norm = vec![coin(20, "btc"), coin(100, "eth")];
 
@@ -213,21 +201,21 @@ mod test {
 
         // proper queries work
         let req = BankQuery::AllBalances {
-            address: owner.clone(),
+            address: owner.clone().into(),
         };
         let raw = bank.query(&store, req).unwrap();
         let res: AllBalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, norm);
 
         let req = BankQuery::AllBalances {
-            address: rcpt.clone(),
+            address: rcpt.clone().into(),
         };
         let raw = bank.query(&store, req).unwrap();
         let res: AllBalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, vec![]);
 
         let req = BankQuery::Balance {
-            address: owner.clone(),
+            address: owner.clone().into(),
             denom: "eth".into(),
         };
         let raw = bank.query(&store, req).unwrap();
@@ -235,7 +223,7 @@ mod test {
         assert_eq!(res.amount, coin(100, "eth"));
 
         let req = BankQuery::Balance {
-            address: owner.clone(),
+            address: owner.clone().into(),
             denom: "foobar".into(),
         };
         let raw = bank.query(&store, req).unwrap();
@@ -243,7 +231,7 @@ mod test {
         assert_eq!(res.amount, coin(0, "foobar"));
 
         let req = BankQuery::Balance {
-            address: rcpt.clone(),
+            address: rcpt.clone().into(),
             denom: "eth".into(),
         };
         let raw = bank.query(&store, req).unwrap();
@@ -255,8 +243,8 @@ mod test {
     fn send_coins() {
         let mut store = MockStorage::new();
 
-        let owner = HumanAddr::from("owner");
-        let rcpt = HumanAddr::from("receiver");
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("receiver");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
         let rcpt_funds = vec![coin(5, "btc")];
 
@@ -270,7 +258,7 @@ mod test {
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
         let msg = BankMsg::Send {
-            to_address: rcpt.clone(),
+            to_address: rcpt.clone().into(),
             amount: to_send.clone(),
         };
         bank.handle(&mut store, owner.clone(), msg.clone()).unwrap();
@@ -284,7 +272,7 @@ mod test {
 
         // cannot send too much
         let msg = BankMsg::Send {
-            to_address: rcpt.clone(),
+            to_address: rcpt.clone().into(),
             amount: coins(20, "btc"),
         };
         bank.handle(&mut store, owner.clone(), msg.clone())

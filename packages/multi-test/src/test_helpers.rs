@@ -77,7 +77,7 @@ fn handle_payout(
     // always try to payout what was set originally
     let payout = PAYOUT.load(deps.storage)?;
     let msg = BankMsg::Send {
-        to_address: info.sender,
+        to_address: info.sender.into(),
         amount: vec![payout.payout],
     }
     .into();
