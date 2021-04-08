@@ -1,9 +1,10 @@
+use cosmwasm_std::Addr;
 use std::marker::PhantomData;
 use std::str::from_utf8;
 
+use crate::addr::AddrRef;
 use crate::helpers::{decode_length, namespaces_with_key};
 use crate::Endian;
-use cosmwasm_std::Addr;
 
 // pub trait PrimaryKey<'a>: Copy {
 pub trait PrimaryKey<'a>: Clone {
@@ -50,22 +51,6 @@ impl<'a> PrimaryKey<'a> for &'a str {
 
     fn parse_key(serialized: &'a [u8]) -> Self {
         from_utf8(serialized).unwrap()
-    }
-}
-
-/// type safe version to ensure address was validated before use.
-/// unfortunately I cannot use &Addr here due to parse_key lifetimes
-impl<'a> PrimaryKey<'a> for Addr {
-    type Prefix = ();
-    type SubPrefix = ();
-
-    fn key(&self) -> Vec<&[u8]> {
-        // this is simple, we don't add more prefixes
-        vec![self.as_ref().as_bytes()]
-    }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        Addr::unchecked(from_utf8(serialized).unwrap().to_string())
     }
 }
 
@@ -158,13 +143,6 @@ impl<'a> Prefixer<'a> for &'a str {
     }
 }
 
-/// A type-safe way to use verified addresses as keys
-impl<'a> Prefixer<'a> for &'a Addr {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.as_ref().as_bytes()]
-    }
-}
-
 // this is a marker for the Map.range() helper, so we can detect () in Generic bounds
 pub trait EmptyPrefix {
     fn new() -> Self;
@@ -194,6 +172,52 @@ impl<'a> PrimaryKey<'a> for PkOwned {
 impl<'a> Prefixer<'a> for PkOwned {
     fn prefix(&self) -> Vec<&[u8]> {
         vec![&self.0]
+    }
+}
+
+/// type safe version to ensure address was validated before use.
+/// unfortunately I cannot use &Addr here due to parse_key lifetimes
+impl<'a> PrimaryKey<'a> for Addr {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_ref().as_bytes()]
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        Addr::unchecked(from_utf8(serialized).unwrap().to_string())
+    }
+}
+
+/// A type-safe way to use verified addresses as keys
+impl<'a> Prefixer<'a> for &'a Addr {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![self.as_ref().as_bytes()]
+    }
+}
+
+/// type safe version to ensure address was validated before use.
+/// This is equivalent to &Addr but compatible with these lifetimes
+impl<'a> PrimaryKey<'a> for AddrRef<'a> {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_bytes()]
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        AddrRef::unchecked(from_utf8(serialized).unwrap())
+    }
+}
+
+/// A type-safe way to use verified addresses as keys
+impl<'a> Prefixer<'a> for AddrRef<'a> {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![self.as_bytes()]
     }
 }
 
