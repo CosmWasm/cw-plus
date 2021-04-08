@@ -6,18 +6,10 @@ The name and design is based on Ethereum's ERC1155 standard.
 The specification is split into multiple sections, a contract may only
 implement some of this functionality, but must implement the base.
 
-Design decisions:
+Fungible tokens and non-fungible tokens are treated equally, non-fungible tokens just have one max supply.
 
-- Fungible tokens and non-fungible tokens are treated equally, non-fungible tokens just have one max supply.
-
-- Approval is set or unset to some operator over entire set of tokens. (More nuanced control is defined in
-  [ERC1761](https://eips.ethereum.org/EIPS/eip-1761), do we want to merge them together?)
-
-- Mint and burn are mixed with transfer/send messages, otherwise, we'll have much more message types, e.g.
-  `Mint`/`MintToContract`/`BatchMint`/`BatchMintToContract`, etc.
-
-  In transfer/send messges, `from`/`to` are optional, a `None` `from` means minting, a `None` `to` means burning, they
-must not both be `None` at the same time.
+Approval is set or unset to some operator over entire set of tokens. (More nuanced control is defined in
+[ERC1761](https://eips.ethereum.org/EIPS/eip-1761))
 
 ## Base
 
@@ -48,7 +40,7 @@ is set, then this allowance has a time/height limit.
 
 ### Queries
 
-`Balance { owner, token_id }` - Query the balance of `owner` on perticular type of token, default to `0` when record not
+`Balance { owner, token_id }` - Query the balance of `owner` on particular type of token, default to `0` when record not
 exist.
 
 `BatchBalance { owner, token_ids }` - Query the balance of `owner` on multiple types of tokens, batched version of
@@ -58,8 +50,8 @@ exist.
 tokens. Return type is `ApprovedForAllResponse`.  If `include_expired` is set, show expired owners in the results,
 otherwise, ignore them.
 
-`ApprovedForAllItem{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is
-`ApprovedForAllItemResponse`.
+`IsApprovedForAll{owner, operator}` - Query approved status `owner` granted to `operator`. Return type is
+`IsApprovedForAllResponse`.
 
 ### Receiver
 

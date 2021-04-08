@@ -256,6 +256,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw1155-base"
+version = "0.6.0-alpha3"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw0",
+ "cw1155",
+ "cw2",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw2"
 version = "0.6.0-alpha3"
 dependencies = [
