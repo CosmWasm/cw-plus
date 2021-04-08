@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    attr, CosmosMsg, Deps, DepsMut, Addr, MessageInfo, Response, StdError, StdResult, Storage,
+    attr, Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Response, StdError, StdResult, Storage,
 };
 use cw_storage_plus::Item;
 
@@ -13,7 +13,7 @@ use crate::admin::{Admin, AdminError};
 // TODO: pull into cw0 as common dep
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct HooksResponse {
-    pub hooks: Vec<Addr>,
+    pub hooks: Vec<String>,
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -120,6 +120,7 @@ impl<'a> Hooks<'a> {
 
     pub fn query_hooks(&self, deps: Deps) -> StdResult<HooksResponse> {
         let hooks = self.0.may_load(deps.storage)?.unwrap_or_default();
+        let hooks = hooks.into_iter().map(String::from).collect();
         Ok(HooksResponse { hooks })
     }
 }
