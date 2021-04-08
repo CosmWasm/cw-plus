@@ -5,8 +5,8 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env,
-    MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
+    attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Order, Response, StakingMsg, StdError, StdResult,
 };
 use cw0::Expiration;
 use cw1::CanExecuteResponse;
@@ -26,7 +26,7 @@ use crate::msg::{
     QueryMsg,
 };
 use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
-use cw_storage_plus::Bound;
+use cw_storage_plus::{AddrRef, Bound};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
@@ -96,7 +96,7 @@ where
         for msg in &msgs {
             match msg {
                 CosmosMsg::Staking(staking_msg) => {
-                    let perm = PERMISSIONS.may_load(deps.storage, info.sender.clone())?;
+                    let perm = PERMISSIONS.may_load(deps.storage, AddrRef::from(&info.sender))?;
                     let perm = perm.ok_or(ContractError::NotAllowed {})?;
                     check_staking_permissions(staking_msg, perm)?;
                 }
@@ -106,7 +106,7 @@ where
                 }) => {
                     ALLOWANCES.update::<_, ContractError>(
                         deps.storage,
-                        info.sender.clone(),
+                        AddrRef::from(&info.sender),
                         |allow| {
                             let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
                             // Decrease allowance
@@ -182,7 +182,7 @@ where
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    ALLOWANCES.update::<_, StdError>(deps.storage, spender_addr, |allow| {
+    ALLOWANCES.update::<_, StdError>(deps.storage, AddrRef::from(&spender_addr), |allow| {
         let mut allowance = allow.unwrap_or_default();
         if let Some(exp) = expires {
             allowance.expires = exp;
@@ -227,8 +227,10 @@ where
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let allowance =
-        ALLOWANCES.update::<_, ContractError>(deps.storage, spender_addr.clone(), |allow| {
+    let allowance = ALLOWANCES.update::<_, ContractError>(
+        deps.storage,
+        AddrRef::from(&spender_addr),
+        |allow| {
             // Fail fast
             let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
             if let Some(exp) = expires {
@@ -236,9 +238,10 @@ where
             }
             allowance.balance = allowance.balance.sub_saturating(amount.clone())?; // Tolerates underflows (amount bigger than balance), but fails if there are no tokens at all for the denom (report potential errors)
             Ok(allowance)
-        })?;
+        },
+    )?;
     if allowance.balance.is_empty() {
-        ALLOWANCES.remove(deps.storage, spender_addr);
+        ALLOWANCES.remove(deps.storage, AddrRef::from(&spender_addr));
     }
 
     let res = Response {
@@ -275,7 +278,7 @@ where
     if info.sender == spender_addr {
         return Err(ContractError::CannotSetOwnAccount {});
     }
-    PERMISSIONS.save(deps.storage, spender_addr, &perm)?;
+    PERMISSIONS.save(deps.storage, AddrRef::from(&spender_addr), &perm)?;
 
     let res = Response {
         submessages: vec![],
@@ -311,7 +314,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_allowance(deps: Deps, spender: String) -> StdResult<Allowance> {
     // we can use unchecked here as it is a query - bad value means a miss, we never write it
     let allow = ALLOWANCES
-        .may_load(deps.storage, Addr::unchecked(spender))?
+        .may_load(deps.storage, AddrRef::unchecked(&spender))?
         .unwrap_or_default();
     Ok(allow)
 }
@@ -319,7 +322,7 @@ pub fn query_allowance(deps: Deps, spender: String) -> StdResult<Allowance> {
 // if the subkey has no permissions, return an empty struct (not an error)
 pub fn query_permissions(deps: Deps, spender: String) -> StdResult<Permissions> {
     let permissions = PERMISSIONS
-        .may_load(deps.storage, Addr::unchecked(spender))?
+        .may_load(deps.storage, AddrRef::unchecked(&spender))?
         .unwrap_or_default();
     Ok(permissions)
 }
@@ -340,7 +343,7 @@ fn can_execute(deps: Deps, sender: String, msg: CosmosMsg) -> StdResult<bool> {
     match msg {
         CosmosMsg::Bank(BankMsg::Send { amount, .. }) => {
             // now we check if there is enough allowance for this message
-            let allowance = ALLOWANCES.may_load(deps.storage, Addr::unchecked(sender))?;
+            let allowance = ALLOWANCES.may_load(deps.storage, AddrRef::unchecked(&sender))?;
             match allowance {
                 // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
                 Some(allow) => Ok(allow.balance.sub(amount).is_ok()),
@@ -348,7 +351,7 @@ fn can_execute(deps: Deps, sender: String, msg: CosmosMsg) -> StdResult<bool> {
             }
         }
         CosmosMsg::Staking(staking_msg) => {
-            let perm_opt = PERMISSIONS.may_load(deps.storage, Addr::unchecked(sender))?;
+            let perm_opt = PERMISSIONS.may_load(deps.storage, AddrRef::unchecked(&sender))?;
             match perm_opt {
                 Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
                 None => Ok(false),
@@ -1462,7 +1465,7 @@ mod tests {
             withdraw: false,
         };
 
-        let spender_addr = Addr::unchecked(spender);
+        let spender_addr = AddrRef::unchecked(&spender);
         let _ = PERMISSIONS.save(&mut deps.storage, spender_addr, &perm);
 
         // let us make some queries... different msg types by owner and by other
