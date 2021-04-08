@@ -250,7 +250,7 @@ mod tests {
 
         // it worked, let's query the state
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(HumanAddr::from(INIT_ADMIN)), res.admin);
+        assert_eq!(Some(INIT_ADMIN.into()), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(17, res.weight);
@@ -324,7 +324,7 @@ mod tests {
         let err = update_members(
             deps.as_mut(),
             height + 5,
-            USER1.into(),
+            Addr::unchecked(USER1),
             add.clone(),
             remove.clone(),
         )
@@ -339,7 +339,14 @@ mod tests {
         assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
 
         // admin updates properly
-        update_members(deps.as_mut(), height + 10, INIT_ADMIN.into(), add, remove).unwrap();
+        update_members(
+            deps.as_mut(),
+            height + 10,
+            Addr::unchecked(INIT_ADMIN),
+            add,
+            remove,
+        )
+        .unwrap();
 
         // updated properly
         assert_users(&deps, None, Some(6), Some(15), None);
@@ -363,7 +370,14 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
+        update_members(
+            deps.as_mut(),
+            height,
+            Addr::unchecked(INIT_ADMIN),
+            add,
+            remove,
+        )
+        .unwrap();
         assert_users(&deps, Some(4), Some(6), None, None);
     }
 
@@ -388,7 +402,14 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
+        update_members(
+            deps.as_mut(),
+            height,
+            Addr::unchecked(INIT_ADMIN),
+            add,
+            remove,
+        )
+        .unwrap();
         assert_users(&deps, None, Some(6), Some(5), None);
     }
 
@@ -401,8 +422,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = HumanAddr::from("hook1");
-        let contract2 = HumanAddr::from("hook2");
+        let contract1 = String::from("hook1");
+        let contract2 = String::from("hook2");
 
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
@@ -420,7 +441,7 @@ mod tests {
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // admin can add it, and it appears in the query
-        let admin_info = mock_info(INIT_ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN.as_ref(), &[]);
         let _ = execute(
             deps.as_mut(),
             mock_env(),
@@ -495,11 +516,11 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = HumanAddr::from("hook1");
-        let contract2 = HumanAddr::from("hook2");
+        let contract1 = String::from("hook1");
+        let contract2 = String::from("hook2");
 
         // register 2 hooks
-        let admin_info = mock_info(INIT_ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN.as_ref(), &[]);
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
@@ -556,14 +577,14 @@ mod tests {
         assert_eq!(17, total);
 
         // get member votes from raw key
-        let member2_canon = deps.api.canonical_address(&USER2.into()).unwrap();
-        let member2_raw = deps.storage.get(&member_key(&member2_canon)).unwrap();
+        let member2_raw = deps.storage.get(&member_key(USER2.as_ref())).unwrap();
         let member2: u64 = from_slice(&member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and execute misses
-        let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
-        let member3_raw = deps.storage.get(&member_key(&member3_canon));
+        // let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
+        // let member3_raw = deps.storage.get(&member_key(&member3_canon));
+        let member3_raw = deps.storage.get(&member_key(USER3.as_ref()));
         assert_eq!(None, member3_raw);
     }
 }
