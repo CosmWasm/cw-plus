@@ -1,6 +1,6 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Api, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order, Pair, Response,
+    to_binary, Addr, Api, Binary, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
     StdResult, Uint128,
 };
 use cw_storage_plus::Bound;
@@ -32,7 +32,7 @@ pub fn instantiate(
     msg: InitMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    let minter = deps.api.canonical_address(&msg.minter)?;
+    let minter = deps.api.addr_canonicalize(msg.minter.as_ref())?;
     MINTER.save(deps.storage, &minter)?;
     Ok(Response::default())
 }
@@ -93,13 +93,13 @@ pub fn execute(
 /// Make sure permissions are checked before calling this.
 fn execute_transfer_inner<'a>(
     deps: &'a mut DepsMut,
-    from: Option<&'a HumanAddr>,
-    to: Option<&'a HumanAddr>,
+    from: Option<&'a Addr>,
+    to: Option<&'a Addr>,
     token_id: &'a str,
     amount: Uint128,
 ) -> Result<TransferEvent<'a>, ContractError> {
     if let Some(from) = from {
-        let from_raw = deps.api.canonical_address(from)?;
+        let from_raw = deps.api.addr_canonicalize(from.as_ref())?;
         BALANCES.update(
             deps.storage,
             (from_raw.as_slice(), token_id),
@@ -110,7 +110,7 @@ fn execute_transfer_inner<'a>(
     }
 
     if let Some(to) = to {
-        let canonical_to = deps.api.canonical_address(to)?;
+        let canonical_to = deps.api.addr_canonicalize(to.as_ref())?;
         BALANCES.update(
             deps.storage,
             (canonical_to.as_slice(), token_id),
@@ -129,15 +129,10 @@ fn execute_transfer_inner<'a>(
 }
 
 /// returns true iff the sender can execute approve or reject on the contract
-fn check_can_approve(
-    deps: Deps,
-    env: &Env,
-    owner: &HumanAddr,
-    operator: &HumanAddr,
-) -> StdResult<bool> {
+fn check_can_approve(deps: Deps, env: &Env, owner: &Addr, operator: &Addr) -> StdResult<bool> {
     // owner can approve
-    let owner_raw = deps.api.canonical_address(owner)?;
-    let operator_raw = deps.api.canonical_address(operator)?;
+    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
+    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
     if owner_raw == operator_raw {
         return Ok(true);
     }
@@ -152,8 +147,8 @@ fn check_can_approve(
 fn guard_can_approve(
     deps: Deps,
     env: &Env,
-    owner: &HumanAddr,
-    operator: &HumanAddr,
+    owner: &Addr,
+    operator: &Addr,
 ) -> Result<(), ContractError> {
     if !check_can_approve(deps, env, owner, operator)? {
         Err(ContractError::Unauthorized {})
@@ -164,8 +159,8 @@ fn guard_can_approve(
 
 pub fn execute_send_from(
     env: ExecuteEnv,
-    from: HumanAddr,
-    to: HumanAddr,
+    from: Addr,
+    to: Addr,
     token_id: TokenId,
     amount: Uint128,
     msg: Option<Binary>,
@@ -199,14 +194,14 @@ pub fn execute_send_from(
 
 pub fn execute_mint(
     env: ExecuteEnv,
-    to: HumanAddr,
+    to: Addr,
     token_id: TokenId,
     amount: Uint128,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
 
-    let sender = deps.api.canonical_address(&info.sender)?;
+    let sender = deps.api.addr_canonicalize(info.sender.as_ref())?;
     if sender != MINTER.load(deps.storage)? {
         return Err(ContractError::Unauthorized {});
     }
@@ -238,7 +233,7 @@ pub fn execute_mint(
 
 pub fn execute_burn(
     env: ExecuteEnv,
-    from: HumanAddr,
+    from: Addr,
     token_id: TokenId,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
@@ -259,8 +254,8 @@ pub fn execute_burn(
 
 pub fn execute_batch_send_from(
     env: ExecuteEnv,
-    from: HumanAddr,
-    to: HumanAddr,
+    from: Addr,
+    to: Addr,
     batch: Vec<(TokenId, Uint128)>,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
@@ -293,12 +288,12 @@ pub fn execute_batch_send_from(
 
 pub fn execute_batch_mint(
     env: ExecuteEnv,
-    to: HumanAddr,
+    to: Addr,
     batch: Vec<(TokenId, Uint128)>,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
-    let sender = deps.api.canonical_address(&info.sender)?;
+    let sender = deps.api.addr_canonicalize(info.sender.as_ref())?;
     if sender != MINTER.load(deps.storage)? {
         return Err(ContractError::Unauthorized {});
     }
@@ -332,7 +327,7 @@ pub fn execute_batch_mint(
 
 pub fn execute_batch_burn(
     env: ExecuteEnv,
-    from: HumanAddr,
+    from: Addr,
     batch: Vec<(TokenId, Uint128)>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv {
@@ -353,7 +348,7 @@ pub fn execute_batch_burn(
 
 pub fn execute_approve_all(
     env: ExecuteEnv,
-    operator: HumanAddr,
+    operator: Addr,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { deps, info, env } = env;
@@ -365,8 +360,8 @@ pub fn execute_approve_all(
     }
 
     // set the operator for us
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let operator_raw = deps.api.canonical_address(&operator)?;
+    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
     APPROVES.save(deps.storage, (&sender_raw, &operator_raw), &expires)?;
 
     let mut rsp = Response::default();
@@ -379,10 +374,10 @@ pub fn execute_approve_all(
     Ok(rsp)
 }
 
-pub fn execute_revoke_all(env: ExecuteEnv, operator: HumanAddr) -> Result<Response, ContractError> {
+pub fn execute_revoke_all(env: ExecuteEnv, operator: Addr) -> Result<Response, ContractError> {
     let ExecuteEnv { deps, info, .. } = env;
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let operator_raw = deps.api.canonical_address(&operator)?;
+    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
+    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
     APPROVES.remove(deps.storage, (&sender_raw, &operator_raw));
 
     let mut rsp = Response::default();
@@ -399,14 +394,14 @@ pub fn execute_revoke_all(env: ExecuteEnv, operator: HumanAddr) -> Result<Respon
 pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
     match msg {
         Cw1155QueryMsg::Balance { owner, token_id } => {
-            let canonical_owner = deps.api.canonical_address(&owner)?;
+            let canonical_owner = deps.api.addr_canonicalize(owner.as_ref())?;
             let balance = BALANCES
                 .may_load(deps.storage, (canonical_owner.as_slice(), &token_id))?
                 .unwrap_or_default();
             to_binary(&BalanceResponse { balance })
         }
         Cw1155QueryMsg::BatchBalance { owner, token_ids } => {
-            let canonical_owner = deps.api.canonical_address(&owner)?;
+            let canonical_owner = deps.api.addr_canonicalize(owner.as_ref())?;
             let balances = token_ids
                 .into_iter()
                 .map(|token_id| -> StdResult<_> {
@@ -451,7 +446,7 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
 
 fn parse_approval(api: &dyn Api, item: StdResult<Pair<Expiration>>) -> StdResult<cw1155::Approval> {
     item.and_then(|(k, expires)| {
-        let spender = api.human_address(&k.into())?;
+        let spender = api.addr_humanize(&k.into())?;
         Ok(cw1155::Approval { spender, expires })
     })
 }
@@ -459,16 +454,16 @@ fn parse_approval(api: &dyn Api, item: StdResult<Pair<Expiration>>) -> StdResult
 fn query_all_approvals(
     deps: Deps,
     env: Env,
-    owner: HumanAddr,
+    owner: Addr,
     include_expired: bool,
-    start_after: Option<HumanAddr>,
+    start_after: Option<Addr>,
     limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start_canon = maybe_canonical(deps.api, start_after)?;
     let start = start_canon.map(Bound::exclusive);
 
-    let owner_raw = deps.api.canonical_address(&owner)?;
+    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
     let operators = APPROVES
         .prefix(&owner_raw)
         .range(deps.storage, start, None, Order::Ascending)
@@ -481,14 +476,14 @@ fn query_all_approvals(
 
 fn query_tokens(
     deps: Deps,
-    owner: HumanAddr,
+    owner: Addr,
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let owner_raw = deps.api.canonical_address(&owner)?;
+    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
     let tokens = BALANCES
         .prefix(&owner_raw)
         .range(deps.storage, start, None, Order::Ascending)
@@ -543,9 +538,9 @@ mod tests {
         let token1 = "token1".to_owned();
         let token2 = "token2".to_owned();
         let token3 = "token3".to_owned();
-        let minter: HumanAddr = "minter".into();
-        let user1: HumanAddr = "user1".into();
-        let user2: HumanAddr = "user2".into();
+        let minter = Addr::unchecked("minter");
+        let user1 = Addr::unchecked("user1");
+        let user2 = Addr::unchecked("user2");
 
         let mut deps = mock_dependencies(&[]);
         let msg = InitMsg {
@@ -565,7 +560,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(user1.clone(), &[]),
+                mock_info(user1.as_ref(), &[]),
                 mint_msg.clone(),
             ),
             Err(ContractError::Unauthorized {})
@@ -576,7 +571,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 mint_msg,
             )
             .unwrap(),
@@ -619,7 +614,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 transfer_msg.clone(),
             ),
             Err(ContractError::Unauthorized {})
@@ -629,7 +624,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(user1.clone(), &[]),
+            mock_info(user1.as_ref(), &[]),
             Cw1155ExecuteMsg::ApproveAll {
                 operator: minter.clone(),
                 expires: None,
@@ -642,7 +637,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 transfer_msg.clone(),
             )
             .unwrap(),
@@ -691,7 +686,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::BatchMint {
                     to: user2.clone(),
                     batch: vec![(token2.clone(), 1u64.into()), (token3.clone(), 1u64.into())],
@@ -729,7 +724,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 batch_transfer_msg.clone(),
             ),
             Err(ContractError::Unauthorized {}),
@@ -739,7 +734,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(user2.clone(), &[]),
+            mock_info(user2.as_ref(), &[]),
             Cw1155ExecuteMsg::ApproveAll {
                 operator: minter.clone(),
                 expires: None,
@@ -752,7 +747,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 batch_transfer_msg,
             )
             .unwrap(),
@@ -797,7 +792,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(user1.clone(), &[]),
+            mock_info(user1.as_ref(), &[]),
             Cw1155ExecuteMsg::RevokeAll {
                 operator: minter.clone(),
             },
@@ -822,7 +817,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::SendFrom {
                     from: user1.clone(),
                     to: user2.clone(),
@@ -839,7 +834,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(user1.clone(), &[]),
+                mock_info(user1.as_ref(), &[]),
                 Cw1155ExecuteMsg::Burn {
                     from: user1.clone(),
                     token_id: token1.clone(),
@@ -863,7 +858,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(user1.clone(), &[]),
+                mock_info(user1.as_ref(), &[]),
                 Cw1155ExecuteMsg::BatchBurn {
                     from: user1.clone(),
                     batch: vec![(token2.clone(), 1u64.into()), (token3.clone(), 1u64.into())]
@@ -888,9 +883,9 @@ mod tests {
 
     #[test]
     fn check_send_contract() {
-        let receiver: HumanAddr = "receive_contract".into();
-        let minter: HumanAddr = "minter".into();
-        let user1: HumanAddr = "user1".into();
+        let receiver = Addr::unchecked("receive_contract");
+        let minter = Addr::unchecked("minter");
+        let user1 = Addr::unchecked("user1");
         let token1 = "token1".to_owned();
         let token2 = "token2".to_owned();
         let dummy_msg = Binary::default();
@@ -905,7 +900,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(minter.clone(), &[]),
+            mock_info(minter.as_ref(), &[]),
             Cw1155ExecuteMsg::Mint {
                 to: user1.clone(),
                 token_id: token2.clone(),
@@ -920,7 +915,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::Mint {
                     to: receiver.clone(),
                     token_id: token1.clone(),
@@ -954,7 +949,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(user1.clone(), &[]),
+                mock_info(user1.as_ref(), &[]),
                 Cw1155ExecuteMsg::BatchSendFrom {
                     from: user1.clone(),
                     to: receiver.clone(),
@@ -990,9 +985,9 @@ mod tests {
         // grant approval to multiple operators, and query them
         let tokens = (0..10).map(|i| format!("token{}", i)).collect::<Vec<_>>();
         let users = (0..10)
-            .map(|i| HumanAddr::from(format!("user{}", i)))
+            .map(|i| Addr::unchecked(format!("user{}", i)))
             .collect::<Vec<_>>();
-        let minter: HumanAddr = "minter".into();
+        let minter = Addr::unchecked("minter");
 
         let mut deps = mock_dependencies(&[]);
         let msg = InitMsg {
@@ -1004,7 +999,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            mock_info(minter.clone(), &[]),
+            mock_info(minter.as_ref(), &[]),
             Cw1155ExecuteMsg::BatchMint {
                 to: users[0].clone(),
                 batch: tokens
@@ -1075,7 +1070,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(users[0].clone(), &[]),
+                mock_info(users[0].as_ref(), &[]),
                 Cw1155ExecuteMsg::ApproveAll {
                     operator: user.clone(),
                     expires: None,
@@ -1091,13 +1086,13 @@ mod tests {
                 Cw1155QueryMsg::ApprovedForAll {
                     owner: users[0].clone(),
                     include_expired: None,
-                    start_after: Some("user2".into()),
+                    start_after: Some(Addr::unchecked("user2")),
                     limit: Some(1),
                 },
             ),
             to_binary(&ApprovedForAllResponse {
                 operators: vec![cw1155::Approval {
-                    // Not ordered in the same way as HumanAddr
+                    // Not ordered in the same way as Addr
                     spender: users[8].clone().into(),
                     expires: Expiration::Never {}
                 }],
@@ -1109,9 +1104,9 @@ mod tests {
     fn approval_expires() {
         let mut deps = mock_dependencies(&[]);
         let token1 = "token1".to_owned();
-        let minter: HumanAddr = "minter".into();
-        let user1: HumanAddr = "user1".into();
-        let user2: HumanAddr = "user2".into();
+        let minter = Addr::unchecked("minter");
+        let user1 = Addr::unchecked("user1");
+        let user2 = Addr::unchecked("user2");
 
         let env = {
             let mut env = mock_env();
@@ -1128,7 +1123,7 @@ mod tests {
         execute(
             deps.as_mut(),
             env.clone(),
-            mock_info(minter.clone(), &[]),
+            mock_info(minter.as_ref(), &[]),
             Cw1155ExecuteMsg::Mint {
                 to: user1.clone(),
                 token_id: token1.clone(),
@@ -1143,7 +1138,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 env.clone(),
-                mock_info(user1.clone(), &[]),
+                mock_info(user1.as_ref(), &[]),
                 Cw1155ExecuteMsg::ApproveAll {
                     operator: user2.clone(),
                     expires: Some(Expiration::AtHeight(5)),
@@ -1155,7 +1150,7 @@ mod tests {
         execute(
             deps.as_mut(),
             env.clone(),
-            mock_info(user1.clone(), &[]),
+            mock_info(user1.as_ref(), &[]),
             Cw1155ExecuteMsg::ApproveAll {
                 operator: user2.clone(),
                 expires: Some(Expiration::AtHeight(100)),
@@ -1188,8 +1183,8 @@ mod tests {
     fn mint_overflow() {
         let mut deps = mock_dependencies(&[]);
         let token1 = "token1".to_owned();
-        let minter: HumanAddr = "minter".into();
-        let user1: HumanAddr = "user1".into();
+        let minter = Addr::unchecked("minter");
+        let user1 = Addr::unchecked("user1");
 
         let env = mock_env();
         let msg = InitMsg {
@@ -1201,7 +1196,7 @@ mod tests {
         execute(
             deps.as_mut(),
             env.clone(),
-            mock_info(minter.clone(), &[]),
+            mock_info(minter.as_ref(), &[]),
             Cw1155ExecuteMsg::Mint {
                 to: user1.clone(),
                 token_id: token1.clone(),
@@ -1215,7 +1210,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 env.clone(),
-                mock_info(minter.clone(), &[]),
+                mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::Mint {
                     to: user1.clone(),
                     token_id: token1.clone(),

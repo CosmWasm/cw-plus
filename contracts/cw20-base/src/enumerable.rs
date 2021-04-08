@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, Deps, HumanAddr, Order, StdResult};
+use cosmwasm_std::{Addr, CanonicalAddr, Deps, Order, StdResult};
 use cw0::maybe_canonical;
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
@@ -11,11 +11,11 @@ const DEFAULT_LIMIT: u32 = 10;
 
 pub fn query_all_allowances(
     deps: Deps,
-    owner: HumanAddr,
-    start_after: Option<HumanAddr>,
+    owner: Addr,
+    start_after: Option<Addr>,
     limit: Option<u32>,
 ) -> StdResult<AllAllowancesResponse> {
-    let owner_raw = deps.api.canonical_address(&owner)?;
+    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let canon = maybe_canonical(deps.api, start_after)?;
     let start = canon.map(Bound::exclusive);
@@ -28,7 +28,7 @@ pub fn query_all_allowances(
         .map(|item| {
             let (k, v) = item?;
             Ok(AllowanceInfo {
-                spender: api.human_address(&CanonicalAddr::from(k))?,
+                spender: api.addr_humanize(&CanonicalAddr::from(k))?,
                 allowance: v.allowance,
                 expires: v.expires,
             })
@@ -41,7 +41,7 @@ pub fn query_all_allowances(
 
 pub fn query_all_accounts(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<Addr>,
     limit: Option<u32>,
 ) -> StdResult<AllAccountsResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
@@ -51,7 +51,7 @@ pub fn query_all_accounts(
     let api = &deps.api;
     let accounts: StdResult<Vec<_>> = BALANCES
         .keys(deps.storage, start, None, Order::Ascending)
-        .map(|key| api.human_address(&key.into()))
+        .map(|key| api.addr_humanize(&key.into()))
         .take(limit)
         .collect();
 
@@ -72,18 +72,18 @@ mod tests {
     use crate::msg::{ExecuteMsg, InstantiateMsg};
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, addr: &HumanAddr, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(mut deps: DepsMut, addr: &Addr, amount: Uint128) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
             initial_balances: vec![Cw20CoinHuman {
-                address: addr.into(),
+                address: addr.clone(),
                 amount,
             }],
             mint: None,
         };
-        let info = mock_info(&HumanAddr("creator".to_string()), &[]);
+        let info = mock_info("creator", &[]);
         let env = mock_env();
         instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         query_token_info(deps.as_ref()).unwrap()
@@ -93,12 +93,12 @@ mod tests {
     fn query_all_allowances_works() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let owner = HumanAddr::from("owner");
+        let owner = Addr::unchecked("owner");
         // these are in alphabetical order different than insert order
-        let spender1 = HumanAddr::from("later");
-        let spender2 = HumanAddr::from("earlier");
+        let spender1 = Addr::unchecked("later");
+        let spender2 = Addr::unchecked("earlier");
 
-        let info = mock_info(owner.clone(), &[]);
+        let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
 
@@ -129,7 +129,7 @@ mod tests {
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
-        // first one is spender1 (order of CanonicalAddr uncorrelated with HumanAddr)
+        // first one is spender1 (order of CanonicalAddr uncorrelated with Addr)
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, Some(1)).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
@@ -157,16 +157,16 @@ mod tests {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
         // insert order and lexographical order are different
-        let acct1 = HumanAddr::from("acct01");
-        let acct2 = HumanAddr::from("zebra");
-        let acct3 = HumanAddr::from("nice");
-        let acct4 = HumanAddr::from("aaaardvark");
+        let acct1 = Addr::unchecked("acct01");
+        let acct2 = Addr::unchecked("zebra");
+        let acct3 = Addr::unchecked("nice");
+        let acct4 = Addr::unchecked("aaaardvark");
         let expected_order = [acct2.clone(), acct1.clone(), acct3.clone(), acct4.clone()];
 
         do_instantiate(deps.as_mut(), &acct1, Uint128(12340000));
 
         // put money everywhere (to create balanaces)
-        let info = mock_info(acct1.clone(), &[]);
+        let info = mock_info(acct1.as_ref(), &[]);
         let env = mock_env();
         execute(
             deps.as_mut(),
