@@ -1,3 +1,4 @@
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Api, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order, Response, StdResult,
     Uint128, KV,
@@ -23,6 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 30;
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -42,6 +44,7 @@ pub struct ExecuteEnv<'a> {
     info: MessageInfo,
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -85,7 +88,9 @@ pub fn execute(
 
 /// When from is None: mint new coins
 /// When to is None: burn coins
-/// When both are None: not token balance is changed, meaningless but valid
+/// When both are None: no token balance is changed, pointless but valid
+///
+/// Make sure permissions are checked before calling this.
 fn execute_transfer_inner<'a>(
     deps: &'a mut DepsMut,
     from: Option<&'a HumanAddr>,
@@ -140,14 +145,6 @@ fn check_can_approve(
     })
 }
 
-fn guard(cond: bool, err: ContractError) -> Result<(), ContractError> {
-    if cond {
-        Ok(())
-    } else {
-        Err(err)
-    }
-}
-
 pub fn execute_send_from(
     env: ExecuteEnv,
     from: HumanAddr,
@@ -162,18 +159,17 @@ pub fn execute_send_from(
         info,
     } = env;
 
-    guard(
-        check_can_approve(deps.as_ref(), &env, &from, &info.sender)?,
-        ContractError::Unauthorized {},
-    )?;
+    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
+        return Err(ContractError::Unauthorized {});
+    }
 
     let mut rsp = Response::default();
 
     let event = execute_transfer_inner(&mut deps, Some(&from), Some(&to), &token_id, amount)?;
     event.add_attributes(&mut rsp);
 
-    rsp.messages = if let Some(msg) = msg {
-        vec![Cw1155ReceiveMsg {
+    if let Some(msg) = msg {
+        rsp.messages = vec![Cw1155ReceiveMsg {
             operator: info.sender,
             from: Some(from.clone()),
             amount,
@@ -181,9 +177,7 @@ pub fn execute_send_from(
             msg,
         }
         .into_cosmos_msg(to)?]
-    } else {
-        vec![]
-    };
+    }
 
     Ok(rsp)
 }
@@ -207,8 +201,8 @@ pub fn execute_mint(
     let event = execute_transfer_inner(&mut deps, None, Some(&to), &token_id, amount)?;
     event.add_attributes(&mut rsp);
 
-    rsp.messages = if let Some(msg) = msg {
-        vec![Cw1155ReceiveMsg {
+    if let Some(msg) = msg {
+        rsp.messages = vec![Cw1155ReceiveMsg {
             operator: info.sender,
             from: None,
             amount,
@@ -216,9 +210,7 @@ pub fn execute_mint(
             msg,
         }
         .into_cosmos_msg(to)?]
-    } else {
-        vec![]
-    };
+    }
 
     // insert if not exist
     let key = TOKENS.key(&token_id);
@@ -242,10 +234,9 @@ pub fn execute_burn(
     } = env;
 
     // whoever can transfer these tokens can burn
-    guard(
-        check_can_approve(deps.as_ref(), &env, &from, &info.sender)?,
-        ContractError::Unauthorized {},
-    )?;
+    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
+        return Err(ContractError::Unauthorized {});
+    }
 
     let mut rsp = Response::default();
     let event = execute_transfer_inner(&mut deps, Some(&from), None, &token_id, amount)?;
@@ -266,10 +257,9 @@ pub fn execute_batch_send_from(
         info,
     } = env;
 
-    guard(
-        check_can_approve(deps.as_ref(), &env, &from, &info.sender)?,
-        ContractError::Unauthorized {},
-    )?;
+    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
+        return Err(ContractError::Unauthorized {});
+    }
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.iter() {
@@ -277,16 +267,14 @@ pub fn execute_batch_send_from(
         event.add_attributes(&mut rsp);
     }
 
-    rsp.messages = if let Some(msg) = msg {
-        vec![Cw1155BatchReceiveMsg {
+    if let Some(msg) = msg {
+        rsp.messages = vec![Cw1155BatchReceiveMsg {
             operator: info.sender,
             from: Some(from),
             batch,
             msg,
         }
         .into_cosmos_msg(to)?]
-    } else {
-        vec![]
     };
 
     Ok(rsp)
@@ -309,26 +297,23 @@ pub fn execute_batch_mint(
     for (token_id, amount) in batch.iter() {
         let event = execute_transfer_inner(&mut deps, None, Some(&to), &token_id, *amount)?;
         event.add_attributes(&mut rsp);
-    }
 
-    for (token_id, _) in batch.iter() {
         // insert if not exist
         let key = TOKENS.key(&token_id);
         if deps.storage.get(&key).is_none() {
+            // insert an empty entry so token enumeration can find it
             key.save(deps.storage, &"".to_owned())?;
         }
     }
 
-    rsp.messages = if let Some(msg) = msg {
-        vec![Cw1155BatchReceiveMsg {
+    if let Some(msg) = msg {
+        rsp.messages = vec![Cw1155BatchReceiveMsg {
             operator: info.sender,
             from: None,
             batch,
             msg,
         }
         .into_cosmos_msg(to)?]
-    } else {
-        vec![]
     };
 
     Ok(rsp)
@@ -345,10 +330,9 @@ pub fn execute_batch_burn(
         env,
     } = env;
 
-    guard(
-        check_can_approve(deps.as_ref(), &env, &from, &info.sender)?,
-        ContractError::Unauthorized {},
-    )?;
+    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
+        return Err(ContractError::Unauthorized {});
+    }
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.into_iter() {
@@ -402,6 +386,7 @@ pub fn execute_revoke_all(env: ExecuteEnv, operator: HumanAddr) -> Result<Respon
     Ok(rsp)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
     match msg {
         Cw1155QueryMsg::Balance { owner, token_id } => {

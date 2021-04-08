@@ -1,17 +1,7 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_std::{CanonicalAddr, Uint128};
 use cw1155::Expiration;
 use cw_storage_plus::{Item, Map};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct Approval {
-    /// Account that can transfer/send the token
-    pub spender: CanonicalAddr,
-    /// When the Approval expires (maybe Expiration::never)
-    pub expires: Expiration,
-}
 /// Store the minter address who have permission to mint new tokens.
 pub const MINTER: Item<CanonicalAddr> = Item::new("minter");
 /// Store the balance map, `(owner, token_id) -> balance`

@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "cw1155-base"
-version = "0.6.0-alpha1"
+version = "0.6.0-alpha3"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
