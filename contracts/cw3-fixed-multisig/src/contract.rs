@@ -3,17 +3,17 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HumanAddr, MessageInfo, Order, Response, StdResult,
+    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    Response, StdResult,
 };
 
-use cw0::{maybe_canonical, Expiration};
+use cw0::Expiration;
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
-use cw_storage_plus::Bound;
+use cw_storage_plus::{AddrRef, Bound};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -55,8 +55,8 @@ pub fn instantiate(
 
     // add all voters
     for voter in msg.voters.iter() {
-        let key = deps.api.canonical_address(&voter.addr)?;
-        VOTERS.save(deps.storage, &key, &voter.weight)?;
+        let key = deps.api.addr_validate(&voter.addr)?;
+        VOTERS.save(deps.storage, AddrRef::new(&key), &voter.weight)?;
     }
     Ok(Response::default())
 }
@@ -92,9 +92,9 @@ pub fn execute_propose(
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
-    let raw_sender = deps.api.canonical_address(&info.sender)?;
+    let sender = AddrRef::new(&info.sender);
     let vote_power = VOTERS
-        .may_load(deps.storage, &raw_sender)?
+        .may_load(deps.storage, sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     let cfg = CONFIG.load(deps.storage)?;
@@ -133,7 +133,7 @@ pub fn execute_propose(
         weight: vote_power,
         vote: Vote::Yes,
     };
-    BALLOTS.save(deps.storage, (id.into(), &raw_sender), &ballot)?;
+    BALLOTS.save(deps.storage, (id.into(), sender), &ballot)?;
 
     Ok(Response {
         submessages: vec![],
@@ -156,9 +156,9 @@ pub fn execute_vote(
     vote: Vote,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
-    let raw_sender = deps.api.canonical_address(&info.sender)?;
+    let sender = AddrRef::new(&info.sender);
     let vote_power = VOTERS
-        .may_load(deps.storage, &raw_sender)?
+        .may_load(deps.storage, sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
@@ -173,7 +173,7 @@ pub fn execute_vote(
     // cast vote if no vote previously cast
     BALLOTS.update(
         deps.storage,
-        (proposal_id.into(), &raw_sender),
+        (proposal_id.into(), sender),
         |bal| match bal {
             Some(_) => Err(ContractError::AlreadyVoted {}),
             None => Ok(Ballot {
@@ -394,9 +394,11 @@ fn map_proposal(
     })
 }
 
-fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteResponse> {
-    let voter_raw = deps.api.canonical_address(&voter)?;
-    let ballot = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
+fn query_vote(deps: Deps, proposal_id: u64, voter: String) -> StdResult<VoteResponse> {
+    let ballot = BALLOTS.may_load(
+        deps.storage,
+        (proposal_id.into(), AddrRef::unchecked(&voter)),
+    )?;
     let vote = ballot.map(|b| VoteInfo {
         voter,
         vote: b.vote,
@@ -408,14 +410,12 @@ fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteR
 fn list_votes(
     deps: Deps,
     proposal_id: u64,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<VoteListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let start = start_after.map(Bound::exclusive);
 
-    let api = &deps.api;
     let votes: StdResult<Vec<_>> = BALLOTS
         .prefix(proposal_id.into())
         .range(deps.storage, start, None, Order::Ascending)
@@ -423,7 +423,7 @@ fn list_votes(
         .map(|item| {
             let (key, ballot) = item?;
             Ok(VoteInfo {
-                voter: api.human_address(&CanonicalAddr::from(key))?,
+                voter: String::from_utf8(key)?,
                 vote: ballot.vote,
                 weight: ballot.weight,
             })
@@ -433,29 +433,26 @@ fn list_votes(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
-    let voter_raw = deps.api.canonical_address(&voter)?;
-    let weight = VOTERS.may_load(deps.storage, &voter_raw)?;
+fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
+    let weight = VOTERS.may_load(deps.storage, AddrRef::unchecked(&voter))?;
     Ok(VoterResponse { weight })
 }
 
 fn list_voters(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let start = start_after.map(Bound::exclusive);
 
-    let api = &deps.api;
     let voters: StdResult<Vec<_>> = VOTERS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
             Ok(VoterDetail {
-                addr: api.human_address(&CanonicalAddr::from(key))?,
+                addr: String::from_utf8(key)?,
                 weight,
             })
         })
@@ -496,7 +493,7 @@ mod tests {
     const VOTER5: &str = "voter0005";
     const SOMEBODY: &str = "somebody";
 
-    fn voter<T: Into<HumanAddr>>(addr: T, weight: u64) -> Voter {
+    fn voter<T: Into<String>>(addr: T, weight: u64) -> Voter {
         Voter {
             addr: addr.into(),
             weight,

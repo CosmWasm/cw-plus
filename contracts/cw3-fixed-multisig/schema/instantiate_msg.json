@@ -38,7 +38,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -51,12 +52,10 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Voter": {
       "type": "object",
@@ -66,7 +65,7 @@
       ],
       "properties": {
         "addr": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "weight": {
           "type": "integer",
