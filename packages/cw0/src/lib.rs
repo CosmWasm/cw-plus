@@ -5,7 +5,8 @@ mod pagination;
 mod payment;
 
 pub use pagination::{
-    calc_range_end_human, calc_range_start_human, calc_range_start_string, maybe_canonical,
+    calc_range_end_human, calc_range_start_human, calc_range_start_string, maybe_addr,
+    maybe_canonical,
 };
 pub use payment::{may_pay, must_pay, nonpayable, one_coin, PaymentError};
 

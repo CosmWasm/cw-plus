@@ -5,6 +5,11 @@ pub fn maybe_canonical(api: &dyn Api, human: Option<Addr>) -> StdResult<Option<C
     human.map(|x| api.addr_canonicalize(x.as_ref())).transpose()
 }
 
+// This is used for pagination. Maybe we move it into the std lib one day?
+pub fn maybe_addr(api: &dyn Api, human: Option<String>) -> StdResult<Option<Addr>> {
+    human.map(|x| api.addr_validate(&x)).transpose()
+}
+
 // this will set the first key after the provided key, by appending a 0 byte
 pub fn calc_range_start_human(
     api: &dyn Api,
