@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
+use cosmwasm_std::{CosmosMsg, Empty, Addr};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -14,7 +14,7 @@ where
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// from the given sender, before any further state changes, should also succeed.
     CanExecute {
-        sender: HumanAddr,
+        sender: Addr,
         msg: CosmosMsg<T>,
     },
 }

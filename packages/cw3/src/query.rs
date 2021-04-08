@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{CosmosMsg, Decimal, Empty, HumanAddr};
+use cosmwasm_std::{CosmosMsg, Decimal, Empty, Addr};
 use cw0::Expiration;
 
 use crate::msg::Vote;
@@ -31,20 +31,20 @@ pub enum Cw3QueryMsg {
     /// Query the vote made by the given voter on `proposal_id`. This should
     /// return an error if there is no such proposal. It will return a None value
     /// if the proposal exists but the voter did not vote. Returns VoteResponse
-    Vote { proposal_id: u64, voter: HumanAddr },
+    Vote { proposal_id: u64, voter: Addr },
     /// Iterate (with pagination) over all votes for this proposal. The ordering is arbitrary,
-    /// unlikely to be sorted by HumanAddr. But ordering is consistent and pagination from the end
+    /// unlikely to be sorted by Addr. But ordering is consistent and pagination from the end
     /// of each page will cover all votes for the proposal. Returns VoteListResponse
     ListVotes {
         proposal_id: u64,
-        start_after: Option<HumanAddr>,
+        start_after: Option<Addr>,
         limit: Option<u32>,
     },
     /// Voter extension: Returns VoterResponse
-    Voter { address: HumanAddr },
+    Voter { address: Addr },
     /// ListVoters extension: Returns VoterListResponse
     ListVoters {
-        start_after: Option<HumanAddr>,
+        start_after: Option<Addr>,
         limit: Option<u32>,
     },
 }
@@ -168,7 +168,7 @@ pub struct VoteListResponse {
 /// the address of the voter who submitted it
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteInfo {
-    pub voter: HumanAddr,
+    pub voter: Addr,
     pub vote: Vote,
     pub weight: u64,
 }
@@ -190,6 +190,6 @@ pub struct VoterListResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoterDetail {
-    pub addr: HumanAddr,
+    pub addr: Addr,
     pub weight: u64,
 }
