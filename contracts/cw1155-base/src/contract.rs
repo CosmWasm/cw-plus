@@ -145,6 +145,19 @@ fn check_can_approve(
     })
 }
 
+fn guard_can_approve(
+    deps: Deps,
+    env: &Env,
+    owner: &HumanAddr,
+    operator: &HumanAddr,
+) -> Result<(), ContractError> {
+    if !check_can_approve(deps, env, owner, operator)? {
+        Err(ContractError::Unauthorized {})
+    } else {
+        Ok(())
+    }
+}
+
 pub fn execute_send_from(
     env: ExecuteEnv,
     from: HumanAddr,
@@ -159,9 +172,7 @@ pub fn execute_send_from(
         info,
     } = env;
 
-    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
-        return Err(ContractError::Unauthorized {});
-    }
+    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
 
     let mut rsp = Response::default();
 
@@ -234,9 +245,7 @@ pub fn execute_burn(
     } = env;
 
     // whoever can transfer these tokens can burn
-    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
-        return Err(ContractError::Unauthorized {});
-    }
+    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
 
     let mut rsp = Response::default();
     let event = execute_transfer_inner(&mut deps, Some(&from), None, &token_id, amount)?;
@@ -257,9 +266,7 @@ pub fn execute_batch_send_from(
         info,
     } = env;
 
-    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
-        return Err(ContractError::Unauthorized {});
-    }
+    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.iter() {
@@ -330,9 +337,7 @@ pub fn execute_batch_burn(
         env,
     } = env;
 
-    if !check_can_approve(deps.as_ref(), &env, &from, &info.sender)? {
-        return Err(ContractError::Unauthorized {});
-    }
+    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.into_iter() {
