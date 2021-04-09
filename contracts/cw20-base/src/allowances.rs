@@ -274,7 +274,7 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, CosmosMsg, WasmMsg};
-    use cw20::{Cw20CoinHuman, TokenInfoResponse};
+    use cw20::{Cw20Coin, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
     use crate::msg::{ExecuteMsg, InstantiateMsg};
@@ -284,13 +284,17 @@ mod tests {
     }
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, addr: &String, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate<T: Into<String>>(
+        mut deps: DepsMut,
+        addr: T,
+        amount: Uint128,
+    ) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
-            initial_balances: vec![Cw20CoinHuman {
-                address: addr.clone(),
+            initial_balances: vec![Cw20Coin {
+                address: addr.into(),
                 amount,
             }],
             mint: None,
@@ -305,11 +309,11 @@ mod tests {
     fn increase_decrease_allowances() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let owner = Addr::unchecked("addr0001");
-        let spender = Addr::unchecked("addr0002");
+        let owner = String::from("addr0001");
+        let spender = String::from("addr0002");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
+        do_instantiate(deps.as_mut(), owner.clone(), Uint128(12340000));
 
         // no allowance to start
         let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
@@ -387,9 +391,9 @@ mod tests {
     fn allowances_independent() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let owner = Addr::unchecked("addr0001");
-        let spender = Addr::unchecked("addr0002");
-        let spender2 = Addr::unchecked("addr0003");
+        let owner = String::from("addr0001");
+        let spender = String::from("addr0002");
+        let spender2 = String::from("addr0003");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
@@ -482,7 +486,7 @@ mod tests {
     fn no_self_allowance() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let owner = Addr::unchecked("addr0001");
+        let owner = String::from("addr0001");
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
         do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
@@ -509,9 +513,9 @@ mod tests {
     #[test]
     fn transfer_from_respects_limits() {
         let mut deps = mock_dependencies(&[]);
-        let owner = Addr::unchecked("addr0001");
-        let spender = Addr::unchecked("addr0002");
-        let rcpt = Addr::unchecked("addr0003");
+        let owner = String::from("addr0001");
+        let spender = String::from("addr0002");
+        let rcpt = String::from("addr0003");
 
         let start = Uint128(999999);
         do_instantiate(deps.as_mut(), &owner, start);
@@ -590,8 +594,8 @@ mod tests {
     #[test]
     fn burn_from_respects_limits() {
         let mut deps = mock_dependencies(&[]);
-        let owner = Addr::unchecked("addr0001");
-        let spender = Addr::unchecked("addr0002");
+        let owner = String::from("addr0001");
+        let spender = String::from("addr0002");
 
         let start = Uint128(999999);
         do_instantiate(deps.as_mut(), &owner, start);
@@ -666,9 +670,9 @@ mod tests {
     #[test]
     fn send_from_respects_limits() {
         let mut deps = mock_dependencies(&[]);
-        let owner = Addr::unchecked("addr0001");
-        let spender = Addr::unchecked("addr0002");
-        let contract = Addr::unchecked("cool-dex");
+        let owner = String::from("addr0001");
+        let spender = String::from("addr0002");
+        let contract = String::from("cool-dex");
         let send_msg = Binary::from(r#"{"some":123}"#.as_bytes());
 
         let start = Uint128(999999);

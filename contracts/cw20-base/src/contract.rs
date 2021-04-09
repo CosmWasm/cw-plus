@@ -346,16 +346,16 @@ mod tests {
 
     use super::*;
 
-    fn get_balance<T: Into<Addr>>(deps: Deps, address: T) -> Uint128 {
+    fn get_balance<T: Into<String>>(deps: Deps, address: T) -> Uint128 {
         query_balance(deps, address.into()).unwrap().balance
     }
 
     // this will set up the instantiation for other tests
     fn do_instantiate_with_minter(
         deps: DepsMut,
-        addr: &Addr,
+        addr: &String,
         amount: Uint128,
-        minter: &Addr,
+        minter: &String,
         cap: Option<Uint128>,
     ) -> TokenInfoResponse {
         _do_instantiate(
@@ -370,14 +370,14 @@ mod tests {
     }
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(deps: DepsMut, addr: &Addr, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(deps: DepsMut, addr: &String, amount: Uint128) -> TokenInfoResponse {
         _do_instantiate(deps, addr, amount, None)
     }
 
     // this will set up the instantiation for other tests
     fn _do_instantiate(
         mut deps: DepsMut,
-        addr: &Addr,
+        addr: &String,
         amount: Uint128,
         mint: Option<MinterResponse>,
     ) -> TokenInfoResponse {
@@ -420,7 +420,7 @@ mod tests {
             symbol: "CASH".to_string(),
             decimals: 9,
             initial_balances: vec![Cw20Coin {
-                address: Addr::unchecked("addr0000"),
+                address: String::from("addr0000"),
                 amount,
             }],
             mint: None,
@@ -439,24 +439,21 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(
-            get_balance(deps.as_ref(), Addr::unchecked("addr0000")),
-            Uint128(11223344)
-        );
+        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
     }
 
     #[test]
     fn instantiate_mintable() {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128(11223344);
-        let minter = Addr::unchecked("asmodat");
+        let minter = String::from("asmodat");
         let limit = Uint128(511223344);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
             initial_balances: vec![Cw20Coin {
-                address: Addr::unchecked("addr0000"),
+                address: "addr0000".into(),
                 amount,
             }],
             mint: Some(MinterResponse {
@@ -478,10 +475,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(
-            get_balance(deps.as_ref(), Addr::unchecked("addr0000")),
-            Uint128(11223344)
-        );
+        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
         assert_eq!(
             query_minter(deps.as_ref()).unwrap(),
             Some(MinterResponse {
@@ -495,14 +489,14 @@ mod tests {
     fn instantiate_mintable_over_cap() {
         let mut deps = mock_dependencies(&[]);
         let amount = Uint128(11223344);
-        let minter = Addr::unchecked("asmodat");
+        let minter = String::from("asmodat");
         let limit = Uint128(11223300);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
             decimals: 9,
             initial_balances: vec![Cw20Coin {
-                address: Addr::unchecked("addr0000"),
+                address: String::from("addr0000"),
                 amount,
             }],
             mint: Some(MinterResponse {
@@ -524,14 +518,14 @@ mod tests {
     fn can_mint_by_minter() {
         let mut deps = mock_dependencies(&[]);
 
-        let genesis = Addr::unchecked("genesis");
+        let genesis = String::from("genesis");
         let amount = Uint128(11223344);
-        let minter = Addr::unchecked("asmodat");
+        let minter = String::from("asmodat");
         let limit = Uint128(511223344);
         do_instantiate_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
-        let winner = Addr::unchecked("lucky");
+        let winner = String::from("lucky");
         let prize = Uint128(222_222_222);
         let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
@@ -572,14 +566,14 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
         do_instantiate_with_minter(
             deps.as_mut(),
-            &Addr::unchecked("genesis"),
+            &String::from("genesis"),
             Uint128(1234),
-            &Addr::unchecked("minter"),
+            &String::from("minter"),
             None,
         );
 
         let msg = ExecuteMsg::Mint {
-            recipient: Addr::unchecked("lucky"),
+            recipient: String::from("lucky"),
             amount: Uint128(222),
         };
         let info = mock_info("anyone else", &[]);
@@ -591,10 +585,10 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies(&[]);
-        do_instantiate(deps.as_mut(), &Addr::unchecked("genesis"), Uint128(1234));
+        do_instantiate(deps.as_mut(), &String::from("genesis"), Uint128(1234));
 
         let msg = ExecuteMsg::Mint {
-            recipient: Addr::unchecked("lucky"),
+            recipient: String::from("lucky"),
             amount: Uint128(222),
         };
         let info = mock_info("genesis", &[]);
@@ -607,9 +601,9 @@ mod tests {
     fn instantiate_multiple_accounts() {
         let mut deps = mock_dependencies(&[]);
         let amount1 = Uint128::from(11223344u128);
-        let addr1 = Addr::unchecked("addr0001");
+        let addr1 = String::from("addr0001");
         let amount2 = Uint128::from(7890987u128);
-        let addr2 = Addr::unchecked("addr0002");
+        let addr2 = String::from("addr0002");
         let instantiate_msg = InstantiateMsg {
             name: "Bash Shell".to_string(),
             symbol: "BASH".to_string(),
@@ -647,7 +641,7 @@ mod tests {
     #[test]
     fn queries_work() {
         let mut deps = mock_dependencies(&coins(2, "token"));
-        let addr1 = Addr::unchecked("addr0001");
+        let addr1 = String::from("addr0001");
         let amount1 = Uint128::from(12340000u128);
 
         let expected = do_instantiate(deps.as_mut(), &addr1, amount1);
@@ -675,7 +669,7 @@ mod tests {
             deps.as_ref(),
             env.clone(),
             QueryMsg::Balance {
-                address: Addr::unchecked("addr0002"),
+                address: String::from("addr0002"),
             },
         )
         .unwrap();
@@ -686,8 +680,8 @@ mod tests {
     #[test]
     fn transfer() {
         let mut deps = mock_dependencies(&coins(2, "token"));
-        let addr1 = Addr::unchecked("addr0001");
-        let addr2 = Addr::unchecked("addr0002");
+        let addr1 = String::from("addr0001");
+        let addr2 = String::from("addr0002");
         let amount1 = Uint128::from(12340000u128);
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
@@ -746,7 +740,7 @@ mod tests {
     #[test]
     fn burn() {
         let mut deps = mock_dependencies(&coins(2, "token"));
-        let addr1 = Addr::unchecked("addr0001");
+        let addr1 = String::from("addr0001");
         let amount1 = Uint128::from(12340000u128);
         let burn = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);
@@ -795,8 +789,8 @@ mod tests {
     #[test]
     fn send() {
         let mut deps = mock_dependencies(&coins(2, "token"));
-        let addr1 = Addr::unchecked("addr0001");
-        let contract = Addr::unchecked("addr0002");
+        let addr1 = String::from("addr0001");
+        let contract = String::from("addr0002");
         let amount1 = Uint128::from(12340000u128);
         let transfer = Uint128::from(76543u128);
         let too_much = Uint128::from(12340321u128);

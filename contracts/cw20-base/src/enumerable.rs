@@ -61,7 +61,7 @@ mod tests {
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, DepsMut, Uint128};
-    use cw20::{Cw20CoinHuman, Expiration, TokenInfoResponse};
+    use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_token_info};
     use crate::msg::{ExecuteMsg, InstantiateMsg};
@@ -72,8 +72,8 @@ mod tests {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
             decimals: 3,
-            initial_balances: vec![Cw20CoinHuman {
-                address: addr.clone(),
+            initial_balances: vec![Cw20Coin {
+                address: addr.into(),
                 amount,
             }],
             mint: None,
@@ -88,10 +88,10 @@ mod tests {
     fn query_all_allowances_works() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        let owner = String::unchecked("owner");
-        // these are in alphabetical order different than insert order
-        let spender1 = String::unchecked("later");
-        let spender2 = String::unchecked("earlier");
+        let owner = String::from("owner");
+        // these are in alphabetical order same than insert order
+        let spender1 = String::from("earlier");
+        let spender2 = String::from("later");
 
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
@@ -151,12 +151,12 @@ mod tests {
     fn query_all_accounts_works() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
-        // insert order and lexographical order are different
-        let acct1 = String::unchecked("acct01");
-        let acct2 = String::unchecked("zebra");
-        let acct3 = String::unchecked("nice");
-        let acct4 = String::unchecked("aaaardvark");
-        let expected_order = [acct2.clone(), acct1.clone(), acct3.clone(), acct4.clone()];
+        // insert order and lexicographical order are different
+        let acct1 = String::from("acct01");
+        let acct2 = String::from("zebra");
+        let acct3 = String::from("nice");
+        let acct4 = String::from("aaaardvark");
+        let expected_order = [acct4.clone(), acct1.clone(), acct3.clone(), acct2.clone()];
 
         do_instantiate(deps.as_mut(), &acct1, Uint128(12340000));
 
