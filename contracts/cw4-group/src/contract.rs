@@ -582,8 +582,6 @@ mod tests {
         assert_eq!(6, member2);
 
         // and execute misses
-        // let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
-        // let member3_raw = deps.storage.get(&member_key(&member3_canon));
         let member3_raw = deps.storage.get(&member_key(USER3.as_ref()));
         assert_eq!(None, member3_raw);
     }
