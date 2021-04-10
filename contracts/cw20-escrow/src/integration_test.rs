@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{coins, to_binary, Empty, HumanAddr, Uint128};
-use cw20::{Cw20CoinHuman, Cw20Contract, Cw20ExecuteMsg};
+use cosmwasm_std::{coins, to_binary, Addr, Empty, Uint128};
+use cw20::{Cw20Coin, Cw20Contract, Cw20ExecuteMsg};
 use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
 
 use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
@@ -39,7 +39,7 @@ fn escrow_happy_path_cw20_tokens() {
     let mut router = mock_app();
 
     // set personal balance
-    let owner = HumanAddr::from("owner");
+    let owner = Addr::unchecked("owner");
     let init_funds = coins(2000, "btc");
     router
         .set_bank_balance(owner.clone(), init_funds.clone())
@@ -51,20 +51,20 @@ fn escrow_happy_path_cw20_tokens() {
         name: "Cash Money".to_string(),
         symbol: "CASH".to_string(),
         decimals: 2,
-        initial_balances: vec![Cw20CoinHuman {
-            address: owner.clone(),
+        initial_balances: vec![Cw20Coin {
+            address: owner.to_string(),
             amount: Uint128(5000),
         }],
         mint: None,
     };
     let cash_addr = router
-        .instantiate_contract(cw20_id, &owner, &msg, &[], "CASH")
+        .instantiate_contract(cw20_id, owner.clone(), &msg, &[], "CASH")
         .unwrap();
 
     // set up reflect contract
     let escrow_id = router.store_code(contract_escrow());
     let escrow_addr = router
-        .instantiate_contract(escrow_id, &owner, &InstantiateMsg {}, &[], "Escrow")
+        .instantiate_contract(escrow_id, owner.clone(), &InstantiateMsg {}, &[], "Escrow")
         .unwrap();
 
     // they are different
@@ -80,12 +80,12 @@ fn escrow_happy_path_cw20_tokens() {
     assert_eq!(escrow_balance, Uint128(0));
 
     // send some tokens to create an escrow
-    let arb = HumanAddr::from("arbiter");
-    let ben = HumanAddr::from("beneficiary");
+    let arb = Addr::unchecked("arbiter");
+    let ben = String::from("beneficiary");
     let id = "demo".to_string();
     let create_msg = ReceiveMsg::Create(CreateMsg {
         id: id.clone(),
-        arbiter: arb.clone(),
+        arbiter: arb.to_string(),
         recipient: ben.clone(),
         end_height: None,
         end_time: None,
@@ -93,12 +93,12 @@ fn escrow_happy_path_cw20_tokens() {
     });
     let create_bin = to_binary(&create_msg).unwrap();
     let send_msg = Cw20ExecuteMsg::Send {
-        contract: escrow_addr.clone(),
+        contract: escrow_addr.to_string(),
         amount: Uint128(1200),
         msg: Some(create_bin),
     };
     let res = router
-        .execute_contract(&owner, &cash_addr, &send_msg, &[])
+        .execute_contract(owner.clone(), cash_addr.clone(), &send_msg, &[])
         .unwrap();
     println!("{:?}", res.attributes);
     assert_eq!(6, res.attributes.len());
@@ -118,8 +118,8 @@ fn escrow_happy_path_cw20_tokens() {
     assert_eq!(arb, details.arbiter);
     assert_eq!(ben, details.recipient);
     assert_eq!(
-        vec![Cw20CoinHuman {
-            address: cash_addr.clone(),
+        vec![Cw20Coin {
+            address: cash_addr.to_string(),
             amount: Uint128(1200)
         }],
         details.cw20_balance
@@ -128,13 +128,13 @@ fn escrow_happy_path_cw20_tokens() {
     // release escrow
     let approve_msg = ExecuteMsg::Approve { id: id.clone() };
     let _ = router
-        .execute_contract(&arb, &escrow_addr, &approve_msg, &[])
+        .execute_contract(arb, escrow_addr.clone(), &approve_msg, &[])
         .unwrap();
 
     // ensure balances updated - release to ben
     let owner_balance = cash.balance(&router, owner.clone()).unwrap();
     assert_eq!(owner_balance, Uint128(3800));
-    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    let escrow_balance = cash.balance(&router, escrow_addr).unwrap();
     assert_eq!(escrow_balance, Uint128(0));
     let ben_balance = cash.balance(&router, ben.clone()).unwrap();
     assert_eq!(ben_balance, Uint128(1200));
