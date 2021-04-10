@@ -33,14 +33,12 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let res = deps.api.addr_validate(&msg.group_addr);
-    if res.is_err() {
-        return Err(ContractError::InvalidGroup {
-            addr: msg.group_addr,
-        });
-    }
-    let group = Cw4Contract(res.unwrap());
-    let total_weight = group.total_weight(&deps.querier)?;
+    let group_addr = Cw4Contract(deps.api.addr_validate(&msg.group_addr).map_err(|_| {
+        ContractError::InvalidGroup {
+            addr: msg.group_addr.clone(),
+        }
+    })?);
+    let total_weight = group_addr.total_weight(&deps.querier)?;
     msg.threshold.validate(total_weight)?;
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -48,7 +46,7 @@ pub fn instantiate(
     let cfg = Config {
         threshold: msg.threshold,
         max_voting_period: msg.max_voting_period,
-        group_addr: group,
+        group_addr,
     };
     CONFIG.save(deps.storage, &cfg)?;
 
