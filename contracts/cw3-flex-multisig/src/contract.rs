@@ -3,11 +3,11 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HumanAddr, MessageInfo, Order, Response, StdResult,
+    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    Response, StdResult,
 };
 
-use cw0::{maybe_canonical, Expiration};
+use cw0::{maybe_addr, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
@@ -33,14 +33,13 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    // we just convert to canonical to check if this is a valid format
-    if deps.api.canonical_address(&msg.group_addr).is_err() {
+    let res = deps.api.addr_validate(&msg.group_addr);
+    if res.is_err() {
         return Err(ContractError::InvalidGroup {
             addr: msg.group_addr,
         });
     }
-
-    let group = Cw4Contract(msg.group_addr);
+    let group = Cw4Contract(res.unwrap());
     let total_weight = group.total_weight(&deps.querier)?;
     msg.threshold.validate(total_weight)?;
 
@@ -90,12 +89,11 @@ pub fn execute_propose(
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
-    let raw_sender = deps.api.canonical_address(&info.sender)?;
     let cfg = CONFIG.load(deps.storage)?;
 
     let vote_power = cfg
         .group_addr
-        .is_member(&deps.querier, &raw_sender)?
+        .is_member(&deps.querier, &info.sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     // max expires also used as default
@@ -129,7 +127,7 @@ pub fn execute_propose(
         weight: vote_power,
         vote: Vote::Yes,
     };
-    BALLOTS.save(deps.storage, (id.into(), &raw_sender), &ballot)?;
+    BALLOTS.save(deps.storage, (id.into(), info.sender.as_ref()), &ballot)?;
 
     Ok(Response {
         submessages: vec![],
@@ -152,7 +150,6 @@ pub fn execute_vote(
     vote: Vote,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
-    let raw_sender = deps.api.canonical_address(&info.sender)?;
     let cfg = CONFIG.load(deps.storage)?;
 
     // ensure proposal exists and can be voted on
@@ -173,7 +170,7 @@ pub fn execute_vote(
     // cast vote if no vote previously cast
     BALLOTS.update(
         deps.storage,
-        (proposal_id.into(), &raw_sender),
+        (proposal_id.into(), &info.sender.as_ref()),
         |bal| match bal {
             Some(_) => Err(ContractError::AlreadyVoted {}),
             None => Ok(Ballot {
@@ -386,9 +383,9 @@ fn map_proposal(
     })
 }
 
-fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteResponse> {
-    let voter_raw = deps.api.canonical_address(&voter)?;
-    let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_raw))?;
+fn query_vote(deps: Deps, proposal_id: u64, voter: String) -> StdResult<VoteResponse> {
+    let voter_addr = deps.api.addr_validate(&voter)?;
+    let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), voter_addr.as_ref()))?;
     let vote = prop.map(|b| VoteInfo {
         voter,
         vote: b.vote,
@@ -400,22 +397,21 @@ fn query_vote(deps: Deps, proposal_id: u64, voter: HumanAddr) -> StdResult<VoteR
 fn list_votes(
     deps: Deps,
     proposal_id: u64,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<VoteListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let addr = maybe_addr(deps.api, start_after)?;
+    let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let api = &deps.api;
     let votes: StdResult<Vec<_>> = BALLOTS
         .prefix(proposal_id.into())
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
-            let (key, ballot) = item?;
+            let (voter, ballot) = item?;
             Ok(VoteInfo {
-                voter: api.human_address(&CanonicalAddr::from(key))?,
+                voter: String::from_utf8(voter)?,
                 vote: ballot.vote,
                 weight: ballot.weight,
             })
@@ -425,17 +421,17 @@ fn list_votes(
     Ok(VoteListResponse { votes: votes? })
 }
 
-fn query_voter(deps: Deps, voter: HumanAddr) -> StdResult<VoterResponse> {
+fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
     let cfg = CONFIG.load(deps.storage)?;
-    let voter_raw = deps.api.canonical_address(&voter)?;
-    let weight = cfg.group_addr.is_member(&deps.querier, &voter_raw)?;
+    let voter_addr = deps.api.addr_validate(&voter)?;
+    let weight = cfg.group_addr.is_member(&deps.querier, &voter_addr)?;
 
     Ok(VoterResponse { weight })
 }
 
 fn list_voters(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<VoterListResponse> {
     let cfg = CONFIG.load(deps.storage)?;
@@ -454,7 +450,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-    use cosmwasm_std::{coin, coins, BankMsg, Coin, Decimal};
+    use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal};
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
@@ -473,7 +469,7 @@ mod tests {
     const VOTER5: &str = "voter0005";
     const SOMEBODY: &str = "somebody";
 
-    fn member<T: Into<HumanAddr>>(addr: T, weight: u64) -> Member {
+    fn member<T: Into<String>>(addr: T, weight: u64) -> Member {
         Member {
             addr: addr.into(),
             weight,
@@ -507,7 +503,7 @@ mod tests {
     }
 
     // uploads code and returns address of group contract
-    fn instantiate_group(app: &mut App, members: Vec<Member>) -> HumanAddr {
+    fn instantiate_group(app: &mut App, members: Vec<Member>) -> Addr {
         let group_id = app.store_code(contract_group());
         let msg = cw4_group::msg::InstantiateMsg {
             admin: Some(OWNER.into()),
