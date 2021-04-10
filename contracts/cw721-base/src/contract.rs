@@ -1,11 +1,11 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Api, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair,
-    Response, StdError, StdResult,
+    attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
+    StdError, StdResult,
 };
 
-use cw0::maybe_canonical;
+use cw0::maybe_addr;
 use cw2::set_contract_version;
 use cw721::{
     AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Cw721ReceiveMsg, Expiration,
@@ -37,7 +37,7 @@ pub fn instantiate(
         symbol: msg.symbol,
     };
     CONTRACT_INFO.save(deps.storage, &info)?;
-    let minter = deps.api.addr_canonicalize(msg.minter.as_ref())?;
+    let minter = deps.api.addr_validate(&msg.minter)?;
     MINTER.save(deps.storage, &minter)?;
     Ok(Response::default())
 }
@@ -82,15 +82,14 @@ pub fn execute_mint(
     msg: MintMsg,
 ) -> Result<Response, ContractError> {
     let minter = MINTER.load(deps.storage)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
 
-    if sender_raw != minter {
+    if info.sender != minter {
         return Err(ContractError::Unauthorized {});
     }
 
     // create the token
     let token = TokenInfo {
-        owner: deps.api.addr_canonicalize(msg.owner.as_ref())?,
+        owner: deps.api.addr_validate(&msg.owner)?,
         approvals: vec![],
         name: msg.name,
         description: msg.description.unwrap_or_default(),
@@ -119,7 +118,7 @@ pub fn execute_transfer_nft(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    recipient: Addr,
+    recipient: String,
     token_id: String,
 ) -> Result<Response, ContractError> {
     _transfer_nft(deps, &env, &info, &recipient, &token_id)?;
@@ -141,7 +140,7 @@ pub fn execute_send_nft(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    contract: Addr,
+    contract: String,
     token_id: String,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
@@ -149,7 +148,7 @@ pub fn execute_send_nft(
     _transfer_nft(deps, &env, &info, &contract, &token_id)?;
 
     let send = Cw721ReceiveMsg {
-        sender: info.sender.clone(),
+        sender: info.sender.to_string(),
         token_id: token_id.clone(),
         msg,
     };
@@ -172,14 +171,14 @@ pub fn _transfer_nft(
     deps: DepsMut,
     env: &Env,
     info: &MessageInfo,
-    recipient: &Addr,
+    recipient: &str,
     token_id: &str,
 ) -> Result<TokenInfo, ContractError> {
     let mut token = tokens().load(deps.storage, &token_id)?;
     // ensure we have permissions
     check_can_send(deps.as_ref(), env, info, &token)?;
     // set owner and remove existing approvals
-    token.owner = deps.api.addr_canonicalize(recipient.as_ref())?;
+    token.owner = deps.api.addr_validate(recipient)?;
     token.approvals = vec![];
     tokens().save(deps.storage, &token_id, &token)?;
     Ok(token)
@@ -189,7 +188,7 @@ pub fn execute_approve(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    spender: Addr,
+    spender: String,
     token_id: String,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
@@ -212,7 +211,7 @@ pub fn execute_revoke(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    spender: Addr,
+    spender: String,
     token_id: String,
 ) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
@@ -234,7 +233,7 @@ pub fn _update_approvals(
     deps: DepsMut,
     env: &Env,
     info: &MessageInfo,
-    spender: &Addr,
+    spender: &str,
     token_id: &str,
     // if add == false, remove. if add == true, remove then set with this expiration
     add: bool,
@@ -245,11 +244,11 @@ pub fn _update_approvals(
     check_can_approve(deps.as_ref(), env, info, &token)?;
 
     // update the approval list (remove any for the same spender before adding)
-    let spender_raw = deps.api.addr_canonicalize(&spender.as_ref())?;
+    let spender_addr = deps.api.addr_validate(spender)?;
     token.approvals = token
         .approvals
         .into_iter()
-        .filter(|apr| apr.spender != spender_raw)
+        .filter(|apr| apr.spender != spender_addr)
         .collect();
 
     // only difference between approve and revoke
@@ -260,7 +259,7 @@ pub fn _update_approvals(
             return Err(ContractError::Expired {});
         }
         let approval = Approval {
-            spender: spender_raw,
+            spender: spender_addr,
             expires,
         };
         token.approvals.push(approval);
@@ -275,7 +274,7 @@ pub fn execute_approve_all(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    operator: Addr,
+    operator: String,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
     // reject expired data as invalid
@@ -285,9 +284,12 @@ pub fn execute_approve_all(
     }
 
     // set the operator for us
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
-    OPERATORS.save(deps.storage, (&sender_raw, &operator_raw), &expires)?;
+    let operator_addr = deps.api.addr_validate(&operator)?;
+    OPERATORS.save(
+        deps.storage,
+        (info.sender.as_ref(), operator_addr.as_ref()),
+        &expires,
+    )?;
 
     Ok(Response {
         submessages: vec![],
@@ -305,11 +307,10 @@ pub fn execute_revoke_all(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    operator: Addr,
+    operator: String,
 ) -> Result<Response, ContractError> {
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
-    OPERATORS.remove(deps.storage, (&sender_raw, &operator_raw));
+    let operator_addr = deps.api.addr_validate(operator.as_ref())?;
+    OPERATORS.remove(deps.storage, (info.sender.as_ref(), operator_addr.as_ref()));
 
     Ok(Response {
         submessages: vec![],
@@ -331,12 +332,11 @@ fn check_can_approve(
     token: &TokenInfo,
 ) -> Result<(), ContractError> {
     // owner can approve
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    if token.owner == sender_raw {
+    if token.owner == info.sender {
         return Ok(());
     }
     // operator can approve
-    let op = OPERATORS.may_load(deps.storage, (&token.owner, &sender_raw))?;
+    let op = OPERATORS.may_load(deps.storage, (token.owner.as_ref(), info.sender.as_ref()))?;
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
@@ -357,8 +357,7 @@ fn check_can_send(
     token: &TokenInfo,
 ) -> Result<(), ContractError> {
     // owner can send
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    if token.owner == sender_raw {
+    if token.owner == info.sender {
         return Ok(());
     }
 
@@ -366,13 +365,13 @@ fn check_can_send(
     if token
         .approvals
         .iter()
-        .any(|apr| apr.spender == sender_raw && !apr.expires.is_expired(&env.block))
+        .any(|apr| apr.spender == info.sender && !apr.expires.is_expired(&env.block))
     {
         return Ok(());
     }
 
     // operator can send
-    let op = OPERATORS.may_load(deps.storage, (&token.owner, &sender_raw))?;
+    let op = OPERATORS.may_load(deps.storage, (token.owner.as_ref(), info.sender.as_ref()))?;
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
@@ -435,9 +434,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 fn query_minter(deps: Deps) -> StdResult<MinterResponse> {
-    let minter_raw = MINTER.load(deps.storage)?;
-    let minter = deps.api.addr_humanize(&minter_raw)?;
-    Ok(MinterResponse { minter })
+    let minter_addr = MINTER.load(deps.storage)?;
+    Ok(MinterResponse {
+        minter: minter_addr.to_string(),
+    })
 }
 
 fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
@@ -466,8 +466,8 @@ fn query_owner_of(
 ) -> StdResult<OwnerOfResponse> {
     let info = tokens().load(deps.storage, &token_id)?;
     Ok(OwnerOfResponse {
-        owner: deps.api.addr_humanize(&info.owner)?,
-        approvals: humanize_approvals(deps.api, &env.block, &info, include_expired)?,
+        owner: info.owner.to_string(),
+        approvals: humanize_approvals(&env.block, &info, include_expired),
     })
 }
 
@@ -477,36 +477,36 @@ const MAX_LIMIT: u32 = 30;
 fn query_all_approvals(
     deps: Deps,
     env: Env,
-    owner: Addr,
+    owner: String,
     include_expired: bool,
-    start_after: Option<Addr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_canon = maybe_canonical(deps.api, start_after)?;
-    let start = start_canon.map(Bound::exclusive);
+    let start_addr = maybe_addr(deps.api, start_after)?;
+    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
     let res: StdResult<Vec<_>> = OPERATORS
-        .prefix(&owner_raw)
+        .prefix(owner_addr.as_ref())
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
-        .map(|item| parse_approval(deps.api, item))
+        .map(parse_approval)
         .collect();
     Ok(ApprovedForAllResponse { operators: res? })
 }
 
-fn parse_approval(api: &dyn Api, item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approval> {
+fn parse_approval(item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approval> {
     item.and_then(|(k, expires)| {
-        let spender = api.addr_humanize(&k.into())?;
+        let spender = String::from_utf8(k)?;
         Ok(cw721::Approval { spender, expires })
     })
 }
 
 fn query_tokens(
     deps: Deps,
-    owner: Addr,
+    owner: String,
     start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
@@ -558,8 +558,8 @@ fn query_all_nft_info(
     let info = tokens().load(deps.storage, &token_id)?;
     Ok(AllNftInfoResponse {
         access: OwnerOfResponse {
-            owner: deps.api.addr_humanize(&info.owner)?,
-            approvals: humanize_approvals(deps.api, &env.block, &info, include_expired)?,
+            owner: info.owner.to_string(),
+            approvals: humanize_approvals(&env.block, &info, include_expired),
         },
         info: NftInfoResponse {
             name: info.name,
@@ -570,28 +570,27 @@ fn query_all_nft_info(
 }
 
 fn humanize_approvals(
-    api: &dyn Api,
     block: &BlockInfo,
     info: &TokenInfo,
     include_expired: bool,
-) -> StdResult<Vec<cw721::Approval>> {
+) -> Vec<cw721::Approval> {
     let iter = info.approvals.iter();
     iter.filter(|apr| include_expired || !apr.expires.is_expired(block))
-        .map(|apr| humanize_approval(api, apr))
+        .map(humanize_approval)
         .collect()
 }
 
-fn humanize_approval(api: &dyn Api, approval: &Approval) -> StdResult<cw721::Approval> {
-    Ok(cw721::Approval {
-        spender: api.addr_humanize(&approval.spender)?,
+fn humanize_approval(approval: &Approval) -> cw721::Approval {
+    cw721::Approval {
+        spender: approval.spender.to_string(),
         expires: approval.expires,
-    })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_binary, CosmosMsg, WasmMsg};
+    use cosmwasm_std::{from_binary, Addr, CosmosMsg, WasmMsg};
 
     use super::*;
     use cw721::ApprovedForAllResponse;
