@@ -12,7 +12,7 @@
   ],
   "properties": {
     "balance": {
-      "description": "Balance in native tokens or cw20 token, with human address",
+      "description": "Balance in native tokens or cw20 token, with human-readable address",
       "allOf": [
         {
           "$ref": "#/definitions/BalanceHuman"
@@ -37,19 +37,11 @@
     },
     "recipient": {
       "description": "If released, funds go to the recipient",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
+      "type": "string"
     },
     "source": {
       "description": "If refunded, funds go to the source",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
+      "type": "string"
     }
   },
   "definitions": {
@@ -67,7 +59,8 @@
                 "$ref": "#/definitions/Coin"
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -76,9 +69,10 @@
           ],
           "properties": {
             "Cw20": {
-              "$ref": "#/definitions/Cw20CoinHuman"
+              "$ref": "#/definitions/Cw20Coin"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -97,7 +91,7 @@
         }
       }
     },
-    "Cw20CoinHuman": {
+    "Cw20Coin": {
       "type": "object",
       "required": [
         "address",
@@ -105,7 +99,7 @@
       ],
       "properties": {
         "address": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "amount": {
           "$ref": "#/definitions/Uint128"
@@ -127,7 +121,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "AtTime will expire when `env.block.time` >= time",
@@ -141,7 +136,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Never will never expire. Used to express the empty variant",
@@ -153,12 +149,10 @@
             "never": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"

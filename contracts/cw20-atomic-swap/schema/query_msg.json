@@ -28,7 +28,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns the details of the named swap, error if not created. Return type: DetailsResponse.",
@@ -48,7 +49,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ]
 }
