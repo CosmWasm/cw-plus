@@ -475,23 +475,22 @@ mod tests {
     };
     use cw0::{Duration, DAY, HOUR, WEEK};
     use cw_controllers::Claim;
-    use cw_storage_plus::AddrRef;
 
-    fn sample_validator<U: Into<Addr>>(addr: U) -> Validator {
+    fn sample_validator(addr: &str) -> Validator {
         Validator {
-            address: addr.into(),
+            address: Addr::unchecked(addr),
             commission: Decimal::percent(3),
             max_commission: Decimal::percent(10),
             max_change_rate: Decimal::percent(1),
         }
     }
 
-    fn sample_delegation<U: Into<Addr>>(addr: U, amount: Coin) -> FullDelegation {
+    fn sample_delegation(addr: &str, amount: Coin) -> FullDelegation {
         let can_redelegate = amount.clone();
         let accumulated_rewards = coins(0, &amount.denom);
         FullDelegation {
-            validator: addr.into(),
-            delegator: String::from(MOCK_CONTRACT_ADDR),
+            validator: Addr::unchecked(addr),
+            delegator: Addr::unchecked(MOCK_CONTRACT_ADDR),
             amount,
             can_redelegate,
             accumulated_rewards,
@@ -539,8 +538,11 @@ mod tests {
         query_balance(deps, addr.into()).unwrap().balance
     }
 
-    fn get_claims<U: Into<AddrRef>>(deps: Deps, addr: U) -> Vec<Claim> {
-        CLAIMS.query_claims(deps, addr.into()).unwrap().claims
+    fn get_claims(deps: Deps, addr: &str) -> Vec<Claim> {
+        CLAIMS
+            .query_claims(deps, AddrRef::from(&Addr::unchecked(addr)))
+            .unwrap()
+            .claims
     }
 
     #[test]
