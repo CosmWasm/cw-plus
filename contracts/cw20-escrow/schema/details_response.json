@@ -14,24 +14,20 @@
   "properties": {
     "arbiter": {
       "description": "arbiter can decide to approve or refund the escrow",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
+      "type": "string"
     },
     "cw20_balance": {
       "description": "Balance in cw20 tokens",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/Cw20CoinHuman"
+        "$ref": "#/definitions/Cw20Coin"
       }
     },
     "cw20_whitelist": {
       "description": "Whitelisted cw20 tokens",
       "type": "array",
       "items": {
-        "$ref": "#/definitions/HumanAddr"
+        "type": "string"
       }
     },
     "end_height": {
@@ -65,19 +61,11 @@
     },
     "recipient": {
       "description": "if approved, funds go to the recipient",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
+      "type": "string"
     },
     "source": {
       "description": "if refunded, funds go to the source",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
+      "type": "string"
     }
   },
   "definitions": {
@@ -96,7 +84,7 @@
         }
       }
     },
-    "Cw20CoinHuman": {
+    "Cw20Coin": {
       "type": "object",
       "required": [
         "address",
@@ -104,15 +92,12 @@
       ],
       "properties": {
         "address": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "amount": {
           "$ref": "#/definitions/Uint128"
         }
       }
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"
