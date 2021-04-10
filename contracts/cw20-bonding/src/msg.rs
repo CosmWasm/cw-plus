@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::curves::{decimal, Constant, Curve, DecimalPlaces, Linear, SquareRoot};
-use cosmwasm_std::{Binary, Decimal, HumanAddr, Uint128};
+use cosmwasm_std::{Binary, Decimal, Uint128};
 use cw20::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -74,16 +74,13 @@ pub enum ExecuteMsg {
     Buy {},
 
     /// Implements CW20. Transfer is a base message to move tokens to another account without triggering actions
-    Transfer {
-        recipient: HumanAddr,
-        amount: Uint128,
-    },
+    Transfer { recipient: String, amount: Uint128 },
     /// Implements CW20. Burn is a base message to destroy tokens forever
     Burn { amount: Uint128 },
     /// Implements CW20.  Send is a base message to transfer tokens to a contract and trigger an action
     /// on the receiving contract.
     Send {
-        contract: HumanAddr,
+        contract: String,
         amount: Uint128,
         msg: Option<Binary>,
     },
@@ -91,7 +88,7 @@ pub enum ExecuteMsg {
     /// from the owner's (env.sender) account. If expires is Some(), overwrites current allowance
     /// expiration with this one.
     IncreaseAllowance {
-        spender: HumanAddr,
+        spender: String,
         amount: Uint128,
         expires: Option<Expiration>,
     },
@@ -99,27 +96,27 @@ pub enum ExecuteMsg {
     /// from the owner's (env.sender) account by amount. If expires is Some(), overwrites current
     /// allowance expiration with this one.
     DecreaseAllowance {
-        spender: HumanAddr,
+        spender: String,
         amount: Uint128,
         expires: Option<Expiration>,
     },
     /// Implements CW20 "approval" extension. Transfers amount tokens from owner -> recipient
     /// if `env.sender` has sufficient pre-approval.
     TransferFrom {
-        owner: HumanAddr,
-        recipient: HumanAddr,
+        owner: String,
+        recipient: String,
         amount: Uint128,
     },
     /// Implements CW20 "approval" extension. Sends amount tokens from owner -> contract
     /// if `env.sender` has sufficient pre-approval.
     SendFrom {
-        owner: HumanAddr,
-        contract: HumanAddr,
+        owner: String,
+        contract: String,
         amount: Uint128,
         msg: Option<Binary>,
     },
     /// Implements CW20 "approval" extension. Destroys tokens forever
-    BurnFrom { owner: HumanAddr, amount: Uint128 },
+    BurnFrom { owner: String, amount: Uint128 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -129,15 +126,12 @@ pub enum QueryMsg {
     CurveInfo {},
 
     /// Implements CW20. Returns the current balance of the given address, 0 if unset.
-    Balance { address: HumanAddr },
+    Balance { address: String },
     /// Implements CW20. Returns metadata on the contract - name, decimals, supply, etc.
     TokenInfo {},
     /// Implements CW20 "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
-    Allowance {
-        owner: HumanAddr,
-        spender: HumanAddr,
-    },
+    Allowance { owner: String, spender: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
