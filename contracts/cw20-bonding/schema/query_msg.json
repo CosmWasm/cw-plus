@@ -12,7 +12,8 @@
         "curve_info": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20. Returns the current balance of the given address, 0 if unset.",
@@ -28,11 +29,12 @@
           ],
           "properties": {
             "address": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20. Returns metadata on the contract - name, decimals, supply, etc.",
@@ -44,7 +46,8 @@
         "token_info": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20 \"allowance\" extension. Returns how much spender can use from owner account, 0 if unset.",
@@ -61,19 +64,15 @@
           ],
           "properties": {
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }
