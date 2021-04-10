@@ -311,7 +311,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> {
     let balance = BALANCES
-        .may_load(deps.storage, AddrRef::unchecked(&address))?
+        .may_load(
+            deps.storage,
+            AddrRef::from(&deps.api.addr_validate(&address)?),
+        )?
         .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }
