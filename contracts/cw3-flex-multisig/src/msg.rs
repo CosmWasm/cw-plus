@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use cosmwasm_std::{CosmosMsg, Decimal, Empty, HumanAddr};
+use cosmwasm_std::{CosmosMsg, Decimal, Empty};
 use cw0::{Duration, Expiration};
 use cw3::{ThresholdResponse, Vote};
 use cw4::MemberChangedHookMsg;
@@ -10,7 +10,7 @@ use cw4::MemberChangedHookMsg;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InstantiateMsg {
     // this is the group contract that contains the member list
-    pub group_addr: HumanAddr,
+    pub group_addr: String,
     pub threshold: Threshold,
     pub max_voting_period: Duration,
 }
@@ -146,18 +146,18 @@ pub enum QueryMsg {
         limit: Option<u32>,
     },
     /// Returns VoteResponse
-    Vote { proposal_id: u64, voter: HumanAddr },
+    Vote { proposal_id: u64, voter: String },
     /// Returns VoteListResponse
     ListVotes {
         proposal_id: u64,
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Returns VoterInfo
-    Voter { address: HumanAddr },
+    Voter { address: String },
     /// Returns VoterListResponse
     ListVoters {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
 }

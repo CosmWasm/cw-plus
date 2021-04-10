@@ -1,4 +1,4 @@
-use cosmwasm_std::{HumanAddr, StdError};
+use cosmwasm_std::StdError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -13,7 +13,7 @@ pub enum ContractError {
     UnreachableThreshold {},
 
     #[error("Group contract invalid address '{addr}'")]
-    InvalidGroup { addr: HumanAddr },
+    InvalidGroup { addr: String },
 
     #[error("Unauthorized")]
     Unauthorized {},
