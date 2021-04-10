@@ -151,7 +151,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const PROPOSAL_COUNT: Item<u64> = Item::new("proposal_count");
 
 // multiple-item map
-pub const BALLOTS: Map<(U64Key, &[u8]), Ballot> = Map::new("votes");
+pub const BALLOTS: Map<(U64Key, &str), Ballot> = Map::new("votes");
 pub const PROPOSALS: Map<U64Key, Proposal> = Map::new("proposals");
 
 pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
