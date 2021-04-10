@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Binary, CanonicalAddr, ContractResult, CosmosMsg, Empty,
+    from_slice, to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty,
     QuerierWrapper, QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
 };
 
@@ -87,9 +87,9 @@ impl Cw4Contract {
     pub fn is_member(
         &self,
         querier: &QuerierWrapper,
-        addr: &CanonicalAddr,
+        addr: &Addr,
     ) -> StdResult<Option<u64>> {
-        let path = member_key(addr.as_slice());
+        let path = member_key(addr.as_ref());
         let query = self.encode_raw_query(path);
 
         // We have to copy the logic of Querier.query to handle the empty case, and not
