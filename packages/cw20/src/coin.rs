@@ -11,7 +11,7 @@ pub struct Cw20Coin {
 
 impl Cw20Coin {
     pub fn is_empty(&self) -> bool {
-        self.amount == Uint128(0)
+        self.amount == Uint128::zero()
     }
 }
 
@@ -19,4 +19,10 @@ impl Cw20Coin {
 pub struct Cw20CoinVerified {
     pub address: Addr,
     pub amount: Uint128,
+}
+
+impl Cw20CoinVerified {
+    pub fn is_empty(&self) -> bool {
+        self.amount == Uint128::zero()
+    }
 }
