@@ -1,13 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, HumanAddr,
+    attr, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdResult, WasmMsg,
 };
 use sha2::{Digest, Sha256};
 
 use cw2::set_contract_version;
-use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -61,13 +61,13 @@ pub fn execute_receive(
         Some(bin) => Ok(from_binary(&bin)?),
         None => Err(ContractError::NoData {}),
     }?;
-    let token = Cw20Coin {
-        address: deps.api.canonical_address(&info.sender)?,
+    let token = Cw20CoinVerified {
+        address: info.sender,
         amount: wrapper.amount,
     };
     // we need to update the info... so the original sender is the one authorizing with these tokens
     let orig_info = MessageInfo {
-        sender: wrapper.sender,
+        sender: deps.api.addr_validate(&wrapper.sender)?,
         funds: info.funds,
     };
     match msg {
@@ -100,12 +100,12 @@ pub fn execute_create(
         return Err(ContractError::Expired {});
     }
 
-    let recipient_raw = deps.api.canonical_address(&msg.recipient)?;
+    let recipient = deps.api.addr_validate(&msg.recipient)?;
 
     let swap = AtomicSwap {
         hash: Binary(hash),
-        recipient: recipient_raw,
-        source: deps.api.canonical_address(&info.sender)?,
+        recipient,
+        source: info.sender,
         expires: msg.expires,
         balance,
     };
@@ -144,13 +144,11 @@ pub fn execute_release(
         return Err(ContractError::InvalidPreimage {});
     }
 
-    let rcpt = deps.api.human_address(&swap.recipient)?;
-
     // Delete the swap
     SWAPS.remove(deps.storage, &id);
 
     // Send all tokens out
-    let msgs = send_tokens(deps.api, &rcpt, swap.balance)?;
+    let msgs = send_tokens(&swap.recipient, swap.balance)?;
     Ok(Response {
         submessages: vec![],
         messages: msgs,
@@ -158,7 +156,7 @@ pub fn execute_release(
             attr("action", "release"),
             attr("id", id),
             attr("preimage", preimage),
-            attr("to", rcpt),
+            attr("to", swap.recipient.to_string()),
         ],
         data: None,
     })
@@ -171,16 +169,18 @@ pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, C
         return Err(ContractError::NotExpired {});
     }
 
-    let rcpt = deps.api.human_address(&swap.source)?;
-
     // We delete the swap
     SWAPS.remove(deps.storage, &id);
 
-    let msgs = send_tokens(deps.api, &rcpt, swap.balance)?;
+    let msgs = send_tokens(&swap.source, swap.balance)?;
     Ok(Response {
         submessages: vec![],
         messages: msgs,
-        attributes: vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)],
+        attributes: vec![
+            attr("action", "refund"),
+            attr("id", id),
+            attr("to", swap.source.to_string()),
+        ],
         data: None,
     })
 }
@@ -198,7 +198,7 @@ fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
     }
 }
 
-fn send_tokens(api: &dyn Api, to: &HumanAddr, amount: Balance) -> StdResult<Vec<CosmosMsg>> {
+fn send_tokens(to: &Addr, amount: Balance) -> StdResult<Vec<CosmosMsg>> {
     if amount.is_empty() {
         Ok(vec![])
     } else {
@@ -216,7 +216,7 @@ fn send_tokens(api: &dyn Api, to: &HumanAddr, amount: Balance) -> StdResult<Vec<
                     amount: coin.amount,
                 };
                 let exec = WasmMsg::Execute {
-                    contract_addr: api.human_address(&coin.address)?,
+                    contract_addr: coin.address.into(),
                     msg: to_binary(&msg)?,
                     send: vec![],
                 };
@@ -240,8 +240,8 @@ fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
     // Convert balance to human balance
     let balance_human = match swap.balance {
         Balance::Native(coins) => BalanceHuman::Native(coins.into_vec()),
-        Balance::Cw20(coin) => BalanceHuman::Cw20(Cw20CoinHuman {
-            address: deps.api.human_address(&coin.address)?,
+        Balance::Cw20(coin) => BalanceHuman::Cw20(Cw20Coin {
+            address: coin.address.into(),
             amount: coin.amount,
         }),
     };
@@ -249,8 +249,8 @@ fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
     let details = DetailsResponse {
         id,
         hash: hex::encode(swap.hash.as_slice()),
-        recipient: deps.api.human_address(&swap.recipient)?,
-        source: deps.api.human_address(&swap.source)?,
+        recipient: swap.recipient.into(),
+        source: swap.source.into(),
         expires: swap.expires,
         balance: balance_human,
     };
@@ -323,7 +323,7 @@ mod tests {
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
-        let sender = HumanAddr::from("sender0001");
+        let sender = String::from("sender0001");
         let balance = coins(100, "tokens");
 
         // Cannot create, invalid ids
@@ -332,7 +332,7 @@ mod tests {
             let create = CreateMsg {
                 id: id.to_string(),
                 hash: real_hash(),
-                recipient: HumanAddr::from("rcpt0001"),
+                recipient: String::from("rcpt0001"),
                 expires: Expiration::AtHeight(123456),
             };
             let err = execute(
@@ -443,7 +443,7 @@ mod tests {
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
-        let sender = HumanAddr::from("sender0001");
+        let sender = String::from("sender0001");
         let balance = coins(1000, "tokens");
 
         let info = mock_info(&sender, &balance);
@@ -530,7 +530,7 @@ mod tests {
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
-        let sender = HumanAddr::from("sender0001");
+        let sender = String::from("sender0001");
         let balance = coins(1000, "tokens");
 
         let info = mock_info(&sender, &balance);
@@ -594,8 +594,8 @@ mod tests {
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
 
-        let sender1 = HumanAddr::from("sender0001");
-        let sender2 = HumanAddr::from("sender0002");
+        let sender1 = String::from("sender0001");
+        let sender2 = String::from("sender0002");
         // Same balance for simplicity
         let balance = coins(1000, "tokens");
 
@@ -687,8 +687,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // Native side (offer)
-        let native_sender = HumanAddr::from("A_on_X");
-        let native_rcpt = HumanAddr::from("B_on_X");
+        let native_sender = String::from("A_on_X");
+        let native_rcpt = String::from("B_on_X");
         let native_coins = coins(1000, "tokens_native");
 
         // Create the Native swap offer
@@ -705,10 +705,10 @@ mod tests {
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
         // Cw20 side (counter offer (1:1000))
-        let cw20_sender = HumanAddr::from("B_on_Y");
-        let cw20_rcpt = HumanAddr::from("A_on_Y");
-        let cw20_coin = Cw20CoinHuman {
-            address: HumanAddr::from("my_cw20_token"),
+        let cw20_sender = String::from("B_on_Y");
+        let cw20_rcpt = String::from("A_on_Y");
+        let cw20_coin = Cw20Coin {
+            address: String::from("my_cw20_token"),
             amount: Uint128(1),
         };
 
