@@ -1,29 +1,29 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Decimal, HumanAddr, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw0::Duration;
 use cw_controllers::Claims;
 use cw_storage_plus::Item;
 
 pub const CLAIMS: Claims = Claims::new("claims");
 
-/// Investment info is fixed at instatiation, and is used to control the function of the contract
+/// Investment info is fixed at instantiation, and is used to control the function of the contract
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InvestmentInfo {
-    /// owner created the contract and takes a cut
-    pub owner: CanonicalAddr,
-    /// this is the denomination we can stake (and only one we accept for payments)
+    /// Owner created the contract and takes a cut
+    pub owner: Addr,
+    /// This is the denomination we can stake (and only one we accept for payments)
     pub bond_denom: String,
     /// This is the unbonding period of the native staking module
     /// We need this to only allow claims to be redeemed after the money has arrived
     pub unbonding_period: Duration,
-    /// this is how much the owner takes as a cut when someone unbonds
+    /// This is how much the owner takes as a cut when someone unbonds
     pub exit_tax: Decimal,
     /// All tokens are bonded to this validator
-    /// FIXME: humanize/canonicalize address doesn't work for validator addrresses
-    pub validator: HumanAddr,
-    /// This is the minimum amount we will pull out to reinvest, as well as a minumum
+    /// FIXME: address validation doesn't work for validator addresses
+    pub validator: String,
+    /// This is the minimum amount we will pull out to reinvest, as well as a minimum
     /// that can be unbonded (to avoid needless staking tx)
     pub min_withdrawal: Uint128,
 }
