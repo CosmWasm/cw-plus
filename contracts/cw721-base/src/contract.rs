@@ -365,7 +365,7 @@ fn check_can_send(
     if token
         .approvals
         .iter()
-        .any(|apr| apr.spender == info.sender && !apr.expires.is_expired(&env.block))
+        .any(|apr| apr.spender == info.sender && !apr.is_expired(&env.block))
     {
         return Ok(());
     }
@@ -574,8 +574,9 @@ fn humanize_approvals(
     info: &TokenInfo,
     include_expired: bool,
 ) -> Vec<cw721::Approval> {
-    let iter = info.approvals.iter();
-    iter.filter(|apr| include_expired || !apr.expires.is_expired(block))
+    info.approvals
+        .iter()
+        .filter(|apr| include_expired || !apr.is_expired(block))
         .map(humanize_approval)
         .collect()
 }

@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, StdResult, Storage};
+use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
 use cw721::{ContractInfoResponse, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex, PkOwned};
 
@@ -26,6 +26,12 @@ pub struct Approval {
     pub spender: Addr,
     /// When the Approval expires (maybe Expiration::never)
     pub expires: Expiration,
+}
+
+impl Approval {
+    pub fn is_expired(&self, block: &BlockInfo) -> bool {
+        self.expires.is_expired(block)
+    }
 }
 
 pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("nft_info");
