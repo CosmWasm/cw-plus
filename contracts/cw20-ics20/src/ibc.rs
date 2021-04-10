@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, DepsMut, Env, HumanAddr,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, DepsMut, Env,
     IbcAcknowledgement, IbcBasicResponse, IbcChannel, IbcEndpoint, IbcOrder, IbcPacket,
     IbcReceiveResponse, StdResult, Uint128, WasmMsg,
 };
@@ -157,7 +157,7 @@ pub fn ibc_packet_receive(
                 attr("success", "true"),
             ];
             let to_send = Amount::from_parts(denom.into(), msg.amount);
-            let msg = send_amount(to_send, HumanAddr::from(msg.receiver));
+            let msg = send_amount(to_send, String::from(msg.receiver));
             IbcReceiveResponse {
                 acknowledgement: ack_success(),
                 submessages: vec![],
@@ -307,7 +307,7 @@ fn on_packet_failure(
     ];
 
     let amount = Amount::from_parts(msg.denom, msg.amount);
-    let msg = send_amount(amount, HumanAddr::from(msg.sender));
+    let msg = send_amount(amount, String::from(msg.sender));
     let res = IbcBasicResponse {
         submessages: vec![],
         messages: vec![msg],
@@ -316,7 +316,7 @@ fn on_packet_failure(
     Ok(res)
 }
 
-fn send_amount(amount: Amount, recipient: HumanAddr) -> CosmosMsg {
+fn send_amount(amount: Amount, recipient: String) -> CosmosMsg {
     match amount {
         Amount::Native(coin) => BankMsg::Send {
             to_address: recipient,

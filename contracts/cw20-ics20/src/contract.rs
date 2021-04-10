@@ -1,12 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Binary, Deps, DepsMut, Env, HumanAddr, IbcMsg, IbcQuery,
-    MessageInfo, Order, PortIdResponse, Response, StdResult,
+    attr, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo,
+    Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
-use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
+use cw20::{Cw20Coin, Cw20ReceiveMsg};
 
 use crate::amount::Amount;
 use crate::error::ContractError;
@@ -65,11 +65,12 @@ pub fn execute_receive(
         Some(bin) => from_binary(&bin)?,
         None => return Err(ContractError::NoData {}),
     };
-    let amount = Amount::Cw20(Cw20CoinHuman {
-        address: info.sender,
+    let amount = Amount::Cw20(Cw20Coin {
+        address: info.sender.to_string(),
         amount: wrapper.amount,
     });
-    execute_transfer(deps, env, msg, amount, wrapper.sender)
+    let api = deps.api;
+    execute_transfer(deps, env, msg, amount, api.addr_validate(&wrapper.sender)?)
 }
 
 pub fn execute_transfer(
@@ -77,7 +78,7 @@ pub fn execute_transfer(
     env: Env,
     msg: TransferMsg,
     amount: Amount,
-    sender: HumanAddr,
+    sender: Addr,
 ) -> Result<Response, ContractError> {
     if amount.is_empty() {
         return Err(ContractError::NoFunds {});
@@ -100,7 +101,7 @@ pub fn execute_transfer(
     let packet = Ics20Packet::new(
         amount.amount(),
         amount.denom(),
-        &sender,
+        sender.as_ref(),
         &msg.remote_address,
     );
     packet.validate()?;
