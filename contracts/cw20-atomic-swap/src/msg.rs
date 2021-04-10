@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Coin, HumanAddr};
-use cw20::{Cw20CoinHuman, Cw20ReceiveMsg, Expiration};
+use cosmwasm_std::Coin;
+use cw20::{Cw20Coin, Cw20ReceiveMsg, Expiration};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {}
@@ -40,7 +40,7 @@ pub struct CreateMsg {
     /// This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)
     pub hash: String,
     /// If approved, funds go to the recipient
-    pub recipient: HumanAddr,
+    pub recipient: String,
     /// You can set expiration at time or at block height the contract is valid at.
     /// After the contract is expired, it can be returned to the original funder.
     pub expires: Expiration,
@@ -80,17 +80,17 @@ pub struct DetailsResponse {
     /// This is hex-encoded sha-256 hash of the preimage (must be 32*2 = 64 chars)
     pub hash: String,
     /// If released, funds go to the recipient
-    pub recipient: HumanAddr,
+    pub recipient: String,
     /// If refunded, funds go to the source
-    pub source: HumanAddr,
+    pub source: String,
     /// Once a swap is expired, it can be returned to the original source (via "refund").
     pub expires: Expiration,
-    /// Balance in native tokens or cw20 token, with human address
+    /// Balance in native tokens or cw20 token, with human-readable address
     pub balance: BalanceHuman,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub enum BalanceHuman {
     Native(Vec<Coin>),
-    Cw20(Cw20CoinHuman),
+    Cw20(Cw20Coin),
 }
