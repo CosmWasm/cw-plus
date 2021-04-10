@@ -9,14 +9,14 @@
   ],
   "properties": {
     "balances": {
-      "description": "how many tokens we currently have pending over this channel",
+      "description": "How many tokens we currently have pending over this channel",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Amount"
       }
     },
     "info": {
-      "description": "information on the channel's connection",
+      "description": "Information on the channel's connection",
       "allOf": [
         {
           "$ref": "#/definitions/ChannelInfo"
@@ -24,7 +24,7 @@
       ]
     },
     "total_sent": {
-      "description": "the total number of tokens that have been sent over this channel (even if many have been returned, so balanace is low)",
+      "description": "The total number of tokens that have been sent over this channel (even if many have been returned, so balance is low)",
       "type": "array",
       "items": {
         "$ref": "#/definitions/Amount"
@@ -43,7 +43,8 @@
             "native": {
               "$ref": "#/definitions/Coin"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -52,9 +53,10 @@
           ],
           "properties": {
             "cw20": {
-              "$ref": "#/definitions/Cw20CoinHuman"
+              "$ref": "#/definitions/Cw20Coin"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -99,7 +101,7 @@
         }
       }
     },
-    "Cw20CoinHuman": {
+    "Cw20Coin": {
       "type": "object",
       "required": [
         "address",
@@ -107,15 +109,12 @@
       ],
       "properties": {
         "address": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "amount": {
           "$ref": "#/definitions/Uint128"
         }
       }
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "IbcEndpoint": {
       "type": "object",

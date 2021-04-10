@@ -7,7 +7,7 @@
   ],
   "properties": {
     "default_timeout": {
-      "description": "default timeout for ics20 packets, specified in seconds",
+      "description": "Default timeout for ics20 packets, specified in seconds",
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

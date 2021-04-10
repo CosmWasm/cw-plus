@@ -12,7 +12,8 @@
         "port": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Show all channels we have connected to. Return type is ListChannelsResponse.",
@@ -24,10 +25,11 @@
         "list_channels": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
-      "description": "Returns the details of the name channel, error if not created Return type: ChannelResponse.",
+      "description": "Returns the details of the name channel, error if not created. Return type: ChannelResponse.",
       "type": "object",
       "required": [
         "channel"
@@ -44,7 +46,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ]
 }
