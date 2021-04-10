@@ -12,7 +12,8 @@
         "bond": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Unbond will \"burn\" the given amount of derivative tokens and send the unbonded staking tokens to the message sender (after exit tax is deducted)",
@@ -32,7 +33,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Claim is used to claim your native tokens that you previously \"unbonded\" after the chain-defined waiting period (eg. 3 weeks)",
@@ -44,7 +46,8 @@
         "claim": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Reinvest will check for all accumulated rewards, withdraw them, and re-bond them to the same validator. Anyone can call this, which updates the value of the token (how much under custody).",
@@ -56,7 +59,8 @@
         "reinvest": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "_BondAllTokens can only be called by the contract itself, after all rewards have been withdrawn. This is an example of using \"callbacks\" in message flows. This can only be invoked by the contract itself as a return from Reinvest",
@@ -68,7 +72,8 @@
         "__bond_all_tokens": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20. Transfer is a base message to move tokens to another account without triggering actions",
@@ -88,11 +93,12 @@
               "$ref": "#/definitions/Uint128"
             },
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20. Burn is a base message to destroy tokens forever",
@@ -112,7 +118,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20.  Send is a base message to transfer tokens to a contract and trigger an action on the receiving contract.",
@@ -132,7 +139,7 @@
               "$ref": "#/definitions/Uint128"
             },
             "contract": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "anyOf": [
@@ -146,7 +153,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20 \"approval\" extension. Allows spender to access an additional amount tokens from the owner's (env.sender) account. If expires is Some(), overwrites current allowance expiration with this one.",
@@ -176,11 +184,12 @@
               ]
             },
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20 \"approval\" extension. Lowers the spender's access of tokens from the owner's (env.sender) account by amount. If expires is Some(), overwrites current allowance expiration with this one.",
@@ -210,11 +219,12 @@
               ]
             },
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20 \"approval\" extension. Transfers amount tokens from owner -> recipient if `env.sender` has sufficient pre-approval.",
@@ -235,14 +245,15 @@
               "$ref": "#/definitions/Uint128"
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20 \"approval\" extension. Sends amount tokens from owner -> contract if `env.sender` has sufficient pre-approval.",
@@ -263,7 +274,7 @@
               "$ref": "#/definitions/Uint128"
             },
             "contract": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "anyOf": [
@@ -276,11 +287,12 @@
               ]
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Implements CW20 \"approval\" extension. Destroys tokens forever",
@@ -300,11 +312,12 @@
               "$ref": "#/definitions/Uint128"
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -327,7 +340,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "AtTime will expire when `env.block.time` >= time",
@@ -341,7 +355,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Never will never expire. Used to express the empty variant",
@@ -353,12 +368,10 @@
             "never": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"
