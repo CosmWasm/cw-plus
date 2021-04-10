@@ -105,7 +105,6 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::Binary;
 
     #[test]
     fn no_escrow_ids() {
@@ -116,9 +115,9 @@ mod tests {
 
     fn dummy_escrow() -> Escrow {
         Escrow {
-            arbiter: CanonicalAddr(Binary(b"arb".to_vec())),
-            recipient: CanonicalAddr(Binary(b"recip".to_vec())),
-            source: CanonicalAddr(Binary(b"source".to_vec())),
+            arbiter: Addr::unchecked("arb"),
+            recipient: Addr::unchecked("recip"),
+            source: Addr::unchecked("source"),
             end_height: None,
             end_time: None,
             balance: Default::default(),
