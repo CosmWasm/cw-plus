@@ -2,8 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty,
-    QuerierWrapper, QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
+    from_slice, to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty, QuerierWrapper,
+    QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
 };
 
 use crate::msg::Cw4ExecuteMsg;
@@ -84,11 +84,7 @@ impl Cw4Contract {
     }
 
     /// Check if this address is a member, and if so, with which weight
-    pub fn is_member(
-        &self,
-        querier: &QuerierWrapper,
-        addr: &Addr,
-    ) -> StdResult<Option<u64>> {
+    pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
         let path = member_key(addr.as_ref());
         let query = self.encode_raw_query(path);
 
