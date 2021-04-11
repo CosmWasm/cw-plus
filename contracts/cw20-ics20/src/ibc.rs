@@ -157,7 +157,7 @@ pub fn ibc_packet_receive(
                 attr("success", "true"),
             ];
             let to_send = Amount::from_parts(denom.into(), msg.amount);
-            let msg = send_amount(to_send, String::from(msg.receiver));
+            let msg = send_amount(to_send, msg.receiver);
             IbcReceiveResponse {
                 acknowledgement: ack_success(),
                 submessages: vec![],
@@ -307,7 +307,7 @@ fn on_packet_failure(
     ];
 
     let amount = Amount::from_parts(msg.denom, msg.amount);
-    let msg = send_amount(amount, String::from(msg.sender));
+    let msg = send_amount(amount, msg.sender);
     let res = IbcBasicResponse {
         submessages: vec![],
         messages: vec![msg],
