@@ -554,9 +554,9 @@ mod tests {
         let token1 = "token1".to_owned();
         let token2 = "token2".to_owned();
         let token3 = "token3".to_owned();
-        let minter = Addr::unchecked("minter");
-        let user1 = Addr::unchecked("user1");
-        let user2 = Addr::unchecked("user2");
+        let minter = String::from("minter");
+        let user1 = String::from("user1");
+        let user2 = String::from("user2");
 
         let mut deps = mock_dependencies(&[]);
         let msg = InitMsg {
@@ -899,9 +899,9 @@ mod tests {
 
     #[test]
     fn check_send_contract() {
-        let receiver = Addr::unchecked("receive_contract");
-        let minter = Addr::unchecked("minter");
-        let user1 = Addr::unchecked("user1");
+        let receiver = String::from("receive_contract");
+        let minter = String::from("minter");
+        let user1 = String::from("user1");
         let token1 = "token1".to_owned();
         let token2 = "token2".to_owned();
         let dummy_msg = Binary::default();
@@ -1001,9 +1001,9 @@ mod tests {
         // grant approval to multiple operators, and query them
         let tokens = (0..10).map(|i| format!("token{}", i)).collect::<Vec<_>>();
         let users = (0..10)
-            .map(|i| Addr::unchecked(format!("user{}", i)))
+            .map(|i| String::from(format!("user{}", i)))
             .collect::<Vec<_>>();
-        let minter = Addr::unchecked("minter");
+        let minter = String::from("minter");
 
         let mut deps = mock_dependencies(&[]);
         let msg = InitMsg {
@@ -1102,14 +1102,13 @@ mod tests {
                 Cw1155QueryMsg::ApprovedForAll {
                     owner: users[0].clone(),
                     include_expired: None,
-                    start_after: Some(Addr::unchecked("user2")),
+                    start_after: Some(String::from("user2")),
                     limit: Some(1),
                 },
             ),
             to_binary(&ApprovedForAllResponse {
                 operators: vec![cw1155::Approval {
-                    // Not ordered in the same way as Addr
-                    spender: users[8].clone().into(),
+                    spender: users[3].clone().into(),
                     expires: Expiration::Never {}
                 }],
             })
@@ -1120,9 +1119,9 @@ mod tests {
     fn approval_expires() {
         let mut deps = mock_dependencies(&[]);
         let token1 = "token1".to_owned();
-        let minter = Addr::unchecked("minter");
-        let user1 = Addr::unchecked("user1");
-        let user2 = Addr::unchecked("user2");
+        let minter = String::from("minter");
+        let user1 = String::from("user1");
+        let user2 = String::from("user2");
 
         let env = {
             let mut env = mock_env();
@@ -1199,8 +1198,8 @@ mod tests {
     fn mint_overflow() {
         let mut deps = mock_dependencies(&[]);
         let token1 = "token1".to_owned();
-        let minter = Addr::unchecked("minter");
-        let user1 = Addr::unchecked("user1");
+        let minter = String::from("minter");
+        let user1 = String::from("user1");
 
         let env = mock_env();
         let msg = InitMsg {
