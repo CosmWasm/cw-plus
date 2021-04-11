@@ -672,7 +672,7 @@ mod tests {
 
         // minter can mint
         let allowed = mock_info(MINTER, &[]);
-        let _ = execute(deps.as_mut(), mock_env(), allowed, mint_msg.clone()).unwrap();
+        let _ = execute(deps.as_mut(), mock_env(), allowed, mint_msg).unwrap();
 
         // ensure num tokens increases
         let count = query_num_tokens(deps.as_ref()).unwrap();
@@ -686,8 +686,8 @@ mod tests {
         assert_eq!(
             info,
             NftInfoResponse {
-                name: name.clone(),
-                description: description.clone(),
+                name,
+                description,
                 image: None,
             }
         );
@@ -734,8 +734,8 @@ mod tests {
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: String::from("venus"),
-            name: name.clone(),
-            description: Some(description.clone()),
+            name,
+            description: Some(description),
             image: None,
         });
 
@@ -749,7 +749,7 @@ mod tests {
             token_id: token_id.clone(),
         };
 
-        let err = execute(deps.as_mut(), mock_env(), random, transfer_msg.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), random, transfer_msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // owner can
@@ -759,7 +759,7 @@ mod tests {
             token_id: token_id.clone(),
         };
 
-        let res = execute(deps.as_mut(), mock_env(), random, transfer_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), random, transfer_msg).unwrap();
 
         assert_eq!(
             res,
@@ -790,8 +790,8 @@ mod tests {
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: String::from("venus"),
-            name: name.clone(),
-            description: Some(description.clone()),
+            name,
+            description: Some(description),
             image: None,
         });
 
@@ -857,8 +857,8 @@ mod tests {
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
             owner: String::from("demeter"),
-            name: name.clone(),
-            description: Some(description.clone()),
+            name,
+            description: Some(description),
             image: None,
         });
 
@@ -922,7 +922,7 @@ mod tests {
 
         let revoke_msg = ExecuteMsg::Revoke {
             spender: String::from("random"),
-            token_id: token_id.clone(),
+            token_id,
         };
         execute(deps.as_mut(), mock_env(), owner, revoke_msg).unwrap();
 
@@ -954,8 +954,8 @@ mod tests {
         let mint_msg1 = ExecuteMsg::Mint(MintMsg {
             token_id: token_id1.clone(),
             owner: String::from("demeter"),
-            name: name1.clone(),
-            description: Some(description1.clone()),
+            name: name1,
+            description: Some(description1),
             image: None,
         });
 
@@ -965,8 +965,8 @@ mod tests {
         let mint_msg2 = ExecuteMsg::Mint(MintMsg {
             token_id: token_id2.clone(),
             owner: String::from("demeter"),
-            name: name2.clone(),
-            description: Some(description2.clone()),
+            name: name2,
+            description: Some(description2),
             image: None,
         });
 
@@ -1005,7 +1005,7 @@ mod tests {
         let random = mock_info("random", &[]);
         let transfer_msg = ExecuteMsg::TransferNft {
             recipient: String::from("person"),
-            token_id: token_id1.clone(),
+            token_id: token_id1,
         };
         execute(deps.as_mut(), mock_env(), random.clone(), transfer_msg).unwrap();
 
@@ -1019,7 +1019,7 @@ mod tests {
 
         let send_msg = ExecuteMsg::SendNft {
             contract: String::from("another_contract"),
-            token_id: token_id2.clone(),
+            token_id: token_id2,
             msg: Some(to_binary(&msg).unwrap()),
         };
         execute(deps.as_mut(), mock_env(), random, send_msg).unwrap();
@@ -1031,7 +1031,7 @@ mod tests {
         };
         // person is now the owner of the tokens
         let owner = mock_info("person", &[]);
-        execute(deps.as_mut(), mock_env(), owner.clone(), approve_all_msg).unwrap();
+        execute(deps.as_mut(), mock_env(), owner, approve_all_msg).unwrap();
 
         let res = query_all_approvals(
             deps.as_ref(),
@@ -1179,7 +1179,7 @@ mod tests {
             description: Some("Calm even the most excited children".to_string()),
             image: None,
         });
-        execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg).unwrap();
+        execute(deps.as_mut(), mock_env(), minter, mint_msg).unwrap();
 
         // get all tokens in order:
         let expected = vec![token_id1.clone(), token_id2.clone(), token_id3.clone()];
@@ -1192,24 +1192,19 @@ mod tests {
         assert_eq!(&expected[2..], &tokens.tokens[..]);
 
         // get by owner
-        let by_ceres = vec![token_id2.clone()];
-        let by_demeter = vec![token_id1.clone(), token_id3.clone()];
+        let by_ceres = vec![token_id2];
+        let by_demeter = vec![token_id1, token_id3];
         // all tokens by owner
         let tokens = query_tokens(deps.as_ref(), demeter.clone(), None, None).unwrap();
         assert_eq!(&by_demeter, &tokens.tokens);
-        let tokens = query_tokens(deps.as_ref(), ceres.clone(), None, None).unwrap();
+        let tokens = query_tokens(deps.as_ref(), ceres, None, None).unwrap();
         assert_eq!(&by_ceres, &tokens.tokens);
 
         // paginate for demeter
         let tokens = query_tokens(deps.as_ref(), demeter.clone(), None, Some(1)).unwrap();
         assert_eq!(&by_demeter[..1], &tokens.tokens[..]);
-        let tokens = query_tokens(
-            deps.as_ref(),
-            demeter.clone(),
-            Some(by_demeter[0].clone()),
-            Some(3),
-        )
-        .unwrap();
+        let tokens =
+            query_tokens(deps.as_ref(), demeter, Some(by_demeter[0].clone()), Some(3)).unwrap();
         assert_eq!(&by_demeter[1..], &tokens.tokens[..]);
     }
 }
