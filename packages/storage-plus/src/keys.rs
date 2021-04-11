@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
-use std::str::from_utf8;
 
 use crate::addr::AddrRef;
-use crate::helpers::{decode_length, namespaces_with_key};
+use crate::helpers::namespaces_with_key;
 use crate::Endian;
 
 // pub trait PrimaryKey<'a>: Copy {
@@ -18,10 +17,6 @@ pub trait PrimaryKey<'a>: Clone {
         let l = keys.len();
         namespaces_with_key(&keys[0..l - 1], &keys[l - 1])
     }
-
-    /// extracts a single or composite key from a joined key,
-    /// only lives as long as the original bytes
-    fn parse_key(serialized: &'a [u8]) -> Self;
 }
 
 impl<'a> PrimaryKey<'a> for &'a [u8] {
@@ -31,10 +26,6 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
     fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
         vec![self]
-    }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        serialized
     }
 }
 
@@ -47,10 +38,6 @@ impl<'a> PrimaryKey<'a> for &'a str {
         // this is simple, we don't add more prefixes
         vec![self.as_bytes()]
     }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        from_utf8(serialized).unwrap()
-    }
 }
 
 // use generics for combining there - so we can use &[u8], PkOwned, or IntKey
@@ -62,13 +49,6 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
         let mut keys = self.0.key();
         keys.extend(&self.1.key());
         keys
-    }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        let l = decode_length(&serialized[0..2]);
-        let first = &serialized[2..l + 2];
-        let second = &serialized[l + 2..];
-        (T::parse_key(first), U::parse_key(second))
     }
 }
 
@@ -84,19 +64,6 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: 
         keys.extend(&self.1.key());
         keys.extend(&self.2.key());
         keys
-    }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        let l1 = decode_length(&serialized[0..2]);
-        let first = &serialized[2..2 + l1];
-        let l2 = decode_length(&serialized[2 + l1..2 + l1 + 2]);
-        let second = &serialized[2 + l1 + 2..2 + l1 + 2 + l2];
-        let third = &serialized[2 + l1 + 2 + l2..];
-        (
-            T::parse_key(first),
-            U::parse_key(second),
-            V::parse_key(third),
-        )
     }
 }
 
@@ -162,10 +129,6 @@ impl<'a> PrimaryKey<'a> for PkOwned {
     fn key(&self) -> Vec<&[u8]> {
         vec![&self.0]
     }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        PkOwned(serialized.to_vec())
-    }
 }
 
 impl<'a> Prefixer<'a> for PkOwned {
@@ -184,10 +147,6 @@ impl<'a> PrimaryKey<'a> for AddrRef<'a> {
         // this is simple, we don't add more prefixes
         vec![self.as_bytes()]
     }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        AddrRef::unchecked(from_utf8(serialized).unwrap())
-    }
 }
 
 /// A type-safe way to use verified addresses as keys
@@ -204,10 +163,6 @@ impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
 
     fn key(&self) -> Vec<&[u8]> {
         self.as_ref().key()
-    }
-
-    fn parse_key(serialized: &'a [u8]) -> Self {
-        PkOwned::parse_key(serialized).into()
     }
 }
 
@@ -315,8 +270,7 @@ mod test {
         assert_eq!("hello".as_bytes(), path[0]);
 
         let joined = k.joined_key();
-        let parsed = K::parse_key(&joined);
-        assert_eq!(parsed, "hello");
+        assert_eq!(joined, b"hello")
     }
 
     #[test]
@@ -365,71 +319,6 @@ mod test {
         let dir = k.0.prefix();
         assert_eq!(2, dir.len());
         assert_eq!(dir, vec![foo, b"bar"]);
-    }
-
-    #[test]
-    fn parse_joined_keys_pk1() {
-        type K<'a> = &'a [u8];
-
-        let key: K = b"four";
-        let joined = key.joined_key();
-        assert_eq!(key, joined.as_slice());
-        let parsed = K::parse_key(&joined);
-        assert_eq!(key, parsed);
-    }
-
-    #[test]
-    fn parse_joined_keys_pk2() {
-        type K<'a> = (&'a [u8], &'a [u8]);
-
-        let key: K = (b"four", b"square");
-        let joined = key.joined_key();
-        assert_eq!(4 + 6 + 2, joined.len());
-        let parsed = K::parse_key(&joined);
-        assert_eq!(key, parsed);
-    }
-
-    #[test]
-    fn parse_joined_keys_pk3() {
-        type K<'a> = (&'a str, U32Key, &'a [u8]);
-
-        let key: K = ("four", 15.into(), b"cinco");
-        let joined = key.joined_key();
-        assert_eq!(4 + 4 + 5 + 2 * 2, joined.len());
-        let parsed = K::parse_key(&joined);
-        assert_eq!(key, parsed);
-    }
-
-    #[test]
-    fn parse_joined_keys_pk3_alt() {
-        type K<'a> = (&'a str, U64Key, &'a str);
-
-        let key: K = ("one", 222.into(), "three");
-        let joined = key.joined_key();
-        assert_eq!(3 + 8 + 5 + 2 * 2, joined.len());
-        let parsed = K::parse_key(&joined);
-        assert_eq!(key, parsed);
-    }
-
-    #[test]
-    fn parse_joined_keys_int() {
-        let key: U64Key = 12345678.into();
-        let joined = key.joined_key();
-        assert_eq!(8, joined.len());
-        let parsed = U64Key::parse_key(&joined);
-        assert_eq!(key, parsed);
-    }
-
-    #[test]
-    fn parse_joined_keys_string_int() {
-        type K<'a> = (U32Key, &'a str);
-
-        let key: K = (54321.into(), "random");
-        let joined = key.joined_key();
-        assert_eq!(2 + 4 + 6, joined.len());
-        let parsed = K::parse_key(&joined);
-        assert_eq!(key, parsed);
-        assert_eq!("random", parsed.1);
     }
 
     #[test]
