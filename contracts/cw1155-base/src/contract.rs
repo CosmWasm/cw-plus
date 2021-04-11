@@ -1,11 +1,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Api, Binary, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
-    StdResult, Uint128,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response, StdResult,
+    Uint128,
 };
 use cw_storage_plus::Bound;
 
-use cw0::{maybe_canonical, Event};
+use cw0::{maybe_addr, Event};
 use cw1155::{
     ApproveAllEvent, ApprovedForAllResponse, BalanceResponse, BatchBalanceResponse,
     Cw1155BatchReceiveMsg, Cw1155ExecuteMsg, Cw1155QueryMsg, Cw1155ReceiveMsg, Expiration,
@@ -32,7 +32,7 @@ pub fn instantiate(
     msg: InitMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    let minter = deps.api.addr_canonicalize(msg.minter.as_ref())?;
+    let minter = deps.api.addr_validate(&msg.minter)?;
     MINTER.save(deps.storage, &minter)?;
     Ok(Response::default())
 }
@@ -93,27 +93,25 @@ pub fn execute(
 /// Make sure permissions are checked before calling this.
 fn execute_transfer_inner<'a>(
     deps: &'a mut DepsMut,
-    from: Option<&'a Addr>,
-    to: Option<&'a Addr>,
+    from: Option<&'a str>,
+    to: Option<&'a str>,
     token_id: &'a str,
     amount: Uint128,
 ) -> Result<TransferEvent<'a>, ContractError> {
-    if let Some(from) = from {
-        let from_raw = deps.api.addr_canonicalize(from.as_ref())?;
+    if let Some(from_addr) = from {
         BALANCES.update(
             deps.storage,
-            (from_raw.as_slice(), token_id),
+            (from_addr, token_id),
             |balance: Option<Uint128>| -> StdResult<_> {
                 Ok(balance.unwrap_or_default().checked_sub(amount)?)
             },
         )?;
     }
 
-    if let Some(to) = to {
-        let canonical_to = deps.api.addr_canonicalize(to.as_ref())?;
+    if let Some(to_addr) = to {
         BALANCES.update(
             deps.storage,
-            (canonical_to.as_slice(), token_id),
+            (to_addr, token_id),
             |balance: Option<Uint128>| -> StdResult<_> {
                 Ok(balance.unwrap_or_default().checked_add(amount)?)
             },
@@ -131,13 +129,11 @@ fn execute_transfer_inner<'a>(
 /// returns true iff the sender can execute approve or reject on the contract
 fn check_can_approve(deps: Deps, env: &Env, owner: &Addr, operator: &Addr) -> StdResult<bool> {
     // owner can approve
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
-    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
-    if owner_raw == operator_raw {
+    if owner == operator {
         return Ok(true);
     }
     // operator can approve
-    let op = APPROVES.may_load(deps.storage, (&owner_raw, &operator_raw))?;
+    let op = APPROVES.may_load(deps.storage, (owner.as_ref(), operator.as_ref()))?;
     Ok(match op {
         Some(ex) => !ex.is_expired(&env.block),
         None => false,
@@ -159,19 +155,22 @@ fn guard_can_approve(
 
 pub fn execute_send_from(
     env: ExecuteEnv,
-    from: Addr,
-    to: Addr,
+    from: String,
+    to: String,
     token_id: TokenId,
     amount: Uint128,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
+    let from_addr = env.deps.api.addr_validate(&from)?;
+    let _to_addr = env.deps.api.addr_validate(&to)?;
+
     let ExecuteEnv {
         mut deps,
         env,
         info,
     } = env;
 
-    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
+    guard_can_approve(deps.as_ref(), &env, &from_addr, &info.sender)?;
 
     let mut rsp = Response::default();
 
@@ -180,8 +179,8 @@ pub fn execute_send_from(
 
     if let Some(msg) = msg {
         rsp.messages = vec![Cw1155ReceiveMsg {
-            operator: info.sender,
-            from: Some(from.clone()),
+            operator: info.sender.to_string(),
+            from: Some(from),
             amount,
             token_id: token_id.clone(),
             msg,
@@ -194,15 +193,16 @@ pub fn execute_send_from(
 
 pub fn execute_mint(
     env: ExecuteEnv,
-    to: Addr,
+    to: String,
     token_id: TokenId,
     amount: Uint128,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
 
-    let sender = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    if sender != MINTER.load(deps.storage)? {
+    let _to_addr = deps.api.addr_validate(&to)?;
+
+    if info.sender != MINTER.load(deps.storage)? {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -213,7 +213,7 @@ pub fn execute_mint(
 
     if let Some(msg) = msg {
         rsp.messages = vec![Cw1155ReceiveMsg {
-            operator: info.sender,
+            operator: info.sender.to_string(),
             from: None,
             amount,
             token_id: token_id.clone(),
@@ -233,7 +233,7 @@ pub fn execute_mint(
 
 pub fn execute_burn(
     env: ExecuteEnv,
-    from: Addr,
+    from: String,
     token_id: TokenId,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
@@ -243,8 +243,10 @@ pub fn execute_burn(
         env,
     } = env;
 
+    let from_addr = deps.api.addr_validate(&from)?;
+
     // whoever can transfer these tokens can burn
-    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
+    guard_can_approve(deps.as_ref(), &env, &from_addr, &info.sender)?;
 
     let mut rsp = Response::default();
     let event = execute_transfer_inner(&mut deps, Some(&from), None, &token_id, amount)?;
@@ -254,8 +256,8 @@ pub fn execute_burn(
 
 pub fn execute_batch_send_from(
     env: ExecuteEnv,
-    from: Addr,
-    to: Addr,
+    from: String,
+    to: String,
     batch: Vec<(TokenId, Uint128)>,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
@@ -265,7 +267,10 @@ pub fn execute_batch_send_from(
         info,
     } = env;
 
-    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
+    let from_addr = deps.api.addr_validate(&from)?;
+    let _to_addr = deps.api.addr_validate(&to)?;
+
+    guard_can_approve(deps.as_ref(), &env, &from_addr, &info.sender)?;
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.iter() {
@@ -275,7 +280,7 @@ pub fn execute_batch_send_from(
 
     if let Some(msg) = msg {
         rsp.messages = vec![Cw1155BatchReceiveMsg {
-            operator: info.sender,
+            operator: info.sender.to_string(),
             from: Some(from),
             batch,
             msg,
@@ -288,15 +293,16 @@ pub fn execute_batch_send_from(
 
 pub fn execute_batch_mint(
     env: ExecuteEnv,
-    to: Addr,
+    to: String,
     batch: Vec<(TokenId, Uint128)>,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
-    let sender = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    if sender != MINTER.load(deps.storage)? {
+    if info.sender != MINTER.load(deps.storage)? {
         return Err(ContractError::Unauthorized {});
     }
+
+    let _to_addr = deps.api.addr_validate(&to)?;
 
     let mut rsp = Response::default();
 
@@ -314,7 +320,7 @@ pub fn execute_batch_mint(
 
     if let Some(msg) = msg {
         rsp.messages = vec![Cw1155BatchReceiveMsg {
-            operator: info.sender,
+            operator: info.sender.to_string(),
             from: None,
             batch,
             msg,
@@ -327,7 +333,7 @@ pub fn execute_batch_mint(
 
 pub fn execute_batch_burn(
     env: ExecuteEnv,
-    from: Addr,
+    from: String,
     batch: Vec<(TokenId, Uint128)>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv {
@@ -336,7 +342,9 @@ pub fn execute_batch_burn(
         env,
     } = env;
 
-    guard_can_approve(deps.as_ref(), &env, &from, &info.sender)?;
+    let from_addr = deps.api.addr_validate(&from)?;
+
+    guard_can_approve(deps.as_ref(), &env, &from_addr, &info.sender)?;
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.into_iter() {
@@ -348,7 +356,7 @@ pub fn execute_batch_burn(
 
 pub fn execute_approve_all(
     env: ExecuteEnv,
-    operator: Addr,
+    operator: String,
     expires: Option<Expiration>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { deps, info, env } = env;
@@ -360,13 +368,16 @@ pub fn execute_approve_all(
     }
 
     // set the operator for us
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
-    APPROVES.save(deps.storage, (&sender_raw, &operator_raw), &expires)?;
+    let operator_addr = deps.api.addr_validate(&operator)?;
+    APPROVES.save(
+        deps.storage,
+        (info.sender.as_ref(), operator_addr.as_ref()),
+        &expires,
+    )?;
 
     let mut rsp = Response::default();
     ApproveAllEvent {
-        sender: &info.sender,
+        sender: info.sender.as_ref(),
         operator: &operator,
         approved: true,
     }
@@ -374,15 +385,14 @@ pub fn execute_approve_all(
     Ok(rsp)
 }
 
-pub fn execute_revoke_all(env: ExecuteEnv, operator: Addr) -> Result<Response, ContractError> {
+pub fn execute_revoke_all(env: ExecuteEnv, operator: String) -> Result<Response, ContractError> {
     let ExecuteEnv { deps, info, .. } = env;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_ref())?;
-    let operator_raw = deps.api.addr_canonicalize(operator.as_ref())?;
-    APPROVES.remove(deps.storage, (&sender_raw, &operator_raw));
+    let operator_addr = deps.api.addr_validate(&operator)?;
+    APPROVES.remove(deps.storage, (info.sender.as_ref(), operator_addr.as_ref()));
 
     let mut rsp = Response::default();
     ApproveAllEvent {
-        sender: &info.sender,
+        sender: info.sender.as_ref(),
         operator: &operator,
         approved: false,
     }
@@ -394,26 +404,28 @@ pub fn execute_revoke_all(env: ExecuteEnv, operator: Addr) -> Result<Response, C
 pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
     match msg {
         Cw1155QueryMsg::Balance { owner, token_id } => {
-            let canonical_owner = deps.api.addr_canonicalize(owner.as_ref())?;
+            let owner_addr = deps.api.addr_validate(&owner)?;
             let balance = BALANCES
-                .may_load(deps.storage, (canonical_owner.as_slice(), &token_id))?
+                .may_load(deps.storage, (owner_addr.as_ref(), &token_id))?
                 .unwrap_or_default();
             to_binary(&BalanceResponse { balance })
         }
         Cw1155QueryMsg::BatchBalance { owner, token_ids } => {
-            let canonical_owner = deps.api.addr_canonicalize(owner.as_ref())?;
+            let owner_addr = deps.api.addr_validate(&owner)?;
             let balances = token_ids
                 .into_iter()
                 .map(|token_id| -> StdResult<_> {
                     Ok(BALANCES
-                        .may_load(deps.storage, (canonical_owner.as_slice(), &token_id))?
+                        .may_load(deps.storage, (owner_addr.as_ref(), &token_id))?
                         .unwrap_or_default())
                 })
                 .collect::<StdResult<_>>()?;
             to_binary(&BatchBalanceResponse { balances })
         }
         Cw1155QueryMsg::IsApprovedForAll { owner, operator } => {
-            let approved = check_can_approve(deps, &env, &owner, &operator)?;
+            let owner_addr = deps.api.addr_validate(&owner)?;
+            let operator_addr = deps.api.addr_validate(&operator)?;
+            let approved = check_can_approve(deps, &env, &owner_addr, &operator_addr)?;
             to_binary(&IsApprovedForAllResponse { approved })
         }
         Cw1155QueryMsg::ApprovedForAll {
@@ -421,14 +433,18 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
             include_expired,
             start_after,
             limit,
-        } => to_binary(&query_all_approvals(
-            deps,
-            env,
-            owner,
-            include_expired.unwrap_or(false),
-            start_after,
-            limit,
-        )?),
+        } => {
+            let owner_addr = deps.api.addr_validate(&owner)?;
+            let start_addr = maybe_addr(deps.api, start_after)?;
+            to_binary(&query_all_approvals(
+                deps,
+                env,
+                owner_addr,
+                include_expired.unwrap_or(false),
+                start_addr,
+                limit,
+            )?)
+        }
         Cw1155QueryMsg::TokenInfo { token_id } => {
             let url = TOKENS.load(deps.storage, &token_id)?;
             to_binary(&TokenInfoResponse { url })
@@ -437,16 +453,19 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
             owner,
             start_after,
             limit,
-        } => to_binary(&query_tokens(deps, owner, start_after, limit)?),
+        } => {
+            let owner_addr = deps.api.addr_validate(&owner)?;
+            to_binary(&query_tokens(deps, owner_addr, start_after, limit)?)
+        }
         Cw1155QueryMsg::AllTokens { start_after, limit } => {
             to_binary(&query_all_tokens(deps, start_after, limit)?)
         }
     }
 }
 
-fn parse_approval(api: &dyn Api, item: StdResult<Pair<Expiration>>) -> StdResult<cw1155::Approval> {
+fn parse_approval(item: StdResult<Pair<Expiration>>) -> StdResult<cw1155::Approval> {
     item.and_then(|(k, expires)| {
-        let spender = api.addr_humanize(&k.into())?;
+        let spender = String::from_utf8(k)?;
         Ok(cw1155::Approval { spender, expires })
     })
 }
@@ -460,16 +479,14 @@ fn query_all_approvals(
     limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_canon = maybe_canonical(deps.api, start_after)?;
-    let start = start_canon.map(Bound::exclusive);
+    let start = start_after.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
     let operators = APPROVES
-        .prefix(&owner_raw)
+        .prefix(owner.as_ref())
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
-        .map(|item| parse_approval(deps.api, item))
+        .map(parse_approval)
         .collect::<StdResult<_>>()?;
     Ok(ApprovedForAllResponse { operators })
 }
@@ -483,9 +500,8 @@ fn query_tokens(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
     let tokens = BALANCES
-        .prefix(&owner_raw)
+        .prefix(owner.as_ref())
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))
