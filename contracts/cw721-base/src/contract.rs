@@ -519,7 +519,7 @@ fn query_tokens(
         .owner
         .pks(
             deps.storage,
-            PkOwned(owner_addr.to_string().into_bytes()),
+            PkOwned(Vec::from(owner_addr.as_ref())),
             start,
             None,
             Order::Ascending,
