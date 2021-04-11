@@ -654,7 +654,7 @@ mod tests {
                 deps.as_mut(),
                 mock_env(),
                 mock_info(minter.as_ref(), &[]),
-                transfer_msg.clone(),
+                transfer_msg,
             )
             .unwrap(),
             Response {
@@ -836,7 +836,7 @@ mod tests {
                 mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::SendFrom {
                     from: user1.clone(),
-                    to: user2.clone(),
+                    to: user2,
                     token_id: token1.clone(),
                     value: 1u64.into(),
                     msg: None,
@@ -979,7 +979,7 @@ mod tests {
                     operator: user1.clone(),
                     from: Some(user1.clone()),
                     batch: vec![(token2.clone(), 1u64.into())],
-                    msg: dummy_msg.clone(),
+                    msg: dummy_msg,
                 }
                 .into_cosmos_msg(receiver.clone())
                 .unwrap()],
@@ -1000,9 +1000,7 @@ mod tests {
         // mint multiple types of tokens, and query them
         // grant approval to multiple operators, and query them
         let tokens = (0..10).map(|i| format!("token{}", i)).collect::<Vec<_>>();
-        let users = (0..10)
-            .map(|i| String::from(format!("user{}", i)))
-            .collect::<Vec<_>>();
+        let users = (0..10).map(|i| format!("user{}", i)).collect::<Vec<_>>();
         let minter = String::from("minter");
 
         let mut deps = mock_dependencies(&[]);
@@ -1108,7 +1106,7 @@ mod tests {
             ),
             to_binary(&ApprovedForAllResponse {
                 operators: vec![cw1155::Approval {
-                    spender: users[3].clone().into(),
+                    spender: users[3].clone(),
                     expires: Expiration::Never {}
                 }],
             })
@@ -1141,7 +1139,7 @@ mod tests {
             mock_info(minter.as_ref(), &[]),
             Cw1155ExecuteMsg::Mint {
                 to: user1.clone(),
-                token_id: token1.clone(),
+                token_id: token1,
                 value: 1u64.into(),
                 msg: None,
             },
@@ -1174,8 +1172,8 @@ mod tests {
         .unwrap();
 
         let query_msg = Cw1155QueryMsg::IsApprovedForAll {
-            owner: user1.clone(),
-            operator: user2.clone(),
+            owner: user1,
+            operator: user2,
         };
         assert_eq!(
             query(deps.as_ref(), env, query_msg.clone()),
@@ -1224,11 +1222,11 @@ mod tests {
         assert!(matches!(
             execute(
                 deps.as_mut(),
-                env.clone(),
+                env,
                 mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::Mint {
-                    to: user1.clone(),
-                    token_id: token1.clone(),
+                    to: user1,
+                    token_id: token1,
                     value: 1u64.into(),
                     msg: None,
                 },
