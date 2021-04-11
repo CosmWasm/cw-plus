@@ -513,13 +513,13 @@ fn query_tokens(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let owner_raw = deps.api.addr_canonicalize(owner.as_ref())?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
     let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
         .pks(
             deps.storage,
-            PkOwned(owner_raw.into()),
+            PkOwned(owner_addr.to_string().into_bytes()),
             start,
             None,
             Order::Ascending,
@@ -591,7 +591,7 @@ fn humanize_approval(approval: &Approval) -> cw721::Approval {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_binary, Addr, CosmosMsg, WasmMsg};
+    use cosmwasm_std::{from_binary, CosmosMsg, WasmMsg};
 
     use super::*;
     use cw721::ApprovedForAllResponse;
@@ -604,7 +604,7 @@ mod tests {
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
-            minter: Addr::unchecked(MINTER),
+            minter: String::from(MINTER),
         };
         let info = mock_info("creator", &[]);
         let res = instantiate(deps, mock_env(), info, msg).unwrap();
@@ -618,7 +618,7 @@ mod tests {
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
             symbol: SYMBOL.to_string(),
-            minter: Addr::unchecked(MINTER),
+            minter: String::from(MINTER),
         };
         let info = mock_info("creator", &[]);
 
@@ -628,7 +628,7 @@ mod tests {
 
         // it worked, let's query the state
         let res = query_minter(deps.as_ref()).unwrap();
-        assert_eq!(MINTER, res.minter.as_ref());
+        assert_eq!(MINTER, res.minter);
         let info = query_contract_info(deps.as_ref()).unwrap();
         assert_eq!(
             info,
@@ -657,7 +657,7 @@ mod tests {
 
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
-            owner: Addr::unchecked("medusa"),
+            owner: String::from("medusa"),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
@@ -695,7 +695,7 @@ mod tests {
         assert_eq!(
             owner,
             OwnerOfResponse {
-                owner: Addr::unchecked("medusa"),
+                owner: String::from("medusa"),
                 approvals: vec![],
             }
         );
@@ -703,7 +703,7 @@ mod tests {
         // Cannot mint same token_id again
         let mint_msg2 = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
-            owner: Addr::unchecked("hercules"),
+            owner: String::from("hercules"),
             name: "copy cat".into(),
             description: None,
             image: None,
@@ -731,7 +731,7 @@ mod tests {
 
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
-            owner: Addr::unchecked("venus"),
+            owner: String::from("venus"),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
@@ -743,7 +743,7 @@ mod tests {
         // random cannot transfer
         let random = mock_info("random", &[]);
         let transfer_msg = ExecuteMsg::TransferNft {
-            recipient: Addr::unchecked("random"),
+            recipient: String::from("random"),
             token_id: token_id.clone(),
         };
 
@@ -753,7 +753,7 @@ mod tests {
         // owner can
         let random = mock_info("venus", &[]);
         let transfer_msg = ExecuteMsg::TransferNft {
-            recipient: Addr::unchecked("random"),
+            recipient: String::from("random"),
             token_id: token_id.clone(),
         };
 
@@ -787,7 +787,7 @@ mod tests {
 
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
-            owner: Addr::unchecked("venus"),
+            owner: String::from("venus"),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
@@ -797,7 +797,7 @@ mod tests {
         execute(deps.as_mut(), mock_env(), minter, mint_msg).unwrap();
 
         let msg = to_binary("You now have the melting power").unwrap();
-        let target = Addr::unchecked("another_contract");
+        let target = String::from("another_contract");
         let send_msg = ExecuteMsg::SendNft {
             contract: target.clone(),
             token_id: token_id.clone(),
@@ -813,7 +813,7 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), random, send_msg).unwrap();
 
         let payload = Cw721ReceiveMsg {
-            sender: Addr::unchecked("venus"),
+            sender: String::from("venus"),
             token_id: token_id.clone(),
             msg: Some(msg),
         };
@@ -854,7 +854,7 @@ mod tests {
 
         let mint_msg = ExecuteMsg::Mint(MintMsg {
             token_id: token_id.clone(),
-            owner: Addr::unchecked("demeter"),
+            owner: String::from("demeter"),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
@@ -865,7 +865,7 @@ mod tests {
 
         // Give random transferring power
         let approve_msg = ExecuteMsg::Approve {
-            spender: Addr::unchecked("random"),
+            spender: String::from("random"),
             token_id: token_id.clone(),
             expires: None,
         };
@@ -889,7 +889,7 @@ mod tests {
         // random can now transfer
         let random = mock_info("random", &[]);
         let transfer_msg = ExecuteMsg::TransferNft {
-            recipient: Addr::unchecked("person"),
+            recipient: String::from("person"),
             token_id: token_id.clone(),
         };
         execute(deps.as_mut(), mock_env(), random, transfer_msg).unwrap();
@@ -904,14 +904,14 @@ mod tests {
         assert_eq!(
             res,
             OwnerOfResponse {
-                owner: Addr::unchecked("person"),
+                owner: String::from("person"),
                 approvals: vec![],
             }
         );
 
         // Approve, revoke, and check for empty, to test revoke
         let approve_msg = ExecuteMsg::Approve {
-            spender: Addr::unchecked("random"),
+            spender: String::from("random"),
             token_id: token_id.clone(),
             expires: None,
         };
@@ -919,7 +919,7 @@ mod tests {
         execute(deps.as_mut(), mock_env(), owner.clone(), approve_msg).unwrap();
 
         let revoke_msg = ExecuteMsg::Revoke {
-            spender: Addr::unchecked("random"),
+            spender: String::from("random"),
             token_id: token_id.clone(),
         };
         execute(deps.as_mut(), mock_env(), owner, revoke_msg).unwrap();
@@ -930,7 +930,7 @@ mod tests {
         assert_eq!(
             res,
             OwnerOfResponse {
-                owner: Addr::unchecked("person"),
+                owner: String::from("person"),
                 approvals: vec![],
             }
         );
@@ -951,7 +951,7 @@ mod tests {
 
         let mint_msg1 = ExecuteMsg::Mint(MintMsg {
             token_id: token_id1.clone(),
-            owner: Addr::unchecked("demeter"),
+            owner: String::from("demeter"),
             name: name1.clone(),
             description: Some(description1.clone()),
             image: None,
@@ -962,7 +962,7 @@ mod tests {
 
         let mint_msg2 = ExecuteMsg::Mint(MintMsg {
             token_id: token_id2.clone(),
-            owner: Addr::unchecked("demeter"),
+            owner: String::from("demeter"),
             name: name2.clone(),
             description: Some(description2.clone()),
             image: None,
@@ -980,7 +980,7 @@ mod tests {
 
         // demeter gives random full (operator) power over her tokens
         let approve_all_msg = ExecuteMsg::ApproveAll {
-            operator: Addr::unchecked("random"),
+            operator: String::from("random"),
             expires: None,
         };
         let owner = mock_info("demeter", &[]);
@@ -1002,7 +1002,7 @@ mod tests {
         // random can now transfer
         let random = mock_info("random", &[]);
         let transfer_msg = ExecuteMsg::TransferNft {
-            recipient: Addr::unchecked("person"),
+            recipient: String::from("person"),
             token_id: token_id1.clone(),
         };
         execute(deps.as_mut(), mock_env(), random.clone(), transfer_msg).unwrap();
@@ -1016,7 +1016,7 @@ mod tests {
         let msg: CosmosMsg = CosmosMsg::Wasm(inner_msg);
 
         let send_msg = ExecuteMsg::SendNft {
-            contract: Addr::unchecked("another_contract"),
+            contract: String::from("another_contract"),
             token_id: token_id2.clone(),
             msg: Some(to_binary(&msg).unwrap()),
         };
@@ -1024,7 +1024,7 @@ mod tests {
 
         // Approve_all, revoke_all, and check for empty, to test revoke_all
         let approve_all_msg = ExecuteMsg::ApproveAll {
-            operator: Addr::unchecked("operator"),
+            operator: String::from("operator"),
             expires: None,
         };
         // person is now the owner of the tokens
@@ -1034,7 +1034,7 @@ mod tests {
         let res = query_all_approvals(
             deps.as_ref(),
             mock_env(),
-            Addr::unchecked("person"),
+            String::from("person"),
             true,
             None,
             None,
@@ -1044,7 +1044,7 @@ mod tests {
             res,
             ApprovedForAllResponse {
                 operators: vec![cw721::Approval {
-                    spender: Addr::unchecked("operator"),
+                    spender: String::from("operator"),
                     expires: Expiration::Never {}
                 }]
             }
@@ -1053,7 +1053,7 @@ mod tests {
         // second approval
         let buddy_expires = Expiration::AtHeight(1234567);
         let approve_all_msg = ExecuteMsg::ApproveAll {
-            operator: Addr::unchecked("buddy"),
+            operator: String::from("buddy"),
             expires: Some(buddy_expires),
         };
         let owner = mock_info("person", &[]);
@@ -1063,7 +1063,7 @@ mod tests {
         let res = query_all_approvals(
             deps.as_ref(),
             mock_env(),
-            Addr::unchecked("person"),
+            String::from("person"),
             true,
             None,
             Some(1),
@@ -1073,7 +1073,7 @@ mod tests {
             res,
             ApprovedForAllResponse {
                 operators: vec![cw721::Approval {
-                    spender: Addr::unchecked("buddy"),
+                    spender: String::from("buddy"),
                     expires: buddy_expires,
                 }]
             }
@@ -1081,9 +1081,9 @@ mod tests {
         let res = query_all_approvals(
             deps.as_ref(),
             mock_env(),
-            Addr::unchecked("person"),
+            String::from("person"),
             true,
-            Some(Addr::unchecked("buddy")),
+            Some(String::from("buddy")),
             Some(2),
         )
         .unwrap();
@@ -1091,14 +1091,14 @@ mod tests {
             res,
             ApprovedForAllResponse {
                 operators: vec![cw721::Approval {
-                    spender: Addr::unchecked("operator"),
+                    spender: String::from("operator"),
                     expires: Expiration::Never {}
                 }]
             }
         );
 
         let revoke_all_msg = ExecuteMsg::RevokeAll {
-            operator: Addr::unchecked("operator"),
+            operator: String::from("operator"),
         };
         execute(deps.as_mut(), mock_env(), owner, revoke_all_msg).unwrap();
 
@@ -1106,7 +1106,7 @@ mod tests {
         let res = query_all_approvals(
             deps.as_ref(),
             mock_env(),
-            Addr::unchecked("person"),
+            String::from("person"),
             false,
             None,
             None,
@@ -1116,7 +1116,7 @@ mod tests {
             res,
             ApprovedForAllResponse {
                 operators: vec![cw721::Approval {
-                    spender: Addr::unchecked("buddy"),
+                    spender: String::from("buddy"),
                     expires: buddy_expires,
                 }]
             }
@@ -1128,7 +1128,7 @@ mod tests {
         let res = query_all_approvals(
             deps.as_ref(),
             late_env,
-            Addr::unchecked("person"),
+            String::from("person"),
             false,
             None,
             None,
@@ -1145,9 +1145,9 @@ mod tests {
 
         // Mint a couple tokens (from the same owner)
         let token_id1 = "grow1".to_string();
-        let demeter = Addr::unchecked("Demeter");
+        let demeter = String::from("Demeter");
         let token_id2 = "grow2".to_string();
-        let ceres = Addr::unchecked("Ceres");
+        let ceres = String::from("Ceres");
         let token_id3 = "sing".to_string();
 
         let mint_msg = ExecuteMsg::Mint(MintMsg {
