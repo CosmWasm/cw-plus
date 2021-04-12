@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 use std::str::from_utf8;
 
+use cosmwasm_std::Addr;
+
 use crate::addr::AddrRef;
 use crate::helpers::{decode_length, namespaces_with_key};
 use crate::Endian;
@@ -20,7 +22,7 @@ pub trait PrimaryKey<'a>: Clone {
     }
 
     /// extracts a single or composite key from a joined key,
-    /// only lives as long as the original bytes
+    /// and returns it as an owned object.
     fn parse_key(serialized: &'a [u8]) -> Self;
 }
 
@@ -35,6 +37,34 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
 
     fn parse_key(serialized: &'a [u8]) -> Self {
         serialized
+    }
+}
+
+impl<'a> PrimaryKey<'a> for Vec<u8> {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self]
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        serialized.to_owned()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for Addr {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_ref().as_bytes()]
+    }
+
+    fn parse_key(serialized: &'a [u8]) -> Self {
+        Addr::unchecked(from_utf8(serialized).unwrap())
     }
 }
 

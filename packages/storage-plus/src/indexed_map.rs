@@ -54,13 +54,13 @@ where
     /// save will serialize the model and store, returns an error on serialization issues.
     /// this must load the old value to update the indexes properly
     /// if you loaded the old value earlier in the same function, use replace to avoid needless db reads
-    pub fn save(&self, store: &mut dyn Storage, key: K, data: &T) -> StdResult<()> {
-        let old_data = self.may_load(store, key.clone())?;
+    pub fn save(&self, store: &mut dyn Storage, key: &K, data: &T) -> StdResult<()> {
+        let old_data = self.may_load(store, key)?;
         self.replace(store, key, Some(data), old_data.as_ref())
     }
 
-    pub fn remove(&self, store: &mut dyn Storage, key: K) -> StdResult<()> {
-        let old_data = self.may_load(store, key.clone())?;
+    pub fn remove(&self, store: &mut dyn Storage, key: &K) -> StdResult<()> {
+        let old_data = self.may_load(store, key)?;
         self.replace(store, key, None, old_data.as_ref())
     }
 
@@ -70,7 +70,7 @@ where
     pub fn replace(
         &self,
         store: &mut dyn Storage,
-        key: K,
+        key: &K,
         data: Option<&T>,
         old_data: Option<&T>,
     ) -> StdResult<()> {
@@ -96,12 +96,12 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&self, store: &mut dyn Storage, key: K, action: A) -> Result<T, E>
+    pub fn update<A, E>(&self, store: &mut dyn Storage, key: &K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
     {
-        let input = self.may_load(store, key.clone())?;
+        let input = self.may_load(store, key)?;
         let old_val = input.clone();
         let output = action(input)?;
         self.replace(store, key, Some(&output), old_val.as_ref())?;
@@ -112,13 +112,13 @@ where
     // thus can be used from while iterating over indexes
 
     /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self, store: &dyn Storage, key: K) -> StdResult<T> {
+    pub fn load(&self, store: &dyn Storage, key: &K) -> StdResult<T> {
         self.primary.load(store, key)
     }
 
     /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
     /// returns an error on issues parsing
-    pub fn may_load(&self, store: &dyn Storage, key: K) -> StdResult<Option<T>> {
+    pub fn may_load(&self, store: &dyn Storage, key: &K) -> StdResult<Option<T>> {
         self.primary.may_load(store, key)
     }
 
@@ -232,7 +232,7 @@ mod test {
             age: 42,
         };
         let pk: &[u8] = b"1";
-        map.save(store, pk, &data).unwrap();
+        map.save(store, &pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
 
@@ -243,7 +243,7 @@ mod test {
             age: 23,
         };
         let pk: &[u8] = b"2";
-        map.save(store, pk, &data).unwrap();
+        map.save(store, &pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
 
@@ -254,7 +254,7 @@ mod test {
             age: 32,
         };
         let pk: &[u8] = b"3";
-        map.save(store, pk, &data).unwrap();
+        map.save(store, &pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
 
@@ -264,7 +264,7 @@ mod test {
             age: 12,
         };
         let pk: &[u8] = b"4";
-        map.save(store, pk, &data).unwrap();
+        map.save(store, &pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
 
@@ -282,7 +282,7 @@ mod test {
         let data = &datas[0];
 
         // load it properly
-        let loaded = map.load(&store, pk).unwrap();
+        let loaded = map.load(&store, &pk).unwrap();
         assert_eq!(*data, loaded);
 
         let count = map
@@ -342,13 +342,13 @@ mod test {
 
         // match on proper age
         let proper = U32Key::new(42);
-        let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
+        let aged = map.idx.age.item(&store, &proper).unwrap().unwrap();
         assert_eq!(pk.to_vec(), aged.0);
         assert_eq!(*data, aged.1);
 
         // no match on wrong age
         let too_old = U32Key::new(43);
-        let aged = map.idx.age.item(&store, too_old).unwrap();
+        let aged = map.idx.age.item(&store, &too_old).unwrap();
         assert_eq!(None, aged);
     }
 
@@ -364,7 +364,7 @@ mod test {
             age: 42,
         };
         let pk: &[u8] = b"5627";
-        map.save(&mut store, pk, &data1).unwrap();
+        map.save(&mut store, &pk, &data1).unwrap();
 
         let data2 = Data {
             name: "Juan".to_string(),
@@ -372,7 +372,7 @@ mod test {
             age: 13,
         };
         let pk: &[u8] = b"5628";
-        map.save(&mut store, pk, &data2).unwrap();
+        map.save(&mut store, &pk, &data2).unwrap();
 
         let data3 = Data {
             name: "Maria".to_string(),
@@ -380,7 +380,7 @@ mod test {
             age: 24,
         };
         let pk: &[u8] = b"5629";
-        map.save(&mut store, pk, &data3).unwrap();
+        map.save(&mut store, &pk, &data3).unwrap();
 
         let data4 = Data {
             name: "Maria Luisa".to_string(),
@@ -388,7 +388,7 @@ mod test {
             age: 12,
         };
         let pk: &[u8] = b"5630";
-        map.save(&mut store, pk, &data4).unwrap();
+        map.save(&mut store, &pk, &data4).unwrap();
 
         let marias: Vec<_> = map
             .idx
@@ -428,7 +428,7 @@ mod test {
             age: 42,
         };
         let pk1: &[u8] = b"5627";
-        map.save(&mut store, pk1, &data1).unwrap();
+        map.save(&mut store, &pk1, &data1).unwrap();
 
         let data2 = Data {
             name: "Juan".to_string(),
@@ -436,7 +436,7 @@ mod test {
             age: 13,
         };
         let pk2: &[u8] = b"5628";
-        map.save(&mut store, pk2, &data2).unwrap();
+        map.save(&mut store, &pk2, &data2).unwrap();
 
         let data3 = Data {
             name: "Maria".to_string(),
@@ -444,7 +444,7 @@ mod test {
             age: 24,
         };
         let pk3: &[u8] = b"5629";
-        map.save(&mut store, pk3, &data3).unwrap();
+        map.save(&mut store, &pk3, &data3).unwrap();
 
         let data4 = Data {
             name: "Maria Luisa".to_string(),
@@ -452,7 +452,7 @@ mod test {
             age: 43,
         };
         let pk4: &[u8] = b"5630";
-        map.save(&mut store, pk4, &data4).unwrap();
+        map.save(&mut store, &pk4, &data4).unwrap();
 
         let marias: Vec<_> = map
             .idx
@@ -490,28 +490,28 @@ mod test {
         let pk5: &[u8] = b"4";
 
         // enforce this returns some error
-        map.save(&mut store, pk5, &data5).unwrap_err();
+        map.save(&mut store, &pk5, &data5).unwrap_err();
 
         // query by unique key
         // match on proper age
         let age42 = U32Key::new(42);
-        let (k, v) = map.idx.age.item(&store, age42.clone()).unwrap().unwrap();
+        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pks[0]);
         assert_eq!(v.name, datas[0].name);
         assert_eq!(v.age, datas[0].age);
 
         // match on other age
         let age23 = U32Key::new(23);
-        let (k, v) = map.idx.age.item(&store, age23).unwrap().unwrap();
+        let (k, v) = map.idx.age.item(&store, &age23).unwrap().unwrap();
         assert_eq!(k.as_slice(), pks[1]);
         assert_eq!(v.name, datas[1].name);
         assert_eq!(v.age, datas[1].age);
 
         // if we delete the first one, we can add the blocked one
-        map.remove(&mut store, pks[0]).unwrap();
-        map.save(&mut store, pk5, &data5).unwrap();
+        map.remove(&mut store, &pks[0]).unwrap();
+        map.save(&mut store, &pk5, &data5).unwrap();
         // now 42 is the new owner
-        let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
+        let (k, v) = map.idx.age.item(&store, &age42).unwrap().unwrap();
         assert_eq!(k.as_slice(), pk5);
         assert_eq!(v.name, data5.name);
         assert_eq!(v.age, data5.age);
@@ -533,7 +533,7 @@ mod test {
         };
         let pk5: &[u8] = b"5";
         // enforce this returns some error
-        map.save(&mut store, pk5, &data5).unwrap_err();
+        map.save(&mut store, &pk5, &data5).unwrap_err();
     }
 
     #[test]
@@ -567,10 +567,10 @@ mod test {
         assert_eq!(name_count(&map, &store, "Mary"), 0);
 
         // remove maria 2
-        map.remove(&mut store, pks[1]).unwrap();
+        map.remove(&mut store, &pks[1]).unwrap();
 
         // change john to mary
-        map.update(&mut store, pks[2], |d| -> StdResult<_> {
+        map.update(&mut store, &pks[2], |d| -> StdResult<_> {
             let mut x = d.unwrap();
             assert_eq!(&x.name, "John");
             x.name = "Mary".to_string();

@@ -13,7 +13,7 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
-use cw_storage_plus::{AddrRef, Bound};
+use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -56,7 +56,7 @@ pub fn instantiate(
     // add all voters
     for voter in msg.voters.iter() {
         let key = deps.api.addr_validate(&voter.addr)?;
-        VOTERS.save(deps.storage, AddrRef::new(&key), &voter.weight)?;
+        VOTERS.save(deps.storage, &key, &voter.weight)?;
     }
     Ok(Response::default())
 }
@@ -92,9 +92,8 @@ pub fn execute_propose(
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
-    let sender = AddrRef::new(&info.sender);
     let vote_power = VOTERS
-        .may_load(deps.storage, sender)?
+        .may_load(deps.storage, &info.sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     let cfg = CONFIG.load(deps.storage)?;
@@ -126,14 +125,14 @@ pub fn execute_propose(
         required_weight: cfg.required_weight,
     };
     let id = next_id(deps.storage)?;
-    PROPOSALS.save(deps.storage, id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, &id.into(), &prop)?;
 
     // add the first yes vote from voter
     let ballot = Ballot {
         weight: vote_power,
         vote: Vote::Yes,
     };
-    BALLOTS.save(deps.storage, (id.into(), sender), &ballot)?;
+    BALLOTS.save(deps.storage, &(id.into(), info.sender.clone()), &ballot)?;
 
     Ok(Response {
         submessages: vec![],
@@ -156,13 +155,12 @@ pub fn execute_vote(
     vote: Vote,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
-    let sender = AddrRef::new(&info.sender);
     let vote_power = VOTERS
-        .may_load(deps.storage, sender)?
+        .may_load(deps.storage, &info.sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, &proposal_id.into())?;
     if prop.status != Status::Open {
         return Err(ContractError::NotOpen {});
     }
@@ -173,7 +171,7 @@ pub fn execute_vote(
     // cast vote if no vote previously cast
     BALLOTS.update(
         deps.storage,
-        (proposal_id.into(), sender),
+        &(proposal_id.into(), info.sender.clone()),
         |bal| match bal {
             Some(_) => Err(ContractError::AlreadyVoted {}),
             None => Ok(Ballot {
@@ -190,7 +188,7 @@ pub fn execute_vote(
         if prop.yes_weight >= prop.required_weight {
             prop.status = Status::Passed;
         }
-        PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
+        PROPOSALS.save(deps.storage, &proposal_id.into(), &prop)?;
     }
 
     Ok(Response {
@@ -214,7 +212,7 @@ pub fn execute_execute(
 ) -> Result<Response, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, &proposal_id.into())?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
     if prop.status != Status::Passed {
@@ -223,7 +221,7 @@ pub fn execute_execute(
 
     // set it to executed
     prop.status = Status::Executed;
-    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, &proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
     Ok(Response {
@@ -246,7 +244,7 @@ pub fn execute_close(
 ) -> Result<Response<Empty>, ContractError> {
     // anyone can trigger this if the vote passed
 
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id.into())?;
+    let mut prop = PROPOSALS.load(deps.storage, &proposal_id.into())?;
     if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
         .any(|x| *x == prop.status)
@@ -259,7 +257,7 @@ pub fn execute_close(
 
     // set it to failed
     prop.status = Status::Rejected;
-    PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
+    PROPOSALS.save(deps.storage, &proposal_id.into(), &prop)?;
 
     Ok(Response {
         submessages: vec![],
@@ -307,7 +305,7 @@ fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
 }
 
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
-    let prop = PROPOSALS.load(deps.storage, id.into())?;
+    let prop = PROPOSALS.load(deps.storage, &id.into())?;
     let status = prop.current_status(&env.block);
 
     let cfg = CONFIG.load(deps.storage)?;
@@ -395,12 +393,10 @@ fn map_proposal(
 }
 
 fn query_vote(deps: Deps, proposal_id: u64, voter: String) -> StdResult<VoteResponse> {
-    let ballot = BALLOTS.may_load(
-        deps.storage,
-        (proposal_id.into(), AddrRef::unchecked(&voter)),
-    )?;
+    let voter = deps.api.addr_validate(&voter)?;
+    let ballot = BALLOTS.may_load(deps.storage, &(proposal_id.into(), voter.clone()))?;
     let vote = ballot.map(|b| VoteInfo {
-        voter,
+        voter: voter.into(),
         vote: b.vote,
         weight: b.weight,
     });
@@ -434,7 +430,8 @@ fn list_votes(
 }
 
 fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
-    let weight = VOTERS.may_load(deps.storage, AddrRef::unchecked(&voter))?;
+    let voter = deps.api.addr_validate(&voter)?;
+    let weight = VOTERS.may_load(deps.storage, &voter)?;
     Ok(VoterResponse { weight })
 }
 

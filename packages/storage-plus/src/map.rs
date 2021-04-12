@@ -33,7 +33,7 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn key(&self, k: K) -> Path<T> {
+    pub fn key(&self, k: &K) -> Path<T> {
         Path::new(self.namespace, &k.key())
     }
 
@@ -47,22 +47,22 @@ where
         Prefix::new(self.namespace, &p.prefix())
     }
 
-    pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {
+    pub fn save(&self, store: &mut dyn Storage, k: &K, data: &T) -> StdResult<()> {
         self.key(k).save(store, data)
     }
 
-    pub fn remove(&self, store: &mut dyn Storage, k: K) {
+    pub fn remove(&self, store: &mut dyn Storage, k: &K) {
         self.key(k).remove(store)
     }
 
     /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self, store: &dyn Storage, k: K) -> StdResult<T> {
+    pub fn load(&self, store: &dyn Storage, k: &K) -> StdResult<T> {
         self.key(k).load(store)
     }
 
     /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
     /// returns an error on issues parsing
-    pub fn may_load(&self, store: &dyn Storage, k: K) -> StdResult<Option<T>> {
+    pub fn may_load(&self, store: &dyn Storage, k: &K) -> StdResult<Option<T>> {
         self.key(k).may_load(store)
     }
 
@@ -70,7 +70,7 @@ where
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
     /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
-    pub fn update<A, E>(&self, store: &mut dyn Storage, k: K, action: A) -> Result<T, E>
+    pub fn update<A, E>(&self, store: &mut dyn Storage, k: &K, action: A) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
@@ -133,22 +133,23 @@ mod test {
         pub age: i32,
     }
 
-    const PEOPLE: Map<&[u8], Data> = Map::new("people");
+    const PEOPLE: Map<Vec<u8>, Data> = Map::new("people");
 
-    const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
+    const ALLOWANCE: Map<(&[u8], Vec<u8>), u64> = Map::new("allow");
 
     const TRIPLE: Map<(&[u8], U8Key, &str), u64> = Map::new("triple");
 
     #[test]
     fn create_path() {
-        let path = PEOPLE.key(b"john");
+        let john_key = b"john".to_vec();
+        let path = PEOPLE.key(&john_key);
         let key = path.deref();
         // this should be prefixed(people) || john
-        assert_eq!("people".len() + "john".len() + 2, key.len());
+        assert_eq!("people".len() + john_key.len() + 2, key.len());
         assert_eq!(b"people".to_vec().as_slice(), &key[2..8]);
         assert_eq!(b"john".to_vec().as_slice(), &key[8..]);
 
-        let path = ALLOWANCE.key((b"john", b"maria"));
+        let path = ALLOWANCE.key(&(b"john", b"maria".to_vec()));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!(
@@ -159,7 +160,7 @@ mod test {
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
 
-        let path = TRIPLE.key((b"john", 8u8.into(), "pedro"));
+        let path = TRIPLE.key(&(b"john", 8u8.into(), "pedro"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!(
@@ -177,7 +178,9 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on one key
-        let john = PEOPLE.key(b"john");
+        let john_key = b"john".to_vec();
+        let jack_key = b"jack".to_vec();
+        let john = PEOPLE.key(&john_key);
         let data = Data {
             name: "John".to_string(),
             age: 32,
@@ -187,10 +190,10 @@ mod test {
         assert_eq!(data, john.load(&store).unwrap());
 
         // nothing on another key
-        assert_eq!(None, PEOPLE.may_load(&store, b"jack").unwrap());
+        assert_eq!(None, PEOPLE.may_load(&store, &jack_key).unwrap());
 
         // same named path gets the data
-        assert_eq!(data, PEOPLE.load(&store, b"john").unwrap());
+        assert_eq!(data, PEOPLE.load(&store, &john_key).unwrap());
 
         // removing leaves us empty
         john.remove(&mut store);
@@ -202,17 +205,21 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on a composite key
-        let allow = ALLOWANCE.key((b"owner", b"spender"));
+        let allow = ALLOWANCE.key(&(b"owner", b"spender".to_vec()));
         assert_eq!(None, allow.may_load(&store).unwrap());
         allow.save(&mut store, &1234).unwrap();
         assert_eq!(1234, allow.load(&store).unwrap());
 
         // not under other key
-        let different = ALLOWANCE.may_load(&store, (b"owners", b"pender")).unwrap();
+        let different = ALLOWANCE
+            .may_load(&store, &(b"owners", b"pender".to_vec()))
+            .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
-        let same = ALLOWANCE.load(&store, (b"owner", b"spender")).unwrap();
+        let same = ALLOWANCE
+            .load(&store, &(b"owner", b"spender".to_vec()))
+            .unwrap();
         assert_eq!(1234, same);
     }
 
@@ -221,20 +228,20 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on a triple composite key
-        let triple = TRIPLE.key((b"owner", 10u8.into(), "recipient"));
+        let triple = TRIPLE.key(&(b"owner", 10u8.into(), "recipient"));
         assert_eq!(None, triple.may_load(&store).unwrap());
         triple.save(&mut store, &1234).unwrap();
         assert_eq!(1234, triple.load(&store).unwrap());
 
         // not under other key
         let different = TRIPLE
-            .may_load(&store, (b"owners", 10u8.into(), "ecipient"))
+            .may_load(&store, &(b"owners", 10u8.into(), "ecipient"))
             .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
         let same = TRIPLE
-            .load(&store, (b"owner", 10u8.into(), "recipient"))
+            .load(&store, &(b"owner", 10u8.into(), "recipient"))
             .unwrap();
         assert_eq!(1234, same);
     }
@@ -245,17 +252,19 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on two keys
+        let john_key = b"john".to_vec();
+        let jim_key = b"jack".to_vec();
         let data = Data {
             name: "John".to_string(),
             age: 32,
         };
-        PEOPLE.save(&mut store, b"john", &data).unwrap();
+        PEOPLE.save(&mut store, &john_key, &data).unwrap();
 
         let data2 = Data {
             name: "Jim".to_string(),
             age: 44,
         };
-        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
+        PEOPLE.save(&mut store, &jim_key, &data2).unwrap();
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
@@ -264,8 +273,8 @@ mod test {
         assert_eq!(
             all,
             vec![
-                (b"jim".to_vec(), data2.clone()),
-                (b"john".to_vec(), data.clone())
+                (jim_key.clone(), data2.clone()),
+                (john_key.clone(), data.clone())
             ]
         );
 
@@ -282,7 +291,7 @@ mod test {
         assert_eq!(2, all.len());
         assert_eq!(
             all,
-            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+            vec![(jim_key, data2), (john_key.clone(), data.clone())]
         );
 
         // let's try to iterate over a more restrictive range
@@ -296,7 +305,7 @@ mod test {
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
-        assert_eq!(all, vec![(b"john".to_vec(), data)]);
+        assert_eq!(all, vec![(john_key, data)]);
     }
 
     #[test]
@@ -306,13 +315,13 @@ mod test {
 
         // save and load on three keys, one under different owner
         ALLOWANCE
-            .save(&mut store, (b"owner", b"spender"), &1000)
+            .save(&mut store, &(b"owner", b"spender".to_vec()), &1000)
             .unwrap();
         ALLOWANCE
-            .save(&mut store, (b"owner", b"spender2"), &3000)
+            .save(&mut store, &(b"owner", b"spender2".to_vec()), &3000)
             .unwrap();
         ALLOWANCE
-            .save(&mut store, (b"owner2", b"spender"), &5000)
+            .save(&mut store, &(b"owner2", b"spender".to_vec()), &5000)
             .unwrap();
 
         // let's try to iterate!
@@ -335,16 +344,16 @@ mod test {
 
         // save and load on three keys, one under different owner
         TRIPLE
-            .save(&mut store, (b"owner", 9u8.into(), "recipient"), &1000)
+            .save(&mut store, &(b"owner", 9u8.into(), "recipient"), &1000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", 9u8.into(), "recipient2"), &3000)
+            .save(&mut store, &(b"owner", 9u8.into(), "recipient2"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", 10u8.into(), "recipient3"), &3000)
+            .save(&mut store, &(b"owner", 10u8.into(), "recipient3"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner2", 9u8.into(), "recipient"), &5000)
+            .save(&mut store, &(b"owner2", 9u8.into(), "recipient"), &5000)
             .unwrap();
 
         // let's try to iterate!
@@ -396,11 +405,11 @@ mod test {
         let add_ten = |a: Option<u64>| -> StdResult<_> { Ok(a.unwrap_or_default() + 10) };
 
         // save and load on three keys, one under different owner
-        let key: (&[u8], &[u8]) = (b"owner", b"spender");
-        ALLOWANCE.update(&mut store, key, add_ten).unwrap();
-        let twenty = ALLOWANCE.update(&mut store, key, add_ten).unwrap();
+        let key: (&[u8], Vec<u8>) = (b"owner", b"spender".to_vec());
+        ALLOWANCE.update(&mut store, &key, add_ten).unwrap();
+        let twenty = ALLOWANCE.update(&mut store, &key, add_ten).unwrap();
         assert_eq!(20, twenty);
-        let loaded = ALLOWANCE.load(&store, key).unwrap();
+        let loaded = ALLOWANCE.load(&store, &key).unwrap();
         assert_eq!(20, loaded);
     }
 
@@ -412,15 +421,18 @@ mod test {
             age: 32,
         };
 
+        let john_key = b"john".to_vec();
+        let jack_key = b"jack".to_vec();
+
         // load and save with extra key argument
-        let empty = PEOPLE.may_load(&store, b"john")?;
+        let empty = PEOPLE.may_load(&store, &john_key)?;
         assert_eq!(None, empty);
-        PEOPLE.save(&mut store, b"john", &data)?;
-        let loaded = PEOPLE.load(&store, b"john")?;
+        PEOPLE.save(&mut store, &john_key, &data)?;
+        let loaded = PEOPLE.load(&store, &john_key)?;
         assert_eq!(data, loaded);
 
         // nothing on another key
-        let missing = PEOPLE.may_load(&store, b"jack")?;
+        let missing = PEOPLE.may_load(&store, &jack_key)?;
         assert_eq!(None, missing);
 
         // update function for new or existing keys
@@ -437,21 +449,21 @@ mod test {
             }
         };
 
-        let old_john = PEOPLE.update(&mut store, b"john", birthday)?;
+        let old_john = PEOPLE.update(&mut store, &john_key, birthday)?;
         assert_eq!(33, old_john.age);
         assert_eq!("John", old_john.name.as_str());
 
-        let new_jack = PEOPLE.update(&mut store, b"jack", birthday)?;
+        let new_jack = PEOPLE.update(&mut store, &jack_key, birthday)?;
         assert_eq!(0, new_jack.age);
         assert_eq!("Newborn", new_jack.name.as_str());
 
         // update also changes the store
-        assert_eq!(old_john, PEOPLE.load(&store, b"john")?);
-        assert_eq!(new_jack, PEOPLE.load(&store, b"jack")?);
+        assert_eq!(old_john, PEOPLE.load(&store, &john_key)?);
+        assert_eq!(new_jack, PEOPLE.load(&store, &jack_key)?);
 
         // removing leaves us empty
-        PEOPLE.remove(&mut store, b"john");
-        let empty = PEOPLE.may_load(&store, b"john")?;
+        PEOPLE.remove(&mut store, &john_key);
+        let empty = PEOPLE.may_load(&store, &john_key)?;
         assert_eq!(None, empty);
 
         Ok(())
@@ -462,21 +474,25 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on a composite key
-        let empty = ALLOWANCE.may_load(&store, (b"owner", b"spender"))?;
+        let empty = ALLOWANCE.may_load(&store, &(b"owner", b"spender".to_vec()))?;
         assert_eq!(None, empty);
-        ALLOWANCE.save(&mut store, (b"owner", b"spender"), &777)?;
-        let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+        ALLOWANCE.save(&mut store, &(b"owner", b"spender".to_vec()), &777)?;
+        let loaded = ALLOWANCE.load(&store, &(b"owner", b"spender".to_vec()))?;
         assert_eq!(777, loaded);
 
         // doesn't appear under other key (even if a concat would be the same)
-        let different = ALLOWANCE.may_load(&store, (b"owners", b"pender")).unwrap();
+        let different = ALLOWANCE
+            .may_load(&store, &(b"owners", b"pender".to_vec()))
+            .unwrap();
         assert_eq!(None, different);
 
         // simple update
-        ALLOWANCE.update(&mut store, (b"owner", b"spender"), |v| -> StdResult<u64> {
-            Ok(v.unwrap_or_default() + 222)
-        })?;
-        let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+        ALLOWANCE.update(
+            &mut store,
+            &(b"owner", b"spender".to_vec()),
+            |v| -> StdResult<u64> { Ok(v.unwrap_or_default() + 222) },
+        )?;
+        let loaded = ALLOWANCE.load(&store, &(b"owner", b"spender".to_vec()))?;
         assert_eq!(999, loaded);
 
         Ok(())
@@ -491,7 +507,8 @@ mod test {
         };
 
         // create a Path one time to use below
-        let john = PEOPLE.key(b"john");
+        let john_key = b"john".to_vec();
+        let john = PEOPLE.key(&john_key);
 
         // Use this just like an Item above
         let empty = john.may_load(&store)?;
@@ -504,7 +521,7 @@ mod test {
         assert_eq!(None, empty);
 
         // same for composite keys, just use both parts in key()
-        let allow = ALLOWANCE.key((b"owner", b"spender"));
+        let allow = ALLOWANCE.key(&(b"owner", b"spender".to_vec()));
         allow.save(&mut store, &1234)?;
         let loaded = allow.load(&store)?;
         assert_eq!(1234, loaded);
@@ -523,22 +540,24 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on two keys
+        let john_key = b"john".to_vec();
+        let jim_key = b"jim".to_vec();
         let data = Data {
             name: "John".to_string(),
             age: 32,
         };
-        PEOPLE.save(&mut store, b"john", &data)?;
+        PEOPLE.save(&mut store, &john_key, &data)?;
         let data2 = Data {
             name: "Jim".to_string(),
             age: 44,
         };
-        PEOPLE.save(&mut store, b"jim", &data2)?;
+        PEOPLE.save(&mut store, &jim_key, &data2)?;
 
         // iterate over them all
         let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         assert_eq!(
             all?,
-            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+            vec![(jim_key, data2), (john_key.clone(), data.clone())]
         );
 
         // or just show what is after jim
@@ -550,12 +569,12 @@ mod test {
                 Order::Ascending,
             )
             .collect();
-        assert_eq!(all?, vec![(b"john".to_vec(), data)]);
+        assert_eq!(all?, vec![(john_key, data)]);
 
         // save and load on three keys, one under different owner
-        ALLOWANCE.save(&mut store, (b"owner", b"spender"), &1000)?;
-        ALLOWANCE.save(&mut store, (b"owner", b"spender2"), &3000)?;
-        ALLOWANCE.save(&mut store, (b"owner2", b"spender"), &5000)?;
+        ALLOWANCE.save(&mut store, &(b"owner", b"spender".to_vec()), &1000)?;
+        ALLOWANCE.save(&mut store, &(b"owner", b"spender2".to_vec()), &3000)?;
+        ALLOWANCE.save(&mut store, &(b"owner2", b"spender".to_vec()), &5000)?;
 
         // get all under one key
         let all: StdResult<Vec<_>> = ALLOWANCE

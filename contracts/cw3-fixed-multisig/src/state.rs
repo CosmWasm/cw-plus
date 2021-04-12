@@ -2,11 +2,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
 
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
-use cw_storage_plus::{AddrRef, Item, Map, U64Key};
+use cw_storage_plus::{Item, Map, U64Key};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
@@ -57,9 +57,9 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const PROPOSAL_COUNT: Item<u64> = Item::new("proposal_count");
 
 // multiple-item maps
-pub const VOTERS: Map<AddrRef, u64> = Map::new("voters");
+pub const VOTERS: Map<Addr, u64> = Map::new("voters");
 pub const PROPOSALS: Map<U64Key, Proposal> = Map::new("proposals");
-pub const BALLOTS: Map<(U64Key, AddrRef), Ballot> = Map::new("ballots");
+pub const BALLOTS: Map<(U64Key, Addr), Ballot> = Map::new("ballots");
 
 pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
     let id: u64 = PROPOSAL_COUNT.may_load(store)?.unwrap_or_default() + 1;

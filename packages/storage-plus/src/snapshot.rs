@@ -59,7 +59,7 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
 
     pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
         self.checkpoints
-            .update::<_, StdError>(store, height.into(), |count| {
+            .update::<_, StdError>(store, &height.into(), |count| {
                 Ok(count.unwrap_or_default() + 1)
             })?;
         Ok(())
@@ -68,13 +68,13 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
     pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
         let count = self
             .checkpoints
-            .may_load(store, height.into())?
+            .may_load(store, &height.into())?
             .unwrap_or_default();
         if count <= 1 {
-            self.checkpoints.remove(store, height.into());
+            self.checkpoints.remove(store, &height.into());
             Ok(())
         } else {
-            self.checkpoints.save(store, height.into(), &(count - 1))
+            self.checkpoints.save(store, &height.into(), &(count - 1))
         }
     }
 }
@@ -84,7 +84,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn key(&self, k: K) -> Path<T> {
+    pub fn key(&self, k: &K) -> Path<T> {
         self.primary.key(k)
     }
 
@@ -128,44 +128,47 @@ where
     }
 
     /// load old value and store changelog
-    fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
+    fn write_change(&self, store: &mut dyn Storage, k: &K, height: u64) -> StdResult<()> {
         // if there is already data in the changelog for this key and block, do not write more
         if self
             .changelog
-            .may_load(store, (k.clone(), U64Key::from(height)))?
+            .may_load(store, &(k.clone(), U64Key::from(height)))?
             .is_some()
         {
             return Ok(());
         }
         // otherwise, store the previous value
-        let old = self.primary.may_load(store, k.clone())?;
-        self.changelog
-            .save(store, (k, U64Key::from(height)), &ChangeSet { old })
+        let old = self.primary.may_load(store, k)?;
+        self.changelog.save(
+            store,
+            &(k.clone(), U64Key::from(height)),
+            &ChangeSet { old },
+        )
     }
 
-    pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {
+    pub fn save(&self, store: &mut dyn Storage, k: &K, data: &T, height: u64) -> StdResult<()> {
         if self.should_checkpoint(store, &k)? {
-            self.write_change(store, k.clone(), height)?;
+            self.write_change(store, k, height)?;
         }
         self.primary.save(store, k, data)
     }
 
-    pub fn remove(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
+    pub fn remove(&self, store: &mut dyn Storage, k: &K, height: u64) -> StdResult<()> {
         if self.should_checkpoint(store, &k)? {
-            self.write_change(store, k.clone(), height)?;
+            self.write_change(store, k, height)?;
         }
         self.primary.remove(store, k);
         Ok(())
     }
 
     /// load will return an error if no data is set at the given key, or on parse error
-    pub fn load(&self, store: &dyn Storage, k: K) -> StdResult<T> {
+    pub fn load(&self, store: &dyn Storage, k: &K) -> StdResult<T> {
         self.primary.load(store, k)
     }
 
     /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
     /// returns an error on issues parsing
-    pub fn may_load(&self, store: &dyn Storage, k: K) -> StdResult<Option<T>> {
+    pub fn may_load(&self, store: &dyn Storage, k: &K) -> StdResult<Option<T>> {
         self.primary.may_load(store, k)
     }
 
@@ -177,7 +180,7 @@ where
     pub fn may_load_at_height(
         &self,
         store: &dyn Storage,
-        k: K,
+        k: &K,
         height: u64,
     ) -> StdResult<Option<T>> {
         self.assert_checkpointed(store, height)?;
@@ -205,7 +208,7 @@ where
         let has = match self.strategy {
             Strategy::EveryBlock => true,
             Strategy::Never => false,
-            Strategy::Selected => self.checkpoints.may_load(store, height.into())?.is_some(),
+            Strategy::Selected => self.checkpoints.may_load(store, &height.into())?.is_some(),
         };
         match has {
             true => Ok(()),
@@ -222,7 +225,7 @@ where
     pub fn update<A, E>(
         &self,
         store: &mut dyn Storage,
-        k: K,
+        k: &K,
         height: u64,
         action: A,
     ) -> Result<T, E>
@@ -230,7 +233,7 @@ where
         A: FnOnce(Option<T>) -> Result<T, E>,
         E: From<StdError>,
     {
-        let input = self.may_load(store, k.clone())?;
+        let input = self.may_load(store, k)?;
         let output = action(input)?;
         self.save(store, k, &output, height)?;
         Ok(output)
@@ -297,24 +300,24 @@ mod tests {
     // Values at beginning of 3 -> A = 5, B = 7
     // Values at beginning of 5 -> A = 8, C = 13
     fn init_data(map: &TestMap, storage: &mut dyn Storage) {
-        map.save(storage, b"A", &5, 1).unwrap();
-        map.save(storage, b"B", &7, 2).unwrap();
+        map.save(storage, &b"A".as_ref(), &5, 1).unwrap();
+        map.save(storage, &b"B".as_ref(), &7, 2).unwrap();
 
         // checkpoint 3
         map.add_checkpoint(storage, 3).unwrap();
 
         // also use update to set - to ensure this works
-        map.save(storage, b"C", &1, 3).unwrap();
-        map.update(storage, b"A", 3, |_| -> StdResult<u64> { Ok(8) })
+        map.save(storage, &b"C".as_ref(), &1, 3).unwrap();
+        map.update(storage, &b"A".as_ref(), 3, |_| -> StdResult<u64> { Ok(8) })
             .unwrap();
 
-        map.remove(storage, b"B", 4).unwrap();
-        map.save(storage, b"C", &13, 4).unwrap();
+        map.remove(storage, &b"B".as_ref(), 4).unwrap();
+        map.save(storage, &b"C".as_ref(), &13, 4).unwrap();
 
         // checkpoint 5
         map.add_checkpoint(storage, 5).unwrap();
-        map.remove(storage, b"A", 5).unwrap();
-        map.update(storage, b"D", 5, |_| -> StdResult<u64> { Ok(22) })
+        map.remove(storage, &b"A".as_ref(), 5).unwrap();
+        map.update(storage, &b"D".as_ref(), 5, |_| -> StdResult<u64> { Ok(22) })
             .unwrap();
         // and delete it later (unknown if all data present)
         map.remove_checkpoint(storage, 5).unwrap();
@@ -338,8 +341,8 @@ mod tests {
     ];
 
     fn assert_final_values(map: &TestMap, storage: &dyn Storage) {
-        for (k, v) in FINAL_VALUES.iter().cloned() {
-            assert_eq!(v, map.may_load(storage, k).unwrap());
+        for (k, v) in FINAL_VALUES.iter() {
+            assert_eq!(*v, map.may_load(storage, k).unwrap());
         }
     }
 
@@ -349,14 +352,16 @@ mod tests {
         height: u64,
         values: &[(&[u8], Option<u64>)],
     ) {
-        for (k, v) in values.iter().cloned() {
-            assert_eq!(v, map.may_load_at_height(storage, k, height).unwrap());
+        for (k, v) in values.iter() {
+            assert_eq!(*v, map.may_load_at_height(storage, k, height).unwrap());
         }
     }
 
     fn assert_missing_checkpoint(map: &TestMap, storage: &dyn Storage, height: u64) {
         for k in &[b"A", b"B", b"C", b"D"] {
-            assert!(map.may_load_at_height(storage, *k, height).is_err());
+            assert!(map
+                .may_load_at_height(storage, &k.as_ref(), height)
+                .is_err());
         }
     }
 
@@ -401,57 +406,82 @@ mod tests {
         let mut storage = MockStorage::new();
 
         println!("SETUP");
-        EVERY.save(&mut storage, b"A", &5, 1).unwrap();
-        EVERY.save(&mut storage, b"B", &7, 2).unwrap();
-        EVERY.save(&mut storage, b"C", &2, 2).unwrap();
+        EVERY.save(&mut storage, &b"A".as_ref(), &5, 1).unwrap();
+        EVERY.save(&mut storage, &b"B".as_ref(), &7, 2).unwrap();
+        EVERY.save(&mut storage, &b"C".as_ref(), &2, 2).unwrap();
 
         // update and save - A query at 3 => 5, at 4 => 12
         EVERY
-            .update(&mut storage, b"A", 3, |_| -> StdResult<u64> { Ok(9) })
+            .update(&mut storage, &b"A".as_ref(), 3, |_| -> StdResult<u64> {
+                Ok(9)
+            })
             .unwrap();
-        EVERY.save(&mut storage, b"A", &12, 3).unwrap();
+        EVERY.save(&mut storage, &b"A".as_ref(), &12, 3).unwrap();
         assert_eq!(
             Some(5),
-            EVERY.may_load_at_height(&storage, b"A", 2).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"A".as_ref(), 2)
+                .unwrap()
         );
         assert_eq!(
             Some(5),
-            EVERY.may_load_at_height(&storage, b"A", 3).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"A".as_ref(), 3)
+                .unwrap()
         );
         assert_eq!(
             Some(12),
-            EVERY.may_load_at_height(&storage, b"A", 4).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"A".as_ref(), 4)
+                .unwrap()
         );
 
         // save and remove - B query at 4 => 7, at 5 => None
-        EVERY.save(&mut storage, b"B", &17, 4).unwrap();
-        EVERY.remove(&mut storage, b"B", 4).unwrap();
+        EVERY.save(&mut storage, &b"B".as_ref(), &17, 4).unwrap();
+        EVERY.remove(&mut storage, &b"B".as_ref(), 4).unwrap();
         assert_eq!(
             Some(7),
-            EVERY.may_load_at_height(&storage, b"B", 3).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"B".as_ref(), 3)
+                .unwrap()
         );
         assert_eq!(
             Some(7),
-            EVERY.may_load_at_height(&storage, b"B", 4).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"B".as_ref(), 4)
+                .unwrap()
         );
-        assert_eq!(None, EVERY.may_load_at_height(&storage, b"B", 5).unwrap());
+        assert_eq!(
+            None,
+            EVERY
+                .may_load_at_height(&storage, &b"B".as_ref(), 5)
+                .unwrap()
+        );
 
         // remove and update - C query at 5 => 2, at 6 => 16
-        EVERY.remove(&mut storage, b"C", 5).unwrap();
+        EVERY.remove(&mut storage, &b"C".as_ref(), 5).unwrap();
         EVERY
-            .update(&mut storage, b"C", 5, |_| -> StdResult<u64> { Ok(16) })
+            .update(&mut storage, &b"C".as_ref(), 5, |_| -> StdResult<u64> {
+                Ok(16)
+            })
             .unwrap();
         assert_eq!(
             Some(2),
-            EVERY.may_load_at_height(&storage, b"C", 4).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"C".as_ref(), 4)
+                .unwrap()
         );
         assert_eq!(
             Some(2),
-            EVERY.may_load_at_height(&storage, b"C", 5).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"C".as_ref(), 5)
+                .unwrap()
         );
         assert_eq!(
             Some(16),
-            EVERY.may_load_at_height(&storage, b"C", 6).unwrap()
+            EVERY
+                .may_load_at_height(&storage, &b"C".as_ref(), 6)
+                .unwrap()
         );
     }
 }

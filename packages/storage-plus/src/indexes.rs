@@ -105,12 +105,12 @@ where
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
         let idx = (self.index)(data, pk.to_vec());
-        self.idx_map.save(store, idx, &(pk.len() as u32))
+        self.idx_map.save(store, &idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = (self.index)(old_data, pk.to_vec());
-        self.idx_map.remove(store, idx);
+        self.idx_map.remove(store, &idx);
         Ok(())
     }
 }
@@ -240,7 +240,7 @@ where
         let idx = (self.index)(data);
         // error if this is already set
         self.idx_map
-            .update(store, idx, |existing| -> StdResult<_> {
+            .update(store, &idx, |existing| -> StdResult<_> {
                 match existing {
                     Some(_) => Err(StdError::generic_err("Violates unique constraint on index")),
                     None => Ok(UniqueRef::<T> {
@@ -254,7 +254,7 @@ where
 
     fn remove(&self, store: &mut dyn Storage, _pk: &[u8], old_data: &T) -> StdResult<()> {
         let idx = (self.index)(old_data);
-        self.idx_map.remove(store, idx);
+        self.idx_map.remove(store, &idx);
         Ok(())
     }
 }
@@ -283,7 +283,7 @@ where
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Pair<T>>> {
+    pub fn item(&self, store: &dyn Storage, idx: &K) -> StdResult<Option<Pair<T>>> {
         let data = self
             .idx_map
             .may_load(store, idx)?
