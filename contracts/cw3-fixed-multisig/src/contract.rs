@@ -13,7 +13,7 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
-use cw_storage_plus::{AddrRef, Bound};
+use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -56,7 +56,7 @@ pub fn instantiate(
     // add all voters
     for voter in msg.voters.iter() {
         let key = deps.api.addr_validate(&voter.addr)?;
-        VOTERS.save(deps.storage, AddrRef::new(&key), &voter.weight)?;
+        VOTERS.save(deps.storage, &key, &voter.weight)?;
     }
     Ok(Response::default())
 }
@@ -92,9 +92,8 @@ pub fn execute_propose(
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can create a proposal
-    let sender = AddrRef::new(&info.sender);
     let vote_power = VOTERS
-        .may_load(deps.storage, sender)?
+        .may_load(deps.storage, &info.sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     let cfg = CONFIG.load(deps.storage)?;
@@ -133,7 +132,7 @@ pub fn execute_propose(
         weight: vote_power,
         vote: Vote::Yes,
     };
-    BALLOTS.save(deps.storage, (id.into(), sender), &ballot)?;
+    BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
     Ok(Response {
         submessages: vec![],
@@ -156,9 +155,8 @@ pub fn execute_vote(
     vote: Vote,
 ) -> Result<Response<Empty>, ContractError> {
     // only members of the multisig can vote
-    let sender = AddrRef::new(&info.sender);
     let vote_power = VOTERS
-        .may_load(deps.storage, sender)?
+        .may_load(deps.storage, &info.sender)?
         .ok_or(ContractError::Unauthorized {})?;
 
     // ensure proposal exists and can be voted on
@@ -173,7 +171,7 @@ pub fn execute_vote(
     // cast vote if no vote previously cast
     BALLOTS.update(
         deps.storage,
-        (proposal_id.into(), sender),
+        (proposal_id.into(), &info.sender),
         |bal| match bal {
             Some(_) => Err(ContractError::AlreadyVoted {}),
             None => Ok(Ballot {
@@ -395,12 +393,10 @@ fn map_proposal(
 }
 
 fn query_vote(deps: Deps, proposal_id: u64, voter: String) -> StdResult<VoteResponse> {
-    let ballot = BALLOTS.may_load(
-        deps.storage,
-        (proposal_id.into(), AddrRef::unchecked(&voter)),
-    )?;
+    let voter = deps.api.addr_validate(&voter)?;
+    let ballot = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter))?;
     let vote = ballot.map(|b| VoteInfo {
-        voter,
+        voter: voter.into(),
         vote: b.vote,
         weight: b.weight,
     });
@@ -434,7 +430,8 @@ fn list_votes(
 }
 
 fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
-    let weight = VOTERS.may_load(deps.storage, AddrRef::unchecked(&voter))?;
+    let voter = deps.api.addr_validate(&voter)?;
+    let weight = VOTERS.may_load(deps.storage, &voter)?;
     Ok(VoterResponse { weight })
 }
 
