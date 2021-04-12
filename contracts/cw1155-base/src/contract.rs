@@ -14,7 +14,7 @@ use cw1155::{
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::InitMsg;
+use crate::msg::InstantiateMsg;
 use crate::state::{APPROVES, BALANCES, MINTER, TOKENS};
 
 // version info for migration info
@@ -29,7 +29,7 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let minter = deps.api.addr_validate(&msg.minter)?;
@@ -559,7 +559,7 @@ mod tests {
         let user2 = String::from("user2");
 
         let mut deps = mock_dependencies(&[]);
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             minter: minter.clone(),
         };
         let res = instantiate(deps.as_mut(), mock_env(), mock_info("operator", &[]), msg).unwrap();
@@ -907,7 +907,7 @@ mod tests {
         let dummy_msg = Binary::default();
 
         let mut deps = mock_dependencies(&[]);
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             minter: minter.clone(),
         };
         let res = instantiate(deps.as_mut(), mock_env(), mock_info("operator", &[]), msg).unwrap();
@@ -1004,7 +1004,7 @@ mod tests {
         let minter = String::from("minter");
 
         let mut deps = mock_dependencies(&[]);
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             minter: minter.clone(),
         };
         let res = instantiate(deps.as_mut(), mock_env(), mock_info("operator", &[]), msg).unwrap();
@@ -1127,7 +1127,7 @@ mod tests {
             env
         };
 
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             minter: minter.clone(),
         };
         let res = instantiate(deps.as_mut(), env.clone(), mock_info("operator", &[]), msg).unwrap();
@@ -1200,7 +1200,7 @@ mod tests {
         let user1 = String::from("user1");
 
         let env = mock_env();
-        let msg = InitMsg {
+        let msg = InstantiateMsg {
             minter: minter.clone(),
         };
         let res = instantiate(deps.as_mut(), env.clone(), mock_info("operator", &[]), msg).unwrap();

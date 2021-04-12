@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cw1155ReceiveMsg",
+  "description": "Cw1155ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg",
+  "type": "object",
+  "required": [
+    "amount",
+    "msg",
+    "operator",
+    "token_id"
+  ],
+  "properties": {
+    "amount": {
+      "$ref": "#/definitions/Uint128"
+    },
+    "from": {
+      "description": "The account that the token transfered from",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "msg": {
+      "$ref": "#/definitions/Binary"
+    },
+    "operator": {
+      "description": "The account that executed the send message",
+      "type": "string"
+    },
+    "token_id": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}
