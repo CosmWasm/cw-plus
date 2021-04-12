@@ -84,12 +84,6 @@ pub(crate) fn encode_length(namespace: &[u8]) -> [u8; 2] {
     [length_bytes[2], length_bytes[3]]
 }
 
-// pub(crate) fn decode_length(prefix: [u8; 2]) -> usize {
-pub(crate) fn decode_length(prefix: &[u8]) -> usize {
-    // TODO: enforce exactly 2 bytes somehow, but usable with slices
-    (prefix[0] as usize) * 256 + (prefix[1] as usize)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
