@@ -93,8 +93,8 @@ pub fn execute(
 /// Make sure permissions are checked before calling this.
 fn execute_transfer_inner<'a>(
     deps: &'a mut DepsMut,
-    from: Option<&'a str>,
-    to: Option<&'a str>,
+    from: Option<&'a Addr>,
+    to: Option<&'a Addr>,
     token_id: &'a str,
     amount: Uint128,
 ) -> Result<TransferEvent<'a>, ContractError> {
@@ -119,8 +119,8 @@ fn execute_transfer_inner<'a>(
     }
 
     Ok(TransferEvent {
-        from,
-        to,
+        from: from.map(|x| x.as_ref()),
+        to: to.map(|x| x.as_ref()),
         token_id,
         amount,
     })
@@ -133,7 +133,7 @@ fn check_can_approve(deps: Deps, env: &Env, owner: &Addr, operator: &Addr) -> St
         return Ok(true);
     }
     // operator can approve
-    let op = APPROVES.may_load(deps.storage, (owner.as_ref(), operator.as_ref()))?;
+    let op = APPROVES.may_load(deps.storage, (&owner, &operator))?;
     Ok(match op {
         Some(ex) => !ex.is_expired(&env.block),
         None => false,
@@ -162,7 +162,7 @@ pub fn execute_send_from(
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let from_addr = env.deps.api.addr_validate(&from)?;
-    let _to_addr = env.deps.api.addr_validate(&to)?;
+    let to_addr = env.deps.api.addr_validate(&to)?;
 
     let ExecuteEnv {
         mut deps,
@@ -174,7 +174,13 @@ pub fn execute_send_from(
 
     let mut rsp = Response::default();
 
-    let event = execute_transfer_inner(&mut deps, Some(&from), Some(&to), &token_id, amount)?;
+    let event = execute_transfer_inner(
+        &mut deps,
+        Some(&from_addr),
+        Some(&to_addr),
+        &token_id,
+        amount,
+    )?;
     event.add_attributes(&mut rsp);
 
     if let Some(msg) = msg {
@@ -200,7 +206,7 @@ pub fn execute_mint(
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
 
-    let _to_addr = deps.api.addr_validate(&to)?;
+    let to_addr = deps.api.addr_validate(&to)?;
 
     if info.sender != MINTER.load(deps.storage)? {
         return Err(ContractError::Unauthorized {});
@@ -208,7 +214,7 @@ pub fn execute_mint(
 
     let mut rsp = Response::default();
 
-    let event = execute_transfer_inner(&mut deps, None, Some(&to), &token_id, amount)?;
+    let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), &token_id, amount)?;
     event.add_attributes(&mut rsp);
 
     if let Some(msg) = msg {
@@ -249,7 +255,7 @@ pub fn execute_burn(
     guard_can_approve(deps.as_ref(), &env, &from_addr, &info.sender)?;
 
     let mut rsp = Response::default();
-    let event = execute_transfer_inner(&mut deps, Some(&from), None, &token_id, amount)?;
+    let event = execute_transfer_inner(&mut deps, Some(&from_addr), None, &token_id, amount)?;
     event.add_attributes(&mut rsp);
     Ok(rsp)
 }
@@ -268,13 +274,19 @@ pub fn execute_batch_send_from(
     } = env;
 
     let from_addr = deps.api.addr_validate(&from)?;
-    let _to_addr = deps.api.addr_validate(&to)?;
+    let to_addr = deps.api.addr_validate(&to)?;
 
     guard_can_approve(deps.as_ref(), &env, &from_addr, &info.sender)?;
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.iter() {
-        let event = execute_transfer_inner(&mut deps, Some(&from), Some(&to), token_id, *amount)?;
+        let event = execute_transfer_inner(
+            &mut deps,
+            Some(&from_addr),
+            Some(&to_addr),
+            token_id,
+            *amount,
+        )?;
         event.add_attributes(&mut rsp);
     }
 
@@ -302,12 +314,12 @@ pub fn execute_batch_mint(
         return Err(ContractError::Unauthorized {});
     }
 
-    let _to_addr = deps.api.addr_validate(&to)?;
+    let to_addr = deps.api.addr_validate(&to)?;
 
     let mut rsp = Response::default();
 
     for (token_id, amount) in batch.iter() {
-        let event = execute_transfer_inner(&mut deps, None, Some(&to), &token_id, *amount)?;
+        let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), &token_id, *amount)?;
         event.add_attributes(&mut rsp);
 
         // insert if not exist
@@ -348,7 +360,7 @@ pub fn execute_batch_burn(
 
     let mut rsp = Response::default();
     for (token_id, amount) in batch.into_iter() {
-        let event = execute_transfer_inner(&mut deps, Some(&from), None, &token_id, amount)?;
+        let event = execute_transfer_inner(&mut deps, Some(&from_addr), None, &token_id, amount)?;
         event.add_attributes(&mut rsp);
     }
     Ok(rsp)
@@ -369,11 +381,7 @@ pub fn execute_approve_all(
 
     // set the operator for us
     let operator_addr = deps.api.addr_validate(&operator)?;
-    APPROVES.save(
-        deps.storage,
-        (info.sender.as_ref(), operator_addr.as_ref()),
-        &expires,
-    )?;
+    APPROVES.save(deps.storage, (&info.sender, &operator_addr), &expires)?;
 
     let mut rsp = Response::default();
     ApproveAllEvent {
@@ -388,7 +396,7 @@ pub fn execute_approve_all(
 pub fn execute_revoke_all(env: ExecuteEnv, operator: String) -> Result<Response, ContractError> {
     let ExecuteEnv { deps, info, .. } = env;
     let operator_addr = deps.api.addr_validate(&operator)?;
-    APPROVES.remove(deps.storage, (info.sender.as_ref(), operator_addr.as_ref()));
+    APPROVES.remove(deps.storage, (&info.sender, &operator_addr));
 
     let mut rsp = Response::default();
     ApproveAllEvent {
@@ -406,7 +414,7 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
         Cw1155QueryMsg::Balance { owner, token_id } => {
             let owner_addr = deps.api.addr_validate(&owner)?;
             let balance = BALANCES
-                .may_load(deps.storage, (owner_addr.as_ref(), &token_id))?
+                .may_load(deps.storage, (&owner_addr, &token_id))?
                 .unwrap_or_default();
             to_binary(&BalanceResponse { balance })
         }
@@ -416,7 +424,7 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
                 .into_iter()
                 .map(|token_id| -> StdResult<_> {
                     Ok(BALANCES
-                        .may_load(deps.storage, (owner_addr.as_ref(), &token_id))?
+                        .may_load(deps.storage, (&owner_addr, &token_id))?
                         .unwrap_or_default())
                 })
                 .collect::<StdResult<_>>()?;
@@ -482,7 +490,7 @@ fn query_all_approvals(
     let start = start_after.map(|addr| Bound::exclusive(addr.as_ref()));
 
     let operators = APPROVES
-        .prefix(owner.as_ref())
+        .prefix(&owner)
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
@@ -501,7 +509,7 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let tokens = BALANCES
-        .prefix(owner.as_ref())
+        .prefix(&owner)
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))
