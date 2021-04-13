@@ -285,11 +285,7 @@ pub fn execute_approve_all(
 
     // set the operator for us
     let operator_addr = deps.api.addr_validate(&operator)?;
-    OPERATORS.save(
-        deps.storage,
-        (info.sender.as_ref(), operator_addr.as_ref()),
-        &expires,
-    )?;
+    OPERATORS.save(deps.storage, (&info.sender, &operator_addr), &expires)?;
 
     Ok(Response {
         submessages: vec![],
@@ -309,8 +305,8 @@ pub fn execute_revoke_all(
     info: MessageInfo,
     operator: String,
 ) -> Result<Response, ContractError> {
-    let operator_addr = deps.api.addr_validate(operator.as_ref())?;
-    OPERATORS.remove(deps.storage, (info.sender.as_ref(), operator_addr.as_ref()));
+    let operator_addr = deps.api.addr_validate(&operator)?;
+    OPERATORS.remove(deps.storage, (&info.sender, &operator_addr));
 
     Ok(Response {
         submessages: vec![],
@@ -336,7 +332,7 @@ fn check_can_approve(
         return Ok(());
     }
     // operator can approve
-    let op = OPERATORS.may_load(deps.storage, (token.owner.as_ref(), info.sender.as_ref()))?;
+    let op = OPERATORS.may_load(deps.storage, (&token.owner, &info.sender))?;
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
@@ -371,7 +367,7 @@ fn check_can_send(
     }
 
     // operator can send
-    let op = OPERATORS.may_load(deps.storage, (token.owner.as_ref(), info.sender.as_ref()))?;
+    let op = OPERATORS.may_load(deps.storage, (&token.owner, &info.sender))?;
     match op {
         Some(ex) => {
             if ex.is_expired(&env.block) {
@@ -488,7 +484,7 @@ fn query_all_approvals(
 
     let owner_addr = deps.api.addr_validate(&owner)?;
     let res: StdResult<Vec<_>> = OPERATORS
-        .prefix(owner_addr.as_ref())
+        .prefix(&owner_addr)
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)

@@ -50,7 +50,7 @@ pub fn create(
     for member in members.into_iter() {
         total += member.weight;
         let member_addr = deps.api.addr_validate(&member.addr)?;
-        MEMBERS.save(deps.storage, member_addr.as_ref(), &member.weight, height)?;
+        MEMBERS.save(deps.storage, &member_addr, &member.weight, height)?;
     }
     TOTAL.save(deps.storage, &total)?;
 
@@ -126,27 +126,22 @@ pub fn update_members(
     // add all new members and update total
     for add in to_add.into_iter() {
         let add_addr = deps.api.addr_validate(&add.addr)?;
-        MEMBERS.update(
-            deps.storage,
-            add_addr.as_ref(),
-            height,
-            |old| -> StdResult<_> {
-                total -= old.unwrap_or_default();
-                total += add.weight;
-                diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
-                Ok(add.weight)
-            },
-        )?;
+        MEMBERS.update(deps.storage, &add_addr, height, |old| -> StdResult<_> {
+            total -= old.unwrap_or_default();
+            total += add.weight;
+            diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
+            Ok(add.weight)
+        })?;
     }
 
     for remove in to_remove.into_iter() {
         let remove_addr = deps.api.addr_validate(&remove)?;
-        let old = MEMBERS.may_load(deps.storage, remove_addr.as_ref())?;
+        let old = MEMBERS.may_load(deps.storage, &remove_addr)?;
         // Only process this if they were actually in the list before
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
             total -= weight;
-            MEMBERS.remove(deps.storage, remove_addr.as_ref(), height)?;
+            MEMBERS.remove(deps.storage, &remove_addr, height)?;
         }
     }
 
@@ -178,8 +173,8 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, addr.as_ref(), h),
-        None => MEMBERS.may_load(deps.storage, addr.as_ref()),
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
+        None => MEMBERS.may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -195,7 +190,7 @@ fn list_members(
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let addr = maybe_addr(deps.api, start_after)?;
-    let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
+    let start = addr.map(|addr| Bound::exclusive(addr.to_string()));
 
     let members: StdResult<Vec<_>> = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)

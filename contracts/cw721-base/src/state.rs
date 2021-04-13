@@ -38,8 +38,8 @@ pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("nft_info");
 pub const MINTER: Item<Addr> = Item::new("minter");
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
 
-// pub const TOKENS: Map<&str, TokenInfo> = Map::new("tokens");
-pub const OPERATORS: Map<(&str, &str), Expiration> = Map::new("operators");
+// Stored as (granter, operator) giving operator full control over granter's account
+pub const OPERATORS: Map<(&Addr, &Addr), Expiration> = Map::new("operators");
 
 pub fn num_tokens(storage: &dyn Storage) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
