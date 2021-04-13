@@ -6,7 +6,6 @@ use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
 use crate::state::{ALLOWANCES, BALANCES, TOKEN_INFO};
-use cw_storage_plus::AddrRef;
 
 pub fn execute_increase_allowance(
     deps: DepsMut,
@@ -23,7 +22,7 @@ pub fn execute_increase_allowance(
 
     ALLOWANCES.update(
         deps.storage,
-        (AddrRef::new(&info.sender), AddrRef::new(&spender_addr)),
+        (&info.sender, &spender_addr),
         |allow| -> StdResult<_> {
             let mut val = allow.unwrap_or_default();
             if let Some(exp) = expires {
@@ -61,7 +60,7 @@ pub fn execute_decrease_allowance(
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let key = (AddrRef::new(&info.sender), AddrRef::new(&spender_addr));
+    let key = (&info.sender, &spender_addr);
     // load value and delete if it hits 0, or update otherwise
     let mut allowance = ALLOWANCES.load(deps.storage, key)?;
     if amount < allowance.allowance {
@@ -100,7 +99,7 @@ pub fn deduct_allowance(
     block: &BlockInfo,
     amount: Uint128,
 ) -> Result<AllowanceResponse, ContractError> {
-    ALLOWANCES.update(storage, (owner.into(), spender.into()), |current| {
+    ALLOWANCES.update(storage, (owner, spender), |current| {
         match current {
             Some(mut a) => {
                 if a.expires.is_expired(block) {
@@ -135,14 +134,14 @@ pub fn execute_transfer_from(
 
     BALANCES.update(
         deps.storage,
-        AddrRef::new(&owner_addr),
+        &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        AddrRef::new(&rcpt_addr),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -177,7 +176,7 @@ pub fn execute_burn_from(
     // lower balance
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&owner_addr),
+        &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -220,14 +219,14 @@ pub fn execute_send_from(
     // move the tokens to the contract
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&owner_addr),
+        &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&rcpt_addr),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -260,10 +259,7 @@ pub fn query_allowance(deps: Deps, owner: String, spender: String) -> StdResult<
     let owner_addr = deps.api.addr_validate(&owner)?;
     let spender_addr = deps.api.addr_validate(&spender)?;
     let allowance = ALLOWANCES
-        .may_load(
-            deps.storage,
-            (AddrRef::from(&owner_addr), AddrRef::from(&spender_addr)),
-        )?
+        .may_load(deps.storage, (&owner_addr, &spender_addr))?
         .unwrap_or_default();
     Ok(allowance)
 }

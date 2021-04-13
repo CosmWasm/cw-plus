@@ -16,7 +16,6 @@ use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
-use cw_storage_plus::AddrRef;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -65,7 +64,7 @@ pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20Coin]) -> StdResult<U
     let mut total_supply = Uint128::zero();
     for row in accounts {
         let address = deps.api.addr_validate(&row.address)?;
-        BALANCES.save(deps.storage, AddrRef::new(&address), &row.amount)?;
+        BALANCES.save(deps.storage, &address, &row.amount)?;
         total_supply += row.amount;
     }
     Ok(total_supply)
@@ -129,14 +128,14 @@ pub fn execute_transfer(
 
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&info.sender),
+        &info.sender,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&rcpt_addr),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -167,7 +166,7 @@ pub fn execute_burn(
     // lower balance
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&info.sender),
+        &info.sender,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -220,7 +219,7 @@ pub fn execute_mint(
     let rcpt_addr = deps.api.addr_validate(&recipient)?;
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&rcpt_addr),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -254,14 +253,14 @@ pub fn execute_send(
     // move the tokens to the contract
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&info.sender),
+        &info.sender,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
     BALANCES.update(
         deps.storage,
-        AddrRef::from(&rcpt_addr),
+        &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
@@ -310,11 +309,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> {
+    let address = deps.api.addr_validate(&address)?;
     let balance = BALANCES
-        .may_load(
-            deps.storage,
-            AddrRef::from(&deps.api.addr_validate(&address)?),
-        )?
+        .may_load(deps.storage, &address)?
         .unwrap_or_default();
     Ok(BalanceResponse { balance })
 }

@@ -147,6 +147,13 @@ impl<'a> PrimaryKey<'a> for &'a Addr {
         vec![self.as_ref().as_bytes()]
     }
 }
+
+impl<'a> Prefixer<'a> for &'a Addr {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![&self.as_ref().as_bytes()]
+    }
+}
+
 // this auto-implements PrimaryKey for all the IntKey types (and more!)
 impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
     type Prefix = ();

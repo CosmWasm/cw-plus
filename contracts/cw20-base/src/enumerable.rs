@@ -2,7 +2,7 @@ use cosmwasm_std::{Deps, Order, StdResult};
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
 use crate::state::{ALLOWANCES, BALANCES};
-use cw_storage_plus::{AddrRef, Bound};
+use cw_storage_plus::Bound;
 
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
@@ -19,7 +19,7 @@ pub fn query_all_allowances(
     let start = start_after.map(Bound::exclusive);
 
     let allowances: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
-        .prefix(AddrRef::new(&owner_addr))
+        .prefix(&owner_addr)
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
