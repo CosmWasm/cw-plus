@@ -41,9 +41,7 @@ fn escrow_happy_path_cw20_tokens() {
     // set personal balance
     let owner = Addr::unchecked("owner");
     let init_funds = coins(2000, "btc");
-    router
-        .set_bank_balance(owner.clone(), init_funds.clone())
-        .unwrap();
+    router.set_bank_balance(&owner, init_funds.clone()).unwrap();
 
     // set up cw20 contract with some tokens
     let cw20_id = router.store_code(contract_cw20());
