@@ -11,6 +11,7 @@
 | cw4              | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)              | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)    |
 | cw20              | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20)          | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20)    |
 | cw721              | [![cw721 on crates.io](https://img.shields.io/crates/v/cw721.svg)](https://crates.io/crates/cw721)      | [![Docs](https://docs.rs/cw721/badge.svg)](https://docs.rs/cw721)    |
+| cw1155              | [![cw1155 on crates.io](https://img.shields.io/crates/v/cw1155.svg)](https://crates.io/crates/cw1155)      | [![Docs](https://docs.rs/cw1155/badge.svg)](https://docs.rs/cw1155)    |
 
 | Utilities        | Crates.io                                                                                                                        | Docs                                                            |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
@@ -32,6 +33,7 @@
 | cw20-escrow             | [Release v0.5.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.5.0/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
 | cw20-staking            | [Release v0.5.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.5.0/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
 | cw721-base              | [Release v0.5.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.5.0/cw721_base.wasm)          | [![Docs](https://docs.rs/cw721-base/badge.svg)](https://docs.rs/cw721-base)    |
+| cw1155-base              | [Release v0.5.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.5.0/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
 
 
 This is a collection of specification and contracts designed for
