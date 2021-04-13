@@ -11,7 +11,8 @@
         "create": {
           "$ref": "#/definitions/CreateMsg"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Adds all sent native tokens to the contract",
@@ -31,7 +32,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Approve sends all tokens to the recipient. Only the arbiter can do this",
@@ -52,7 +54,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Refund returns all remaining tokens to the original sender, The arbiter can do this any time, or anyone can do this after a timeout",
@@ -73,7 +76,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "This accepts a properly-encoded ReceiveMsg from a cw20 contract",
@@ -85,7 +89,8 @@
         "receive": {
           "$ref": "#/definitions/Cw20ReceiveMsg"
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -103,11 +108,7 @@
       "properties": {
         "arbiter": {
           "description": "arbiter can decide to approve or refund the escrow",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         },
         "cw20_whitelist": {
           "description": "Besides any possible tokens sent with the CreateMsg, this is a list of all cw20 token addresses that are accepted by the escrow during a top-up. This is required to avoid a DoS attack by topping-up with an invalid cw20 contract. See https://github.com/CosmWasm/cosmwasm-plus/issues/19",
@@ -116,7 +117,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/HumanAddr"
+            "type": "string"
           }
         },
         "end_height": {
@@ -143,11 +144,7 @@
         },
         "recipient": {
           "description": "if approved, funds go to the recipient",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         }
       }
     },
@@ -173,12 +170,9 @@
           ]
         },
         "sender": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         }
       }
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"

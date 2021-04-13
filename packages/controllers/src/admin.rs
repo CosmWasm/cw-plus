@@ -2,17 +2,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use cosmwasm_std::{
-    attr, CanonicalAddr, Deps, DepsMut, HumanAddr, MessageInfo, Response, StdError, StdResult,
-};
-use cw0::maybe_canonical;
+use cosmwasm_std::{attr, Addr, Deps, DepsMut, MessageInfo, Response, StdError, StdResult};
 use cw_storage_plus::Item;
 
 // TODO: should the return values end up in cw0, so eg. cw4 can import them as well as this module?
 /// Returned from Admin.query_admin()
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminResponse {
-    pub admin: Option<HumanAddr>,
+    pub admin: Option<String>,
 }
 
 /// Errors returned from Admin
@@ -26,7 +23,7 @@ pub enum AdminError {
 }
 
 // state/logic
-pub struct Admin<'a>(Item<'a, Option<CanonicalAddr>>);
+pub struct Admin<'a>(Item<'a, Option<Addr>>);
 
 // this is the core business logic we expose
 impl<'a> Admin<'a> {
@@ -34,31 +31,26 @@ impl<'a> Admin<'a> {
         Admin(Item::new(namespace))
     }
 
-    pub fn set(&self, deps: DepsMut, admin: Option<HumanAddr>) -> StdResult<()> {
-        let admin_raw = maybe_canonical(deps.api, admin)?;
-        self.0.save(deps.storage, &admin_raw)
+    pub fn set(&self, deps: DepsMut, admin: Option<Addr>) -> StdResult<()> {
+        self.0.save(deps.storage, &admin)
     }
 
-    pub fn get(&self, deps: Deps) -> StdResult<Option<HumanAddr>> {
-        let canon = self.0.load(deps.storage)?;
-        canon.map(|c| deps.api.human_address(&c)).transpose()
+    pub fn get(&self, deps: Deps) -> StdResult<Option<Addr>> {
+        self.0.load(deps.storage)
     }
 
     /// Returns Ok(true) if this is an admin, Ok(false) if not and an Error if
     /// we hit an error with Api or Storage usage
-    pub fn is_admin(&self, deps: Deps, caller: &HumanAddr) -> StdResult<bool> {
+    pub fn is_admin(&self, deps: Deps, caller: &Addr) -> StdResult<bool> {
         match self.0.load(deps.storage)? {
-            Some(owner) => {
-                let caller_raw = deps.api.canonical_address(caller)?;
-                Ok(caller_raw == owner)
-            }
+            Some(owner) => Ok(caller == &owner),
             None => Ok(false),
         }
     }
 
     /// Like is_admin but returns AdminError::NotAdmin if not admin.
     /// Helper for a nice one-line auth check.
-    pub fn assert_admin(&self, deps: Deps, caller: &HumanAddr) -> Result<(), AdminError> {
+    pub fn assert_admin(&self, deps: Deps, caller: &Addr) -> Result<(), AdminError> {
         if !self.is_admin(deps, caller)? {
             Err(AdminError::NotAdmin {})
         } else {
@@ -70,7 +62,7 @@ impl<'a> Admin<'a> {
         &self,
         deps: DepsMut,
         info: MessageInfo,
-        new_admin: Option<HumanAddr>,
+        new_admin: Option<Addr>,
     ) -> Result<Response, AdminError> {
         self.assert_admin(deps.as_ref(), &info.sender)?;
 
@@ -95,7 +87,7 @@ impl<'a> Admin<'a> {
     }
 
     pub fn query_admin(&self, deps: Deps) -> StdResult<AdminResponse> {
-        let admin = self.get(deps)?;
+        let admin = self.get(deps)?.map(String::from);
         Ok(AdminResponse { admin })
     }
 }
@@ -112,7 +104,7 @@ mod tests {
         let control = Admin::new("foo");
 
         // initialize and check
-        let admin = Some(HumanAddr::from("admin"));
+        let admin = Some(Addr::unchecked("admin"));
         control.set(deps.as_mut(), admin.clone()).unwrap();
         let got = control.get(deps.as_ref()).unwrap();
         assert_eq!(admin, got);
@@ -128,8 +120,8 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let control = Admin::new("foo");
-        let owner = HumanAddr::from("big boss");
-        let imposter = HumanAddr::from("imposter");
+        let owner = Addr::unchecked("big boss");
+        let imposter = Addr::unchecked("imposter");
 
         // ensure checks proper with owner set
         control.set(deps.as_mut(), Some(owner.clone())).unwrap();
@@ -155,17 +147,17 @@ mod tests {
 
         // initial setup
         let control = Admin::new("foo");
-        let owner = HumanAddr::from("big boss");
-        let imposter = HumanAddr::from("imposter");
-        let friend = HumanAddr::from("buddy");
+        let owner = Addr::unchecked("big boss");
+        let imposter = Addr::unchecked("imposter");
+        let friend = Addr::unchecked("buddy");
         control.set(deps.as_mut(), Some(owner.clone())).unwrap();
 
         // query shows results
         let res = control.query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(owner.clone()), res.admin);
+        assert_eq!(Some(owner.to_string()), res.admin);
 
         // imposter cannot update
-        let info = mock_info(&imposter, &[]);
+        let info = mock_info(imposter.as_ref(), &[]);
         let new_admin = Some(friend.clone());
         let err = control
             .execute_update_admin(deps.as_mut(), info, new_admin.clone())
@@ -173,7 +165,7 @@ mod tests {
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // owner can update
-        let info = mock_info(&owner, &[]);
+        let info = mock_info(owner.as_ref(), &[]);
         let res = control
             .execute_update_admin(deps.as_mut(), info, new_admin)
             .unwrap();
@@ -181,6 +173,6 @@ mod tests {
 
         // query shows results
         let res = control.query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(friend.clone()), res.admin);
+        assert_eq!(Some(friend.to_string()), res.admin);
     }
 }

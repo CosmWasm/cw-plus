@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, WasmMsg};
+use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, WasmMsg};
 
 /// MemberDiff shows the old and new states for a given cw4 member
 /// They cannot both be None.
@@ -10,17 +10,13 @@ use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, WasmMsg};
 /// old = Some, new = None -> Delete
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MemberDiff {
-    pub key: HumanAddr,
+    pub key: String,
     pub old: Option<u64>,
     pub new: Option<u64>,
 }
 
 impl MemberDiff {
-    pub fn new<T: Into<HumanAddr>>(
-        addr: T,
-        old_weight: Option<u64>,
-        new_weight: Option<u64>,
-    ) -> Self {
+    pub fn new<T: Into<String>>(addr: T, old_weight: Option<u64>, new_weight: Option<u64>) -> Self {
         MemberDiff {
             key: addr.into(),
             old: old_weight,
@@ -53,10 +49,10 @@ impl MemberChangedHookMsg {
     }
 
     /// creates a cosmos_msg sending this struct to the named contract
-    pub fn into_cosmos_msg(self, contract_addr: HumanAddr) -> StdResult<CosmosMsg> {
+    pub fn into_cosmos_msg<T: Into<String>>(self, contract_addr: T) -> StdResult<CosmosMsg> {
         let msg = self.into_binary()?;
         let execute = WasmMsg::Execute {
-            contract_addr,
+            contract_addr: contract_addr.into(),
             msg,
             send: vec![],
         };

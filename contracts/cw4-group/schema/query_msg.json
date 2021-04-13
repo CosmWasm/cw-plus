@@ -12,7 +12,8 @@
         "admin": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Return TotalWeightResponse",
@@ -24,7 +25,8 @@
         "total_weight": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns MembersListResponse",
@@ -45,18 +47,15 @@
               "minimum": 0.0
             },
             "start_after": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns MemberResponse",
@@ -72,7 +71,7 @@
           ],
           "properties": {
             "addr": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "at_height": {
               "type": [
@@ -84,7 +83,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Shows all registered hooks. Returns HooksResponse.",
@@ -96,12 +96,8 @@
         "hooks": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }

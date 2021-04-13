@@ -2,8 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, CosmosMsg, HumanAddr, Querier, QuerierWrapper, StdResult, Uint128, WasmMsg,
-    WasmQuery,
+    to_binary, Addr, CosmosMsg, Querier, QuerierWrapper, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::{
@@ -11,22 +10,22 @@ use crate::{
     TokenInfoResponse,
 };
 
-/// Cw20Contract is a wrapper around HumanAddr that provides a lot of helpers
+/// Cw20Contract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
 ///
 /// If you wish to persist this, convert to Cw20CanonicalContract via .canonical()
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw20Contract(pub HumanAddr);
+pub struct Cw20Contract(pub Addr);
 
 impl Cw20Contract {
-    pub fn addr(&self) -> HumanAddr {
+    pub fn addr(&self) -> Addr {
         self.0.clone()
     }
 
     pub fn call<T: Into<Cw20ExecuteMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
         let msg = to_binary(&msg.into())?;
         Ok(WasmMsg::Execute {
-            contract_addr: self.addr(),
+            contract_addr: self.addr().into(),
             msg,
             send: vec![],
         }
@@ -34,10 +33,16 @@ impl Cw20Contract {
     }
 
     /// Get token balance for the given address
-    pub fn balance<Q: Querier>(&self, querier: &Q, address: HumanAddr) -> StdResult<Uint128> {
-        let msg = Cw20QueryMsg::Balance { address };
+    pub fn balance<Q: Querier, T: Into<String>>(
+        &self,
+        querier: &Q,
+        address: T,
+    ) -> StdResult<Uint128> {
+        let msg = Cw20QueryMsg::Balance {
+            address: address.into(),
+        };
         let query = WasmQuery::Smart {
-            contract_addr: self.addr(),
+            contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
         }
         .into();
@@ -50,7 +55,7 @@ impl Cw20Contract {
     pub fn meta<Q: Querier>(&self, querier: &Q) -> StdResult<TokenInfoResponse> {
         let msg = Cw20QueryMsg::TokenInfo {};
         let query = WasmQuery::Smart {
-            contract_addr: self.addr(),
+            contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
         }
         .into();
@@ -58,15 +63,18 @@ impl Cw20Contract {
     }
 
     /// Get allowance of spender to use owner's account
-    pub fn allowance<Q: Querier>(
+    pub fn allowance<Q: Querier, T: Into<String>, U: Into<String>>(
         &self,
         querier: &Q,
-        owner: HumanAddr,
-        spender: HumanAddr,
+        owner: T,
+        spender: U,
     ) -> StdResult<AllowanceResponse> {
-        let msg = Cw20QueryMsg::Allowance { owner, spender };
+        let msg = Cw20QueryMsg::Allowance {
+            owner: owner.into(),
+            spender: spender.into(),
+        };
         let query = WasmQuery::Smart {
-            contract_addr: self.addr(),
+            contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
         }
         .into();
@@ -77,7 +85,7 @@ impl Cw20Contract {
     pub fn minter<Q: Querier>(&self, querier: &Q) -> StdResult<Option<MinterResponse>> {
         let msg = Cw20QueryMsg::Minter {};
         let query = WasmQuery::Smart {
-            contract_addr: self.addr(),
+            contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
         }
         .into();

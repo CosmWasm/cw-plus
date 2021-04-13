@@ -10,16 +10,11 @@
     "admins": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/HumanAddr"
+        "type": "string"
       }
     },
     "mutable": {
       "type": "boolean"
-    }
-  },
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
     }
   }
 }

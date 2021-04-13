@@ -1,8 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::HumanAddr;
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw4QueryMsg {
@@ -12,12 +10,12 @@ pub enum Cw4QueryMsg {
     TotalWeight {},
     /// Returns MembersListResponse
     ListMembers {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Returns MemberResponse
     Member {
-        addr: HumanAddr,
+        addr: String,
         at_height: Option<u64>,
     },
     /// Shows all registered hooks. Returns HooksResponse.
@@ -26,7 +24,7 @@ pub enum Cw4QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminResponse {
-    pub admin: Option<HumanAddr>,
+    pub admin: Option<String>,
 }
 
 /// A group member has a weight associated with them.
@@ -34,7 +32,7 @@ pub struct AdminResponse {
 /// makes use of the group (eg. voting power)
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Member {
-    pub addr: HumanAddr,
+    pub addr: String,
     pub weight: u64,
 }
 
@@ -55,7 +53,7 @@ pub struct TotalWeightResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct HooksResponse {
-    pub hooks: Vec<HumanAddr>,
+    pub hooks: Vec<String>,
 }
 
 /// TOTAL_KEY is meant for raw queries
@@ -64,13 +62,10 @@ pub const MEMBERS_KEY: &str = "members";
 pub const MEMBERS_CHECKPOINTS: &str = "members__checkpoints";
 pub const MEMBERS_CHANGELOG: &str = "members__changelog";
 
-/// member_key is meant for raw queries for one member, given canonical address
-pub fn member_key(address: &[u8]) -> Vec<u8> {
-    // FIXME?: Inlined here to avoid storage-plus import
-    if MEMBERS_KEY.len() > 0xFF {
-        panic!("only supports member keys up to length 0xFF")
-    }
+/// member_key is meant for raw queries for one member, given address
+pub fn member_key(address: &str) -> Vec<u8> {
+    // FIXME: Inlined here to avoid storage-plus import
     let mut key = [b"\x00", &[MEMBERS_KEY.len() as u8], MEMBERS_KEY.as_bytes()].concat();
-    key.extend_from_slice(address);
+    key.extend_from_slice(address.as_bytes());
     key
 }

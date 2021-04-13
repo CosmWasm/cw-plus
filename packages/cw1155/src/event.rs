@@ -1,10 +1,10 @@
-use cosmwasm_std::{HumanAddr, Response, Uint128};
+use cosmwasm_std::{Response, Uint128};
 use cw0::Event;
 
 /// Tracks token transfer/mint/burn actions
 pub struct TransferEvent<'a> {
-    pub from: Option<&'a HumanAddr>,
-    pub to: Option<&'a HumanAddr>,
+    pub from: Option<&'a str>,
+    pub to: Option<&'a str>,
     pub token_id: &'a str,
     pub amount: Uint128,
 }
@@ -39,8 +39,8 @@ impl<'a> Event for MetadataEvent<'a> {
 
 /// Tracks approve_all status changes
 pub struct ApproveAllEvent<'a> {
-    pub sender: &'a HumanAddr,
-    pub operator: &'a HumanAddr,
+    pub sender: &'a str,
+    pub operator: &'a str,
     pub approved: bool,
 }
 

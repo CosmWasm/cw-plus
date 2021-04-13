@@ -1,4 +1,4 @@
-use cosmwasm_std::{HumanAddr, StdError};
+use cosmwasm_std::StdError;
 use thiserror::Error;
 
 use cw_controllers::{AdminError, HookError};
@@ -27,7 +27,7 @@ pub enum ContractError {
     ExtraDenoms(String),
 
     #[error("Must send valid address to stake")]
-    InvalidDenom(HumanAddr),
+    InvalidDenom(String),
 
     #[error("Missed address or denom")]
     MixedNativeAndCw20(String),

@@ -18,13 +18,10 @@
       ]
     },
     "minter": {
-      "$ref": "#/definitions/HumanAddr"
+      "type": "string"
     }
   },
   "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    },
     "Uint128": {
       "type": "string"
     }

@@ -15,9 +15,6 @@
     }
   },
   "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    },
     "MemberDiff": {
       "description": "MemberDiff shows the old and new states for a given cw4 member They cannot both be None. old = None, new = Some -> Insert old = Some, new = Some -> Update old = Some, new = None -> Delete",
       "type": "object",
@@ -26,7 +23,7 @@
       ],
       "properties": {
         "key": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "new": {
           "type": [

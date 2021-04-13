@@ -13,18 +13,15 @@
           "type": "object",
           "properties": {
             "admin": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Add a new hook to be informed of all membership changes. Must be called by Admin",
@@ -40,11 +37,12 @@
           ],
           "properties": {
             "addr": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Remove a hook. Must be called by Admin",
@@ -60,16 +58,12 @@
           ],
           "properties": {
             "addr": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  ],
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    }
-  }
+  ]
 }

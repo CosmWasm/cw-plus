@@ -8,7 +8,7 @@ use crate::state::ChannelInfo;
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct InitMsg {
-    /// default timeout for ics20 packets, specified in seconds
+    /// Default timeout for ics20 packets, specified in seconds
     pub default_timeout: u64,
 }
 
@@ -29,7 +29,7 @@ pub enum ExecuteMsg {
 pub struct TransferMsg {
     /// The local channel to send the packets on
     pub channel: String,
-    /// The remote address to send to
+    /// The remote address to send to.
     /// Don't use HumanAddress as this will likely have a different Bech32 prefix than we use
     /// and cannot be validated locally
     pub remote_address: String,
@@ -44,7 +44,7 @@ pub enum QueryMsg {
     Port {},
     /// Show all channels we have connected to. Return type is ListChannelsResponse.
     ListChannels {},
-    /// Returns the details of the name channel, error if not created
+    /// Returns the details of the name channel, error if not created.
     /// Return type: ChannelResponse.
     Channel { id: String },
 }
@@ -56,12 +56,12 @@ pub struct ListChannelsResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ChannelResponse {
-    /// information on the channel's connection
+    /// Information on the channel's connection
     pub info: ChannelInfo,
-    /// how many tokens we currently have pending over this channel
+    /// How many tokens we currently have pending over this channel
     pub balances: Vec<Amount>,
-    /// the total number of tokens that have been sent over this channel
-    /// (even if many have been returned, so balanace is low)
+    /// The total number of tokens that have been sent over this channel
+    /// (even if many have been returned, so balance is low)
     pub total_sent: Vec<Amount>,
 }
 

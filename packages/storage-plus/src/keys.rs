@@ -1,3 +1,4 @@
+use cosmwasm_std::Addr;
 use std::marker::PhantomData;
 
 use crate::helpers::namespaces_with_key;
@@ -133,6 +134,23 @@ impl<'a> PrimaryKey<'a> for PkOwned {
 impl<'a> Prefixer<'a> for PkOwned {
     fn prefix(&self) -> Vec<&[u8]> {
         vec![&self.0]
+    }
+}
+
+/// type safe version to ensure address was validated before use.
+impl<'a> PrimaryKey<'a> for &'a Addr {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_ref().as_bytes()]
+    }
+}
+
+impl<'a> Prefixer<'a> for &'a Addr {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![&self.as_ref().as_bytes()]
     }
 }
 

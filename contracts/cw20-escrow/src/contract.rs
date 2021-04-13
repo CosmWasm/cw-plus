@@ -1,12 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Api, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env, HumanAddr,
+    attr, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Response, StdResult, WasmMsg,
 };
 
 use cw2::set_contract_version;
-use cw20::{Balance, Cw20Coin, Cw20CoinHuman, Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw20::{Balance, Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg};
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -57,12 +57,15 @@ pub fn execute_receive(
         Some(bin) => Ok(from_binary(&bin)?),
         None => Err(ContractError::NoData {}),
     }?;
-    let balance = Balance::Cw20(Cw20Coin {
-        address: deps.api.canonical_address(&info.sender)?,
+    let balance = Balance::Cw20(Cw20CoinVerified {
+        address: info.sender,
         amount: wrapper.amount,
     });
+    let api = deps.api;
     match msg {
-        ReceiveMsg::Create(msg) => execute_create(deps, msg, balance, &wrapper.sender),
+        ReceiveMsg::Create(msg) => {
+            execute_create(deps, msg, balance, &api.addr_validate(&wrapper.sender)?)
+        }
         ReceiveMsg::TopUp { id } => execute_top_up(deps, id, balance),
     }
 }
@@ -71,13 +74,13 @@ pub fn execute_create(
     deps: DepsMut,
     msg: CreateMsg,
     balance: Balance,
-    sender: &HumanAddr,
+    sender: &Addr,
 ) -> Result<Response, ContractError> {
     if balance.is_empty() {
         return Err(ContractError::EmptyBalance {});
     }
 
-    let mut cw20_whitelist = msg.canonical_whitelist(deps.api)?;
+    let mut cw20_whitelist = msg.addr_whitelist(deps.api)?;
 
     let escrow_balance = match balance {
         Balance::Native(balance) => GenericBalance {
@@ -97,9 +100,9 @@ pub fn execute_create(
     };
 
     let escrow = Escrow {
-        arbiter: deps.api.canonical_address(&msg.arbiter)?,
-        recipient: deps.api.canonical_address(&msg.recipient)?,
-        source: deps.api.canonical_address(&sender)?,
+        arbiter: deps.api.addr_validate(&msg.arbiter)?,
+        recipient: deps.api.addr_validate(&msg.recipient)?,
+        source: sender.clone(),
         end_height: msg.end_height,
         end_time: msg.end_time,
         balance: escrow_balance,
@@ -158,7 +161,7 @@ pub fn execute_approve(
     // this fails is no escrow there
     let escrow = ESCROWS.load(deps.storage, &id)?;
 
-    if deps.api.canonical_address(&info.sender)? != escrow.arbiter {
+    if info.sender != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else if escrow.is_expired(&env) {
         Err(ContractError::Expired {})
@@ -166,12 +169,14 @@ pub fn execute_approve(
         // we delete the escrow
         ESCROWS.remove(deps.storage, &id);
 
-        let rcpt = deps.api.human_address(&escrow.recipient)?;
-
         // send all tokens out
-        let messages = send_tokens(deps.api, &rcpt, &escrow.balance)?;
+        let messages = send_tokens(&escrow.recipient, &escrow.balance)?;
 
-        let attributes = vec![attr("action", "approve"), attr("id", id), attr("to", rcpt)];
+        let attributes = vec![
+            attr("action", "approve"),
+            attr("id", id),
+            attr("to", escrow.recipient),
+        ];
         Ok(Response {
             submessages: vec![],
             messages,
@@ -191,18 +196,20 @@ pub fn execute_refund(
     let escrow = ESCROWS.load(deps.storage, &id)?;
 
     // the arbiter can send anytime OR anyone can send after expiration
-    if !escrow.is_expired(&env) && deps.api.canonical_address(&info.sender)? != escrow.arbiter {
+    if !escrow.is_expired(&env) && info.sender != escrow.arbiter {
         Err(ContractError::Unauthorized {})
     } else {
         // we delete the escrow
         ESCROWS.remove(deps.storage, &id);
 
-        let rcpt = deps.api.human_address(&escrow.source)?;
-
         // send all tokens out
-        let messages = send_tokens(deps.api, &rcpt, &escrow.balance)?;
+        let messages = send_tokens(&escrow.source, &escrow.balance)?;
 
-        let attributes = vec![attr("action", "refund"), attr("id", id), attr("to", rcpt)];
+        let attributes = vec![
+            attr("action", "refund"),
+            attr("id", id),
+            attr("to", escrow.source),
+        ];
         Ok(Response {
             submessages: vec![],
             messages,
@@ -212,11 +219,7 @@ pub fn execute_refund(
     }
 }
 
-fn send_tokens(
-    api: &dyn Api,
-    to: &HumanAddr,
-    balance: &GenericBalance,
-) -> StdResult<Vec<CosmosMsg>> {
+fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>> {
     let native_balance = &balance.native;
     let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
         vec![]
@@ -237,7 +240,7 @@ fn send_tokens(
                 amount: c.amount,
             };
             let exec = WasmMsg::Execute {
-                contract_addr: api.human_address(&c.address)?,
+                contract_addr: c.address.to_string(),
                 msg: to_binary(&msg)?,
                 send: vec![],
             };
@@ -259,7 +262,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
     let escrow = ESCROWS.load(deps.storage, &id)?;
 
-    let cw20_whitelist = escrow.human_whitelist(deps.api)?;
+    let cw20_whitelist = escrow.human_whitelist();
 
     // transform tokens
     let native_balance = escrow.balance.native;
@@ -269,8 +272,8 @@ fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
         .cw20
         .into_iter()
         .map(|token| {
-            Ok(Cw20CoinHuman {
-                address: deps.api.human_address(&token.address)?,
+            Ok(Cw20Coin {
+                address: token.address.into(),
                 amount: token.amount,
             })
         })
@@ -278,9 +281,9 @@ fn query_details(deps: Deps, id: String) -> StdResult<DetailsResponse> {
 
     let details = DetailsResponse {
         id,
-        arbiter: deps.api.human_address(&escrow.arbiter)?,
-        recipient: deps.api.human_address(&escrow.recipient)?,
-        source: deps.api.human_address(&escrow.source)?,
+        arbiter: escrow.arbiter.into(),
+        recipient: escrow.recipient.into(),
+        source: escrow.source.into(),
         end_height: escrow.end_height,
         end_time: escrow.end_time,
         native_balance,
@@ -299,7 +302,7 @@ fn query_list(deps: Deps) -> StdResult<ListResponse> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, CanonicalAddr, CosmosMsg, StdError, Uint128};
+    use cosmwasm_std::{coin, coins, CosmosMsg, StdError, Uint128};
 
     use crate::msg::ExecuteMsg::TopUp;
 
@@ -311,20 +314,20 @@ mod tests {
 
         // instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};
-        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let info = mock_info(&String::from("anyone"), &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // create an escrow
         let create = CreateMsg {
             id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
+            arbiter: String::from("arbitrate"),
+            recipient: String::from("recd"),
             end_time: None,
             end_height: Some(123456),
             cw20_whitelist: None,
         };
-        let sender = HumanAddr::from("source");
+        let sender = String::from("source");
         let balance = coins(100, "tokens");
         let info = mock_info(&sender, &balance);
         let msg = ExecuteMsg::Create(create.clone());
@@ -338,9 +341,9 @@ mod tests {
             details,
             DetailsResponse {
                 id: "foobar".to_string(),
-                arbiter: HumanAddr::from("arbitrate"),
-                recipient: HumanAddr::from("recd"),
-                source: HumanAddr::from("source"),
+                arbiter: String::from("arbitrate"),
+                recipient: String::from("recd"),
+                source: String::from("source"),
                 end_height: Some(123456),
                 end_time: None,
                 native_balance: balance.clone(),
@@ -376,25 +379,25 @@ mod tests {
 
         // instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};
-        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let info = mock_info(&String::from("anyone"), &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // create an escrow
         let create = CreateMsg {
             id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
+            arbiter: String::from("arbitrate"),
+            recipient: String::from("recd"),
             end_time: None,
             end_height: None,
-            cw20_whitelist: Some(vec![HumanAddr::from("other-token")]),
+            cw20_whitelist: Some(vec![String::from("other-token")]),
         };
         let receive = Cw20ReceiveMsg {
-            sender: HumanAddr::from("source"),
+            sender: String::from("source"),
             amount: Uint128(100),
             msg: Some(to_binary(&ExecuteMsg::Create(create.clone())).unwrap()),
         };
-        let token_contract = HumanAddr::from("my-cw20-token");
+        let token_contract = String::from("my-cw20-token");
         let info = mock_info(&token_contract, &[]);
         let msg = ExecuteMsg::Receive(receive.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -407,20 +410,17 @@ mod tests {
             details,
             DetailsResponse {
                 id: "foobar".to_string(),
-                arbiter: HumanAddr::from("arbitrate"),
-                recipient: HumanAddr::from("recd"),
-                source: HumanAddr::from("source"),
+                arbiter: String::from("arbitrate"),
+                recipient: String::from("recd"),
+                source: String::from("source"),
                 end_height: None,
                 end_time: None,
                 native_balance: vec![],
-                cw20_balance: vec![Cw20CoinHuman {
-                    address: HumanAddr::from("my-cw20-token"),
+                cw20_balance: vec![Cw20Coin {
+                    address: String::from("my-cw20-token"),
                     amount: Uint128(100),
                 }],
-                cw20_whitelist: vec![
-                    HumanAddr::from("other-token"),
-                    HumanAddr::from("my-cw20-token")
-                ],
+                cw20_whitelist: vec![String::from("other-token"), String::from("my-cw20-token")],
             }
         );
 
@@ -464,28 +464,28 @@ mod tests {
     #[test]
     fn add_cw_tokens_proper() {
         let mut tokens = GenericBalance::default();
-        let bar_token = CanonicalAddr(b"bar_token".to_vec().into());
-        let foo_token = CanonicalAddr(b"foo_token".to_vec().into());
-        tokens.add_tokens(Balance::Cw20(Cw20Coin {
+        let bar_token = Addr::unchecked("bar_token");
+        let foo_token = Addr::unchecked("foo_token");
+        tokens.add_tokens(Balance::Cw20(Cw20CoinVerified {
             address: foo_token.clone(),
             amount: Uint128(12345),
         }));
-        tokens.add_tokens(Balance::Cw20(Cw20Coin {
+        tokens.add_tokens(Balance::Cw20(Cw20CoinVerified {
             address: bar_token.clone(),
             amount: Uint128(777),
         }));
-        tokens.add_tokens(Balance::Cw20(Cw20Coin {
+        tokens.add_tokens(Balance::Cw20(Cw20CoinVerified {
             address: foo_token.clone(),
             amount: Uint128(23400),
         }));
         assert_eq!(
             tokens.cw20,
             vec![
-                Cw20Coin {
+                Cw20CoinVerified {
                     address: foo_token,
                     amount: Uint128(35745),
                 },
-                Cw20Coin {
+                Cw20CoinVerified {
                     address: bar_token,
                     amount: Uint128(777),
                 }
@@ -499,23 +499,23 @@ mod tests {
 
         // instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};
-        let info = mock_info(&HumanAddr::from("anyone"), &[]);
+        let info = mock_info(&String::from("anyone"), &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // only accept these tokens
-        let whitelist = vec![HumanAddr::from("bar_token"), HumanAddr::from("foo_token")];
+        let whitelist = vec![String::from("bar_token"), String::from("foo_token")];
 
         // create an escrow with 2 native tokens
         let create = CreateMsg {
             id: "foobar".to_string(),
-            arbiter: HumanAddr::from("arbitrate"),
-            recipient: HumanAddr::from("recd"),
+            arbiter: String::from("arbitrate"),
+            recipient: String::from("recd"),
             end_time: None,
             end_height: None,
             cw20_whitelist: Some(whitelist),
         };
-        let sender = HumanAddr::from("source");
+        let sender = String::from("source");
         let balance = vec![coin(100, "fee"), coin(200, "stake")];
         let info = mock_info(&sender, &balance);
         let msg = ExecuteMsg::Create(create.clone());
@@ -534,12 +534,12 @@ mod tests {
         assert_eq!(attr("action", "top_up"), res.attributes[0]);
 
         // top up with one foreign token
-        let bar_token = HumanAddr::from("bar_token");
+        let bar_token = String::from("bar_token");
         let base = TopUp {
             id: create.id.clone(),
         };
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
+            sender: String::from("random"),
             amount: Uint128(7890),
             msg: Some(to_binary(&base).unwrap()),
         });
@@ -550,12 +550,12 @@ mod tests {
 
         // top with a foreign token not on the whitelist
         // top up with one foreign token
-        let baz_token = HumanAddr::from("baz_token");
+        let baz_token = String::from("baz_token");
         let base = TopUp {
             id: create.id.clone(),
         };
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
+            sender: String::from("random"),
             amount: Uint128(7890),
             msg: Some(to_binary(&base).unwrap()),
         });
@@ -564,12 +564,12 @@ mod tests {
         assert_eq!(err, ContractError::NotInWhitelist {});
 
         // top up with second foreign token
-        let foo_token = HumanAddr::from("foo_token");
+        let foo_token = String::from("foo_token");
         let base = TopUp {
             id: create.id.clone(),
         };
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
-            sender: HumanAddr::from("random"),
+            sender: String::from("random"),
             amount: Uint128(888),
             msg: Some(to_binary(&base).unwrap()),
         });

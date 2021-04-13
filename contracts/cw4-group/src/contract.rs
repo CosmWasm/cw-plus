@@ -1,10 +1,9 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, CanonicalAddr, Deps, DepsMut, Env, HumanAddr, MessageInfo, Order,
-    Response, StdResult,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
 };
-use cw0::maybe_canonical;
+use cw0::maybe_addr;
 use cw2::set_contract_version;
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
@@ -38,17 +37,20 @@ pub fn instantiate(
 // easily be imported in other contracts
 pub fn create(
     mut deps: DepsMut,
-    admin: Option<HumanAddr>,
+    admin: Option<String>,
     members: Vec<Member>,
     height: u64,
 ) -> Result<(), ContractError> {
-    ADMIN.set(deps.branch(), admin)?;
+    let admin_addr = admin
+        .map(|admin| deps.api.addr_validate(&admin))
+        .transpose()?;
+    ADMIN.set(deps.branch(), admin_addr)?;
 
     let mut total = 0u64;
     for member in members.into_iter() {
         total += member.weight;
-        let raw = deps.api.canonical_address(&member.addr)?;
-        MEMBERS.save(deps.storage, &raw, &member.weight, height)?;
+        let member_addr = deps.api.addr_validate(&member.addr)?;
+        MEMBERS.save(deps.storage, &member_addr, &member.weight, height)?;
     }
     TOTAL.save(deps.storage, &total)?;
 
@@ -63,13 +65,22 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let api = deps.api;
     match msg {
-        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
+        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(
+            deps,
+            info,
+            admin.map(|admin| api.addr_validate(&admin)).transpose()?,
+        )?),
         ExecuteMsg::UpdateMembers { add, remove } => {
             execute_update_members(deps, env, info, add, remove)
         }
-        ExecuteMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
-        ExecuteMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::AddHook { addr } => {
+            Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
+        ExecuteMsg::RemoveHook { addr } => {
+            Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
     }
 }
 
@@ -78,7 +89,7 @@ pub fn execute_update_members(
     env: Env,
     info: MessageInfo,
     add: Vec<Member>,
-    remove: Vec<HumanAddr>,
+    remove: Vec<String>,
 ) -> Result<Response, ContractError> {
     let attributes = vec![
         attr("action", "update_members"),
@@ -103,9 +114,9 @@ pub fn execute_update_members(
 pub fn update_members(
     deps: DepsMut,
     height: u64,
-    sender: HumanAddr,
+    sender: Addr,
     to_add: Vec<Member>,
-    to_remove: Vec<HumanAddr>,
+    to_remove: Vec<String>,
 ) -> Result<MemberChangedHookMsg, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &sender)?;
 
@@ -114,8 +125,8 @@ pub fn update_members(
 
     // add all new members and update total
     for add in to_add.into_iter() {
-        let raw = deps.api.canonical_address(&add.addr)?;
-        MEMBERS.update(deps.storage, &raw, height, |old| -> StdResult<_> {
+        let add_addr = deps.api.addr_validate(&add.addr)?;
+        MEMBERS.update(deps.storage, &add_addr, height, |old| -> StdResult<_> {
             total -= old.unwrap_or_default();
             total += add.weight;
             diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
@@ -124,13 +135,13 @@ pub fn update_members(
     }
 
     for remove in to_remove.into_iter() {
-        let raw = deps.api.canonical_address(&remove)?;
-        let old = MEMBERS.may_load(deps.storage, &raw)?;
+        let remove_addr = deps.api.addr_validate(&remove)?;
+        let old = MEMBERS.may_load(deps.storage, &remove_addr)?;
         // Only process this if they were actually in the list before
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
             total -= weight;
-            MEMBERS.remove(deps.storage, &raw, height)?;
+            MEMBERS.remove(deps.storage, &remove_addr, height)?;
         }
     }
 
@@ -159,11 +170,11 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member(deps: Deps, addr: HumanAddr, height: Option<u64>) -> StdResult<MemberResponse> {
-    let raw = deps.api.canonical_address(&addr)?;
+fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
+    let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, &raw, h),
-        None => MEMBERS.may_load(deps.storage, &raw),
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
+        None => MEMBERS.may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -174,21 +185,20 @@ const DEFAULT_LIMIT: u32 = 10;
 
 fn list_members(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let addr = maybe_addr(deps.api, start_after)?;
+    let start = addr.map(|addr| Bound::exclusive(addr.to_string()));
 
-    let api = &deps.api;
     let members: StdResult<Vec<_>> = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
             Ok(Member {
-                addr: api.human_address(&CanonicalAddr::from(key))?,
+                addr: String::from_utf8(key)?,
                 weight,
             })
         })
@@ -235,7 +245,7 @@ mod tests {
 
         // it worked, let's query the state
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(HumanAddr::from(INIT_ADMIN)), res.admin);
+        assert_eq!(Some(INIT_ADMIN.into()), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(17, res.weight);
@@ -309,7 +319,7 @@ mod tests {
         let err = update_members(
             deps.as_mut(),
             height + 5,
-            USER1.into(),
+            Addr::unchecked(USER1),
             add.clone(),
             remove.clone(),
         )
@@ -324,7 +334,14 @@ mod tests {
         assert_users(&deps, Some(11), Some(6), None, Some(height + 1));
 
         // admin updates properly
-        update_members(deps.as_mut(), height + 10, INIT_ADMIN.into(), add, remove).unwrap();
+        update_members(
+            deps.as_mut(),
+            height + 10,
+            Addr::unchecked(INIT_ADMIN),
+            add,
+            remove,
+        )
+        .unwrap();
 
         // updated properly
         assert_users(&deps, None, Some(6), Some(15), None);
@@ -348,7 +365,14 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
+        update_members(
+            deps.as_mut(),
+            height,
+            Addr::unchecked(INIT_ADMIN),
+            add,
+            remove,
+        )
+        .unwrap();
         assert_users(&deps, Some(4), Some(6), None, None);
     }
 
@@ -373,7 +397,14 @@ mod tests {
 
         // admin updates properly
         let height = mock_env().block.height;
-        update_members(deps.as_mut(), height, INIT_ADMIN.into(), add, remove).unwrap();
+        update_members(
+            deps.as_mut(),
+            height,
+            Addr::unchecked(INIT_ADMIN),
+            add,
+            remove,
+        )
+        .unwrap();
         assert_users(&deps, None, Some(6), Some(5), None);
     }
 
@@ -386,8 +417,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = HumanAddr::from("hook1");
-        let contract2 = HumanAddr::from("hook2");
+        let contract1 = String::from("hook1");
+        let contract2 = String::from("hook2");
 
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
@@ -405,7 +436,7 @@ mod tests {
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // admin can add it, and it appears in the query
-        let admin_info = mock_info(INIT_ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN.as_ref(), &[]);
         let _ = execute(
             deps.as_mut(),
             mock_env(),
@@ -480,11 +511,11 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = HumanAddr::from("hook1");
-        let contract2 = HumanAddr::from("hook2");
+        let contract1 = String::from("hook1");
+        let contract2 = String::from("hook2");
 
         // register 2 hooks
-        let admin_info = mock_info(INIT_ADMIN, &[]);
+        let admin_info = mock_info(INIT_ADMIN.as_ref(), &[]);
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
         };
@@ -541,14 +572,12 @@ mod tests {
         assert_eq!(17, total);
 
         // get member votes from raw key
-        let member2_canon = deps.api.canonical_address(&USER2.into()).unwrap();
-        let member2_raw = deps.storage.get(&member_key(&member2_canon)).unwrap();
+        let member2_raw = deps.storage.get(&member_key(USER2.as_ref())).unwrap();
         let member2: u64 = from_slice(&member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and execute misses
-        let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
-        let member3_raw = deps.storage.get(&member_key(&member3_canon));
+        let member3_raw = deps.storage.get(&member_key(USER3.as_ref()));
         assert_eq!(None, member3_raw);
     }
 }

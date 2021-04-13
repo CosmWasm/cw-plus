@@ -1,7 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::HumanAddr;
 use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -17,10 +16,10 @@ pub enum Cw721QueryMsg {
     /// List all operators that can access all of the owner's tokens.
     /// Return type: `ApprovedForAllResponse`
     ApprovedForAll {
-        owner: HumanAddr,
+        owner: String,
         /// unset or false will filter out expired approvals, you must set to true to see them
         include_expired: Option<bool>,
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Total number of tokens issued
@@ -46,7 +45,7 @@ pub enum Cw721QueryMsg {
     /// Returns all tokens owned by the given address, [] if unset.
     /// Return type: TokensResponse.
     Tokens {
-        owner: HumanAddr,
+        owner: String,
         start_after: Option<String>,
         limit: Option<u32>,
     },
@@ -62,7 +61,7 @@ pub enum Cw721QueryMsg {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct OwnerOfResponse {
     /// Owner of the token
-    pub owner: HumanAddr,
+    pub owner: String,
     /// If set this address is approved to transfer/send the token as well
     pub approvals: Vec<Approval>,
 }
@@ -70,7 +69,7 @@ pub struct OwnerOfResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Approval {
     /// Account that can transfer/send the token
-    pub spender: HumanAddr,
+    pub spender: String,
     /// When the Approval expires (maybe Expiration::never)
     pub expires: Expiration,
 }

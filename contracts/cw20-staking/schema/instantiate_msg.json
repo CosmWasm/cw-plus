@@ -27,7 +27,7 @@
       ]
     },
     "min_withdrawal": {
-      "description": "This is the minimum amount we will pull out to reinvest, as well as a minumum that can be unbonded (to avoid needless staking tx)",
+      "description": "This is the minimum amount we will pull out to reinvest, as well as a minimum that can be unbonded (to avoid needless staking tx)",
       "allOf": [
         {
           "$ref": "#/definitions/Uint128"
@@ -52,11 +52,7 @@
     },
     "validator": {
       "description": "This is the validator that all tokens will be bonded to",
-      "allOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      ]
+      "type": "string"
     }
   },
   "definitions": {
@@ -78,7 +74,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -91,12 +88,10 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "Uint128": {
       "type": "string"

@@ -12,7 +12,8 @@
         "receive": {
           "$ref": "#/definitions/Cw20ReceiveMsg"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "This allows us to transfer *exactly one* native token",
@@ -24,7 +25,8 @@
         "transfer": {
           "$ref": "#/definitions/TransferMsg"
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -54,12 +56,9 @@
           ]
         },
         "sender": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         }
       }
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "TransferMsg": {
       "description": "This is the message we accept via Receive",
@@ -74,7 +73,7 @@
           "type": "string"
         },
         "remote_address": {
-          "description": "The remote address to send to Don't use HumanAddress as this will likely have a different Bech32 prefix than we use and cannot be validated locally",
+          "description": "The remote address to send to. Don't use HumanAddress as this will likely have a different Bech32 prefix than we use and cannot be validated locally",
           "type": "string"
         },
         "timeout": {

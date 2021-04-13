@@ -5,8 +5,8 @@ use std::fmt;
 use std::ops::Deref;
 
 use cosmwasm_std::{
-    from_slice, Api, Binary, BlockInfo, ContractInfo, CosmosMsg, Deps, DepsMut, Empty, Env,
-    HumanAddr, MessageInfo, Querier, QuerierWrapper, Response, Storage, SubMsg, WasmQuery,
+    from_slice, Addr, Api, Binary, BlockInfo, ContractInfo, CosmosMsg, Deps, DepsMut, Empty, Env,
+    MessageInfo, Querier, QuerierWrapper, Response, Storage, SubMsg, WasmQuery,
 };
 
 use crate::transactions::{RepLog, StorageTransaction};
@@ -157,6 +157,7 @@ where
                 id: x.id,
                 msg: customize_msg(x.msg),
                 gas_limit: x.gas_limit,
+                reply_on: Default::default(),
             })
             .collect(),
         messages: resp.messages.into_iter().map(customize_msg::<C>).collect(),
@@ -260,7 +261,7 @@ where
 {
     // WasmState - cache this, pass in separate?
     handlers: HashMap<usize, Box<dyn Contract<C>>>,
-    contracts: HashMap<HumanAddr, ContractData>,
+    contracts: HashMap<Addr, ContractData>,
     // WasmConst
     block: BlockInfo,
     api: Box<dyn Api>,
@@ -308,16 +309,18 @@ where
     pub fn query(&self, querier: &dyn Querier, request: WasmQuery) -> Result<Binary, String> {
         match request {
             WasmQuery::Smart { contract_addr, msg } => {
-                self.query_smart(contract_addr, querier, msg.into())
+                self.query_smart(Addr::unchecked(contract_addr), querier, msg.into())
             }
-            WasmQuery::Raw { contract_addr, key } => self.query_raw(contract_addr, &key),
+            WasmQuery::Raw { contract_addr, key } => {
+                self.query_raw(Addr::unchecked(contract_addr), &key)
+            }
             q => panic!("Unsupported wasm query: {:?}", q),
         }
     }
 
     pub fn query_smart(
         &self,
-        address: HumanAddr,
+        address: Addr,
         querier: &dyn Querier,
         msg: Vec<u8>,
     ) -> Result<Binary, String> {
@@ -326,7 +329,7 @@ where
         })
     }
 
-    pub fn query_raw(&self, address: HumanAddr, key: &[u8]) -> Result<Binary, String> {
+    pub fn query_raw(&self, address: Addr, key: &[u8]) -> Result<Binary, String> {
         let contract = self
             .contracts
             .get(&address)
@@ -335,7 +338,7 @@ where
         Ok(data.into())
     }
 
-    fn get_env<T: Into<HumanAddr>>(&self, address: T) -> Env {
+    fn get_env<T: Into<Addr>>(&self, address: T) -> Env {
         Env {
             block: self.block.clone(),
             contract: ContractInfo {
@@ -347,7 +350,7 @@ where
     fn with_storage<F, T>(
         &self,
         querier: &dyn Querier,
-        address: HumanAddr,
+        address: Addr,
         action: F,
     ) -> Result<T, String>
     where
@@ -399,15 +402,15 @@ where
 /// while still getting an immutable reference to router.
 /// (We cannot take &mut WasmCache)
 pub struct WasmCacheState<'a> {
-    contracts: HashMap<HumanAddr, ContractData>,
-    contract_diffs: HashMap<HumanAddr, StorageTransaction<'a>>,
+    contracts: HashMap<Addr, ContractData>,
+    contract_diffs: HashMap<Addr, StorageTransaction<'a>>,
 }
 
 /// This is a set of data from the WasmCache with no external reference,
 /// which can be used to commit to the underlying WasmRouter.
 pub struct WasmOps {
-    new_contracts: HashMap<HumanAddr, ContractData>,
-    contract_diffs: Vec<(HumanAddr, RepLog)>,
+    new_contracts: HashMap<Addr, ContractData>,
+    contract_diffs: Vec<(Addr, RepLog)>,
 }
 
 impl WasmOps {
@@ -449,7 +452,7 @@ where
     /// This just creates an address and empty storage instance, returning the new address
     /// You must call init after this to set up the contract properly.
     /// These are separated into two steps to have cleaner return values.
-    pub fn register_contract(&mut self, code_id: usize) -> Result<HumanAddr, String> {
+    pub fn register_contract(&mut self, code_id: usize) -> Result<Addr, String> {
         if !self.router.handlers.contains_key(&code_id) {
             return Err("Cannot init contract with unregistered code id".to_string());
         }
@@ -460,15 +463,15 @@ where
     }
 
     // TODO: better addr generation
-    fn next_address(&self) -> HumanAddr {
+    fn next_address(&self) -> Addr {
         let count = self.router.contracts.len() + self.state.contracts.len();
         // we make this longer so it is not rejected by tests
-        HumanAddr::from("Contract #".to_string() + &count.to_string())
+        Addr::unchecked("Contract #".to_string() + &count.to_string())
     }
 
     pub fn handle(
         &mut self,
-        address: HumanAddr,
+        address: Addr,
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -495,7 +498,7 @@ where
 
     pub fn init(
         &mut self,
-        address: HumanAddr,
+        address: Addr,
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -522,7 +525,7 @@ where
 
     pub fn sudo(
         &mut self,
-        address: HumanAddr,
+        address: Addr,
         querier: &dyn Querier,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
@@ -563,8 +566,8 @@ impl<'a> WasmCacheState<'a> {
 
     fn get_contract<'b>(
         &'b mut self,
-        parent: &'a HashMap<HumanAddr, ContractData>,
-        addr: &HumanAddr,
+        parent: &'a HashMap<Addr, ContractData>,
+        addr: &Addr,
     ) -> Option<(usize, &'b mut dyn Storage)> {
         // if we created this transaction
         if let Some(x) = self.contracts.get_mut(addr) {
@@ -588,8 +591,8 @@ impl<'a> WasmCacheState<'a> {
     fn with_storage<F, T>(
         &mut self,
         querier: &dyn Querier,
-        parent: &'a HashMap<HumanAddr, ContractData>,
-        address: HumanAddr,
+        parent: &'a HashMap<Addr, ContractData>,
+        address: Addr,
         env: Env,
         api: &dyn Api,
         action: F,
@@ -647,7 +650,12 @@ mod test {
         // and the error for calling an unregistered contract
         let info = mock_info("foobar", &[]);
         let err = cache
-            .init("unregistered".into(), &querier, info, b"{}".to_vec())
+            .init(
+                Addr::unchecked("unregistered"),
+                &querier,
+                info,
+                b"{}".to_vec(),
+            )
             .unwrap_err();
         // Default error message from router when not found
         assert_eq!(err, "Unregistered contract address");
@@ -660,9 +668,9 @@ mod test {
     fn update_block() {
         let mut router = mock_router();
 
-        let BlockInfo { time, height, .. } = router.get_env("foo").block;
+        let BlockInfo { time, height, .. } = router.get_env(Addr::unchecked("foo")).block;
         router.update_block(next_block);
-        let next = router.get_env("foo").block;
+        let next = router.get_env(Addr::unchecked("foo")).block;
 
         assert_eq!(time + 5, next.time);
         assert_eq!(height + 1, next.height);

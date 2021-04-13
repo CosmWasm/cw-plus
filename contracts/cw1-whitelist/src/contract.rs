@@ -4,8 +4,8 @@ use std::fmt;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Api, Binary, CanonicalAddr, CosmosMsg, Deps, DepsMut, Empty, Env, HumanAddr,
-    MessageInfo, Response, StdResult,
+    attr, to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdResult,
 };
 
 use cw1::CanExecuteResponse;
@@ -28,22 +28,15 @@ pub fn instantiate(
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = AdminList {
-        admins: map_canonical(deps.api, &msg.admins)?,
+        admins: map_validate(deps.api, &msg.admins)?,
         mutable: msg.mutable,
     };
     ADMIN_LIST.save(deps.storage, &cfg)?;
     Ok(Response::default())
 }
 
-pub fn map_canonical(api: &dyn Api, admins: &[HumanAddr]) -> StdResult<Vec<CanonicalAddr>> {
-    admins
-        .iter()
-        .map(|addr| api.canonical_address(addr))
-        .collect()
-}
-
-fn map_human(api: &dyn Api, admins: &[CanonicalAddr]) -> StdResult<Vec<HumanAddr>> {
-    admins.iter().map(|addr| api.human_address(addr)).collect()
+pub fn map_validate(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
+    admins.iter().map(|addr| api.addr_validate(&addr)).collect()
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -71,7 +64,7 @@ pub fn execute_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    if !can_execute(deps.as_ref(), &info.sender)? {
+    if !can_execute(deps.as_ref(), info.sender.as_ref())? {
         Err(ContractError::Unauthorized {})
     } else {
         let res = Response {
@@ -89,7 +82,7 @@ pub fn execute_freeze(
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
     let mut cfg = ADMIN_LIST.load(deps.storage)?;
-    if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
+    if !cfg.can_modify(info.sender.as_ref()) {
         Err(ContractError::Unauthorized {})
     } else {
         cfg.mutable = false;
@@ -107,13 +100,13 @@ pub fn execute_update_admins(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    admins: Vec<HumanAddr>,
+    admins: Vec<String>,
 ) -> Result<Response, ContractError> {
     let mut cfg = ADMIN_LIST.load(deps.storage)?;
-    if !cfg.can_modify(&deps.api.canonical_address(&info.sender)?) {
+    if !cfg.can_modify(info.sender.as_ref()) {
         Err(ContractError::Unauthorized {})
     } else {
-        cfg.admins = map_canonical(deps.api, &admins)?;
+        cfg.admins = map_validate(deps.api, &admins)?;
         ADMIN_LIST.save(deps.storage, &cfg)?;
 
         let res = Response {
@@ -124,9 +117,9 @@ pub fn execute_update_admins(
     }
 }
 
-fn can_execute(deps: Deps, sender: &HumanAddr) -> StdResult<bool> {
+fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    let can = cfg.is_admin(&deps.api.canonical_address(sender)?);
+    let can = cfg.is_admin(sender.as_ref());
     Ok(can)
 }
 
@@ -141,14 +134,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_admin_list(deps: Deps) -> StdResult<AdminListResponse> {
     let cfg = ADMIN_LIST.load(deps.storage)?;
     Ok(AdminListResponse {
-        admins: map_human(deps.api, &cfg.admins)?,
+        admins: cfg.admins.into_iter().map(|a| a.into()).collect(),
         mutable: cfg.mutable,
     })
 }
 
 pub fn query_can_execute(
     deps: Deps,
-    sender: HumanAddr,
+    sender: String,
     _msg: CosmosMsg,
 ) -> StdResult<CanExecuteResponse> {
     Ok(CanExecuteResponse {
@@ -166,15 +159,15 @@ mod tests {
     fn instantiate_and_modify_config() {
         let mut deps = mock_dependencies(&[]);
 
-        let alice = HumanAddr::from("alice");
-        let bob = HumanAddr::from("bob");
-        let carl = HumanAddr::from("carl");
+        let alice = "alice";
+        let bob = "bob";
+        let carl = "carl";
 
-        let anyone = HumanAddr::from("anyone");
+        let anyone = "anyone";
 
         // instantiate the contract
         let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.clone(), bob.clone(), carl.clone()],
+            admins: vec![alice.to_string(), bob.to_string(), carl.to_string()],
             mutable: true,
         };
         let info = mock_info(&anyone, &[]);
@@ -182,14 +175,14 @@ mod tests {
 
         // ensure expected config
         let expected = AdminListResponse {
-            admins: vec![alice.clone(), bob.clone(), carl.clone()],
+            admins: vec![alice.to_string(), bob.to_string(), carl.to_string()],
             mutable: true,
         };
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // anyone cannot modify the contract
         let msg = ExecuteMsg::UpdateAdmins {
-            admins: vec![anyone.clone()],
+            admins: vec![anyone.to_string()],
         };
         let info = mock_info(&anyone, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -197,14 +190,14 @@ mod tests {
 
         // but alice can kick out carl
         let msg = ExecuteMsg::UpdateAdmins {
-            admins: vec![alice.clone(), bob.clone()],
+            admins: vec![alice.to_string(), bob.to_string()],
         };
         let info = mock_info(&alice, &[]);
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // ensure expected config
         let expected = AdminListResponse {
-            admins: vec![alice.clone(), bob.clone()],
+            admins: vec![alice.to_string(), bob.to_string()],
             mutable: true,
         };
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
@@ -218,14 +211,14 @@ mod tests {
         let info = mock_info(&bob, &[]);
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
-            admins: vec![alice.clone(), bob.clone()],
+            admins: vec![alice.to_string(), bob.to_string()],
             mutable: false,
         };
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // and now alice cannot change it again
         let msg = ExecuteMsg::UpdateAdmins {
-            admins: vec![alice.clone()],
+            admins: vec![alice.to_string()],
         };
         let info = mock_info(&alice, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
@@ -236,13 +229,13 @@ mod tests {
     fn execute_messages_has_proper_permissions() {
         let mut deps = mock_dependencies(&[]);
 
-        let alice = HumanAddr::from("alice");
-        let bob = HumanAddr::from("bob");
-        let carl = HumanAddr::from("carl");
+        let alice = "alice";
+        let bob = "bob";
+        let carl = "carl";
 
         // instantiate the contract
         let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.clone(), carl.clone()],
+            admins: vec![alice.to_string(), carl.to_string()],
             mutable: false,
         };
         let info = mock_info(&bob, &[]);
@@ -251,12 +244,12 @@ mod tests {
         let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
-                to_address: bob.clone(),
+                to_address: bob.to_string(),
                 amount: coins(10000, "DAI"),
             }
             .into(),
             WasmMsg::Execute {
-                contract_addr: HumanAddr::from("some contract"),
+                contract_addr: "some contract".into(),
                 msg: to_binary(&freeze).unwrap(),
                 send: vec![],
             }
@@ -282,14 +275,14 @@ mod tests {
     fn can_execute_query_works() {
         let mut deps = mock_dependencies(&[]);
 
-        let alice = HumanAddr::from("alice");
-        let bob = HumanAddr::from("bob");
+        let alice = "alice";
+        let bob = "bob";
 
-        let anyone = HumanAddr::from("anyone");
+        let anyone = "anyone";
 
         // instantiate the contract
         let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.clone(), bob.clone()],
+            admins: vec![alice.to_string(), bob.to_string()],
             mutable: false,
         };
         let info = mock_info(&anyone, &[]);
@@ -297,28 +290,29 @@ mod tests {
 
         // let us make some queries... different msg types by owner and by other
         let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: anyone.clone(),
+            to_address: anyone.to_string(),
             amount: coins(12345, "ushell"),
         });
         let staking_msg = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: anyone.clone(),
+            validator: anyone.to_string(),
             amount: coin(70000, "ureef"),
         });
 
         // owner can send
-        let res = query_can_execute(deps.as_ref(), alice.clone(), send_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), alice.to_string(), send_msg.clone()).unwrap();
         assert_eq!(res.can_execute, true);
 
         // owner can stake
-        let res = query_can_execute(deps.as_ref(), bob.clone(), staking_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), bob.to_string(), staking_msg.clone()).unwrap();
         assert_eq!(res.can_execute, true);
 
         // anyone cannot send
-        let res = query_can_execute(deps.as_ref(), anyone.clone(), send_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg.clone()).unwrap();
         assert_eq!(res.can_execute, false);
 
         // anyone cannot stake
-        let res = query_can_execute(deps.as_ref(), anyone.clone(), staking_msg.clone()).unwrap();
+        let res =
+            query_can_execute(deps.as_ref(), anyone.to_string(), staking_msg.clone()).unwrap();
         assert_eq!(res.can_execute, false);
     }
 }

@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{HumanAddr, Uint128};
+use cosmwasm_std::Uint128;
 
 use cw0::Expiration;
 
@@ -10,17 +10,14 @@ use cw0::Expiration;
 pub enum Cw20QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     /// Return type: BalanceResponse.
-    Balance { address: HumanAddr },
+    Balance { address: String },
     /// Returns metadata on the contract - name, decimals, supply, etc.
     /// Return type: TokenInfoResponse.
     TokenInfo {},
     /// Only with "allowance" extension.
     /// Returns how much spender can use from owner account, 0 if unset.
     /// Return type: AllowanceResponse.
-    Allowance {
-        owner: HumanAddr,
-        spender: HumanAddr,
-    },
+    Allowance { owner: String, spender: String },
     /// Only with "mintable" extension.
     /// Returns who can mint and how much.
     /// Return type: MinterResponse.
@@ -29,15 +26,15 @@ pub enum Cw20QueryMsg {
     /// Returns all allowances this owner has approved. Supports pagination.
     /// Return type: AllAllowancesResponse.
     AllAllowances {
-        owner: HumanAddr,
-        start_after: Option<HumanAddr>,
+        owner: String,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Only with "enumerable" extension
     /// Returns all accounts that have balances. Supports pagination.
     /// Return type: AllAccountsResponse.
     AllAccounts {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
 }
@@ -63,14 +60,14 @@ pub struct AllowanceResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterResponse {
-    pub minter: HumanAddr,
+    pub minter: String,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AllowanceInfo {
-    pub spender: HumanAddr,
+    pub spender: String,
     pub allowance: Uint128,
     pub expires: Expiration,
 }
@@ -82,5 +79,5 @@ pub struct AllAllowancesResponse {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AllAccountsResponse {
-    pub accounts: Vec<HumanAddr>,
+    pub accounts: Vec<String>,
 }

@@ -38,11 +38,12 @@
                   }
                 },
                 "to_address": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -76,7 +77,8 @@
             "bank": {
               "$ref": "#/definitions/BankMsg"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -87,7 +89,8 @@
             "custom": {
               "$ref": "#/definitions/Empty"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -98,7 +101,8 @@
             "staking": {
               "$ref": "#/definitions/StakingMsg"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -109,7 +113,8 @@
             "wasm": {
               "$ref": "#/definitions/WasmMsg"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -136,7 +141,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "AtTime will expire when `env.block.time` >= time",
@@ -150,7 +156,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Never will never expire. Used to express the empty variant",
@@ -162,12 +169,10 @@
             "never": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "ProposalResponse_for_Empty": {
       "description": "Note, if you are storing custom messages in the proposal, the querier needs to know what possible custom message types those are in order to parse the response",
@@ -236,11 +241,12 @@
                   "$ref": "#/definitions/Coin"
                 },
                 "validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "This is translated to a [MsgUndelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L112-L121). `delegator_address` is automatically filled with the current contract's address.",
@@ -260,11 +266,12 @@
                   "$ref": "#/definitions/Coin"
                 },
                 "validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "This is translated to a [MsgSetWithdrawAddress](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L29-L37) followed by a [MsgWithdrawDelegatorReward](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L42-L50). `delegator_address` is automatically filled with the current contract's address.",
@@ -281,21 +288,18 @@
               "properties": {
                 "recipient": {
                   "description": "this is the \"withdraw address\", the one that should receive the rewards if None, then use delegator address",
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/HumanAddr"
-                    },
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "This is translated to a [MsgBeginRedelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L95-L105). `delegator_address` is automatically filled with the current contract's address.",
@@ -316,14 +320,15 @@
                   "$ref": "#/definitions/Coin"
                 },
                 "dst_validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "src_validator": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -366,7 +371,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Declares a percentage of the total weight that must cast Yes votes, in order for a proposal to pass. The passing weight is computed over the total weight minus the weight of the abstained votes.\n\nThis is useful for similar circumstances as `AbsoluteCount`, where we have a relatively small set of voters, and participation is required. It is understood that if the voting set (group) changes between different proposals that refer to the same group, each proposal will work with a different set of voter weights (the ones snapshotted at proposal creation), and the passing weight for each proposal will be computed based on the absolute percentage, times the total weights of the members at the time of each proposal creation.\n\nExample: we set `percentage` to 51%. Proposal 1 starts when there is a `total_weight` of 5. This will require 3 weight of Yes votes in order to pass. Later, the Proposal 2 starts but the `total_weight` of the group has increased to 9. That proposal will then automatically require 5 Yes of 9 to pass, rather than 3 yes of 9 as would be the case with `AbsoluteCount`.",
@@ -392,7 +398,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "In addition to a `threshold`, declares a `quorum` of the total votes that must participate in the election in order for the vote to be considered at all. Within the votes that were cast, it requires `threshold` votes in favor. That is calculated by ignoring the Abstain votes (they count towards `quorum`, but do not influence `threshold`). That is, we calculate `Yes / (Yes + No + Veto)` and compare it with `threshold` to consider if the proposal was passed.\n\nIt is rather difficult for a proposal of this type to pass early. That can only happen if the required quorum has been already met, and there are already enough Yes votes for the proposal to pass.\n\n30% Yes votes, 10% No votes, and 20% Abstain would pass early if quorum <= 60% (who has cast votes) and if the threshold is <= 37.5% (the remaining 40% voting no => 30% yes + 50% no). Once the voting period has passed with no additional votes, that same proposal would be considered successful if quorum <= 60% and threshold <= 75% (percent in favor if we ignore abstain votes).\n\nThis type is more common in general elections, where participation is often expected to be low, and `AbsolutePercentage` would either be too high to pass anything, or allow low percentages to pass, independently of if there was high participation in the election or not.",
@@ -422,7 +429,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -448,7 +456,7 @@
               ],
               "properties": {
                 "contract_addr": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "msg": {
                   "description": "msg is the json-encoded ExecuteMsg struct (as raw Binary)",
@@ -466,7 +474,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Instantiates a new contracts from previously uploaded Wasm code.\n\nThis is translated to a [MsgInstantiateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L47-L61). `sender` is automatically filled with the current contract's address.",
@@ -509,7 +518,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Migrates a given contracts to use new wasm code. Passes a MigrateMsg to allow us to customize behavior.\n\nOnly the contract admin (as defined in wasmd), if any, is able to make this call.\n\nThis is translated to a [MsgMigrateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L86-L96). `sender` is automatically filled with the current contract's address.",
@@ -527,7 +537,7 @@
               ],
               "properties": {
                 "contract_addr": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "msg": {
                   "description": "msg is the json-encoded MigrateMsg struct that will be passed to the new code",
@@ -545,7 +555,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     }

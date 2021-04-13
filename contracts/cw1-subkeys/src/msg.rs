@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{Coin, CosmosMsg, Empty, HumanAddr};
+use cosmwasm_std::{Coin, CosmosMsg, Empty};
 use cw0::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
@@ -21,24 +21,24 @@ where
     Freeze {},
     /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,
     /// and only works if the contract is mutable
-    UpdateAdmins { admins: Vec<HumanAddr> },
+    UpdateAdmins { admins: Vec<String> },
 
     /// Add an allowance to a given subkey (subkey must not be admin)
     IncreaseAllowance {
-        spender: HumanAddr,
+        spender: String,
         amount: Coin,
         expires: Option<Expiration>,
     },
     /// Decreases an allowance for a given subkey (subkey must not be admin)
     DecreaseAllowance {
-        spender: HumanAddr,
+        spender: String,
         amount: Coin,
         expires: Option<Expiration>,
     },
 
     // Setups up permissions for a given subkey.
     SetPermissions {
-        spender: HumanAddr,
+        spender: String,
         permissions: Permissions,
     },
 }
@@ -54,27 +54,24 @@ where
     AdminList {},
     /// Get the current allowance for the given subkey (how much it can spend)
     /// Returns crate::state::Allowance
-    Allowance { spender: HumanAddr },
+    Allowance { spender: String },
     /// Get the current permissions for the given subkey (how much it can spend)
     /// Returns PermissionsInfo
-    Permissions { spender: HumanAddr },
+    Permissions { spender: String },
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
-    CanExecute {
-        sender: HumanAddr,
-        msg: CosmosMsg<T>,
-    },
+    CanExecute { sender: String, msg: CosmosMsg<T> },
     /// Gets all Allowances for this contract
     /// Returns AllAllowancesResponse
     AllAllowances {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Gets all Permissions for this contract
     /// Returns AllPermissionsResponse
     AllPermissions {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
 }
@@ -86,14 +83,14 @@ pub struct AllAllowancesResponse {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct AllowanceInfo {
-    pub spender: HumanAddr,
+    pub spender: String,
     pub balance: NativeBalance,
     pub expires: Expiration,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct PermissionsInfo {
-    pub spender: HumanAddr,
+    pub spender: String,
     pub permissions: Permissions,
 }
 

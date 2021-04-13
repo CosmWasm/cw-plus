@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
+use cosmwasm_std::{CosmosMsg, Empty};
 use cw0::{Duration, Expiration};
 use cw3::Vote;
 
@@ -14,7 +14,7 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Voter {
-    pub addr: HumanAddr,
+    pub addr: String,
     pub weight: u64,
 }
 
@@ -60,18 +60,18 @@ pub enum QueryMsg {
         limit: Option<u32>,
     },
     /// Returns VoteResponse
-    Vote { proposal_id: u64, voter: HumanAddr },
+    Vote { proposal_id: u64, voter: String },
     /// Returns VoteListResponse
     ListVotes {
         proposal_id: u64,
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Returns VoterInfo
-    Voter { address: HumanAddr },
+    Voter { address: String },
     /// Returns VoterListResponse
     ListVoters {
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
 }

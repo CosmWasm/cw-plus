@@ -15,9 +15,6 @@
     }
   },
   "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    },
     "Vote": {
       "type": "string",
       "enum": [
@@ -40,7 +37,7 @@
           "$ref": "#/definitions/Vote"
         },
         "voter": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "weight": {
           "type": "integer",

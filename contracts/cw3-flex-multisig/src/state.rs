@@ -2,7 +2,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{
+    Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128,
+};
 
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
@@ -151,7 +153,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const PROPOSAL_COUNT: Item<u64> = Item::new("proposal_count");
 
 // multiple-item map
-pub const BALLOTS: Map<(U64Key, &[u8]), Ballot> = Map::new("votes");
+pub const BALLOTS: Map<(U64Key, &Addr), Ballot> = Map::new("votes");
 pub const PROPOSALS: Map<U64Key, Proposal> = Map::new("proposals");
 
 pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
@@ -248,10 +250,7 @@ mod test {
             true,
             check_is_passed(fixed.clone(), votes.clone(), 30, false)
         );
-        assert_eq!(
-            true,
-            check_is_passed(fixed.clone(), votes.clone(), 30, true)
-        );
+        assert_eq!(true, check_is_passed(fixed, votes, 30, true));
     }
 
     #[test]
@@ -283,10 +282,7 @@ mod test {
             true,
             check_is_passed(percent.clone(), votes.clone(), 14, false)
         );
-        assert_eq!(
-            true,
-            check_is_passed(percent.clone(), votes.clone(), 14, true)
-        );
+        assert_eq!(true, check_is_passed(percent, votes, 14, true));
     }
 
     #[test]
@@ -336,10 +332,7 @@ mod test {
             check_is_passed(quorum.clone(), passes_ignoring_abstain.clone(), 40, true)
         );
         // over quorum, but under threshold fails also
-        assert_eq!(
-            false,
-            check_is_passed(quorum.clone(), failing.clone(), 20, true)
-        );
+        assert_eq!(false, check_is_passed(quorum.clone(), failing, 20, true));
 
         // now, check with open voting period
         // would pass if closed, but fail here, as remaining votes no -> fail
@@ -359,13 +352,10 @@ mod test {
         // all votes have been cast, some abstain
         assert_eq!(
             true,
-            check_is_passed(quorum.clone(), passes_ignoring_abstain.clone(), 17, false)
+            check_is_passed(quorum.clone(), passes_ignoring_abstain, 17, false)
         );
         // 3 votes uncast, if they all vote no, we have 7 yes, 7 no+veto, 2 abstain (out of 16)
-        assert_eq!(
-            true,
-            check_is_passed(quorum.clone(), passing.clone(), 16, false)
-        );
+        assert_eq!(true, check_is_passed(quorum, passing, 16, false));
     }
 
     #[test]
@@ -390,7 +380,7 @@ mod test {
         );
         assert_eq!(
             false,
-            check_is_passed(quorum.clone(), missing_voters.clone(), 15, true)
+            check_is_passed(quorum.clone(), missing_voters, 15, true)
         );
 
         // 1 less yes, 3 vetos and this passes only when expired
@@ -406,7 +396,7 @@ mod test {
         );
         assert_eq!(
             true,
-            check_is_passed(quorum.clone(), wait_til_expired.clone(), 15, true)
+            check_is_passed(quorum.clone(), wait_til_expired, 15, true)
         );
 
         // 9 yes and 3 nos passes early
@@ -420,9 +410,6 @@ mod test {
             true,
             check_is_passed(quorum.clone(), passes_early.clone(), 15, false)
         );
-        assert_eq!(
-            true,
-            check_is_passed(quorum.clone(), passes_early.clone(), 15, true)
-        );
+        assert_eq!(true, check_is_passed(quorum, passes_early, 15, true));
     }
 }

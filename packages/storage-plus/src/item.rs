@@ -79,7 +79,7 @@ mod test {
     use cosmwasm_std::testing::MockStorage;
     use serde::{Deserialize, Serialize};
 
-    use cosmwasm_std::StdError;
+    use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug)]
     struct Config {
@@ -196,9 +196,15 @@ mod test {
         };
         CONFIG.save(&mut store, &cfg).unwrap();
 
-        let output = CONFIG.update(&mut store, &|_c| Err(StdError::underflow(4, 7)));
+        let output = CONFIG.update(&mut store, &|_c| {
+            Err(StdError::overflow(OverflowError::new(
+                OverflowOperation::Sub,
+                4,
+                7,
+            )))
+        });
         match output.unwrap_err() {
-            StdError::Underflow { .. } => {}
+            StdError::Overflow { .. } => {}
             err => panic!("Unexpected error: {:?}", err),
         }
         assert_eq!(CONFIG.load(&store).unwrap(), cfg);

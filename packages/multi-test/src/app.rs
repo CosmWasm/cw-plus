@@ -3,9 +3,9 @@ use serde::Serialize;
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
-    ContractResult, CosmosMsg, Empty, HumanAddr, MessageInfo, Querier, QuerierResult,
-    QuerierWrapper, QueryRequest, Response, SystemError, SystemResult, WasmMsg,
+    from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
+    ContractResult, CosmosMsg, Empty, MessageInfo, Querier, QuerierResult, QuerierWrapper,
+    QueryRequest, Response, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
@@ -48,11 +48,11 @@ impl<C> ActionResponse<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn init(input: Response<C>, address: HumanAddr) -> Self {
+    fn init(input: Response<C>, address: Addr) -> Self {
         ActionResponse {
             messages: input.messages,
             attributes: input.attributes,
-            data: Some(address.as_bytes().into()),
+            data: Some(address.as_ref().as_bytes().into()),
         }
     }
 }
@@ -127,11 +127,7 @@ where
     }
 
     /// This is an "admin" function to let us adjust bank accounts
-    pub fn set_bank_balance(
-        &mut self,
-        account: HumanAddr,
-        amount: Vec<Coin>,
-    ) -> Result<(), String> {
+    pub fn set_bank_balance(&mut self, account: Addr, amount: Vec<Coin>) -> Result<(), String> {
         self.bank.set_balance(account, amount)
     }
 
@@ -159,14 +155,14 @@ where
 
     /// Create a contract and get the new address.
     /// This is just a helper around execute()
-    pub fn instantiate_contract<T: Serialize, U: Into<String>, V: Into<HumanAddr>>(
+    pub fn instantiate_contract<T: Serialize, U: Into<String>>(
         &mut self,
         code_id: u64,
-        sender: V,
+        sender: Addr,
         init_msg: &T,
         send_funds: &[Coin],
         label: U,
-    ) -> Result<HumanAddr, String> {
+    ) -> Result<Addr, String> {
         // instantiate contract
         let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
         let msg: CosmosMsg<C> = WasmMsg::Instantiate {
@@ -176,16 +172,16 @@ where
             label: label.into(),
         }
         .into();
-        let res = self.execute(sender.into(), msg)?;
+        let res = self.execute(sender, msg)?;
         parse_contract_addr(&res.data)
     }
 
     /// Execute a contract and process all returned messages.
     /// This is just a helper around execute()
-    pub fn execute_contract<T: Serialize, U: Into<HumanAddr>>(
+    pub fn execute_contract<T: Serialize>(
         &mut self,
-        sender: U,
-        contract_addr: U,
+        sender: Addr,
+        contract_addr: Addr,
         msg: &T,
         send_funds: &[Coin],
     ) -> Result<AppResponse, String> {
@@ -196,13 +192,13 @@ where
             send: send_funds.to_vec(),
         }
         .into();
-        self.execute(sender.into(), msg)
+        self.execute(sender, msg)
     }
 
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn execute(&mut self, sender: HumanAddr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -213,7 +209,7 @@ where
     /// return an error. But all writes are persisted on success.
     pub fn execute_multi(
         &mut self,
-        sender: HumanAddr,
+        sender: Addr,
         msgs: Vec<CosmosMsg<C>>,
     ) -> Result<Vec<AppResponse>, String> {
         // we need to do some caching of storage here, once in the entry point:
@@ -239,7 +235,7 @@ where
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn sudo<T: Serialize, U: Into<HumanAddr>>(
+    pub fn sudo<T: Serialize, U: Into<Addr>>(
         &mut self,
         contract_addr: U,
         msg: &T,
@@ -310,7 +306,7 @@ where
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
-    fn execute(&mut self, sender: HumanAddr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.handle_wasm(sender, msg)?;
@@ -335,7 +331,7 @@ where
         }
     }
 
-    fn sudo(&mut self, contract_addr: HumanAddr, msg: Vec<u8>) -> Result<AppResponse, String> {
+    fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
         let res = self.wasm.sudo(contract_addr.clone(), self.router, msg)?;
         let mut attributes = res.attributes;
         // recurse in all messages
@@ -354,17 +350,18 @@ where
     // this returns the contract address as well, so we can properly resend the data
     fn handle_wasm(
         &mut self,
-        sender: HumanAddr,
+        sender: Addr,
         msg: WasmMsg,
-    ) -> Result<(HumanAddr, ActionResponse<C>), String> {
+    ) -> Result<(Addr, ActionResponse<C>), String> {
         match msg {
             WasmMsg::Execute {
                 contract_addr,
                 msg,
                 send,
             } => {
+                let contract_addr = Addr::unchecked(contract_addr);
                 // first move the cash
-                self.send(&sender, &contract_addr, &send)?;
+                self.send(sender.clone(), contract_addr.clone().into(), &send)?;
                 // then call the contract
                 let info = MessageInfo {
                     sender,
@@ -381,9 +378,9 @@ where
                 send,
                 label: _,
             } => {
-                let contract_addr = self.wasm.register_contract(code_id as usize)?;
+                let contract_addr = Addr::unchecked(self.wasm.register_contract(code_id as usize)?);
                 // move the cash
-                self.send(&sender, &contract_addr, &send)?;
+                self.send(sender.clone(), contract_addr.clone().into(), &send)?;
                 // then call the contract
                 let info = MessageInfo {
                     sender,
@@ -402,32 +399,31 @@ where
         }
     }
 
-    fn send<T: Into<HumanAddr>, U: Into<HumanAddr>>(
+    fn send<T: Into<Addr>>(
         &mut self,
         sender: T,
-        recipient: U,
+        recipient: String,
         amount: &[Coin],
     ) -> Result<AppResponse, String> {
         if !amount.is_empty() {
-            let sender: HumanAddr = sender.into();
             let msg = BankMsg::Send {
-                to_address: recipient.into(),
+                to_address: recipient,
                 amount: amount.to_vec(),
             };
-            self.bank.execute(sender, msg)?;
+            self.bank.execute(sender.into(), msg)?;
         }
         Ok(AppResponse::default())
     }
 }
 
 // this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> Result<HumanAddr, String> {
+pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
     let bin = data
         .as_ref()
         .ok_or_else(|| "No data response".to_string())?
         .to_vec();
     let str = String::from_utf8(bin).map_err(|e| e.to_string())?;
-    Ok(HumanAddr::from(str))
+    Ok(Addr::unchecked(str))
 }
 
 #[cfg(test)]
@@ -457,7 +453,7 @@ mod test {
         App::new(api, env.block, bank, || Box::new(MockStorage::new()))
     }
 
-    fn get_balance<C>(router: &App<C>, addr: &HumanAddr) -> Vec<Coin>
+    fn get_balance<C>(router: &App<C>, addr: &Addr) -> Vec<Coin>
     where
         C: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
@@ -468,8 +464,8 @@ mod test {
     fn send_tokens() {
         let mut router = mock_router();
 
-        let owner = HumanAddr::from("owner");
-        let rcpt = HumanAddr::from("receiver");
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("receiver");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
         let rcpt_funds = vec![coin(5, "btc")];
 
@@ -484,7 +480,7 @@ mod test {
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
         let msg: CosmosMsg = BankMsg::Send {
-            to_address: rcpt.clone(),
+            to_address: rcpt.clone().into(),
             amount: to_send.clone(),
         }
         .into();
@@ -499,7 +495,7 @@ mod test {
 
         // cannot send too much
         let msg = BankMsg::Send {
-            to_address: rcpt.clone(),
+            to_address: rcpt.clone().into(),
             amount: coins(20, "btc"),
         }
         .into();
@@ -514,7 +510,7 @@ mod test {
         let mut router = mock_router();
 
         // set personal balance
-        let owner = HumanAddr::from("owner");
+        let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
         router
             .set_bank_balance(owner.clone(), init_funds.clone())
@@ -526,7 +522,7 @@ mod test {
             payout: coin(5, "eth"),
         };
         let contract_addr = router
-            .instantiate_contract(code_id, &owner, &msg, &coins(23, "eth"), "Payout")
+            .instantiate_contract(code_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
             .unwrap();
 
         // sender funds deducted
@@ -537,13 +533,13 @@ mod test {
         assert_eq!(funds, coins(23, "eth"));
 
         // create empty account
-        let random = HumanAddr::from("random");
+        let random = Addr::unchecked("random");
         let funds = get_balance(&router, &random);
         assert_eq!(funds, vec![]);
 
         // do one payout and see money coming in
         let res = router
-            .execute_contract(&random, &contract_addr, &EmptyMsg {}, &[])
+            .execute_contract(random.clone(), contract_addr.clone(), &EmptyMsg {}, &[])
             .unwrap();
         assert_eq!(1, res.attributes.len());
         assert_eq!(&attr("action", "payout"), &res.attributes[0]);
@@ -561,7 +557,7 @@ mod test {
         let mut router = custom_router();
 
         // set personal balance
-        let owner = HumanAddr::from("owner");
+        let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
         router
             .set_bank_balance(owner.clone(), init_funds.clone())
@@ -573,13 +569,13 @@ mod test {
             payout: coin(5, "eth"),
         };
         let payout_addr = router
-            .instantiate_contract(payout_id, &owner, &msg, &coins(23, "eth"), "Payout")
+            .instantiate_contract(payout_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
             .unwrap();
 
         // set up reflect contract
         let reflect_id = router.store_code(contract_reflect());
         let reflect_addr = router
-            .instantiate_contract(reflect_id, &owner, &EmptyMsg {}, &[], "Reflect")
+            .instantiate_contract(reflect_id, owner.clone(), &EmptyMsg {}, &[], "Reflect")
             .unwrap();
 
         // reflect account is empty
@@ -594,7 +590,7 @@ mod test {
 
         // reflecting payout message pays reflect contract
         let msg = WasmMsg::Execute {
-            contract_addr: payout_addr.clone(),
+            contract_addr: payout_addr.clone().into(),
             msg: b"{}".into(),
             send: vec![],
         }
@@ -603,7 +599,7 @@ mod test {
             messages: vec![msg],
         };
         let res = router
-            .execute_contract(&HumanAddr::from("random"), &reflect_addr, &msgs, &[])
+            .execute_contract(Addr::unchecked("random"), reflect_addr.clone(), &msgs, &[])
             .unwrap();
 
         // ensure the attributes were relayed from the sub-message
@@ -627,7 +623,7 @@ mod test {
         let mut router = custom_router();
 
         // set personal balance
-        let owner = HumanAddr::from("owner");
+        let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
         router
             .set_bank_balance(owner.clone(), init_funds.clone())
@@ -638,7 +634,7 @@ mod test {
         let reflect_addr = router
             .instantiate_contract(
                 reflect_id,
-                &owner,
+                owner.clone(),
                 &EmptyMsg {},
                 &coins(40, "eth"),
                 "Reflect",
@@ -648,11 +644,11 @@ mod test {
         // reflect has 40 eth
         let funds = get_balance(&router, &reflect_addr);
         assert_eq!(funds, coins(40, "eth"));
-        let random = HumanAddr::from("random");
+        let random = Addr::unchecked("random");
 
         // sending 7 eth works
         let msg = BankMsg::Send {
-            to_address: random.clone(),
+            to_address: random.clone().into(),
             amount: coins(7, "eth"),
         }
         .into();
@@ -660,7 +656,7 @@ mod test {
             messages: vec![msg],
         };
         let res = router
-            .execute_contract(&random, &reflect_addr, &msgs, &[])
+            .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
         assert_eq!(0, res.attributes.len());
         // ensure random got paid
@@ -676,12 +672,12 @@ mod test {
 
         // sending 8 eth, then 3 btc should fail both
         let msg = BankMsg::Send {
-            to_address: random.clone(),
+            to_address: random.clone().into(),
             amount: coins(8, "eth"),
         }
         .into();
         let msg2 = BankMsg::Send {
-            to_address: random.clone(),
+            to_address: random.clone().into(),
             amount: coins(3, "btc"),
         }
         .into();
@@ -689,9 +685,9 @@ mod test {
             messages: vec![msg, msg2],
         };
         let err = router
-            .execute_contract(&random, &reflect_addr, &msgs, &[])
+            .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap_err();
-        assert_eq!("Cannot subtract 3 from 0", err.as_str());
+        assert_eq!("Overflow: Cannot Sub with 0 and 3", err.as_str());
 
         // first one should have been rolled-back on error (no second payment)
         let funds = get_balance(&router, &random);
@@ -709,10 +705,10 @@ mod test {
     fn sudo_works() {
         let mut router = custom_router();
 
-        let owner = HumanAddr::from("owner");
+        let owner = Addr::unchecked("owner");
         let reflect_id = router.store_code(contract_reflect());
         let reflect_addr = router
-            .instantiate_contract(reflect_id, &owner, &EmptyMsg {}, &[], "Reflect")
+            .instantiate_contract(reflect_id, owner.clone(), &EmptyMsg {}, &[], "Reflect")
             .unwrap();
 
         // count is 1
@@ -724,7 +720,7 @@ mod test {
 
         // sudo
         let msg = ReflectSudoMsg { set_count: 25 };
-        router.sudo(&reflect_addr, &msg).unwrap();
+        router.sudo(reflect_addr.clone(), &msg).unwrap();
 
         // count is 25
         let ReflectResponse { count } = router

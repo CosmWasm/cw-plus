@@ -1,12 +1,12 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{to_binary, CosmosMsg, HumanAddr, StdResult, WasmMsg};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 
 use crate::msg::{Cw3ExecuteMsg, Vote};
 use cw0::Expiration;
 
-/// Cw3Contract is a wrapper around HumanAddr that provides a lot of helpers
+/// Cw3Contract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
 ///
 /// If you wish to persist this, convert to Cw3CanonicalContract via .canonical()
@@ -14,16 +14,16 @@ use cw0::Expiration;
 /// FIXME: Cw3Contract currently only supports CosmosMsg<Empty>. When we actually
 /// use this in some consuming code, we should make it generic over CosmosMsg<T>.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Cw3Contract(pub HumanAddr);
+pub struct Cw3Contract(pub Addr);
 
 impl Cw3Contract {
-    pub fn addr(&self) -> HumanAddr {
+    pub fn addr(&self) -> Addr {
         self.0.clone()
     }
 
     pub fn encode_msg(&self, msg: Cw3ExecuteMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
-            contract_addr: self.addr(),
+            contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
             send: vec![],
         }

@@ -13,7 +13,7 @@
       "type": "string"
     },
     "remote_address": {
-      "description": "The remote address to send to Don't use HumanAddress as this will likely have a different Bech32 prefix than we use and cannot be validated locally",
+      "description": "The remote address to send to. Don't use HumanAddress as this will likely have a different Bech32 prefix than we use and cannot be validated locally",
       "type": "string"
     },
     "timeout": {

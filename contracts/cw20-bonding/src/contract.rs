@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, to_binary, BankMsg, Binary, Deps, DepsMut, Env, HumanAddr, MessageInfo, Response,
-    StdResult, Uint128,
+    attr, coins, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -43,7 +43,7 @@ pub fn instantiate(
         total_supply: Uint128(0),
         // set self as minter, so we can properly execute mint and burn
         mint: Some(MinterData {
-            minter: deps.api.canonical_address(&env.contract.address)?,
+            minter: env.contract.address,
             cap: None,
         }),
     };
@@ -146,7 +146,9 @@ pub fn execute_buy(
     let curve = curve_fn(state.decimals);
     state.reserve += payment;
     let new_supply = curve.supply(state.reserve);
-    let minted = (new_supply - state.supply)?;
+    let minted = new_supply
+        .checked_sub(state.supply)
+        .map_err(StdError::overflow)?;
     state.supply = new_supply;
     CURVE_STATE.save(deps.storage, &state)?;
 
@@ -155,7 +157,7 @@ pub fn execute_buy(
         sender: env.contract.address.clone(),
         funds: vec![],
     };
-    execute_mint(deps, env, sub_info, info.sender.clone(), minted)?;
+    execute_mint(deps, env, sub_info, info.sender.to_string(), minted)?;
 
     // bond them to the validator
     let res = Response {
@@ -194,27 +196,34 @@ pub fn execute_sell_from(
     env: Env,
     info: MessageInfo,
     curve_fn: CurveFn,
-    owner: HumanAddr,
+    owner: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     nonpayable(&info)?;
-    let owner_raw = deps.api.canonical_address(&owner)?;
-    let spender_raw = deps.api.canonical_address(&info.sender)?;
+    let owner_addr = deps.api.addr_validate(&owner)?;
+    let spender_addr = info.sender.clone();
 
     // deduct allowance before doing anything else have enough allowance
-    deduct_allowance(deps.storage, &owner_raw, &spender_raw, &env.block, amount)?;
+    deduct_allowance(deps.storage, &owner_addr, &spender_addr, &env.block, amount)?;
 
     // do all the work in do_sell
-    let receiver = info.sender;
+    let receiver_addr = info.sender;
     let owner_info = MessageInfo {
-        sender: owner,
+        sender: owner_addr,
         funds: info.funds,
     };
-    let mut res = do_sell(deps, env, owner_info, curve_fn, receiver.clone(), amount)?;
+    let mut res = do_sell(
+        deps,
+        env,
+        owner_info,
+        curve_fn,
+        receiver_addr.clone(),
+        amount,
+    )?;
 
     // add our custom attributes
     res.attributes.push(attr("action", "burn_from"));
-    res.attributes.push(attr("by", receiver));
+    res.attributes.push(attr("by", receiver_addr));
     Ok(res)
 }
 
@@ -225,7 +234,7 @@ fn do_sell(
     info: MessageInfo,
     curve_fn: CurveFn,
     // receiver is the one who gains (same for execute_sell, diff for execute_sell_from)
-    receiver: HumanAddr,
+    receiver: Addr,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // burn from the caller, this ensures there are tokens to cover this
@@ -234,15 +243,21 @@ fn do_sell(
     // calculate how many tokens can be purchased with this and mint them
     let mut state = CURVE_STATE.load(deps.storage)?;
     let curve = curve_fn(state.decimals);
-    state.supply = (state.supply - amount)?;
+    state.supply = state
+        .supply
+        .checked_sub(amount)
+        .map_err(StdError::overflow)?;
     let new_reserve = curve.reserve(state.supply);
-    let released = (state.reserve - new_reserve)?;
+    let released = state
+        .reserve
+        .checked_sub(new_reserve)
+        .map_err(StdError::overflow)?;
     state.reserve = new_reserve;
     CURVE_STATE.save(deps.storage, &state)?;
 
     // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
     let msg = BankMsg::Send {
-        to_address: receiver,
+        to_address: receiver.to_string(),
         amount: coins(released.u128(), state.reserve_denom),
     };
     let res = Response {
@@ -309,7 +324,7 @@ mod tests {
     use super::*;
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, Decimal, StdError};
+    use cosmwasm_std::{coin, Decimal, OverflowError, OverflowOperation, StdError};
     use cw0::PaymentError;
 
     const DENOM: &str = "satoshi";
@@ -332,13 +347,13 @@ mod tests {
         }
     }
 
-    fn get_balance<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Uint128 {
+    fn get_balance<U: Into<String>>(deps: Deps, addr: U) -> Uint128 {
         query_balance(deps, addr.into()).unwrap().balance
     }
 
     fn setup_test(deps: DepsMut, decimals: u8, reserve_decimals: u8, curve_type: CurveType) {
         // this matches `linear_curve` test case from curves.rs
-        let creator = HumanAddr::from(CREATOR);
+        let creator = String::from(CREATOR);
         let msg = default_instantiate(decimals, reserve_decimals, curve_type.clone());
         let info = mock_info(&creator, &[]);
 
@@ -352,7 +367,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         // this matches `linear_curve` test case from curves.rs
-        let creator = HumanAddr::from("creator");
+        let creator = String::from("creator");
         let curve_type = CurveType::SquareRoot {
             slope: Uint128(1),
             scale: 1,
@@ -488,8 +503,8 @@ mod tests {
         let err = execute(deps.as_mut(), mock_env(), info, burn).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
-                2000, 3000
+            ContractError::Base(cw20_base::ContractError::Std(StdError::overflow(
+                OverflowError::new(OverflowOperation::Sub, 2000, 3000)
             )))
         );
 
@@ -603,8 +618,8 @@ mod tests {
         let err = execute(deps.as_mut(), mock_env(), info, burn_from).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Base(cw20_base::ContractError::Std(StdError::underflow(
-                3000000, 3300000
+            ContractError::Base(cw20_base::ContractError::Std(StdError::overflow(
+                OverflowError::new(OverflowOperation::Sub, 3000000, 3300000)
             )))
         );
 

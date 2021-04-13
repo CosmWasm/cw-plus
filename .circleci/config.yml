@@ -16,6 +16,7 @@ workflows:
       - contract_cw20_ics20
       - contract_cw20_staking
       - contract_cw721_base
+      - contract_cw1155_base
       - package_controllers
       - package_cw0
       - package_cw1
@@ -24,6 +25,7 @@ workflows:
       - package_cw4
       - package_cw20
       - package_cw721
+      - package_cw1155
       - package_multi_test
       - package_storage_plus
       - lint
@@ -509,6 +511,42 @@ jobs:
             - target
           key: cargocache-cw721-base-rust:1.51.0-{{ checksum "~/project/Cargo.lock" }}
 
+  contract_cw1155_base:
+    docker:
+      - image: rust:1.51.0
+    working_directory: ~/project/contracts/cw1155-base
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version
+      - restore_cache:
+          keys:
+            - cargocache-cw1155-base-rust:1.51.0-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Unit Tests
+          environment:
+            RUST_BACKTRACE: 1
+          command: cargo unit-test --locked
+      - run:
+          name: Build and run schema generator
+          command: cargo schema --locked
+      - run:
+          name: Ensure checked-in schemas are up-to-date
+          command: |
+            CHANGES_IN_REPO=$(git status --porcelain)
+            if [[ -n "$CHANGES_IN_REPO" ]]; then
+              echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
+              git status && git --no-pager diff
+              exit 1
+            fi
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-cw1155-base-rust:1.51.0-{{ checksum "~/project/Cargo.lock" }}
+
   package_controllers:
     docker:
       - image: rust:1.51.0
@@ -770,6 +808,44 @@ jobs:
             - target
           key: cargocache-v2-cw721:1.51.0-{{ checksum "~/project/Cargo.lock" }}
 
+
+  package_cw1155:
+    docker:
+      - image: rust:1.51.0
+    working_directory: ~/project/packages/cw1155
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
+      - restore_cache:
+          keys:
+            - cargocache-v2-cw1155:1.51.0-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Build library for native target
+          command: cargo build --locked
+      - run:
+          name: Run unit tests
+          command: cargo test --locked
+      - run:
+          name: Build and run schema generator
+          command: cargo schema --locked
+      - run:
+          name: Ensure schemas are up-to-date
+          command: |
+            CHANGES_IN_REPO=$(git status --porcelain)
+            if [[ -n "$CHANGES_IN_REPO" ]]; then
+              echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
+              git status && git --no-pager diff
+              exit 1
+            fi
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-v2-cw1155:1.51.0-{{ checksum "~/project/Cargo.lock" }}
+
   lint:
     docker:
       - image: rust:1.51.0
@@ -833,7 +909,7 @@ jobs:
           # Uses --debug for compilation speed
           # FIXME: Change when `check_contract` (part of `cosmwasm-0.14.0`) is published
           #command: cargo install --debug --features iterator --example check_contract -- cosmwasm-vm
-          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --tag=v0.14.0-beta1 --example check_contract -- cosmwasm-vm
+          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --tag=v0.14.0-beta2 --example check_contract -- cosmwasm-vm
       - save_cache:
           paths:
             - /usr/local/cargo/registry

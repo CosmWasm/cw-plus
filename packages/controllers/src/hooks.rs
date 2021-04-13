@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    attr, CosmosMsg, Deps, DepsMut, HumanAddr, MessageInfo, Response, StdError, StdResult, Storage,
+    attr, Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Response, StdError, StdResult, Storage,
 };
 use cw_storage_plus::Item;
 
@@ -13,7 +13,7 @@ use crate::admin::{Admin, AdminError};
 // TODO: pull into cw0 as common dep
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct HooksResponse {
-    pub hooks: Vec<HumanAddr>,
+    pub hooks: Vec<String>,
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -32,14 +32,14 @@ pub enum HookError {
 }
 
 // store all hook addresses in one item. We cannot have many of them before the contract becomes unusable anyway.
-pub struct Hooks<'a>(Item<'a, Vec<HumanAddr>>);
+pub struct Hooks<'a>(Item<'a, Vec<Addr>>);
 
 impl<'a> Hooks<'a> {
     pub const fn new(storage_key: &'a str) -> Self {
         Hooks(Item::new(storage_key))
     }
 
-    pub fn add_hook(&self, storage: &mut dyn Storage, addr: HumanAddr) -> Result<(), HookError> {
+    pub fn add_hook(&self, storage: &mut dyn Storage, addr: Addr) -> Result<(), HookError> {
         let mut hooks = self.0.may_load(storage)?.unwrap_or_default();
         if !hooks.iter().any(|h| h == &addr) {
             hooks.push(addr);
@@ -49,7 +49,7 @@ impl<'a> Hooks<'a> {
         Ok(self.0.save(storage, &hooks)?)
     }
 
-    pub fn remove_hook(&self, storage: &mut dyn Storage, addr: HumanAddr) -> Result<(), HookError> {
+    pub fn remove_hook(&self, storage: &mut dyn Storage, addr: Addr) -> Result<(), HookError> {
         let mut hooks = self.0.load(storage)?;
         if let Some(p) = hooks.iter().position(|x| x == &addr) {
             hooks.remove(p);
@@ -59,7 +59,7 @@ impl<'a> Hooks<'a> {
         Ok(self.0.save(storage, &hooks)?)
     }
 
-    pub fn prepare_hooks<F: Fn(HumanAddr) -> StdResult<CosmosMsg>>(
+    pub fn prepare_hooks<F: Fn(Addr) -> StdResult<CosmosMsg>>(
         &self,
         storage: &dyn Storage,
         prep: F,
@@ -77,7 +77,7 @@ impl<'a> Hooks<'a> {
         admin: &Admin,
         deps: DepsMut,
         info: MessageInfo,
-        addr: HumanAddr,
+        addr: Addr,
     ) -> Result<Response, HookError> {
         admin.assert_admin(deps.as_ref(), &info.sender)?;
         self.add_hook(deps.storage, addr.clone())?;
@@ -100,7 +100,7 @@ impl<'a> Hooks<'a> {
         admin: &Admin,
         deps: DepsMut,
         info: MessageInfo,
-        addr: HumanAddr,
+        addr: Addr,
     ) -> Result<Response, HookError> {
         admin.assert_admin(deps.as_ref(), &info.sender)?;
         self.remove_hook(deps.storage, addr.clone())?;
@@ -120,6 +120,7 @@ impl<'a> Hooks<'a> {
 
     pub fn query_hooks(&self, deps: Deps) -> StdResult<HooksResponse> {
         let hooks = self.0.may_load(deps.storage)?.unwrap_or_default();
+        let hooks = hooks.into_iter().map(String::from).collect();
         Ok(HooksResponse { hooks })
     }
 }

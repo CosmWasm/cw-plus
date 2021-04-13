@@ -1,11 +1,11 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, coins, to_binary, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Deps, DepsMut,
-    Env, HumanAddr, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
+    attr, coin, coins, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
 
-use cw0::{maybe_canonical, NativeBalance};
+use cw0::{maybe_addr, NativeBalance};
 use cw2::set_contract_version;
 use cw20::{Balance, Denom};
 use cw4::{
@@ -32,7 +32,8 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    ADMIN.set(deps.branch(), msg.admin)?;
+    let api = deps.api;
+    ADMIN.set(deps.branch(), maybe_addr(api, msg.admin)?)?;
 
     // min_bond is at least 1, so 0 stake -> non-membership
     let min_bond = match msg.min_bond {
@@ -60,10 +61,17 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    let api = deps.api;
     match msg {
-        ExecuteMsg::UpdateAdmin { admin } => Ok(ADMIN.execute_update_admin(deps, info, admin)?),
-        ExecuteMsg::AddHook { addr } => Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, addr)?),
-        ExecuteMsg::RemoveHook { addr } => Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, addr)?),
+        ExecuteMsg::UpdateAdmin { admin } => {
+            Ok(ADMIN.execute_update_admin(deps, info, maybe_addr(api, admin)?)?)
+        }
+        ExecuteMsg::AddHook { addr } => {
+            Ok(HOOKS.execute_add_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
+        ExecuteMsg::RemoveHook { addr } => {
+            Ok(HOOKS.execute_remove_hook(&ADMIN, deps, info, api.addr_validate(&addr)?)?)
+        }
         ExecuteMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
         ExecuteMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
         ExecuteMsg::Claim {} => execute_claim(deps, env, info),
@@ -74,7 +82,7 @@ pub fn execute_bond(
     deps: DepsMut,
     env: Env,
     amount: Balance,
-    sender: HumanAddr,
+    sender: Addr,
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -87,7 +95,7 @@ pub fn execute_bond(
             if want == &have.address {
                 Ok(have.amount)
             } else {
-                Err(ContractError::InvalidDenom(deps.api.human_address(&want)?))
+                Err(ContractError::InvalidDenom(want.into()))
             }
         }
         _ => Err(ContractError::MixedNativeAndCw20(
@@ -96,15 +104,13 @@ pub fn execute_bond(
     }?;
 
     // update the sender's stake
-    let sender_raw = deps.api.canonical_address(&sender)?;
-    let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
+    let new_stake = STAKE.update(deps.storage, &sender, |stake| -> StdResult<_> {
         Ok(stake.unwrap_or_default() + amount)
     })?;
 
     let messages = update_membership(
         deps.storage,
         sender.clone(),
-        &sender_raw,
         new_stake,
         &cfg,
         env.block.height,
@@ -130,16 +136,15 @@ pub fn execute_unbond(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // reduce the sender's stake - aborting if insufficient
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let new_stake = STAKE.update(deps.storage, &sender_raw, |stake| -> StdResult<_> {
-        stake.unwrap_or_default() - amount
+    let new_stake = STAKE.update(deps.storage, &info.sender, |stake| -> StdResult<_> {
+        Ok(stake.unwrap_or_default().checked_sub(amount)?)
     })?;
 
     // provide them a claim
     let cfg = CONFIG.load(deps.storage)?;
     CLAIMS.create_claim(
         deps.storage,
-        &sender_raw,
+        &info.sender,
         amount,
         cfg.unbonding_period.after(&env.block),
     )?;
@@ -147,7 +152,6 @@ pub fn execute_unbond(
     let messages = update_membership(
         deps.storage,
         info.sender.clone(),
-        &sender_raw,
         new_stake,
         &cfg,
         env.block.height,
@@ -184,15 +188,14 @@ pub fn must_pay_funds(balance: &NativeBalance, denom: &str) -> Result<Uint128, C
 
 fn update_membership(
     storage: &mut dyn Storage,
-    sender: HumanAddr,
-    sender_raw: &CanonicalAddr,
+    sender: Addr,
     new_stake: Uint128,
     cfg: &Config,
     height: u64,
 ) -> StdResult<Vec<CosmosMsg>> {
     // update their membership weight
     let new = calc_weight(new_stake, cfg);
-    let old = MEMBERS.may_load(storage, sender_raw)?;
+    let old = MEMBERS.may_load(storage, &sender)?;
 
     // short-circuit if no change
     if new == old {
@@ -200,8 +203,8 @@ fn update_membership(
     }
     // otherwise, record change of weight
     match new.as_ref() {
-        Some(w) => MEMBERS.save(storage, sender_raw, w, height),
-        None => MEMBERS.remove(storage, sender_raw, height),
+        Some(w) => MEMBERS.save(storage, &sender, w, height),
+        None => MEMBERS.remove(storage, &sender, height),
     }?;
 
     // update total
@@ -230,8 +233,7 @@ pub fn execute_claim(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let sender_raw = deps.api.canonical_address(&info.sender)?;
-    let release = CLAIMS.claim_tokens(deps.storage, &sender_raw, &env.block, None)?;
+    let release = CLAIMS.claim_tokens(deps.storage, &info.sender, &env.block, None)?;
     if release.is_zero() {
         return Err(ContractError::NothingToClaim {});
     }
@@ -247,7 +249,7 @@ pub fn execute_claim(
 
     let amount_str = coins_to_string(&amount);
     let messages = vec![BankMsg::Send {
-        to_address: info.sender.clone(),
+        to_address: info.sender.clone().into(),
         amount,
     }
     .into()];
@@ -285,7 +287,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&list_members(deps, start_after, limit)?)
         }
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
-        QueryMsg::Claims { address } => to_binary(&CLAIMS.query_claims(deps, address)?),
+        QueryMsg::Claims { address } => {
+            to_binary(&CLAIMS.query_claims(deps, &deps.api.addr_validate(&address)?)?)
+        }
         QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
@@ -297,11 +301,9 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     Ok(TotalWeightResponse { weight })
 }
 
-pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse> {
-    let address_raw = deps.api.canonical_address(&address)?;
-    let stake = STAKE
-        .may_load(deps.storage, &address_raw)?
-        .unwrap_or_default();
+pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
+    let addr = deps.api.addr_validate(&addr)?;
+    let stake = STAKE.may_load(deps.storage, &addr)?.unwrap_or_default();
     let denom = match CONFIG.load(deps.storage)?.denom {
         Denom::Native(want) => want,
         _ => {
@@ -315,11 +317,11 @@ pub fn query_staked(deps: Deps, address: HumanAddr) -> StdResult<StakedResponse>
     })
 }
 
-fn query_member(deps: Deps, addr: HumanAddr, height: Option<u64>) -> StdResult<MemberResponse> {
-    let raw = deps.api.canonical_address(&addr)?;
+fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
+    let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, &raw, h),
-        None => MEMBERS.may_load(deps.storage, &raw),
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
+        None => MEMBERS.may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -330,21 +332,20 @@ const DEFAULT_LIMIT: u32 = 10;
 
 fn list_members(
     deps: Deps,
-    start_after: Option<HumanAddr>,
+    start_after: Option<String>,
     limit: Option<u32>,
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let canon = maybe_canonical(deps.api, start_after)?;
-    let start = canon.map(Bound::exclusive);
+    let addr = maybe_addr(deps.api, start_after)?;
+    let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let api = &deps.api;
     let members: StdResult<Vec<_>> = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
             Ok(Member {
-                addr: api.human_address(&CanonicalAddr::from(key))?,
+                addr: String::from_utf8(key)?,
                 weight,
             })
         })
@@ -356,7 +357,7 @@ fn list_members(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, Api, StdError, Storage};
+    use cosmwasm_std::{from_slice, OverflowError, OverflowOperation, StdError, Storage};
     use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
@@ -408,7 +409,7 @@ mod tests {
         for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
             if *stake != 0 {
                 let msg = ExecuteMsg::Bond {};
-                let info = mock_info(HumanAddr::from(*addr), &coins(*stake, DENOM));
+                let info = mock_info(addr, &coins(*stake, DENOM));
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -423,7 +424,7 @@ mod tests {
                 let msg = ExecuteMsg::Unbond {
                     tokens: Uint128(*stake),
                 };
-                let info = mock_info(HumanAddr::from(*addr), &[]);
+                let info = mock_info(addr, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -436,13 +437,13 @@ mod tests {
 
         // it worked, let's query the state
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
-        assert_eq!(Some(HumanAddr::from(INIT_ADMIN)), res.admin);
+        assert_eq!(Some(INIT_ADMIN.into()), res.admin);
 
         let res = query_total_weight(deps.as_ref()).unwrap();
         assert_eq!(0, res.weight);
     }
 
-    fn get_member(deps: Deps, addr: HumanAddr, at_height: Option<u64>) -> Option<u64> {
+    fn get_member(deps: Deps, addr: String, at_height: Option<u64>) -> Option<u64> {
         let raw = query(deps, mock_env(), QueryMsg::Member { addr, at_height }).unwrap();
         let res: MemberResponse = from_slice(&raw).unwrap();
         res.weight
@@ -563,7 +564,14 @@ mod tests {
         env.block.height += 5;
         let info = mock_info(USER2, &[]);
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::Std(StdError::underflow(5000, 5100)));
+        assert_eq!(
+            err,
+            ContractError::Std(StdError::overflow(OverflowError::new(
+                OverflowOperation::Sub,
+                5000,
+                5100
+            )))
+        );
     }
 
     #[test]
@@ -580,19 +588,17 @@ mod tests {
         assert_eq!(17, total);
 
         // get member votes from raw key
-        let member2_canon = deps.api.canonical_address(&USER2.into()).unwrap();
-        let member2_raw = deps.storage.get(&member_key(&member2_canon)).unwrap();
+        let member2_raw = deps.storage.get(&member_key(USER2.as_ref())).unwrap();
         let member2: u64 = from_slice(&member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and execute misses
-        let member3_canon = deps.api.canonical_address(&USER3.into()).unwrap();
-        let member3_raw = deps.storage.get(&member_key(&member3_canon));
+        let member3_raw = deps.storage.get(&member_key(USER3.as_ref()));
         assert_eq!(None, member3_raw);
     }
 
-    fn get_claims<U: Into<HumanAddr>>(deps: Deps, addr: U) -> Vec<Claim> {
-        CLAIMS.query_claims(deps, addr.into()).unwrap().claims
+    fn get_claims(deps: Deps, addr: &Addr) -> Vec<Claim> {
+        CLAIMS.query_claims(deps, addr).unwrap().claims
     }
 
     #[test]
@@ -609,14 +615,14 @@ mod tests {
         // check the claims for each user
         let expires = Duration::Height(UNBONDING_BLOCKS).after(&env.block);
         assert_eq!(
-            get_claims(deps.as_ref(), USER1),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
             vec![Claim::new(4_500, expires)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), USER2),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER2)),
             vec![Claim::new(2_600, expires)]
         );
-        assert_eq!(get_claims(deps.as_ref(), USER3), vec![]);
+        assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER3)), vec![]);
 
         // do another unbond later on
         let mut env2 = mock_env();
@@ -626,15 +632,15 @@ mod tests {
         // with updated claims
         let expires2 = Duration::Height(UNBONDING_BLOCKS).after(&env2.block);
         assert_eq!(
-            get_claims(deps.as_ref(), USER1),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
             vec![Claim::new(4_500, expires)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), USER2),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER2)),
             vec![Claim::new(2_600, expires), Claim::new(1_345, expires2)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), USER3),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER3)),
             vec![Claim::new(1_500, expires2)]
         );
 
@@ -696,13 +702,13 @@ mod tests {
         assert_eq!(err, ContractError::NothingToClaim {});
 
         // claims updated properly
-        assert_eq!(get_claims(deps.as_ref(), USER1), vec![]);
+        assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER1)), vec![]);
         assert_eq!(
-            get_claims(deps.as_ref(), USER2),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER2)),
             vec![Claim::new(1_345, expires2)]
         );
         assert_eq!(
-            get_claims(deps.as_ref(), USER3),
+            get_claims(deps.as_ref(), &Addr::unchecked(USER3)),
             vec![Claim::new(1_500, expires2)]
         );
 
@@ -729,7 +735,7 @@ mod tests {
             }
             .into()]
         );
-        assert_eq!(get_claims(deps.as_ref(), USER2), vec![]);
+        assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER2)), vec![]);
     }
 
     #[test]
@@ -741,8 +747,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = HumanAddr::from("hook1");
-        let contract2 = HumanAddr::from("hook2");
+        let contract1 = String::from("hook1");
+        let contract2 = String::from("hook2");
 
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
@@ -835,8 +841,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = HumanAddr::from("hook1");
-        let contract2 = HumanAddr::from("hook2");
+        let contract1 = String::from("hook1");
+        let contract2 = String::from("hook2");
 
         // register 2 hooks
         let admin_info = mock_info(INIT_ADMIN, &[]);
@@ -887,26 +893,23 @@ mod tests {
         default_instantiate(deps.as_mut());
 
         // cannot bond with 0 coins
-        let info = mock_info(HumanAddr::from(USER1), &[]);
+        let info = mock_info(USER1, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::NoFunds {});
 
         // cannot bond with incorrect denom
-        let info = mock_info(HumanAddr::from(USER1), &[coin(500, "FOO")]);
+        let info = mock_info(USER1, &[coin(500, "FOO")]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::MissingDenom(DENOM.to_string()));
 
         // cannot bond with 2 coins (even if one is correct)
-        let info = mock_info(
-            HumanAddr::from(USER1),
-            &[coin(1234, DENOM), coin(5000, "BAR")],
-        );
+        let info = mock_info(USER1, &[coin(1234, DENOM), coin(5000, "BAR")]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap_err();
         assert_eq!(err, ContractError::ExtraDenoms(DENOM.to_string()));
 
         // can bond with just the proper denom
         // cannot bond with incorrect denom
-        let info = mock_info(HumanAddr::from(USER1), &[coin(500, DENOM)]);
+        let info = mock_info(USER1, &[coin(500, DENOM)]);
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
     }
 

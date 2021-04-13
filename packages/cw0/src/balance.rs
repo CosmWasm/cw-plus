@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops;
 
-use cosmwasm_std::{Coin, StdError, StdResult, Uint128};
+use cosmwasm_std::{Coin, OverflowError, OverflowOperation, StdError, StdResult, Uint128};
 
 // Balance wraps Vec<Coin> and provides some nice helpers. It mutates the Vec and can be
 // unwrapped when done.
@@ -75,11 +75,17 @@ impl NativeBalance {
                 if c.amount <= other.amount {
                     self.0.remove(i);
                 } else {
-                    self.0[i].amount = (self.0[i].amount - other.amount)?;
+                    self.0[i].amount = self.0[i].amount.checked_sub(other.amount)?;
                 }
             }
             // error if no tokens
-            None => return Err(StdError::underflow(0, other.amount.u128())),
+            None => {
+                return Err(StdError::overflow(OverflowError::new(
+                    OverflowOperation::Sub,
+                    0,
+                    other.amount.u128(),
+                )))
+            }
         };
         Ok(self)
     }
@@ -132,7 +138,7 @@ impl ops::Sub<Coin> for NativeBalance {
     fn sub(mut self, other: Coin) -> StdResult<Self> {
         match self.find(&other.denom) {
             Some((i, c)) => {
-                let remainder = (c.amount - other.amount)?;
+                let remainder = c.amount.checked_sub(other.amount)?;
                 if remainder.u128() == 0 {
                     self.0.remove(i);
                 } else {
@@ -140,7 +146,13 @@ impl ops::Sub<Coin> for NativeBalance {
                 }
             }
             // error if no tokens
-            None => return Err(StdError::underflow(0, other.amount.u128())),
+            None => {
+                return Err(StdError::overflow(OverflowError::new(
+                    OverflowOperation::Sub,
+                    0,
+                    other.amount.u128(),
+                )))
+            }
         };
         Ok(self)
     }

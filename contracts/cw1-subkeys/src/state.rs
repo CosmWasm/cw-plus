@@ -1,10 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
+use cosmwasm_std::Addr;
 use cw0::{Expiration, NativeBalance};
 use cw_storage_plus::Map;
-
-use std::fmt;
 
 // Permissions struct defines users message execution permissions.
 // Could have implemented permissions for each cosmos module(StakingPermissions, GovPermissions etc...)
@@ -34,5 +34,5 @@ pub struct Allowance {
     pub expires: Expiration,
 }
 
-pub const PERMISSIONS: Map<&[u8], Permissions> = Map::new("permissions");
-pub const ALLOWANCES: Map<&[u8], Allowance> = Map::new("allowances");
+pub const PERMISSIONS: Map<&Addr, Permissions> = Map::new("permissions");
+pub const ALLOWANCES: Map<&Addr, Allowance> = Map::new("allowances");

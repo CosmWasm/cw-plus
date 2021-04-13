@@ -1,15 +1,15 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Api, CanonicalAddr, Coin, Env, HumanAddr, Order, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, Coin, Env, Order, StdError, StdResult, Storage};
 use cw_storage_plus::Map;
 
-use cw20::{Balance, Cw20Coin};
+use cw20::{Balance, Cw20CoinVerified};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct GenericBalance {
     pub native: Vec<Coin>,
-    pub cw20: Vec<Cw20Coin>,
+    pub cw20: Vec<Cw20CoinVerified>,
 }
 
 impl GenericBalance {
@@ -50,11 +50,11 @@ impl GenericBalance {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Escrow {
     /// arbiter can decide to approve or refund the escrow
-    pub arbiter: CanonicalAddr,
+    pub arbiter: Addr,
     /// if approved, funds go to the recipient
-    pub recipient: CanonicalAddr,
+    pub recipient: Addr,
     /// if refunded, funds go to the source
-    pub source: CanonicalAddr,
+    pub source: Addr,
     /// When end height set and block height exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_height: Option<u64>,
@@ -65,7 +65,7 @@ pub struct Escrow {
     /// Balance in Native and Cw20 tokens
     pub balance: GenericBalance,
     /// All possible contracts that we accept tokens from
-    pub cw20_whitelist: Vec<CanonicalAddr>,
+    pub cw20_whitelist: Vec<Addr>,
 }
 
 impl Escrow {
@@ -85,11 +85,8 @@ impl Escrow {
         false
     }
 
-    pub fn human_whitelist(&self, api: &dyn Api) -> StdResult<Vec<HumanAddr>> {
-        self.cw20_whitelist
-            .iter()
-            .map(|h| api.human_address(h))
-            .collect()
+    pub fn human_whitelist(&self) -> Vec<String> {
+        self.cw20_whitelist.iter().map(|a| a.to_string()).collect()
     }
 }
 
@@ -108,7 +105,6 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::Binary;
 
     #[test]
     fn no_escrow_ids() {
@@ -119,9 +115,9 @@ mod tests {
 
     fn dummy_escrow() -> Escrow {
         Escrow {
-            arbiter: CanonicalAddr(Binary(b"arb".to_vec())),
-            recipient: CanonicalAddr(Binary(b"recip".to_vec())),
-            source: CanonicalAddr(Binary(b"source".to_vec())),
+            arbiter: Addr::unchecked("arb"),
+            recipient: Addr::unchecked("recip"),
+            source: Addr::unchecked("source"),
             end_height: None,
             end_time: None,
             balance: Default::default(),

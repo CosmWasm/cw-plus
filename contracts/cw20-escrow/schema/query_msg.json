@@ -12,7 +12,8 @@
         "list": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Returns the details of the named escrow, error if not created Return type: DetailsResponse.",
@@ -32,7 +33,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ]
 }

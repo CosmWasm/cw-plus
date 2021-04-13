@@ -14,9 +14,6 @@
     }
   },
   "definitions": {
-    "HumanAddr": {
-      "type": "string"
-    },
     "VoterDetail": {
       "type": "object",
       "required": [
@@ -25,7 +22,7 @@
       ],
       "properties": {
         "addr": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "weight": {
           "type": "integer",

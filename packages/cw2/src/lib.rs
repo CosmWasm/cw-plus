@@ -1,9 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{
-    HumanAddr, Querier, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery,
-};
+use cosmwasm_std::{Querier, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery};
 use cw_storage_plus::Item;
 
 pub const CONTRACT: Item<ContractVersion> = Item::new("contract_info");
@@ -44,7 +42,7 @@ pub fn set_contract_version<T: Into<String>, U: Into<String>>(
 /// if the other contract exists and claims to be a cw20-base contract for example.
 /// (Note: you usually want to require *interfaces* not *implementations* of the
 /// contracts you compose with, so be careful of overuse)
-pub fn query_contract_info<Q: Querier, T: Into<HumanAddr>>(
+pub fn query_contract_info<Q: Querier, T: Into<String>>(
     querier: &Q,
     contract_addr: T,
 ) -> StdResult<ContractVersion> {

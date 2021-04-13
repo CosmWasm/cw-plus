@@ -2,11 +2,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{CosmosMsg, Empty, HumanAddr};
+use cosmwasm_std::{CosmosMsg, Empty};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
-    pub admins: Vec<HumanAddr>,
+    pub admins: Vec<String>,
     pub mutable: bool,
 }
 
@@ -24,7 +24,7 @@ where
     Freeze {},
     /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,
     /// and only works if the contract is mutable
-    UpdateAdmins { admins: Vec<HumanAddr> },
+    UpdateAdmins { admins: Vec<String> },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -38,14 +38,11 @@ where
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
-    CanExecute {
-        sender: HumanAddr,
-        msg: CosmosMsg<T>,
-    },
+    CanExecute { sender: String, msg: CosmosMsg<T> },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminListResponse {
-    pub admins: Vec<HumanAddr>,
+    pub admins: Vec<String>,
     pub mutable: bool,
 }

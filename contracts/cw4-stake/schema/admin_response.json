@@ -4,19 +4,10 @@
   "type": "object",
   "properties": {
     "admin": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        },
-        {
-          "type": "null"
-        }
+      "type": [
+        "string",
+        "null"
       ]
-    }
-  },
-  "definitions": {
-    "HumanAddr": {
-      "type": "string"
     }
   }
 }

@@ -1,15 +1,15 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage};
+use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
 use cw721::{ContractInfoResponse, Expiration};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex, PkOwned};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {
-    /// The owner of the newly minter NFT
-    pub owner: CanonicalAddr,
-    /// approvals are stored here, as we clear them all upon transfer and cannot accumulate much
+    /// The owner of the newly minted NFT
+    pub owner: Addr,
+    /// Approvals are stored here, as we clear them all upon transfer and cannot accumulate much
     pub approvals: Vec<Approval>,
 
     /// Identifies the asset to which this NFT represents
@@ -23,17 +23,23 @@ pub struct TokenInfo {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Approval {
     /// Account that can transfer/send the token
-    pub spender: CanonicalAddr,
+    pub spender: Addr,
     /// When the Approval expires (maybe Expiration::never)
     pub expires: Expiration,
 }
 
+impl Approval {
+    pub fn is_expired(&self, block: &BlockInfo) -> bool {
+        self.expires.is_expired(block)
+    }
+}
+
 pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("nft_info");
-pub const MINTER: Item<CanonicalAddr> = Item::new("minter");
+pub const MINTER: Item<Addr> = Item::new("minter");
 pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
 
-// pub const TOKENS: Map<&str, TokenInfo> = Map::new("tokens");
-pub const OPERATORS: Map<(&[u8], &[u8]), Expiration> = Map::new("operators");
+// Stored as (granter, operator) giving operator full control over granter's account
+pub const OPERATORS: Map<(&Addr, &Addr), Expiration> = Map::new("operators");
 
 pub fn num_tokens(storage: &dyn Storage) -> StdResult<u64> {
     Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
@@ -60,7 +66,7 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
         owner: MultiIndex::new(
-            |d, k| (PkOwned(d.owner.to_vec()), PkOwned(k)),
+            |d, k| (PkOwned(Vec::from(d.owner.as_ref())), PkOwned(k)),
             "tokens",
             "tokens__owner",
         ),

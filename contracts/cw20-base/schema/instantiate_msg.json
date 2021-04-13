@@ -17,7 +17,7 @@
     "initial_balances": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/Cw20CoinHuman"
+        "$ref": "#/definitions/Cw20Coin"
       }
     },
     "mint": {
@@ -38,7 +38,7 @@
     }
   },
   "definitions": {
-    "Cw20CoinHuman": {
+    "Cw20Coin": {
       "type": "object",
       "required": [
         "address",
@@ -46,15 +46,12 @@
       ],
       "properties": {
         "address": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         },
         "amount": {
           "$ref": "#/definitions/Uint128"
         }
       }
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "MinterResponse": {
       "type": "object",
@@ -74,7 +71,7 @@
           ]
         },
         "minter": {
-          "$ref": "#/definitions/HumanAddr"
+          "type": "string"
         }
       }
     },

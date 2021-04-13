@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Uint128};
+use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::{Item, Map};
 
 use cw20::AllowanceResponse;
@@ -18,7 +18,7 @@ pub struct TokenInfo {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterData {
-    pub minter: CanonicalAddr,
+    pub minter: Addr,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
 }
@@ -30,5 +30,5 @@ impl TokenInfo {
 }
 
 pub const TOKEN_INFO: Item<TokenInfo> = Item::new("token_info");
-pub const BALANCES: Map<&[u8], Uint128> = Map::new("balance");
-pub const ALLOWANCES: Map<(&[u8], &[u8]), AllowanceResponse> = Map::new("allowance");
+pub const BALANCES: Map<&Addr, Uint128> = Map::new("balance");
+pub const ALLOWANCES: Map<(&Addr, &Addr), AllowanceResponse> = Map::new("allowance");

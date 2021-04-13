@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Api, CanonicalAddr, Coin, HumanAddr, StdResult};
+use cosmwasm_std::{Addr, Api, Coin, StdResult};
 
-use cw20::{Cw20CoinHuman, Cw20ReceiveMsg};
+use cw20::{Cw20Coin, Cw20ReceiveMsg};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {}
@@ -48,9 +48,9 @@ pub struct CreateMsg {
     /// 3-20 bytes of utf-8 text
     pub id: String,
     /// arbiter can decide to approve or refund the escrow
-    pub arbiter: HumanAddr,
+    pub arbiter: String,
     /// if approved, funds go to the recipient
-    pub recipient: HumanAddr,
+    pub recipient: String,
     /// When end height set and block height exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_height: Option<u64>,
@@ -61,13 +61,13 @@ pub struct CreateMsg {
     /// Besides any possible tokens sent with the CreateMsg, this is a list of all cw20 token addresses
     /// that are accepted by the escrow during a top-up. This is required to avoid a DoS attack by topping-up
     /// with an invalid cw20 contract. See https://github.com/CosmWasm/cosmwasm-plus/issues/19
-    pub cw20_whitelist: Option<Vec<HumanAddr>>,
+    pub cw20_whitelist: Option<Vec<String>>,
 }
 
 impl CreateMsg {
-    pub fn canonical_whitelist(&self, api: &dyn Api) -> StdResult<Vec<CanonicalAddr>> {
+    pub fn addr_whitelist(&self, api: &dyn Api) -> StdResult<Vec<Addr>> {
         match self.cw20_whitelist.as_ref() {
-            Some(v) => v.iter().map(|h| api.canonical_address(h)).collect(),
+            Some(v) => v.iter().map(|h| api.addr_validate(h)).collect(),
             None => Ok(vec![]),
         }
     }
@@ -102,11 +102,11 @@ pub struct DetailsResponse {
     /// id of this escrow
     pub id: String,
     /// arbiter can decide to approve or refund the escrow
-    pub arbiter: HumanAddr,
+    pub arbiter: String,
     /// if approved, funds go to the recipient
-    pub recipient: HumanAddr,
+    pub recipient: String,
     /// if refunded, funds go to the source
-    pub source: HumanAddr,
+    pub source: String,
     /// When end height set and block height exceeds this value, the escrow is expired.
     /// Once an escrow is expired, it can be returned to the original funder (via "refund").
     pub end_height: Option<u64>,
@@ -117,7 +117,7 @@ pub struct DetailsResponse {
     /// Balance in native tokens
     pub native_balance: Vec<Coin>,
     /// Balance in cw20 tokens
-    pub cw20_balance: Vec<Cw20CoinHuman>,
+    pub cw20_balance: Vec<Cw20Coin>,
     /// Whitelisted cw20 tokens
-    pub cw20_whitelist: Vec<HumanAddr>,
+    pub cw20_whitelist: Vec<String>,
 }

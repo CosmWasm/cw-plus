@@ -18,14 +18,15 @@
           ],
           "properties": {
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "token_id": {
               "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Send is a base message to transfer a token to a contract and trigger an action on the receiving contract.",
@@ -42,7 +43,7 @@
           ],
           "properties": {
             "contract": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "msg": {
               "anyOf": [
@@ -59,7 +60,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Allows operator to transfer / send the token from the owner's account. If expiration is set, then this allowance has a time/height limit",
@@ -86,14 +88,15 @@
               ]
             },
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "token_id": {
               "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Remove previously granted Approval",
@@ -110,14 +113,15 @@
           ],
           "properties": {
             "spender": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "token_id": {
               "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Allows operator to transfer / send any token from the owner's account. If expiration is set, then this allowance has a time/height limit",
@@ -143,11 +147,12 @@
               ]
             },
             "operator": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Remove previously granted ApproveAll permission",
@@ -163,11 +168,12 @@
           ],
           "properties": {
             "operator": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Mint a new NFT, can only be called by the contract minter",
@@ -179,7 +185,8 @@
         "mint": {
           "$ref": "#/definitions/MintMsg"
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
@@ -202,7 +209,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "AtTime will expire when `env.block.time` >= time",
@@ -216,7 +224,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Never will never expire. Used to express the empty variant",
@@ -228,12 +237,10 @@
             "never": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
-    },
-    "HumanAddr": {
-      "type": "string"
     },
     "MintMsg": {
       "type": "object",
@@ -263,11 +270,7 @@
         },
         "owner": {
           "description": "The owner of the newly minter NFT",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         },
         "token_id": {
           "description": "Unique ID of the NFT",

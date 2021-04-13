@@ -4,11 +4,11 @@ command -v shellcheck > /dev/null && shellcheck "$0"
 
 # these are imported by other packages
 BASE_PACKAGES="cw0 storage-plus"
-ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw721 multi-test"
+ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw721 cw1155 multi-test"
 
 # these are imported by other contracts
 BASE_CONTRACTS="cw1-whitelist  cw4-group cw20-base cw721-base"
-ALL_CONTRACTS="cw1-subkeys cw3-fixed-multisig cw3-flex-multisig cw4-stake cw20-atomic-swap cw20-bonding cw20-escrow cw20-ics20 cw20-staking"
+ALL_CONTRACTS="cw1-subkeys cw3-fixed-multisig cw3-flex-multisig cw4-stake cw20-atomic-swap cw20-bonding cw20-escrow cw20-ics20 cw20-staking cw1155-base"
 
 SLEEP_TIME=30
 

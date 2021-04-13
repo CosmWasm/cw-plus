@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, BlockInfo, CanonicalAddr, Order, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, Binary, BlockInfo, Order, StdError, StdResult, Storage};
 use cw_storage_plus::{Bound, Map};
 
 use cw20::{Balance, Expiration};
@@ -10,8 +10,8 @@ use cw20::{Balance, Expiration};
 pub struct AtomicSwap {
     /// This is the sha-256 hash of the preimage
     pub hash: Binary,
-    pub recipient: CanonicalAddr,
-    pub source: CanonicalAddr,
+    pub recipient: Addr,
+    pub source: Addr,
     pub expires: Expiration,
     /// Balance in native tokens, or cw20 token
     pub balance: Balance,
@@ -54,8 +54,8 @@ mod tests {
 
     fn dummy_swap() -> AtomicSwap {
         AtomicSwap {
-            recipient: CanonicalAddr(Binary(b"recip".to_vec())),
-            source: CanonicalAddr(Binary(b"source".to_vec())),
+            recipient: Addr::unchecked("recip"),
+            source: Addr::unchecked("source"),
             expires: Default::default(),
             hash: Binary("hash".into()),
             balance: Default::default(),

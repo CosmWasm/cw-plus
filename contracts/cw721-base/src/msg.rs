@@ -1,19 +1,19 @@
-use cosmwasm_std::{Binary, HumanAddr};
+use cosmwasm_std::Binary;
 use cw721::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    /// name of the NFT contract
+    /// Name of the NFT contract
     pub name: String,
-    /// symbol of the NFT contract
+    /// Symbol of the NFT contract
     pub symbol: String,
 
     /// The minter is the only one who can create new NFTs.
     /// This is designed for a base NFT that is controlled by an external program
     /// or contract. You will likely replace this with custom logic in custom NFTs
-    pub minter: HumanAddr,
+    pub minter: String,
 }
 
 /// This is like Cw721ExecuteMsg but we add a Mint command for an owner
@@ -23,37 +23,31 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     /// Transfer is a base message to move a token to another account without triggering actions
-    TransferNft {
-        recipient: HumanAddr,
-        token_id: String,
-    },
+    TransferNft { recipient: String, token_id: String },
     /// Send is a base message to transfer a token to a contract and trigger an action
     /// on the receiving contract.
     SendNft {
-        contract: HumanAddr,
+        contract: String,
         token_id: String,
         msg: Option<Binary>,
     },
     /// Allows operator to transfer / send the token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit
     Approve {
-        spender: HumanAddr,
+        spender: String,
         token_id: String,
         expires: Option<Expiration>,
     },
     /// Remove previously granted Approval
-    Revoke {
-        spender: HumanAddr,
-        token_id: String,
-    },
+    Revoke { spender: String, token_id: String },
     /// Allows operator to transfer / send any token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit
     ApproveAll {
-        operator: HumanAddr,
+        operator: String,
         expires: Option<Expiration>,
     },
     /// Remove previously granted ApproveAll permission
-    RevokeAll { operator: HumanAddr },
+    RevokeAll { operator: String },
 
     /// Mint a new NFT, can only be called by the contract minter
     Mint(MintMsg),
@@ -64,7 +58,7 @@ pub struct MintMsg {
     /// Unique ID of the NFT
     pub token_id: String,
     /// The owner of the newly minter NFT
-    pub owner: HumanAddr,
+    pub owner: String,
     /// Identifies the asset to which this NFT represents
     pub name: String,
     /// Describes the asset to which this NFT represents (may be empty)
@@ -86,10 +80,10 @@ pub enum QueryMsg {
     /// List all operators that can access all of the owner's tokens
     /// Return type: `ApprovedForAllResponse`
     ApprovedForAll {
-        owner: HumanAddr,
+        owner: String,
         /// unset or false will filter out expired items, you must set to true to see them
         include_expired: Option<bool>,
-        start_after: Option<HumanAddr>,
+        start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Total number of tokens issued
@@ -117,7 +111,7 @@ pub enum QueryMsg {
     /// Returns all tokens owned by the given address, [] if unset.
     /// Return type: TokensResponse.
     Tokens {
-        owner: HumanAddr,
+        owner: String,
         start_after: Option<String>,
         limit: Option<u32>,
     },
@@ -136,5 +130,5 @@ pub enum QueryMsg {
 /// Shows who can mint these tokens
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterResponse {
-    pub minter: HumanAddr,
+    pub minter: String,
 }

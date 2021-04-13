@@ -4,7 +4,7 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{from_slice, Binary, Order, StdError, StdResult, Storage, KV};
+use cosmwasm_std::{from_slice, Binary, Order, Pair, StdError, StdResult, Storage};
 
 use crate::helpers::namespaces_with_key;
 use crate::keys::EmptyPrefix;
@@ -77,8 +77,8 @@ where
 fn deserialize_multi_kv<T: DeserializeOwned>(
     store: &dyn Storage,
     pk_namespace: &[u8],
-    kv: KV,
-) -> StdResult<KV<T>> {
+    kv: Pair,
+) -> StdResult<Pair<T>> {
     let (key, pk_len) = kv;
 
     // Deserialize pk_len
@@ -175,7 +175,7 @@ where
         &self,
         store: &'c dyn Storage,
         prefix: K::Prefix,
-    ) -> StdResult<Vec<KV<T>>> {
+    ) -> StdResult<Vec<Pair<T>>> {
         self.prefix(prefix)
             .range(store, None, None, Order::Ascending)
             .collect()
@@ -197,7 +197,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<Pair<T>>> + 'c>
     where
         T: 'c,
     {
@@ -259,7 +259,7 @@ where
     }
 }
 
-fn deserialize_unique_kv<T: DeserializeOwned>(kv: KV) -> StdResult<KV<T>> {
+fn deserialize_unique_kv<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
     Ok((t.pk.into(), t.value))
@@ -283,7 +283,7 @@ where
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<KV<T>>> {
+    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Pair<T>>> {
         let data = self
             .idx_map
             .may_load(store, idx)?
@@ -307,7 +307,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<KV<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<Pair<T>>> + 'c>
     where
         T: 'c,
     {

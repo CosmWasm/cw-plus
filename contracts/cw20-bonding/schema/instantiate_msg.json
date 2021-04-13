@@ -71,7 +71,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "Linear returns `slope * 10^-scale * supply` as spot price",
@@ -97,7 +98,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "SquareRoot returns `slope * 10^-scale * supply^0.5` as spot price",
@@ -123,7 +125,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },

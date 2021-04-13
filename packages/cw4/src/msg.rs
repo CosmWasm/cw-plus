@@ -1,15 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::HumanAddr;
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw4ExecuteMsg {
     /// Change the admin
-    UpdateAdmin { admin: Option<HumanAddr> },
+    UpdateAdmin { admin: Option<String> },
     /// Add a new hook to be informed of all membership changes. Must be called by Admin
-    AddHook { addr: HumanAddr },
+    AddHook { addr: String },
     /// Remove a hook. Must be called by Admin
-    RemoveHook { addr: HumanAddr },
+    RemoveHook { addr: String },
 }
