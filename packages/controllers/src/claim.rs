@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{BlockInfo, Deps, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, BlockInfo, Deps, StdResult, Storage, Uint128};
 use cw0::Expiration;
-use cw_storage_plus::{AddrRef, Map};
+use cw_storage_plus::Map;
 
 // TODO: pull into cw0?
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -28,7 +28,7 @@ impl Claim {
 }
 
 // TODO: revisit design (split each claim on own key?)
-pub struct Claims<'a>(Map<'a, AddrRef<'a>, Vec<Claim>>);
+pub struct Claims<'a>(Map<'a, &'a Addr, Vec<Claim>>);
 
 impl<'a> Claims<'a> {
     pub const fn new(storage_key: &'a str) -> Self {
@@ -40,7 +40,7 @@ impl<'a> Claims<'a> {
     pub fn create_claim(
         &self,
         storage: &mut dyn Storage,
-        addr: AddrRef,
+        addr: &Addr,
         amount: Uint128,
         release_at: Expiration,
     ) -> StdResult<()> {
@@ -58,7 +58,7 @@ impl<'a> Claims<'a> {
     pub fn claim_tokens(
         &self,
         storage: &mut dyn Storage,
-        addr: AddrRef,
+        addr: &Addr,
         block: &BlockInfo,
         cap: Option<Uint128>,
     ) -> StdResult<Uint128> {
@@ -86,7 +86,7 @@ impl<'a> Claims<'a> {
         Ok(to_send)
     }
 
-    pub fn query_claims(&self, deps: Deps, address: AddrRef) -> StdResult<ClaimsResponse> {
+    pub fn query_claims(&self, deps: Deps, address: &Addr) -> StdResult<ClaimsResponse> {
         let claims = self.0.may_load(deps.storage, address)?.unwrap_or_default();
         Ok(ClaimsResponse { claims })
     }

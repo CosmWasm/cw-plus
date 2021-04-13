@@ -12,7 +12,7 @@ use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
-use cw_storage_plus::{AddrRef, Bound};
+use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, StakedResponse};
@@ -104,7 +104,7 @@ pub fn execute_bond(
     }?;
 
     // update the sender's stake
-    let new_stake = STAKE.update(deps.storage, sender.as_ref(), |stake| -> StdResult<_> {
+    let new_stake = STAKE.update(deps.storage, &sender, |stake| -> StdResult<_> {
         Ok(stake.unwrap_or_default() + amount)
     })?;
 
@@ -136,17 +136,15 @@ pub fn execute_unbond(
     amount: Uint128,
 ) -> Result<Response, ContractError> {
     // reduce the sender's stake - aborting if insufficient
-    let new_stake = STAKE.update(
-        deps.storage,
-        &info.sender.as_ref(),
-        |stake| -> StdResult<_> { Ok(stake.unwrap_or_default().checked_sub(amount)?) },
-    )?;
+    let new_stake = STAKE.update(deps.storage, &info.sender, |stake| -> StdResult<_> {
+        Ok(stake.unwrap_or_default().checked_sub(amount)?)
+    })?;
 
     // provide them a claim
     let cfg = CONFIG.load(deps.storage)?;
     CLAIMS.create_claim(
         deps.storage,
-        AddrRef::from(&info.sender),
+        &info.sender,
         amount,
         cfg.unbonding_period.after(&env.block),
     )?;
@@ -197,7 +195,7 @@ fn update_membership(
 ) -> StdResult<Vec<CosmosMsg>> {
     // update their membership weight
     let new = calc_weight(new_stake, cfg);
-    let old = MEMBERS.may_load(storage, sender.as_ref())?;
+    let old = MEMBERS.may_load(storage, &sender)?;
 
     // short-circuit if no change
     if new == old {
@@ -205,8 +203,8 @@ fn update_membership(
     }
     // otherwise, record change of weight
     match new.as_ref() {
-        Some(w) => MEMBERS.save(storage, sender.as_ref(), w, height),
-        None => MEMBERS.remove(storage, sender.as_ref(), height),
+        Some(w) => MEMBERS.save(storage, &sender, w, height),
+        None => MEMBERS.remove(storage, &sender, height),
     }?;
 
     // update total
@@ -235,8 +233,7 @@ pub fn execute_claim(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let release =
-        CLAIMS.claim_tokens(deps.storage, AddrRef::from(&info.sender), &env.block, None)?;
+    let release = CLAIMS.claim_tokens(deps.storage, &info.sender, &env.block, None)?;
     if release.is_zero() {
         return Err(ContractError::NothingToClaim {});
     }
@@ -290,9 +287,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             to_binary(&list_members(deps, start_after, limit)?)
         }
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
-        QueryMsg::Claims { address } => to_binary(
-            &CLAIMS.query_claims(deps, AddrRef::from(&deps.api.addr_validate(&address)?))?,
-        ),
+        QueryMsg::Claims { address } => {
+            to_binary(&CLAIMS.query_claims(deps, &deps.api.addr_validate(&address)?)?)
+        }
         QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
@@ -306,9 +303,7 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
 
 pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
     let addr = deps.api.addr_validate(&addr)?;
-    let stake = STAKE
-        .may_load(deps.storage, addr.as_ref())?
-        .unwrap_or_default();
+    let stake = STAKE.may_load(deps.storage, &addr)?.unwrap_or_default();
     let denom = match CONFIG.load(deps.storage)?.denom {
         Denom::Native(want) => want,
         _ => {
@@ -325,8 +320,8 @@ pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, addr.as_ref(), h),
-        None => MEMBERS.may_load(deps.storage, addr.as_ref()),
+        Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
+        None => MEMBERS.may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -602,8 +597,8 @@ mod tests {
         assert_eq!(None, member3_raw);
     }
 
-    fn get_claims<'a, U: Into<AddrRef<'a>>>(deps: Deps, addr: U) -> Vec<Claim> {
-        CLAIMS.query_claims(deps, addr.into()).unwrap().claims
+    fn get_claims(deps: Deps, addr: &Addr) -> Vec<Claim> {
+        CLAIMS.query_claims(deps, addr).unwrap().claims
     }
 
     #[test]
