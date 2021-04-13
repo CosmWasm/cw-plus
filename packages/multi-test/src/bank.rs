@@ -295,4 +295,40 @@ mod test {
         let rich = bank.get_balance(&store, &owner).unwrap();
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
     }
+
+    #[test]
+    fn burn_coins() {
+        let mut store = MockStorage::new();
+
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("recipient");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+
+        // set money
+        let bank = SimpleBank {};
+        bank.set_balance(&mut store, &owner, init_funds).unwrap();
+
+        // send both tokens
+        let to_burn = vec![coin(30, "eth"), coin(5, "btc")];
+        let msg = BankMsg::Burn { amount: to_burn };
+        bank.handle(&mut store, owner.clone(), msg).unwrap();
+        let rich = bank.get_balance(&store, &owner).unwrap();
+        assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
+
+        // cannot burn too much
+        let msg = BankMsg::Burn {
+            amount: coins(20, "btc"),
+        };
+        let err = bank.handle(&mut store, owner.clone(), msg).unwrap_err();
+        assert!(err.contains("Overflow"));
+        let rich = bank.get_balance(&store, &owner).unwrap();
+        assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
+
+        // cannot burn from empty account
+        let msg = BankMsg::Burn {
+            amount: coins(1, "btc"),
+        };
+        let err = bank.handle(&mut store, rcpt, msg).unwrap_err();
+        assert!(err.contains("Overflow"));
+    }
 }
