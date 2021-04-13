@@ -127,7 +127,7 @@ where
     }
 
     /// This is an "admin" function to let us adjust bank accounts
-    pub fn set_bank_balance(&mut self, account: Addr, amount: Vec<Coin>) -> Result<(), String> {
+    pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
         self.bank.set_balance(account, amount)
     }
 
@@ -470,12 +470,8 @@ mod test {
         let rcpt_funds = vec![coin(5, "btc")];
 
         // set money
-        router
-            .set_bank_balance(owner.clone(), init_funds.clone())
-            .unwrap();
-        router
-            .set_bank_balance(rcpt.clone(), rcpt_funds.clone())
-            .unwrap();
+        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
+        router.set_bank_balance(&rcpt, rcpt_funds.clone()).unwrap();
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
@@ -512,9 +508,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router
-            .set_bank_balance(owner.clone(), init_funds.clone())
-            .unwrap();
+        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
 
         // set up contract
         let code_id = router.store_code(contract_payout());
@@ -559,9 +553,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router
-            .set_bank_balance(owner.clone(), init_funds.clone())
-            .unwrap();
+        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
 
         // set up payout contract
         let payout_id = router.store_code(contract_payout_custom());
@@ -625,9 +617,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router
-            .set_bank_balance(owner.clone(), init_funds.clone())
-            .unwrap();
+        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
 
         // set up reflect contract
         let reflect_id = router.store_code(contract_reflect());

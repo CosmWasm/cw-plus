@@ -588,7 +588,7 @@ mod tests {
 
         // Bonus: set some funds on the multisig contract for future proposals
         if !init_funds.is_empty() {
-            app.set_bank_balance(flex_addr.clone(), init_funds).unwrap();
+            app.set_bank_balance(&flex_addr, init_funds).unwrap();
         }
         (flex_addr, group_addr)
     }

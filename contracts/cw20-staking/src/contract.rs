@@ -473,7 +473,7 @@ mod tests {
 
     fn sample_validator(addr: &str) -> Validator {
         Validator {
-            address: Addr::unchecked(addr),
+            address: addr.into(),
             commission: Decimal::percent(3),
             max_commission: Decimal::percent(10),
             max_change_rate: Decimal::percent(1),
@@ -484,7 +484,7 @@ mod tests {
         let can_redelegate = amount.clone();
         let accumulated_rewards = coins(0, &amount.denom);
         FullDelegation {
-            validator: Addr::unchecked(addr),
+            validator: addr.into(),
             delegator: Addr::unchecked(MOCK_CONTRACT_ADDR),
             amount,
             can_redelegate,
