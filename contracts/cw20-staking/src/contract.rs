@@ -18,7 +18,6 @@ use cw20_base::state::{MinterData, TokenInfo, TOKEN_INFO};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, InvestmentResponse, QueryMsg};
 use crate::state::{InvestmentInfo, Supply, CLAIMS, INVESTMENT, TOTAL_SUPPLY};
-use cw_storage_plus::AddrRef;
 
 const FALLBACK_RATIO: Decimal = Decimal::one();
 
@@ -278,7 +277,7 @@ pub fn unbond(
 
     CLAIMS.create_claim(
         deps.storage,
-        AddrRef::from(&info.sender),
+        &info.sender,
         unbond,
         invest.unbonding_period.after(&env.block),
     )?;
@@ -314,12 +313,8 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
 
     // check how much to send - min(balance, claims[sender]), and reduce the claim
     // Ensure we have enough balance to cover this and only send some claims if that is all we can cover
-    let to_send = CLAIMS.claim_tokens(
-        deps.storage,
-        AddrRef::from(&info.sender),
-        &env.block,
-        Some(balance.amount),
-    )?;
+    let to_send =
+        CLAIMS.claim_tokens(deps.storage, &info.sender, &env.block, Some(balance.amount))?;
     if to_send == Uint128(0) {
         return Err(ContractError::NothingToClaim {});
     }
@@ -428,9 +423,9 @@ pub fn _bond_all_tokens(
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // custom queries
-        QueryMsg::Claims { address } => to_binary(
-            &CLAIMS.query_claims(deps, AddrRef::from(&deps.api.addr_validate(&address)?))?,
-        ),
+        QueryMsg::Claims { address } => {
+            to_binary(&CLAIMS.query_claims(deps, &deps.api.addr_validate(&address)?)?)
+        }
         QueryMsg::Investment {} => to_binary(&query_investment(deps)?),
         // inherited from cw20-base
         QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
@@ -540,7 +535,7 @@ mod tests {
 
     fn get_claims(deps: Deps, addr: &str) -> Vec<Claim> {
         CLAIMS
-            .query_claims(deps, AddrRef::from(&Addr::unchecked(addr)))
+            .query_claims(deps, &Addr::unchecked(addr))
             .unwrap()
             .claims
     }
