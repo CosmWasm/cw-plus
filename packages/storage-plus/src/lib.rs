@@ -1,4 +1,3 @@
-mod addr;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -11,7 +10,6 @@ mod path;
 mod prefix;
 mod snapshot;
 
-pub use addr::AddrRef;
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};

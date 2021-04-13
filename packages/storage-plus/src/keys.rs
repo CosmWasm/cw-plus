@@ -1,7 +1,6 @@
 use cosmwasm_std::Addr;
 use std::marker::PhantomData;
 
-use crate::addr::AddrRef;
 use crate::helpers::namespaces_with_key;
 use crate::Endian;
 
@@ -148,26 +147,6 @@ impl<'a> PrimaryKey<'a> for &'a Addr {
         vec![self.as_ref().as_bytes()]
     }
 }
-
-/// type safe version to ensure address was validated before use.
-/// This is equivalent to &Addr but compatible with these lifetimes
-impl<'a> PrimaryKey<'a> for AddrRef<'a> {
-    type Prefix = ();
-    type SubPrefix = ();
-
-    fn key(&self) -> Vec<&[u8]> {
-        // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
-    }
-}
-
-/// A type-safe way to use verified addresses as keys
-impl<'a> Prefixer<'a> for AddrRef<'a> {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
-    }
-}
-
 // this auto-implements PrimaryKey for all the IntKey types (and more!)
 impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
     type Prefix = ();
