@@ -125,7 +125,7 @@ pub fn execute_propose(
         weight: vote_power,
         vote: Vote::Yes,
     };
-    BALLOTS.save(deps.storage, (id.into(), info.sender.as_ref()), &ballot)?;
+    BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
     Ok(Response {
         submessages: vec![],
@@ -168,7 +168,7 @@ pub fn execute_vote(
     // cast vote if no vote previously cast
     BALLOTS.update(
         deps.storage,
-        (proposal_id.into(), &info.sender.as_ref()),
+        (proposal_id.into(), &info.sender),
         |bal| match bal {
             Some(_) => Err(ContractError::AlreadyVoted {}),
             None => Ok(Ballot {
@@ -383,7 +383,7 @@ fn map_proposal(
 
 fn query_vote(deps: Deps, proposal_id: u64, voter: String) -> StdResult<VoteResponse> {
     let voter_addr = deps.api.addr_validate(&voter)?;
-    let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), voter_addr.as_ref()))?;
+    let prop = BALLOTS.may_load(deps.storage, (proposal_id.into(), &voter_addr))?;
     let vote = prop.map(|b| VoteInfo {
         voter,
         vote: b.vote,
