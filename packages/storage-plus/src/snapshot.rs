@@ -375,7 +375,7 @@ mod tests {
     fn every_blocks_stores_present_and_past() {
         let mut storage = MockStorage::new();
         init_data(&EVERY, &mut storage);
-        assert_final_values(&EVERY, &mut storage);
+        assert_final_values(&EVERY, &storage);
 
         // historical queries return historical values
         assert_values_at_height(&EVERY, &storage, 3, VALUES_START_3);
@@ -386,7 +386,7 @@ mod tests {
     fn selected_shows_3_not_5() {
         let mut storage = MockStorage::new();
         init_data(&SELECT, &mut storage);
-        assert_final_values(&SELECT, &mut storage);
+        assert_final_values(&SELECT, &storage);
 
         // historical queries return historical values
         assert_values_at_height(&SELECT, &storage, 3, VALUES_START_3);

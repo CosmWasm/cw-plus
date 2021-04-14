@@ -67,7 +67,7 @@ mod tests {
     use crate::msg::{ExecuteMsg, InstantiateMsg};
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(mut deps: DepsMut, addr: &String, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
         let instantiate_msg = InstantiateMsg {
             name: "Auto Gen".to_string(),
             symbol: "AUTO".to_string(),
@@ -107,7 +107,7 @@ mod tests {
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender1.clone(),
             amount: allow1,
-            expires: Some(expires.clone()),
+            expires: Some(expires),
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -118,7 +118,7 @@ mod tests {
             amount: allow2,
             expires: None,
         };
-        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), env, info, msg).unwrap();
 
         // query list gets 2
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
@@ -135,7 +135,7 @@ mod tests {
         // next one is spender2
         let allowances = query_all_allowances(
             deps.as_ref(),
-            owner.clone(),
+            owner,
             Some(allow.spender.clone()),
             Some(10000),
         )
@@ -185,8 +185,8 @@ mod tests {
         .unwrap();
         execute(
             deps.as_mut(),
-            env.clone(),
-            info.clone(),
+            env,
+            info,
             ExecuteMsg::Transfer {
                 recipient: acct4,
                 amount: Uint128(444444),
@@ -196,7 +196,7 @@ mod tests {
 
         // make sure we get the proper results
         let accounts = query_all_accounts(deps.as_ref(), None, None).unwrap();
-        assert_eq!(accounts.accounts, expected_order.clone());
+        assert_eq!(accounts.accounts, expected_order);
 
         // let's do pagination
         let accounts = query_all_accounts(deps.as_ref(), None, Some(2)).unwrap();

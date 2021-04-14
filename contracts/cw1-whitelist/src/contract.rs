@@ -266,7 +266,7 @@ mod tests {
 
         // but carl can
         let info = mock_info(&carl, &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }
@@ -307,12 +307,11 @@ mod tests {
         assert_eq!(res.can_execute, true);
 
         // anyone cannot send
-        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg).unwrap();
         assert_eq!(res.can_execute, false);
 
         // anyone cannot stake
-        let res =
-            query_can_execute(deps.as_ref(), anyone.to_string(), staking_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), anyone.to_string(), staking_msg).unwrap();
         assert_eq!(res.can_execute, false);
     }
 }

@@ -237,7 +237,7 @@ mod test {
         assert_eq!(res.amount, coin(100, "eth"));
 
         let req = BankQuery::Balance {
-            address: owner.clone().into(),
+            address: owner.into(),
             denom: "foobar".into(),
         };
         let raw = bank.query(&store, req).unwrap();
@@ -245,7 +245,7 @@ mod test {
         assert_eq!(res.amount, coin(0, "foobar"));
 
         let req = BankQuery::Balance {
-            address: rcpt.clone().into(),
+            address: rcpt.into(),
             denom: "eth".into(),
         };
         let raw = bank.query(&store, req).unwrap();
@@ -264,16 +264,14 @@ mod test {
 
         // set money
         let bank = SimpleBank {};
-        bank.set_balance(&mut store, &owner, init_funds.clone())
-            .unwrap();
-        bank.set_balance(&mut store, &rcpt, rcpt_funds.clone())
-            .unwrap();
+        bank.set_balance(&mut store, &owner, init_funds).unwrap();
+        bank.set_balance(&mut store, &rcpt, rcpt_funds).unwrap();
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
         let msg = BankMsg::Send {
             to_address: rcpt.clone().into(),
-            amount: to_send.clone(),
+            amount: to_send,
         };
         bank.handle(&mut store, owner.clone(), msg.clone()).unwrap();
         let rich = bank.get_balance(&store, &owner).unwrap();
@@ -286,11 +284,10 @@ mod test {
 
         // cannot send too much
         let msg = BankMsg::Send {
-            to_address: rcpt.clone().into(),
+            to_address: rcpt.into(),
             amount: coins(20, "btc"),
         };
-        bank.handle(&mut store, owner.clone(), msg.clone())
-            .unwrap_err();
+        bank.handle(&mut store, owner.clone(), msg).unwrap_err();
 
         let rich = bank.get_balance(&store, &owner).unwrap();
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);

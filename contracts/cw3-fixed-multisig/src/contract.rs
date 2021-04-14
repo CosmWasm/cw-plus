@@ -602,7 +602,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info, required_weight, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
             to_address: SOMEBODY.into(),
@@ -626,7 +626,7 @@ mod tests {
         let proposal_wrong_exp = ExecuteMsg::Propose {
             title: "Rewarding somebody".to_string(),
             description: "Do we reward her?".to_string(),
-            msgs: msgs.clone(),
+            msgs,
             latest: Some(Expiration::AtHeight(123456)),
         };
         let err = execute(deps.as_mut(), mock_env(), info, proposal_wrong_exp).unwrap_err();
@@ -827,7 +827,7 @@ mod tests {
 
         // Only Passed can be executed
         let execution = ExecuteMsg::Execute { proposal_id };
-        let err = execute(deps.as_mut(), mock_env(), info.clone(), execution.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, execution.clone()).unwrap_err();
         assert_eq!(err, ContractError::WrongExecuteStatus {});
 
         // Vote it, so it passes
@@ -906,7 +906,7 @@ mod tests {
             msgs: msgs.clone(),
             latest: None,
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
@@ -917,7 +917,7 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
 
         // Non-expired proposals cannot be closed
-        let err = execute(deps.as_mut(), mock_env(), info.clone(), closing.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, closing).unwrap_err();
         assert_eq!(err, ContractError::NotExpired {});
 
         // Expired proposals can be closed
@@ -926,7 +926,7 @@ mod tests {
         let proposal = ExecuteMsg::Propose {
             title: "(Try to) pay somebody".to_string(),
             description: "Pay somebody after time?".to_string(),
-            msgs: msgs.clone(),
+            msgs,
             latest: Some(Expiration::AtHeight(123456)),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();

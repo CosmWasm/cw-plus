@@ -610,7 +610,7 @@ mod tests {
 
         // third one release foo cw20 token
         let send_msg = Cw20ExecuteMsg::Transfer {
-            recipient: create.recipient.clone(),
+            recipient: create.recipient,
             amount: Uint128(888),
         };
         assert_eq!(

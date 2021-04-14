@@ -125,19 +125,14 @@ fn cw3_controls_cw20() {
         vote: Vote::Yes,
     };
     router
-        .execute_contract(addr2.clone(), multisig_addr.clone(), &vote2_msg, &[])
+        .execute_contract(addr2, multisig_addr.clone(), &vote2_msg, &[])
         .unwrap();
 
     // only 1 vote and msg mint fails
     let execute_proposal_msg = ExecuteMsg::Execute { proposal_id: 1 };
     // execute mint
     router
-        .execute_contract(
-            addr1.clone(),
-            multisig_addr.clone(),
-            &execute_proposal_msg,
-            &[],
-        )
+        .execute_contract(addr1, multisig_addr, &execute_proposal_msg, &[])
         .unwrap();
 
     // check the mint is successful

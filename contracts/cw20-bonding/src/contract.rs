@@ -313,8 +313,8 @@ pub fn query_curve_info(deps: Deps, curve_fn: CurveFn) -> StdResult<CurveInfoRes
     Ok(CurveInfoResponse {
         reserve,
         supply,
-        reserve_denom,
         spot_price,
+        reserve_denom,
     })
 }
 
@@ -354,11 +354,11 @@ mod tests {
     fn setup_test(deps: DepsMut, decimals: u8, reserve_decimals: u8, curve_type: CurveType) {
         // this matches `linear_curve` test case from curves.rs
         let creator = String::from(CREATOR);
-        let msg = default_instantiate(decimals, reserve_decimals, curve_type.clone());
+        let msg = default_instantiate(decimals, reserve_decimals, curve_type);
         let info = mock_info(&creator, &[]);
 
         // make sure we can instantiate with this
-        let res = instantiate(deps, mock_env(), info, msg.clone()).unwrap();
+        let res = instantiate(deps, mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(state.spot_price, Decimal::zero());
 
         // curve type is stored properly
-        let curve = CURVE_TYPE.load(&mut deps.storage).unwrap();
+        let curve = CURVE_TYPE.load(&deps.storage).unwrap();
         assert_eq!(curve_type, curve);
 
         // no balance
@@ -434,7 +434,7 @@ mod tests {
 
         // second stake needs more to get next 1000 EPOXY
         let info = mock_info(INVESTOR, &coins(1_500_000_000, DENOM));
-        execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, buy).unwrap();
 
         // ensure balances updated
         assert_eq!(get_balance(deps.as_ref(), INVESTOR), Uint128(1000));
@@ -459,7 +459,7 @@ mod tests {
             slope: Uint128(1),
             scale: 1,
         };
-        setup_test(deps.as_mut(), 2, 8, curve_type.clone());
+        setup_test(deps.as_mut(), 2, 8, curve_type);
 
         // fails when no tokens sent
         let info = mock_info(INVESTOR, &[]);
@@ -474,7 +474,7 @@ mod tests {
 
         // fails when too many tokens sent
         let info = mock_info(INVESTOR, &[coin(3400022, DENOM), coin(1234567, "wei")]);
-        let err = execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, buy).unwrap_err();
         assert_eq!(err, PaymentError::MultipleDenoms {}.into());
     }
 
@@ -548,7 +548,7 @@ mod tests {
             value: Uint128(15),
             scale: 1,
         };
-        setup_test(deps.as_mut(), 9, 6, curve_type.clone());
+        setup_test(deps.as_mut(), 9, 6, curve_type);
 
         let alice: &str = "alice";
         let bob: &str = "bobby";
@@ -557,7 +557,7 @@ mod tests {
         // spend 45_000 uatom for 30_000_000 EPOXY
         let info = mock_info(bob, &coins(45_000, DENOM));
         let buy = ExecuteMsg::Buy {};
-        execute(deps.as_mut(), mock_env(), info, buy.clone()).unwrap();
+        execute(deps.as_mut(), mock_env(), info, buy).unwrap();
 
         // check balances
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(30_000_000));
@@ -579,7 +579,7 @@ mod tests {
             amount: Uint128(35_000_000),
             expires: None,
         };
-        execute(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info, allow).unwrap();
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(28_000_000));
         assert_eq!(get_balance(deps.as_ref(), alice), Uint128(0));
         assert_eq!(
@@ -596,7 +596,7 @@ mod tests {
             amount: Uint128(25_000_000),
         };
         let alice_info = mock_info(alice, &[]);
-        execute(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
+        execute(deps.as_mut(), mock_env(), alice_info, self_pay).unwrap();
         assert_eq!(get_balance(deps.as_ref(), bob), Uint128(3_000_000));
         assert_eq!(get_balance(deps.as_ref(), alice), Uint128(25_000_000));
         assert_eq!(get_balance(deps.as_ref(), carl), Uint128(2_000_000));

@@ -327,11 +327,11 @@ mod tests {
         assert_eq!(Uint128(23), reserve);
         // if we have 100 TREE, we should have 233.333333333 CHF
         let reserve = curve.reserve(Uint128(100_000_000));
-        assert_eq!(Uint128(233_33), reserve);
+        assert_eq!(Uint128(23_333), reserve);
         // test rounding
         // if we have 235 TREE, we should have 840.5790828021146 CHF
         let reserve = curve.reserve(Uint128(235_000_000));
-        assert_eq!(Uint128(840_57), reserve); // round down
+        assert_eq!(Uint128(84_057), reserve); // round down
 
         // // if we have 0.23 CHF, we should have 0.990453 TREE (round down)
         let supply = curve.supply(Uint128(23));

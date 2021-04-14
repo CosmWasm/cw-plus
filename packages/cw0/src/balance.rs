@@ -202,7 +202,7 @@ mod test {
         );
 
         // add an new coin
-        let add_atom = balance.clone() + coin(777, "ATOM");
+        let add_atom = balance + coin(777, "ATOM");
         assert_eq!(
             add_atom,
             NativeBalance(vec![
@@ -228,10 +228,10 @@ mod test {
             &NativeBalance(vec![coin(900, "ATOM"), coin(555, "BTC"), coin(666, "ETH")])
         );
 
-        let foo = balance + NativeBalance(vec![coin(234, "BTC")]);
+        let sum = balance + NativeBalance(vec![coin(234, "BTC")]);
         assert_eq!(
-            &foo,
-            &NativeBalance(vec![coin(900, "ATOM"), coin(789, "BTC"), coin(666, "ETH")])
+            sum,
+            NativeBalance(vec![coin(900, "ATOM"), coin(789, "BTC"), coin(666, "ETH")])
         );
     }
 
@@ -255,7 +255,7 @@ mod test {
         assert!(underflow.is_err());
 
         // subtract non-existent denom
-        let missing = balance.clone() - coin(1, "ATOM");
+        let missing = balance - coin(1, "ATOM");
         assert!(missing.is_err());
     }
 
@@ -280,7 +280,7 @@ mod test {
         assert_eq!(saturating.unwrap(), NativeBalance(vec![coin(12345, "ETH")]));
 
         // subtract non-existent denom
-        let missing = balance.clone() - coin(1, "ATOM");
+        let missing = balance - coin(1, "ATOM");
         assert!(missing.is_err());
     }
 

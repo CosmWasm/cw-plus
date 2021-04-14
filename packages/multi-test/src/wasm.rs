@@ -717,7 +717,7 @@ mod test {
 
         // query the contract
         let data = router
-            .query_smart(contract_addr.clone(), &querier, b"{}".to_vec())
+            .query_smart(contract_addr, &querier, b"{}".to_vec())
             .unwrap();
         let res: PayoutMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);

@@ -471,7 +471,7 @@ mod test {
         // we get a success cache (ack) for a send
         let ack = IbcAcknowledgement {
             acknowledgement: ack_success(),
-            original_packet: sent_packet.clone(),
+            original_packet: sent_packet,
         };
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
         assert_eq!(0, res.messages.len());
@@ -525,7 +525,7 @@ mod test {
         // we get a success cache (ack) for a send
         let ack = IbcAcknowledgement {
             acknowledgement: ack_success(),
-            original_packet: sent_packet.clone(),
+            original_packet: sent_packet,
         };
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
         assert_eq!(0, res.messages.len());
