@@ -559,7 +559,7 @@ mod tests {
         let info = mock_info(&creator, &[]);
 
         // make sure we can instantiate with this
-        let err = instantiate(deps.as_mut(), mock_env(), info, msg.clone()).unwrap_err();
+        let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(
             err,
             ContractError::NotInValidatorSet {
@@ -898,13 +898,7 @@ mod tests {
         assert!(fail.is_err(), "{:?}", fail);
 
         // this should work with cash and claims ready
-        let res = execute(
-            deps.as_mut(),
-            claim_ready,
-            info.clone(),
-            ExecuteMsg::Claim {},
-        )
-        .unwrap();
+        let res = execute(deps.as_mut(), claim_ready, info, ExecuteMsg::Claim {}).unwrap();
         assert_eq!(1, res.messages.len());
         let payout = &res.messages[0];
         match payout {
@@ -975,11 +969,11 @@ mod tests {
             amount: Uint128(250),
         };
         let alice_info = mock_info(&alice, &[]);
-        execute(deps.as_mut(), mock_env(), alice_info.clone(), self_pay).unwrap();
+        execute(deps.as_mut(), mock_env(), alice_info, self_pay).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
         assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(250));
         assert_eq!(
-            query_allowance(deps.as_ref(), bob.clone(), alice.clone())
+            query_allowance(deps.as_ref(), bob.clone(), alice)
                 .unwrap()
                 .allowance,
             Uint128(100)
@@ -995,7 +989,7 @@ mod tests {
         let burn = ExecuteMsg::Burn {
             amount: Uint128(130),
         };
-        execute(deps.as_mut(), mock_env(), bob_info.clone(), burn).unwrap();
+        execute(deps.as_mut(), mock_env(), bob_info, burn).unwrap();
         assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(420));
     }
 }

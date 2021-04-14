@@ -41,7 +41,7 @@ fn escrow_happy_path_cw20_tokens() {
     // set personal balance
     let owner = Addr::unchecked("owner");
     let init_funds = coins(2000, "btc");
-    router.set_bank_balance(&owner, init_funds.clone()).unwrap();
+    router.set_bank_balance(&owner, init_funds).unwrap();
 
     // set up cw20 contract with some tokens
     let cw20_id = router.store_code(contract_cw20());
@@ -124,16 +124,16 @@ fn escrow_happy_path_cw20_tokens() {
     );
 
     // release escrow
-    let approve_msg = ExecuteMsg::Approve { id: id.clone() };
+    let approve_msg = ExecuteMsg::Approve { id };
     let _ = router
         .execute_contract(arb, escrow_addr.clone(), &approve_msg, &[])
         .unwrap();
 
     // ensure balances updated - release to ben
-    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    let owner_balance = cash.balance(&router, owner).unwrap();
     assert_eq!(owner_balance, Uint128(3800));
     let escrow_balance = cash.balance(&router, escrow_addr).unwrap();
     assert_eq!(escrow_balance, Uint128(0));
-    let ben_balance = cash.balance(&router, ben.clone()).unwrap();
+    let ben_balance = cash.balance(&router, ben).unwrap();
     assert_eq!(ben_balance, Uint128(1200));
 }

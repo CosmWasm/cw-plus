@@ -292,7 +292,7 @@ mod test {
 
         // reject with bad channel id
         transfer.channel = "channel-45".to_string();
-        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let msg = ExecuteMsg::Transfer(transfer);
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(

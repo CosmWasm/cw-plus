@@ -159,23 +159,19 @@ where
     }
 
     #[cfg(test)]
-    pub fn count<'c>(&self, store: &'c dyn Storage, p: K::Prefix) -> usize {
+    pub fn count(&self, store: &dyn Storage, p: K::Prefix) -> usize {
         self.pks(store, p, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
-    pub fn all_pks<'c>(&self, store: &'c dyn Storage, p: K::Prefix) -> Vec<Vec<u8>> {
+    pub fn all_pks(&self, store: &dyn Storage, p: K::Prefix) -> Vec<Vec<u8>> {
         self.pks(store, p, None, None, Order::Ascending)
             .collect::<StdResult<Vec<Vec<u8>>>>()
             .unwrap()
     }
 
     #[cfg(test)]
-    pub fn all_items<'c>(
-        &self,
-        store: &'c dyn Storage,
-        prefix: K::Prefix,
-    ) -> StdResult<Vec<Pair<T>>> {
+    pub fn all_items(&self, store: &dyn Storage, prefix: K::Prefix) -> StdResult<Vec<Pair<T>>> {
         self.prefix(prefix)
             .range(store, None, None, Order::Ascending)
             .collect()

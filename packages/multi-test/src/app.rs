@@ -470,14 +470,14 @@ mod test {
         let rcpt_funds = vec![coin(5, "btc")];
 
         // set money
-        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
-        router.set_bank_balance(&rcpt, rcpt_funds.clone()).unwrap();
+        router.set_bank_balance(&owner, init_funds).unwrap();
+        router.set_bank_balance(&rcpt, rcpt_funds).unwrap();
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
         let msg: CosmosMsg = BankMsg::Send {
             to_address: rcpt.clone().into(),
-            amount: to_send.clone(),
+            amount: to_send,
         }
         .into();
         router.execute(owner.clone(), msg.clone()).unwrap();
@@ -491,7 +491,7 @@ mod test {
 
         // cannot send too much
         let msg = BankMsg::Send {
-            to_address: rcpt.clone().into(),
+            to_address: rcpt.into(),
             amount: coins(20, "btc"),
         }
         .into();
@@ -508,7 +508,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
+        router.set_bank_balance(&owner, init_funds).unwrap();
 
         // set up contract
         let code_id = router.store_code(contract_payout());
@@ -553,7 +553,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
+        router.set_bank_balance(&owner, init_funds).unwrap();
 
         // set up payout contract
         let payout_id = router.store_code(contract_payout_custom());
@@ -567,7 +567,7 @@ mod test {
         // set up reflect contract
         let reflect_id = router.store_code(contract_reflect());
         let reflect_addr = router
-            .instantiate_contract(reflect_id, owner.clone(), &EmptyMsg {}, &[], "Reflect")
+            .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect")
             .unwrap();
 
         // reflect account is empty
@@ -582,7 +582,7 @@ mod test {
 
         // reflecting payout message pays reflect contract
         let msg = WasmMsg::Execute {
-            contract_addr: payout_addr.clone().into(),
+            contract_addr: payout_addr.into(),
             msg: b"{}".into(),
             send: vec![],
         }
@@ -617,14 +617,14 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds.clone()).unwrap();
+        router.set_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
         let reflect_id = router.store_code(contract_reflect());
         let reflect_addr = router
             .instantiate_contract(
                 reflect_id,
-                owner.clone(),
+                owner,
                 &EmptyMsg {},
                 &coins(40, "eth"),
                 "Reflect",
@@ -698,7 +698,7 @@ mod test {
         let owner = Addr::unchecked("owner");
         let reflect_id = router.store_code(contract_reflect());
         let reflect_addr = router
-            .instantiate_contract(reflect_id, owner.clone(), &EmptyMsg {}, &[], "Reflect")
+            .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect")
             .unwrap();
 
         // count is 1

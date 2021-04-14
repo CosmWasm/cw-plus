@@ -353,9 +353,9 @@ mod tests {
     // this will set up the instantiation for other tests
     fn do_instantiate_with_minter(
         deps: DepsMut,
-        addr: &String,
+        addr: &str,
         amount: Uint128,
-        minter: &String,
+        minter: &str,
         cap: Option<Uint128>,
     ) -> TokenInfoResponse {
         _do_instantiate(
@@ -363,21 +363,21 @@ mod tests {
             addr,
             amount,
             Some(MinterResponse {
-                minter: minter.clone(),
+                minter: minter.to_string(),
                 cap,
             }),
         )
     }
 
     // this will set up the instantiation for other tests
-    fn do_instantiate(deps: DepsMut, addr: &String, amount: Uint128) -> TokenInfoResponse {
+    fn do_instantiate(deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
         _do_instantiate(deps, addr, amount, None)
     }
 
     // this will set up the instantiation for other tests
     fn _do_instantiate(
         mut deps: DepsMut,
-        addr: &String,
+        addr: &str,
         amount: Uint128,
         mint: Option<MinterResponse>,
     ) -> TokenInfoResponse {
@@ -386,7 +386,7 @@ mod tests {
             symbol: "AUTO".to_string(),
             decimals: 3,
             initial_balances: vec![Cw20Coin {
-                address: addr.clone(),
+                address: addr.to_string(),
                 amount,
             }],
             mint: mint.clone(),
@@ -406,7 +406,7 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), addr.clone()), amount);
+        assert_eq!(get_balance(deps.as_ref(), addr), amount);
         assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
         meta
     }
@@ -427,7 +427,7 @@ mod tests {
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
-        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
+        let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -463,7 +463,7 @@ mod tests {
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
-        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
+        let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -479,7 +479,7 @@ mod tests {
         assert_eq!(
             query_minter(deps.as_ref()).unwrap(),
             Some(MinterResponse {
-                minter: minter.clone(),
+                minter,
                 cap: Some(limit),
             }),
         );
@@ -500,14 +500,13 @@ mod tests {
                 amount,
             }],
             mint: Some(MinterResponse {
-                minter: minter.clone(),
+                minter,
                 cap: Some(limit),
             }),
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
-        let err =
-            instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap_err();
+        let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
         assert_eq!(
             err,
             StdError::generic_err("Initial supply greater than cap")
@@ -534,9 +533,9 @@ mod tests {
 
         let info = mock_info(minter.as_ref(), &[]);
         let env = mock_env();
-        let res = execute(deps.as_mut(), env, info, msg.clone()).unwrap();
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(get_balance(deps.as_ref(), genesis.clone()), amount);
+        assert_eq!(get_balance(deps.as_ref(), genesis), amount);
         assert_eq!(get_balance(deps.as_ref(), winner.clone()), prize);
 
         // but cannot mint nothing
@@ -546,18 +545,18 @@ mod tests {
         };
         let info = mock_info(minter.as_ref(), &[]);
         let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::InvalidZeroAmount {});
 
         // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
         let msg = ExecuteMsg::Mint {
-            recipient: winner.clone(),
+            recipient: winner,
             amount: Uint128(333_222_222),
         };
         let info = mock_info(minter.as_ref(), &[]);
         let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::CannotExceedCap {});
     }
 
@@ -578,7 +577,7 @@ mod tests {
         };
         let info = mock_info("anyone else", &[]);
         let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
     }
 
@@ -593,7 +592,7 @@ mod tests {
         };
         let info = mock_info("genesis", &[]);
         let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
     }
 
@@ -622,7 +621,7 @@ mod tests {
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
-        let res = instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap();
+        let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         assert_eq!(
@@ -634,8 +633,8 @@ mod tests {
                 total_supply: amount1 + amount2,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), addr1.clone()), amount1);
-        assert_eq!(get_balance(deps.as_ref(), addr2.clone()), amount2);
+        assert_eq!(get_balance(deps.as_ref(), addr1), amount1);
+        assert_eq!(get_balance(deps.as_ref(), addr2), amount2);
     }
 
     #[test]
@@ -656,9 +655,7 @@ mod tests {
         let data = query(
             deps.as_ref(),
             env.clone(),
-            QueryMsg::Balance {
-                address: addr1.clone(),
-            },
+            QueryMsg::Balance { address: addr1 },
         )
         .unwrap();
         let loaded: BalanceResponse = from_binary(&data).unwrap();
@@ -667,7 +664,7 @@ mod tests {
         // check balance query (empty)
         let data = query(
             deps.as_ref(),
-            env.clone(),
+            env,
             QueryMsg::Balance {
                 address: String::from("addr0002"),
             },
@@ -729,8 +726,8 @@ mod tests {
         assert_eq!(res.messages.len(), 0);
 
         let remainder = amount1.checked_sub(transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1.clone()), remainder);
-        assert_eq!(get_balance(deps.as_ref(), addr2.clone()), transfer);
+        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
+        assert_eq!(get_balance(deps.as_ref(), addr2), transfer);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -779,7 +776,7 @@ mod tests {
         assert_eq!(res.messages.len(), 0);
 
         let remainder = amount1.checked_sub(burn).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1.clone()), remainder);
+        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             remainder
@@ -844,7 +841,7 @@ mod tests {
         assert_eq!(
             res.messages[0],
             CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: contract.clone().into(),
+                contract_addr: contract.clone(),
                 msg: binary_msg,
                 send: vec![],
             })
@@ -852,8 +849,8 @@ mod tests {
 
         // ensure balance is properly transferred
         let remainder = amount1.checked_sub(transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), addr1.clone()), remainder);
-        assert_eq!(get_balance(deps.as_ref(), contract.clone()), transfer);
+        assert_eq!(get_balance(deps.as_ref(), addr1), remainder);
+        assert_eq!(get_balance(deps.as_ref(), contract), transfer);
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1

@@ -65,15 +65,9 @@ mod tests {
     #[test]
     fn test_all_swap_ids() {
         let mut storage = MockStorage::new();
-        SWAPS
-            .save(&mut storage, "lazy".into(), &dummy_swap())
-            .unwrap();
-        SWAPS
-            .save(&mut storage, "assign".into(), &dummy_swap())
-            .unwrap();
-        SWAPS
-            .save(&mut storage, "zen".into(), &dummy_swap())
-            .unwrap();
+        SWAPS.save(&mut storage, "lazy", &dummy_swap()).unwrap();
+        SWAPS.save(&mut storage, "assign", &dummy_swap()).unwrap();
+        SWAPS.save(&mut storage, "zen", &dummy_swap()).unwrap();
 
         let ids = all_swap_ids(&storage, None, 10).unwrap();
         assert_eq!(3, ids.len());

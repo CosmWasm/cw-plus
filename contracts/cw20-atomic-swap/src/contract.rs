@@ -328,7 +328,7 @@ mod tests {
 
         // Cannot create, invalid ids
         let info = mock_info(&sender, &balance);
-        for id in vec!["sh", "atomic_swap_id_too_long"] {
+        for id in &["sh", "atomic_swap_id_too_long"] {
             let create = CreateMsg {
                 id: id.to_string(),
                 hash: real_hash(),
@@ -346,20 +346,14 @@ mod tests {
         }
 
         // Cannot create, no funds
-        let info = mock_info(&sender, &vec![]);
+        let info = mock_info(&sender, &[]);
         let create = CreateMsg {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            ExecuteMsg::Create(create.clone()),
-        )
-        .unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap_err();
         assert_eq!(err, ContractError::EmptyBalance {});
 
         // Cannot create, expired
@@ -370,13 +364,7 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtTime(1),
         };
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            ExecuteMsg::Create(create.clone()),
-        )
-        .unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap_err();
         assert_eq!(err, ContractError::Expired {});
 
         // Cannot create, invalid hash
@@ -387,13 +375,7 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            ExecuteMsg::Create(create.clone()),
-        )
-        .unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap_err();
         assert_eq!(
             err,
             ContractError::ParseError("Invalid character \'u\' at position 1".into())
@@ -407,13 +389,7 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            ExecuteMsg::Create(create.clone()),
-        )
-        .unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap();
         assert_eq!(0, res.messages.len());
         assert_eq!(attr("action", "create"), res.attributes[0]);
 
@@ -426,13 +402,7 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            ExecuteMsg::Create(create.clone()),
-        )
-        .unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap_err();
         assert_eq!(err, ContractError::AlreadyExists {});
     }
 
@@ -456,7 +426,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Create(create.clone()),
         )
         .unwrap();
@@ -488,7 +458,7 @@ mod tests {
             id: "swap0001".to_string(),
             preimage: hex::encode(b"This is 32 bytes, but incorrect."),
         };
-        let err = execute(deps.as_mut(), mock_env(), info.clone(), release).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, release).unwrap_err();
         assert!(matches!(err, ContractError::InvalidPreimage {}));
 
         // Cannot release, expired
@@ -519,7 +489,7 @@ mod tests {
         );
 
         // Cannot release again
-        let err = execute(deps.as_mut(), mock_env(), info.clone(), release).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, release).unwrap_err();
         assert!(matches!(err, ContractError::Std(StdError::NotFound { .. })));
     }
 
@@ -540,13 +510,7 @@ mod tests {
             recipient: "rcpt0001".into(),
             expires: Expiration::AtHeight(123456),
         };
-        execute(
-            deps.as_mut(),
-            mock_env(),
-            info.clone(),
-            ExecuteMsg::Create(create.clone()),
-        )
-        .unwrap();
+        execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap();
 
         // Anyone can attempt refund
         let info = mock_info("somebody", &[]);
@@ -562,7 +526,7 @@ mod tests {
         let refund = ExecuteMsg::Refund {
             id: "swap0001".to_string(),
         };
-        let err = execute(deps.as_mut(), mock_env(), info.clone(), refund).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, refund).unwrap_err();
         assert!(matches!(err, ContractError::NotExpired { .. }));
 
         // Anyone can refund, if already expired
@@ -610,7 +574,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Create(create1.clone()),
         )
         .unwrap();
@@ -625,7 +589,7 @@ mod tests {
         execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Create(create2.clone()),
         )
         .unwrap();
@@ -731,7 +695,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            ExecuteMsg::Receive(receive.clone()),
+            ExecuteMsg::Receive(receive),
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
@@ -781,7 +745,7 @@ mod tests {
             id: native_swap_id.clone(),
             preimage,
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), release.clone()).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, release).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(attr("action", "release"), res.attributes[0]);
         assert_eq!(attr("id", native_swap_id), res.attributes[1]);

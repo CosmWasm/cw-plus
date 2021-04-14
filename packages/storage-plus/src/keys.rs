@@ -306,17 +306,17 @@ mod test {
     #[test]
     fn nested_composite_keys() {
         // use this to ensure proper type-casts below
-        let foo: &[u8] = b"foo";
+        let first: &[u8] = b"foo";
         // this function tests how well the generics extend to "edge cases"
-        let k: ((&[u8], &[u8]), &[u8]) = ((foo, b"bar"), b"zoom");
+        let k: ((&[u8], &[u8]), &[u8]) = ((first, b"bar"), b"zoom");
         let path = k.key();
         assert_eq!(3, path.len());
-        assert_eq!(path, vec![foo, b"bar", b"zoom"]);
+        assert_eq!(path, vec![first, b"bar", b"zoom"]);
 
         // ensure prefix also works
         let dir = k.0.prefix();
         assert_eq!(2, dir.len());
-        assert_eq!(dir, vec![foo, b"bar"]);
+        assert_eq!(dir, vec![first, b"bar"]);
     }
 
     #[test]

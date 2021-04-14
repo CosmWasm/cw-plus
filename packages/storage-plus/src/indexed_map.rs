@@ -290,8 +290,7 @@ mod test {
             .name
             .prefix(PkOwned(b"Maria".to_vec()))
             .range(&store, None, None, Order::Ascending)
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(2, count);
 
         // TODO: we load by wrong keys - get full storage key!
@@ -316,8 +315,7 @@ mod test {
             .name
             .prefix(PkOwned(b"Marib".to_vec()))
             .range(&store, None, None, Order::Ascending)
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(0, count);
 
         // other index doesn't match (1 byte before)
@@ -326,8 +324,7 @@ mod test {
             .name
             .prefix(PkOwned(b"Mari`".to_vec()))
             .range(&store, None, None, Order::Ascending)
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(0, count);
 
         // other index doesn't match (longer)
@@ -336,8 +333,7 @@ mod test {
             .name
             .prefix(PkOwned(b"Maria5".to_vec()))
             .range(&store, None, None, Order::Ascending)
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(0, count);
 
         // match on proper age

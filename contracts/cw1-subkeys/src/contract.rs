@@ -438,18 +438,18 @@ mod tests {
     ) {
         // Instantiate a contract with admins
         let instantiate_msg = InstantiateMsg {
-            admins: admins.into_iter().map(|x| x.to_string()).collect(),
+            admins: admins.iter().map(|x| x.to_string()).collect(),
             mutable: true,
         };
         instantiate(deps.branch(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
         // Add subkeys with initial allowances
-        for (spender, expiration) in spenders.into_iter().zip(expirations) {
+        for (spender, expiration) in spenders.iter().zip(expirations) {
             for amount in allowances {
                 let msg = ExecuteMsg::IncreaseAllowance {
                     spender: spender.to_string(),
                     amount: amount.clone(),
-                    expires: Some(expiration.clone()),
+                    expires: Some(*expiration),
                 };
                 execute(deps.branch(), mock_env(), info.clone(), msg).unwrap();
             }
@@ -472,10 +472,10 @@ mod tests {
         let amount1 = 1111;
 
         let allow1 = coin(amount1, denom1);
-        let initial_allowances = vec![allow1.clone()];
+        let initial_allowances = vec![allow1];
 
         let expires_never = Expiration::Never {};
-        let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+        let initial_expirations = vec![expires_never, expires_never];
 
         let info = mock_info(owner, &[]);
         setup_test_case(
@@ -492,7 +492,7 @@ mod tests {
                 contract: CONTRACT_NAME.to_string(),
                 version: CONTRACT_VERSION.to_string(),
             },
-            get_contract_version(&mut deps.storage).unwrap()
+            get_contract_version(&deps.storage).unwrap()
         )
     }
 
@@ -501,7 +501,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let owner = "admin0001";
-        let admins = vec![owner.clone(), "admin0002"];
+        let admins = vec![owner, "admin0002"];
 
         let spender1 = "spender0001";
         let spender2 = "spender0002";
@@ -516,7 +516,7 @@ mod tests {
         let initial_allowances = vec![allow1.clone()];
 
         let expires_never = Expiration::Never {};
-        let initial_expirations = vec![expires_never.clone(), expires_never.clone()];
+        let initial_expirations = vec![expires_never, expires_never];
 
         let info = mock_info(owner, &[]);
         setup_test_case(
@@ -534,15 +534,15 @@ mod tests {
             allowance,
             Allowance {
                 balance: NativeBalance(vec![allow1.clone()]),
-                expires: expires_never.clone(),
+                expires: expires_never,
             }
         );
         let allowance = query_allowance(deps.as_ref(), spender2.to_string()).unwrap();
         assert_eq!(
             allowance,
             Allowance {
-                balance: NativeBalance(vec![allow1.clone()]),
-                expires: expires_never.clone(),
+                balance: NativeBalance(vec![allow1]),
+                expires: expires_never,
             }
         );
 
@@ -556,7 +556,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let owner = "admin0001";
-        let admins = vec![owner.clone(), "admin0002"];
+        let admins = vec![owner, "admin0002"];
 
         let spender1 = "spender0001";
         let spender2 = "spender0002";
@@ -566,11 +566,7 @@ mod tests {
         // Same allowances for all spenders, for simplicity
         let initial_allowances = coins(1234, "mytoken");
         let expires_later = Expiration::AtHeight(12345);
-        let initial_expirations = vec![
-            Expiration::Never {},
-            Expiration::Never {},
-            expires_later.clone(),
-        ];
+        let initial_expirations = vec![Expiration::Never {}, Expiration::Never {}, expires_later];
 
         let info = mock_info(owner, &[]);
         setup_test_case(
@@ -613,7 +609,7 @@ mod tests {
             allowances[0],
             AllowanceInfo {
                 spender: spender3.into(),
-                balance: NativeBalance(initial_allowances.clone()),
+                balance: NativeBalance(initial_allowances),
                 expires: expires_later,
             }
         );
@@ -640,10 +636,10 @@ mod tests {
             withdraw: true,
         };
 
-        let info = mock_info(owner.clone(), &[]);
+        let info = mock_info(owner, &[]);
         // Instantiate a contract with admins
         let instantiate_msg = InstantiateMsg {
-            admins: admins.clone(),
+            admins,
             mutable: true,
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
@@ -719,7 +715,7 @@ mod tests {
 
         // Instantiate a contract with admins
         let instantiate_msg = InstantiateMsg {
-            admins: admins.clone(),
+            admins,
             mutable: true,
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
@@ -783,17 +779,10 @@ mod tests {
         let owner = "admin0001";
         let admin2 = "admin0002";
         let admin3 = "admin0003";
-        let initial_admins = vec![owner.clone(), admin2.clone()];
+        let initial_admins = vec![owner, admin2];
 
-        let info = mock_info(owner.clone(), &[]);
-        setup_test_case(
-            deps.as_mut(),
-            &info,
-            &initial_admins,
-            &vec![],
-            &vec![],
-            &vec![],
-        );
+        let info = mock_info(owner, &[]);
+        setup_test_case(deps.as_mut(), &info, &initial_admins, &[], &[], &[]);
 
         // Verify
         let config = query_admin_list(deps.as_ref()).unwrap();
@@ -874,7 +863,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let owner = "admin0001";
-        let admins = vec![owner.clone(), "admin0002"];
+        let admins = vec![owner, "admin0002"];
 
         let spender1 = "spender0001";
         let spender2 = "spender0002";
@@ -899,7 +888,7 @@ mod tests {
         let expires_never = Expiration::Never {};
         let expires_time = Expiration::AtTime(1234567890);
         // Initially set first spender allowance with height expiration, the second with no expiration
-        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
+        let initial_expirations = vec![expires_height, expires_never];
 
         let info = mock_info(owner, &[]);
         setup_test_case(
@@ -925,7 +914,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: NativeBalance(vec![coin(amount1 * 2, &allow1.denom), allow2.clone()]),
-                expires: expires_height.clone(),
+                expires: expires_height,
             }
         );
 
@@ -933,7 +922,7 @@ mod tests {
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.to_string(),
             amount: allow3.clone(),
-            expires: Some(expires_height.clone()),
+            expires: Some(expires_height),
         };
         execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
@@ -942,8 +931,8 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: NativeBalance(vec![allow1.clone(), allow2.clone(), allow3.clone()]),
-                expires: expires_height.clone(),
+                balance: NativeBalance(vec![allow1.clone(), allow2.clone(), allow3]),
+                expires: expires_height,
             }
         );
 
@@ -960,8 +949,8 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: NativeBalance(vec![allow1.clone()]),
-                expires: expires_never.clone(),
+                balance: NativeBalance(vec![allow1]),
+                expires: expires_never,
             }
         );
 
@@ -969,7 +958,7 @@ mod tests {
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender4.into(),
             amount: allow2.clone(),
-            expires: Some(expires_time.clone()),
+            expires: Some(expires_time),
         };
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
@@ -978,7 +967,7 @@ mod tests {
         assert_eq!(
             allowance,
             Allowance {
-                balance: NativeBalance(vec![allow2.clone()]),
+                balance: NativeBalance(vec![allow2]),
                 expires: expires_time,
             }
         );
@@ -989,7 +978,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let owner = "admin0001";
-        let admins = vec![owner.clone(), "admin0002"];
+        let admins = vec![owner, "admin0002"];
 
         let spender1 = "spender0001";
         let spender2 = "spender0002";
@@ -1012,7 +1001,7 @@ mod tests {
         let expires_height = Expiration::AtHeight(5432);
         let expires_never = Expiration::Never {};
         // Initially set first spender allowance with height expiration, the second with no expiration
-        let initial_expirations = vec![expires_height.clone(), expires_never.clone()];
+        let initial_expirations = vec![expires_height, expires_never];
 
         let info = mock_info(owner, &[]);
         setup_test_case(
@@ -1027,7 +1016,7 @@ mod tests {
         // Subtract from spender1 (existing) account (has none of that denom)
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender1.to_string(),
-            amount: allow3.clone(),
+            amount: allow3,
             expires: None,
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
@@ -1040,7 +1029,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: NativeBalance(vec![allow1.clone(), allow2.clone()]),
-                expires: expires_height.clone(),
+                expires: expires_height,
             }
         );
 
@@ -1058,7 +1047,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: NativeBalance(vec![allow1.clone()]),
-                expires: expires_never.clone(),
+                expires: expires_never,
             }
         );
 
@@ -1079,7 +1068,7 @@ mod tests {
                     coin(amount1 / 2 + (amount1 & 1), denom1),
                     allow2.clone()
                 ]),
-                expires: expires_height.clone(),
+                expires: expires_height,
             }
         );
 
@@ -1098,7 +1087,7 @@ mod tests {
         // Subtract from spender2 (empty) account (should error)
         let msg = ExecuteMsg::DecreaseAllowance {
             spender: spender2.to_string(),
-            amount: allow1.clone(),
+            amount: allow1,
             expires: None,
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), msg);
@@ -1120,7 +1109,7 @@ mod tests {
             allowance,
             Allowance {
                 balance: NativeBalance(vec![allow2]),
-                expires: expires_height.clone(),
+                expires: expires_height,
             }
         );
     }
@@ -1130,7 +1119,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let owner = "admin0001";
-        let admins = vec![owner.clone(), "admin0002"];
+        let admins = vec![owner, "admin0002"];
 
         let spender1 = "spender0001";
         let spender2 = "spender0002";
@@ -1142,9 +1131,9 @@ mod tests {
         let initial_allowances = vec![allow1];
 
         let expires_never = Expiration::Never {};
-        let initial_expirations = vec![expires_never.clone()];
+        let initial_expirations = vec![expires_never];
 
-        let info = mock_info(owner.clone(), &[]);
+        let info = mock_info(owner, &[]);
         setup_test_case(
             deps.as_mut(),
             &info,
@@ -1185,12 +1174,12 @@ mod tests {
         assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
         // Owner / admins can do anything (at the contract level)
-        let info = mock_info(&owner.clone(), &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
+        let info = mock_info(owner, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, execute_msg).unwrap();
         assert_eq!(res.messages, msgs);
         assert_eq!(
             res.attributes,
-            vec![attr("action", "execute"), attr("owner", owner.clone())]
+            vec![attr("action", "execute"), attr("owner", owner)]
         );
 
         // For admins, even other message types are allowed
@@ -1209,7 +1198,7 @@ mod tests {
 
         // But not for mere mortals
         let info = mock_info(&spender1, &[]);
-        let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, execute_msg).unwrap_err();
         assert_eq!(err, ContractError::MessageTypeRejected {});
     }
 
@@ -1235,10 +1224,10 @@ mod tests {
             withdraw: true,
         };
 
-        let info = mock_info(owner.clone(), &[]);
+        let info = mock_info(owner, &[]);
         // Instantiate a contract with admins
         let instantiate_msg = InstantiateMsg {
-            admins: admins.clone(),
+            admins,
             mutable: true,
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
@@ -1270,7 +1259,7 @@ mod tests {
         .into()];
         let msg_undelegate = vec![StakingMsg::Undelegate {
             validator: "validator1".into(),
-            amount: coin1.clone(),
+            amount: coin1,
         }
         .into()];
         let msg_withdraw = vec![StakingMsg::Withdraw {
@@ -1327,9 +1316,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info.clone(),
-            ExecuteMsg::Execute {
-                msgs: msg_delegate.clone(),
-            },
+            ExecuteMsg::Execute { msgs: msg_delegate },
         );
         // FIXME need better error check here
         assert!(res.is_err());
@@ -1338,7 +1325,7 @@ mod tests {
             mock_env(),
             info.clone(),
             ExecuteMsg::Execute {
-                msgs: msg_redelegate.clone(),
+                msgs: msg_redelegate,
             },
         );
         assert!(res.is_ok());
@@ -1347,7 +1334,7 @@ mod tests {
             mock_env(),
             info.clone(),
             ExecuteMsg::Execute {
-                msgs: msg_undelegate.clone(),
+                msgs: msg_undelegate,
             },
         );
         assert!(res.is_ok());
@@ -1355,9 +1342,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             info,
-            ExecuteMsg::Execute {
-                msgs: msg_withdraw.clone(),
-            },
+            ExecuteMsg::Execute { msgs: msg_withdraw },
         );
         assert!(res.is_err())
     }
@@ -1388,10 +1373,10 @@ mod tests {
             withdraw: true,
         };
 
-        let info = mock_info(owner.clone(), &[]);
+        let info = mock_info(owner, &[]);
         // Instantiate a contract with admins
         let instantiate_msg = InstantiateMsg {
-            admins: admins.clone(),
+            admins,
             mutable: true,
         };
         instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
@@ -1418,7 +1403,7 @@ mod tests {
         // setup allowance and then permission and check if changed
         let setup_allowance_msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.to_string(),
-            amount: coin.clone(),
+            amount: coin,
             expires: None,
         };
         execute(deps.as_mut(), mock_env(), info.clone(), setup_allowance_msg).unwrap();
@@ -1443,7 +1428,7 @@ mod tests {
         let spender = "spender808";
         let anyone = "anyone";
 
-        let info = mock_info(owner.clone(), &[]);
+        let info = mock_info(owner, &[]);
         // spender has allowance of 55000 ushell
         setup_test_case(
             deps.as_mut(),
@@ -1521,24 +1506,15 @@ mod tests {
         assert_eq!(res.can_execute, false);
 
         // random person cannot do anything
-        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg.clone()).unwrap();
+        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg).unwrap();
+        assert_eq!(res.can_execute, false);
+        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg_large).unwrap();
         assert_eq!(res.can_execute, false);
         let res =
-            query_can_execute(deps.as_ref(), anyone.to_string(), send_msg_large.clone()).unwrap();
+            query_can_execute(deps.as_ref(), anyone.to_string(), staking_delegate_msg).unwrap();
         assert_eq!(res.can_execute, false);
-        let res = query_can_execute(
-            deps.as_ref(),
-            anyone.to_string(),
-            staking_delegate_msg.clone(),
-        )
-        .unwrap();
-        assert_eq!(res.can_execute, false);
-        let res = query_can_execute(
-            deps.as_ref(),
-            anyone.to_string(),
-            staking_withdraw_msg.clone(),
-        )
-        .unwrap();
+        let res =
+            query_can_execute(deps.as_ref(), anyone.to_string(), staking_withdraw_msg).unwrap();
         assert_eq!(res.can_execute, false);
     }
 }

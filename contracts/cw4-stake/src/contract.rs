@@ -588,12 +588,12 @@ mod tests {
         assert_eq!(17, total);
 
         // get member votes from raw key
-        let member2_raw = deps.storage.get(&member_key(USER2.as_ref())).unwrap();
+        let member2_raw = deps.storage.get(&member_key(USER2)).unwrap();
         let member2: u64 = from_slice(&member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and execute misses
-        let member3_raw = deps.storage.get(&member_key(USER3.as_ref()));
+        let member3_raw = deps.storage.get(&member_key(USER3));
         assert_eq!(None, member3_raw);
     }
 
@@ -647,7 +647,7 @@ mod tests {
         // nothing can be withdrawn yet
         let err = execute(
             deps.as_mut(),
-            env2.clone(),
+            env2,
             mock_info(USER1, &[]),
             ExecuteMsg::Claim {},
         )
@@ -694,7 +694,7 @@ mod tests {
         // but the third one cannot release
         let err = execute(
             deps.as_mut(),
-            env3.clone(),
+            env3,
             mock_info(USER3, &[]),
             ExecuteMsg::Claim {},
         )
@@ -721,7 +721,7 @@ mod tests {
         env4.block.height += 55 + UNBONDING_BLOCKS + UNBONDING_BLOCKS;
         let res = execute(
             deps.as_mut(),
-            env4.clone(),
+            env4,
             mock_info(USER2, &[]),
             ExecuteMsg::Claim {},
         )
@@ -781,13 +781,7 @@ mod tests {
         let remove_msg = ExecuteMsg::RemoveHook {
             addr: contract2.clone(),
         };
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            admin_info.clone(),
-            remove_msg.clone(),
-        )
-        .unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), admin_info.clone(), remove_msg).unwrap_err();
         assert_eq!(err, HookError::HookNotRegistered {}.into());
 
         // add second contract
@@ -799,38 +793,18 @@ mod tests {
         assert_eq!(hooks.hooks, vec![contract1.clone(), contract2.clone()]);
 
         // cannot re-add an existing contract
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            admin_info.clone(),
-            add_msg.clone(),
-        )
-        .unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), admin_info.clone(), add_msg).unwrap_err();
         assert_eq!(err, HookError::HookAlreadyRegistered {}.into());
 
         // non-admin cannot remove
-        let remove_msg = ExecuteMsg::RemoveHook {
-            addr: contract1.clone(),
-        };
-        let err = execute(
-            deps.as_mut(),
-            mock_env(),
-            user_info.clone(),
-            remove_msg.clone(),
-        )
-        .unwrap_err();
+        let remove_msg = ExecuteMsg::RemoveHook { addr: contract1 };
+        let err = execute(deps.as_mut(), mock_env(), user_info, remove_msg.clone()).unwrap_err();
         assert_eq!(err, HookError::Admin(AdminError::NotAdmin {}).into());
 
         // remove the original
-        let _ = execute(
-            deps.as_mut(),
-            mock_env(),
-            admin_info.clone(),
-            remove_msg.clone(),
-        )
-        .unwrap();
+        let _ = execute(deps.as_mut(), mock_env(), admin_info, remove_msg).unwrap();
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
-        assert_eq!(hooks.hooks, vec![contract2.clone()]);
+        assert_eq!(hooks.hooks, vec![contract2]);
     }
 
     #[test]
