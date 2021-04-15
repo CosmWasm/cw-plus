@@ -241,7 +241,7 @@ mod test {
     ) -> (Vec<&'a [u8]>, Vec<Data>) {
         let mut pks = vec![];
         let mut datas = vec![];
-        let height = 0;
+        let mut height = 0;
         let data = Data {
             name: "Maria".to_string(),
             last_name: "Doe".to_string(),
@@ -249,6 +249,7 @@ mod test {
         };
         let pk: &[u8] = b"1";
         map.save(store, pk, &data, height).unwrap();
+        height += 1;
         pks.push(pk);
         datas.push(data);
 
@@ -260,6 +261,7 @@ mod test {
         };
         let pk: &[u8] = b"2";
         map.save(store, pk, &data, height).unwrap();
+        height += 1;
         pks.push(pk);
         datas.push(data);
 
@@ -271,6 +273,7 @@ mod test {
         };
         let pk: &[u8] = b"3";
         map.save(store, pk, &data, height).unwrap();
+        height += 1;
         pks.push(pk);
         datas.push(data);
 
@@ -368,7 +371,7 @@ mod test {
     fn range_simple_key_by_multi_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
-        let height = 1;
+        let mut height = 1;
 
         // save data
         let data1 = Data {
@@ -378,6 +381,7 @@ mod test {
         };
         let pk: &[u8] = b"5627";
         map.save(&mut store, pk, &data1, height).unwrap();
+        height += 1;
 
         let data2 = Data {
             name: "Juan".to_string(),
@@ -386,6 +390,7 @@ mod test {
         };
         let pk: &[u8] = b"5628";
         map.save(&mut store, pk, &data2, height).unwrap();
+        height += 1;
 
         let data3 = Data {
             name: "Maria".to_string(),
@@ -394,6 +399,7 @@ mod test {
         };
         let pk: &[u8] = b"5629";
         map.save(&mut store, pk, &data3, height).unwrap();
+        height += 1;
 
         let data4 = Data {
             name: "Maria Luisa".to_string(),
@@ -424,7 +430,7 @@ mod test {
     #[test]
     fn range_composite_key_by_multi_index() {
         let mut store = MockStorage::new();
-        let height = 2;
+        let mut height = 2;
 
         let indexes = DataCompositeMultiIndex {
             name_age: MultiIndex::new(
@@ -444,6 +450,7 @@ mod test {
         };
         let pk1: &[u8] = b"5627";
         map.save(&mut store, pk1, &data1, height).unwrap();
+        height += 1;
 
         let data2 = Data {
             name: "Juan".to_string(),
@@ -452,6 +459,7 @@ mod test {
         };
         let pk2: &[u8] = b"5628";
         map.save(&mut store, pk2, &data2, height).unwrap();
+        height += 1;
 
         let data3 = Data {
             name: "Maria".to_string(),
@@ -460,6 +468,7 @@ mod test {
         };
         let pk3: &[u8] = b"5629";
         map.save(&mut store, pk3, &data3, height).unwrap();
+        height += 1;
 
         let data4 = Data {
             name: "Maria Luisa".to_string(),
@@ -492,7 +501,7 @@ mod test {
     fn unique_index_enforced() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
-        let height = 3;
+        let mut height = 3;
 
         // save data
         let (pks, datas) = save_data(&mut store, &map);
@@ -507,6 +516,7 @@ mod test {
 
         // enforce this returns some error
         map.save(&mut store, pk5, &data5, height).unwrap_err();
+        height += 1;
 
         // query by unique key
         // match on proper age
@@ -525,6 +535,7 @@ mod test {
 
         // if we delete the first one, we can add the blocked one
         map.remove(&mut store, pks[0], height).unwrap();
+        height += 1;
         map.save(&mut store, pk5, &data5, height).unwrap();
         // now 42 is the new owner
         let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
@@ -557,7 +568,7 @@ mod test {
     fn remove_and_update_reflected_on_indexes() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
-        let height = 5;
+        let mut height = 5;
 
         let name_count = |map: &IndexedSnapshotMap<&[u8], Data, DataIndexes>,
                           store: &MemoryStorage,
@@ -586,6 +597,7 @@ mod test {
 
         // remove maria 2
         map.remove(&mut store, pks[1], height).unwrap();
+        height += 1;
 
         // change john to mary
         map.update(
