@@ -103,8 +103,8 @@ where
         &self,
         store: &mut dyn Storage,
         key: K,
-        action: A,
         height: u64,
+        action: A,
     ) -> Result<T, E>
     where
         A: FnOnce(Option<T>) -> Result<T, E>,
@@ -600,17 +600,12 @@ mod test {
         height += 1;
 
         // change john to mary
-        map.update(
-            &mut store,
-            pks[2],
-            |d| -> StdResult<_> {
-                let mut x = d.unwrap();
-                assert_eq!(&x.name, "John");
-                x.name = "Mary".to_string();
-                Ok(x)
-            },
-            height,
-        )
+        map.update(&mut store, pks[2], height, |d| -> StdResult<_> {
+            let mut x = d.unwrap();
+            assert_eq!(&x.name, "John");
+            x.name = "Mary".to_string();
+            Ok(x)
+        })
         .unwrap();
 
         // find 1 maria, 1 maria luisa, no john, and 1 mary
