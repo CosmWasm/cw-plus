@@ -11,7 +11,6 @@ use crate::snapshot::SnapshotMap;
 use crate::{IndexList, Strategy};
 
 /// IndexedSnapshotMap works like a SnapshotMap but has a secondary index
-/// TODO: remove traits here and make this const fn new
 pub struct IndexedSnapshotMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
@@ -31,7 +30,6 @@ where
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
 {
-    /// TODO: remove traits here and make this const fn new
     pub fn new(
         pk_namespace: &'a str,
         checkpoints: &'a str,
