@@ -232,7 +232,6 @@ fn list_members_by_weight(
     let members: StdResult<Vec<_>> = members()
         .idx
         .weight
-        .sub_prefix(()) // FIXME: Use range() directly, and impl EmptyPrefix for IntKey<T>?
         .range(deps.storage, start, None, Order::Descending)
         .take(limit)
         .map(|item| {
