@@ -13,7 +13,7 @@ use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{members, ADMIN, HOOKS, MEMBERS, TOTAL};
+use crate::state::{members, ADMIN, HOOKS, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -176,7 +176,7 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
+        Some(h) => members().primary.may_load_at_height(deps.storage, &addr, h),
         None => members().may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
@@ -195,7 +195,7 @@ fn list_members(
     let addr = maybe_addr(deps.api, start_after)?;
     let start = addr.map(|addr| Bound::exclusive(addr.to_string()));
 
-    let members: StdResult<Vec<_>> = MEMBERS
+    let members: StdResult<Vec<_>> = members()
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
