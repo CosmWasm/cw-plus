@@ -14,6 +14,7 @@ use cw_storage_plus::Bound;
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{members, ADMIN, HOOKS, TOTAL};
+use std::mem::size_of;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -221,7 +222,7 @@ fn list_members_by_weight(
         Bound::exclusive(
             [
                 b"\x00".as_ref(),
-                b"\x08".as_ref(),
+                &[size_of::<u64>() as u8],
                 &w.to_be_bytes(),
                 a.as_bytes(),
             ]
