@@ -18,7 +18,7 @@ where
     I: IndexList<T>,
 {
     pk_namespace: &'a [u8],
-    primary: SnapshotMap<'a, K, T>,
+    pub primary: SnapshotMap<'a, K, T>,
     /// This is meant to be read directly to get the proper types, like:
     /// map.idx.owner.items(...)
     pub idx: I,
