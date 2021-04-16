@@ -92,6 +92,10 @@ where
         self.primary.prefix(p)
     }
 
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+        self.primary.sub_prefix(p)
+    }
+
     /// should_checkpoint looks at the strategy and determines if we want to checkpoint
     fn should_checkpoint(&self, store: &dyn Storage, k: &K) -> StdResult<bool> {
         match self.strategy {
@@ -243,7 +247,7 @@ impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + Prefixer<'a>,
-    K::Prefix: EmptyPrefix,
+    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -257,7 +261,8 @@ where
     where
         T: 'c,
     {
-        self.prefix(K::Prefix::new()).range(store, min, max, order)
+        self.sub_prefix(K::SubPrefix::new())
+            .range(store, min, max, order)
     }
 }
 

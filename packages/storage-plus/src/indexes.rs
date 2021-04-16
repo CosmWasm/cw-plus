@@ -183,7 +183,7 @@ impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
-    K::Prefix: EmptyPrefix,
+    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -197,7 +197,8 @@ where
     where
         T: 'c,
     {
-        self.prefix(K::Prefix::new()).range(store, min, max, order)
+        self.sub_prefix(K::SubPrefix::new())
+            .range(store, min, max, order)
     }
 }
 
@@ -293,7 +294,7 @@ impl<'a, K, T> UniqueIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
-    K::Prefix: EmptyPrefix,
+    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -307,6 +308,7 @@ where
     where
         T: 'c,
     {
-        self.prefix(K::Prefix::new()).range(store, min, max, order)
+        self.sub_prefix(K::SubPrefix::new())
+            .range(store, min, max, order)
     }
 }

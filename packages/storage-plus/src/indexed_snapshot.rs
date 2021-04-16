@@ -146,7 +146,7 @@ where
     K: PrimaryKey<'a> + Prefixer<'a>,
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
-    K::Prefix: EmptyPrefix,
+    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -160,7 +160,8 @@ where
     where
         T: 'c,
     {
-        self.prefix(K::Prefix::new()).range(store, min, max, order)
+        self.sub_prefix(K::SubPrefix::new())
+            .range(store, min, max, order)
     }
 }
 
