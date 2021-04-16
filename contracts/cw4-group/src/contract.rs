@@ -308,9 +308,10 @@ mod tests {
         let members = list_members(deps.as_ref(), None, None).unwrap();
         assert_eq!(members.members.len(), 2);
         // TODO: assert the set is proper
-
-        // TODO: Test pagination / limits
     }
+
+    // TODO: Test member_by_weight
+    // Test pagination / limits
 
     fn assert_users<S: Storage, A: Api, Q: Querier>(
         deps: &OwnedDeps<S, A, Q>,
