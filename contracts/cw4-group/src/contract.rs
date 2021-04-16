@@ -9,12 +9,11 @@ use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
-use cw_storage_plus::Bound;
+use cw_storage_plus::{Bound, PrimaryKey, U64Key};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{members, ADMIN, HOOKS, TOTAL};
-use std::mem::size_of;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -217,18 +216,8 @@ fn list_members_by_weight(
     limit: Option<u32>,
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    // FIXME: Avoid building the (length-prefixed) bound manually
-    let start = start_after.map(|(w, a)| {
-        Bound::exclusive(
-            [
-                b"\x00".as_ref(),
-                &[size_of::<u64>() as u8],
-                &w.to_be_bytes(),
-                a.as_bytes(),
-            ]
-            .concat(),
-        )
-    });
+    let start =
+        start_after.map(|(w, a)| Bound::exclusive((U64Key::from(w), a.as_str()).joined_key()));
 
     let members: StdResult<Vec<_>> = members()
         .idx
