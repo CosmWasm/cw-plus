@@ -85,7 +85,7 @@ impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
-    K::Prefix: EmptyPrefix,
+    K::SubPrefix: EmptyPrefix,
 {
     pub fn range<'c>(
         &self,
@@ -97,7 +97,8 @@ where
     where
         T: 'c,
     {
-        self.prefix(K::Prefix::new()).range(store, min, max, order)
+        self.sub_prefix(K::SubPrefix::new())
+            .range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -110,7 +111,8 @@ where
     where
         T: 'c,
     {
-        self.prefix(K::Prefix::new()).keys(store, min, max, order)
+        self.sub_prefix(K::SubPrefix::new())
+            .keys(store, min, max, order)
     }
 }
 

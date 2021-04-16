@@ -1,6 +1,7 @@
 mod endian;
 mod helpers;
 mod indexed_map;
+mod indexed_snapshot;
 mod indexes;
 mod item;
 mod iter_helpers;
@@ -13,6 +14,8 @@ mod snapshot;
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};
+#[cfg(feature = "iterator")]
+pub use indexed_snapshot::IndexedSnapshotMap;
 #[cfg(feature = "iterator")]
 pub use indexes::{
     index_string, index_string_tuple, index_triple, index_tuple, Index, MultiIndex, UniqueIndex,
