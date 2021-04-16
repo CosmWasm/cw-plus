@@ -12,11 +12,11 @@ use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
-use cw_storage_plus::Bound;
+use cw_storage_plus::{Bound, PrimaryKey, U64Key};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, StakedResponse};
-use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
+use crate::state::{members, Config, ADMIN, CLAIMS, CONFIG, HOOKS, STAKE, TOTAL};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-stake";
@@ -195,7 +195,7 @@ fn update_membership(
 ) -> StdResult<Vec<CosmosMsg>> {
     // update their membership weight
     let new = calc_weight(new_stake, cfg);
-    let old = MEMBERS.may_load(storage, &sender)?;
+    let old = members().may_load(storage, &sender)?;
 
     // short-circuit if no change
     if new == old {
@@ -203,8 +203,8 @@ fn update_membership(
     }
     // otherwise, record change of weight
     match new.as_ref() {
-        Some(w) => MEMBERS.save(storage, &sender, w, height),
-        None => MEMBERS.remove(storage, &sender, height),
+        Some(w) => members().save(storage, &sender, w, height),
+        None => members().remove(storage, &sender, height),
     }?;
 
     // update total
@@ -286,6 +286,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListMembers { start_after, limit } => {
             to_binary(&list_members(deps, start_after, limit)?)
         }
+        QueryMsg::ListMembersByWeight { start_after, limit } => {
+            to_binary(&list_members_by_weight(deps, start_after, limit)?)
+        }
         QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
         QueryMsg::Claims { address } => {
             to_binary(&CLAIMS.query_claims(deps, &deps.api.addr_validate(&address)?)?)
@@ -320,8 +323,8 @@ pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
-        None => MEMBERS.may_load(deps.storage, &addr),
+        Some(h) => members().primary.may_load_at_height(deps.storage, &addr, h),
+        None => members().may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
 }
@@ -339,8 +342,34 @@ fn list_members(
     let addr = maybe_addr(deps.api, start_after)?;
     let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let members: StdResult<Vec<_>> = MEMBERS
+    let members: StdResult<Vec<_>> = members()
         .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            let (key, weight) = item?;
+            Ok(Member {
+                addr: String::from_utf8(key)?,
+                weight,
+            })
+        })
+        .collect();
+
+    Ok(MemberListResponse { members: members? })
+}
+
+fn list_members_by_weight(
+    deps: Deps,
+    start_after: Option<(u64, String)>,
+    limit: Option<u32>,
+) -> StdResult<MemberListResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start =
+        start_after.map(|(w, a)| Bound::exclusive((U64Key::from(w), a.as_str()).joined_key()));
+
+    let members: StdResult<Vec<_>> = members()
+        .idx
+        .weight
+        .range(deps.storage, None, start, Order::Descending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
@@ -448,6 +477,11 @@ mod tests {
         let res: MemberResponse = from_slice(&raw).unwrap();
         res.weight
     }
+
+    // TODO: Test list_members
+
+    // TODO: Test list_members_by_weight
+    // Test pagination / limits
 
     // this tests the member queries
     fn assert_users(

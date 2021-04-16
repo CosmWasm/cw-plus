@@ -60,6 +60,11 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
     },
+    /// Returns MembersListResponse, sorted by weight descending.
+    ListMembersByWeight {
+        start_after: Option<(u64, String)>,
+        limit: Option<u32>,
+    },
     /// Returns MemberResponse
     Member {
         addr: String,
