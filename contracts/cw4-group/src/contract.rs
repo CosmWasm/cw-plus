@@ -346,8 +346,66 @@ mod tests {
         assert_eq!(members.len(), 0);
     }
 
-    // TODO: Test member_by_weight
-    // Test pagination / limits
+    #[test]
+    fn try_list_members_by_weight() {
+        let mut deps = mock_dependencies(&[]);
+        do_instantiate(deps.as_mut());
+
+        let members = list_members_by_weight(deps.as_ref(), None, None)
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 2);
+        // Assert the set is sorted by (descending) weight
+        assert_eq!(
+            members,
+            vec![
+                Member {
+                    addr: USER1.into(),
+                    weight: 11
+                },
+                Member {
+                    addr: USER2.into(),
+                    weight: 6
+                }
+            ]
+        );
+
+        // Test pagination / limits
+        let members = list_members_by_weight(deps.as_ref(), None, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER1.into(),
+                weight: 11
+            },]
+        );
+
+        // Next page
+        let start_after = Some((members[0].weight, members[0].addr.clone()));
+        let members = list_members_by_weight(deps.as_ref(), start_after, None)
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER2.into(),
+                weight: 6
+            },]
+        );
+
+        // Assert there's no more
+        let start_after = Some((members[0].weight, members[0].addr.clone()));
+        let members = list_members_by_weight(deps.as_ref(), start_after, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 0);
+    }
 
     fn assert_users<S: Storage, A: Api, Q: Querier>(
         deps: &OwnedDeps<S, A, Q>,
