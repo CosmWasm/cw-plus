@@ -99,6 +99,47 @@
       "additionalProperties": false
     },
     {
+      "description": "Returns MembersListResponse, sorted by weight descending.",
+      "type": "object",
+      "required": [
+        "list_members_by_weight"
+      ],
+      "properties": {
+        "list_members_by_weight": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": [
+                {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "maxItems": 2,
+              "minItems": 2
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Returns MemberResponse",
       "type": "object",
       "required": [
