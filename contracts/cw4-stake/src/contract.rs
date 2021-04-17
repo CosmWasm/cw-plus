@@ -478,11 +478,6 @@ mod tests {
         res.weight
     }
 
-    // TODO: Test list_members
-
-    // TODO: Test list_members_by_weight
-    // Test pagination / limits
-
     // this tests the member queries
     fn assert_users(
         deps: Deps,
@@ -563,6 +558,77 @@ mod tests {
         assert_users(deps.as_ref(), Some(12), Some(15), Some(5), Some(height + 3));
         // after second stake
     }
+
+    #[test]
+    fn try_member_queries() {
+        let mut deps = mock_dependencies(&[]);
+        default_instantiate(deps.as_mut());
+
+        bond(deps.as_mut(), 12_000, 7_500, 4_000, 1);
+
+        let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
+        assert_eq!(member1.weight, Some(12));
+
+        let member2 = query_member(deps.as_ref(), USER2.into(), None).unwrap();
+        assert_eq!(member2.weight, Some(7));
+
+        let member3 = query_member(deps.as_ref(), USER3.into(), None).unwrap();
+        assert_eq!(member3.weight, None);
+
+        let members = list_members(deps.as_ref(), None, None).unwrap().members;
+        assert_eq!(members.len(), 2);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![
+                Member {
+                    addr: USER2.into(),
+                    weight: 7
+                },
+                Member {
+                    addr: USER1.into(),
+                    weight: 12
+                },
+            ]
+        );
+
+        // Test pagination / limits
+        let members = list_members(deps.as_ref(), None, Some(1)).unwrap().members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER2.into(),
+                weight: 7
+            },]
+        );
+
+        // Next page
+        let start_after = Some(members[0].addr.clone());
+        let members = list_members(deps.as_ref(), start_after, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER1.into(),
+                weight: 12
+            },]
+        );
+
+        // Assert there's no more
+        let start_after = Some(members[0].addr.clone());
+        let members = list_members(deps.as_ref(), start_after, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 0);
+    }
+
+    // TODO: Test list_members_by_weight
+    // Test pagination / limits
 
     #[test]
     fn unbond_stake_update_membership() {
