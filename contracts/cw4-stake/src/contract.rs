@@ -627,8 +627,80 @@ mod tests {
         assert_eq!(members.len(), 0);
     }
 
-    // TODO: Test list_members_by_weight
-    // Test pagination / limits
+    #[test]
+    fn try_list_members_by_weight() {
+        let mut deps = mock_dependencies(&[]);
+        default_instantiate(deps.as_mut());
+
+        bond(deps.as_mut(), 11_000, 6_500, 5_000, 1);
+
+        let members = list_members_by_weight(deps.as_ref(), None, None)
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 3);
+        // Assert the set is sorted by (descending) weight
+        assert_eq!(
+            members,
+            vec![
+                Member {
+                    addr: USER1.into(),
+                    weight: 11
+                },
+                Member {
+                    addr: USER2.into(),
+                    weight: 6
+                },
+                Member {
+                    addr: USER3.into(),
+                    weight: 5
+                }
+            ]
+        );
+
+        // Test pagination / limits
+        let members = list_members_by_weight(deps.as_ref(), None, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER1.into(),
+                weight: 11
+            },]
+        );
+
+        // Next page
+        let last = members.last().unwrap();
+        let start_after = Some((last.weight, last.addr.clone()));
+        let members = list_members_by_weight(deps.as_ref(), start_after, None)
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 2);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![
+                Member {
+                    addr: USER2.into(),
+                    weight: 6
+                },
+                Member {
+                    addr: USER3.into(),
+                    weight: 5
+                }
+            ]
+        );
+
+        // Assert there's no more
+        let last = members.last().unwrap();
+        let start_after = Some((last.weight, last.addr.clone()));
+        let members = list_members_by_weight(deps.as_ref(), start_after, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 0);
+    }
 
     #[test]
     fn unbond_stake_update_membership() {
