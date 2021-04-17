@@ -222,7 +222,7 @@ fn list_members_by_weight(
     let members: StdResult<Vec<_>> = members()
         .idx
         .weight
-        .range(deps.storage, start, None, Order::Descending)
+        .range(deps.storage, None, start, Order::Descending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
