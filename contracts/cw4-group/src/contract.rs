@@ -193,7 +193,7 @@ fn list_members(
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let addr = maybe_addr(deps.api, start_after)?;
-    let start = addr.map(|addr| Bound::exclusive(addr.to_string()));
+    let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
     let members: StdResult<Vec<_>> = members()
         .range(deps.storage, start, None, Order::Ascending)
@@ -294,9 +294,56 @@ mod tests {
         let member3 = query_member(deps.as_ref(), USER3.into(), None).unwrap();
         assert_eq!(member3.weight, None);
 
-        let members = list_members(deps.as_ref(), None, None).unwrap();
-        assert_eq!(members.members.len(), 2);
-        // TODO: assert the set is proper
+        let members = list_members(deps.as_ref(), None, None).unwrap().members;
+        assert_eq!(members.len(), 2);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![
+                Member {
+                    addr: USER2.into(),
+                    weight: 6
+                },
+                Member {
+                    addr: USER1.into(),
+                    weight: 11
+                },
+            ]
+        );
+
+        // Test pagination / limits
+        let members = list_members(deps.as_ref(), None, Some(1)).unwrap().members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER2.into(),
+                weight: 6
+            },]
+        );
+
+        // Next page
+        let start_after = Some(members[0].addr.clone());
+        let members = list_members(deps.as_ref(), start_after, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 1);
+        // Assert the set is proper
+        assert_eq!(
+            members,
+            vec![Member {
+                addr: USER1.into(),
+                weight: 11
+            },]
+        );
+
+        // Assert there's no more
+        let start_after = Some(members[0].addr.clone());
+        let members = list_members(deps.as_ref(), start_after, Some(1))
+            .unwrap()
+            .members;
+        assert_eq!(members.len(), 0);
     }
 
     // TODO: Test member_by_weight
