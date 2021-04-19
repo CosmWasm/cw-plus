@@ -323,7 +323,7 @@ pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
-        Some(h) => members().primary.may_load_at_height(deps.storage, &addr, h),
+        Some(h) => members().may_load_at_height(deps.storage, &addr, h),
         None => members().may_load(deps.storage, &addr),
     }?;
     Ok(MemberResponse { weight })
