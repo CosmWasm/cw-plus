@@ -18,7 +18,7 @@ where
     I: IndexList<T>,
 {
     pk_namespace: &'a [u8],
-    pub primary: SnapshotMap<'a, K, T>,
+    primary: SnapshotMap<'a, K, T>,
     /// This is meant to be read directly to get the proper types, like:
     /// map.idx.owner.items(...)
     pub idx: I,
@@ -42,6 +42,34 @@ where
             primary: SnapshotMap::new(pk_namespace, checkpoints, changelog, strategy),
             idx: indexes,
         }
+    }
+
+    pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
+        self.primary.add_checkpoint(store, height)
+    }
+
+    pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
+        self.primary.remove_checkpoint(store, height)
+    }
+}
+
+impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + Prefixer<'a>,
+    I: IndexList<T>,
+{
+    pub fn may_load_at_height(
+        &self,
+        store: &dyn Storage,
+        k: K,
+        height: u64,
+    ) -> StdResult<Option<T>> {
+        self.primary.may_load_at_height(store, k, height)
+    }
+
+    pub fn assert_checkpointed(&self, store: &dyn Storage, height: u64) -> StdResult<()> {
+        self.primary.assert_checkpointed(store, height)
     }
 }
 
