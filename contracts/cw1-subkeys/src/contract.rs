@@ -147,6 +147,11 @@ pub fn check_staking_permissions(
                 return Err(ContractError::ReDelegatePerm {});
             }
         }
+        StakingMsg::Withdraw { .. } => {
+            if !permissions.withdraw {
+                return Err(ContractError::WithdrawPerm {});
+            }
+        }
         s => panic!("Unsupported staking message: {:?}", s),
     }
     Ok(true)
@@ -1257,11 +1262,17 @@ mod tests {
             amount: coin1,
         }
         .into()];
+        let msg_withdraw = vec![StakingMsg::Withdraw {
+            validator: "validator1".into(),
+            recipient: None,
+        }
+        .into()];
 
         let msgs = vec![
             msg_delegate.clone(),
             msg_redelegate.clone(),
             msg_undelegate.clone(),
+            msg_withdraw.clone(),
         ];
 
         // spender1 can execute
@@ -1327,6 +1338,13 @@ mod tests {
             },
         );
         assert!(res.is_ok());
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            info,
+            ExecuteMsg::Execute { msgs: msg_withdraw },
+        );
+        assert!(res.is_err())
     }
 
     // tests permissions and allowances are independent features and does not affect each other
@@ -1444,6 +1462,10 @@ mod tests {
             validator: anyone.to_string(),
             amount: coin(70000, "ureef"),
         });
+        let staking_withdraw_msg = CosmosMsg::Staking(StakingMsg::Withdraw {
+            validator: anyone.to_string(),
+            recipient: None,
+        });
 
         // owner can send big or small
         let res = query_can_execute(deps.as_ref(), owner.to_string(), send_msg.clone()).unwrap();
@@ -1475,6 +1497,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(res.can_execute, true);
+        let res = query_can_execute(
+            deps.as_ref(),
+            spender.to_string(),
+            staking_withdraw_msg.clone(),
+        )
+        .unwrap();
+        assert_eq!(res.can_execute, false);
 
         // random person cannot do anything
         let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg).unwrap();
@@ -1483,6 +1512,9 @@ mod tests {
         assert_eq!(res.can_execute, false);
         let res =
             query_can_execute(deps.as_ref(), anyone.to_string(), staking_delegate_msg).unwrap();
+        assert_eq!(res.can_execute, false);
+        let res =
+            query_can_execute(deps.as_ref(), anyone.to_string(), staking_withdraw_msg).unwrap();
         assert_eq!(res.can_execute, false);
     }
 }
