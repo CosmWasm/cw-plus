@@ -5,8 +5,8 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Order, Response, StakingMsg, StdError, StdResult,
+    attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
+    MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
 };
 use cw0::Expiration;
 use cw1::CanExecuteResponse;
@@ -100,6 +100,11 @@ where
                     let perm = perm.ok_or(ContractError::NotAllowed {})?;
                     check_staking_permissions(staking_msg, perm)?;
                 }
+                CosmosMsg::Distribution(distribution_msg) => {
+                    let perm = PERMISSIONS.may_load(deps.storage, &info.sender)?;
+                    let perm = perm.ok_or(ContractError::NotAllowed {})?;
+                    check_distribution_permissions(distribution_msg, perm)?;
+                }
                 CosmosMsg::Bank(BankMsg::Send {
                     to_address: _,
                     amount,
@@ -147,12 +152,27 @@ pub fn check_staking_permissions(
                 return Err(ContractError::ReDelegatePerm {});
             }
         }
-        StakingMsg::Withdraw { .. } => {
+        s => panic!("Unsupported staking message: {:?}", s),
+    }
+    Ok(true)
+}
+
+pub fn check_distribution_permissions(
+    distribution_msg: &DistributionMsg,
+    permissions: Permissions,
+) -> Result<bool, ContractError> {
+    match distribution_msg {
+        DistributionMsg::SetWithdrawAddress { .. } => {
+            if !permissions.withdraw {
+                return Err(ContractError::WithdrawAddrPerm {});
+            }
+        }
+        DistributionMsg::WithdrawDelegatorReward { .. } => {
             if !permissions.withdraw {
                 return Err(ContractError::WithdrawPerm {});
             }
         }
-        s => panic!("Unsupported staking message: {:?}", s),
+        s => panic!("Unsupported distribution message: {:?}", s),
     }
     Ok(true)
 }
@@ -1262,9 +1282,8 @@ mod tests {
             amount: coin1,
         }
         .into()];
-        let msg_withdraw = vec![StakingMsg::Withdraw {
+        let msg_withdraw = vec![DistributionMsg::WithdrawDelegatorReward {
             validator: "validator1".into(),
-            recipient: None,
         }
         .into()];
 
@@ -1462,10 +1481,10 @@ mod tests {
             validator: anyone.to_string(),
             amount: coin(70000, "ureef"),
         });
-        let staking_withdraw_msg = CosmosMsg::Staking(StakingMsg::Withdraw {
-            validator: anyone.to_string(),
-            recipient: None,
-        });
+        let staking_withdraw_msg =
+            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
+                validator: anyone.to_string(),
+            });
 
         // owner can send big or small
         let res = query_can_execute(deps.as_ref(), owner.to_string(), send_msg.clone()).unwrap();

@@ -166,6 +166,7 @@ where
         // instantiate contract
         let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
         let msg: CosmosMsg<C> = WasmMsg::Instantiate {
+            admin: None,
             code_id,
             msg: init_msg,
             send: send_funds.to_vec(),
@@ -373,6 +374,7 @@ where
                 Ok((contract_addr, res.into()))
             }
             WasmMsg::Instantiate {
+                admin: _,
                 code_id,
                 msg,
                 send,

@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, to_binary, Addr, BankMsg, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
-    QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
+    attr, coin, to_binary, Addr, BankMsg, Binary, Decimal, Deps, DepsMut, DistributionMsg, Env,
+    MessageInfo, QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -35,7 +35,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // ensure the validator is registered
-    let vals = deps.querier.query_validators()?;
+    let vals = deps.querier.query_all_validators()?;
     if !vals.iter().any(|v| v.address == msg.validator) {
         return Err(ContractError::NotInValidatorSet {
             validator: msg.validator,
@@ -356,9 +356,8 @@ pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response,
     let res = Response {
         submessages: vec![],
         messages: vec![
-            StakingMsg::Withdraw {
+            DistributionMsg::WithdrawDelegatorReward {
                 validator: invest.validator,
-                recipient: Some(contract_addr.to_string()),
             }
             .into(),
             WasmMsg::Execute {

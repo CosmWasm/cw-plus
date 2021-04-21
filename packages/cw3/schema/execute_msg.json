@@ -230,18 +230,6 @@
         {
           "type": "object",
           "required": [
-            "staking"
-          ],
-          "properties": {
-            "staking": {
-              "$ref": "#/definitions/StakingMsg"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
             "wasm"
           ],
           "properties": {
@@ -305,118 +293,6 @@
         }
       ]
     },
-    "StakingMsg": {
-      "description": "The message types of the staking module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto",
-      "anyOf": [
-        {
-          "description": "This is translated to a [MsgDelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L81-L90). `delegator_address` is automatically filled with the current contract's address.",
-          "type": "object",
-          "required": [
-            "delegate"
-          ],
-          "properties": {
-            "delegate": {
-              "type": "object",
-              "required": [
-                "amount",
-                "validator"
-              ],
-              "properties": {
-                "amount": {
-                  "$ref": "#/definitions/Coin"
-                },
-                "validator": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "This is translated to a [MsgUndelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L112-L121). `delegator_address` is automatically filled with the current contract's address.",
-          "type": "object",
-          "required": [
-            "undelegate"
-          ],
-          "properties": {
-            "undelegate": {
-              "type": "object",
-              "required": [
-                "amount",
-                "validator"
-              ],
-              "properties": {
-                "amount": {
-                  "$ref": "#/definitions/Coin"
-                },
-                "validator": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "This is translated to a [MsgSetWithdrawAddress](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L29-L37) followed by a [MsgWithdrawDelegatorReward](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/distribution/v1beta1/tx.proto#L42-L50). `delegator_address` is automatically filled with the current contract's address.",
-          "type": "object",
-          "required": [
-            "withdraw"
-          ],
-          "properties": {
-            "withdraw": {
-              "type": "object",
-              "required": [
-                "validator"
-              ],
-              "properties": {
-                "recipient": {
-                  "description": "this is the \"withdraw address\", the one that should receive the rewards if None, then use delegator address",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "validator": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "description": "This is translated to a [MsgBeginRedelegate](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto#L95-L105). `delegator_address` is automatically filled with the current contract's address.",
-          "type": "object",
-          "required": [
-            "redelegate"
-          ],
-          "properties": {
-            "redelegate": {
-              "type": "object",
-              "required": [
-                "amount",
-                "dst_validator",
-                "src_validator"
-              ],
-              "properties": {
-                "amount": {
-                  "$ref": "#/definitions/Coin"
-                },
-                "dst_validator": {
-                  "type": "string"
-                },
-                "src_validator": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "additionalProperties": false
-        }
-      ]
-    },
     "Uint128": {
       "type": "string"
     },
@@ -470,7 +346,7 @@
           "additionalProperties": false
         },
         {
-          "description": "Instantiates a new contracts from previously uploaded Wasm code.\n\nThis is translated to a [MsgInstantiateContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L47-L61). `sender` is automatically filled with the current contract's address.",
+          "description": "Instantiates a new contracts from previously uploaded Wasm code.\n\nThis is translated to a [MsgInstantiateContract](https://github.com/CosmWasm/wasmd/blob/v0.16.0-alpha1/x/wasm/internal/types/tx.proto#L47-L61). `sender` is automatically filled with the current contract's address.",
           "type": "object",
           "required": [
             "instantiate"
@@ -485,6 +361,12 @@
                 "send"
               ],
               "properties": {
+                "admin": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "code_id": {
                   "type": "integer",
                   "format": "uint64",
