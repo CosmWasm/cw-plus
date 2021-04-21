@@ -1282,9 +1282,8 @@ mod tests {
             amount: coin1,
         }
         .into()];
-        let msg_withdraw = vec![StakingMsg::Withdraw {
+        let msg_withdraw = vec![DistributionMsg::WithdrawDelegatorReward {
             validator: "validator1".into(),
-            recipient: None,
         }
         .into()];
 
@@ -1352,7 +1351,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            info,
+            info.clone(),
             ExecuteMsg::Execute {
                 msgs: msg_undelegate,
             },
@@ -1482,10 +1481,10 @@ mod tests {
             validator: anyone.to_string(),
             amount: coin(70000, "ureef"),
         });
-        let staking_withdraw_msg = CosmosMsg::Staking(StakingMsg::Withdraw {
-            validator: anyone.to_string(),
-            recipient: None,
-        });
+        let staking_withdraw_msg =
+            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
+                validator: anyone.to_string(),
+            });
 
         // owner can send big or small
         let res = query_can_execute(deps.as_ref(), owner.to_string(), send_msg.clone()).unwrap();
