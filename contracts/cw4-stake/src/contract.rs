@@ -1,13 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, coins, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
+    attr, coin, coins, from_slice, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps,
+    DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
 };
 
 use cw0::{maybe_addr, NativeBalance};
 use cw2::set_contract_version;
-use cw20::{Balance, Denom};
+use cw20::{Balance, Cw20CoinVerified, Cw20ReceiveMsg, Denom};
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
@@ -15,7 +15,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, StakedResponse};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
@@ -75,6 +75,7 @@ pub fn execute(
         ExecuteMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
         ExecuteMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
         ExecuteMsg::Claim {} => execute_claim(deps, env, info),
+        ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
     }
 }
 
@@ -127,6 +128,28 @@ pub fn execute_bond(
         attributes,
         data: None,
     })
+}
+
+pub fn execute_receive(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    wrapper: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    let msg: ReceiveMsg = match wrapper.msg {
+        Some(bin) => Ok(from_slice(&bin)?),
+        None => Err(ContractError::NoData {}),
+    }?;
+    let balance = Balance::Cw20(Cw20CoinVerified {
+        address: info.sender,
+        amount: wrapper.amount,
+    });
+    let api = deps.api;
+    match msg {
+        ReceiveMsg::Bond {} => {
+            execute_bond(deps, env, balance, api.addr_validate(&wrapper.sender)?)
+        }
+    }
 }
 
 pub fn execute_unbond(
