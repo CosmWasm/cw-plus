@@ -38,6 +38,12 @@ workflows:
              only: /^v[0-9]+\.[0-9]+\.[0-9]+.*/
            branches:
              ignore: /.*/
+      - optimize_contracts:
+          filters:
+           tags:
+             ignore: /.*/
+           branches:
+             only: ci-optimize-contracts
 
 jobs:
   contract_cw1_subkeys:
@@ -1028,3 +1034,35 @@ jobs:
               -n "$TITLE" -b "$BODY" \
               -delete \
               "$TAG" ./artifacts/
+  optimize_contracts:
+    docker:
+      # Image from https://github.com/cibuilds/github, based on alpine
+      - image: cibuilds/github:0.13
+    steps:
+      - run:
+          name: Install Docker client
+          command: apk add docker-cli
+      - setup_remote_docker
+      - checkout
+      - run:
+          # We cannot mount local folders, see https://circleci.com/docs/2.0/building-docker-images/#mounting-folders
+          name: Prepare volume with source code
+          command: |
+            # create a dummy container which will hold a volume with config
+            docker create -v /code --name with_code alpine /bin/true
+            # copy a config file into this volume
+            docker cp Cargo.toml with_code:/code
+            docker cp Cargo.lock with_code:/code
+            # copy code into this volume
+            docker cp ./contracts with_code:/code
+            docker cp ./packages with_code:/code
+      - run:
+          name: Build development contracts
+          command: |
+            docker run --volumes-from with_code cosmwasm/workspace-optimizer:0.11.0
+            docker cp with_code:/code/artifacts ./artifacts
+      - run:
+          name: Show data
+          command: |
+            ls -l artifacts
+            cat artifacts/checksums.txt
