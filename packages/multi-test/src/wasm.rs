@@ -66,10 +66,10 @@ where
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-    E3: std::fmt::Display,
-    E4: std::fmt::Display,
+    E1: ToString,
+    E2: ToString,
+    E3: ToString,
+    E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     handle_fn: ContractClosure<T1, C, E1>,
@@ -83,9 +83,9 @@ where
     T1: DeserializeOwned + 'static,
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
-    E1: std::fmt::Display + 'static,
-    E2: std::fmt::Display + 'static,
-    E3: std::fmt::Display + 'static,
+    E1: ToString + 'static,
+    E2: ToString + 'static,
+    E3: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
@@ -123,10 +123,10 @@ where
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
     T4: DeserializeOwned + 'static,
-    E1: std::fmt::Display + 'static,
-    E2: std::fmt::Display + 'static,
-    E3: std::fmt::Display + 'static,
-    E4: std::fmt::Display + 'static,
+    E1: ToString + 'static,
+    E2: ToString + 'static,
+    E3: ToString + 'static,
+    E4: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new_with_sudo(
@@ -147,7 +147,7 @@ where
 fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
 where
     T: DeserializeOwned + 'static,
-    E: std::fmt::Display + 'static,
+    E: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     let customized =
@@ -202,10 +202,10 @@ where
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-    E3: std::fmt::Display,
-    E4: std::fmt::Display,
+    E1: ToString,
+    E2: ToString,
+    E3: ToString,
+    E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     fn handle(
