@@ -1,5 +1,5 @@
 use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
@@ -10,18 +10,6 @@ use cosmwasm_std::{
 };
 
 use crate::transactions::{RepLog, StorageTransaction};
-use std::fmt::Formatter;
-
-/// This is used as a placeholder type that can be anything
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Any {}
-
-// We couldn't use Empty as it didn't implement Display. Shall we upstream this?
-impl fmt::Display for Any {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("{Any}")
-    }
-}
 
 /// Interface to call into a Contract
 pub trait Contract<T>
@@ -60,7 +48,7 @@ type QueryClosure<T, E> = Box<dyn Fn(Deps, Env, T) -> Result<Binary, E>>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// Place T4 and E4 at the end, as we just want default placeholders for most contracts that don't have sudo
-pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Any, E4 = Any>
+pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Empty, E4 = String>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
