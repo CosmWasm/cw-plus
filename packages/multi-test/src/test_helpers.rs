@@ -9,7 +9,7 @@ use cosmwasm_std::{
 };
 use cw_storage_plus::Item;
 
-use crate::wasm::{Contract, ContractWrapper};
+use crate::wasm::{Any, Contract, ContractWrapper};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EmptyMsg {}
@@ -37,7 +37,7 @@ fn query_error(_deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
 }
 
 pub fn contract_error() -> Box<dyn Contract<Empty>> {
-    let contract: ContractWrapper<_, _, _, _, _, _, _, String, String> =
+    let contract: ContractWrapper<_, _, _, _, _, _, _, Any, Any> =
         ContractWrapper::new(handle_error, init_error, query_error);
     Box::new(contract)
 }
@@ -47,7 +47,7 @@ pub fn contract_error_custom<C>() -> Box<dyn Contract<C>>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    let contract: ContractWrapper<_, _, _, _, _, _, _, String, String> =
+    let contract: ContractWrapper<_, _, _, _, _, _, _, Any, Any> =
         ContractWrapper::new_with_empty(handle_error, init_error, query_error);
     Box::new(contract)
 }
