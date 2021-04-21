@@ -2,12 +2,12 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coin, coins, from_slice, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps,
-    DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
+    DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 
 use cw0::{maybe_addr, NativeBalance};
 use cw2::set_contract_version;
-use cw20::{Balance, Cw20CoinVerified, Cw20ReceiveMsg, Denom};
+use cw20::{Balance, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg, Denom};
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
@@ -262,20 +262,32 @@ pub fn execute_claim(
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let amount;
-    match &config.denom {
-        Denom::Native(denom) => amount = coins(release.u128(), denom),
-        Denom::Cw20(_canonical_addr) => {
-            unimplemented!("The CW20 coins release functionality is in progress")
+    let (amount_str, message) = match &config.denom {
+        Denom::Native(denom) => {
+            let amount = coins(release.u128(), denom);
+            let amount_str = coins_to_string(&amount);
+            let message = BankMsg::Send {
+                to_address: info.sender.clone().into(),
+                amount,
+            }
+            .into();
+            (amount_str, message)
         }
-    }
-
-    let amount_str = coins_to_string(&amount);
-    let messages = vec![BankMsg::Send {
-        to_address: info.sender.clone().into(),
-        amount,
-    }
-    .into()];
+        Denom::Cw20(canonical_addr) => {
+            let amount_str = format!("{}{}", release.u128(), canonical_addr);
+            let transfer = Cw20ExecuteMsg::Transfer {
+                recipient: info.sender.clone().into(),
+                amount: release,
+            };
+            let message = WasmMsg::Execute {
+                contract_addr: canonical_addr.into(),
+                msg: to_binary(&transfer)?,
+                send: vec![],
+            }
+            .into();
+            (amount_str, message)
+        }
+    };
 
     let attributes = vec![
         attr("action", "claim"),
@@ -284,7 +296,7 @@ pub fn execute_claim(
     ];
     Ok(Response {
         submessages: vec![],
-        messages,
+        messages: vec![message],
         attributes,
         data: None,
     })
