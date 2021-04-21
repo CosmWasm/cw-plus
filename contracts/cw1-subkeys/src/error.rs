@@ -32,6 +32,9 @@ pub enum ContractError {
 
     #[error("Withdraw is not allowed")]
     WithdrawPerm {},
+
+    #[error("Set withdraw address is not allowed")]
+    WithdrawAddrPerm {},
 }
 
 impl From<cw1_whitelist::ContractError> for ContractError {
