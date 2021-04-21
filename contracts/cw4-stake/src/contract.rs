@@ -647,7 +647,60 @@ mod tests {
     }
 
     #[test]
-    fn cw20_token_claim() {}
+    fn cw20_token_claim() {
+        let mut deps = mock_dependencies(&[]);
+        let unbonding = Duration::Height(50);
+        cw20_instantiate(deps.as_mut(), unbonding);
+
+        // bond some tokens
+        bond_cw20(deps.as_mut(), 20_000, 13_500, 500, 1);
+
+        // unbond part
+        unbond(deps.as_mut(), 7_900, 4_600, 0, 10);
+
+        // Assert updated weights
+        assert_stake(deps.as_ref(), 12_100, 8_900, 500);
+        assert_users(deps.as_ref(), Some(12), Some(8), None, None);
+
+        // with proper claims
+        let mut env = mock_env();
+        env.block.height += 10;
+        let expires = unbonding.after(&env.block);
+        assert_eq!(
+            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
+            vec![Claim::new(7_900, expires)]
+        );
+
+        // wait til they expire and get payout
+        env.block.height += 60;
+        let res = execute(
+            deps.as_mut(),
+            env,
+            mock_info(USER1, &[]),
+            ExecuteMsg::Claim {},
+        )
+        .unwrap();
+        assert_eq!(res.messages.len(), 1);
+        match &res.messages[0] {
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr,
+                msg,
+                send,
+            }) => {
+                assert_eq!(contract_addr.as_str(), CW20_ADDRESS);
+                assert_eq!(send.len(), 0);
+                let parsed: Cw20ExecuteMsg = from_slice(&msg).unwrap();
+                assert_eq!(
+                    parsed,
+                    Cw20ExecuteMsg::Transfer {
+                        recipient: USER1.into(),
+                        amount: Uint128(7_900)
+                    }
+                );
+            }
+            _ => panic!("Must initiate cw20 transfer"),
+        }
+    }
 
     #[test]
     fn raw_queries_work() {
