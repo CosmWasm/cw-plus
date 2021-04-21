@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, coins, from_slice, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps,
-    DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128, WasmMsg,
+    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdResult, Storage, Uint128, WasmMsg,
 };
 
 use cw0::{maybe_addr, NativeBalance};
@@ -339,17 +339,8 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
 pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let stake = STAKE.may_load(deps.storage, &addr)?.unwrap_or_default();
-    let denom = match CONFIG.load(deps.storage)?.denom {
-        Denom::Native(want) => want,
-        _ => {
-            return Err(StdError::generic_err(
-                "The stake for CW20 is not yet implemented",
-            ));
-        }
-    };
-    Ok(StakedResponse {
-        stake: coin(stake.u128(), denom),
-    })
+    let denom = CONFIG.load(deps.storage)?.denom;
+    Ok(StakedResponse { stake, denom })
 }
 
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
@@ -392,7 +383,7 @@ fn list_members(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OverflowError, OverflowOperation, StdError, Storage};
+    use cosmwasm_std::{coin, from_slice, OverflowError, OverflowOperation, StdError, Storage};
     use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
@@ -410,6 +401,7 @@ mod tests {
     const TOKENS_PER_WEIGHT: Uint128 = Uint128(1_000);
     const MIN_BOND: Uint128 = Uint128(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
+    const CW20_ADDRESS: &str = "wasm1234567890";
 
     fn default_instantiate(deps: DepsMut) {
         do_instantiate(
@@ -437,6 +429,18 @@ mod tests {
         instantiate(deps, mock_env(), info, msg).unwrap();
     }
 
+    fn cw20_instantiate(deps: DepsMut, unbonding_period: Duration) {
+        let msg = InstantiateMsg {
+            denom: Denom::Cw20(Addr::unchecked(CW20_ADDRESS)),
+            tokens_per_weight: TOKENS_PER_WEIGHT,
+            min_bond: MIN_BOND,
+            unbonding_period,
+            admin: Some(INIT_ADMIN.into()),
+        };
+        let info = mock_info("creator", &[]);
+        instantiate(deps, mock_env(), info, msg).unwrap();
+    }
+
     fn bond(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
         let mut env = mock_env();
         env.block.height += height_delta;
@@ -445,6 +449,23 @@ mod tests {
             if *stake != 0 {
                 let msg = ExecuteMsg::Bond {};
                 let info = mock_info(addr, &coins(*stake, DENOM));
+                execute(deps.branch(), env.clone(), info, msg).unwrap();
+            }
+        }
+    }
+
+    fn bond_cw20(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
+        let mut env = mock_env();
+        env.block.height += height_delta;
+
+        for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
+            if *stake != 0 {
+                let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+                    sender: addr.to_string(),
+                    amount: Uint128(*stake),
+                    msg: Some(to_binary(&ReceiveMsg::Bond {}).unwrap()),
+                });
+                let info = mock_info(CW20_ADDRESS, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -526,13 +547,13 @@ mod tests {
     // this tests the member queries
     fn assert_stake(deps: Deps, user1_stake: u128, user2_stake: u128, user3_stake: u128) {
         let stake1 = query_staked(deps, USER1.into()).unwrap();
-        assert_eq!(stake1.stake, coin(user1_stake, DENOM));
+        assert_eq!(stake1.stake, user1_stake.into());
 
         let stake2 = query_staked(deps, USER2.into()).unwrap();
-        assert_eq!(stake2.stake, coin(user2_stake, DENOM));
+        assert_eq!(stake2.stake, user2_stake.into());
 
         let stake3 = query_staked(deps, USER3.into()).unwrap();
-        assert_eq!(stake3.stake, coin(user3_stake, DENOM));
+        assert_eq!(stake3.stake, user3_stake.into());
     }
 
     #[test]
@@ -608,6 +629,25 @@ mod tests {
             )))
         );
     }
+
+    #[test]
+    fn cw20_token_bond() {
+        let mut deps = mock_dependencies(&[]);
+        cw20_instantiate(deps.as_mut(), Duration::Height(2000));
+
+        // Assert original weights
+        assert_users(deps.as_ref(), None, None, None, None);
+
+        // ensure it rounds down, and respects cut-off
+        bond_cw20(deps.as_mut(), 12_000, 7_500, 4_000, 1);
+
+        // Assert updated weights
+        assert_stake(deps.as_ref(), 12_000, 7_500, 4_000);
+        assert_users(deps.as_ref(), Some(12), Some(7), None, None);
+    }
+
+    #[test]
+    fn cw20_token_claim() {}
 
     #[test]
     fn raw_queries_work() {
