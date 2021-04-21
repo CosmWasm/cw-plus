@@ -1,5 +1,5 @@
 use schemars::JsonSchema;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
@@ -10,18 +10,6 @@ use cosmwasm_std::{
 };
 
 use crate::transactions::{RepLog, StorageTransaction};
-use std::fmt::Formatter;
-
-/// This is used as a placeholder type that can be anything
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Any {}
-
-// We couldn't use Empty as it didn't implement Display. Shall we upstream this?
-impl fmt::Display for Any {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("{Any}")
-    }
-}
 
 /// Interface to call into a Contract
 pub trait Contract<T>
@@ -60,16 +48,16 @@ type QueryClosure<T, E> = Box<dyn Fn(Deps, Env, T) -> Result<Binary, E>>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// Place T4 and E4 at the end, as we just want default placeholders for most contracts that don't have sudo
-pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Any, E4 = Any>
+pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Empty, E4 = String>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-    E3: std::fmt::Display,
-    E4: std::fmt::Display,
+    E1: ToString,
+    E2: ToString,
+    E3: ToString,
+    E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     handle_fn: ContractClosure<T1, C, E1>,
@@ -83,9 +71,9 @@ where
     T1: DeserializeOwned + 'static,
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
-    E1: std::fmt::Display + 'static,
-    E2: std::fmt::Display + 'static,
-    E3: std::fmt::Display + 'static,
+    E1: ToString + 'static,
+    E2: ToString + 'static,
+    E3: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
@@ -123,10 +111,10 @@ where
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
     T4: DeserializeOwned + 'static,
-    E1: std::fmt::Display + 'static,
-    E2: std::fmt::Display + 'static,
-    E3: std::fmt::Display + 'static,
-    E4: std::fmt::Display + 'static,
+    E1: ToString + 'static,
+    E2: ToString + 'static,
+    E3: ToString + 'static,
+    E4: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new_with_sudo(
@@ -147,7 +135,7 @@ where
 fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
 where
     T: DeserializeOwned + 'static,
-    E: std::fmt::Display + 'static,
+    E: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     let customized =
@@ -202,10 +190,10 @@ where
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
-    E1: std::fmt::Display,
-    E2: std::fmt::Display,
-    E3: std::fmt::Display,
-    E4: std::fmt::Display,
+    E1: ToString,
+    E2: ToString,
+    E3: ToString,
+    E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     fn handle(
