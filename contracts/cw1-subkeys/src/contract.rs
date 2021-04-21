@@ -1321,7 +1321,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            info.clone(),
+            info,
             ExecuteMsg::Execute {
                 msgs: msg_undelegate,
             },
