@@ -32,7 +32,12 @@ workflows:
       - wasm-build
   deploy:
     jobs:
-      - build_and_upload_contracts
+      - build_and_upload_contracts:
+          filters:
+           tags:
+             only: /^v[0-9]+\.[0-9]+\.[0-9]+.*/
+           branches:
+             ignore: /.*/
 
 jobs:
   contract_cw1_subkeys:
@@ -1011,15 +1016,15 @@ jobs:
           command: |
             ls -l artifacts
             cat artifacts/checksums.txt
-#      - run:
-#          name: Publish artifacts on GitHub
-#          command: |
-#            TAG="$CIRCLE_TAG"
-#            TITLE="$TAG"
-#            BODY="Attached there are some build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
-#            ghr -t "$GITHUB_TOKEN" \
-#              -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
-#              -c "$CIRCLE_SHA1" \
-#              -n "$TITLE" -b "$BODY" \
-#              -delete \
-#              "$TAG" ./artifacts/
+      - run:
+          name: Publish artifacts on GitHub
+          command: |
+            TAG="$CIRCLE_TAG"
+            TITLE="$TAG"
+            BODY="Attached there are some build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
+            ghr -t "$GITHUB_TOKEN" \
+              -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
+              -c "$CIRCLE_SHA1" \
+              -n "$TITLE" -b "$BODY" \
+              -delete \
+              "$TAG" ./artifacts/
