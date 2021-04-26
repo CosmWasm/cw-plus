@@ -140,10 +140,7 @@ pub fn execute_receive(
     // wrapper.sender is the address of the user that requested the cw20 contract to send this.
     // This cannot be fully trusted (the cw20 contract can fake it), so only use it for actions
     // in the address's favor (like paying/bonding tokens, not withdrawls)
-    let msg: ReceiveMsg = match wrapper.msg {
-        Some(bin) => Ok(from_slice(&bin)?),
-        None => Err(ContractError::NoData {}),
-    }?;
+    let msg: ReceiveMsg = from_slice(&wrapper.msg)?;
     let balance = Balance::Cw20(Cw20CoinVerified {
         address: info.sender,
         amount: wrapper.amount,
@@ -463,7 +460,7 @@ mod tests {
                 let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
                     sender: addr.to_string(),
                     amount: Uint128(*stake),
-                    msg: Some(to_binary(&ReceiveMsg::Bond {}).unwrap()),
+                    msg: to_binary(&ReceiveMsg::Bond {}).unwrap(),
                 });
                 let info = mock_info(CW20_ADDRESS, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
