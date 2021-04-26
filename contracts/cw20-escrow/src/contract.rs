@@ -53,10 +53,7 @@ pub fn execute_receive(
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    let msg: ReceiveMsg = match wrapper.msg {
-        Some(bin) => Ok(from_binary(&bin)?),
-        None => Err(ContractError::NoData {}),
-    }?;
+    let msg: ReceiveMsg = from_binary(&wrapper.msg)?;
     let balance = Balance::Cw20(Cw20CoinVerified {
         address: info.sender,
         amount: wrapper.amount,
@@ -395,7 +392,7 @@ mod tests {
         let receive = Cw20ReceiveMsg {
             sender: String::from("source"),
             amount: Uint128(100),
-            msg: Some(to_binary(&ExecuteMsg::Create(create.clone())).unwrap()),
+            msg: to_binary(&ExecuteMsg::Create(create.clone())).unwrap(),
         };
         let token_contract = String::from("my-cw20-token");
         let info = mock_info(&token_contract, &[]);
@@ -541,7 +538,7 @@ mod tests {
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: String::from("random"),
             amount: Uint128(7890),
-            msg: Some(to_binary(&base).unwrap()),
+            msg: to_binary(&base).unwrap(),
         });
         let info = mock_info(&bar_token, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
@@ -557,7 +554,7 @@ mod tests {
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: String::from("random"),
             amount: Uint128(7890),
-            msg: Some(to_binary(&base).unwrap()),
+            msg: to_binary(&base).unwrap(),
         });
         let info = mock_info(&baz_token, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, top_up).unwrap_err();
@@ -571,7 +568,7 @@ mod tests {
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: String::from("random"),
             amount: Uint128(888),
-            msg: Some(to_binary(&base).unwrap()),
+            msg: to_binary(&base).unwrap(),
         });
         let info = mock_info(&foo_token, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();

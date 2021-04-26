@@ -69,7 +69,7 @@ pub enum ExecuteMsg {
     Send {
         contract: String,
         amount: Uint128,
-        msg: Option<Binary>,
+        msg: Binary,
     },
     /// Only with the "mintable" extension. If authorized, creates amount new tokens
     /// and adds to the recipient balance.
@@ -103,7 +103,7 @@ pub enum ExecuteMsg {
         owner: String,
         contract: String,
         amount: Uint128,
-        msg: Option<Binary>,
+        msg: Binary,
     },
     /// Only with "approval" extension. Destroys tokens forever
     BurnFrom { owner: String, amount: Uint128 },

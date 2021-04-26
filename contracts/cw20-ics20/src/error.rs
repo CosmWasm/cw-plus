@@ -17,9 +17,6 @@ pub enum ContractError {
     #[error("{0}")]
     Payment(#[from] PaymentError),
 
-    #[error("No data in ReceiveMsg")]
-    NoData {},
-
     #[error("Channel doesn't exist: {id}")]
     NoSuchChannel { id: String },
 
