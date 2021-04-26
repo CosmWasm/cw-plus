@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
+    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
     MessageInfo, Order, Response, StdResult, Storage, Uint128, WasmMsg,
 };
 
@@ -136,6 +136,10 @@ pub fn execute_receive(
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
+    // info.sender is the address of the cw20 contract (that re-sent this message).
+    // wrapper.sender is the address of the user that requested the cw20 contract to send this.
+    // This cannot be fully trusted (the cw20 contract can fake it), so only use it for actions
+    // in the address's favor (like paying/bonding tokens, not withdrawls)
     let msg: ReceiveMsg = match wrapper.msg {
         Some(bin) => Ok(from_slice(&bin)?),
         None => Err(ContractError::NoData {}),
@@ -264,23 +268,23 @@ pub fn execute_claim(
     let config = CONFIG.load(deps.storage)?;
     let (amount_str, message) = match &config.denom {
         Denom::Native(denom) => {
+            let amount_str = coin_to_string(release, denom.as_str());
             let amount = coins(release.u128(), denom);
-            let amount_str = coins_to_string(&amount);
             let message = BankMsg::Send {
-                to_address: info.sender.clone().into(),
+                to_address: info.sender.to_string(),
                 amount,
             }
             .into();
             (amount_str, message)
         }
-        Denom::Cw20(canonical_addr) => {
-            let amount_str = format!("{}{}", release.u128(), canonical_addr);
+        Denom::Cw20(addr) => {
+            let amount_str = coin_to_string(release, addr.as_str());
             let transfer = Cw20ExecuteMsg::Transfer {
                 recipient: info.sender.clone().into(),
                 amount: release,
             };
             let message = WasmMsg::Execute {
-                contract_addr: canonical_addr.into(),
+                contract_addr: addr.into(),
                 msg: to_binary(&transfer)?,
                 send: vec![],
             }
@@ -302,13 +306,9 @@ pub fn execute_claim(
     })
 }
 
-// TODO: put in cosmwasm-std
-fn coins_to_string(coins: &[Coin]) -> String {
-    let strings: Vec<_> = coins
-        .iter()
-        .map(|c| format!("{}{}", c.amount, c.denom))
-        .collect();
-    strings.join(",")
+#[inline]
+fn coin_to_string(amount: Uint128, denom: &str) -> String {
+    format!("{} {}", amount, denom)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -648,15 +648,18 @@ mod tests {
 
     #[test]
     fn cw20_token_claim() {
+        let unbonding_period: u64 = 50;
+        let unbond_height: u64 = 10;
+
         let mut deps = mock_dependencies(&[]);
-        let unbonding = Duration::Height(50);
+        let unbonding = Duration::Height(unbonding_period);
         cw20_instantiate(deps.as_mut(), unbonding);
 
         // bond some tokens
         bond_cw20(deps.as_mut(), 20_000, 13_500, 500, 1);
 
         // unbond part
-        unbond(deps.as_mut(), 7_900, 4_600, 0, 10);
+        unbond(deps.as_mut(), 7_900, 4_600, 0, unbond_height);
 
         // Assert updated weights
         assert_stake(deps.as_ref(), 12_100, 8_900, 500);
@@ -664,7 +667,7 @@ mod tests {
 
         // with proper claims
         let mut env = mock_env();
-        env.block.height += 10;
+        env.block.height += unbond_height;
         let expires = unbonding.after(&env.block);
         assert_eq!(
             get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
@@ -672,7 +675,7 @@ mod tests {
         );
 
         // wait til they expire and get payout
-        env.block.height += 60;
+        env.block.height += unbonding_period;
         let res = execute(
             deps.as_mut(),
             env,
