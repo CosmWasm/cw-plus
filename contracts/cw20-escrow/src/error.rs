@@ -6,9 +6,6 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
-    #[error("No data in ReceiveMsg")]
-    NoData {},
-
     #[error("Unauthorized")]
     Unauthorized {},
 
