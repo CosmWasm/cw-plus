@@ -72,7 +72,8 @@
           "type": "object",
           "required": [
             "amount",
-            "contract"
+            "contract",
+            "msg"
           ],
           "properties": {
             "amount": {
@@ -82,14 +83,7 @@
               "type": "string"
             },
             "msg": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Binary"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/definitions/Binary"
             }
           }
         }
@@ -207,6 +201,7 @@
           "required": [
             "amount",
             "contract",
+            "msg",
             "owner"
           ],
           "properties": {
@@ -217,14 +212,7 @@
               "type": "string"
             },
             "msg": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Binary"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/definitions/Binary"
             },
             "owner": {
               "type": "string"

@@ -153,6 +153,7 @@
       "type": "object",
       "required": [
         "amount",
+        "msg",
         "sender"
       ],
       "properties": {
@@ -160,14 +161,7 @@
           "$ref": "#/definitions/Uint128"
         },
         "msg": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Binary"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/definitions/Binary"
         },
         "sender": {
           "type": "string"
