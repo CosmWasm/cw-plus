@@ -1,13 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, coins, to_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdError, StdResult, Storage, Uint128,
+    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    MessageInfo, Order, Response, StdResult, Storage, Uint128, WasmMsg,
 };
 
 use cw0::{maybe_addr, NativeBalance};
 use cw2::set_contract_version;
-use cw20::{Balance, Denom};
+use cw20::{Balance, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg, Denom};
 use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
@@ -15,7 +15,7 @@ use cw4::{
 use cw_storage_plus::Bound;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, StakedResponse};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 
 // version info for migration info
@@ -75,6 +75,7 @@ pub fn execute(
         ExecuteMsg::Bond {} => execute_bond(deps, env, Balance::from(info.funds), info.sender),
         ExecuteMsg::Unbond { tokens: amount } => execute_unbond(deps, env, info, amount),
         ExecuteMsg::Claim {} => execute_claim(deps, env, info),
+        ExecuteMsg::Receive(msg) => execute_receive(deps, env, info, msg),
     }
 }
 
@@ -127,6 +128,29 @@ pub fn execute_bond(
         attributes,
         data: None,
     })
+}
+
+pub fn execute_receive(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    wrapper: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    // info.sender is the address of the cw20 contract (that re-sent this message).
+    // wrapper.sender is the address of the user that requested the cw20 contract to send this.
+    // This cannot be fully trusted (the cw20 contract can fake it), so only use it for actions
+    // in the address's favor (like paying/bonding tokens, not withdrawls)
+    let msg: ReceiveMsg = from_slice(&wrapper.msg)?;
+    let balance = Balance::Cw20(Cw20CoinVerified {
+        address: info.sender,
+        amount: wrapper.amount,
+    });
+    let api = deps.api;
+    match msg {
+        ReceiveMsg::Bond {} => {
+            execute_bond(deps, env, balance, api.addr_validate(&wrapper.sender)?)
+        }
+    }
 }
 
 pub fn execute_unbond(
@@ -239,20 +263,32 @@ pub fn execute_claim(
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let amount;
-    match &config.denom {
-        Denom::Native(denom) => amount = coins(release.u128(), denom),
-        Denom::Cw20(_canonical_addr) => {
-            unimplemented!("The CW20 coins release functionality is in progress")
+    let (amount_str, message) = match &config.denom {
+        Denom::Native(denom) => {
+            let amount_str = coin_to_string(release, denom.as_str());
+            let amount = coins(release.u128(), denom);
+            let message = BankMsg::Send {
+                to_address: info.sender.to_string(),
+                amount,
+            }
+            .into();
+            (amount_str, message)
         }
-    }
-
-    let amount_str = coins_to_string(&amount);
-    let messages = vec![BankMsg::Send {
-        to_address: info.sender.clone().into(),
-        amount,
-    }
-    .into()];
+        Denom::Cw20(addr) => {
+            let amount_str = coin_to_string(release, addr.as_str());
+            let transfer = Cw20ExecuteMsg::Transfer {
+                recipient: info.sender.clone().into(),
+                amount: release,
+            };
+            let message = WasmMsg::Execute {
+                contract_addr: addr.into(),
+                msg: to_binary(&transfer)?,
+                send: vec![],
+            }
+            .into();
+            (amount_str, message)
+        }
+    };
 
     let attributes = vec![
         attr("action", "claim"),
@@ -261,19 +297,15 @@ pub fn execute_claim(
     ];
     Ok(Response {
         submessages: vec![],
-        messages,
+        messages: vec![message],
         attributes,
         data: None,
     })
 }
 
-// TODO: put in cosmwasm-std
-fn coins_to_string(coins: &[Coin]) -> String {
-    let strings: Vec<_> = coins
-        .iter()
-        .map(|c| format!("{}{}", c.amount, c.denom))
-        .collect();
-    strings.join(",")
+#[inline]
+fn coin_to_string(amount: Uint128, denom: &str) -> String {
+    format!("{} {}", amount, denom)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -304,17 +336,8 @@ fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
 pub fn query_staked(deps: Deps, addr: String) -> StdResult<StakedResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let stake = STAKE.may_load(deps.storage, &addr)?.unwrap_or_default();
-    let denom = match CONFIG.load(deps.storage)?.denom {
-        Denom::Native(want) => want,
-        _ => {
-            return Err(StdError::generic_err(
-                "The stake for CW20 is not yet implemented",
-            ));
-        }
-    };
-    Ok(StakedResponse {
-        stake: coin(stake.u128(), denom),
-    })
+    let denom = CONFIG.load(deps.storage)?.denom;
+    Ok(StakedResponse { stake, denom })
 }
 
 fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
@@ -357,7 +380,7 @@ fn list_members(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_slice, OverflowError, OverflowOperation, StdError, Storage};
+    use cosmwasm_std::{coin, from_slice, OverflowError, OverflowOperation, StdError, Storage};
     use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
@@ -375,6 +398,7 @@ mod tests {
     const TOKENS_PER_WEIGHT: Uint128 = Uint128(1_000);
     const MIN_BOND: Uint128 = Uint128(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
+    const CW20_ADDRESS: &str = "wasm1234567890";
 
     fn default_instantiate(deps: DepsMut) {
         do_instantiate(
@@ -402,6 +426,18 @@ mod tests {
         instantiate(deps, mock_env(), info, msg).unwrap();
     }
 
+    fn cw20_instantiate(deps: DepsMut, unbonding_period: Duration) {
+        let msg = InstantiateMsg {
+            denom: Denom::Cw20(Addr::unchecked(CW20_ADDRESS)),
+            tokens_per_weight: TOKENS_PER_WEIGHT,
+            min_bond: MIN_BOND,
+            unbonding_period,
+            admin: Some(INIT_ADMIN.into()),
+        };
+        let info = mock_info("creator", &[]);
+        instantiate(deps, mock_env(), info, msg).unwrap();
+    }
+
     fn bond(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
         let mut env = mock_env();
         env.block.height += height_delta;
@@ -410,6 +446,23 @@ mod tests {
             if *stake != 0 {
                 let msg = ExecuteMsg::Bond {};
                 let info = mock_info(addr, &coins(*stake, DENOM));
+                execute(deps.branch(), env.clone(), info, msg).unwrap();
+            }
+        }
+    }
+
+    fn bond_cw20(mut deps: DepsMut, user1: u128, user2: u128, user3: u128, height_delta: u64) {
+        let mut env = mock_env();
+        env.block.height += height_delta;
+
+        for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
+            if *stake != 0 {
+                let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+                    sender: addr.to_string(),
+                    amount: Uint128(*stake),
+                    msg: to_binary(&ReceiveMsg::Bond {}).unwrap(),
+                });
+                let info = mock_info(CW20_ADDRESS, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
             }
         }
@@ -491,13 +544,13 @@ mod tests {
     // this tests the member queries
     fn assert_stake(deps: Deps, user1_stake: u128, user2_stake: u128, user3_stake: u128) {
         let stake1 = query_staked(deps, USER1.into()).unwrap();
-        assert_eq!(stake1.stake, coin(user1_stake, DENOM));
+        assert_eq!(stake1.stake, user1_stake.into());
 
         let stake2 = query_staked(deps, USER2.into()).unwrap();
-        assert_eq!(stake2.stake, coin(user2_stake, DENOM));
+        assert_eq!(stake2.stake, user2_stake.into());
 
         let stake3 = query_staked(deps, USER3.into()).unwrap();
-        assert_eq!(stake3.stake, coin(user3_stake, DENOM));
+        assert_eq!(stake3.stake, user3_stake.into());
     }
 
     #[test]
@@ -572,6 +625,81 @@ mod tests {
                 5100
             )))
         );
+    }
+
+    #[test]
+    fn cw20_token_bond() {
+        let mut deps = mock_dependencies(&[]);
+        cw20_instantiate(deps.as_mut(), Duration::Height(2000));
+
+        // Assert original weights
+        assert_users(deps.as_ref(), None, None, None, None);
+
+        // ensure it rounds down, and respects cut-off
+        bond_cw20(deps.as_mut(), 12_000, 7_500, 4_000, 1);
+
+        // Assert updated weights
+        assert_stake(deps.as_ref(), 12_000, 7_500, 4_000);
+        assert_users(deps.as_ref(), Some(12), Some(7), None, None);
+    }
+
+    #[test]
+    fn cw20_token_claim() {
+        let unbonding_period: u64 = 50;
+        let unbond_height: u64 = 10;
+
+        let mut deps = mock_dependencies(&[]);
+        let unbonding = Duration::Height(unbonding_period);
+        cw20_instantiate(deps.as_mut(), unbonding);
+
+        // bond some tokens
+        bond_cw20(deps.as_mut(), 20_000, 13_500, 500, 1);
+
+        // unbond part
+        unbond(deps.as_mut(), 7_900, 4_600, 0, unbond_height);
+
+        // Assert updated weights
+        assert_stake(deps.as_ref(), 12_100, 8_900, 500);
+        assert_users(deps.as_ref(), Some(12), Some(8), None, None);
+
+        // with proper claims
+        let mut env = mock_env();
+        env.block.height += unbond_height;
+        let expires = unbonding.after(&env.block);
+        assert_eq!(
+            get_claims(deps.as_ref(), &Addr::unchecked(USER1)),
+            vec![Claim::new(7_900, expires)]
+        );
+
+        // wait til they expire and get payout
+        env.block.height += unbonding_period;
+        let res = execute(
+            deps.as_mut(),
+            env,
+            mock_info(USER1, &[]),
+            ExecuteMsg::Claim {},
+        )
+        .unwrap();
+        assert_eq!(res.messages.len(), 1);
+        match &res.messages[0] {
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr,
+                msg,
+                send,
+            }) => {
+                assert_eq!(contract_addr.as_str(), CW20_ADDRESS);
+                assert_eq!(send.len(), 0);
+                let parsed: Cw20ExecuteMsg = from_slice(&msg).unwrap();
+                assert_eq!(
+                    parsed,
+                    Cw20ExecuteMsg::Transfer {
+                        recipient: USER1.into(),
+                        amount: Uint128(7_900)
+                    }
+                );
+            }
+            _ => panic!("Must initiate cw20 transfer"),
+        }
     }
 
     #[test]

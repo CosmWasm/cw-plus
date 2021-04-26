@@ -1,9 +1,9 @@
-use cosmwasm_std::{Coin, Uint128};
+use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cw0::Duration;
-use cw20::Denom;
+use cw20::{Cw20ReceiveMsg, Denom};
 pub use cw_controllers::ClaimsResponse;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -37,6 +37,16 @@ pub enum ExecuteMsg {
     AddHook { addr: String },
     /// Remove a hook. Must be called by Admin
     RemoveHook { addr: String },
+
+    /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
+    Receive(Cw20ReceiveMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiveMsg {
+    /// Only valid cw20 message is to bond the tokens
+    Bond {},
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -71,5 +81,6 @@ pub enum QueryMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StakedResponse {
-    pub stake: Coin,
+    pub stake: Uint128,
+    pub denom: Denom,
 }

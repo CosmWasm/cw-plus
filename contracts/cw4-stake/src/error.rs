@@ -34,4 +34,7 @@ pub enum ContractError {
 
     #[error("No funds sent")]
     NoFunds {},
+
+    #[error("No data in ReceiveMsg")]
+    NoData {},
 }
