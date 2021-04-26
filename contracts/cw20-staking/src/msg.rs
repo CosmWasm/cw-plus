@@ -57,7 +57,7 @@ pub enum ExecuteMsg {
     Send {
         contract: String,
         amount: Uint128,
-        msg: Option<Binary>,
+        msg: Binary,
     },
     /// Implements CW20 "approval" extension. Allows spender to access an additional amount tokens
     /// from the owner's (env.sender) account. If expires is Some(), overwrites current allowance
@@ -88,7 +88,7 @@ pub enum ExecuteMsg {
         owner: String,
         contract: String,
         amount: Uint128,
-        msg: Option<Binary>,
+        msg: Binary,
     },
     /// Implements CW20 "approval" extension. Destroys tokens forever
     BurnFrom { owner: String, amount: Uint128 },
