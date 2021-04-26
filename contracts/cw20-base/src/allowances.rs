@@ -208,7 +208,7 @@ pub fn execute_send_from(
     owner: String,
     contract: String,
     amount: Uint128,
-    msg: Option<Binary>,
+    msg: Binary,
 ) -> Result<Response, ContractError> {
     let rcpt_addr = deps.api.addr_validate(&contract)?;
     let owner_addr = deps.api.addr_validate(&owner)?;
@@ -691,7 +691,7 @@ mod tests {
             owner: owner.clone(),
             amount: transfer,
             contract: contract.clone(),
-            msg: Some(send_msg.clone()),
+            msg: send_msg.clone(),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -703,7 +703,7 @@ mod tests {
         let binary_msg = Cw20ReceiveMsg {
             sender: spender.clone(),
             amount: transfer,
-            msg: Some(send_msg.clone()),
+            msg: send_msg.clone(),
         }
         .into_binary()
         .unwrap();
@@ -736,7 +736,7 @@ mod tests {
             owner: owner.clone(),
             amount: Uint128(33443),
             contract: contract.clone(),
-            msg: Some(send_msg.clone()),
+            msg: send_msg.clone(),
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
@@ -758,7 +758,7 @@ mod tests {
             owner,
             amount: Uint128(33443),
             contract,
-            msg: Some(send_msg),
+            msg: send_msg,
         };
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();

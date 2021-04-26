@@ -242,7 +242,7 @@ pub fn execute_send(
     info: MessageInfo,
     contract: String,
     amount: Uint128,
-    msg: Option<Binary>,
+    msg: Binary,
 ) -> Result<Response, ContractError> {
     if amount == Uint128::zero() {
         return Err(ContractError::InvalidZeroAmount {});
@@ -801,7 +801,7 @@ mod tests {
         let msg = ExecuteMsg::Send {
             contract: contract.clone(),
             amount: Uint128::zero(),
-            msg: Some(send_msg.clone()),
+            msg: send_msg.clone(),
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::InvalidZeroAmount {});
@@ -812,7 +812,7 @@ mod tests {
         let msg = ExecuteMsg::Send {
             contract: contract.clone(),
             amount: too_much,
-            msg: Some(send_msg.clone()),
+            msg: send_msg.clone(),
         };
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
@@ -823,7 +823,7 @@ mod tests {
         let msg = ExecuteMsg::Send {
             contract: contract.clone(),
             amount: transfer,
-            msg: Some(send_msg.clone()),
+            msg: send_msg.clone(),
         };
         let res = execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(res.messages.len(), 1);
@@ -833,7 +833,7 @@ mod tests {
         let binary_msg = Cw20ReceiveMsg {
             sender: addr1.clone(),
             amount: transfer,
-            msg: Some(send_msg),
+            msg: send_msg,
         }
         .into_binary()
         .unwrap();
