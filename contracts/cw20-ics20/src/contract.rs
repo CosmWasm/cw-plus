@@ -61,10 +61,7 @@ pub fn execute_receive(
 ) -> Result<Response, ContractError> {
     nonpayable(&info)?;
 
-    let msg: TransferMsg = match wrapper.msg {
-        Some(bin) => from_binary(&bin)?,
-        None => return Err(ContractError::NoData {}),
-    };
+    let msg: TransferMsg = from_binary(&wrapper.msg)?;
     let amount = Amount::Cw20(Cw20Coin {
         address: info.sender.to_string(),
         amount: wrapper.amount,
@@ -317,7 +314,7 @@ mod test {
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: "my-account".into(),
             amount: Uint128(888777666),
-            msg: Some(to_binary(&transfer).unwrap()),
+            msg: to_binary(&transfer).unwrap(),
         });
 
         // works with proper funds
