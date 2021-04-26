@@ -57,10 +57,7 @@ pub fn execute_receive(
     info: MessageInfo,
     wrapper: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    let msg: ReceiveMsg = match wrapper.msg {
-        Some(bin) => Ok(from_binary(&bin)?),
-        None => Err(ContractError::NoData {}),
-    }?;
+    let msg: ReceiveMsg = from_binary(&wrapper.msg)?;
     let token = Cw20CoinVerified {
         address: info.sender,
         amount: wrapper.amount,
@@ -687,7 +684,7 @@ mod tests {
         let receive = Cw20ReceiveMsg {
             sender: cw20_sender,
             amount: cw20_coin.amount,
-            msg: Some(to_binary(&ExecuteMsg::Create(create)).unwrap()),
+            msg: to_binary(&ExecuteMsg::Create(create)).unwrap(),
         };
         let token_contract = cw20_coin.address;
         let info = mock_info(&token_contract, &[]);
