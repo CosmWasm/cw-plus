@@ -92,7 +92,7 @@ pub fn execute_transfer(
         None => CONFIG.load(deps.storage)?.default_timeout,
     };
     // timeout is in nanoseconds
-    let timeout = (env.block.time + timeout_delta) * 1_000_000_000;
+    let timeout = env.block.timestamp().plus_seconds(timeout_delta);
 
     // build ics20 packet
     let packet = Ics20Packet::new(
@@ -107,8 +107,7 @@ pub fn execute_transfer(
     let msg = IbcMsg::SendPacket {
         channel_id: msg.channel,
         data: to_binary(&packet)?,
-        timeout_block: None,
-        timeout_timestamp: Some(timeout),
+        timeout: timeout.into(),
     };
 
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
