@@ -9,6 +9,7 @@ use crate::indexes::Index;
 use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{Bound, Prefix};
+use crate::Path;
 
 pub trait IndexList<T> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<T>> + '_>;
@@ -42,6 +43,10 @@ where
             primary: Map::new(pk_namespace),
             idx: indexes,
         }
+    }
+
+    pub fn key(&self, k: K) -> Path<T> {
+        self.primary.key(k)
     }
 }
 
