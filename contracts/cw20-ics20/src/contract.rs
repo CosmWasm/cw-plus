@@ -254,16 +254,11 @@ mod test {
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,
-            timeout_timestamp,
-            timeout_block,
+            timeout,
         }) = &res.messages[0]
         {
-            assert!(timeout_block.is_none());
-            assert!(timeout_timestamp.is_some());
-            assert_eq!(
-                timeout_timestamp.unwrap() / 1_000_000_000,
-                mock_env().block.time + DEFAULT_TIMEOUT
-            );
+            let expected_timeout = mock_env().block.timestamp().plus_seconds(DEFAULT_TIMEOUT);
+            assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
             assert_eq!(msg.amount, Uint128(1234567));
@@ -323,16 +318,11 @@ mod test {
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,
-            timeout_timestamp,
-            timeout_block,
+            timeout,
         }) = &res.messages[0]
         {
-            assert!(timeout_block.is_none());
-            assert!(timeout_timestamp.is_some());
-            assert_eq!(
-                timeout_timestamp.unwrap() / 1_000_000_000,
-                mock_env().block.time + 7777
-            );
+            let expected_timeout = mock_env().block.timestamp().plus_seconds(7777);
+            assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
             assert_eq!(msg.amount, Uint128(888777666));
