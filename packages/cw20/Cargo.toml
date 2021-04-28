@@ -1,6 +1,6 @@
 [package]
 name = "cw20"
-version = "0.6.0-beta2"
+version = "0.6.0-beta3"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Definition and types for the CosmWasm-20 interface"
@@ -10,7 +10,7 @@ homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.6.0-beta2" }
+cw0 = { path = "../../packages/cw0", version = "0.6.0-beta3" }
 cosmwasm-std = { version = "0.14.0-beta5" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

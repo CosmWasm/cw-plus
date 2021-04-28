@@ -909,7 +909,7 @@ jobs:
           # Uses --debug for compilation speed
           # FIXME: Change when `check_contract` (part of `cosmwasm-0.14.0`) is published
           #command: cargo install --debug --features iterator --example check_contract -- cosmwasm-vm
-          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --tag=v0.14.0-beta2 --example check_contract -- cosmwasm-vm
+          command: cargo install --debug --features iterator --git https://github.com/CosmWasm/cosmwasm --tag=v0.14.0-beta5 --example check_contract -- cosmwasm-vm
       - save_cache:
           paths:
             - /usr/local/cargo/registry

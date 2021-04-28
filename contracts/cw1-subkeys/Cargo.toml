@@ -1,6 +1,6 @@
 [package]
 name = "cw1-subkeys"
-version = "0.6.0-beta2"
+version = "0.6.0-beta3"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Implement subkeys for authorizing native tokens as a cw1 proxy contract"
@@ -18,12 +18,12 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.6.0-beta2" }
-cw1 = { path = "../../packages/cw1", version = "0.6.0-beta2" }
-cw2 = { path = "../../packages/cw2", version = "0.6.0-beta2" }
-cw1-whitelist = { path = "../cw1-whitelist", version = "0.6.0-beta2", features = ["library"] }
+cw0 = { path = "../../packages/cw0", version = "0.6.0-beta3" }
+cw1 = { path = "../../packages/cw1", version = "0.6.0-beta3" }
+cw2 = { path = "../../packages/cw2", version = "0.6.0-beta3" }
+cw1-whitelist = { path = "../cw1-whitelist", version = "0.6.0-beta3", features = ["library"] }
 cosmwasm-std = { version = "0.14.0-beta5", features = ["iterator", "staking"] }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.0-beta2", features = ["iterator"] }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.0-beta3", features = ["iterator"] }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
