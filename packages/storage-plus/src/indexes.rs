@@ -138,6 +138,10 @@ where
         )
     }
 
+    pub fn index_key(&self, k: K) -> Vec<u8> {
+        k.joined_key()
+    }
+
     // FIXME?: Move to Prefix<T> for ergonomics
     pub fn pks<'c>(
         &self,
@@ -267,6 +271,10 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
+    pub fn index_key(&self, k: K) -> Vec<u8> {
+        k.joined_key()
+    }
+
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
