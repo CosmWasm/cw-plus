@@ -13,6 +13,6 @@ documentation = "https://docs.cosmwasm.com"
 iterator = ["cosmwasm-std/iterator"]
 
 [dependencies]
-cosmwasm-std = { version = "0.14.0-beta4" }
+cosmwasm-std = { version = "0.14.0-beta5" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

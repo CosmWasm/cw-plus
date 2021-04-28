@@ -25,7 +25,7 @@ cw2 = { path = "../../packages/cw2", version = "0.6.0-beta2" }
 cw20 = { path = "../../packages/cw20", version = "0.6.0-beta2" }
 cw20-base = { path = "../../contracts/cw20-base", version = "0.6.0-beta2", features = ["library"] }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.0-beta2" }
-cosmwasm-std = { version = "0.14.0-beta4", features = ["staking"] }
+cosmwasm-std = { version = "0.14.0-beta5", features = ["staking"] }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
@@ -34,4 +34,4 @@ integer-sqrt = { version = "0.1.5" }
 integer-cbrt = { version = "0.1" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.14.0-beta4" }
+cosmwasm-schema = { version = "0.14.0-beta5" }

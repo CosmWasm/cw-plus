@@ -92,7 +92,7 @@ pub fn execute_transfer(
         None => CONFIG.load(deps.storage)?.default_timeout,
     };
     // timeout is in nanoseconds
-    let timeout = (env.block.time + timeout_delta) * 1_000_000_000;
+    let timeout = env.block.timestamp().plus_seconds(timeout_delta);
 
     // build ics20 packet
     let packet = Ics20Packet::new(
@@ -107,8 +107,7 @@ pub fn execute_transfer(
     let msg = IbcMsg::SendPacket {
         channel_id: msg.channel,
         data: to_binary(&packet)?,
-        timeout_block: None,
-        timeout_timestamp: Some(timeout),
+        timeout: timeout.into(),
     };
 
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
@@ -255,16 +254,11 @@ mod test {
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,
-            timeout_timestamp,
-            timeout_block,
+            timeout,
         }) = &res.messages[0]
         {
-            assert!(timeout_block.is_none());
-            assert!(timeout_timestamp.is_some());
-            assert_eq!(
-                timeout_timestamp.unwrap() / 1_000_000_000,
-                mock_env().block.time + DEFAULT_TIMEOUT
-            );
+            let expected_timeout = mock_env().block.timestamp().plus_seconds(DEFAULT_TIMEOUT);
+            assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
             assert_eq!(msg.amount, Uint128(1234567));
@@ -324,16 +318,11 @@ mod test {
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,
-            timeout_timestamp,
-            timeout_block,
+            timeout,
         }) = &res.messages[0]
         {
-            assert!(timeout_block.is_none());
-            assert!(timeout_timestamp.is_some());
-            assert_eq!(
-                timeout_timestamp.unwrap() / 1_000_000_000,
-                mock_env().block.time + 7777
-            );
+            let expected_timeout = mock_env().block.timestamp().plus_seconds(7777);
+            assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
             assert_eq!(msg.amount, Uint128(888777666));
