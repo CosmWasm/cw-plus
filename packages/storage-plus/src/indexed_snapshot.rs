@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
 use crate::prefix::{Bound, Prefix};
 use crate::snapshot::SnapshotMap;
-use crate::{IndexList, Strategy};
+use crate::{IndexList, Path, Strategy};
 
 /// IndexedSnapshotMap works like a SnapshotMap but has a secondary index
 pub struct IndexedSnapshotMap<'a, K, T, I>
@@ -70,6 +70,10 @@ where
 
     pub fn assert_checkpointed(&self, store: &dyn Storage, height: u64) -> StdResult<()> {
         self.primary.assert_checkpointed(store, height)
+    }
+
+    pub fn key(&self, k: K) -> Path<T> {
+        self.primary.key(k)
     }
 }
 
