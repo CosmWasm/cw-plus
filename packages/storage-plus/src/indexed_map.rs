@@ -342,6 +342,19 @@ mod test {
             .count();
         assert_eq!(0, count);
 
+        // index_key() works
+        let key = map
+            .idx
+            .name
+            .index_key((PkOwned(b"Maria".to_vec()), PkOwned(b"1".to_vec())));
+        let count = map
+            .idx
+            .name
+            .range(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
+            .count();
+        // gets all the "Maria"s
+        assert_eq!(3, count);
+
         // match on proper age
         let proper = U32Key::new(42);
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
