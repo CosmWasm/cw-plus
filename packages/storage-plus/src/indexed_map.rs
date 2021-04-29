@@ -342,11 +342,13 @@ mod test {
             .count();
         assert_eq!(0, count);
 
-        // index_key() works
-        let key = map
-            .idx
-            .name
-            .index_key((PkOwned(b"Maria".to_vec()), PkOwned(b"1".to_vec())));
+        // index_key() with empty pk works
+        // In a MultiIndex, an index key is composed by the index and the primary key.
+        // Primary key may be empty (so that to iterate over all elements that match just the index)
+        let key = (PkOwned(b"Maria".to_vec()), PkOwned(b"".to_vec()));
+        // Use the index_key() helper to build the (raw) index key
+        let key = map.idx.name.index_key(key);
+        // Iterate using a bound over the raw key
         let count = map
             .idx
             .name
