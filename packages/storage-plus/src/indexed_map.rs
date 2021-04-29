@@ -357,6 +357,21 @@ mod test {
         // gets all the "Maria"s
         assert_eq!(3, count);
 
+        // index_key() with non-empty pk works.
+        // Build key including a set pk
+        let key = (PkOwned(b"Maria".to_vec()), PkOwned(b"1".to_vec()));
+        // Use the index_key() helper to build the (raw) index key
+        let key = map.idx.name.index_key(key);
+        // Iterate using a (exclusive) bound over the raw key.
+        // Useful for pagination / continuation contexts
+        let count = map
+            .idx
+            .name
+            .range(&store, Some(Bound::exclusive(key)), None, Order::Ascending)
+            .count();
+        // gets all the "Maria"s except for the first one
+        assert_eq!(2, count);
+
         // match on proper age
         let proper = U32Key::new(42);
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
