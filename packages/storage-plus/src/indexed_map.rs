@@ -342,7 +342,7 @@ mod test {
             .count();
         assert_eq!(0, count);
 
-        // index_key() with empty pk works
+        // index_key() over MultiIndex works (empty pk)
         // In a MultiIndex, an index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
         let key = (PkOwned(b"Maria".to_vec()), PkOwned(b"".to_vec()));
@@ -357,13 +357,13 @@ mod test {
         // gets all the "Maria"s
         assert_eq!(3, count);
 
-        // index_key() with non-empty pk works.
-        // Build key including a set pk
+        // index_key() over MultiIndex works (non-empty pk)
+        // Build key including a non-empty pk
         let key = (PkOwned(b"Maria".to_vec()), PkOwned(b"1".to_vec()));
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a (exclusive) bound over the raw key.
-        // Useful for pagination / continuation contexts
+        // (Useful for pagination / continuation contexts).
         let count = map
             .idx
             .name
@@ -371,6 +371,24 @@ mod test {
             .count();
         // gets all the "Maria"s except for the first one
         assert_eq!(2, count);
+
+        // index_key() over UniqueIndex works.
+        let age_key = U32Key::from(23);
+        // Use the index_key() helper to build the (raw) index key
+        let age_key = map.idx.age.index_key(age_key);
+        // Iterate using a (inclusive) bound over the raw key.
+        let count = map
+            .idx
+            .age
+            .range(
+                &store,
+                Some(Bound::inclusive(age_key)),
+                None,
+                Order::Ascending,
+            )
+            .count();
+        // gets all the greater than or equal to 23 years old people
+        assert_eq!(3, count);
 
         // match on proper age
         let proper = U32Key::new(42);
