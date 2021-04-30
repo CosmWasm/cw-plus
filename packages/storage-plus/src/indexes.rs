@@ -9,21 +9,21 @@ use cosmwasm_std::{from_slice, Binary, Order, Pair, StdError, StdResult, Storage
 use crate::helpers::namespaces_with_key;
 use crate::keys::EmptyPrefix;
 use crate::map::Map;
-use crate::{Bound, PkOwned, Prefix, Prefixer, PrimaryKey, U32Key};
+use crate::{Bound, Prefix, Prefixer, PrimaryKey, U32Key};
 
-pub fn index_string(data: &str) -> PkOwned {
-    PkOwned(data.as_bytes().to_vec())
+pub fn index_string(data: &str) -> Vec<u8> {
+    data.as_bytes().to_vec()
 }
 
-pub fn index_tuple(name: &str, age: u32) -> (PkOwned, U32Key) {
+pub fn index_tuple(name: &str, age: u32) -> (Vec<u8>, U32Key) {
     (index_string(name), U32Key::new(age))
 }
 
-pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (PkOwned, U32Key, PkOwned) {
-    (index_string(name), U32Key::new(age), PkOwned(pk))
+pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (Vec<u8>, U32Key, Vec<u8>) {
+    (index_string(name), U32Key::new(age), pk)
 }
 
-pub fn index_string_tuple(data1: &str, data2: &str) -> (PkOwned, PkOwned) {
+pub fn index_string_tuple(data1: &str, data2: &str) -> (Vec<u8>, Vec<u8>) {
     (index_string(data1), index_string(data2))
 }
 
