@@ -118,25 +118,6 @@ impl EmptyPrefix for () {
     fn new() {}
 }
 
-// Add support for an dynamic keys - constructor functions below
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PkOwned(pub Vec<u8>);
-
-impl<'a> PrimaryKey<'a> for PkOwned {
-    type Prefix = ();
-    type SubPrefix = ();
-
-    fn key(&self) -> Vec<&[u8]> {
-        vec![&self.0]
-    }
-}
-
-impl<'a> Prefixer<'a> for PkOwned {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self.0]
-    }
-}
-
 impl<'a> PrimaryKey<'a> for Vec<u8> {
     type Prefix = ();
     type SubPrefix = ();
@@ -198,7 +179,7 @@ pub type I32Key = IntKey<i32>;
 pub type I64Key = IntKey<i64>;
 pub type I128Key = IntKey<i128>;
 
-/// It will cast one-particular int type into a Key via PkOwned, ensuring you don't mix up u32 and u64
+/// It will cast one-particular int type into a Key via Vec<u8>, ensuring you don't mix up u32 and u64
 /// You can use new or the from/into pair to build a key from an int:
 ///
 ///   let k = U64Key::new(12345);

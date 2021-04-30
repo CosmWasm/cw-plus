@@ -22,7 +22,7 @@ pub use indexes::{
 };
 pub use item::Item;
 pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
-pub use keys::{PkOwned, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
+pub use keys::{Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
