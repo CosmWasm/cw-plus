@@ -92,7 +92,7 @@ pub fn execute_transfer(
         None => CONFIG.load(deps.storage)?.default_timeout,
     };
     // timeout is in nanoseconds
-    let timeout = env.block.timestamp().plus_seconds(timeout_delta);
+    let timeout = env.block.time.plus_seconds(timeout_delta);
 
     // build ics20 packet
     let packet = Ics20Packet::new(

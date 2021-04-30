@@ -249,7 +249,7 @@ impl ContractData {
 }
 
 pub fn next_block(block: &mut BlockInfo) {
-    block.time += 5;
+    block.time.plus_seconds(5);
     block.height += 1;
 }
 

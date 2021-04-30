@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{BlockInfo, StdError, StdResult};
+use cosmwasm_std::{BlockInfo, StdError, StdResult, Timestamp};
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Add, Mul};
@@ -15,7 +15,7 @@ pub enum Expiration {
     /// AtHeight will expire when `env.block.height` >= height
     AtHeight(u64),
     /// AtTime will expire when `env.block.time` >= time
-    AtTime(u64),
+    AtTime(Timestamp),
     /// Never will never expire. Used to express the empty variant
     Never {},
 }
@@ -24,7 +24,10 @@ impl fmt::Display for Expiration {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Expiration::AtHeight(height) => write!(f, "expiration height: {}", height),
-            Expiration::AtTime(time) => write!(f, "expiration time: {}", time),
+            Expiration::AtTime(time) => {
+                let secs = time.nanos() / 1_000_000_000;
+                write!(f, "expiration time: {}", secs)
+            }
             Expiration::Never {} => write!(f, "expiration: never"),
         }
     }
@@ -52,7 +55,9 @@ impl Add<Duration> for Expiration {
 
     fn add(self, duration: Duration) -> StdResult<Expiration> {
         match (self, duration) {
-            (Expiration::AtTime(t), Duration::Time(delta)) => Ok(Expiration::AtTime(t + delta)),
+            (Expiration::AtTime(t), Duration::Time(delta)) => {
+                Ok(Expiration::AtTime(t.plus_seconds(delta)))
+            }
             (Expiration::AtHeight(h), Duration::Height(delta)) => {
                 Ok(Expiration::AtHeight(h + delta))
             }
@@ -90,6 +95,7 @@ pub const WEEK: Duration = Duration::Time(7 * 24 * 60 * 60);
 #[serde(rename_all = "snake_case")]
 pub enum Duration {
     Height(u64),
+    /// Time in seconds
     Time(u64),
 }
 
@@ -107,7 +113,7 @@ impl Duration {
     pub fn after(&self, block: &BlockInfo) -> Expiration {
         match self {
             Duration::Height(h) => Expiration::AtHeight(block.height + h),
-            Duration::Time(t) => Expiration::AtTime(block.time + t),
+            Duration::Time(t) => Expiration::AtTime(block.time.plus_seconds(*t)),
         }
     }
 
