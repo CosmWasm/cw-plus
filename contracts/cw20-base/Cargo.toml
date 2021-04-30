@@ -22,10 +22,10 @@ cw0 = { path = "../../packages/cw0", version = "0.6.0-beta3" }
 cw2 = { path = "../../packages/cw2", version = "0.6.0-beta3" }
 cw20 = { path = "../../packages/cw20", version = "0.6.0-beta3" }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.0-beta3", features = ["iterator"] }
-cosmwasm-std = { version = "0.14.0-beta5", features = ["iterator"] }
+cosmwasm-std = { version = "0.14.0-rc1", features = ["iterator"] }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.20" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.14.0-beta5" }
+cosmwasm-schema = { version = "0.14.0-rc1" }
