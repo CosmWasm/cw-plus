@@ -478,7 +478,7 @@ mod tests {
 
     fn mock_env_time(time_delta: u64) -> Env {
         let mut env = mock_env();
-        env.block.time += time_delta;
+        env.block.time = env.block.time.plus_seconds(time_delta);
         env
     }
 

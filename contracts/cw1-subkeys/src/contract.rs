@@ -437,7 +437,7 @@ pub fn query_all_permissions(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, Addr, StakingMsg};
+    use cosmwasm_std::{coin, coins, Addr, StakingMsg, Timestamp};
 
     use cw0::NativeBalance;
     use cw1_whitelist::msg::AdminListResponse;
@@ -906,7 +906,7 @@ mod tests {
 
         let expires_height = Expiration::AtHeight(5432);
         let expires_never = Expiration::Never {};
-        let expires_time = Expiration::AtTime(1234567890);
+        let expires_time = Expiration::AtTime(Timestamp::from_seconds(1234567890));
         // Initially set first spender allowance with height expiration, the second with no expiration
         let initial_expirations = vec![expires_height, expires_never];
 
