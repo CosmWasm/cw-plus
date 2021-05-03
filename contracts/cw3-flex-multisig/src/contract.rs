@@ -805,12 +805,8 @@ mod tests {
         move |block: &mut BlockInfo| {
             match voting_period {
                 Duration::Time(duration) => {
-                    let (secs, nanos) = (
-                        block.time.nanos() / 1_000_000_000,
-                        block.time.nanos() % 1_000_000_000,
-                    );
-                    let earlier = Timestamp::from_seconds(secs - duration);
-                    block.time = earlier.plus_nanos(nanos);
+                    block.time =
+                        Timestamp::from_nanos(block.time.nanos() - (duration * 1_000_000_000));
                 }
                 Duration::Height(duration) => block.height -= duration,
             };

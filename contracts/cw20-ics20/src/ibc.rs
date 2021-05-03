@@ -441,7 +441,7 @@ mod test {
                 channel_id: my_channel.to_string(),
             },
             sequence: 3,
-            timeout: IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
+            timeout: Timestamp::from_seconds(1665321069).into(),
         }
     }
 
