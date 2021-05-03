@@ -249,7 +249,7 @@ impl ContractData {
 }
 
 pub fn next_block(block: &mut BlockInfo) {
-    block.time.plus_seconds(5);
+    block.time = block.time.plus_seconds(5);
     block.height += 1;
 }
 
@@ -672,7 +672,7 @@ mod test {
         router.update_block(next_block);
         let next = router.get_env(Addr::unchecked("foo")).block;
 
-        assert_eq!(time + 5, next.time);
+        assert_eq!(time.plus_seconds(5), next.time);
         assert_eq!(height + 1, next.height);
     }
 
