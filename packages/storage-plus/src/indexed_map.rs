@@ -270,6 +270,16 @@ mod test {
         pks.push(pk);
         datas.push(data);
 
+        let data = Data {
+            name: "Marta".to_string(),
+            last_name: "After".to_string(),
+            age: 90,
+        };
+        let pk: &[u8] = b"5";
+        map.save(store, pk, &data).unwrap();
+        pks.push(pk);
+        datas.push(data);
+
         (pks, datas)
     }
 
@@ -350,8 +360,8 @@ mod test {
             .name
             .range(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
             .count();
-        // gets all the "Maria"s
-        assert_eq!(3, count);
+        // gets from the first "Maria" until the end
+        assert_eq!(4, count);
 
         // index_key() over MultiIndex works (non-empty pk)
         // Build key including a non-empty pk
@@ -365,8 +375,8 @@ mod test {
             .name
             .range(&store, Some(Bound::exclusive(key)), None, Order::Ascending)
             .count();
-        // gets all the "Maria"s except for the first one
-        assert_eq!(2, count);
+        // gets from the 2nd "Maria" until the end
+        assert_eq!(3, count);
 
         // index_key() over UniqueIndex works.
         let age_key = U32Key::from(23);
@@ -384,7 +394,7 @@ mod test {
             )
             .count();
         // gets all the greater than or equal to 23 years old people
-        assert_eq!(3, count);
+        assert_eq!(4, count);
 
         // match on proper age
         let proper = U32Key::new(42);
@@ -529,7 +539,7 @@ mod test {
 
         // different name, different last name, same age => error
         let data5 = Data {
-            name: "Marta".to_string(),
+            name: "Marcel".to_string(),
             last_name: "Laurens".to_string(),
             age: 42,
         };
@@ -647,15 +657,17 @@ mod test {
         let ages = res.unwrap();
 
         let count = ages.len();
-        assert_eq!(4, count);
+        assert_eq!(5, count);
 
         // The pks, sorted by age ascending
+        assert_eq!(pks[4].to_vec(), ages[4].0);
         assert_eq!(pks[3].to_vec(), ages[0].0);
         assert_eq!(pks[1].to_vec(), ages[1].0);
         assert_eq!(pks[2].to_vec(), ages[2].0);
         assert_eq!(pks[0].to_vec(), ages[3].0);
 
         // The associated data
+        assert_eq!(datas[4], ages[4].1);
         assert_eq!(datas[3], ages[0].1);
         assert_eq!(datas[1], ages[1].1);
         assert_eq!(datas[2], ages[2].1);
