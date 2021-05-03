@@ -40,7 +40,7 @@ impl<'a> PrimaryKey<'a> for &'a str {
     }
 }
 
-// use generics for combining there - so we can use &[u8], PkOwned, or IntKey
+// use generics for combining there - so we can use &[u8], Vec<u8>, or IntKey
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U) {
     type Prefix = T;
     type SubPrefix = ();
@@ -52,7 +52,7 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
     }
 }
 
-// use generics for combining there - so we can use &[u8], PkOwned, or IntKey
+// use generics for combining there - so we can use &[u8], Vec<u8>, or IntKey
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>>
     PrimaryKey<'a> for (T, U, V)
 {
@@ -118,22 +118,18 @@ impl EmptyPrefix for () {
     fn new() {}
 }
 
-// Add support for an dynamic keys - constructor functions below
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PkOwned(pub Vec<u8>);
-
-impl<'a> PrimaryKey<'a> for PkOwned {
+impl<'a> PrimaryKey<'a> for Vec<u8> {
     type Prefix = ();
     type SubPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
-        vec![&self.0]
+        vec![&self]
     }
 }
 
-impl<'a> Prefixer<'a> for PkOwned {
+impl<'a> Prefixer<'a> for Vec<u8> {
     fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self.0]
+        vec![&self]
     }
 }
 
@@ -154,20 +150,20 @@ impl<'a> Prefixer<'a> for &'a Addr {
     }
 }
 
-// this auto-implements PrimaryKey for all the IntKey types (and more!)
-impl<'a, T: AsRef<PkOwned> + From<PkOwned> + Clone> PrimaryKey<'a> for T {
+// this auto-implements PrimaryKey for all the IntKey types
+impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T> {
     type Prefix = ();
     type SubPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
-        self.as_ref().key()
+        self.wrapped.key()
     }
 }
 
-// this auto-implements Prefixer for all the IntKey types (and more!)
-impl<'a, T: AsRef<PkOwned>> Prefixer<'a> for T {
+// this auto-implements Prefixer for all the IntKey types
+impl<'a, T: Endian> Prefixer<'a> for IntKey<T> {
     fn prefix(&self) -> Vec<&[u8]> {
-        self.as_ref().prefix()
+        self.wrapped.prefix()
     }
 }
 
@@ -183,7 +179,7 @@ pub type I32Key = IntKey<i32>;
 pub type I64Key = IntKey<i64>;
 pub type I128Key = IntKey<i128>;
 
-/// It will cast one-particular int type into a Key via PkOwned, ensuring you don't mix up u32 and u64
+/// It will cast one-particular int type into a Key via Vec<u8>, ensuring you don't mix up u32 and u64
 /// You can use new or the from/into pair to build a key from an int:
 ///
 ///   let k = U64Key::new(12345);
@@ -191,14 +187,14 @@ pub type I128Key = IntKey<i128>;
 ///   let k: U16Key = 12345.into();
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IntKey<T: Endian> {
-    pub wrapped: PkOwned,
+    pub wrapped: Vec<u8>,
     pub data: PhantomData<T>,
 }
 
 impl<T: Endian> IntKey<T> {
     pub fn new(val: T) -> Self {
         IntKey {
-            wrapped: PkOwned(val.to_be_bytes().into()),
+            wrapped: val.to_be_bytes().into(),
             data: PhantomData,
         }
     }
@@ -210,8 +206,8 @@ impl<T: Endian> From<T> for IntKey<T> {
     }
 }
 
-impl<T: Endian> From<PkOwned> for IntKey<T> {
-    fn from(wrap: PkOwned) -> Self {
+impl<T: Endian> From<Vec<u8>> for IntKey<T> {
+    fn from(wrap: Vec<u8>) -> Self {
         // TODO: assert proper length
         IntKey {
             wrapped: wrap,
@@ -220,21 +216,9 @@ impl<T: Endian> From<PkOwned> for IntKey<T> {
     }
 }
 
-impl<T: Endian> From<Vec<u8>> for IntKey<T> {
-    fn from(wrap: Vec<u8>) -> Self {
-        PkOwned(wrap).into()
-    }
-}
-
 impl<T: Endian> From<IntKey<T>> for Vec<u8> {
     fn from(k: IntKey<T>) -> Vec<u8> {
-        k.wrapped.0
-    }
-}
-
-impl<T: Endian> AsRef<PkOwned> for IntKey<T> {
-    fn as_ref(&self) -> &PkOwned {
-        &self.wrapped
+        k.wrapped
     }
 }
 

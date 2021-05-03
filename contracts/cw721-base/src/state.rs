@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
 use cw721::{ContractInfoResponse, Expiration};
-use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex, PkOwned};
+use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {
@@ -53,7 +53,7 @@ pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 
 pub struct TokenIndexes<'a> {
     // pk goes to second tuple element
-    pub owner: MultiIndex<'a, (PkOwned, PkOwned), TokenInfo>,
+    pub owner: MultiIndex<'a, (Vec<u8>, Vec<u8>), TokenInfo>,
 }
 
 impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
@@ -66,7 +66,7 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
         owner: MultiIndex::new(
-            |d, k| (PkOwned(Vec::from(d.owner.as_ref())), PkOwned(k)),
+            |d, k| (Vec::from(d.owner.as_ref()), k),
             "tokens",
             "tokens__owner",
         ),

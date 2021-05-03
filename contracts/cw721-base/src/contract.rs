@@ -17,7 +17,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
     increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS,
 };
-use cw_storage_plus::{Bound, PkOwned};
+use cw_storage_plus::Bound;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -516,7 +516,7 @@ fn query_tokens(
         .owner
         .pks(
             deps.storage,
-            PkOwned(Vec::from(owner_addr.as_ref())),
+            Vec::from(owner_addr.as_ref()),
             start,
             None,
             Order::Ascending,

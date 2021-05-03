@@ -168,7 +168,7 @@ mod test {
     use super::*;
 
     use crate::indexes::{index_string_tuple, index_triple, MultiIndex, UniqueIndex};
-    use crate::{PkOwned, U32Key};
+    use crate::U32Key;
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -182,9 +182,9 @@ mod test {
 
     struct DataIndexes<'a> {
         // Second arg is for storing pk
-        pub name: MultiIndex<'a, (PkOwned, PkOwned), Data>,
+        pub name: MultiIndex<'a, (Vec<u8>, Vec<u8>), Data>,
         pub age: UniqueIndex<'a, U32Key, Data>,
-        pub name_lastname: UniqueIndex<'a, (PkOwned, PkOwned), Data>,
+        pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -198,7 +198,7 @@ mod test {
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
         // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (PkOwned, U32Key, PkOwned), Data>,
+        pub name_age: MultiIndex<'a, (Vec<u8>, U32Key, Vec<u8>), Data>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -212,11 +212,7 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(
-                |d, k| (PkOwned(d.name.as_bytes().to_vec()), PkOwned(k)),
-                "data",
-                "data__name",
-            ),
+            name: MultiIndex::new(|d, k| (d.name.as_bytes().to_vec(), k), "data", "data__name"),
             age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
@@ -294,7 +290,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(PkOwned(b"Maria".to_vec()))
+            .prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(2, count);
@@ -306,7 +302,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix(PkOwned(b"Maria".to_vec()))
+            .prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -319,7 +315,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(PkOwned(b"Marib".to_vec()))
+            .prefix(b"Marib".to_vec())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -328,7 +324,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(PkOwned(b"Mari`".to_vec()))
+            .prefix(b"Mari`".to_vec())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -337,7 +333,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(PkOwned(b"Maria5".to_vec()))
+            .prefix(b"Maria5".to_vec())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -345,7 +341,7 @@ mod test {
         // index_key() over MultiIndex works (empty pk)
         // In a MultiIndex, an index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
-        let key = (PkOwned(b"Maria".to_vec()), PkOwned(b"".to_vec()));
+        let key = (b"Maria".to_vec(), b"".to_vec());
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a bound over the raw key
@@ -359,7 +355,7 @@ mod test {
 
         // index_key() over MultiIndex works (non-empty pk)
         // Build key including a non-empty pk
-        let key = (PkOwned(b"Maria".to_vec()), PkOwned(b"1".to_vec()));
+        let key = (b"Maria".to_vec(), b"1".to_vec());
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a (exclusive) bound over the raw key.
@@ -443,7 +439,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix(PkOwned(b"Maria".to_vec()))
+            .prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -507,7 +503,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name_age
-            .sub_prefix(PkOwned(b"Maria".to_vec()))
+            .sub_prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -599,7 +595,7 @@ mod test {
                 .name
                 .pks(
                     store,
-                    PkOwned(name.as_bytes().to_vec()),
+                    name.as_bytes().to_vec(),
                     None,
                     None,
                     Order::Ascending,
@@ -677,7 +673,7 @@ mod test {
         let res: StdResult<Vec<_>> = map
             .idx
             .name_lastname
-            .prefix(PkOwned(b"Maria".to_vec()))
+            .prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Ascending)
             .collect();
         let marias = res.unwrap();
