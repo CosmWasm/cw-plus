@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Coin, Env, Order, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, Coin, Env, Order, StdError, StdResult, Storage, Timestamp};
 use cw_storage_plus::Map;
 
 use cw20::{Balance, Cw20CoinVerified};
@@ -77,7 +77,7 @@ impl Escrow {
         }
 
         if let Some(end_time) = self.end_time {
-            if env.block.time > end_time {
+            if env.block.time > Timestamp::from_seconds(end_time) {
                 return true;
             }
         }

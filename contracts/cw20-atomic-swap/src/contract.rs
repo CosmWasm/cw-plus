@@ -274,7 +274,7 @@ fn query_list(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, Uint128};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, Timestamp, Uint128};
 
     use cw20::Expiration;
 
@@ -359,7 +359,7 @@ mod tests {
             id: "swap0001".to_string(),
             hash: real_hash(),
             recipient: "rcpt0001".into(),
-            expires: Expiration::AtTime(1),
+            expires: Expiration::AtTime(Timestamp::from_seconds(1)),
         };
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap_err();
         assert_eq!(err, ContractError::Expired {});
@@ -581,7 +581,7 @@ mod tests {
             id: "swap0002".to_string(),
             hash: custom_hash(2),
             recipient: "rcpt0002".into(),
-            expires: Expiration::AtTime(2_000_000_000),
+            expires: Expiration::AtTime(Timestamp::from_seconds(2_000_000_000)),
         };
         execute(
             deps.as_mut(),

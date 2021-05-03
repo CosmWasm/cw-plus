@@ -42,6 +42,7 @@
           "additionalProperties": false
         },
         {
+          "description": "Time in seconds",
           "type": "object",
           "required": [
             "time"

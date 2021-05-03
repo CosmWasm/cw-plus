@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{BlockInfo, StdError, StdResult};
+use cosmwasm_std::{BlockInfo, StdError, StdResult, Timestamp};
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Add, Mul};
@@ -15,7 +15,7 @@ pub enum Expiration {
     /// AtHeight will expire when `env.block.height` >= height
     AtHeight(u64),
     /// AtTime will expire when `env.block.time` >= time
-    AtTime(u64),
+    AtTime(Timestamp),
     /// Never will never expire. Used to express the empty variant
     Never {},
 }
@@ -52,7 +52,9 @@ impl Add<Duration> for Expiration {
 
     fn add(self, duration: Duration) -> StdResult<Expiration> {
         match (self, duration) {
-            (Expiration::AtTime(t), Duration::Time(delta)) => Ok(Expiration::AtTime(t + delta)),
+            (Expiration::AtTime(t), Duration::Time(delta)) => {
+                Ok(Expiration::AtTime(t.plus_seconds(delta)))
+            }
             (Expiration::AtHeight(h), Duration::Height(delta)) => {
                 Ok(Expiration::AtHeight(h + delta))
             }
@@ -90,6 +92,7 @@ pub const WEEK: Duration = Duration::Time(7 * 24 * 60 * 60);
 #[serde(rename_all = "snake_case")]
 pub enum Duration {
     Height(u64),
+    /// Time in seconds
     Time(u64),
 }
 
@@ -107,7 +110,7 @@ impl Duration {
     pub fn after(&self, block: &BlockInfo) -> Expiration {
         match self {
             Duration::Height(h) => Expiration::AtHeight(block.height + h),
-            Duration::Time(t) => Expiration::AtTime(block.time + t),
+            Duration::Time(t) => Expiration::AtTime(block.time.plus_seconds(*t)),
         }
     }
 
@@ -152,21 +155,39 @@ mod test {
         // matching pairs
         assert_eq!(true, Expiration::AtHeight(5) < Expiration::AtHeight(10));
         assert_eq!(false, Expiration::AtHeight(8) < Expiration::AtHeight(7));
-        assert_eq!(true, Expiration::AtTime(555) < Expiration::AtTime(777));
-        assert_eq!(false, Expiration::AtTime(86) > Expiration::AtTime(100));
+        assert_eq!(
+            true,
+            Expiration::AtTime(Timestamp::from_seconds(555))
+                < Expiration::AtTime(Timestamp::from_seconds(777))
+        );
+        assert_eq!(
+            false,
+            Expiration::AtTime(Timestamp::from_seconds(86))
+                > Expiration::AtTime(Timestamp::from_seconds(100))
+        );
 
         // never as infinity
         assert!(Expiration::AtHeight(500000) < Expiration::Never {});
-        assert!(Expiration::Never {} > Expiration::AtTime(500000));
+        assert!(Expiration::Never {} > Expiration::AtTime(Timestamp::from_seconds(500000)));
 
         // what happens for the uncomparables?? all compares are false
         assert_eq!(
             None,
-            Expiration::AtTime(1000).partial_cmp(&Expiration::AtHeight(230))
+            Expiration::AtTime(Timestamp::from_seconds(1000))
+                .partial_cmp(&Expiration::AtHeight(230))
         );
-        assert_eq!(false, Expiration::AtTime(1000) < Expiration::AtHeight(230));
-        assert_eq!(false, Expiration::AtTime(1000) > Expiration::AtHeight(230));
-        assert_eq!(false, Expiration::AtTime(1000) == Expiration::AtHeight(230));
+        assert_eq!(
+            false,
+            Expiration::AtTime(Timestamp::from_seconds(1000)) < Expiration::AtHeight(230)
+        );
+        assert_eq!(
+            false,
+            Expiration::AtTime(Timestamp::from_seconds(1000)) > Expiration::AtHeight(230)
+        );
+        assert_eq!(
+            false,
+            Expiration::AtTime(Timestamp::from_seconds(1000)) == Expiration::AtHeight(230)
+        );
     }
 
     #[test]
@@ -176,8 +197,11 @@ mod test {
         assert_eq!(end.unwrap(), Expiration::AtHeight(12745));
 
         // time
-        let end = Expiration::AtTime(55544433) + Duration::Time(40300);
-        assert_eq!(end.unwrap(), Expiration::AtTime(55584733));
+        let end = Expiration::AtTime(Timestamp::from_seconds(55544433)) + Duration::Time(40300);
+        assert_eq!(
+            end.unwrap(),
+            Expiration::AtTime(Timestamp::from_seconds(55584733))
+        );
 
         // never
         let end = Expiration::Never {} + Duration::Time(40300);
@@ -196,8 +220,7 @@ mod test {
     fn block_plus_duration() {
         let block = BlockInfo {
             height: 1000,
-            time: 7777,
-            time_nanos: 123456789,
+            time: Timestamp::from_seconds(7777),
             chain_id: "foo".to_string(),
         };
 
@@ -205,7 +228,7 @@ mod test {
         assert_eq!(Expiration::AtHeight(1456), end);
 
         let end = Duration::Time(1212).after(&block);
-        assert_eq!(Expiration::AtTime(8989), end);
+        assert_eq!(Expiration::AtTime(Timestamp::from_seconds(8989)), end);
     }
 
     #[test]

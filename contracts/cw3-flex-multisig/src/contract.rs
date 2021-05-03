@@ -448,7 +448,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-    use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal};
+    use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal, Timestamp};
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
@@ -795,7 +795,7 @@ mod tests {
     fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
         move |block: &mut BlockInfo| {
             match voting_period {
-                Duration::Time(duration) => block.time += duration + 1,
+                Duration::Time(duration) => block.time = block.time.plus_seconds(duration + 1),
                 Duration::Height(duration) => block.height += duration + 1,
             };
         }
@@ -804,7 +804,10 @@ mod tests {
     fn unexpire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
         move |block: &mut BlockInfo| {
             match voting_period {
-                Duration::Time(duration) => block.time -= duration,
+                Duration::Time(duration) => {
+                    block.time =
+                        Timestamp::from_nanos(block.time.nanos() - (duration * 1_000_000_000));
+                }
                 Duration::Height(duration) => block.height -= duration,
             };
         }

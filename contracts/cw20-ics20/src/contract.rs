@@ -92,7 +92,7 @@ pub fn execute_transfer(
         None => CONFIG.load(deps.storage)?.default_timeout,
     };
     // timeout is in nanoseconds
-    let timeout = env.block.timestamp().plus_seconds(timeout_delta);
+    let timeout = env.block.time.plus_seconds(timeout_delta);
 
     // build ics20 packet
     let packet = Ics20Packet::new(
@@ -257,7 +257,7 @@ mod test {
             timeout,
         }) = &res.messages[0]
         {
-            let expected_timeout = mock_env().block.timestamp().plus_seconds(DEFAULT_TIMEOUT);
+            let expected_timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
             assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
@@ -321,7 +321,7 @@ mod test {
             timeout,
         }) = &res.messages[0]
         {
-            let expected_timeout = mock_env().block.timestamp().plus_seconds(7777);
+            let expected_timeout = mock_env().block.time.plus_seconds(7777);
             assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();

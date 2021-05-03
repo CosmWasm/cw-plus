@@ -510,7 +510,7 @@ mod tests {
             _ => panic!("Must provide duration in time"),
         };
         let mut res = env.clone();
-        res.block.time += time_delta;
+        res.block.time = res.block.time.plus_seconds(time_delta);
         res
     }
 
