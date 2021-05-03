@@ -12,9 +12,9 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema_with_title(&mut schema_for!(InstantiateMsg), &out_dir, "InstantiateMsg");
-    export_schema_with_title(&mut schema_for!(ExecuteMsg), &out_dir, "ExecuteMsg");
-    export_schema_with_title(&mut schema_for!(QueryMsg), &out_dir, "QueryMsg");
+    export_schema_with_title(&schema_for!(InstantiateMsg), &out_dir, "InstantiateMsg");
+    export_schema_with_title(&schema_for!(ExecuteMsg), &out_dir, "ExecuteMsg");
+    export_schema_with_title(&schema_for!(QueryMsg), &out_dir, "QueryMsg");
     export_schema(&schema_for!(AdminResponse), &out_dir);
     export_schema(&schema_for!(MemberListResponse), &out_dir);
     export_schema(&schema_for!(MemberResponse), &out_dir);
