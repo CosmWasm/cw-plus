@@ -345,7 +345,7 @@ mod test {
 
     use crate::contract::query_channel;
     use cosmwasm_std::testing::mock_env;
-    use cosmwasm_std::{coins, to_vec, IbcEndpoint};
+    use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcTimeout, Timestamp};
 
     #[test]
     fn check_ack_json() {
@@ -413,8 +413,7 @@ mod test {
                 channel_id: "channel-1234".to_string(),
             },
             sequence: 2,
-            timeout_block: None,
-            timeout_timestamp: Some(1665321069000000000u64),
+            timeout: IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
         }
     }
     fn mock_receive_packet(
@@ -442,8 +441,7 @@ mod test {
                 channel_id: my_channel.to_string(),
             },
             sequence: 3,
-            timeout_block: None,
-            timeout_timestamp: Some(1665321069000000000u64),
+            timeout: IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
         }
     }
 

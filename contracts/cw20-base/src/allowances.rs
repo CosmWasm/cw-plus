@@ -269,7 +269,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, CosmosMsg, WasmMsg};
+    use cosmwasm_std::{coins, CosmosMsg, Timestamp, WasmMsg};
     use cw20::{Cw20Coin, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
@@ -356,7 +356,7 @@ mod tests {
         // increase it some more and override the expires
         let raise = Uint128(87654);
         let allow3 = allow2 + raise;
-        let new_expire = Expiration::AtTime(8888888888);
+        let new_expire = Expiration::AtTime(Timestamp::from_seconds(8888888888));
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: raise,
@@ -453,7 +453,7 @@ mod tests {
         let info = mock_info(spender.as_ref(), &[]);
         let env = mock_env();
         let allow3 = Uint128(1821);
-        let expires3 = Expiration::AtTime(3767626296);
+        let expires3 = Expiration::AtTime(Timestamp::from_seconds(3767626296));
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow3,
