@@ -1,6 +1,6 @@
 pub mod contract;
 mod error;
-mod msg;
-mod state;
+pub mod msg;
+pub mod state;
 
-pub use msg::InstantiateMsg;
+pub use crate::error::ContractError;
