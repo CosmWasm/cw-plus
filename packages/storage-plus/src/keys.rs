@@ -133,6 +133,21 @@ impl<'a> Prefixer<'a> for Vec<u8> {
     }
 }
 
+impl<'a> PrimaryKey<'a> for String {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        vec![self.as_bytes()]
+    }
+}
+
+impl<'a> Prefixer<'a> for String {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![self.as_bytes()]
+    }
+}
+
 /// type safe version to ensure address was validated before use.
 impl<'a> PrimaryKey<'a> for &'a Addr {
     type Prefix = ();
@@ -256,6 +271,19 @@ mod test {
     }
 
     #[test]
+    fn string_key_works() {
+        type K = String;
+
+        let k: K = "hello".to_string();
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!("hello".as_bytes(), path[0]);
+
+        let joined = k.joined_key();
+        assert_eq!(joined, b"hello")
+    }
+
+    #[test]
     fn nested_str_key_works() {
         type K<'a> = (&'a str, &'a [u8]);
 
@@ -319,6 +347,14 @@ mod test {
         let three: Vec<u8> = b"end".to_vec();
         assert_eq!(
             triple.prefix(),
+            vec![one.as_slice(), two.as_slice(), three.as_slice()]
+        );
+
+        // same works with owned variants (&str -> String, &[u8] -> Vec<u8>)
+        let owned_triple: (String, U32Key, Vec<u8>) =
+            ("begin".to_string(), 12345.into(), b"end".to_vec());
+        assert_eq!(
+            owned_triple.prefix(),
             vec![one.as_slice(), two.as_slice(), three.as_slice()]
         );
     }
