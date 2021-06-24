@@ -21,29 +21,29 @@
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
-| cw1-subkeys             | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw1_subkeys.wasm)                        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
-| cw1-whitelist           | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw1_whitelist.wasm)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
-| cw3-fixed-multisig       | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw3_fixed_multisig.wasm)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
-| cw3-flex-multisig       | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw3_flex_multisig.wasm)          | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)    |
-| cw4-group               | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)    |
-| cw4-stake               | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)    |
-| cw20-atomic-swap        | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw20_atomic_swap.wasm)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
-| cw20-base               | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
-| cw20-bonding            | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw20_bonding.wasm)          | [![Docs](https://docs.rs/cw20-bonding/badge.svg)](https://docs.rs/cw20-bonding)    |
-| cw20-escrow             | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
-| cw20-ics20             | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw20_ics20.wasm)          | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)    |
-| cw20-staking            | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
-| cw721-base              | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw721_base.wasm)          | [![Docs](https://docs.rs/cw721-base/badge.svg)](https://docs.rs/cw721-base)    |
-| cw1155-base              | [Release v0.6.1](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.1/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
+| cw1-subkeys             | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw1_subkeys.wasm)                        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
+| cw1-whitelist           | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw1_whitelist.wasm)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
+| cw3-fixed-multisig       | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw3_fixed_multisig.wasm)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
+| cw3-flex-multisig       | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw3_flex_multisig.wasm)          | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)    |
+| cw4-group               | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)    |
+| cw4-stake               | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)    |
+| cw20-atomic-swap        | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_atomic_swap.wasm)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
+| cw20-base               | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
+| cw20-bonding            | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_bonding.wasm)          | [![Docs](https://docs.rs/cw20-bonding/badge.svg)](https://docs.rs/cw20-bonding)    |
+| cw20-escrow             | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
+| cw20-ics20             | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_ics20.wasm)          | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)    |
+| cw20-staking            | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
+| cw721-base              | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw721_base.wasm)          | [![Docs](https://docs.rs/cw721-base/badge.svg)](https://docs.rs/cw721-base)    |
+| cw1155-base              | [Release v0.6.2](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
 
 
 This is a collection of specification and contracts designed for
 use on real networks. They are designed not just as examples, but to
-solve real-world use cases, and to provide a reusable basis to build 
+solve real-world use cases, and to provide a reusable basis to build
 many custom contracts.
 
-If you don't know what CosmWasm is, please check out 
-[our homepage](https://cosmwasm.com) and 
+If you don't know what CosmWasm is, please check out
+[our homepage](https://cosmwasm.com) and
 [our documentation](https://docs.cosmwasm.com) to get more background.
 We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/coralnet/README.md)
 you can use to test out any contracts.
@@ -54,17 +54,17 @@ your projects.
 
 **Note** All code in pre-1.0 packages is in "draft" form, meaning it may
 undergo minor changes and additions until 1.0. For example between 0.1 and
-0.2 we adjusted the `Expiration` type to make the JSON representation 
-cleaner (before: `expires: {at_height: {height: 12345}}` after 
+0.2 we adjusted the `Expiration` type to make the JSON representation
+cleaner (before: `expires: {at_height: {height: 12345}}` after
 `expires: {at_height: 12345}`)
 
 ## Specifications
 
 The most reusable components are the various cwXYZ specifications under
 `packages`. Each one defines a standard interface for different domains,
-e.g. [cw20](./packages/cw20/README.md) for fungible tokens, 
-[cw721](./packages/cw721/README.md) for non-fungible tokens, 
-[cw1](./packages/cw1/README.md) for  "proxy contracts", etc. 
+e.g. [cw20](./packages/cw20/README.md) for fungible tokens,
+[cw721](./packages/cw721/README.md) for non-fungible tokens,
+[cw1](./packages/cw1/README.md) for  "proxy contracts", etc.
 The interface comes with a human description in the READMEs, as well
 as Rust types that can be imported.
 
@@ -81,13 +81,13 @@ or [create a pull request](https://github.com/CosmWasm/cosmwasm-plus/pulls) on t
 
 ## Contracts
 
-We provide sample contracts that either implement or consume these 
+We provide sample contracts that either implement or consume these
 specifications to both provide examples, and provide a basis
 for code you can extend for more custom contacts, without worrying
 about reinventing the wheel each time.
 For example [`cw20-base`](./contracts/cw20-base) is a basic implementation
-of a `cw20` compatible contract that can be imported in any custom 
-contract you want to build on it. 
+of a `cw20` compatible contract that can be imported in any custom
+contract you want to build on it.
 
 CW1 Proxy Contracts:
 
@@ -136,7 +136,7 @@ staking native tokens on your behalf and minting cw20 tokens that can
 be used to claim them. It uses `cw20-base` for all the cw20 logic and
 only implements the interactions with the staking module and accounting
 for prices.
-* [`cw20-escrow`](./contracts/cw20-escrow) is a basic escrow contract 
+* [`cw20-escrow`](./contracts/cw20-escrow) is a basic escrow contract
 (arbiter can release or refund tokens) that is compatible with all native
 and cw20 tokens. This is a good example to show how to interact with
 cw20 tokens.
@@ -162,7 +162,7 @@ This will compile all packages in the `contracts` directory and output the
 stripped and optimized wasm code under the `artifacts` directory as output,
 along with a `checksums.txt` file.
 
-If you hit any issues there and want to debug, you can try to run the 
+If you hit any issues there and want to debug, you can try to run the
 following in each contract dir:
 `RUSTFLAGS="-C link-arg=-s" cargo build --release --target=wasm32-unknown-unknown --locked`
 
@@ -203,14 +203,14 @@ package is the real value. If does give quick feedback for you if you unit test 
 
 This repo contains two license, [Apache 2.0](./LICENSE-APACHE) and
 [AGPL 3.0](./LICENSE-AGPL.md). All crates in this repo may be licensed
-as one or the other. Please check the `NOTICE` in each crate or the 
+as one or the other. Please check the `NOTICE` in each crate or the
 relevant `Cargo.toml` file for clarity.
 
 All *specifications* will always be Apache-2.0. All contracts that are
 meant to be *building blocks* will also be Apache-2.0. This is along
 the lines of Open Zepellin or other public references.
 
-Contracts that are "ready to deploy" may be licensed under AGPL 3.0 to 
+Contracts that are "ready to deploy" may be licensed under AGPL 3.0 to
 encourage anyone using them to contribute back any improvements they
 make. This is common practice for actual projects running on Ethereum,
 like Uniswap or Maker DAO.
