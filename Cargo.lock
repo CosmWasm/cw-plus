@@ -140,6 +140,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cosmwasm-schema"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d66ae8ed0319a9ae48a18cb00eda7f6b4b5c2d2e1c05b194f9a4eefbb07b3a43"
+dependencies = [
+ "schemars",
+ "serde_json",
+]
+
+[[package]]
 name = "cosmwasm-std"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -251,7 +261,7 @@ dependencies = [
 name = "cw1"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.15.0",
  "schemars",
  "serde",
@@ -261,7 +271,7 @@ dependencies = [
 name = "cw1-subkeys"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",
@@ -277,7 +287,7 @@ dependencies = [
 name = "cw1-whitelist"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",
@@ -292,7 +302,7 @@ dependencies = [
 name = "cw1155"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.15.0",
  "cw0",
  "schemars",
@@ -303,7 +313,7 @@ dependencies = [
 name = "cw1155-base"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",
@@ -328,7 +338,7 @@ dependencies = [
 name = "cw20"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.15.0",
  "cw0",
  "schemars",
@@ -339,7 +349,7 @@ dependencies = [
 name = "cw20-atomic-swap"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",
@@ -356,8 +366,8 @@ dependencies = [
 name = "cw20-base"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std 0.14.0",
+ "cosmwasm-schema 0.15.0",
+ "cosmwasm-std 0.15.0",
  "cw-storage-plus",
  "cw0",
  "cw2",
@@ -371,7 +381,7 @@ dependencies = [
 name = "cw20-bonding"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",
@@ -390,7 +400,7 @@ dependencies = [
 name = "cw20-escrow"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-multi-test",
  "cw-storage-plus",
@@ -407,7 +417,7 @@ dependencies = [
 name = "cw20-ics20"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",
@@ -422,7 +432,7 @@ dependencies = [
 name = "cw20-staking"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-controllers",
  "cw-storage-plus",
@@ -439,7 +449,7 @@ dependencies = [
 name = "cw3"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.15.0",
  "cw0",
  "schemars",
@@ -450,7 +460,7 @@ dependencies = [
 name = "cw3-fixed-multisig"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-multi-test",
  "cw-storage-plus",
@@ -468,7 +478,7 @@ dependencies = [
 name = "cw3-flex-multisig"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-multi-test",
  "cw-storage-plus",
@@ -486,7 +496,7 @@ dependencies = [
 name = "cw4"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.15.0",
  "schemars",
  "serde",
@@ -496,7 +506,7 @@ dependencies = [
 name = "cw4-group"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-controllers",
  "cw-storage-plus",
@@ -512,7 +522,7 @@ dependencies = [
 name = "cw4-stake"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-controllers",
  "cw-storage-plus",
@@ -529,7 +539,7 @@ dependencies = [
 name = "cw721"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.15.0",
  "cw0",
  "schemars",
@@ -540,7 +550,7 @@ dependencies = [
 name = "cw721-base"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 0.14.0",
  "cosmwasm-std 0.14.0",
  "cw-storage-plus",
  "cw0",

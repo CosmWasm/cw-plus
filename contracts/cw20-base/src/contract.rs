@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Uint128,
+    SubMsg, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -140,7 +140,6 @@ pub fn execute_transfer(
     )?;
 
     let res = Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "transfer"),
@@ -148,6 +147,7 @@ pub fn execute_transfer(
             attr("to", recipient),
             attr("amount", amount),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -178,13 +178,13 @@ pub fn execute_burn(
     })?;
 
     let res = Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "burn"),
             attr("from", info.sender),
             attr("amount", amount),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -224,13 +224,13 @@ pub fn execute_mint(
     )?;
 
     let res = Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "mint"),
             attr("to", recipient),
             attr("amount", amount),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -272,17 +272,19 @@ pub fn execute_send(
     ];
 
     // create a send message
-    let msg = Cw20ReceiveMsg {
-        sender: info.sender.into(),
-        amount,
-        msg,
-    }
-    .into_cosmos_msg(contract)?;
+    let msg = SubMsg::new(
+        Cw20ReceiveMsg {
+            sender: info.sender.into(),
+            amount,
+            msg,
+        }
+        .into_cosmos_msg(contract)?,
+    );
 
     let res = Response {
-        submessages: vec![],
         messages: vec![msg],
         attributes: attrs,
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -439,15 +441,18 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
+        assert_eq!(
+            get_balance(deps.as_ref(), "addr0000"),
+            Uint128::new(11223344)
+        );
     }
 
     #[test]
     fn instantiate_mintable() {
         let mut deps = mock_dependencies(&[]);
-        let amount = Uint128(11223344);
+        let amount = Uint128::new(11223344);
         let minter = String::from("asmodat");
-        let limit = Uint128(511223344);
+        let limit = Uint128::new(511223344);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
@@ -475,7 +480,10 @@ mod tests {
                 total_supply: amount,
             }
         );
-        assert_eq!(get_balance(deps.as_ref(), "addr0000"), Uint128(11223344));
+        assert_eq!(
+            get_balance(deps.as_ref(), "addr0000"),
+            Uint128::new(11223344)
+        );
         assert_eq!(
             query_minter(deps.as_ref()).unwrap(),
             Some(MinterResponse {
@@ -488,9 +496,9 @@ mod tests {
     #[test]
     fn instantiate_mintable_over_cap() {
         let mut deps = mock_dependencies(&[]);
-        let amount = Uint128(11223344);
+        let amount = Uint128::new(11223344);
         let minter = String::from("asmodat");
-        let limit = Uint128(11223300);
+        let limit = Uint128::new(11223300);
         let instantiate_msg = InstantiateMsg {
             name: "Cash Token".to_string(),
             symbol: "CASH".to_string(),
@@ -518,14 +526,14 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let genesis = String::from("genesis");
-        let amount = Uint128(11223344);
+        let amount = Uint128::new(11223344);
         let minter = String::from("asmodat");
-        let limit = Uint128(511223344);
+        let limit = Uint128::new(511223344);
         do_instantiate_with_minter(deps.as_mut(), &genesis, amount, &minter, Some(limit));
 
         // minter can mint coins to some winner
         let winner = String::from("lucky");
-        let prize = Uint128(222_222_222);
+        let prize = Uint128::new(222_222_222);
         let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
             amount: prize,
@@ -552,7 +560,7 @@ mod tests {
         // cap is enforced
         let msg = ExecuteMsg::Mint {
             recipient: winner,
-            amount: Uint128(333_222_222),
+            amount: Uint128::new(333_222_222),
         };
         let info = mock_info(minter.as_ref(), &[]);
         let env = mock_env();
@@ -566,14 +574,14 @@ mod tests {
         do_instantiate_with_minter(
             deps.as_mut(),
             &String::from("genesis"),
-            Uint128(1234),
+            Uint128::new(1234),
             &String::from("minter"),
             None,
         );
 
         let msg = ExecuteMsg::Mint {
             recipient: String::from("lucky"),
-            amount: Uint128(222),
+            amount: Uint128::new(222),
         };
         let info = mock_info("anyone else", &[]);
         let env = mock_env();
@@ -584,11 +592,11 @@ mod tests {
     #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies(&[]);
-        do_instantiate(deps.as_mut(), &String::from("genesis"), Uint128(1234));
+        do_instantiate(deps.as_mut(), &String::from("genesis"), Uint128::new(1234));
 
         let msg = ExecuteMsg::Mint {
             recipient: String::from("lucky"),
-            amount: Uint128(222),
+            amount: Uint128::new(222),
         };
         let info = mock_info("genesis", &[]);
         let env = mock_env();
@@ -840,11 +848,11 @@ mod tests {
         // and this is how it must be wrapped for the vm to process it
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
+            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract.clone(),
                 msg: binary_msg,
-                send: vec![],
-            })
+                funds: vec![],
+            }))
         );
 
         // ensure balance is properly transferred
