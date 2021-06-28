@@ -25,8 +25,8 @@ pub struct CurveState {
 impl CurveState {
     pub fn new(reserve_denom: String, decimals: DecimalPlaces) -> Self {
         CurveState {
-            reserve: Uint128(0),
-            supply: Uint128(0),
+            reserve: Uint128::zero(),
+            supply: Uint128::zero(),
             reserve_denom,
             decimals,
         }
