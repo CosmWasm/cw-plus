@@ -153,15 +153,13 @@ mod test {
     #[test]
     fn compare_expiration() {
         // matching pairs
-        assert_eq!(true, Expiration::AtHeight(5) < Expiration::AtHeight(10));
-        assert_eq!(false, Expiration::AtHeight(8) < Expiration::AtHeight(7));
-        assert_eq!(
-            true,
+        assert!(Expiration::AtHeight(5) < Expiration::AtHeight(10));
+        assert!(Expiration::AtHeight(8) < Expiration::AtHeight(7));
+        assert!(
             Expiration::AtTime(Timestamp::from_seconds(555))
                 < Expiration::AtTime(Timestamp::from_seconds(777))
         );
-        assert_eq!(
-            false,
+        assert!(
             Expiration::AtTime(Timestamp::from_seconds(86))
                 > Expiration::AtTime(Timestamp::from_seconds(100))
         );
@@ -176,16 +174,13 @@ mod test {
             Expiration::AtTime(Timestamp::from_seconds(1000))
                 .partial_cmp(&Expiration::AtHeight(230))
         );
-        assert_eq!(
-            false,
+        assert!(
             Expiration::AtTime(Timestamp::from_seconds(1000)) < Expiration::AtHeight(230)
         );
-        assert_eq!(
-            false,
+        assert!(
             Expiration::AtTime(Timestamp::from_seconds(1000)) > Expiration::AtHeight(230)
         );
-        assert_eq!(
-            false,
+        assert!(
             Expiration::AtTime(Timestamp::from_seconds(1000)) == Expiration::AtHeight(230)
         );
     }
