@@ -6,7 +6,7 @@ use std::ops::{AddAssign, Sub};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
-    MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
+    MessageInfo, Order, Response, StakingMsg, StdError, StdResult, SubMsg,
 };
 use cw0::Expiration;
 use cw1::CanExecuteResponse;
@@ -78,7 +78,7 @@ pub fn execute_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msgs: Vec<CosmosMsg<T>>,
+    msgs: Vec<SubMsg<T>>,
 ) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -94,7 +94,7 @@ where
         Ok(res)
     } else {
         for msg in &msgs {
-            match msg {
+            match &msg.msg {
                 CosmosMsg::Staking(staking_msg) => {
                     let perm = PERMISSIONS.may_load(deps.storage, &info.sender)?;
                     let perm = perm.ok_or(ContractError::NotAllowed {})?;
@@ -123,9 +123,9 @@ where
         }
         // Relay messages
         let res = Response {
-            submessages: vec![],
             messages: msgs,
             attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
+            events: vec![],
             data: None,
         };
         Ok(res)
@@ -208,7 +208,6 @@ where
     })?;
 
     let res = Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
@@ -217,6 +216,7 @@ where
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -258,7 +258,6 @@ where
     }
 
     let res = Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
@@ -267,6 +266,7 @@ where
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -294,7 +294,6 @@ where
     PERMISSIONS.save(deps.storage, &spender_addr, &perm)?;
 
     let res = Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "set_permissions"),
@@ -302,6 +301,7 @@ where
             attr("spender", spender),
             attr("permissions", perm),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -1164,11 +1164,10 @@ mod tests {
         );
 
         // Create Send message
-        let msgs = vec![BankMsg::Send {
+        let msgs = vec![SubMsg::new(BankMsg::Send {
             to_address: spender2.to_string(),
             amount: coins(1000, "token1"),
-        }
-        .into()];
+        })];
 
         let execute_msg = ExecuteMsg::Execute { msgs: msgs.clone() };
 
@@ -1203,7 +1202,7 @@ mod tests {
         );
 
         // For admins, even other message types are allowed
-        let other_msgs = vec![CosmosMsg::Custom(Empty {})];
+        let other_msgs = vec![SubMsg::new(CosmosMsg::Custom(Empty {}))];
         let execute_msg = ExecuteMsg::Execute {
             msgs: other_msgs.clone(),
         };
@@ -1266,26 +1265,22 @@ mod tests {
         // default is no permission
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
 
-        let msg_delegate = vec![StakingMsg::Delegate {
+        let msg_delegate = vec![SubMsg::new(StakingMsg::Delegate {
             validator: "validator1".into(),
             amount: coin1.clone(),
-        }
-        .into()];
-        let msg_redelegate = vec![StakingMsg::Redelegate {
+        })];
+        let msg_redelegate = vec![SubMsg::new(StakingMsg::Redelegate {
             src_validator: "validator1".into(),
             dst_validator: "validator2".into(),
             amount: coin1.clone(),
-        }
-        .into()];
-        let msg_undelegate = vec![StakingMsg::Undelegate {
+        })];
+        let msg_undelegate = vec![SubMsg::new(StakingMsg::Undelegate {
             validator: "validator1".into(),
             amount: coin1,
-        }
-        .into()];
-        let msg_withdraw = vec![DistributionMsg::WithdrawDelegatorReward {
+        })];
+        let msg_withdraw = vec![SubMsg::new(DistributionMsg::WithdrawDelegatorReward {
             validator: "validator1".into(),
-        }
-        .into()];
+        })];
 
         let msgs = vec![
             msg_delegate.clone(),

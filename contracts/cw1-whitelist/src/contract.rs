@@ -5,7 +5,7 @@ use std::fmt;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Response, StdResult,
+    Response, StdResult, SubMsg,
 };
 
 use cw1::CanExecuteResponse;
@@ -59,7 +59,7 @@ pub fn execute_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msgs: Vec<CosmosMsg<T>>,
+    msgs: Vec<SubMsg<T>>,
 ) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -243,17 +243,15 @@ mod tests {
 
         let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
         let msgs = vec![
-            BankMsg::Send {
+            SubMsg::new(BankMsg::Send {
                 to_address: bob.to_string(),
                 amount: coins(10000, "DAI"),
-            }
-            .into(),
-            WasmMsg::Execute {
+            }),
+            SubMsg::new(WasmMsg::Execute {
                 contract_addr: "some contract".into(),
                 msg: to_binary(&freeze).unwrap(),
-                send: vec![],
-            }
-            .into(),
+                funds: vec![],
+            }),
         ];
 
         // make some nice message
