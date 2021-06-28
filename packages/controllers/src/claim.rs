@@ -62,7 +62,7 @@ impl<'a> Claims<'a> {
         block: &BlockInfo,
         cap: Option<Uint128>,
     ) -> StdResult<Uint128> {
-        let mut to_send = Uint128(0);
+        let mut to_send = Uint128::new(0);
         self.0.update(storage, addr, |claim| -> StdResult<_> {
             let (_send, waiting): (Vec<_>, _) =
                 claim.unwrap_or_default().iter().cloned().partition(|c| {

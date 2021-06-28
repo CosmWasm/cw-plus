@@ -54,7 +54,7 @@ impl MemberChangedHookMsg {
         let execute = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
             msg,
-            send: vec![],
+            funds: vec![],
         };
         Ok(execute.into())
     }

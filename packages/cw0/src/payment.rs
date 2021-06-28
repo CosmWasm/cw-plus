@@ -42,7 +42,7 @@ pub fn must_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError
 /// denom was sent. Otherwise, returns the amount of `denom` sent, or 0 if nothing sent.
 pub fn may_pay(info: &MessageInfo, denom: &str) -> Result<Uint128, PaymentError> {
     if info.funds.is_empty() {
-        Ok(Uint128(0))
+        Ok(Uint128::new(0))
     } else if info.funds.len() == 1 && info.funds[0].denom == denom {
         Ok(info.funds[0].amount)
     } else {
@@ -97,10 +97,10 @@ mod test {
         let mixed_payment = mock_info(SENDER, &[coin(50, atom), coin(120, "wei")]);
 
         let res = may_pay(&no_payment, atom).unwrap();
-        assert_eq!(res, Uint128(0));
+        assert_eq!(res, Uint128::new(0));
 
         let res = may_pay(&atom_payment, atom).unwrap();
-        assert_eq!(res, Uint128(100));
+        assert_eq!(res, Uint128::new(100));
 
         let err = may_pay(&eth_payment, atom).unwrap_err();
         assert_eq!(err, PaymentError::ExtraDenom("wei".to_string()));
@@ -119,7 +119,7 @@ mod test {
         let mixed_payment = mock_info(SENDER, &[coin(50, atom), coin(120, "wei")]);
 
         let res = must_pay(&atom_payment, atom).unwrap();
-        assert_eq!(res, Uint128(100));
+        assert_eq!(res, Uint128::new(100));
 
         let err = must_pay(&no_payment, atom).unwrap_err();
         assert_eq!(err, PaymentError::NoFunds {});

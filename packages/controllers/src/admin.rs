@@ -79,9 +79,9 @@ impl<'a> Admin<'a> {
         self.set(deps, new_admin)?;
 
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
             attributes,
+            events: vec![],
             data: None,
         })
     }
