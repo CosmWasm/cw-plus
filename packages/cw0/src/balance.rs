@@ -65,7 +65,7 @@ impl NativeBalance {
     }
 
     pub fn is_empty(&self) -> bool {
-        !self.0.iter().any(|x| x.amount != Uint128::new(0))
+        !self.0.iter().any(|x| x.amount != Uint128::zero())
     }
 
     /// similar to `Balance.sub`, but doesn't fail when minuend less than subtrahend
