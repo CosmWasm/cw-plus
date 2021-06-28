@@ -88,9 +88,9 @@ impl<'a> Hooks<'a> {
             attr("sender", info.sender),
         ];
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
             attributes,
+            events: vec![],
             data: None,
         })
     }
@@ -111,9 +111,9 @@ impl<'a> Hooks<'a> {
             attr("sender", info.sender),
         ];
         Ok(Response {
-            submessages: vec![],
             messages: vec![],
             attributes,
+            events: vec![],
             data: None,
         })
     }

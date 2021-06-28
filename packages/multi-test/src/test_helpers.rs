@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Response, StdError,
+    attr, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    StdError, SubMsg,
 };
 use cw_storage_plus::Item;
 
@@ -76,15 +76,14 @@ fn handle_payout(
 ) -> Result<Response, StdError> {
     // always try to payout what was set originally
     let payout = PAYOUT.load(deps.storage)?;
-    let msg = BankMsg::Send {
+    let msg = SubMsg::new(BankMsg::Send {
         to_address: info.sender.into(),
         amount: vec![payout.payout],
-    }
-    .into();
+    });
     let res = Response {
-        submessages: vec![],
         messages: vec![msg],
         attributes: vec![attr("action", "payout")],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -123,7 +122,7 @@ pub struct ReflectSudoMsg {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReflectMessage {
-    pub messages: Vec<CosmosMsg<CustomMsg>>,
+    pub messages: Vec<SubMsg<CustomMsg>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -152,9 +151,9 @@ fn handle_reflect(
     REFLECT.update::<_, StdError>(deps.storage, |old| Ok(old + 1))?;
 
     let res = Response {
-        submessages: vec![],
         messages: msg.messages,
         attributes: vec![],
+        events: vec![],
         data: None,
     };
     Ok(res)

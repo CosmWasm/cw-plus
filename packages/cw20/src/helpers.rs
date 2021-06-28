@@ -27,7 +27,7 @@ impl Cw20Contract {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr().into(),
             msg,
-            send: vec![],
+            funds: vec![],
         }
         .into())
     }
