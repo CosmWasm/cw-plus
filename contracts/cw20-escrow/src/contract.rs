@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, WasmMsg,
+    attr, from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, SubMsg, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -167,7 +167,7 @@ pub fn execute_approve(
         ESCROWS.remove(deps.storage, &id);
 
         // send all tokens out
-        let messages = send_tokens(&escrow.recipient, &escrow.balance)?;
+        let messages: Vec<SubMsg> = send_tokens(&escrow.recipient, &escrow.balance)?;
 
         let attributes = vec![
             attr("action", "approve"),
@@ -175,9 +175,9 @@ pub fn execute_approve(
             attr("to", escrow.recipient),
         ];
         Ok(Response {
-            submessages: vec![],
             messages,
             attributes,
+            events: vec![],
             data: None,
         })
     }
@@ -208,24 +208,23 @@ pub fn execute_refund(
             attr("to", escrow.source),
         ];
         Ok(Response {
-            submessages: vec![],
             messages,
             attributes,
+            events: vec![],
             data: None,
         })
     }
 }
 
-fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>> {
+fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<SubMsg>> {
     let native_balance = &balance.native;
-    let mut msgs: Vec<CosmosMsg> = if native_balance.is_empty() {
+    let mut msgs: Vec<SubMsg> = if native_balance.is_empty() {
         vec![]
     } else {
-        vec![BankMsg::Send {
+        vec![SubMsg::new(BankMsg::Send {
             to_address: to.into(),
             amount: native_balance.to_vec(),
-        }
-        .into()]
+        })]
     };
 
     let cw20_balance = &balance.cw20;
@@ -236,12 +235,12 @@ fn send_tokens(to: &Addr, balance: &GenericBalance) -> StdResult<Vec<CosmosMsg>>
                 recipient: to.into(),
                 amount: c.amount,
             };
-            let exec = WasmMsg::Execute {
+            let exec = SubMsg::new(WasmMsg::Execute {
                 contract_addr: c.address.to_string(),
                 msg: to_binary(&msg)?,
-                send: vec![],
-            };
-            Ok(exec.into())
+                funds: vec![],
+            });
+            Ok(exec)
         })
         .collect();
     msgs.append(&mut cw20_msgs?);
@@ -357,10 +356,10 @@ mod tests {
         assert_eq!(attr("action", "approve"), res.attributes[0]);
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 to_address: create.recipient,
                 amount: balance,
-            })
+            }))
         );
 
         // second attempt fails (not found)
@@ -391,7 +390,7 @@ mod tests {
         };
         let receive = Cw20ReceiveMsg {
             sender: String::from("source"),
-            amount: Uint128(100),
+            amount: Uint128::new(100),
             msg: to_binary(&ExecuteMsg::Create(create.clone())).unwrap(),
         };
         let token_contract = String::from("my-cw20-token");
@@ -415,7 +414,7 @@ mod tests {
                 native_balance: vec![],
                 cw20_balance: vec![Cw20Coin {
                     address: String::from("my-cw20-token"),
-                    amount: Uint128(100),
+                    amount: Uint128::new(100),
                 }],
                 cw20_whitelist: vec![String::from("other-token"), String::from("my-cw20-token")],
             }
@@ -433,11 +432,11 @@ mod tests {
         };
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
+            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: token_contract,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
-            })
+                funds: vec![]
+            }))
         );
 
         // second attempt fails (not found)
@@ -465,26 +464,26 @@ mod tests {
         let foo_token = Addr::unchecked("foo_token");
         tokens.add_tokens(Balance::Cw20(Cw20CoinVerified {
             address: foo_token.clone(),
-            amount: Uint128(12345),
+            amount: Uint128::new(12345),
         }));
         tokens.add_tokens(Balance::Cw20(Cw20CoinVerified {
             address: bar_token.clone(),
-            amount: Uint128(777),
+            amount: Uint128::new(777),
         }));
         tokens.add_tokens(Balance::Cw20(Cw20CoinVerified {
             address: foo_token.clone(),
-            amount: Uint128(23400),
+            amount: Uint128::new(23400),
         }));
         assert_eq!(
             tokens.cw20,
             vec![
                 Cw20CoinVerified {
                     address: foo_token,
-                    amount: Uint128(35745),
+                    amount: Uint128::new(35745),
                 },
                 Cw20CoinVerified {
                     address: bar_token,
-                    amount: Uint128(777),
+                    amount: Uint128::new(777),
                 }
             ]
         );
@@ -537,7 +536,7 @@ mod tests {
         };
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: String::from("random"),
-            amount: Uint128(7890),
+            amount: Uint128::new(7890),
             msg: to_binary(&base).unwrap(),
         });
         let info = mock_info(&bar_token, &[]);
@@ -553,7 +552,7 @@ mod tests {
         };
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: String::from("random"),
-            amount: Uint128(7890),
+            amount: Uint128::new(7890),
             msg: to_binary(&base).unwrap(),
         });
         let info = mock_info(&baz_token, &[]);
@@ -567,7 +566,7 @@ mod tests {
         };
         let top_up = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: String::from("random"),
-            amount: Uint128(888),
+            amount: Uint128::new(888),
             msg: to_binary(&base).unwrap(),
         });
         let info = mock_info(&foo_token, &[]);
@@ -585,38 +584,38 @@ mod tests {
         // first message releases all native coins
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
                 to_address: create.recipient.clone(),
                 amount: vec![coin(100, "fee"), coin(500, "stake"), coin(250, "random")],
-            })
+            }))
         );
 
         // second one release bar cw20 token
         let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: create.recipient.clone(),
-            amount: Uint128(7890),
+            amount: Uint128::new(7890),
         };
         assert_eq!(
             res.messages[1],
-            CosmosMsg::Wasm(WasmMsg::Execute {
+            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: bar_token,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
-            })
+                funds: vec![]
+            }))
         );
 
         // third one release foo cw20 token
         let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: create.recipient,
-            amount: Uint128(888),
+            amount: Uint128::new(888),
         };
         assert_eq!(
             res.messages[2],
-            CosmosMsg::Wasm(WasmMsg::Execute {
+            SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: foo_token,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
-            })
+                funds: vec![]
+            }))
         );
     }
 }
