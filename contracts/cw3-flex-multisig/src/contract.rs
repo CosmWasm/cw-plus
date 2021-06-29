@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    Response, StdResult,
+    attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Empty, Env, MessageInfo, Order, Response,
+    StdResult, SubMsg,
 };
 
 use cw0::{maybe_addr, Expiration};
@@ -82,7 +82,7 @@ pub fn execute_propose(
     info: MessageInfo,
     title: String,
     description: String,
-    msgs: Vec<CosmosMsg>,
+    msgs: Vec<SubMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
@@ -128,7 +128,6 @@ pub fn execute_propose(
     BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
@@ -136,6 +135,7 @@ pub fn execute_propose(
             attr("proposal_id", id),
             attr("status", format!("{:?}", prop.status)),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -184,7 +184,6 @@ pub fn execute_vote(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
@@ -192,6 +191,7 @@ pub fn execute_vote(
             attr("proposal_id", proposal_id),
             attr("status", format!("{:?}", prop.status)),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -217,13 +217,13 @@ pub fn execute_execute(
 
     // dispatch all proposed messages
     Ok(Response {
-        submessages: vec![],
         messages: prop.msgs,
         attributes: vec![
             attr("action", "execute"),
             attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -252,13 +252,13 @@ pub fn execute_close(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
             attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -593,12 +593,12 @@ mod tests {
         (flex_addr, group_addr)
     }
 
-    fn proposal_info() -> (Vec<CosmosMsg<Empty>>, String, String) {
+    fn proposal_info() -> (Vec<SubMsg<Empty>>, String, String) {
         let bank_msg = BankMsg::Send {
             to_address: SOMEBODY.into(),
             amount: coins(1, "BTC"),
         };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let msgs = vec![SubMsg::new(bank_msg)];
         let title = "Pay somebody".to_string();
         let description = "Do I pay her?".to_string();
         (msgs, title, description)
@@ -1348,9 +1348,11 @@ mod tests {
         );
 
         // Start a proposal to remove VOTER3 from the set
-        let update_msg = Cw4GroupContract::new(group_addr)
-            .update_members(vec![VOTER3.into()], vec![])
-            .unwrap();
+        let update_msg = SubMsg::new(
+            Cw4GroupContract::new(group_addr)
+                .update_members(vec![VOTER3.into()], vec![])
+                .unwrap(),
+        );
         let update_proposal = ExecuteMsg::Propose {
             title: "Kick out VOTER3".to_string(),
             description: "He's trying to steal our money".to_string(),

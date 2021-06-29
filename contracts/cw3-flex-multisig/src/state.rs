@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
 use cosmwasm_std::{
-    Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128,
+    Addr, BlockInfo, Decimal, Empty, StdError, StdResult, Storage, SubMsg, Uint128,
 };
 
 use cw0::{Duration, Expiration};
@@ -31,7 +31,7 @@ pub struct Proposal {
     pub description: String,
     pub start_height: u64,
     pub expires: Expiration,
-    pub msgs: Vec<CosmosMsg<Empty>>,
+    pub msgs: Vec<SubMsg<Empty>>,
     pub status: Status,
     /// pass requirements
     pub threshold: Threshold,
@@ -135,7 +135,7 @@ impl Proposal {
 // this is a helper function so Decimal works with u64 rather than Uint128
 // also, we must *round up* here, as we need 8, not 7 votes to reach 50% of 15 total
 fn votes_needed(weight: u64, percentage: Decimal) -> u64 {
-    let applied = percentage * Uint128(PRECISION_FACTOR * weight as u128);
+    let applied = percentage * Uint128::new(PRECISION_FACTOR * weight as u128);
     // Divide by PRECISION_FACTOR, rounding up to the nearest integer
     ((applied.u128() + PRECISION_FACTOR - 1) / PRECISION_FACTOR) as u64
 }

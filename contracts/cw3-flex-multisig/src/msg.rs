@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use cosmwasm_std::{CosmosMsg, Decimal, Empty};
+use cosmwasm_std::{Decimal, Empty, SubMsg};
 use cw0::{Duration, Expiration};
 use cw3::{ThresholdResponse, Vote};
 use cw4::MemberChangedHookMsg;
@@ -109,7 +109,7 @@ pub enum ExecuteMsg {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg<Empty>>,
+        msgs: Vec<SubMsg<Empty>>,
         // note: we ignore API-spec'd earliest if passed, always opens immediately
         latest: Option<Expiration>,
     },
