@@ -2,7 +2,8 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coin, to_binary, Addr, BankMsg, Binary, Decimal, Deps, DepsMut, DistributionMsg, Env,
-    MessageInfo, QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
+    MessageInfo, QuerierWrapper, Response, StakingMsg, StdError, StdResult, SubMsg, Uint128,
+    WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -47,7 +48,7 @@ pub fn instantiate(
         name: msg.name,
         symbol: msg.symbol,
         decimals: msg.decimals,
-        total_supply: Uint128(0),
+        total_supply: Uint128::zero(),
         // set self as minter, so we can properly execute mint and burn
         mint: Some(MinterData {
             minter: env.contract.address,
@@ -138,10 +139,10 @@ pub fn execute(
 fn get_bonded(querier: &QuerierWrapper, contract: &Addr) -> Result<Uint128, ContractError> {
     let bonds = querier.query_all_delegations(contract)?;
     if bonds.is_empty() {
-        return Ok(Uint128(0));
+        return Ok(Uint128::zero());
     }
     let denom = bonds[0].amount.denom.as_str();
-    bonds.iter().fold(Ok(Uint128(0)), |racc, d| {
+    bonds.iter().fold(Ok(Uint128::zero()), |racc, d| {
         let acc = racc?;
         if d.amount.denom.as_str() != denom {
             Err(ContractError::DifferentBondDenom {
@@ -204,18 +205,17 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
 
     // bond them to the validator
     let res = Response {
-        submessages: vec![],
-        messages: vec![StakingMsg::Delegate {
+        messages: vec![SubMsg::new(StakingMsg::Delegate {
             validator: invest.validator,
             amount: payment.clone(),
-        }
-        .into()],
+        })],
         attributes: vec![
             attr("action", "bond"),
             attr("from", info.sender),
             attr("bonded", payment.amount),
             attr("minted", to_mint),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -240,7 +240,7 @@ pub fn unbond(
 
     // burn from the original caller
     execute_burn(deps.branch(), env.clone(), info.clone(), amount)?;
-    if tax > Uint128(0) {
+    if tax > Uint128::zero() {
         let sub_info = MessageInfo {
             sender: env.contract.address.clone(),
             funds: vec![],
@@ -284,18 +284,17 @@ pub fn unbond(
 
     // unbond them
     let res = Response {
-        submessages: vec![],
-        messages: vec![StakingMsg::Undelegate {
+        messages: vec![SubMsg::new(StakingMsg::Undelegate {
             validator: invest.validator,
             amount: coin(unbond.u128(), &invest.bond_denom),
-        }
-        .into()],
+        })],
         attributes: vec![
             attr("action", "unbond"),
             attr("to", info.sender),
             attr("unbonded", unbond),
             attr("burnt", amount),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -315,7 +314,7 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
     // Ensure we have enough balance to cover this and only send some claims if that is all we can cover
     let to_send =
         CLAIMS.claim_tokens(deps.storage, &info.sender, &env.block, Some(balance.amount))?;
-    if to_send == Uint128(0) {
+    if to_send == Uint128::zero() {
         return Err(ContractError::NothingToClaim {});
     }
 
@@ -328,17 +327,16 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
     // transfer tokens to the sender
     balance.amount = to_send;
     let res = Response {
-        submessages: vec![],
-        messages: vec![BankMsg::Send {
+        messages: vec![SubMsg::new(BankMsg::Send {
             to_address: info.sender.to_string(),
             amount: vec![balance],
-        }
-        .into()],
+        })],
         attributes: vec![
             attr("action", "claim"),
             attr("from", info.sender),
             attr("amount", to_send),
         ],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -354,20 +352,18 @@ pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response,
 
     // and bond them to the validator
     let res = Response {
-        submessages: vec![],
         messages: vec![
-            DistributionMsg::WithdrawDelegatorReward {
+            SubMsg::new(DistributionMsg::WithdrawDelegatorReward {
                 validator: invest.validator,
-            }
-            .into(),
-            WasmMsg::Execute {
+            }),
+            SubMsg::new(WasmMsg::Execute {
                 contract_addr: contract_addr.to_string(),
                 msg,
-                send: vec![],
-            }
-            .into(),
+                funds: vec![],
+            }),
         ],
         attributes: vec![],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -406,13 +402,12 @@ pub fn _bond_all_tokens(
 
     // and bond them to the validator
     let res = Response {
-        submessages: vec![],
-        messages: vec![StakingMsg::Delegate {
+        messages: vec![SubMsg::new(StakingMsg::Delegate {
             validator: invest.validator,
             amount: balance.clone(),
-        }
-        .into()],
+        })],
         attributes: vec![attr("action", "reinvest"), attr("bonded", balance.amount)],
+        events: vec![],
         data: None,
     };
     Ok(res)
@@ -524,7 +519,7 @@ mod tests {
             validator: String::from(DEFAULT_VALIDATOR),
             unbonding_period: DAY * 3,
             exit_tax: Decimal::percent(tax_percent),
-            min_withdrawal: Uint128(min_withdrawal),
+            min_withdrawal: Uint128::new(min_withdrawal),
         }
     }
 
@@ -553,7 +548,7 @@ mod tests {
             validator: String::from("my-validator"),
             unbonding_period: WEEK,
             exit_tax: Decimal::percent(2),
-            min_withdrawal: Uint128(50),
+            min_withdrawal: Uint128::new(50),
         };
         let info = mock_info(&creator, &[]);
 
@@ -588,7 +583,7 @@ mod tests {
             validator: String::from("my-validator"),
             unbonding_period: HOUR * 12,
             exit_tax: Decimal::percent(2),
-            min_withdrawal: Uint128(50),
+            min_withdrawal: Uint128::new(50),
         };
         let info = mock_info(&creator, &[]);
 
@@ -601,10 +596,10 @@ mod tests {
         assert_eq!(&token.name, &msg.name);
         assert_eq!(&token.symbol, &msg.symbol);
         assert_eq!(token.decimals, msg.decimals);
-        assert_eq!(token.total_supply, Uint128(0));
+        assert_eq!(token.total_supply, Uint128::zero());
 
         // no balance
-        assert_eq!(get_balance(deps.as_ref(), &creator), Uint128(0));
+        assert_eq!(get_balance(deps.as_ref(), &creator), Uint128::zero());
         // no claims
         assert_eq!(get_claims(deps.as_ref(), &creator), vec![]);
 
@@ -615,7 +610,7 @@ mod tests {
         assert_eq!(invest.exit_tax, msg.exit_tax);
         assert_eq!(invest.min_withdrawal, msg.min_withdrawal);
 
-        assert_eq!(invest.token_supply, Uint128(0));
+        assert_eq!(invest.token_supply, Uint128::zero());
         assert_eq!(invest.staked_tokens, coin(0, "ustake"));
         assert_eq!(invest.nominal_value, Decimal::one());
     }
@@ -642,7 +637,7 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), info, bond_msg).unwrap();
         assert_eq!(1, res.messages.len());
         let delegate = &res.messages[0];
-        match delegate {
+        match &delegate.msg {
             CosmosMsg::Staking(StakingMsg::Delegate { validator, amount }) => {
                 assert_eq!(validator.as_str(), DEFAULT_VALIDATOR);
                 assert_eq!(amount, &coin(1000, "ustake"));
@@ -651,17 +646,17 @@ mod tests {
         }
 
         // bob got 1000 DRV for 1000 stake at a 1.0 ratio
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(1000));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(1000));
 
         // investment info correct (updated supply)
         let invest = query_investment(deps.as_ref()).unwrap();
-        assert_eq!(invest.token_supply, Uint128(1000));
+        assert_eq!(invest.token_supply, Uint128::new(1000));
         assert_eq!(invest.staked_tokens, coin(1000, "ustake"));
         assert_eq!(invest.nominal_value, Decimal::one());
 
         // token info also properly updated
         let token = query_token_info(deps.as_ref()).unwrap();
-        assert_eq!(token.total_supply, Uint128(1000));
+        assert_eq!(token.total_supply, Uint128::new(1000));
     }
 
     #[test]
@@ -699,7 +694,7 @@ mod tests {
 
         // we should now see 1000 issues and 1500 bonded (and a price of 1.5)
         let invest = query_investment(deps.as_ref()).unwrap();
-        assert_eq!(invest.token_supply, Uint128(1000));
+        assert_eq!(invest.token_supply, Uint128::new(1000));
         assert_eq!(invest.staked_tokens, coin(1500, "ustake"));
         let ratio = Decimal::from_str("1.5").unwrap();
         assert_eq!(invest.nominal_value, ratio);
@@ -715,10 +710,10 @@ mod tests {
         set_delegation(&mut deps.querier, 3000, "ustake");
 
         // alice should have gotten 2000 DRV for the 3000 stake, keeping the ratio at 1.5
-        assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(2000));
+        assert_eq!(get_balance(deps.as_ref(), &alice), Uint128::new(2000));
 
         let invest = query_investment(deps.as_ref()).unwrap();
-        assert_eq!(invest.token_supply, Uint128(3000));
+        assert_eq!(invest.token_supply, Uint128::new(3000));
         assert_eq!(invest.staked_tokens, coin(4500, "ustake"));
         assert_eq!(invest.nominal_value, ratio);
     }
@@ -788,7 +783,7 @@ mod tests {
 
         // creator now tries to unbond these tokens - this must fail
         let unbond_msg = ExecuteMsg::Unbond {
-            amount: Uint128(600),
+            amount: Uint128::new(600),
         };
         let info = mock_info(&creator, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, unbond_msg).unwrap_err();
@@ -805,17 +800,17 @@ mod tests {
         // 60 are taken and send to the owner
         // 540 are unbonded in exchange for 540 * 1.5 = 810 native tokens
         let unbond_msg = ExecuteMsg::Unbond {
-            amount: Uint128(600),
+            amount: Uint128::new(600),
         };
-        let owner_cut = Uint128(60);
-        let bobs_claim = Uint128(810);
-        let bobs_balance = Uint128(400);
+        let owner_cut = Uint128::new(60);
+        let bobs_claim = Uint128::new(810);
+        let bobs_balance = Uint128::new(400);
         let env = mock_env();
         let info = mock_info(&bob, &[]);
         let res = execute(deps.as_mut(), env.clone(), info, unbond_msg).unwrap();
         assert_eq!(1, res.messages.len());
         let delegate = &res.messages[0];
-        match delegate {
+        match &delegate.msg {
             CosmosMsg::Staking(StakingMsg::Undelegate { validator, amount }) => {
                 assert_eq!(validator.as_str(), DEFAULT_VALIDATOR);
                 assert_eq!(amount, &coin(bobs_claim.u128(), "ustake"));
@@ -864,7 +859,7 @@ mod tests {
 
         // unbond part of them
         let unbond_msg = ExecuteMsg::Unbond {
-            amount: Uint128(600),
+            amount: Uint128::new(600),
         };
         let env = mock_env();
         let info = mock_info(&bob, &[]);
@@ -872,7 +867,7 @@ mod tests {
         set_delegation(&mut deps.querier, 460, "ustake");
 
         // ensure claims are proper
-        let bobs_claim = Uint128(540);
+        let bobs_claim = Uint128::new(540);
         let original_claims = vec![Claim {
             amount: bobs_claim,
             release_at: (DAY * 3).after(&env.block),
@@ -900,7 +895,7 @@ mod tests {
         let res = execute(deps.as_mut(), claim_ready, info, ExecuteMsg::Claim {}).unwrap();
         assert_eq!(1, res.messages.len());
         let payout = &res.messages[0];
-        match payout {
+        match &payout.msg {
             CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
                 assert_eq!(amount, &coins(540, "ustake"));
                 assert_eq!(to_address, &bob);
@@ -933,62 +928,62 @@ mod tests {
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Bond {}).unwrap();
 
         // bob got 1000 DRV for 1000 stake at a 1.0 ratio
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(1000));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(1000));
 
         // send coins to carl
         let bob_info = mock_info(&bob, &[]);
         let transfer = ExecuteMsg::Transfer {
             recipient: carl.clone(),
-            amount: Uint128(200),
+            amount: Uint128::new(200),
         };
         execute(deps.as_mut(), mock_env(), bob_info.clone(), transfer).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(800));
-        assert_eq!(get_balance(deps.as_ref(), &carl), Uint128(200));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(800));
+        assert_eq!(get_balance(deps.as_ref(), &carl), Uint128::new(200));
 
         // allow alice
         let allow = ExecuteMsg::IncreaseAllowance {
             spender: alice.clone(),
-            amount: Uint128(350),
+            amount: Uint128::new(350),
             expires: None,
         };
         execute(deps.as_mut(), mock_env(), bob_info.clone(), allow).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(800));
-        assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(0));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(800));
+        assert_eq!(get_balance(deps.as_ref(), &alice), Uint128::zero());
         assert_eq!(
             query_allowance(deps.as_ref(), bob.clone(), alice.clone())
                 .unwrap()
                 .allowance,
-            Uint128(350)
+            Uint128::new(350)
         );
 
         // alice takes some for herself
         let self_pay = ExecuteMsg::TransferFrom {
             owner: bob.clone(),
             recipient: alice.clone(),
-            amount: Uint128(250),
+            amount: Uint128::new(250),
         };
         let alice_info = mock_info(&alice, &[]);
         execute(deps.as_mut(), mock_env(), alice_info, self_pay).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
-        assert_eq!(get_balance(deps.as_ref(), &alice), Uint128(250));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(550));
+        assert_eq!(get_balance(deps.as_ref(), &alice), Uint128::new(250));
         assert_eq!(
             query_allowance(deps.as_ref(), bob.clone(), alice)
                 .unwrap()
                 .allowance,
-            Uint128(100)
+            Uint128::new(100)
         );
 
         // burn some, but not too much
         let burn_too_much = ExecuteMsg::Burn {
-            amount: Uint128(1000),
+            amount: Uint128::new(1000),
         };
         let failed = execute(deps.as_mut(), mock_env(), bob_info.clone(), burn_too_much);
         assert!(failed.is_err());
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(550));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(550));
         let burn = ExecuteMsg::Burn {
-            amount: Uint128(130),
+            amount: Uint128::new(130),
         };
         execute(deps.as_mut(), mock_env(), bob_info, burn).unwrap();
-        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128(420));
+        assert_eq!(get_balance(deps.as_ref(), &bob), Uint128::new(420));
     }
 }
