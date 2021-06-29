@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::{Empty, SubMsg};
 use cw0::{Duration, Expiration};
 use cw3::Vote;
 
@@ -25,7 +25,7 @@ pub enum ExecuteMsg {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg<Empty>>,
+        msgs: Vec<SubMsg<Empty>>,
         // note: we ignore API-spec'd earliest if passed, always opens immediately
         latest: Option<Expiration>,
     },

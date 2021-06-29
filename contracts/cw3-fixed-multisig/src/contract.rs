@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    Response, StdResult,
+    attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Empty, Env, MessageInfo, Order, Response,
+    StdResult, SubMsg,
 };
 
 use cw0::Expiration;
@@ -87,7 +87,7 @@ pub fn execute_propose(
     info: MessageInfo,
     title: String,
     description: String,
-    msgs: Vec<CosmosMsg>,
+    msgs: Vec<SubMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
@@ -135,7 +135,6 @@ pub fn execute_propose(
     BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
@@ -143,6 +142,7 @@ pub fn execute_propose(
             attr("proposal_id", id),
             attr("status", format!("{:?}", prop.status)),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -192,7 +192,6 @@ pub fn execute_vote(
     }
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
@@ -200,6 +199,7 @@ pub fn execute_vote(
             attr("proposal_id", proposal_id),
             attr("status", format!("{:?}", prop.status)),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -225,13 +225,13 @@ pub fn execute_execute(
 
     // dispatch all proposed messages
     Ok(Response {
-        submessages: vec![],
         messages: prop.msgs,
         attributes: vec![
             attr("action", "execute"),
             attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -260,13 +260,13 @@ pub fn execute_close(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
             attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -608,7 +608,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let msgs = vec![SubMsg::new(bank_msg)];
 
         // Only voters can propose
         let info = mock_info(SOMEBODY, &[]);
@@ -640,7 +640,6 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
@@ -648,6 +647,7 @@ mod tests {
                     attr("proposal_id", 1),
                     attr("status", "Open"),
                 ],
+                events: vec![],
                 data: None,
             }
         );
@@ -660,7 +660,6 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
@@ -668,6 +667,7 @@ mod tests {
                     attr("proposal_id", 2),
                     attr("status", "Passed"),
                 ],
+                events: vec![],
                 data: None,
             }
         );
@@ -688,7 +688,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let msgs = vec![SubMsg::new(bank_msg)];
         let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
@@ -721,7 +721,6 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -729,6 +728,7 @@ mod tests {
                     attr("proposal_id", proposal_id),
                     attr("status", "Open"),
                 ],
+                events: vec![],
                 data: None,
             }
         );
@@ -780,7 +780,6 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -788,6 +787,7 @@ mod tests {
                     attr("proposal_id", proposal_id),
                     attr("status", "Passed"),
                 ],
+                events: vec![],
                 data: None,
             }
         );
@@ -813,7 +813,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let msgs = vec![SubMsg::new(bank_msg)];
         let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
@@ -842,7 +842,6 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
@@ -850,6 +849,7 @@ mod tests {
                     attr("proposal_id", proposal_id),
                     attr("status", "Passed"),
                 ],
+                events: vec![],
                 data: None,
             }
         );
@@ -867,13 +867,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: msgs,
                 attributes: vec![
                     attr("action", "execute"),
                     attr("sender", SOMEBODY),
                     attr("proposal_id", proposal_id),
                 ],
+                events: vec![],
                 data: None,
             }
         );
@@ -899,7 +899,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let msgs = vec![SubMsg::new(bank_msg)];
         let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
@@ -950,13 +950,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![],
                 attributes: vec![
                     attr("action", "close"),
                     attr("sender", SOMEBODY),
                     attr("proposal_id", proposal_id),
                 ],
+                events: vec![],
                 data: None,
             }
         );
