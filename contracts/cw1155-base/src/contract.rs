@@ -1,7 +1,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response, StdResult,
-    Uint128,
+    SubMsg, Uint128,
 };
 use cw_storage_plus::Bound;
 
@@ -184,14 +184,16 @@ pub fn execute_send_from(
     event.add_attributes(&mut rsp);
 
     if let Some(msg) = msg {
-        rsp.messages = vec![Cw1155ReceiveMsg {
-            operator: info.sender.to_string(),
-            from: Some(from),
-            amount,
-            token_id: token_id.clone(),
-            msg,
-        }
-        .into_cosmos_msg(to)?]
+        rsp.messages = vec![SubMsg::new(
+            Cw1155ReceiveMsg {
+                operator: info.sender.to_string(),
+                from: Some(from),
+                amount,
+                token_id: token_id.clone(),
+                msg,
+            }
+            .into_cosmos_msg(to)?,
+        )]
     }
 
     Ok(rsp)
@@ -218,14 +220,16 @@ pub fn execute_mint(
     event.add_attributes(&mut rsp);
 
     if let Some(msg) = msg {
-        rsp.messages = vec![Cw1155ReceiveMsg {
-            operator: info.sender.to_string(),
-            from: None,
-            amount,
-            token_id: token_id.clone(),
-            msg,
-        }
-        .into_cosmos_msg(to)?]
+        rsp.messages = vec![SubMsg::new(
+            Cw1155ReceiveMsg {
+                operator: info.sender.to_string(),
+                from: None,
+                amount,
+                token_id: token_id.clone(),
+                msg,
+            }
+            .into_cosmos_msg(to)?,
+        )]
     }
 
     // insert if not exist
@@ -291,13 +295,15 @@ pub fn execute_batch_send_from(
     }
 
     if let Some(msg) = msg {
-        rsp.messages = vec![Cw1155BatchReceiveMsg {
-            operator: info.sender.to_string(),
-            from: Some(from),
-            batch,
-            msg,
-        }
-        .into_cosmos_msg(to)?]
+        rsp.messages = vec![SubMsg::new(
+            Cw1155BatchReceiveMsg {
+                operator: info.sender.to_string(),
+                from: Some(from),
+                batch,
+                msg,
+            }
+            .into_cosmos_msg(to)?,
+        )]
     };
 
     Ok(rsp)
@@ -331,13 +337,15 @@ pub fn execute_batch_mint(
     }
 
     if let Some(msg) = msg {
-        rsp.messages = vec![Cw1155BatchReceiveMsg {
-            operator: info.sender.to_string(),
-            from: None,
-            batch,
-            msg,
-        }
-        .into_cosmos_msg(to)?]
+        rsp.messages = vec![SubMsg::new(
+            Cw1155BatchReceiveMsg {
+                operator: info.sender.to_string(),
+                from: None,
+                batch,
+                msg,
+            }
+            .into_cosmos_msg(to)?,
+        )]
     };
 
     Ok(rsp)
@@ -949,15 +957,17 @@ mod tests {
             )
             .unwrap(),
             Response {
-                messages: vec![Cw1155ReceiveMsg {
-                    operator: minter.clone(),
-                    from: None,
-                    amount: 1u64.into(),
-                    token_id: token1.clone(),
-                    msg: dummy_msg.clone(),
-                }
-                .into_cosmos_msg(receiver.clone())
-                .unwrap(),],
+                messages: vec![SubMsg::new(
+                    Cw1155ReceiveMsg {
+                        operator: minter.clone(),
+                        from: None,
+                        amount: 1u64.into(),
+                        token_id: token1.clone(),
+                        msg: dummy_msg.clone(),
+                    }
+                    .into_cosmos_msg(receiver.clone())
+                    .unwrap()
+                ),],
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token1),
@@ -983,14 +993,16 @@ mod tests {
             )
             .unwrap(),
             Response {
-                messages: vec![Cw1155BatchReceiveMsg {
-                    operator: user1.clone(),
-                    from: Some(user1.clone()),
-                    batch: vec![(token2.clone(), 1u64.into())],
-                    msg: dummy_msg,
-                }
-                .into_cosmos_msg(receiver.clone())
-                .unwrap()],
+                messages: vec![SubMsg::new(
+                    Cw1155BatchReceiveMsg {
+                        operator: user1.clone(),
+                        from: Some(user1.clone()),
+                        batch: vec![(token2.clone(), 1u64.into())],
+                        msg: dummy_msg,
+                    }
+                    .into_cosmos_msg(receiver.clone())
+                    .unwrap()
+                )],
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token2),
