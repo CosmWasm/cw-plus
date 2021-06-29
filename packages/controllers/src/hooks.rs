@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    attr, Addr, CosmosMsg, Deps, DepsMut, MessageInfo, Response, StdError, StdResult, Storage,
+    attr, Addr, SubMsg, Deps, DepsMut, MessageInfo, Response, StdError, StdResult, Storage,
 };
 use cw_storage_plus::Item;
 
@@ -59,11 +59,11 @@ impl<'a> Hooks<'a> {
         Ok(self.0.save(storage, &hooks)?)
     }
 
-    pub fn prepare_hooks<F: Fn(Addr) -> StdResult<CosmosMsg>>(
+    pub fn prepare_hooks<F: Fn(Addr) -> StdResult<SubMsg>>(
         &self,
         storage: &dyn Storage,
         prep: F,
-    ) -> StdResult<Vec<CosmosMsg>> {
+    ) -> StdResult<Vec<SubMsg>> {
         self.0
             .may_load(storage)?
             .unwrap_or_default()
