@@ -351,8 +351,8 @@ dependencies = [
 name = "cw20-atomic-swap"
 version = "0.6.2"
 dependencies = [
- "cosmwasm-schema 0.14.1",
- "cosmwasm-std 0.14.1",
+ "cosmwasm-schema 0.15.0",
+ "cosmwasm-std 0.15.0",
  "cw-storage-plus",
  "cw0",
  "cw2",
