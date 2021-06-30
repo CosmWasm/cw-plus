@@ -126,15 +126,15 @@ mod tests {
         // ensure checks proper with owner set
         control.set(deps.as_mut(), Some(owner.clone())).unwrap();
         assert!(control.is_admin(deps.as_ref(), &owner).unwrap());
-        assert!(control.is_admin(deps.as_ref(), &imposter).unwrap());
+        assert!(!(control.is_admin(deps.as_ref(), &imposter).unwrap()));
         control.assert_admin(deps.as_ref(), &owner).unwrap();
         let err = control.assert_admin(deps.as_ref(), &imposter).unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // ensure checks proper with owner None
         control.set(deps.as_mut(), None).unwrap();
-        assert!(control.is_admin(deps.as_ref(), &owner).unwrap());
-        assert!(control.is_admin(deps.as_ref(), &imposter).unwrap());
+        assert!(!(control.is_admin(deps.as_ref(), &owner).unwrap()));
+        assert!(!(control.is_admin(deps.as_ref(), &imposter).unwrap()));
         let err = control.assert_admin(deps.as_ref(), &owner).unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
         let err = control.assert_admin(deps.as_ref(), &imposter).unwrap_err();
