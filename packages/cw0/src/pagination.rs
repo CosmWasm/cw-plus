@@ -35,8 +35,91 @@ pub fn calc_range_start_string(start_after: Option<String>) -> Option<Vec<u8>> {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use cosmwasm_std::{testing::mock_dependencies, Order, StdError};
+    use cw_storage_plus::{Bound, Map};
+
+    pub const HOLDERS: Map<&Addr, usize> = Map::new("some_data");
+    const LIMIT: usize = 30;
+
+    fn addr_from_i(i: usize) -> Addr {
+        Addr::unchecked(format!("addr{:0>8}", i))
+    }
+
+    fn deser_holder_kv(holder_kv: Result<(Vec<u8>, usize), StdError>) -> (String, usize) {
+        let (k_bytes, v) = holder_kv.unwrap();
+        let key = std::str::from_utf8(&k_bytes).unwrap().to_string();
+        (key, v)
+    }
+
+    #[test]
+    fn calc_range_start_works_as_expected() {
+        let total_elements_count = 100;
+        let mut deps = mock_dependencies(&[]);
+        for i in 0..total_elements_count {
+            let holder = (addr_from_i(i), i);
+            HOLDERS
+                .save(&mut deps.storage, &holder.0, &holder.1)
+                .unwrap();
+        }
+
+        for j in 0..4 {
+            let start_after = if j == 0 {
+                None
+            } else {
+                Some(addr_from_i(j * LIMIT - 1))
+            };
+
+            let start = calc_range_start(start_after).map(Bound::exclusive);
+
+            let holders: Vec<(String, usize)> = HOLDERS
+                .range(&deps.storage, start, None, Order::Ascending)
+                .map(|item| deser_holder_kv(item))
+                .take(LIMIT)
+                .collect();
+
+            let mut i = 0;
+            for holder in holders {
+                let global_index = j * LIMIT + i;
+                assert_eq!(holder.0, addr_from_i(global_index));
+                i += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn calc_range_end_works_as_expected() {
+        let total_elements_count = 100;
+        let mut deps = mock_dependencies(&[]);
+        for i in 0..total_elements_count {
+            let holder = (addr_from_i(i), i);
+            HOLDERS
+                .save(&mut deps.storage, &holder.0, &holder.1)
+                .unwrap();
+        }
+
+        for j in 0..4 {
+            let end_before = Some(addr_from_i(total_elements_count - j * LIMIT));
+
+            let end = calc_range_end(end_before).map(Bound::exclusive);
+
+            let holders: Vec<(String, usize)> = HOLDERS
+                .range(&deps.storage, None, end, Order::Descending)
+                .map(|item| deser_holder_kv(item))
+                .take(LIMIT)
+                .collect();
+
+            let mut i = 0;
+            for holder in holders {
+                let global_index = total_elements_count - i - j * LIMIT - 1;
+                assert_eq!(holder.0, addr_from_i(global_index));
+                i += 1;
+            }
+        }
+    }
+
     // TODO: add unit tests
     #[ignore]
     #[test]
-    fn add_some_tests() {}
+    fn add_more_tests() {}
 }
