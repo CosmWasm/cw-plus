@@ -16,3 +16,6 @@ cosmwasm-std = { version = "0.15.0" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
+
+[dev-dependencies]
+cw-storage-plus = { version = "0.6.1", features = ["iterator"] }
