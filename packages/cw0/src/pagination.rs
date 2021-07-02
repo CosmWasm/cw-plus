@@ -74,15 +74,13 @@ mod test {
 
             let holders: Vec<(String, usize)> = HOLDERS
                 .range(&deps.storage, start, None, Order::Ascending)
-                .map(|item| deser_holder_kv(item))
+                .map(deser_holder_kv)
                 .take(LIMIT)
                 .collect();
 
-            let mut i = 0;
-            for holder in holders {
+            for (i, holder) in holders.into_iter().enumerate() {
                 let global_index = j * LIMIT + i;
                 assert_eq!(holder.0, addr_from_i(global_index));
-                i += 1;
             }
         }
     }
@@ -105,15 +103,13 @@ mod test {
 
             let holders: Vec<(String, usize)> = HOLDERS
                 .range(&deps.storage, None, end, Order::Descending)
-                .map(|item| deser_holder_kv(item))
+                .map(deser_holder_kv)
                 .take(LIMIT)
                 .collect();
 
-            let mut i = 0;
-            for holder in holders {
+            for (i, holder) in holders.into_iter().enumerate() {
                 let global_index = total_elements_count - i - j * LIMIT - 1;
                 assert_eq!(holder.0, addr_from_i(global_index));
-                i += 1;
             }
         }
     }
