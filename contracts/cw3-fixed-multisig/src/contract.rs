@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Empty, Env, MessageInfo, Order, Response,
-    StdResult, SubMsg,
+    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    Response, StdResult, SubMsg,
 };
 
 use cw0::Expiration;
@@ -87,10 +87,11 @@ pub fn execute_propose(
     info: MessageInfo,
     title: String,
     description: String,
-    msgs: Vec<SubMsg>,
+    msgs: Vec<CosmosMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
+    let msgs = msgs.into_iter().map(SubMsg::new).collect();
     // only members of the multisig can create a proposal
     let vote_power = VOTERS
         .may_load(deps.storage, &info.sender)?
@@ -608,7 +609,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![SubMsg::new(bank_msg)];
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
 
         // Only voters can propose
         let info = mock_info(SOMEBODY, &[]);
@@ -688,7 +689,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![SubMsg::new(bank_msg)];
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
         let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
@@ -813,7 +814,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![SubMsg::new(bank_msg)];
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
         let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),
@@ -863,11 +864,12 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
         let res = execute(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
 
+        let msgs: Vec<_> = msgs.into_iter().map(SubMsg::new).collect();
         // Verify
         assert_eq!(
             res,
             Response {
-                messages: msgs,
+                messages: msgs.clone(),
                 attributes: vec![
                     attr("action", "execute"),
                     attr("sender", SOMEBODY),
@@ -899,7 +901,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: vec![coin(1, "BTC")],
         };
-        let msgs = vec![SubMsg::new(bank_msg)];
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
         let proposal = ExecuteMsg::Propose {
             title: "Pay somebody".to_string(),
             description: "Do I pay her?".to_string(),

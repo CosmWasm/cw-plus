@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{CosmosMsg, Empty, SubMsg};
+use cosmwasm_std::{CosmosMsg, Empty};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
@@ -19,7 +19,7 @@ where
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
     /// determine in
-    Execute { msgs: Vec<SubMsg<T>> },
+    Execute { msgs: Vec<CosmosMsg<T>> },
     /// Freeze will make a mutable contract immutable, must be called by an admin
     Freeze {},
     /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,

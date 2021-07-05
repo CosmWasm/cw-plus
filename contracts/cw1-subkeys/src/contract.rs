@@ -83,6 +83,7 @@ pub fn execute_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
+    // Wrap `msgs` in SubMsg.
     let msgs = msgs.into_iter().map(SubMsg::new).collect();
     let cfg = ADMIN_LIST.load(deps.storage)?;
     // this is the admin behavior (same as cw1-whitelist)
