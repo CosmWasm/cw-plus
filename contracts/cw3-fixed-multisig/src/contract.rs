@@ -869,7 +869,7 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: msgs.clone(),
+                messages: msgs,
                 attributes: vec![
                     attr("action", "execute"),
                     attr("sender", SOMEBODY),
