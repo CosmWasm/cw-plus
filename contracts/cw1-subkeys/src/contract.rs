@@ -78,11 +78,12 @@ pub fn execute_execute<T>(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msgs: Vec<SubMsg<T>>,
+    msgs: Vec<CosmosMsg<T>>,
 ) -> Result<Response<T>, ContractError>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
+    let msgs = msgs.into_iter().map(SubMsg::new).collect();
     let cfg = ADMIN_LIST.load(deps.storage)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(info.sender.as_ref()) {
@@ -1164,10 +1165,11 @@ mod tests {
         );
 
         // Create Send message
-        let msgs = vec![SubMsg::new(BankMsg::Send {
+        let msgs = vec![BankMsg::Send {
             to_address: spender2.to_string(),
             amount: coins(1000, "token1"),
-        })];
+        }
+        .into()];
 
         let execute_msg = ExecuteMsg::Execute { msgs: msgs.clone() };
 
@@ -1179,6 +1181,7 @@ mod tests {
         // But spender1 can (he has enough funds)
         let info = mock_info(&spender1, &[]);
         let res = execute(deps.as_mut(), mock_env(), info.clone(), execute_msg.clone()).unwrap();
+        let msgs: Vec<_> = msgs.into_iter().map(SubMsg::new).collect();
         assert_eq!(res.messages, msgs);
         assert_eq!(
             res.attributes,
@@ -1202,14 +1205,17 @@ mod tests {
         );
 
         // For admins, even other message types are allowed
-        let other_msgs = vec![SubMsg::new(CosmosMsg::Custom(Empty {}))];
+        let other_msgs = vec![CosmosMsg::Custom(Empty {})];
         let execute_msg = ExecuteMsg::Execute {
             msgs: other_msgs.clone(),
         };
 
         let info = mock_info(&owner, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
-        assert_eq!(res.messages, other_msgs);
+        assert_eq!(
+            res.messages,
+            other_msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
+        );
         assert_eq!(
             res.attributes,
             vec![attr("action", "execute"), attr("owner", owner)]
@@ -1265,22 +1271,26 @@ mod tests {
         // default is no permission
         execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
 
-        let msg_delegate = vec![SubMsg::new(StakingMsg::Delegate {
+        let msg_delegate = vec![StakingMsg::Delegate {
             validator: "validator1".into(),
             amount: coin1.clone(),
-        })];
-        let msg_redelegate = vec![SubMsg::new(StakingMsg::Redelegate {
+        }
+        .into()];
+        let msg_redelegate = vec![StakingMsg::Redelegate {
             src_validator: "validator1".into(),
             dst_validator: "validator2".into(),
             amount: coin1.clone(),
-        })];
-        let msg_undelegate = vec![SubMsg::new(StakingMsg::Undelegate {
+        }
+        .into()];
+        let msg_undelegate = vec![StakingMsg::Undelegate {
             validator: "validator1".into(),
             amount: coin1,
-        })];
-        let msg_withdraw = vec![SubMsg::new(DistributionMsg::WithdrawDelegatorReward {
+        }
+        .into()];
+        let msg_withdraw = vec![DistributionMsg::WithdrawDelegatorReward {
             validator: "validator1".into(),
-        })];
+        }
+        .into()];
 
         let msgs = vec![
             msg_delegate.clone(),
