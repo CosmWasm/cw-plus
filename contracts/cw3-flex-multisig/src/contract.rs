@@ -1350,8 +1350,7 @@ mod tests {
         // Start a proposal to remove VOTER3 from the set
         let update_msg = Cw4GroupContract::new(group_addr)
             .update_members(vec![VOTER3.into()], vec![])
-            .unwrap()
-            .into();
+            .unwrap();
         let update_proposal = ExecuteMsg::Propose {
             title: "Kick out VOTER3".to_string(),
             description: "He's trying to steal our money".to_string(),
