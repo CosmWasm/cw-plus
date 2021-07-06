@@ -6,7 +6,7 @@ use std::ops::{AddAssign, Sub};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
-    MessageInfo, Order, Response, StakingMsg, StdError, StdResult,
+    MessageInfo, Order, Response, StakingMsg, StdError, StdResult, SubMsg,
 };
 use cw0::Expiration;
 use cw1::CanExecuteResponse;
@@ -83,6 +83,8 @@ pub fn execute_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
+    // Wrap `msgs` in SubMsg.
+    let msgs = msgs.into_iter().map(SubMsg::new).collect();
     let cfg = ADMIN_LIST.load(deps.storage)?;
     // this is the admin behavior (same as cw1-whitelist)
     if cfg.is_admin(info.sender.as_ref()) {
@@ -94,7 +96,7 @@ where
         Ok(res)
     } else {
         for msg in &msgs {
-            match msg {
+            match &msg.msg {
                 CosmosMsg::Staking(staking_msg) => {
                     let perm = PERMISSIONS.may_load(deps.storage, &info.sender)?;
                     let perm = perm.ok_or(ContractError::NotAllowed {})?;
@@ -123,10 +125,9 @@ where
         }
         // Relay messages
         let res = Response {
-            submessages: vec![],
             messages: msgs,
             attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
-            data: None,
+            ..Response::default()
         };
         Ok(res)
     }
@@ -208,8 +209,6 @@ where
     })?;
 
     let res = Response {
-        submessages: vec![],
-        messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
             attr("owner", info.sender),
@@ -217,7 +216,7 @@ where
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
         ],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -258,8 +257,6 @@ where
     }
 
     let res = Response {
-        submessages: vec![],
-        messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
             attr("owner", info.sender),
@@ -267,7 +264,7 @@ where
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
         ],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -294,15 +291,13 @@ where
     PERMISSIONS.save(deps.storage, &spender_addr, &perm)?;
 
     let res = Response {
-        submessages: vec![],
-        messages: vec![],
         attributes: vec![
             attr("action", "set_permissions"),
             attr("owner", info.sender),
             attr("spender", spender),
             attr("permissions", perm),
         ],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -1180,6 +1175,7 @@ mod tests {
         // But spender1 can (he has enough funds)
         let info = mock_info(&spender1, &[]);
         let res = execute(deps.as_mut(), mock_env(), info.clone(), execute_msg.clone()).unwrap();
+        let msgs: Vec<_> = msgs.into_iter().map(SubMsg::new).collect();
         assert_eq!(res.messages, msgs);
         assert_eq!(
             res.attributes,
@@ -1210,7 +1206,10 @@ mod tests {
 
         let info = mock_info(&owner, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap();
-        assert_eq!(res.messages, other_msgs);
+        assert_eq!(
+            res.messages,
+            other_msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
+        );
         assert_eq!(
             res.attributes,
             vec![attr("action", "execute"), attr("owner", owner)]

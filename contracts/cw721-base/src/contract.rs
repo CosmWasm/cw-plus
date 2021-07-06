@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
-    StdError, StdResult,
+    StdError, StdResult, SubMsg,
 };
 
 use cw0::maybe_addr;
@@ -103,13 +103,13 @@ pub fn execute_mint(
     increment_tokens(deps.storage)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "mint"),
             attr("minter", info.sender),
             attr("token_id", msg.token_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -124,7 +124,6 @@ pub fn execute_transfer_nft(
     _transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "transfer_nft"),
@@ -132,6 +131,7 @@ pub fn execute_transfer_nft(
             attr("recipient", recipient),
             attr("token_id", token_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -155,14 +155,14 @@ pub fn execute_send_nft(
 
     // Send message
     Ok(Response {
-        submessages: vec![],
-        messages: vec![send.into_cosmos_msg(contract.clone())?],
+        messages: vec![SubMsg::new(send.into_cosmos_msg(contract.clone())?)],
         attributes: vec![
             attr("action", "send_nft"),
             attr("sender", info.sender),
             attr("recipient", contract),
             attr("token_id", token_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -195,7 +195,6 @@ pub fn execute_approve(
     _update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "approve"),
@@ -203,6 +202,7 @@ pub fn execute_approve(
             attr("spender", spender),
             attr("token_id", token_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -217,7 +217,6 @@ pub fn execute_revoke(
     _update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "revoke"),
@@ -225,6 +224,7 @@ pub fn execute_revoke(
             attr("spender", spender),
             attr("token_id", token_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -288,13 +288,13 @@ pub fn execute_approve_all(
     OPERATORS.save(deps.storage, (&info.sender, &operator_addr), &expires)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "approve_all"),
             attr("sender", info.sender),
             attr("operator", operator),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -309,13 +309,13 @@ pub fn execute_revoke_all(
     OPERATORS.remove(deps.storage, (&info.sender, &operator_addr));
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "revoke_all"),
             attr("sender", info.sender),
             attr("operator", operator),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -760,15 +760,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
-                messages: vec![],
                 attributes: vec![
                     attr("action", "transfer_nft"),
                     attr("sender", "venus"),
                     attr("recipient", "random"),
                     attr("token_id", token_id),
                 ],
-                data: None,
+                ..Response::default()
             }
         );
     }
@@ -815,9 +813,9 @@ mod tests {
             token_id: token_id.clone(),
             msg: Some(msg),
         };
-        let expected = payload.into_cosmos_msg(target.clone()).unwrap();
+        let expected = SubMsg::new(payload.into_cosmos_msg(target.clone()).unwrap());
         // ensure expected serializes as we think it should
-        match &expected {
+        match &expected.msg {
             CosmosMsg::Wasm(WasmMsg::Execute { contract_addr, .. }) => {
                 assert_eq!(contract_addr, &target)
             }
@@ -827,7 +825,6 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
                 messages: vec![expected],
                 attributes: vec![
                     attr("action", "send_nft"),
@@ -835,7 +832,7 @@ mod tests {
                     attr("recipient", "another_contract"),
                     attr("token_id", token_id),
                 ],
-                data: None,
+                ..Response::default()
             }
         );
     }
@@ -872,15 +869,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
-                messages: vec![],
                 attributes: vec![
                     attr("action", "approve"),
                     attr("sender", "demeter"),
                     attr("spender", "random"),
                     attr("token_id", token_id.clone()),
                 ],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -986,14 +981,12 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                submessages: vec![],
-                messages: vec![],
                 attributes: vec![
                     attr("action", "approve_all"),
                     attr("sender", "demeter"),
                     attr("operator", "random"),
                 ],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -1009,7 +1002,7 @@ mod tests {
         let inner_msg = WasmMsg::Execute {
             contract_addr: "another_contract".into(),
             msg: to_binary("You now also have the growing power").unwrap(),
-            send: vec![],
+            funds: vec![],
         };
         let msg: CosmosMsg = CosmosMsg::Wasm(inner_msg);
 

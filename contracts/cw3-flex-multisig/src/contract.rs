@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    Response, StdResult,
+    Response, StdResult, SubMsg,
 };
 
 use cw0::{maybe_addr, Expiration};
@@ -128,7 +128,6 @@ pub fn execute_propose(
     BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "propose"),
@@ -136,6 +135,7 @@ pub fn execute_propose(
             attr("proposal_id", id),
             attr("status", format!("{:?}", prop.status)),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -184,7 +184,6 @@ pub fn execute_vote(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "vote"),
@@ -192,6 +191,7 @@ pub fn execute_vote(
             attr("proposal_id", proposal_id),
             attr("status", format!("{:?}", prop.status)),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -217,13 +217,13 @@ pub fn execute_execute(
 
     // dispatch all proposed messages
     Ok(Response {
-        submessages: vec![],
-        messages: prop.msgs,
+        messages: prop.msgs.into_iter().map(SubMsg::new).collect(),
         attributes: vec![
             attr("action", "execute"),
             attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -252,13 +252,13 @@ pub fn execute_close(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     Ok(Response {
-        submessages: vec![],
         messages: vec![],
         attributes: vec![
             attr("action", "close"),
             attr("sender", info.sender),
             attr("proposal_id", proposal_id),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -598,7 +598,7 @@ mod tests {
             to_address: SOMEBODY.into(),
             amount: coins(1, "BTC"),
         };
-        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let msgs = vec![bank_msg.into()];
         let title = "Pay somebody".to_string();
         let description = "Do I pay her?".to_string();
         (msgs, title, description)

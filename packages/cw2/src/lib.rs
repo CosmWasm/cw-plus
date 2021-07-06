@@ -12,7 +12,7 @@ pub struct ContractVersion {
     /// we will use other prefixes for other languages, and their standard global namespacing
     pub contract: String,
     /// version is any string that this implementation knows. It may be simple counter "1", "2".
-    /// or semantic version on release tags "v0.6.2", or some custom feature flag list.
+    /// or semantic version on release tags "v0.7.0", or some custom feature flag list.
     /// the only code that needs to understand the version parsing is code that knows how to
     /// migrate from the given contract (and is tied to it's implementation somehow)
     pub version: String,

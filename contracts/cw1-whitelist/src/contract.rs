@@ -5,7 +5,7 @@ use std::fmt;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Response, StdResult,
+    Response, StdResult, SubMsg,
 };
 
 use cw1::CanExecuteResponse;
@@ -64,6 +64,8 @@ pub fn execute_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
+    // Wrap `msgs` in SubMsg.
+    let msgs = msgs.into_iter().map(SubMsg::new).collect();
     if !can_execute(deps.as_ref(), info.sender.as_ref())? {
         Err(ContractError::Unauthorized {})
     } else {
@@ -251,7 +253,7 @@ mod tests {
             WasmMsg::Execute {
                 contract_addr: "some contract".into(),
                 msg: to_binary(&freeze).unwrap(),
-                send: vec![],
+                funds: vec![],
             }
             .into(),
         ];
@@ -267,7 +269,10 @@ mod tests {
         // but carl can
         let info = mock_info(&carl, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg).unwrap();
-        assert_eq!(res.messages, msgs);
+        assert_eq!(
+            res.messages,
+            msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
+        );
         assert_eq!(res.attributes, vec![attr("action", "execute")]);
     }
 

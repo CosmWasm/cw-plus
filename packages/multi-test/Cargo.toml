@@ -1,6 +1,6 @@
 [package]
 name = "cw-multi-test"
-version = "0.6.2"
+version = "0.7.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Test helpers for multi-contract interactions"
@@ -16,8 +16,8 @@ iterator = ["cosmwasm-std/iterator"]
 stargate = ["cosmwasm-std/stargate"]
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.6.2" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.2" }
-cosmwasm-std = { version = "0.14.0", features = ["staking"] }
+cw0 = { path = "../../packages/cw0", version = "0.7.0" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.7.0" }
+cosmwasm-std = { version = "0.15.0", features = ["staking"] }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

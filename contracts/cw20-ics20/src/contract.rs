@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo,
-    Order, PortIdResponse, Response, StdResult,
+    Order, PortIdResponse, Response, StdResult, SubMsg,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -122,10 +122,9 @@ pub fn execute_transfer(
 
     // send response
     let res = Response {
-        submessages: vec![],
-        messages: vec![msg.into()],
+        messages: vec![SubMsg::new(msg)],
         attributes,
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -255,13 +254,13 @@ mod test {
             channel_id,
             data,
             timeout,
-        }) = &res.messages[0]
+        }) = &res.messages[0].msg
         {
             let expected_timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
             assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
-            assert_eq!(msg.amount, Uint128(1234567));
+            assert_eq!(msg.amount, Uint128::new(1234567));
             assert_eq!(msg.denom.as_str(), "ucosm");
             assert_eq!(msg.sender.as_str(), "foobar");
             assert_eq!(msg.receiver.as_str(), "foreign-address");
@@ -307,7 +306,7 @@ mod test {
         };
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: "my-account".into(),
-            amount: Uint128(888777666),
+            amount: Uint128::new(888777666),
             msg: to_binary(&transfer).unwrap(),
         });
 
@@ -319,13 +318,13 @@ mod test {
             channel_id,
             data,
             timeout,
-        }) = &res.messages[0]
+        }) = &res.messages[0].msg
         {
             let expected_timeout = mock_env().block.time.plus_seconds(7777);
             assert_eq!(timeout, &expected_timeout.into());
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
-            assert_eq!(msg.amount, Uint128(888777666));
+            assert_eq!(msg.amount, Uint128::new(888777666));
             assert_eq!(msg.denom, format!("cw20:{}", cw20_addr));
             assert_eq!(msg.sender.as_str(), "my-account");
             assert_eq!(msg.receiver.as_str(), "foreign-address");

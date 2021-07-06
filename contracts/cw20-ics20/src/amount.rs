@@ -28,14 +28,14 @@ impl Amount {
     pub fn cw20(amount: u128, addr: &str) -> Self {
         Amount::Cw20(Cw20Coin {
             address: addr.into(),
-            amount: Uint128(amount),
+            amount: Uint128::new(amount),
         })
     }
 
     pub fn native(amount: u128, denom: &str) -> Self {
         Amount::Native(Coin {
             denom: denom.to_string(),
-            amount: Uint128(amount),
+            amount: Uint128::new(amount),
         })
     }
 }

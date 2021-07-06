@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdResult, Storage, Uint128, WasmMsg,
+    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
+    Order, Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,
 };
 
 use cw0::{maybe_addr, NativeBalance};
@@ -36,10 +36,7 @@ pub fn instantiate(
     ADMIN.set(deps.branch(), maybe_addr(api, msg.admin)?)?;
 
     // min_bond is at least 1, so 0 stake -> non-membership
-    let min_bond = match msg.min_bond {
-        Uint128(0) => Uint128(1),
-        v => v,
-    };
+    let min_bond = std::cmp::max(msg.min_bond, Uint128::new(1));
 
     let config = Config {
         denom: msg.denom,
@@ -123,9 +120,9 @@ pub fn execute_bond(
         attr("sender", sender),
     ];
     Ok(Response {
-        submessages: vec![],
         messages,
         attributes,
+        events: vec![],
         data: None,
     })
 }
@@ -187,9 +184,9 @@ pub fn execute_unbond(
         attr("sender", info.sender),
     ];
     Ok(Response {
-        submessages: vec![],
         messages,
         attributes,
+        events: vec![],
         data: None,
     })
 }
@@ -216,7 +213,7 @@ fn update_membership(
     new_stake: Uint128,
     cfg: &Config,
     height: u64,
-) -> StdResult<Vec<CosmosMsg>> {
+) -> StdResult<Vec<SubMsg>> {
     // update their membership weight
     let new = calc_weight(new_stake, cfg);
     let old = MEMBERS.may_load(storage, &sender)?;
@@ -239,7 +236,9 @@ fn update_membership(
     // alert the hooks
     let diff = MemberDiff::new(sender, old, new);
     HOOKS.prepare_hooks(storage, |h| {
-        MemberChangedHookMsg::one(diff.clone()).into_cosmos_msg(h)
+        MemberChangedHookMsg::one(diff.clone())
+            .into_cosmos_msg(h)
+            .map(SubMsg::new)
     })
 }
 
@@ -267,11 +266,10 @@ pub fn execute_claim(
         Denom::Native(denom) => {
             let amount_str = coin_to_string(release, denom.as_str());
             let amount = coins(release.u128(), denom);
-            let message = BankMsg::Send {
+            let message = SubMsg::new(BankMsg::Send {
                 to_address: info.sender.to_string(),
                 amount,
-            }
-            .into();
+            });
             (amount_str, message)
         }
         Denom::Cw20(addr) => {
@@ -280,12 +278,11 @@ pub fn execute_claim(
                 recipient: info.sender.clone().into(),
                 amount: release,
             };
-            let message = WasmMsg::Execute {
+            let message = SubMsg::new(WasmMsg::Execute {
                 contract_addr: addr.into(),
                 msg: to_binary(&transfer)?,
-                send: vec![],
-            }
-            .into();
+                funds: vec![],
+            });
             (amount_str, message)
         }
     };
@@ -296,9 +293,9 @@ pub fn execute_claim(
         attr("sender", info.sender),
     ];
     Ok(Response {
-        submessages: vec![],
         messages: vec![message],
         attributes,
+        events: vec![],
         data: None,
     })
 }
@@ -380,7 +377,9 @@ fn list_members(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, from_slice, OverflowError, OverflowOperation, StdError, Storage};
+    use cosmwasm_std::{
+        coin, from_slice, CosmosMsg, OverflowError, OverflowOperation, StdError, Storage,
+    };
     use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
@@ -395,8 +394,8 @@ mod tests {
     const USER2: &str = "else";
     const USER3: &str = "funny";
     const DENOM: &str = "stake";
-    const TOKENS_PER_WEIGHT: Uint128 = Uint128(1_000);
-    const MIN_BOND: Uint128 = Uint128(5_000);
+    const TOKENS_PER_WEIGHT: Uint128 = Uint128::new(1_000);
+    const MIN_BOND: Uint128 = Uint128::new(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
     const CW20_ADDRESS: &str = "wasm1234567890";
 
@@ -459,7 +458,7 @@ mod tests {
             if *stake != 0 {
                 let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
                     sender: addr.to_string(),
-                    amount: Uint128(*stake),
+                    amount: Uint128::new(*stake),
                     msg: to_binary(&ReceiveMsg::Bond {}).unwrap(),
                 });
                 let info = mock_info(CW20_ADDRESS, &[]);
@@ -475,7 +474,7 @@ mod tests {
         for (addr, stake) in &[(USER1, user1), (USER2, user2), (USER3, user3)] {
             if *stake != 0 {
                 let msg = ExecuteMsg::Unbond {
-                    tokens: Uint128(*stake),
+                    tokens: Uint128::new(*stake),
                 };
                 let info = mock_info(addr, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
@@ -611,7 +610,7 @@ mod tests {
 
         // error if try to unbond more than stake (USER2 has 5000 staked)
         let msg = ExecuteMsg::Unbond {
-            tokens: Uint128(5100),
+            tokens: Uint128::new(5100),
         };
         let mut env = mock_env();
         env.block.height += 5;
@@ -681,20 +680,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(res.messages.len(), 1);
-        match &res.messages[0] {
+        match &res.messages[0].msg {
             CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr,
                 msg,
-                send,
+                funds,
             }) => {
                 assert_eq!(contract_addr.as_str(), CW20_ADDRESS);
-                assert_eq!(send.len(), 0);
+                assert_eq!(funds.len(), 0);
                 let parsed: Cw20ExecuteMsg = from_slice(&msg).unwrap();
                 assert_eq!(
                     parsed,
                     Cw20ExecuteMsg::Transfer {
                         recipient: USER1.into(),
-                        amount: Uint128(7_900)
+                        amount: Uint128::new(7_900)
                     }
                 );
             }
@@ -795,11 +794,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             res.messages,
-            vec![BankMsg::Send {
+            vec![SubMsg::new(BankMsg::Send {
                 to_address: USER1.into(),
                 amount: coins(4_500, DENOM),
-            }
-            .into()]
+            })]
         );
 
         // second releases partially
@@ -812,11 +810,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             res.messages,
-            vec![BankMsg::Send {
+            vec![SubMsg::new(BankMsg::Send {
                 to_address: USER2.into(),
                 amount: coins(2_600, DENOM),
-            }
-            .into()]
+            })]
         );
 
         // but the third one cannot release
@@ -856,12 +853,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             res.messages,
-            vec![BankMsg::Send {
+            vec![SubMsg::new(BankMsg::Send {
                 to_address: USER2.into(),
                 // 1_345 + 600 + 1_005
                 amount: coins(2_950, DENOM),
-            }
-            .into()]
+            })]
         );
         assert_eq!(get_claims(deps.as_ref(), &Addr::unchecked(USER2)), vec![]);
     }
@@ -968,13 +964,13 @@ mod tests {
         assert_eq!(res.messages.len(), 2);
         let diff = MemberDiff::new(USER1, None, Some(13));
         let hook_msg = MemberChangedHookMsg::one(diff);
-        let msg1 = hook_msg.clone().into_cosmos_msg(contract1.clone()).unwrap();
-        let msg2 = hook_msg.into_cosmos_msg(contract2.clone()).unwrap();
+        let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1.clone()).unwrap());
+        let msg2 = SubMsg::new(hook_msg.into_cosmos_msg(contract2.clone()).unwrap());
         assert_eq!(res.messages, vec![msg1, msg2]);
 
         // check firing on unbond
         let msg = ExecuteMsg::Unbond {
-            tokens: Uint128(7_300),
+            tokens: Uint128::new(7_300),
         };
         let info = mock_info(USER1, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -984,8 +980,8 @@ mod tests {
         assert_eq!(res.messages.len(), 2);
         let diff = MemberDiff::new(USER1, Some(13), Some(6));
         let hook_msg = MemberChangedHookMsg::one(diff);
-        let msg1 = hook_msg.clone().into_cosmos_msg(contract1).unwrap();
-        let msg2 = hook_msg.into_cosmos_msg(contract2).unwrap();
+        let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1).unwrap());
+        let msg2 = SubMsg::new(hook_msg.into_cosmos_msg(contract2).unwrap());
         assert_eq!(res.messages, vec![msg1, msg2]);
     }
 
@@ -1019,7 +1015,12 @@ mod tests {
     fn ensure_bonding_edge_cases() {
         // use min_bond 0, tokens_per_weight 500
         let mut deps = mock_dependencies(&[]);
-        do_instantiate(deps.as_mut(), Uint128(100), Uint128(0), Duration::Height(5));
+        do_instantiate(
+            deps.as_mut(),
+            Uint128::new(100),
+            Uint128::zero(),
+            Duration::Height(5),
+        );
 
         // setting 50 tokens, gives us Some(0) weight
         // even setting to 1 token

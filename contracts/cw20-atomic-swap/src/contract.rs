@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, WasmMsg,
+    attr, from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, SubMsg, WasmMsg,
 };
 use sha2::{Digest, Sha256};
 
@@ -147,7 +147,6 @@ pub fn execute_release(
     // Send all tokens out
     let msgs = send_tokens(&swap.recipient, swap.balance)?;
     Ok(Response {
-        submessages: vec![],
         messages: msgs,
         attributes: vec![
             attr("action", "release"),
@@ -155,6 +154,7 @@ pub fn execute_release(
             attr("preimage", preimage),
             attr("to", swap.recipient.to_string()),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -171,13 +171,13 @@ pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, C
 
     let msgs = send_tokens(&swap.source, swap.balance)?;
     Ok(Response {
-        submessages: vec![],
         messages: msgs,
         attributes: vec![
             attr("action", "refund"),
             attr("id", id),
             attr("to", swap.source.to_string()),
         ],
+        events: vec![],
         data: None,
     })
 }
@@ -195,7 +195,7 @@ fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
     }
 }
 
-fn send_tokens(to: &Addr, amount: Balance) -> StdResult<Vec<CosmosMsg>> {
+fn send_tokens(to: &Addr, amount: Balance) -> StdResult<Vec<SubMsg>> {
     if amount.is_empty() {
         Ok(vec![])
     } else {
@@ -205,7 +205,7 @@ fn send_tokens(to: &Addr, amount: Balance) -> StdResult<Vec<CosmosMsg>> {
                     to_address: to.into(),
                     amount: coins.into_vec(),
                 };
-                Ok(vec![msg.into()])
+                Ok(vec![SubMsg::new(msg)])
             }
             Balance::Cw20(coin) => {
                 let msg = Cw20ExecuteMsg::Transfer {
@@ -215,9 +215,9 @@ fn send_tokens(to: &Addr, amount: Balance) -> StdResult<Vec<CosmosMsg>> {
                 let exec = WasmMsg::Execute {
                     contract_addr: coin.address.into(),
                     msg: to_binary(&msg)?,
-                    send: vec![],
+                    funds: vec![],
                 };
-                Ok(vec![exec.into()])
+                Ok(vec![SubMsg::new(exec)])
             }
         }
     }
@@ -274,7 +274,7 @@ fn query_list(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, Timestamp, Uint128};
+    use cosmwasm_std::{coins, from_binary, StdError, Timestamp, Uint128};
 
     use cw20::Expiration;
 
@@ -479,7 +479,7 @@ mod tests {
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(BankMsg::Send {
                 to_address: create.recipient,
                 amount: balance,
             })
@@ -537,7 +537,7 @@ mod tests {
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(BankMsg::Send {
                 to_address: sender,
                 amount: balance,
             })
@@ -670,7 +670,7 @@ mod tests {
         let cw20_rcpt = String::from("A_on_Y");
         let cw20_coin = Cw20Coin {
             address: String::from("my_cw20_token"),
-            amount: Uint128(1),
+            amount: Uint128::new(1),
         };
 
         // Create the Cw20 side swap counter offer
@@ -722,10 +722,10 @@ mod tests {
         };
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Wasm(WasmMsg::Execute {
+            SubMsg::new(WasmMsg::Execute {
                 contract_addr: token_contract,
                 msg: to_binary(&send_msg).unwrap(),
-                send: vec![],
+                funds: vec![],
             })
         );
 
@@ -750,7 +750,7 @@ mod tests {
         // Verify the resulting Native send message
         assert_eq!(
             res.messages[0],
-            CosmosMsg::Bank(BankMsg::Send {
+            SubMsg::new(BankMsg::Send {
                 to_address: native_rcpt,
                 amount: native_coins,
             })

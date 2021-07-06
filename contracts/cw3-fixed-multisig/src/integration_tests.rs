@@ -97,7 +97,7 @@ fn cw3_controls_cw20() {
 
     // mint some cw20 tokens according to proposal result
     let mint_recipient = Addr::unchecked("recipient");
-    let mint_amount = Uint128(1000);
+    let mint_amount = Uint128::new(1000);
     let cw20_mint_msg = cw20_base::msg::ExecuteMsg::Mint {
         recipient: mint_recipient.to_string(),
         amount: mint_amount,
@@ -106,7 +106,7 @@ fn cw3_controls_cw20() {
     let execute_mint_msg = WasmMsg::Execute {
         contract_addr: cw20_addr.to_string(),
         msg: to_binary(&cw20_mint_msg).unwrap(),
-        send: vec![],
+        funds: vec![],
     };
     let propose_msg = ExecuteMsg::Propose {
         title: "Mint tokens".to_string(),

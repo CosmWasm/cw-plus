@@ -95,14 +95,14 @@ mod tests {
 
         let info = mock_info(owner.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128(12340000));
+        do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
 
         // no allowance to start
         let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances, vec![]);
 
         // set allowance with height expiration
-        let allow1 = Uint128(7777);
+        let allow1 = Uint128::new(7777);
         let expires = Expiration::AtHeight(5432);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender1.clone(),
@@ -112,7 +112,7 @@ mod tests {
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // set allowance with no expiration
-        let allow2 = Uint128(54321);
+        let allow2 = Uint128::new(54321);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender2.clone(),
             amount: allow2,
@@ -158,7 +158,7 @@ mod tests {
         let acct4 = String::from("aaaardvark");
         let expected_order = [acct4.clone(), acct1.clone(), acct3.clone(), acct2.clone()];
 
-        do_instantiate(deps.as_mut(), &acct1, Uint128(12340000));
+        do_instantiate(deps.as_mut(), &acct1, Uint128::new(12340000));
 
         // put money everywhere (to create balanaces)
         let info = mock_info(acct1.as_ref(), &[]);
@@ -169,7 +169,7 @@ mod tests {
             info.clone(),
             ExecuteMsg::Transfer {
                 recipient: acct2,
-                amount: Uint128(222222),
+                amount: Uint128::new(222222),
             },
         )
         .unwrap();
@@ -179,7 +179,7 @@ mod tests {
             info.clone(),
             ExecuteMsg::Transfer {
                 recipient: acct3,
-                amount: Uint128(333333),
+                amount: Uint128::new(333333),
             },
         )
         .unwrap();
@@ -189,7 +189,7 @@ mod tests {
             info,
             ExecuteMsg::Transfer {
                 recipient: acct4,
-                amount: Uint128(444444),
+                amount: Uint128::new(444444),
             },
         )
         .unwrap();

@@ -150,36 +150,32 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     Response::<C> {
-        submessages: resp
-            .submessages
-            .into_iter()
-            .map(|x| SubMsg {
-                id: x.id,
-                msg: customize_msg(x.msg),
-                gas_limit: x.gas_limit,
-                reply_on: Default::default(),
-            })
-            .collect(),
         messages: resp.messages.into_iter().map(customize_msg::<C>).collect(),
+        events: vec![],
         attributes: resp.attributes,
         data: resp.data,
     }
 }
 
-fn customize_msg<C>(msg: CosmosMsg<Empty>) -> CosmosMsg<C>
+fn customize_msg<C>(msg: SubMsg<Empty>) -> SubMsg<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    match msg {
-        CosmosMsg::Wasm(wasm) => CosmosMsg::Wasm(wasm),
-        CosmosMsg::Bank(bank) => CosmosMsg::Bank(bank),
-        CosmosMsg::Staking(staking) => CosmosMsg::Staking(staking),
-        CosmosMsg::Custom(_) => unreachable!(),
-        #[cfg(feature = "stargate")]
-        CosmosMsg::Ibc(ibc) => CosmosMsg::Ibc(ibc),
-        #[cfg(feature = "stargate")]
-        CosmosMsg::Stargate { type_url, value } => CosmosMsg::Stargate { type_url, value },
-        _ => panic!("unknown message variant {:?}", msg),
+    SubMsg {
+        msg: match msg.msg {
+            CosmosMsg::Wasm(wasm) => CosmosMsg::Wasm(wasm),
+            CosmosMsg::Bank(bank) => CosmosMsg::Bank(bank),
+            CosmosMsg::Staking(staking) => CosmosMsg::Staking(staking),
+            CosmosMsg::Custom(_) => unreachable!(),
+            #[cfg(feature = "stargate")]
+            CosmosMsg::Ibc(ibc) => CosmosMsg::Ibc(ibc),
+            #[cfg(feature = "stargate")]
+            CosmosMsg::Stargate { type_url, value } => CosmosMsg::Stargate { type_url, value },
+            _ => panic!("unknown message variant {:?}", msg),
+        },
+        id: msg.id,
+        gas_limit: msg.gas_limit,
+        reply_on: msg.reply_on,
     }
 }
 
@@ -704,7 +700,7 @@ mod test {
             .handle(contract_addr.clone(), &querier, info, b"{}".to_vec())
             .unwrap();
         assert_eq!(1, res.messages.len());
-        match &res.messages[0] {
+        match &res.messages[0].msg {
             CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
                 assert_eq!(to_address.as_str(), "foobar");
                 assert_eq!(amount.as_slice(), &[payout.clone()]);

@@ -5,7 +5,7 @@ use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
     ContractResult, CosmosMsg, Empty, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Response, SystemError, SystemResult, WasmMsg,
+    QueryRequest, Response, SubMsg, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
@@ -25,7 +25,6 @@ pub struct ActionResponse<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    // TODO: allow T != Empty
     pub messages: Vec<CosmosMsg<C>>,
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
@@ -37,7 +36,7 @@ where
 {
     fn from(input: Response<C>) -> Self {
         ActionResponse {
-            messages: input.messages,
+            messages: input.messages.into_iter().map(|m| m.msg).collect(),
             attributes: input.attributes,
             data: input.data,
         }
@@ -50,7 +49,7 @@ where
 {
     fn init(input: Response<C>, address: Addr) -> Self {
         ActionResponse {
-            messages: input.messages,
+            messages: input.messages.into_iter().map(|m| m.msg).collect(),
             attributes: input.attributes,
             data: Some(address.as_ref().as_bytes().into()),
         }
@@ -165,14 +164,13 @@ where
     ) -> Result<Addr, String> {
         // instantiate contract
         let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
-        let msg: CosmosMsg<C> = WasmMsg::Instantiate {
+        let msg = SubMsg::new(WasmMsg::Instantiate {
             admin: None,
             code_id,
             msg: init_msg,
-            send: send_funds.to_vec(),
+            funds: send_funds.to_vec(),
             label: label.into(),
-        }
-        .into();
+        });
         let res = self.execute(sender, msg)?;
         parse_contract_addr(&res.data)
     }
@@ -187,19 +185,18 @@ where
         send_funds: &[Coin],
     ) -> Result<AppResponse, String> {
         let msg = to_binary(msg).map_err(|e| e.to_string())?;
-        let msg = WasmMsg::Execute {
+        let msg = SubMsg::new(WasmMsg::Execute {
             contract_addr: contract_addr.into(),
             msg,
-            send: send_funds.to_vec(),
-        }
-        .into();
+            funds: send_funds.to_vec(),
+        });
         self.execute(sender, msg)
     }
 
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+    pub fn execute(&mut self, sender: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -211,7 +208,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<CosmosMsg<C>>,
+        msgs: Vec<SubMsg<C>>,
     ) -> Result<Vec<AppResponse>, String> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -307,14 +304,14 @@ where
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
-        match msg {
+    fn execute(&mut self, sender: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
+        match msg.msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.handle_wasm(sender, msg)?;
                 let mut attributes = res.attributes;
                 // recurse in all messages
                 for resend in res.messages {
-                    let subres = self.execute(resender.clone(), resend)?;
+                    let subres = self.execute(resender.clone(), SubMsg::new(resend))?;
                     // ignore the data now, just like in wasmd
                     // append the events
                     attributes.extend_from_slice(&subres.attributes);
@@ -358,16 +355,13 @@ where
             WasmMsg::Execute {
                 contract_addr,
                 msg,
-                send,
+                funds,
             } => {
                 let contract_addr = Addr::unchecked(contract_addr);
                 // first move the cash
-                self.send(sender.clone(), contract_addr.clone().into(), &send)?;
+                self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
                 // then call the contract
-                let info = MessageInfo {
-                    sender,
-                    funds: send,
-                };
+                let info = MessageInfo { sender, funds };
                 let res =
                     self.wasm
                         .handle(contract_addr.clone(), self.router, info, msg.to_vec())?;
@@ -377,17 +371,14 @@ where
                 admin: _,
                 code_id,
                 msg,
-                send,
+                funds,
                 label: _,
             } => {
                 let contract_addr = Addr::unchecked(self.wasm.register_contract(code_id as usize)?);
                 // move the cash
-                self.send(sender.clone(), contract_addr.clone().into(), &send)?;
+                self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
                 // then call the contract
-                let info = MessageInfo {
-                    sender,
-                    funds: send,
-                };
+                let info = MessageInfo { sender, funds };
                 let res = self
                     .wasm
                     .init(contract_addr.clone(), self.router, info, msg.to_vec())?;
@@ -477,11 +468,10 @@ mod test {
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
-        let msg: CosmosMsg = BankMsg::Send {
+        let msg = SubMsg::new(BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: to_send,
-        }
-        .into();
+        });
         router.execute(owner.clone(), msg.clone()).unwrap();
         let rich = get_balance(&router, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
@@ -492,11 +482,10 @@ mod test {
         router.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
-        let msg = BankMsg::Send {
+        let msg = SubMsg::new(BankMsg::Send {
             to_address: rcpt.into(),
             amount: coins(20, "btc"),
-        }
-        .into();
+        });
         router.execute(owner.clone(), msg).unwrap_err();
 
         let rich = get_balance(&router, &owner);
@@ -583,12 +572,11 @@ mod test {
         assert_eq!(1, qres.count);
 
         // reflecting payout message pays reflect contract
-        let msg = WasmMsg::Execute {
+        let msg = SubMsg::new(WasmMsg::Execute {
             contract_addr: payout_addr.into(),
             msg: b"{}".into(),
-            send: vec![],
-        }
-        .into();
+            funds: vec![],
+        });
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
@@ -639,11 +627,10 @@ mod test {
         let random = Addr::unchecked("random");
 
         // sending 7 eth works
-        let msg = BankMsg::Send {
+        let msg = SubMsg::new(BankMsg::Send {
             to_address: random.clone().into(),
             amount: coins(7, "eth"),
-        }
-        .into();
+        });
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
@@ -663,16 +650,14 @@ mod test {
         assert_eq!(2, qres.count);
 
         // sending 8 eth, then 3 btc should fail both
-        let msg = BankMsg::Send {
+        let msg = SubMsg::new(BankMsg::Send {
             to_address: random.clone().into(),
             amount: coins(8, "eth"),
-        }
-        .into();
-        let msg2 = BankMsg::Send {
+        });
+        let msg2 = SubMsg::new(BankMsg::Send {
             to_address: random.clone().into(),
             amount: coins(3, "btc"),
-        }
-        .into();
+        });
         let msgs = ReflectMessage {
             messages: vec![msg, msg2],
         };
