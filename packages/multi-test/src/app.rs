@@ -25,8 +25,7 @@ pub struct ActionResponse<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    // TODO: allow T != Empty
-    pub messages: Vec<SubMsg<C>>,
+    pub messages: Vec<CosmosMsg<C>>,
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
 }
@@ -37,7 +36,7 @@ where
 {
     fn from(input: Response<C>) -> Self {
         ActionResponse {
-            messages: input.messages,
+            messages: input.messages.into_iter().map(|m| m.msg).collect(),
             attributes: input.attributes,
             data: input.data,
         }
@@ -50,7 +49,7 @@ where
 {
     fn init(input: Response<C>, address: Addr) -> Self {
         ActionResponse {
-            messages: input.messages,
+            messages: input.messages.into_iter().map(|m| m.msg).collect(),
             attributes: input.attributes,
             data: Some(address.as_ref().as_bytes().into()),
         }
@@ -312,7 +311,7 @@ where
                 let mut attributes = res.attributes;
                 // recurse in all messages
                 for resend in res.messages {
-                    let subres = self.execute(resender.clone(), resend)?;
+                    let subres = self.execute(resender.clone(), SubMsg::new(resend))?;
                     // ignore the data now, just like in wasmd
                     // append the events
                     attributes.extend_from_slice(&subres.attributes);
