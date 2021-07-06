@@ -32,7 +32,7 @@
             "msgs": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/SubMsg_for_Empty"
+                "$ref": "#/definitions/CosmosMsg_for_Empty"
               }
             },
             "title": {
@@ -410,16 +410,6 @@
         }
       }
     },
-    "ReplyOn": {
-      "description": "Use this to define when the contract gets a response callback. If you only need it for errors or success you can select just those in order to save gas.",
-      "type": "string",
-      "enum": [
-        "always",
-        "error",
-        "success",
-        "never"
-      ]
-    },
     "StakingMsg": {
       "description": "The message types of the staking module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/staking/v1beta1/tx.proto",
       "anyOf": [
@@ -503,37 +493,6 @@
           "additionalProperties": false
         }
       ]
-    },
-    "SubMsg_for_Empty": {
-      "description": "A submessage that will guarantee a `reply` call on success or error, depending on the `reply_on` setting. If you do not need to process the result, use regular messages instead.\n\nNote: On error the submessage execution will revert any partial state changes due to this message, but not revert any state changes in the calling contract. If this is required, it must be done manually in the `reply` entry point.",
-      "type": "object",
-      "required": [
-        "id",
-        "msg",
-        "reply_on"
-      ],
-      "properties": {
-        "gas_limit": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "id": {
-          "description": "An arbitrary ID chosen by the contract. This is typically used to match `Reply`s in the `reply` entry point to the submessage.",
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "msg": {
-          "$ref": "#/definitions/CosmosMsg_for_Empty"
-        },
-        "reply_on": {
-          "$ref": "#/definitions/ReplyOn"
-        }
-      }
     },
     "Timestamp": {
       "description": "A point in time in nanosecond precision.\n\nThis type can represent times from 1970-01-01T00:00:00Z to 2554-07-21T23:34:33Z.\n\n## Examples\n\n``` # use cosmwasm_std::Timestamp; let ts = Timestamp::from_nanos(1_000_000_202); assert_eq!(ts.nanos(), 1_000_000_202); assert_eq!(ts.seconds(), 1); assert_eq!(ts.subsec_nanos(), 202);\n\nlet ts = ts.plus_seconds(2); assert_eq!(ts.nanos(), 3_000_000_202); assert_eq!(ts.seconds(), 3); assert_eq!(ts.subsec_nanos(), 202); ```",

@@ -211,7 +211,7 @@
         "msgs": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/SubMsg_for_Empty"
+            "$ref": "#/definitions/CosmosMsg_for_Empty"
           }
         },
         "status": {
@@ -230,16 +230,6 @@
         }
       }
     },
-    "ReplyOn": {
-      "description": "Use this to define when the contract gets a response callback. If you only need it for errors or success you can select just those in order to save gas.",
-      "type": "string",
-      "enum": [
-        "always",
-        "error",
-        "success",
-        "never"
-      ]
-    },
     "Status": {
       "type": "string",
       "enum": [
@@ -249,37 +239,6 @@
         "passed",
         "executed"
       ]
-    },
-    "SubMsg_for_Empty": {
-      "description": "A submessage that will guarantee a `reply` call on success or error, depending on the `reply_on` setting. If you do not need to process the result, use regular messages instead.\n\nNote: On error the submessage execution will revert any partial state changes due to this message, but not revert any state changes in the calling contract. If this is required, it must be done manually in the `reply` entry point.",
-      "type": "object",
-      "required": [
-        "id",
-        "msg",
-        "reply_on"
-      ],
-      "properties": {
-        "gas_limit": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "id": {
-          "description": "An arbitrary ID chosen by the contract. This is typically used to match `Reply`s in the `reply` entry point to the submessage.",
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "msg": {
-          "$ref": "#/definitions/CosmosMsg_for_Empty"
-        },
-        "reply_on": {
-          "$ref": "#/definitions/ReplyOn"
-        }
-      }
     },
     "ThresholdResponse": {
       "description": "This defines the different ways tallies can happen. Every contract should support a subset of these, ideally all.\n\nThe total_weight used for calculating success as well as the weights of each individual voter used in tallying should be snapshotted at the beginning of the block at which the proposal starts (this is likely the responsibility of a correct cw4 implementation).",
