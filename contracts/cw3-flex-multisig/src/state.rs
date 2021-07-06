@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
 use cosmwasm_std::{
-    Addr, BlockInfo, Decimal, Empty, StdError, StdResult, Storage, SubMsg, Uint128,
+    Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128,
 };
 
 use cw0::{Duration, Expiration};
@@ -31,7 +31,7 @@ pub struct Proposal {
     pub description: String,
     pub start_height: u64,
     pub expires: Expiration,
-    pub msgs: Vec<SubMsg<Empty>>,
+    pub msgs: Vec<CosmosMsg<Empty>>,
     pub status: Status,
     /// pass requirements
     pub threshold: Threshold,

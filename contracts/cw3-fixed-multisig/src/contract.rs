@@ -91,7 +91,6 @@ pub fn execute_propose(
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
-    let msgs = msgs.into_iter().map(SubMsg::new).collect();
     // only members of the multisig can create a proposal
     let vote_power = VOTERS
         .may_load(deps.storage, &info.sender)?
@@ -226,7 +225,7 @@ pub fn execute_execute(
 
     // dispatch all proposed messages
     Ok(Response {
-        messages: prop.msgs,
+        messages: prop.msgs.into_iter().map(SubMsg::new).collect(),
         attributes: vec![
             attr("action", "execute"),
             attr("sender", info.sender),

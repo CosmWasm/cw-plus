@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cosmwasm_std::{Decimal, Empty, SubMsg};
+use cosmwasm_std::{CosmosMsg, Decimal, Empty};
 use cw0::Expiration;
 
 use crate::msg::Vote;
@@ -129,7 +129,7 @@ where
     pub id: u64,
     pub title: String,
     pub description: String,
-    pub msgs: Vec<SubMsg<T>>,
+    pub msgs: Vec<CosmosMsg<T>>,
     pub status: Status,
     pub expires: Expiration,
     /// This is the threshold that is applied to this proposal. Both the rules of the voting contract,

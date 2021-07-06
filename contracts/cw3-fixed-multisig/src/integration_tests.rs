@@ -3,7 +3,7 @@
 use crate::contract::{execute, instantiate, query};
 use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{from_binary, to_binary, Addr, CosmosMsg, Empty, Uint128, WasmMsg, WasmQuery};
+use cosmwasm_std::{from_binary, to_binary, Addr, Empty, Uint128, WasmMsg, WasmQuery};
 use cw0::Duration;
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
@@ -111,7 +111,7 @@ fn cw3_controls_cw20() {
     let propose_msg = ExecuteMsg::Propose {
         title: "Mint tokens".to_string(),
         description: "Need to mint tokens".to_string(),
-        msgs: vec![CosmosMsg::Wasm(execute_mint_msg)],
+        msgs: vec![execute_mint_msg.into()],
         latest: None,
     };
     // propose mint

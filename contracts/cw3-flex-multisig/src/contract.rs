@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Empty, Env, MessageInfo, Order, Response,
-    StdResult, SubMsg,
+    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    Response, StdResult, SubMsg,
 };
 
 use cw0::{maybe_addr, Expiration};
@@ -82,7 +82,7 @@ pub fn execute_propose(
     info: MessageInfo,
     title: String,
     description: String,
-    msgs: Vec<SubMsg>,
+    msgs: Vec<CosmosMsg>,
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
@@ -217,7 +217,7 @@ pub fn execute_execute(
 
     // dispatch all proposed messages
     Ok(Response {
-        messages: prop.msgs,
+        messages: prop.msgs.into_iter().map(SubMsg::new).collect(),
         attributes: vec![
             attr("action", "execute"),
             attr("sender", info.sender),
@@ -593,12 +593,12 @@ mod tests {
         (flex_addr, group_addr)
     }
 
-    fn proposal_info() -> (Vec<SubMsg<Empty>>, String, String) {
+    fn proposal_info() -> (Vec<CosmosMsg<Empty>>, String, String) {
         let bank_msg = BankMsg::Send {
             to_address: SOMEBODY.into(),
             amount: coins(1, "BTC"),
         };
-        let msgs = vec![SubMsg::new(bank_msg)];
+        let msgs = vec![bank_msg.into()];
         let title = "Pay somebody".to_string();
         let description = "Do I pay her?".to_string();
         (msgs, title, description)
@@ -1348,11 +1348,10 @@ mod tests {
         );
 
         // Start a proposal to remove VOTER3 from the set
-        let update_msg = SubMsg::new(
-            Cw4GroupContract::new(group_addr)
-                .update_members(vec![VOTER3.into()], vec![])
-                .unwrap(),
-        );
+        let update_msg = Cw4GroupContract::new(group_addr)
+            .update_members(vec![VOTER3.into()], vec![])
+            .unwrap()
+            .into();
         let update_proposal = ExecuteMsg::Propose {
             title: "Kick out VOTER3".to_string(),
             description: "He's trying to steal our money".to_string(),

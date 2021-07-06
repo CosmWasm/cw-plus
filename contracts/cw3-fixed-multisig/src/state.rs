@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
-use cosmwasm_std::{Addr, BlockInfo, Empty, StdError, StdResult, Storage, SubMsg};
+use cosmwasm_std::{Addr, BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
 
 use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
@@ -20,7 +20,7 @@ pub struct Proposal {
     pub title: String,
     pub description: String,
     pub expires: Expiration,
-    pub msgs: Vec<SubMsg<Empty>>,
+    pub msgs: Vec<CosmosMsg<Empty>>,
     pub status: Status,
     /// how many votes have already said yes
     pub yes_weight: u64,
