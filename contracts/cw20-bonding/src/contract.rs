@@ -161,15 +161,13 @@ pub fn execute_buy(
 
     // bond them to the validator
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "buy"),
             attr("from", info.sender),
             attr("reserve", payment),
             attr("supply", minted),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -267,8 +265,7 @@ fn do_sell(
             attr("supply", amount),
             attr("reserve", released),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }

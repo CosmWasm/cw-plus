@@ -127,8 +127,7 @@ where
         let res = Response {
             messages: msgs,
             attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
-            events: vec![],
-            data: None,
+            ..Response::default()
         };
         Ok(res)
     }
@@ -210,7 +209,6 @@ where
     })?;
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
             attr("owner", info.sender),
@@ -218,8 +216,7 @@ where
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -260,7 +257,6 @@ where
     }
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
             attr("owner", info.sender),
@@ -268,8 +264,7 @@ where
             attr("denomination", amount.denom),
             attr("amount", amount.amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -296,15 +291,13 @@ where
     PERMISSIONS.save(deps.storage, &spender_addr, &perm)?;
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "set_permissions"),
             attr("owner", info.sender),
             attr("spender", spender),
             attr("permissions", perm),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }

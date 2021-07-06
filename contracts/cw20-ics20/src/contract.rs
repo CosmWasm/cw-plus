@@ -124,8 +124,7 @@ pub fn execute_transfer(
     let res = Response {
         messages: vec![SubMsg::new(msg)],
         attributes,
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }

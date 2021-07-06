@@ -215,8 +215,7 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
             attr("bonded", payment.amount),
             attr("minted", to_mint),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -294,8 +293,7 @@ pub fn unbond(
             attr("unbonded", unbond),
             attr("burnt", amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -336,8 +334,7 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
             attr("from", info.sender),
             attr("amount", to_send),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -362,9 +359,7 @@ pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response,
                 funds: vec![],
             }),
         ],
-        attributes: vec![],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -407,8 +402,7 @@ pub fn _bond_all_tokens(
             amount: balance.clone(),
         })],
         attributes: vec![attr("action", "reinvest"), attr("bonded", balance.amount)],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }

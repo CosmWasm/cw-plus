@@ -34,15 +34,13 @@ pub fn execute_increase_allowance(
     )?;
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "increase_allowance"),
             attr("owner", info.sender),
             attr("spender", spender),
             attr("amount", amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -78,15 +76,13 @@ pub fn execute_decrease_allowance(
     }
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "decrease_allowance"),
             attr("owner", info.sender),
             attr("spender", spender),
             attr("amount", amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -146,7 +142,6 @@ pub fn execute_transfer_from(
     )?;
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "transfer_from"),
             attr("from", owner),
@@ -154,8 +149,7 @@ pub fn execute_transfer_from(
             attr("by", info.sender),
             attr("amount", amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -188,15 +182,13 @@ pub fn execute_burn_from(
     })?;
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "burn_from"),
             attr("from", owner),
             attr("by", info.sender),
             attr("amount", amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -251,8 +243,7 @@ pub fn execute_send_from(
     let res = Response {
         messages: vec![msg],
         attributes: attrs,
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }

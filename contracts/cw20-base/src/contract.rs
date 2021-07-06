@@ -224,14 +224,12 @@ pub fn execute_mint(
     )?;
 
     let res = Response {
-        messages: vec![],
         attributes: vec![
             attr("action", "mint"),
             attr("to", recipient),
             attr("amount", amount),
         ],
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }
@@ -284,8 +282,7 @@ pub fn execute_send(
     let res = Response {
         messages: vec![msg],
         attributes: attrs,
-        events: vec![],
-        data: None,
+        ..Response::default()
     };
     Ok(res)
 }

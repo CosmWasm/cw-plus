@@ -760,15 +760,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "transfer_nft"),
                     attr("sender", "venus"),
                     attr("recipient", "random"),
                     attr("token_id", token_id),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
     }
@@ -834,8 +832,7 @@ mod tests {
                     attr("recipient", "another_contract"),
                     attr("token_id", token_id),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
     }
@@ -872,15 +869,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "approve"),
                     attr("sender", "demeter"),
                     attr("spender", "random"),
                     attr("token_id", token_id.clone()),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -986,14 +981,12 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "approve_all"),
                     attr("sender", "demeter"),
                     attr("operator", "random"),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 

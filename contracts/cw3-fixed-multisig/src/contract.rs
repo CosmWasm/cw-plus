@@ -641,15 +641,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
                     attr("sender", VOTER3),
                     attr("proposal_id", 1),
                     attr("status", "Open"),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -661,15 +659,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "propose"),
                     attr("sender", VOTER4),
                     attr("proposal_id", 2),
                     attr("status", "Passed"),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
     }
@@ -722,15 +718,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
                     attr("sender", VOTER1),
                     attr("proposal_id", proposal_id),
                     attr("status", "Open"),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -781,15 +775,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
                     attr("sender", VOTER4),
                     attr("proposal_id", proposal_id),
                     attr("status", "Passed"),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -843,15 +835,13 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "vote"),
                     attr("sender", VOTER3),
                     attr("proposal_id", proposal_id),
                     attr("status", "Passed"),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -875,8 +865,7 @@ mod tests {
                     attr("sender", SOMEBODY),
                     attr("proposal_id", proposal_id),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
@@ -952,14 +941,12 @@ mod tests {
         assert_eq!(
             res,
             Response {
-                messages: vec![],
                 attributes: vec![
                     attr("action", "close"),
                     attr("sender", SOMEBODY),
                     attr("proposal_id", proposal_id),
                 ],
-                events: vec![],
-                data: None,
+                ..Response::default()
             }
         );
 
