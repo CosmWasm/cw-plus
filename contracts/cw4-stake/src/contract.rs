@@ -36,10 +36,7 @@ pub fn instantiate(
     ADMIN.set(deps.branch(), maybe_addr(api, msg.admin)?)?;
 
     // min_bond is at least 1, so 0 stake -> non-membership
-    let min_bond = Uint128::new(match msg.min_bond.u128() {
-        0 => 1,
-        v => v,
-    });
+    let min_bond = std::cmp::max(msg.min_bond, Uint128::new(1));
 
     let config = Config {
         denom: msg.denom,
