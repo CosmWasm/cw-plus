@@ -100,7 +100,7 @@ const useOptions = (options: Options): Network => {
     const [account] = await wallet.getAccounts();
     // ensure we have some tokens
     if (options.faucetUrl) {
-      const tokens = await client.getBalance(account.address, 'usponge')
+      const tokens = await client.getBalance(account.address, options.feeToken)
       if (tokens.amount === '0') {
         console.log(`Getting ${options.feeToken} from faucet`);
         await hitFaucet(options.faucetUrl, account.address, options.feeToken);
