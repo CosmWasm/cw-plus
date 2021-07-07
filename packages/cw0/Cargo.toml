@@ -18,4 +18,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
 
 [dev-dependencies]
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.6.2", features = ["iterator"] }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.7.0", features = ["iterator"] }
