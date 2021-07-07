@@ -13,7 +13,7 @@ pub fn maybe_addr(api: &dyn Api, human: Option<String>) -> StdResult<Option<Addr
 // this will set the first key after the provided key, by appending a 0 byte
 pub fn calc_range_start(start_after: Option<Addr>) -> Option<Vec<u8>> {
     start_after.map(|addr| {
-        let mut v: Vec<u8> = addr.as_ref().into();
+        let mut v: Vec<u8> = addr.as_bytes().into();
         v.push(0);
         v
     })
@@ -21,7 +21,7 @@ pub fn calc_range_start(start_after: Option<Addr>) -> Option<Vec<u8>> {
 
 // set the end to the canonicalized format (used for Order::Descending)
 pub fn calc_range_end(end_before: Option<Addr>) -> Option<Vec<u8>> {
-    end_before.map(|addr| addr.as_ref().into())
+    end_before.map(|addr| addr.as_bytes().into())
 }
 
 // this will set the first key after the provided key, by appending a 0 byte
