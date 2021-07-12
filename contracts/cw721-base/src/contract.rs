@@ -142,7 +142,7 @@ pub fn execute_send_nft(
     info: MessageInfo,
     contract: String,
     token_id: String,
-    msg: Option<Binary>,
+    msg: Binary,
 ) -> Result<Response, ContractError> {
     // Transfer token
     _transfer_nft(deps, &env, &info, &contract, &token_id)?;
@@ -797,7 +797,7 @@ mod tests {
         let send_msg = ExecuteMsg::SendNft {
             contract: target.clone(),
             token_id: token_id.clone(),
-            msg: Some(msg.clone()),
+            msg: msg.clone(),
         };
 
         let random = mock_info("random", &[]);
@@ -811,7 +811,7 @@ mod tests {
         let payload = Cw721ReceiveMsg {
             sender: String::from("venus"),
             token_id: token_id.clone(),
-            msg: Some(msg),
+            msg,
         };
         let expected = SubMsg::new(payload.into_cosmos_msg(target.clone()).unwrap());
         // ensure expected serializes as we think it should
@@ -1009,7 +1009,7 @@ mod tests {
         let send_msg = ExecuteMsg::SendNft {
             contract: String::from("another_contract"),
             token_id: token_id2,
-            msg: Some(to_binary(&msg).unwrap()),
+            msg: to_binary(&msg).unwrap(),
         };
         execute(deps.as_mut(), mock_env(), random, send_msg).unwrap();
 

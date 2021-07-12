@@ -9,7 +9,7 @@ use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, WasmMsg};
 pub struct Cw721ReceiveMsg {
     pub sender: String,
     pub token_id: String,
-    pub msg: Option<Binary>,
+    pub msg: Binary,
 }
 
 impl Cw721ReceiveMsg {

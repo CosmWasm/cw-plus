@@ -89,11 +89,10 @@ fn escrow_happy_path_cw20_tokens() {
         end_time: None,
         cw20_whitelist: None,
     });
-    let create_bin = to_binary(&create_msg).unwrap();
     let send_msg = Cw20ExecuteMsg::Send {
         contract: escrow_addr.to_string(),
         amount: Uint128::new(1200),
-        msg: Some(create_bin),
+        msg: to_binary(&create_msg).unwrap(),
     };
     let res = router
         .execute_contract(owner.clone(), cash_addr.clone(), &send_msg, &[])

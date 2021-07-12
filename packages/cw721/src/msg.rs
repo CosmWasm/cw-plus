@@ -14,7 +14,7 @@ pub enum Cw721ExecuteMsg {
     SendNft {
         contract: String,
         token_id: String,
-        msg: Option<Binary>,
+        msg: Binary,
     },
     /// Allows operator to transfer / send the token from the owner's account.
     /// If expiration is set, then this allowance has a time/height limit
