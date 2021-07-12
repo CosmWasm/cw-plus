@@ -66,6 +66,12 @@ where
         self.key(k).may_load(store)
     }
 
+    /// has returns true or false if any data is at this key, without parsing or interpreting the
+    /// contents.
+    pub fn has(&self, store: &dyn Storage, k: K) -> bool {
+        self.key(k).has(store)
+    }
+
     /// Loads the data, perform the specified action, and store the result
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
@@ -197,6 +203,33 @@ mod test {
         // removing leaves us empty
         john.remove(&mut store);
         assert_eq!(None, john.may_load(&store).unwrap());
+    }
+
+    #[test]
+    fn existence() {
+        let mut store = MockStorage::new();
+
+        // set data in proper format
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.save(&mut store, b"john", &data).unwrap();
+
+        // set and remove it
+        PEOPLE.save(&mut store, b"removed", &data).unwrap();
+        PEOPLE.remove(&mut store, b"removed");
+
+        // invalid, but non-empty data
+        store.set(&PEOPLE.key(b"random"), b"random-data");
+
+        // any data, including invalid or empty is returned as "has"
+        assert!(PEOPLE.has(&store, b"john"));
+        assert!(PEOPLE.has(&store, b"random"));
+
+        // if nothing was written, it is false
+        assert!(!PEOPLE.has(&store, b"never-writen"));
+        assert!(!PEOPLE.has(&store, b"removed"));
     }
 
     #[test]

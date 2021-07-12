@@ -65,6 +65,12 @@ where
         may_deserialize(&value)
     }
 
+    /// has returns true or false if any data is at this key, without parsing or interpreting the
+    /// contents. It will returns true for an length-0 byte array (Some(b"")), if you somehow manage to set that.
+    pub fn has(&self, store: &dyn Storage) -> bool {
+        store.get(&self.storage_key).is_some()
+    }
+
     /// Loads the data, perform the specified action, and store the result
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
