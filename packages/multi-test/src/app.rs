@@ -5,7 +5,7 @@ use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
     ContractResult, CosmosMsg, Empty, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Response, SubMsg, SystemError, SystemResult, WasmMsg,
+    QueryRequest, ReplyOn, Response, SubMsg, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankOps, BankRouter};
@@ -25,7 +25,7 @@ pub struct ActionResponse<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    pub messages: Vec<CosmosMsg<C>>,
+    pub messages: Vec<SubMsg<C>>,
     pub attributes: Vec<Attribute>,
     pub data: Option<Binary>,
 }
@@ -36,7 +36,7 @@ where
 {
     fn from(input: Response<C>) -> Self {
         ActionResponse {
-            messages: input.messages.into_iter().map(|m| m.msg).collect(),
+            messages: input.messages,
             attributes: input.attributes,
             data: input.data,
         }
@@ -49,7 +49,7 @@ where
 {
     fn init(input: Response<C>, address: Addr) -> Self {
         ActionResponse {
-            messages: input.messages.into_iter().map(|m| m.msg).collect(),
+            messages: input.messages,
             attributes: input.attributes,
             data: Some(address.as_ref().as_bytes().into()),
         }
@@ -305,13 +305,17 @@ where
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
     fn execute(&mut self, sender: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
+        // TODO: actually handle reply semantics
+        if msg.reply_on != ReplyOn::Never {
+            unimplemented!();
+        }
         match msg.msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.handle_wasm(sender, msg)?;
                 let mut attributes = res.attributes;
                 // recurse in all messages
                 for resend in res.messages {
-                    let subres = self.execute(resender.clone(), SubMsg::new(resend))?;
+                    let subres = self.execute(resender.clone(), resend)?;
                     // ignore the data now, just like in wasmd
                     // append the events
                     attributes.extend_from_slice(&subres.attributes);
