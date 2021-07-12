@@ -16,7 +16,7 @@ pub trait Contract<T>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn handle(
+    fn execute(
         &self,
         deps: DepsMut,
         env: Env,
@@ -24,7 +24,7 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<T>, String>;
 
-    fn init(
+    fn instantiate(
         &self,
         deps: DepsMut,
         env: Env,
@@ -60,8 +60,8 @@ where
     E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    handle_fn: ContractClosure<T1, C, E1>,
-    init_fn: ContractClosure<T2, C, E2>,
+    execute_fn: ContractClosure<T1, C, E1>,
+    instantiate_fn: ContractClosure<T2, C, E2>,
     query_fn: QueryClosure<T3, E3>,
     sudo_fn: Option<SudoClosure<T4, C, E4>>,
 }
@@ -77,13 +77,13 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
-        handle_fn: ContractFn<T1, C, E1>,
-        init_fn: ContractFn<T2, C, E2>,
+        execute_fn: ContractFn<T1, C, E1>,
+        instantiate_fn: ContractFn<T2, C, E2>,
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
-            handle_fn: Box::new(handle_fn),
-            init_fn: Box::new(init_fn),
+            execute_fn: Box::new(execute_fn),
+            instantiate_fn: Box::new(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: None,
         }
@@ -92,13 +92,13 @@ where
     /// this will take a contract that returns Response<Empty> and will "upgrade" it
     /// to Response<C> if needed to be compatible with a chain-specific extension
     pub fn new_with_empty(
-        handle_fn: ContractFn<T1, Empty, E1>,
-        init_fn: ContractFn<T2, Empty, E2>,
+        execute_fn: ContractFn<T1, Empty, E1>,
+        instantiate_fn: ContractFn<T2, Empty, E2>,
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
-            handle_fn: customize_fn(handle_fn),
-            init_fn: customize_fn(init_fn),
+            execute_fn: customize_fn(execute_fn),
+            instantiate_fn: customize_fn(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: None,
         }
@@ -118,14 +118,14 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new_with_sudo(
-        handle_fn: ContractFn<T1, C, E1>,
-        init_fn: ContractFn<T2, C, E2>,
+        execute_fn: ContractFn<T1, C, E1>,
+        instantiate_fn: ContractFn<T2, C, E2>,
         query_fn: QueryFn<T3, E3>,
         sudo_fn: SudoFn<T4, C, E4>,
     ) -> Self {
         ContractWrapper {
-            handle_fn: Box::new(handle_fn),
-            init_fn: Box::new(init_fn),
+            execute_fn: Box::new(execute_fn),
+            instantiate_fn: Box::new(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: Some(Box::new(sudo_fn)),
         }
@@ -192,7 +192,7 @@ where
     E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn handle(
+    fn execute(
         &self,
         deps: DepsMut,
         env: Env,
@@ -200,11 +200,11 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let msg: T1 = from_slice(&msg).map_err(|e| e.to_string())?;
-        let res = (self.handle_fn)(deps, env, info, msg);
+        let res = (self.execute_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
     }
 
-    fn init(
+    fn instantiate(
         &self,
         deps: DepsMut,
         env: Env,
@@ -212,7 +212,7 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let msg: T2 = from_slice(&msg).map_err(|e| e.to_string())?;
-        let res = (self.init_fn)(deps, env, info, msg);
+        let res = (self.instantiate_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
     }
 
@@ -487,7 +487,7 @@ where
                 let handler = parent
                     .get(&code_id)
                     .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.handle(deps, env, info, msg)
+                handler.execute(deps, env, info, msg)
             },
         )
     }
@@ -514,7 +514,7 @@ where
                 let handler = parent
                     .get(&code_id)
                     .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.init(deps, env, info, msg)
+                handler.instantiate(deps, env, info, msg)
             },
         )
     }
