@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 use cosmwasm_std::{
     from_slice, Addr, Api, Binary, BlockInfo, ContractInfo, CosmosMsg, Deps, DepsMut, Empty, Env,
-    MessageInfo, Querier, QuerierWrapper, Response, Storage, SubMsg, WasmQuery,
+    MessageInfo, Querier, QuerierWrapper, Reply, Response, Storage, SubMsg, WasmQuery,
 };
 
 use crate::transactions::{RepLog, StorageTransaction};
@@ -34,21 +34,25 @@ where
 
     fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<T>, String>;
 
+    fn reply(&self, deps: DepsMut, env: Env, msg: Reply) -> Result<Response<T>, String>;
+
     fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
 }
 
 type ContractFn<T, C, E> =
     fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<Response<C>, E>;
 type SudoFn<T, C, E> = fn(deps: DepsMut, env: Env, msg: T) -> Result<Response<C>, E>;
+// type ReplyFn<C, E> = fn(deps: DepsMut, env: Env, msg: Reply) -> Result<Response<C>, E>;
 type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
 
 type ContractClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, MessageInfo, T) -> Result<Response<C>, E>>;
 type SudoClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, T) -> Result<Response<C>, E>>;
+type ReplyClosure<C, E> = Box<dyn Fn(DepsMut, Env, Reply) -> Result<Response<C>, E>>;
 type QueryClosure<T, E> = Box<dyn Fn(Deps, Env, T) -> Result<Binary, E>>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// Place T4 and E4 at the end, as we just want default placeholders for most contracts that don't have sudo
-pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Empty, E4 = String>
+pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Empty, E4 = String, E5 = String>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
@@ -58,12 +62,14 @@ where
     E2: ToString,
     E3: ToString,
     E4: ToString,
+    E5: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     execute_fn: ContractClosure<T1, C, E1>,
     instantiate_fn: ContractClosure<T2, C, E2>,
     query_fn: QueryClosure<T3, E3>,
     sudo_fn: Option<SudoClosure<T4, C, E4>>,
+    reply_fn: Option<ReplyClosure<C, E5>>,
 }
 
 impl<T1, T2, T3, E1, E2, E3, C> ContractWrapper<T1, T2, T3, E1, E2, E3, C>
@@ -86,6 +92,7 @@ where
             instantiate_fn: Box::new(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: None,
+            reply_fn: None,
         }
     }
 
@@ -101,6 +108,7 @@ where
             instantiate_fn: customize_fn(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: None,
+            reply_fn: None,
         }
     }
 }
@@ -128,6 +136,7 @@ where
             instantiate_fn: Box::new(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: Some(Box::new(sudo_fn)),
+            reply_fn: None,
         }
     }
 }
@@ -179,8 +188,8 @@ where
     }
 }
 
-impl<T1, T2, T3, E1, E2, E3, C, T4, E4> Contract<C>
-    for ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4>
+impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5> Contract<C>
+    for ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
@@ -190,6 +199,7 @@ where
     E2: ToString,
     E3: ToString,
     E4: ToString,
+    E5: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     fn execute(
@@ -222,6 +232,15 @@ where
         let res = match &self.sudo_fn {
             Some(sudo) => sudo(deps, env, msg),
             None => return Err("sudo not implemented for contract".to_string()),
+        };
+        res.map_err(|e| e.to_string())
+    }
+
+    // this returns an error if the contract doesn't implement sudo
+    fn reply(&self, deps: DepsMut, env: Env, reply_data: Reply) -> Result<Response<C>, String> {
+        let res = match &self.reply_fn {
+            Some(reply) => reply(deps, env, reply_data),
+            None => return Err("reply not implemented for contract".to_string()),
         };
         res.map_err(|e| e.to_string())
     }
