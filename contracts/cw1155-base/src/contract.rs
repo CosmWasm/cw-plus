@@ -233,9 +233,9 @@ pub fn execute_mint(
     }
 
     // insert if not exist
-    let key = TOKENS.key(&token_id);
-    if deps.storage.get(&key).is_none() {
-        key.save(deps.storage, &"".to_owned())?;
+    if !TOKENS.has(deps.storage, &token_id) {
+        // we must save some valid data here
+        TOKENS.save(deps.storage, &token_id, &String::new())?;
     }
 
     Ok(rsp)
@@ -329,10 +329,9 @@ pub fn execute_batch_mint(
         event.add_attributes(&mut rsp);
 
         // insert if not exist
-        let key = TOKENS.key(&token_id);
-        if deps.storage.get(&key).is_none() {
-            // insert an empty entry so token enumeration can find it
-            key.save(deps.storage, &"".to_owned())?;
+        if !TOKENS.has(deps.storage, &token_id) {
+            // we must save some valid data here
+            TOKENS.save(deps.storage, &token_id, &String::new())?;
         }
     }
 
