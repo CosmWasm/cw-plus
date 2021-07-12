@@ -38,6 +38,7 @@
           "type": "object",
           "required": [
             "contract",
+            "msg",
             "token_id"
           ],
           "properties": {
@@ -45,14 +46,7 @@
               "type": "string"
             },
             "msg": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Binary"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/definitions/Binary"
             },
             "token_id": {
               "type": "string"

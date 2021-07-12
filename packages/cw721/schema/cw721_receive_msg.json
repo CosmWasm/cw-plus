@@ -4,19 +4,13 @@
   "description": "Cw721ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg",
   "type": "object",
   "required": [
+    "msg",
     "sender",
     "token_id"
   ],
   "properties": {
     "msg": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Binary"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/definitions/Binary"
     },
     "sender": {
       "type": "string"
