@@ -282,7 +282,7 @@ where
         }
         match msg.msg {
             CosmosMsg::Wasm(msg) => {
-                let (resender, res) = self.handle_wasm(sender, msg)?;
+                let (resender, res) = self.execute_wasm(sender, msg)?;
                 let mut attributes = res.attributes;
                 let mut events = res.events;
                 // recurse in all messages
@@ -329,7 +329,7 @@ where
     }
 
     // this returns the contract address as well, so we can properly resend the data
-    fn handle_wasm(&mut self, sender: Addr, msg: WasmMsg) -> Result<(Addr, Response<C>), String> {
+    fn execute_wasm(&mut self, sender: Addr, msg: WasmMsg) -> Result<(Addr, Response<C>), String> {
         match msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -343,7 +343,7 @@ where
                 let info = MessageInfo { sender, funds };
                 let res =
                     self.wasm
-                        .handle(contract_addr.clone(), self.router, info, msg.to_vec())?;
+                        .execute(contract_addr.clone(), self.router, info, msg.to_vec())?;
                 Ok((contract_addr, res))
             }
             WasmMsg::Instantiate {
@@ -358,9 +358,12 @@ where
                 self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
                 // then call the contract
                 let info = MessageInfo { sender, funds };
-                let mut res =
-                    self.wasm
-                        .init(contract_addr.clone(), self.router, info, msg.to_vec())?;
+                let mut res = self.wasm.instantiate(
+                    contract_addr.clone(),
+                    self.router,
+                    info,
+                    msg.to_vec(),
+                )?;
                 init_response(&mut res, &contract_addr);
                 Ok((contract_addr, res))
             }
