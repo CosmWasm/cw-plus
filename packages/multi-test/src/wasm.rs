@@ -42,7 +42,7 @@ where
 type ContractFn<T, C, E> =
     fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<Response<C>, E>;
 type SudoFn<T, C, E> = fn(deps: DepsMut, env: Env, msg: T) -> Result<Response<C>, E>;
-// type ReplyFn<C, E> = fn(deps: DepsMut, env: Env, msg: Reply) -> Result<Response<C>, E>;
+type ReplyFn<C, E> = fn(deps: DepsMut, env: Env, msg: Reply) -> Result<Response<C>, E>;
 type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
 
 type ContractClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, MessageInfo, T) -> Result<Response<C>, E>>;
@@ -137,6 +137,33 @@ where
             query_fn: Box::new(query_fn),
             sudo_fn: Some(Box::new(sudo_fn)),
             reply_fn: None,
+        }
+    }
+}
+
+impl<T1, T2, T3, E1, E2, E3, C, E5> ContractWrapper<T1, T2, T3, E1, E2, E3, C, Empty, String, E5>
+where
+    T1: DeserializeOwned + 'static,
+    T2: DeserializeOwned + 'static,
+    T3: DeserializeOwned + 'static,
+    E1: ToString + 'static,
+    E2: ToString + 'static,
+    E3: ToString + 'static,
+    E5: ToString + 'static,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    pub fn new_with_reply(
+        execute_fn: ContractFn<T1, C, E1>,
+        instantiate_fn: ContractFn<T2, C, E2>,
+        query_fn: QueryFn<T3, E3>,
+        reply_fn: ReplyFn<C, E5>,
+    ) -> Self {
+        ContractWrapper {
+            execute_fn: Box::new(execute_fn),
+            instantiate_fn: Box::new(instantiate_fn),
+            query_fn: Box::new(query_fn),
+            sudo_fn: None,
+            reply_fn: Some(Box::new(reply_fn)),
         }
     }
 }
