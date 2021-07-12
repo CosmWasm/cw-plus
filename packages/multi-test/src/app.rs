@@ -4,7 +4,7 @@ use serde::Serialize;
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
-    ContractResult, CosmosMsg, Empty, MessageInfo, Querier, QuerierResult, QuerierWrapper,
+    ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
     QueryRequest, ReplyOn, Response, SubMsg, SystemError, SystemResult, WasmMsg,
 };
 
@@ -16,44 +16,15 @@ use std::fmt;
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
     pub attributes: Vec<Attribute>,
+    pub events: Vec<Event>,
     pub data: Option<Binary>,
 }
 
-// This can be Response, Response, MigrationResponse
-#[derive(Default, Clone)]
-pub struct ActionResponse<C>
+fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    pub messages: Vec<SubMsg<C>>,
-    pub attributes: Vec<Attribute>,
-    pub data: Option<Binary>,
-}
-
-impl<C> From<Response<C>> for ActionResponse<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn from(input: Response<C>) -> Self {
-        ActionResponse {
-            messages: input.messages,
-            attributes: input.attributes,
-            data: input.data,
-        }
-    }
-}
-
-impl<C> ActionResponse<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn init(input: Response<C>, address: Addr) -> Self {
-        ActionResponse {
-            messages: input.messages,
-            attributes: input.attributes,
-            data: Some(address.as_ref().as_bytes().into()),
-        }
-    }
+    res.data = Some(contact_address.as_bytes().into());
 }
 
 impl<C> Querier for App<C>
@@ -313,15 +284,19 @@ where
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.handle_wasm(sender, msg)?;
                 let mut attributes = res.attributes;
+                let mut events = res.events;
                 // recurse in all messages
                 for resend in res.messages {
                     let subres = self.execute(resender.clone(), resend)?;
                     // ignore the data now, just like in wasmd
                     // append the events
+                    // TODO: is this correct for attributes??? Or do we turn them into sub-events?
                     attributes.extend_from_slice(&subres.attributes);
+                    events.extend_from_slice(&subres.events);
                 }
                 Ok(AppResponse {
                     attributes,
+                    events,
                     data: res.data,
                 })
             }
@@ -336,25 +311,25 @@ where
     fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
         let res = self.wasm.sudo(contract_addr.clone(), self.router, msg)?;
         let mut attributes = res.attributes;
+        let mut events = res.events;
         // recurse in all messages
         for resend in res.messages {
             let subres = self.execute(contract_addr.clone(), resend)?;
             // ignore the data now, just like in wasmd
             // append the events
+            // TODO: is this correct for attributes??? Or do we turn them into sub-events?
             attributes.extend_from_slice(&subres.attributes);
+            events.extend_from_slice(&subres.events);
         }
         Ok(AppResponse {
             attributes,
+            events,
             data: res.data,
         })
     }
 
     // this returns the contract address as well, so we can properly resend the data
-    fn handle_wasm(
-        &mut self,
-        sender: Addr,
-        msg: WasmMsg,
-    ) -> Result<(Addr, ActionResponse<C>), String> {
+    fn handle_wasm(&mut self, sender: Addr, msg: WasmMsg) -> Result<(Addr, Response<C>), String> {
         match msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -369,7 +344,7 @@ where
                 let res =
                     self.wasm
                         .handle(contract_addr.clone(), self.router, info, msg.to_vec())?;
-                Ok((contract_addr, res.into()))
+                Ok((contract_addr, res))
             }
             WasmMsg::Instantiate {
                 admin: _,
@@ -383,13 +358,11 @@ where
                 self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
                 // then call the contract
                 let info = MessageInfo { sender, funds };
-                let res = self
-                    .wasm
-                    .init(contract_addr.clone(), self.router, info, msg.to_vec())?;
-                Ok((
-                    contract_addr.clone(),
-                    ActionResponse::init(res, contract_addr),
-                ))
+                let mut res =
+                    self.wasm
+                        .init(contract_addr.clone(), self.router, info, msg.to_vec())?;
+                init_response(&mut res, &contract_addr);
+                Ok((contract_addr, res))
             }
             WasmMsg::Migrate { .. } => unimplemented!(),
             m => panic!("Unsupported wasm message: {:?}", m),
