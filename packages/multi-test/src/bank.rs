@@ -12,7 +12,7 @@ const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
 pub trait Bank {
-    fn handle(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String>;
+    fn execute(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String>;
 
     fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String>;
 
@@ -85,7 +85,7 @@ impl<'a> BankCache<'a> {
     }
 
     pub fn execute(&mut self, sender: Addr, msg: BankMsg) -> Result<(), String> {
-        self.router.bank.handle(&mut self.state, sender, msg)
+        self.router.bank.execute(&mut self.state, sender, msg)
     }
 }
 
@@ -136,7 +136,7 @@ impl SimpleBank {
 }
 
 impl Bank for SimpleBank {
-    fn handle(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String> {
+    fn execute(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String> {
         match msg {
             BankMsg::Send { to_address, amount } => {
                 self.send(storage, sender, Addr::unchecked(to_address), amount)
@@ -273,21 +273,22 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: to_send,
         };
-        bank.handle(&mut store, owner.clone(), msg.clone()).unwrap();
+        bank.execute(&mut store, owner.clone(), msg.clone())
+            .unwrap();
         let rich = bank.get_balance(&store, &owner).unwrap();
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
         let poor = bank.get_balance(&store, &rcpt).unwrap();
         assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
 
         // can send from any account with funds
-        bank.handle(&mut store, rcpt.clone(), msg).unwrap();
+        bank.execute(&mut store, rcpt.clone(), msg).unwrap();
 
         // cannot send too much
         let msg = BankMsg::Send {
             to_address: rcpt.into(),
             amount: coins(20, "btc"),
         };
-        bank.handle(&mut store, owner.clone(), msg).unwrap_err();
+        bank.execute(&mut store, owner.clone(), msg).unwrap_err();
 
         let rich = bank.get_balance(&store, &owner).unwrap();
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
@@ -308,7 +309,7 @@ mod test {
         // send both tokens
         let to_burn = vec![coin(30, "eth"), coin(5, "btc")];
         let msg = BankMsg::Burn { amount: to_burn };
-        bank.handle(&mut store, owner.clone(), msg).unwrap();
+        bank.execute(&mut store, owner.clone(), msg).unwrap();
         let rich = bank.get_balance(&store, &owner).unwrap();
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
 
@@ -316,7 +317,7 @@ mod test {
         let msg = BankMsg::Burn {
             amount: coins(20, "btc"),
         };
-        let err = bank.handle(&mut store, owner.clone(), msg).unwrap_err();
+        let err = bank.execute(&mut store, owner.clone(), msg).unwrap_err();
         assert!(err.contains("Overflow"));
         let rich = bank.get_balance(&store, &owner).unwrap();
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
@@ -325,7 +326,7 @@ mod test {
         let msg = BankMsg::Burn {
             amount: coins(1, "btc"),
         };
-        let err = bank.handle(&mut store, rcpt, msg).unwrap_err();
+        let err = bank.execute(&mut store, rcpt, msg).unwrap_err();
         assert!(err.contains("Overflow"));
     }
 }

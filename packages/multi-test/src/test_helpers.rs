@@ -14,7 +14,7 @@ use crate::wasm::{Contract, ContractWrapper};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EmptyMsg {}
 
-fn init_error(
+fn instantiate_error(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -23,7 +23,7 @@ fn init_error(
     Err(StdError::generic_err("Init failed"))
 }
 
-fn handle_error(
+fn execute_error(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -38,7 +38,7 @@ fn query_error(_deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
 
 pub fn contract_error() -> Box<dyn Contract<Empty>> {
     let contract: ContractWrapper<_, _, _, _, _, _, _, _, _> =
-        ContractWrapper::new(handle_error, init_error, query_error);
+        ContractWrapper::new(execute_error, instantiate_error, query_error);
     Box::new(contract)
 }
 
@@ -48,7 +48,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     let contract: ContractWrapper<_, _, _, _, _, _, _, _, _> =
-        ContractWrapper::new_with_empty(handle_error, init_error, query_error);
+        ContractWrapper::new_with_empty(execute_error, instantiate_error, query_error);
     Box::new(contract)
 }
 
@@ -58,7 +58,7 @@ pub struct PayoutMessage {
 }
 const PAYOUT: Item<PayoutMessage> = Item::new("payout");
 
-fn init_payout(
+fn instantiate_payout(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -68,7 +68,7 @@ fn init_payout(
     Ok(Response::default())
 }
 
-fn handle_payout(
+fn execute_payout(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
@@ -95,7 +95,7 @@ fn query_payout(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErro
 }
 
 pub fn contract_payout() -> Box<dyn Contract<Empty>> {
-    let contract = ContractWrapper::new(handle_payout, init_payout, query_payout);
+    let contract = ContractWrapper::new(execute_payout, instantiate_payout, query_payout);
     Box::new(contract)
 }
 
@@ -103,7 +103,8 @@ pub fn contract_payout_custom<C>() -> Box<dyn Contract<C>>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    let contract = ContractWrapper::new_with_empty(handle_payout, init_payout, query_payout);
+    let contract =
+        ContractWrapper::new_with_empty(execute_payout, instantiate_payout, query_payout);
     Box::new(contract)
 }
 
@@ -132,7 +133,7 @@ pub struct ReflectResponse {
 
 const REFLECT: Item<u32> = Item::new("reflect");
 
-fn init_reflect(
+fn instantiate_reflect(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -142,7 +143,7 @@ fn init_reflect(
     Ok(Response::default())
 }
 
-fn handle_reflect(
+fn execute_reflect(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
@@ -175,7 +176,11 @@ fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdErr
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
-    let contract =
-        ContractWrapper::new_with_sudo(handle_reflect, init_reflect, query_reflect, sudo_reflect);
+    let contract = ContractWrapper::new_with_sudo(
+        execute_reflect,
+        instantiate_reflect,
+        query_reflect,
+        sudo_reflect,
+    );
     Box::new(contract)
 }

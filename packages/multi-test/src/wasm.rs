@@ -16,7 +16,7 @@ pub trait Contract<T>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn handle(
+    fn execute(
         &self,
         deps: DepsMut,
         env: Env,
@@ -24,7 +24,7 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<T>, String>;
 
-    fn init(
+    fn instantiate(
         &self,
         deps: DepsMut,
         env: Env,
@@ -60,8 +60,8 @@ where
     E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    handle_fn: ContractClosure<T1, C, E1>,
-    init_fn: ContractClosure<T2, C, E2>,
+    execute_fn: ContractClosure<T1, C, E1>,
+    instantiate_fn: ContractClosure<T2, C, E2>,
     query_fn: QueryClosure<T3, E3>,
     sudo_fn: Option<SudoClosure<T4, C, E4>>,
 }
@@ -77,13 +77,13 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
-        handle_fn: ContractFn<T1, C, E1>,
-        init_fn: ContractFn<T2, C, E2>,
+        execute_fn: ContractFn<T1, C, E1>,
+        instantiate_fn: ContractFn<T2, C, E2>,
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
-            handle_fn: Box::new(handle_fn),
-            init_fn: Box::new(init_fn),
+            execute_fn: Box::new(execute_fn),
+            instantiate_fn: Box::new(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: None,
         }
@@ -92,13 +92,13 @@ where
     /// this will take a contract that returns Response<Empty> and will "upgrade" it
     /// to Response<C> if needed to be compatible with a chain-specific extension
     pub fn new_with_empty(
-        handle_fn: ContractFn<T1, Empty, E1>,
-        init_fn: ContractFn<T2, Empty, E2>,
+        execute_fn: ContractFn<T1, Empty, E1>,
+        instantiate_fn: ContractFn<T2, Empty, E2>,
         query_fn: QueryFn<T3, E3>,
     ) -> Self {
         ContractWrapper {
-            handle_fn: customize_fn(handle_fn),
-            init_fn: customize_fn(init_fn),
+            execute_fn: customize_fn(execute_fn),
+            instantiate_fn: customize_fn(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: None,
         }
@@ -118,14 +118,14 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new_with_sudo(
-        handle_fn: ContractFn<T1, C, E1>,
-        init_fn: ContractFn<T2, C, E2>,
+        execute_fn: ContractFn<T1, C, E1>,
+        instantiate_fn: ContractFn<T2, C, E2>,
         query_fn: QueryFn<T3, E3>,
         sudo_fn: SudoFn<T4, C, E4>,
     ) -> Self {
         ContractWrapper {
-            handle_fn: Box::new(handle_fn),
-            init_fn: Box::new(init_fn),
+            execute_fn: Box::new(execute_fn),
+            instantiate_fn: Box::new(instantiate_fn),
             query_fn: Box::new(query_fn),
             sudo_fn: Some(Box::new(sudo_fn)),
         }
@@ -151,7 +151,7 @@ where
 {
     Response::<C> {
         messages: resp.messages.into_iter().map(customize_msg::<C>).collect(),
-        events: vec![],
+        events: resp.events,
         attributes: resp.attributes,
         data: resp.data,
     }
@@ -192,7 +192,7 @@ where
     E4: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn handle(
+    fn execute(
         &self,
         deps: DepsMut,
         env: Env,
@@ -200,11 +200,11 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let msg: T1 = from_slice(&msg).map_err(|e| e.to_string())?;
-        let res = (self.handle_fn)(deps, env, info, msg);
+        let res = (self.execute_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
     }
 
-    fn init(
+    fn instantiate(
         &self,
         deps: DepsMut,
         env: Env,
@@ -212,7 +212,7 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let msg: T2 = from_slice(&msg).map_err(|e| e.to_string())?;
-        let res = (self.init_fn)(deps, env, info, msg);
+        let res = (self.instantiate_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
     }
 
@@ -256,7 +256,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     // WasmState - cache this, pass in separate?
-    handlers: HashMap<usize, Box<dyn Contract<C>>>,
+    codes: HashMap<usize, Box<dyn Contract<C>>>,
     contracts: HashMap<Addr, ContractData>,
     // WasmConst
     block: BlockInfo,
@@ -270,7 +270,7 @@ where
 {
     pub fn new(api: Box<dyn Api>, block: BlockInfo, storage_factory: StorageFactory) -> Self {
         WasmRouter {
-            handlers: HashMap::new(),
+            codes: HashMap::new(),
             contracts: HashMap::new(),
             block,
             api,
@@ -293,8 +293,8 @@ where
     }
 
     pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
-        let idx = self.handlers.len() + 1;
-        self.handlers.insert(idx, code);
+        let idx = self.codes.len() + 1;
+        self.codes.insert(idx, code);
         idx
     }
 
@@ -357,7 +357,7 @@ where
             .get(&address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
         let handler = self
-            .handlers
+            .codes
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let env = self.get_env(address);
@@ -449,7 +449,7 @@ where
     /// You must call init after this to set up the contract properly.
     /// These are separated into two steps to have cleaner return values.
     pub fn register_contract(&mut self, code_id: usize) -> Result<Addr, String> {
-        if !self.router.handlers.contains_key(&code_id) {
+        if !self.router.codes.contains_key(&code_id) {
             return Err("Cannot init contract with unregistered code id".to_string());
         }
         let addr = self.next_address();
@@ -465,14 +465,14 @@ where
         Addr::unchecked("Contract #".to_string() + &count.to_string())
     }
 
-    pub fn handle(
+    pub fn execute(
         &mut self,
         address: Addr,
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        let parent = &self.router.handlers;
+        let parent = &self.router.codes;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
         let api = self.router.api.as_ref();
@@ -487,19 +487,19 @@ where
                 let handler = parent
                     .get(&code_id)
                     .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.handle(deps, env, info, msg)
+                handler.execute(deps, env, info, msg)
             },
         )
     }
 
-    pub fn init(
+    pub fn instantiate(
         &mut self,
         address: Addr,
         querier: &dyn Querier,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        let parent = &self.router.handlers;
+        let parent = &self.router.codes;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
         let api = self.router.api.as_ref();
@@ -514,7 +514,7 @@ where
                 let handler = parent
                     .get(&code_id)
                     .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.init(deps, env, info, msg)
+                handler.instantiate(deps, env, info, msg)
             },
         )
     }
@@ -525,7 +525,7 @@ where
         querier: &dyn Querier,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        let parent = &self.router.handlers;
+        let parent = &self.router.codes;
         let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
         let api = self.router.api.as_ref();
@@ -638,7 +638,7 @@ mod test {
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let info = mock_info("foobar", &[]);
         let err = cache
-            .init(contract_addr, &querier, info, b"{}".to_vec())
+            .instantiate(contract_addr, &querier, info, b"{}".to_vec())
             .unwrap_err();
         // StdError from contract_error auto-converted to string
         assert_eq!(err, "Generic error: Init failed");
@@ -646,7 +646,7 @@ mod test {
         // and the error for calling an unregistered contract
         let info = mock_info("foobar", &[]);
         let err = cache
-            .init(
+            .instantiate(
                 Addr::unchecked("unregistered"),
                 &querier,
                 info,
@@ -690,14 +690,14 @@ mod test {
         })
         .unwrap();
         let res = cache
-            .init(contract_addr.clone(), &querier, info, init_msg)
+            .instantiate(contract_addr.clone(), &querier, info, init_msg)
             .unwrap();
         assert_eq!(0, res.messages.len());
 
         // execute the contract
         let info = mock_info("foobar", &[]);
         let res = cache
-            .handle(contract_addr.clone(), &querier, info, b"{}".to_vec())
+            .execute(contract_addr.clone(), &querier, info, b"{}".to_vec())
             .unwrap();
         assert_eq!(1, res.messages.len());
         match &res.messages[0].msg {
