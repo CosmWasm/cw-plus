@@ -27,9 +27,19 @@ pub trait Bank {
     fn clone(&self) -> Box<dyn Bank>;
 }
 
+pub trait Committable {
+    fn mut_store(&mut self) -> &mut dyn Storage;
+}
+
 pub struct BankRouter {
     bank: Box<dyn Bank>,
     storage: Box<dyn Storage>,
+}
+
+impl Committable for BankRouter {
+    fn mut_store(&mut self) -> &mut dyn Storage {
+        self.storage.as_mut()
+    }
 }
 
 impl BankRouter {
@@ -61,16 +71,17 @@ pub struct BankCache<'a> {
     state: StorageTransaction<'a>,
 }
 
+impl<'a> Committable for BankCache<'a> {
+    fn mut_store(&mut self) -> &mut dyn Storage {
+        &mut self.state
+    }
+}
+
 pub struct BankOps(RepLog);
 
-// TODO: combine these into one function that takes both
 impl BankOps {
-    pub fn commit(self, router: &mut BankRouter) {
-        self.0.commit(router.storage.as_mut())
-    }
-
-    pub fn commit_cache(self, cache: &mut BankCache) {
-        self.0.commit(&mut cache.state)
+    pub fn commit(self, committable: &mut dyn Committable) {
+        self.0.commit(committable.mut_store())
     }
 }
 
@@ -407,7 +418,7 @@ mod test {
 
         // apply second to first
         let ops = cache2.prepare();
-        ops.commit_cache(&mut cache);
+        ops.commit(&mut cache);
 
         // apply first to router
         let ops = cache.prepare();
