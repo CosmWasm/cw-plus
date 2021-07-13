@@ -5,7 +5,8 @@ use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
     ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, ReplyOn, Response, SubMsg, SystemError, SystemResult, WasmMsg,
+    QueryRequest, Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError,
+    SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
@@ -310,11 +311,44 @@ where
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
     fn execute(&mut self, sender: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
-        // TODO: actually handle reply semantics
-        if msg.reply_on != ReplyOn::Never {
-            unimplemented!();
+        // execute in cache
+        let mut subtx = self.cache();
+        let res = subtx._execute(sender.clone(), msg.msg);
+        if res.is_ok() {
+            subtx.prepare().commit(self);
         }
-        match msg.msg {
+
+        // call reply if meaningful
+        if let Ok(r) = res {
+            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
+                let reply = Reply {
+                    id: msg.id,
+                    result: ContractResult::Ok(SubMsgExecutionResponse {
+                        events: r.events,
+                        data: r.data,
+                    }),
+                };
+                self._reply(sender, reply)
+            } else {
+                Ok(r)
+            }
+        } else if let Err(e) = res {
+            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
+                let reply = Reply {
+                    id: msg.id,
+                    result: ContractResult::Err(e),
+                };
+                self._reply(sender, reply)
+            } else {
+                Err(e)
+            }
+        } else {
+            res
+        }
+    }
+
+    fn _execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+        match msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.execute_wasm(sender, msg)?;
                 let mut attributes = res.attributes;
@@ -340,6 +374,27 @@ where
             }
             _ => unimplemented!(),
         }
+    }
+
+    fn _reply(&mut self, contract: Addr, reply: Reply) -> Result<AppResponse, String> {
+        // TODO: process result better, combine events / data from parent
+        let res = self.wasm.reply(contract.clone(), self.querier, reply)?;
+        let mut attributes = res.attributes;
+        let mut events = res.events;
+        // recurse in all messages
+        for resend in res.messages {
+            let subres = self.execute(contract.clone(), resend)?;
+            // ignore the data now, just like in wasmd
+            // append the events
+            // TODO: is this correct for attributes??? Or do we turn them into sub-events?
+            attributes.extend_from_slice(&subres.attributes);
+            events.extend_from_slice(&subres.events);
+        }
+        Ok(AppResponse {
+            attributes,
+            events,
+            data: res.data,
+        })
     }
 
     fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
@@ -796,6 +851,7 @@ mod test {
             .unwrap();
 
         // ensure error was written
+        let query = ReflectQueryMsg::Reply { id: 456 };
         let res: Reply = router
             .wrap()
             .query_wasm_smart(&reflect_addr, &query)

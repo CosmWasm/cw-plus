@@ -674,6 +674,32 @@ where
         )
     }
 
+    pub fn reply(
+        &mut self,
+        address: Addr,
+        querier: &dyn Querier,
+        reply: Reply,
+    ) -> Result<Response<C>, String> {
+        // this errors if the sender is not a contract
+        let parent = &self.router.codes;
+        let env = self.router.get_env(address.clone());
+        let api = self.router.api.as_ref();
+
+        self.state.with_storage(
+            querier,
+            self.parent_contracts,
+            address,
+            env,
+            api,
+            |code_id, deps, env| {
+                let handler = parent
+                    .get(&code_id)
+                    .ok_or_else(|| "Unregistered code id".to_string())?;
+                handler.reply(deps, env, reply)
+            },
+        )
+    }
+
     pub fn sudo(
         &mut self,
         address: Addr,
