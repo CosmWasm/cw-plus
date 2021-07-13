@@ -3,10 +3,9 @@ use serde::Serialize;
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
-    ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError,
-    SystemResult, WasmMsg,
+    from_slice, to_binary, to_vec, Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractResult,
+    CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest,
+    Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError, SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
@@ -16,7 +15,6 @@ use std::fmt;
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
-    pub attributes: Vec<Attribute>,
     pub events: Vec<Event>,
     pub data: Option<Binary>,
 }
@@ -395,7 +393,6 @@ where
             events.extend_from_slice(&subres.events);
         }
         Ok(AppResponse {
-            attributes: vec![],
             events,
             data: response.data,
         })
@@ -718,7 +715,11 @@ mod test {
         let res = router
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
-        assert_eq!(0, res.attributes.len());
+        // only one wasm event with no custom attributes
+        assert_eq!(1, res.events.len());
+        assert_eq!(1, res.events[0].attributes.len());
+        assert_eq!("wasm", res.events[0].ty.as_str());
+        assert_eq!("contract_address", res.events[0].attributes[0].key.as_str());
         // ensure random got paid
         let funds = get_balance(&router, &random);
         assert_eq!(funds, coins(7, "eth"));
