@@ -534,16 +534,43 @@ pub struct WasmOps {
 }
 
 impl WasmOps {
-    pub fn commit<C>(self, router: &mut WasmRouter<C>)
-    where
-        C: Clone + fmt::Debug + PartialEq + JsonSchema,
-    {
-        self.new_contracts.into_iter().for_each(|(k, v)| {
-            router.contracts.insert(k, v);
+    pub fn commit(self, committable: &mut dyn WasmCommittable) {
+        committable.apply_ops(self)
+    }
+}
+
+pub trait WasmCommittable {
+    fn apply_ops(&mut self, ops: WasmOps);
+}
+
+impl<C> WasmCommittable for WasmRouter<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn apply_ops(&mut self, ops: WasmOps) {
+        ops.new_contracts.into_iter().for_each(|(k, v)| {
+            self.contracts.insert(k, v);
         });
-        self.contract_diffs.into_iter().for_each(|(k, ops)| {
-            let storage = router.contracts.get_mut(&k).unwrap().storage.as_mut();
+        ops.contract_diffs.into_iter().for_each(|(k, ops)| {
+            let storage = self.contracts.get_mut(&k).unwrap().storage.as_mut();
             ops.commit(storage);
+        });
+    }
+}
+
+impl<'a, C> WasmCommittable for WasmCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn apply_ops(&mut self, ops: WasmOps) {
+        ops.new_contracts.into_iter().for_each(|(k, v)| {
+            self.state.contracts.insert(k, v);
+        });
+        ops.contract_diffs.into_iter().for_each(|(k, ops)| {
+            match self.state.get_contract_mut(self.parent_contracts, &k) {
+                Some(contract) => ops.commit(contract.storage),
+                None => panic!("No contract at {}, but applying diff", k),
+            }
         });
     }
 }
@@ -946,12 +973,19 @@ mod test {
         // ensure first cache still doesn't see this contract
         assert_no_contract(&cache, &contract3);
 
-        // TODO: apply second to first
-        // let ops = cache2.prepare();
-        // ops.commit(&mut cache);
+        // apply second to first, all contracts present
+        cache2.prepare().commit(&mut cache);
+        assert_payout(&mut cache, &contract1, &payout1);
+        assert_payout(&mut cache, &contract2, &payout2);
+        assert_payout(&mut cache, &contract3, &payout3);
 
-        // TODO: check you have 3 contracts in cache
+        // apply to router
+        cache.prepare().commit(&mut router);
 
-        // TODO: apply to router
+        // make new cache and see all contracts there
+        let mut cache3 = router.cache();
+        assert_payout(&mut cache3, &contract1, &payout1);
+        assert_payout(&mut cache3, &contract2, &payout2);
+        assert_payout(&mut cache3, &contract3, &payout3);
     }
 }
