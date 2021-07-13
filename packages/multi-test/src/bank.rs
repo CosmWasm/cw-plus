@@ -57,7 +57,7 @@ impl BankRouter {
 
 pub struct BankCache<'a> {
     // and this into one with reference
-    router: &'a BankRouter,
+    bank: &'a dyn Bank,
     state: StorageTransaction<'a>,
 }
 
@@ -72,7 +72,7 @@ impl BankOps {
 impl<'a> BankCache<'a> {
     fn new(router: &'a BankRouter) -> Self {
         BankCache {
-            router,
+            bank: router.bank.as_ref(),
             state: StorageTransaction::new(router.storage.as_ref()),
         }
     }
@@ -85,7 +85,7 @@ impl<'a> BankCache<'a> {
     }
 
     pub fn execute(&mut self, sender: Addr, msg: BankMsg) -> Result<(), String> {
-        self.router.bank.execute(&mut self.state, sender, msg)
+        self.bank.execute(&mut self.state, sender, msg)
     }
 }
 
