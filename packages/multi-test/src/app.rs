@@ -409,7 +409,7 @@ mod test {
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins};
+    use cosmwasm_std::{attr, coin, coins, Reply};
 
     fn mock_router() -> App {
         let env = mock_env();
@@ -691,5 +691,83 @@ mod test {
             .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
         assert_eq!(25, count);
+    }
+
+    #[test]
+    fn reflect_submessage_reply_works() {
+        let mut router = custom_router();
+
+        // set personal balance
+        let owner = Addr::unchecked("owner");
+        let random = Addr::unchecked("random");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        router.set_bank_balance(&owner, init_funds).unwrap();
+
+        // set up reflect contract
+        let reflect_id = router.store_code(contract_reflect());
+        let reflect_addr = router
+            .instantiate_contract(
+                reflect_id,
+                owner,
+                &EmptyMsg {},
+                &coins(40, "eth"),
+                "Reflect",
+            )
+            .unwrap();
+
+        // no reply writen beforehand
+        let query = ReflectQueryMsg::Reply { id: 123 };
+        router
+            .wrap()
+            .query_wasm_smart::<Reply, _, _>(&reflect_addr, &query)
+            .unwrap_err();
+
+        // reflect sends 7 eth, success
+        let msg = SubMsg::reply_always(
+            BankMsg::Send {
+                to_address: random.clone().into(),
+                amount: coins(7, "eth"),
+            },
+            123,
+        );
+        let msgs = ReflectMessage {
+            messages: vec![msg],
+        };
+        let _res = router
+            .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
+            .unwrap();
+
+        // ensure success was written
+        let res: Reply = router
+            .wrap()
+            .query_wasm_smart(&reflect_addr, &query)
+            .unwrap();
+        assert_eq!(res.id, 123);
+        assert!(res.result.is_ok());
+        // TODO: any more checks on reply data???
+
+        // reflect sends 300 btc, failure, but error caught by submessage (so shows success)
+        let msg = SubMsg::reply_always(
+            BankMsg::Send {
+                to_address: random.clone().into(),
+                amount: coins(300, "btc"),
+            },
+            456,
+        );
+        let msgs = ReflectMessage {
+            messages: vec![msg],
+        };
+        let _res = router
+            .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
+            .unwrap();
+
+        // ensure error was written
+        let res: Reply = router
+            .wrap()
+            .query_wasm_smart(&reflect_addr, &query)
+            .unwrap();
+        assert_eq!(res.id, 456);
+        assert!(res.result.is_err());
+        // TODO: check error?
     }
 }
