@@ -136,14 +136,14 @@ where
     ) -> Result<Addr, String> {
         // instantiate contract
         let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
-        let msg = SubMsg::new(WasmMsg::Instantiate {
+        let msg = WasmMsg::Instantiate {
             admin: None,
             code_id,
             msg: init_msg,
             funds: send_funds.to_vec(),
             label: label.into(),
-        });
-        let res = self.execute(sender, msg)?;
+        };
+        let res = self.execute(sender, msg.into())?;
         parse_contract_addr(&res.data)
     }
 
@@ -157,18 +157,18 @@ where
         send_funds: &[Coin],
     ) -> Result<AppResponse, String> {
         let msg = to_binary(msg).map_err(|e| e.to_string())?;
-        let msg = SubMsg::new(WasmMsg::Execute {
+        let msg = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
             msg,
             funds: send_funds.to_vec(),
-        });
-        self.execute(sender, msg)
+        };
+        self.execute(sender, msg.into())
     }
 
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn execute(&mut self, sender: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
+    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -180,7 +180,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<SubMsg<C>>,
+        msgs: Vec<CosmosMsg<C>>,
     ) -> Result<Vec<AppResponse>, String> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -304,69 +304,11 @@ where
         }
     }
 
-    /// This will execute the given messages, making all changes to the local cache.
-    /// This *will* write some data to the cache if the message fails half-way through.
-    /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
-    ///
-    /// For normal use cases, you can use Router::execute() or Router::execute_multi().
-    /// This is designed to be handled internally as part of larger process flows.
-    fn execute(&mut self, sender: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
-        // execute in cache
-        let mut subtx = self.cache();
-        let res = subtx._execute(sender.clone(), msg.msg);
-        if res.is_ok() {
-            subtx.prepare().commit(self);
-        }
-
-        // call reply if meaningful
-        if let Ok(r) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
-                let reply = Reply {
-                    id: msg.id,
-                    result: ContractResult::Ok(SubMsgExecutionResponse {
-                        events: r.events,
-                        data: r.data,
-                    }),
-                };
-                self._reply(sender, reply)
-            } else {
-                Ok(r)
-            }
-        } else if let Err(e) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
-                let reply = Reply {
-                    id: msg.id,
-                    result: ContractResult::Err(e),
-                };
-                self._reply(sender, reply)
-            } else {
-                Err(e)
-            }
-        } else {
-            res
-        }
-    }
-
-    fn _execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.execute_wasm(sender, msg)?;
-                let mut attributes = res.attributes;
-                let mut events = res.events;
-                // recurse in all messages
-                for resend in res.messages {
-                    let subres = self.execute(resender.clone(), resend)?;
-                    // ignore the data now, just like in wasmd
-                    // append the events
-                    // TODO: is this correct for attributes??? Or do we turn them into sub-events?
-                    attributes.extend_from_slice(&subres.attributes);
-                    events.extend_from_slice(&subres.events);
-                }
-                Ok(AppResponse {
-                    attributes,
-                    events,
-                    data: res.data,
-                })
+                self.process_response(resender, res)
             }
             CosmosMsg::Bank(msg) => {
                 self.bank.execute(sender, msg)?;
@@ -376,45 +318,92 @@ where
         }
     }
 
+    /// This will execute the given messages, making all changes to the local cache.
+    /// This *will* write some data to the cache if the message fails half-way through.
+    /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
+    ///
+    /// For normal use cases, you can use Router::execute() or Router::execute_multi().
+    /// This is designed to be handled internally as part of larger process flows.
+    fn execute_submsg(&mut self, contract: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
+        // execute in cache
+        let mut subtx = self.cache();
+        let res = subtx.execute(contract.clone(), msg.msg);
+        if res.is_ok() {
+            subtx.prepare().commit(self);
+        }
+
+        // call reply if meaningful
+        if let Ok(r) = res {
+            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
+                let mut orig = r.clone();
+                let reply = Reply {
+                    id: msg.id,
+                    result: ContractResult::Ok(SubMsgExecutionResponse {
+                        events: r.events,
+                        data: r.data,
+                    }),
+                };
+                // do reply and combine it with the original response
+                let res2 = self._reply(contract, reply)?;
+                // override data if set
+                if let Some(data) = res2.data {
+                    orig.data = Some(data);
+                }
+                // append the events
+                orig.events.extend_from_slice(&res2.events);
+                Ok(orig)
+            } else {
+                Ok(r)
+            }
+        } else if let Err(e) = res {
+            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
+                let reply = Reply {
+                    id: msg.id,
+                    result: ContractResult::Err(e),
+                };
+                self._reply(contract, reply)
+            } else {
+                Err(e)
+            }
+        } else {
+            res
+        }
+    }
+
     fn _reply(&mut self, contract: Addr, reply: Reply) -> Result<AppResponse, String> {
         // TODO: process result better, combine events / data from parent
         let res = self.wasm.reply(contract.clone(), self.querier, reply)?;
-        let mut attributes = res.attributes;
-        let mut events = res.events;
+        self.process_response(contract, res)
+    }
+
+    fn process_response(
+        &mut self,
+        contract: Addr,
+        response: Response<C>,
+    ) -> Result<AppResponse, String> {
+        let mut events = response.events;
+        // turn attributes into event and place it first
+        let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
+        wasm_event
+            .attributes
+            .extend_from_slice(&response.attributes);
+        events.insert(0, wasm_event);
+
         // recurse in all messages
-        for resend in res.messages {
-            let subres = self.execute(contract.clone(), resend)?;
-            // ignore the data now, just like in wasmd
-            // append the events
-            // TODO: is this correct for attributes??? Or do we turn them into sub-events?
-            attributes.extend_from_slice(&subres.attributes);
+        for resend in response.messages {
+            let subres = self.execute_submsg(contract.clone(), resend)?;
             events.extend_from_slice(&subres.events);
         }
         Ok(AppResponse {
-            attributes,
+            attributes: vec![],
             events,
-            data: res.data,
+            data: response.data,
         })
     }
 
     fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
         let res = self.wasm.sudo(contract_addr.clone(), self.querier, msg)?;
-        let mut attributes = res.attributes;
-        let mut events = res.events;
-        // recurse in all messages
-        for resend in res.messages {
-            let subres = self.execute(contract_addr.clone(), resend)?;
-            // ignore the data now, just like in wasmd
-            // append the events
-            // TODO: is this correct for attributes??? Or do we turn them into sub-events?
-            attributes.extend_from_slice(&subres.attributes);
-            events.extend_from_slice(&subres.events);
-        }
-        Ok(AppResponse {
-            attributes,
-            events,
-            data: res.data,
-        })
+        self.process_response(contract_addr, res)
     }
 
     // this returns the contract address as well, so we can properly resend the data
@@ -538,10 +527,11 @@ mod test {
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
-        let msg = SubMsg::new(BankMsg::Send {
+        let msg: CosmosMsg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: to_send,
-        });
+        }
+        .into();
         router.execute(owner.clone(), msg.clone()).unwrap();
         let rich = get_balance(&router, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
@@ -552,10 +542,11 @@ mod test {
         router.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
-        let msg = SubMsg::new(BankMsg::Send {
+        let msg = BankMsg::Send {
             to_address: rcpt.into(),
             amount: coins(20, "btc"),
-        });
+        }
+        .into();
         router.execute(owner.clone(), msg).unwrap_err();
 
         let rich = get_balance(&router, &owner);
@@ -596,8 +587,11 @@ mod test {
         let res = router
             .execute_contract(random.clone(), contract_addr.clone(), &EmptyMsg {}, &[])
             .unwrap();
-        assert_eq!(1, res.attributes.len());
-        assert_eq!(&attr("action", "payout"), &res.attributes[0]);
+        assert_eq!(1, res.events.len());
+        let event = &res.events[0];
+        assert_eq!(event.ty.as_str(), "wasm");
+        assert_eq!(2, event.attributes.len());
+        assert_eq!(&attr("action", "payout"), &event.attributes[1]);
 
         // random got cash
         let funds = get_balance(&router, &random);
@@ -643,7 +637,7 @@ mod test {
 
         // reflecting payout message pays reflect contract
         let msg = SubMsg::new(WasmMsg::Execute {
-            contract_addr: payout_addr.into(),
+            contract_addr: payout_addr.clone().into(),
             msg: b"{}".into(),
             funds: vec![],
         });
@@ -655,8 +649,25 @@ mod test {
             .unwrap();
 
         // ensure the attributes were relayed from the sub-message
-        assert_eq!(1, res.attributes.len());
-        assert_eq!(&attr("action", "payout"), &res.attributes[0]);
+        assert_eq!(2, res.events.len(), "{:?}", res.events);
+        // first event was the call to reflect
+        let first = &res.events[0];
+        assert_eq!(first.ty.as_str(), "wasm");
+        assert_eq!(1, first.attributes.len());
+        assert_eq!(
+            &attr("contract_address", &reflect_addr),
+            &first.attributes[0]
+        );
+        // second event was call to payout
+        let second = &res.events[1];
+        assert_eq!(second.ty.as_str(), "wasm");
+        assert_eq!(2, second.attributes.len());
+        assert_eq!(
+            &attr("contract_address", &payout_addr),
+            &second.attributes[0]
+        );
+        assert_eq!(&attr("action", "payout"), &second.attributes[1]);
+        // FIXME? reply didn't add any more events itself...
 
         // ensure transfer was executed with reflect as sender
         let funds = get_balance(&router, &reflect_addr);
