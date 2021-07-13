@@ -227,7 +227,7 @@ pub struct AppCache<'a, C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    router: &'a App<C>,
+    querier: &'a dyn Querier,
     wasm: WasmCache<'a, C>,
     bank: BankCache<'a>,
 }
@@ -253,7 +253,7 @@ where
 {
     fn new(router: &'a App<C>) -> Self {
         AppCache {
-            router,
+            querier: router,
             wasm: router.wasm.cache(),
             bank: router.bank.cache(),
         }
@@ -309,7 +309,7 @@ where
     }
 
     fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
-        let res = self.wasm.sudo(contract_addr.clone(), self.router, msg)?;
+        let res = self.wasm.sudo(contract_addr.clone(), self.querier, msg)?;
         let mut attributes = res.attributes;
         let mut events = res.events;
         // recurse in all messages
@@ -343,7 +343,7 @@ where
                 let info = MessageInfo { sender, funds };
                 let res =
                     self.wasm
-                        .execute(contract_addr.clone(), self.router, info, msg.to_vec())?;
+                        .execute(contract_addr.clone(), self.querier, info, msg.to_vec())?;
                 Ok((contract_addr, res))
             }
             WasmMsg::Instantiate {
@@ -360,7 +360,7 @@ where
                 let info = MessageInfo { sender, funds };
                 let mut res = self.wasm.instantiate(
                     contract_addr.clone(),
-                    self.router,
+                    self.querier,
                     info,
                     msg.to_vec(),
                 )?;

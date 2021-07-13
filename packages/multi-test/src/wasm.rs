@@ -417,6 +417,24 @@ where
     }
 }
 
+trait ContractProvider {
+    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<&'a ContractData>;
+    fn num_contracts(&self) -> usize;
+}
+
+impl<C> ContractProvider for WasmRouter<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<&'a ContractData> {
+        self.contracts.get(addr)
+    }
+
+    fn num_contracts(&self) -> usize {
+        self.contracts.len()
+    }
+}
+
 /// A writable transactional cache over the wasm state.
 ///
 /// Reads hit local hashmap or then hit router
@@ -436,6 +454,7 @@ where
 {
     // and this into one with reference
     router: &'a WasmRouter<C>,
+    parent_contracts: &'a dyn ContractProvider,
     state: WasmCacheState<'a>,
 }
 
@@ -477,6 +496,7 @@ where
     fn new(router: &'a WasmRouter<C>) -> Self {
         WasmCache {
             router,
+            parent_contracts: router,
             state: WasmCacheState {
                 contracts: HashMap::new(),
                 contract_diffs: HashMap::new(),
@@ -506,7 +526,7 @@ where
 
     // TODO: better addr generation
     fn next_address(&self) -> Addr {
-        let count = self.router.contracts.len() + self.state.contracts.len();
+        let count = self.parent_contracts.num_contracts() + self.state.contracts.len();
         // we make this longer so it is not rejected by tests
         Addr::unchecked("Contract #".to_string() + &count.to_string())
     }
@@ -519,13 +539,12 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let parent = &self.router.codes;
-        let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
         let api = self.router.api.as_ref();
 
         self.state.with_storage(
             querier,
-            contracts,
+            self.parent_contracts,
             address,
             env,
             api,
@@ -546,13 +565,12 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let parent = &self.router.codes;
-        let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
         let api = self.router.api.as_ref();
 
         self.state.with_storage(
             querier,
-            contracts,
+            self.parent_contracts,
             address,
             env,
             api,
@@ -572,13 +590,12 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
         let parent = &self.router.codes;
-        let contracts = &self.router.contracts;
         let env = self.router.get_env(address.clone());
         let api = self.router.api.as_ref();
 
         self.state.with_storage(
             querier,
-            contracts,
+            self.parent_contracts,
             address,
             env,
             api,
@@ -608,14 +625,14 @@ impl<'a> WasmCacheState<'a> {
 
     fn get_contract<'b>(
         &'b mut self,
-        parent: &'a HashMap<Addr, ContractData>,
+        parent: &'a dyn ContractProvider,
         addr: &Addr,
     ) -> Option<(usize, &'b mut dyn Storage)> {
         // if we created this transaction
         if let Some(x) = self.contracts.get_mut(addr) {
             return Some((x.code_id, x.storage.as_mut()));
         }
-        if let Some(c) = parent.get(addr) {
+        if let Some(c) = parent.get_contract(addr) {
             let code_id = c.code_id;
             if self.contract_diffs.contains_key(addr) {
                 let storage = self.contract_diffs.get_mut(addr).unwrap();
@@ -633,7 +650,7 @@ impl<'a> WasmCacheState<'a> {
     fn with_storage<F, T>(
         &mut self,
         querier: &dyn Querier,
-        parent: &'a HashMap<Addr, ContractData>,
+        parent: &'a dyn ContractProvider,
         address: Addr,
         env: Env,
         api: &dyn Api,
