@@ -758,7 +758,7 @@ mod test {
             messages: vec![msg],
         };
         let _res = router
-            .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
+            .execute_contract(random, reflect_addr.clone(), &msgs, &[])
             .unwrap();
 
         // ensure error was written

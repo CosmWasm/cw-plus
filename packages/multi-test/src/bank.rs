@@ -77,6 +77,13 @@ impl<'a> BankCache<'a> {
         }
     }
 
+    pub fn cache(&self) -> BankCache {
+        BankCache {
+            bank: self.bank,
+            state: StorageTransaction::new(&self.state),
+        }
+    }
+
     /// When we want to commit the BankCache, we need a 2 step process to satisfy Rust reference counting:
     /// 1. prepare() consumes BankCache, releasing &BankRouter, and creating a self-owned update info.
     /// 2. BankOps::commit() can now take &mut BankRouter and updates the underlying state
