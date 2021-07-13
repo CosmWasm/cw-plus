@@ -3,9 +3,10 @@ use serde::Serialize;
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractResult,
-    CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper, QueryRequest,
-    Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError, SystemResult, WasmMsg,
+    from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
+    ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
+    QueryRequest, Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError,
+    SystemResult, WasmMsg,
 };
 
 use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
@@ -17,6 +18,15 @@ use std::fmt;
 pub struct AppResponse {
     pub events: Vec<Event>,
     pub data: Option<Binary>,
+}
+
+impl AppResponse {
+    // Return all custom attributes returned by the contract in the `idx` event.
+    // We assert the type is wasm, and skip the contract_address attribute.
+    pub fn custom_attrs(&self, idx: usize) -> &[Attribute] {
+        assert_eq!(self.events[idx].ty.as_str(), "wasm");
+        &self.events[idx].attributes[1..]
+    }
 }
 
 fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
@@ -585,10 +595,8 @@ mod test {
             .execute_contract(random.clone(), contract_addr.clone(), &EmptyMsg {}, &[])
             .unwrap();
         assert_eq!(1, res.events.len());
-        let event = &res.events[0];
-        assert_eq!(event.ty.as_str(), "wasm");
-        assert_eq!(2, event.attributes.len());
-        assert_eq!(&attr("action", "payout"), &event.attributes[1]);
+        let custom_attrs = res.custom_attrs(0);
+        assert_eq!(&[attr("action", "payout")], &custom_attrs);
 
         // random got cash
         let funds = get_balance(&router, &random);
