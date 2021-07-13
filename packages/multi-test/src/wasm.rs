@@ -763,7 +763,7 @@ mod test {
 
     use crate::test_helpers::{contract_error, contract_payout, PayoutInitMessage, PayoutQueryMsg};
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::{coin, to_vec, BankMsg, BlockInfo, CosmosMsg, Empty};
+    use cosmwasm_std::{coin, to_vec, BankMsg, BlockInfo, Coin, CosmosMsg, Empty};
 
     fn mock_router() -> WasmRouter<Empty> {
         let env = mock_env();
@@ -865,5 +865,93 @@ mod test {
         let data = router.query_smart(contract_addr, &querier, query).unwrap();
         let res: PayoutInitMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
+    }
+
+    fn assert_payout(cache: &mut WasmCache<Empty>, contract_addr: &Addr, payout: &Coin) {
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let info = mock_info("silly", &[]);
+        let res = cache
+            .execute(contract_addr.clone(), &querier, info, b"{}".to_vec())
+            .unwrap();
+        assert_eq!(1, res.messages.len());
+        match &res.messages[0].msg {
+            CosmosMsg::Bank(BankMsg::Send { to_address, amount }) => {
+                assert_eq!(to_address.as_str(), "silly");
+                assert_eq!(amount.as_slice(), &[payout.clone()]);
+            }
+            m => panic!("Unexpected message {:?}", m),
+        }
+    }
+
+    fn assert_no_contract(cache: &WasmCache<Empty>, contract_addr: &Addr) {
+        let foo = cache.get_contract(contract_addr);
+        assert!(foo.is_none(), "{:?}", contract_addr);
+    }
+
+    #[test]
+    fn multi_level_wasm_cache() {
+        let mut router = mock_router();
+        let code_id = router.store_code(contract_payout());
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+
+        // set contract 1 and commit (on router)
+        let mut cache = router.cache();
+        let contract1 = cache.register_contract(code_id).unwrap();
+        let payout1 = coin(100, "TGD");
+        let info = mock_info("foobar", &[]);
+        let init_msg = to_vec(&PayoutInitMessage {
+            payout: payout1.clone(),
+        })
+        .unwrap();
+        let _res = cache
+            .instantiate(contract1.clone(), &querier, info, init_msg)
+            .unwrap();
+        cache.prepare().commit(&mut router);
+
+        // create a new cache and check we can use contract 1
+        let mut cache = router.cache();
+        assert_payout(&mut cache, &contract1, &payout1);
+
+        // create contract 2 and use it
+        let contract2 = cache.register_contract(code_id).unwrap();
+        let payout2 = coin(50, "BTC");
+        let info = mock_info("foobar", &[]);
+        let init_msg = to_vec(&PayoutInitMessage {
+            payout: payout2.clone(),
+        })
+        .unwrap();
+        let _res = cache
+            .instantiate(contract2.clone(), &querier, info, init_msg)
+            .unwrap();
+        assert_payout(&mut cache, &contract2, &payout2);
+
+        // create a level2 cache and check we can use contract 1 and contract 2
+        let mut cache2 = cache.cache();
+        assert_payout(&mut cache2, &contract1, &payout1);
+        assert_payout(&mut cache2, &contract2, &payout2);
+
+        // create a contract on level 2
+        let contract3 = cache2.register_contract(code_id).unwrap();
+        let payout3 = coin(1234, "ATOM");
+        let info = mock_info("johnny", &[]);
+        let init_msg = to_vec(&PayoutInitMessage {
+            payout: payout3.clone(),
+        })
+        .unwrap();
+        let _res = cache2
+            .instantiate(contract3.clone(), &querier, info, init_msg)
+            .unwrap();
+        assert_payout(&mut cache2, &contract3, &payout3);
+
+        // ensure first cache still doesn't see this contract
+        assert_no_contract(&cache, &contract3);
+
+        // TODO: apply second to first
+        // let ops = cache2.prepare();
+        // ops.commit(&mut cache);
+
+        // TODO: check you have 3 contracts in cache
+
+        // TODO: apply to router
     }
 }
