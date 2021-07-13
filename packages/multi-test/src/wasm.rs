@@ -288,6 +288,42 @@ impl ContractData {
     fn new(code_id: usize, storage: Box<dyn Storage>) -> Self {
         ContractData { code_id, storage }
     }
+
+    fn as_mut<'a>(&'a mut self) -> ContractMut<'a> {
+        ContractMut {
+            code_id: self.code_id,
+            storage: self.storage.as_mut(),
+        }
+    }
+
+    fn as_ref<'a>(&'a self) -> ContractRef<'a> {
+        ContractRef {
+            code_id: self.code_id,
+            storage: self.storage.as_ref(),
+        }
+    }
+}
+
+struct ContractMut<'a> {
+    code_id: usize,
+    storage: &'a mut dyn Storage,
+}
+
+impl<'a> ContractMut<'a> {
+    fn new(code_id: usize, storage: &'a mut dyn Storage) -> Self {
+        ContractMut { code_id, storage }
+    }
+}
+
+struct ContractRef<'a> {
+    code_id: usize,
+    storage: &'a dyn Storage,
+}
+
+impl<'a> ContractRef<'a> {
+    fn new(code_id: usize, storage: &'a dyn Storage) -> Self {
+        ContractRef { code_id, storage }
+    }
 }
 
 pub fn next_block(block: &mut BlockInfo) {
@@ -418,7 +454,7 @@ where
 }
 
 trait ContractProvider {
-    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<&'a ContractData>;
+    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<ContractRef<'a>>;
     fn num_contracts(&self) -> usize;
 }
 
@@ -426,8 +462,9 @@ impl<C> ContractProvider for WasmRouter<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<&'a ContractData> {
-        self.contracts.get(addr)
+    // Option<&'a ContractData> {
+    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<ContractRef<'a>> {
+        self.contracts.get(addr).map(|x| x.as_ref())
     }
 
     fn num_contracts(&self) -> usize {
@@ -458,6 +495,19 @@ where
     state: WasmCacheState<'a>,
 }
 
+impl<'a, C> ContractProvider for WasmCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn get_contract<'b>(&'b self, addr: &Addr) -> Option<ContractRef<'b>> {
+        self.state.get_contract_ref(self.parent_contracts, addr)
+    }
+
+    fn num_contracts(&self) -> usize {
+        self.parent_contracts.num_contracts() + self.state.contracts.len()
+    }
+}
+
 /// This is the mutable state of the cached.
 /// Separated out so we can grab a mutable reference to both these HashMaps,
 /// while still getting an immutable reference to router.
@@ -465,6 +515,15 @@ where
 pub struct WasmCacheState<'a> {
     contracts: HashMap<Addr, ContractData>,
     contract_diffs: HashMap<Addr, StorageTransaction<'a>>,
+}
+
+impl<'a> WasmCacheState<'a> {
+    pub fn new() -> Self {
+        WasmCacheState {
+            contracts: HashMap::new(),
+            contract_diffs: HashMap::new(),
+        }
+    }
 }
 
 /// This is a set of data from the WasmCache with no external reference,
@@ -497,10 +556,15 @@ where
         WasmCache {
             router,
             parent_contracts: router,
-            state: WasmCacheState {
-                contracts: HashMap::new(),
-                contract_diffs: HashMap::new(),
-            },
+            state: WasmCacheState::new(),
+        }
+    }
+
+    pub fn cache<'b>(&'b self) -> WasmCache<'b, C> {
+        WasmCache {
+            router: self.router,
+            parent_contracts: self,
+            state: WasmCacheState::new(),
         }
     }
 
@@ -623,25 +687,47 @@ impl<'a> WasmCacheState<'a> {
         }
     }
 
-    fn get_contract<'b>(
+    fn get_contract_mut<'b>(
         &'b mut self,
         parent: &'a dyn ContractProvider,
         addr: &Addr,
-    ) -> Option<(usize, &'b mut dyn Storage)> {
+    ) -> Option<ContractMut<'b>> {
         // if we created this transaction
         if let Some(x) = self.contracts.get_mut(addr) {
-            return Some((x.code_id, x.storage.as_mut()));
+            return Some(x.as_mut());
         }
         if let Some(c) = parent.get_contract(addr) {
             let code_id = c.code_id;
             if self.contract_diffs.contains_key(addr) {
                 let storage = self.contract_diffs.get_mut(addr).unwrap();
-                return Some((code_id, storage));
+                return Some(ContractMut::new(code_id, storage));
             }
             // else make a new transaction
-            let wrap = StorageTransaction::new(c.storage.as_ref());
+            let wrap = StorageTransaction::new(c.storage);
             self.contract_diffs.insert(addr.clone(), wrap);
-            Some((code_id, self.contract_diffs.get_mut(addr).unwrap()))
+            let storage = self.contract_diffs.get_mut(addr).unwrap();
+            return Some(ContractMut::new(code_id, storage));
+        } else {
+            None
+        }
+    }
+
+    fn get_contract_ref<'b>(
+        &'b self,
+        parent: &'a dyn ContractProvider,
+        addr: &Addr,
+    ) -> Option<ContractRef<'b>> {
+        // if we created this transaction
+        if let Some(x) = self.contracts.get(addr) {
+            return Some(x.as_ref());
+        }
+        if let Some(c) = parent.get_contract(addr) {
+            let code_id = c.code_id;
+            if self.contract_diffs.contains_key(addr) {
+                let storage = self.contract_diffs.get(addr).unwrap();
+                return Some(ContractRef::new(code_id, storage));
+            }
+            Some(c)
         } else {
             None
         }
@@ -659,8 +745,8 @@ impl<'a> WasmCacheState<'a> {
     where
         F: FnOnce(usize, DepsMut, Env) -> Result<T, String>,
     {
-        let (code_id, storage) = self
-            .get_contract(parent, &address)
+        let ContractMut { code_id, storage } = self
+            .get_contract_mut(parent, &address)
             .ok_or_else(|| "Unregistered contract address".to_string())?;
         let deps = DepsMut {
             storage,
