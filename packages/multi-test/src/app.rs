@@ -8,8 +8,8 @@ use cosmwasm_std::{
     QueryRequest, ReplyOn, Response, SubMsg, SystemError, SystemResult, WasmMsg,
 };
 
-use crate::bank::{Bank, BankCache, BankOps, BankRouter};
-use crate::wasm::{Contract, StorageFactory, WasmCache, WasmOps, WasmRouter};
+use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
+use crate::wasm::{Contract, StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRouter};
 use schemars::JsonSchema;
 use std::fmt;
 
@@ -232,18 +232,44 @@ where
     bank: BankCache<'a>,
 }
 
+pub trait AppCommittable {
+    fn commit_bank(&mut self) -> &mut dyn BankCommittable;
+    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable;
+}
+
+impl<'a, C> AppCommittable for AppCache<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn commit_bank(&mut self) -> &mut dyn BankCommittable {
+        &mut self.bank
+    }
+    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
+        &mut self.wasm
+    }
+}
+
+impl<C> AppCommittable for App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn commit_bank(&mut self) -> &mut dyn BankCommittable {
+        &mut self.bank
+    }
+    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
+        &mut self.wasm
+    }
+}
+
 pub struct AppOps {
     wasm: WasmOps,
     bank: BankOps,
 }
 
 impl AppOps {
-    pub fn commit<C>(self, router: &mut App<C>)
-    where
-        C: Clone + fmt::Debug + PartialEq + JsonSchema,
-    {
-        self.bank.commit(&mut router.bank);
-        self.wasm.commit(&mut router.wasm);
+    pub fn commit(self, commit: &mut dyn AppCommittable) {
+        self.bank.commit(commit.commit_bank());
+        self.wasm.commit(commit.commit_wasm());
     }
 }
 
@@ -256,6 +282,14 @@ where
             querier: router,
             wasm: router.wasm.cache(),
             bank: router.bank.cache(),
+        }
+    }
+
+    pub fn cache(&self) -> AppCache<C> {
+        AppCache {
+            querier: self.querier,
+            wasm: self.wasm.cache(),
+            bank: self.bank.cache(),
         }
     }
 

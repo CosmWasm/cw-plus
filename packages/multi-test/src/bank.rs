@@ -27,7 +27,7 @@ pub trait Bank {
     fn clone(&self) -> Box<dyn Bank>;
 }
 
-pub trait Committable {
+pub trait BankCommittable {
     fn mut_store(&mut self) -> &mut dyn Storage;
 }
 
@@ -36,7 +36,7 @@ pub struct BankRouter {
     storage: Box<dyn Storage>,
 }
 
-impl Committable for BankRouter {
+impl BankCommittable for BankRouter {
     fn mut_store(&mut self) -> &mut dyn Storage {
         self.storage.as_mut()
     }
@@ -71,7 +71,7 @@ pub struct BankCache<'a> {
     state: StorageTransaction<'a>,
 }
 
-impl<'a> Committable for BankCache<'a> {
+impl<'a> BankCommittable for BankCache<'a> {
     fn mut_store(&mut self) -> &mut dyn Storage {
         &mut self.state
     }
@@ -80,7 +80,7 @@ impl<'a> Committable for BankCache<'a> {
 pub struct BankOps(RepLog);
 
 impl BankOps {
-    pub fn commit(self, committable: &mut dyn Committable) {
+    pub fn commit(self, committable: &mut dyn BankCommittable) {
         self.0.commit(committable.mut_store())
     }
 }
@@ -361,7 +361,7 @@ mod test {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        let res = cache.query(query.clone()).unwrap();
+        let res = cache.query(query).unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
@@ -370,7 +370,7 @@ mod test {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        let res = cache.query(query.clone()).unwrap();
+        let res = cache.query(query).unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
@@ -408,7 +408,7 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: coins(12, "eth"),
         };
-        cache2.execute(owner.clone(), msg).unwrap();
+        cache2.execute(owner, msg).unwrap();
 
         // shows up in 2nd cache
         let cached_rcpt = query_cache(&cache, &rcpt);

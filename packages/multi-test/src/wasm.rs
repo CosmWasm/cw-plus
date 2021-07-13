@@ -289,14 +289,14 @@ impl ContractData {
         ContractData { code_id, storage }
     }
 
-    fn as_mut<'a>(&'a mut self) -> ContractMut<'a> {
+    fn as_mut(&mut self) -> ContractMut {
         ContractMut {
             code_id: self.code_id,
             storage: self.storage.as_mut(),
         }
     }
 
-    fn as_ref<'a>(&'a self) -> ContractRef<'a> {
+    fn as_ref(&self) -> ContractRef {
         ContractRef {
             code_id: self.code_id,
             storage: self.storage.as_ref(),
@@ -587,7 +587,7 @@ where
         }
     }
 
-    pub fn cache<'b>(&'b self) -> WasmCache<'b, C> {
+    pub fn cache(&self) -> WasmCache<C> {
         WasmCache {
             router: self.router,
             parent_contracts: self,
@@ -911,8 +911,8 @@ mod test {
     }
 
     fn assert_no_contract(cache: &WasmCache<Empty>, contract_addr: &Addr) {
-        let foo = cache.get_contract(contract_addr);
-        assert!(foo.is_none(), "{:?}", contract_addr);
+        let contract = cache.get_contract(contract_addr);
+        assert!(contract.is_none(), "{:?}", contract_addr);
     }
 
     #[test]
