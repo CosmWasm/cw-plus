@@ -658,7 +658,7 @@ impl<'a> WasmCacheState<'a> {
 mod test {
     use super::*;
 
-    use crate::test_helpers::{contract_error, contract_payout, PayoutMessage};
+    use crate::test_helpers::{contract_error, contract_payout, PayoutInitMessage, PayoutQueryMsg};
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, to_vec, BankMsg, BlockInfo, CosmosMsg, Empty};
 
@@ -731,7 +731,7 @@ mod test {
 
         // init the contract
         let info = mock_info("foobar", &[]);
-        let init_msg = to_vec(&PayoutMessage {
+        let init_msg = to_vec(&PayoutInitMessage {
             payout: payout.clone(),
         })
         .unwrap();
@@ -758,10 +758,9 @@ mod test {
         cache.prepare().commit(&mut router);
 
         // query the contract
-        let data = router
-            .query_smart(contract_addr, &querier, b"{}".to_vec())
-            .unwrap();
-        let res: PayoutMessage = from_slice(&data).unwrap();
+        let query = to_vec(&PayoutQueryMsg::Payout {}).unwrap();
+        let data = router.query_smart(contract_addr, &querier, query).unwrap();
+        let res: PayoutInitMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
     }
 }

@@ -404,7 +404,7 @@ mod test {
     use super::*;
     use crate::test_helpers::{
         contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
-        PayoutMessage, ReflectMessage, ReflectResponse, ReflectSudoMsg,
+        PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
@@ -483,7 +483,7 @@ mod test {
 
         // set up contract
         let code_id = router.store_code(contract_payout());
-        let msg = PayoutMessage {
+        let msg = PayoutInitMessage {
             payout: coin(5, "eth"),
         };
         let contract_addr = router
@@ -528,7 +528,7 @@ mod test {
 
         // set up payout contract
         let payout_id = router.store_code(contract_payout_custom());
-        let msg = PayoutMessage {
+        let msg = PayoutInitMessage {
             payout: coin(5, "eth"),
         };
         let payout_addr = router
@@ -545,11 +545,11 @@ mod test {
         let funds = get_balance(&router, &reflect_addr);
         assert_eq!(funds, vec![]);
         // reflect count is 1
-        let qres: ReflectResponse = router
+        let qres: PayoutCountResponse = router
             .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
-        assert_eq!(1, qres.count);
+        assert_eq!(0, qres.count);
 
         // reflecting payout message pays reflect contract
         let msg = SubMsg::new(WasmMsg::Execute {
@@ -573,11 +573,11 @@ mod test {
         assert_eq!(funds, coins(5, "eth"));
 
         // reflect count updated
-        let qres: ReflectResponse = router
+        let qres: PayoutCountResponse = router
             .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
-        assert_eq!(2, qres.count);
+        assert_eq!(1, qres.count);
     }
 
     #[test]
@@ -623,11 +623,11 @@ mod test {
         assert_eq!(funds, coins(7, "eth"));
 
         // reflect count should be updated to 2
-        let qres: ReflectResponse = router
+        let qres: PayoutCountResponse = router
             .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
-        assert_eq!(2, qres.count);
+        assert_eq!(1, qres.count);
 
         // sending 8 eth, then 3 btc should fail both
         let msg = SubMsg::new(BankMsg::Send {
@@ -651,38 +651,43 @@ mod test {
         assert_eq!(funds, coins(7, "eth"));
 
         // failure should not update reflect count
-        let qres: ReflectResponse = router
+        let qres: PayoutCountResponse = router
             .wrap()
             .query_wasm_smart(&reflect_addr, &EmptyMsg {})
             .unwrap();
-        assert_eq!(2, qres.count);
+        assert_eq!(1, qres.count);
     }
 
     #[test]
     fn sudo_works() {
-        let mut router = custom_router();
+        let mut router = mock_router();
 
         let owner = Addr::unchecked("owner");
-        let reflect_id = router.store_code(contract_reflect());
-        let reflect_addr = router
-            .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect")
+        let init_funds = vec![coin(100, "eth")];
+        router.set_bank_balance(&owner, init_funds).unwrap();
+        let payout_id = router.store_code(contract_payout());
+        let msg = PayoutInitMessage {
+            payout: coin(5, "eth"),
+        };
+        let payout_addr = router
+            .instantiate_contract(payout_id, owner, &msg, &coins(23, "eth"), "Payout")
             .unwrap();
 
         // count is 1
-        let ReflectResponse { count } = router
+        let PayoutCountResponse { count } = router
             .wrap()
-            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, count);
 
         // sudo
-        let msg = ReflectSudoMsg { set_count: 25 };
-        router.sudo(reflect_addr.clone(), &msg).unwrap();
+        let msg = PayoutSudoMsg { set_count: 25 };
+        router.sudo(payout_addr.clone(), &msg).unwrap();
 
         // count is 25
-        let ReflectResponse { count } = router
+        let PayoutCountResponse { count } = router
             .wrap()
-            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
         assert_eq!(25, count);
     }

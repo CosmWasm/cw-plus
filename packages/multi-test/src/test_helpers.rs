@@ -53,18 +53,37 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PayoutMessage {
+pub struct PayoutInitMessage {
     pub payout: Coin,
 }
-const PAYOUT: Item<PayoutMessage> = Item::new("payout");
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PayoutSudoMsg {
+    pub set_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PayoutQueryMsg {
+    Count {},
+    Payout {},
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PayoutCountResponse {
+    pub count: u32,
+}
+
+const PAYOUT: Item<PayoutInitMessage> = Item::new("payout");
+const COUNT: Item<u32> = Item::new("count");
 
 fn instantiate_payout(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: PayoutMessage,
+    msg: PayoutInitMessage,
 ) -> Result<Response, StdError> {
     PAYOUT.save(deps.storage, &msg)?;
+    COUNT.save(deps.storage, &1)?;
     Ok(Response::default())
 }
 
@@ -89,13 +108,32 @@ fn execute_payout(
     Ok(res)
 }
 
-fn query_payout(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
-    let payout = PAYOUT.load(deps.storage)?;
-    to_binary(&payout)
+fn sudo_payout(deps: DepsMut, _env: Env, msg: PayoutSudoMsg) -> Result<Response, StdError> {
+    COUNT.save(deps.storage, &msg.set_count)?;
+    Ok(Response::default())
+}
+
+fn query_payout(deps: Deps, _env: Env, msg: PayoutQueryMsg) -> Result<Binary, StdError> {
+    match msg {
+        PayoutQueryMsg::Count {} => {
+            let count = COUNT.load(deps.storage)?;
+            let res = PayoutCountResponse { count };
+            to_binary(&res)
+        }
+        PayoutQueryMsg::Payout {} => {
+            let payout = PAYOUT.load(deps.storage)?;
+            to_binary(&payout)
+        }
+    }
 }
 
 pub fn contract_payout() -> Box<dyn Contract<Empty>> {
-    let contract = ContractWrapper::new(execute_payout, instantiate_payout, query_payout);
+    let contract = ContractWrapper::new_with_sudo(
+        execute_payout,
+        instantiate_payout,
+        query_payout,
+        sudo_payout,
+    );
     Box::new(contract)
 }
 
@@ -117,21 +155,9 @@ pub enum CustomMsg {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ReflectSudoMsg {
-    pub set_count: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReflectMessage {
     pub messages: Vec<SubMsg<CustomMsg>>,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ReflectResponse {
-    pub count: u32,
-}
-
-const REFLECT: Item<u32> = Item::new("reflect");
 
 fn instantiate_reflect(
     deps: DepsMut,
@@ -139,7 +165,7 @@ fn instantiate_reflect(
     _info: MessageInfo,
     _msg: EmptyMsg,
 ) -> Result<Response<CustomMsg>, StdError> {
-    REFLECT.save(deps.storage, &1)?;
+    COUNT.save(deps.storage, &0)?;
     Ok(Response::default())
 }
 
@@ -149,7 +175,7 @@ fn execute_reflect(
     _info: MessageInfo,
     msg: ReflectMessage,
 ) -> Result<Response<CustomMsg>, StdError> {
-    REFLECT.update::<_, StdError>(deps.storage, |old| Ok(old + 1))?;
+    COUNT.update::<_, StdError>(deps.storage, |old| Ok(old + 1))?;
 
     let res = Response {
         messages: msg.messages,
@@ -160,27 +186,13 @@ fn execute_reflect(
     Ok(res)
 }
 
-fn sudo_reflect(
-    deps: DepsMut,
-    _env: Env,
-    msg: ReflectSudoMsg,
-) -> Result<Response<CustomMsg>, StdError> {
-    REFLECT.save(deps.storage, &msg.set_count)?;
-    Ok(Response::default())
-}
-
 fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
-    let count = REFLECT.load(deps.storage)?;
-    let res = ReflectResponse { count };
+    let count = COUNT.load(deps.storage)?;
+    let res = PayoutCountResponse { count };
     to_binary(&res)
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
-    let contract = ContractWrapper::new_with_sudo(
-        execute_reflect,
-        instantiate_reflect,
-        query_reflect,
-        sudo_reflect,
-    );
+    let contract = ContractWrapper::new(execute_reflect, instantiate_reflect, query_reflect);
     Box::new(contract)
 }
