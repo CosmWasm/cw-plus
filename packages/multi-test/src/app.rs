@@ -405,6 +405,7 @@ mod test {
     use crate::test_helpers::{
         contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
         PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
+        ReflectQueryMsg,
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
@@ -547,7 +548,7 @@ mod test {
         // reflect count is 1
         let qres: PayoutCountResponse = router
             .wrap()
-            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(0, qres.count);
 
@@ -575,7 +576,7 @@ mod test {
         // reflect count updated
         let qres: PayoutCountResponse = router
             .wrap()
-            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
     }
@@ -622,10 +623,10 @@ mod test {
         let funds = get_balance(&router, &random);
         assert_eq!(funds, coins(7, "eth"));
 
-        // reflect count should be updated to 2
+        // reflect count should be updated to 1
         let qres: PayoutCountResponse = router
             .wrap()
-            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
 
@@ -653,7 +654,7 @@ mod test {
         // failure should not update reflect count
         let qres: PayoutCountResponse = router
             .wrap()
-            .query_wasm_smart(&reflect_addr, &EmptyMsg {})
+            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
     }

@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    StdError, SubMsg,
+    attr, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
+    Response, StdError, SubMsg,
 };
-use cw_storage_plus::Item;
+use cw_storage_plus::{Item, Map, U64Key};
 
 use crate::wasm::{Contract, ContractWrapper};
 
@@ -159,6 +159,14 @@ pub struct ReflectMessage {
     pub messages: Vec<SubMsg<CustomMsg>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ReflectQueryMsg {
+    Count {},
+    Reply { id: u64 },
+}
+
+const REFLECT: Map<U64Key, Reply> = Map::new("reflect");
+
 fn instantiate_reflect(
     deps: DepsMut,
     _env: Env,
@@ -186,13 +194,31 @@ fn execute_reflect(
     Ok(res)
 }
 
-fn query_reflect(deps: Deps, _env: Env, _msg: EmptyMsg) -> Result<Binary, StdError> {
-    let count = COUNT.load(deps.storage)?;
-    let res = PayoutCountResponse { count };
-    to_binary(&res)
+fn query_reflect(deps: Deps, _env: Env, msg: ReflectQueryMsg) -> Result<Binary, StdError> {
+    match msg {
+        ReflectQueryMsg::Count {} => {
+            let count = COUNT.load(deps.storage)?;
+            let res = PayoutCountResponse { count };
+            to_binary(&res)
+        }
+        ReflectQueryMsg::Reply { id } => {
+            let reply = REFLECT.load(deps.storage, id.into())?;
+            to_binary(&reply)
+        }
+    }
+}
+
+fn reply_reflect(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<CustomMsg>, StdError> {
+    REFLECT.save(deps.storage, msg.id.into(), &msg)?;
+    Ok(Response::default())
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
-    let contract = ContractWrapper::new(execute_reflect, instantiate_reflect, query_reflect);
+    let contract = ContractWrapper::new_with_reply(
+        execute_reflect,
+        instantiate_reflect,
+        query_reflect,
+        reply_reflect,
+    );
     Box::new(contract)
 }
