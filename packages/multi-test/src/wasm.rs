@@ -263,7 +263,7 @@ where
         res.map_err(|e| e.to_string())
     }
 
-    // this returns an error if the contract doesn't implement sudo
+    // this returns an error if the contract doesn't implement reply
     fn reply(&self, deps: DepsMut, env: Env, reply_data: Reply) -> Result<Response<C>, String> {
         let res = match &self.reply_fn {
             Some(reply) => reply(deps, env, reply_data),

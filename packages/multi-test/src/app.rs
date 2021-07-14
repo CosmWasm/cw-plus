@@ -316,7 +316,7 @@ where
         match msg {
             CosmosMsg::Wasm(msg) => {
                 let (resender, res) = self.execute_wasm(sender, msg)?;
-                self.process_response(resender, res)
+                self.process_response(resender, res, false)
             }
             CosmosMsg::Bank(msg) => {
                 self.bank.execute(sender, msg)?;
@@ -381,21 +381,34 @@ where
     fn _reply(&mut self, contract: Addr, reply: Reply) -> Result<AppResponse, String> {
         // TODO: process result better, combine events / data from parent
         let res = self.wasm.reply(contract.clone(), self.querier, reply)?;
-        self.process_response(contract, res)
+        self.process_response(contract, res, true)
     }
 
     fn process_response(
         &mut self,
         contract: Addr,
         response: Response<C>,
+        ignore_attributes: bool,
     ) -> Result<AppResponse, String> {
-        let mut events = response.events;
-        // turn attributes into event and place it first
-        let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
-        wasm_event
-            .attributes
-            .extend_from_slice(&response.attributes);
-        events.insert(0, wasm_event);
+        // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
+        // fake system level event types, like transfer from the bank module)
+        let mut events: Vec<_> = response
+            .events
+            .into_iter()
+            .map(|mut ev| {
+                ev.ty = format!("wasm-{}", ev.ty);
+                ev
+            })
+            .collect();
+        // hmmm... we don't need this for reply, right?
+        if !ignore_attributes {
+            // turn attributes into event and place it first
+            let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
+            wasm_event
+                .attributes
+                .extend_from_slice(&response.attributes);
+            events.insert(0, wasm_event);
+        }
 
         // recurse in all messages
         for resend in response.messages {
@@ -410,7 +423,7 @@ where
 
     fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
         let res = self.wasm.sudo(contract_addr.clone(), self.querier, msg)?;
-        self.process_response(contract_addr, res)
+        self.process_response(contract_addr, res, false)
     }
 
     // this returns the contract address as well, so we can properly resend the data
@@ -842,9 +855,20 @@ mod test {
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
-        let _res = router
+        let res = router
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
+        // we should get 2 events, the wasm one and the custom event
+        assert_eq!(2, res.events.len(), "{:?}", res.events);
+        // the first one is just the standard wasm message with custom_address (no more attrs)
+        let attrs = res.custom_attrs(0);
+        assert_eq!(0, attrs.len());
+        // the second one is a custom event
+        let second = &res.events[1];
+        assert_eq!("wasm-custom", second.ty.as_str());
+        assert_eq!(2, second.attributes.len());
+        assert_eq!(&attr("from", "reply"), &second.attributes[0]);
+        assert_eq!(&attr("to", "test"), &second.attributes[1]);
 
         // ensure success was written
         let res: Reply = router

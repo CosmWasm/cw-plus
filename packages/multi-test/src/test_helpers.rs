@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
+    attr, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, Event, MessageInfo, Reply,
     Response, StdError, SubMsg,
 };
 use cw_storage_plus::{Item, Map, U64Key};
@@ -210,7 +210,14 @@ fn query_reflect(deps: Deps, _env: Env, msg: ReflectQueryMsg) -> Result<Binary, 
 
 fn reply_reflect(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<CustomMsg>, StdError> {
     REFLECT.save(deps.storage, msg.id.into(), &msg)?;
-    Ok(Response::default())
+    // add custom event here to test
+    let event = Event::new("custom")
+        .attr("from", "reply")
+        .attr("to", "test");
+    Ok(Response {
+        events: vec![event],
+        ..Response::default()
+    })
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
