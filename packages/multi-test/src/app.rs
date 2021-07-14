@@ -14,6 +14,9 @@ use crate::wasm::{Contract, StorageFactory, WasmCache, WasmCommittable, WasmOps,
 use schemars::JsonSchema;
 use std::fmt;
 
+use prost::Message;
+// use bytes::buf::BufMut;
+
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
     pub events: Vec<Event>,
@@ -29,11 +32,42 @@ impl AppResponse {
     }
 }
 
+#[derive(Clone, PartialEq, Message)]
+pub struct InstantiateData {
+    #[prost(string, tag = "1")]
+    pub address: ::prost::alloc::string::String,
+    /// Unique ID number for this person.
+    #[prost(bytes, tag = "2")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+}
+
 fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    res.data = Some(contact_address.as_bytes().into());
+    let data = res.data.clone().unwrap_or_default().to_vec();
+    let init_data = InstantiateData {
+        address: contact_address.into(),
+        data,
+    };
+    let mut new_data = Vec::<u8>::with_capacity(init_data.encoded_len());
+    // the data must encode successfully
+    init_data.encode(&mut new_data).unwrap();
+    res.data = Some(new_data.into());
+}
+
+// this parses the result from a wasm contract init
+pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
+    let bin = data
+        .as_ref()
+        .ok_or_else(|| "No data response".to_string())?
+        .to_vec();
+    // parse the protobuf struct
+    let init_data = InstantiateData::decode(bin.as_slice()).map_err(|e| e.to_string())?;
+    if init_data.address.is_empty() {
+        return Err("no contract address provided".into());
+    }
+    Ok(Addr::unchecked(init_data.address))
 }
 
 impl<C> Querier for App<C>
@@ -485,16 +519,6 @@ where
         }
         Ok(AppResponse::default())
     }
-}
-
-// this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
-    let bin = data
-        .as_ref()
-        .ok_or_else(|| "No data response".to_string())?
-        .to_vec();
-    let str = String::from_utf8(bin).map_err(|e| e.to_string())?;
-    Ok(Addr::unchecked(str))
 }
 
 #[cfg(test)]
