@@ -15,4 +15,13 @@ pub enum ContractError {
 
     #[error("Invalid input")]
     InvalidInput {},
+
+    #[error("Already claimed")]
+    Claimed{},
+
+    #[error("Wrong length")]
+    WrongLength {},
+
+    #[error("Verification failed")]
+    VerificationFailed {},
 }

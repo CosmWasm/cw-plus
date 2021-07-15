@@ -1,6 +1,6 @@
-use cosmwasm_std::{log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, StdResult, Response, HumanAddr, InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, Storage, Uint128, WasmMsg, DepsMut, MessageInfo, attr};
+use cosmwasm_std::{log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, StdResult, Response, HumanAddr, InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, Storage, Uint128, WasmMsg, DepsMut, MessageInfo, attr, SubMsg};
 
-use crate::state::{read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config, store_latest_stage, store_merkle_root, Config, STAGE, CONFIG_KEY, CONFIG, MERKLE_ROOT};
+use crate::state::{read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config, store_latest_stage, store_merkle_root, Config, STAGE, CONFIG_KEY, CONFIG, MERKLE_ROOT, CLAIM};
 
 use cw20::Cw20ExecuteMsg;
 use hex;
@@ -10,6 +10,8 @@ use crate::msg::{InstantiateMsg, ExecuteMsg};
 use std::borrow::Borrow;
 use crate::error::ContractError;
 use cw_storage_plus::U8Key;
+use crate::msg::QueryMsg::MerkleRoot;
+use std::cmp::Ordering;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
@@ -114,74 +116,76 @@ pub fn execute_register_merkle_root(
     })
 }
 
-pub fn claim<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
+pub fn execute_claim(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
     stage: u8,
     amount: Uint128,
     proof: Vec<String>,
-) -> StdResult<HandleResponse> {
-    let config: Config = read_config(&deps.storage)?;
-    let merkle_root: String = read_merkle_root(&deps.storage, stage)?;
-
-    let user_raw = deps.api.canonical_address(&env.message.sender)?;
-
-    // If user claimed target stage, return err
-    if read_claimed(&deps.storage, &user_raw, stage)? {
-        return Err(StdError::generic_err("Already claimed"));
+) -> Result<Response, ContractError> {
+    // verify not claimed
+    let claimed = CLAIM.may_load(deps.storage, info.sender)?;
+    if claimed.is_some() {
+        return Err(ContractError::Claimed {})
     }
 
-    let user_input: String = env.message.sender.to_string() + &amount.to_string();
+    let config = CONFIG.load(deps.storage)?;
+    let merkle_root = MERKLE_ROOT.load(deps.storage, stage.into())?;
+
+    let user_input: String = info.sender.to_string() + &amount.to_string();
     let mut hash: [u8; 32] = sha3::Keccak256::digest(user_input.as_bytes())
         .as_slice()
         .try_into()
-        .expect("Wrong length");
+        .map_err(|_| ContractError::WrongLength {})?;
 
     for p in proof {
         let mut proof_buf: [u8; 32] = [0; 32];
-        match hex::decode_to_slice(p, &mut proof_buf) {
-            Ok(()) => {}
-            _ => return Err(StdError::generic_err("Invalid hex encoded proof")),
-        }
+        hex::decode_to_slice(p, &mut proof_buf)?;
 
-        hash = if bytes_cmp(hash, proof_buf) == std::cmp::Ordering::Less {
-            sha3::Keccak256::digest(&[hash, proof_buf].concat())
-                .as_slice()
-                .try_into()
-                .expect("Wrong length")
-        } else {
-            sha3::Keccak256::digest(&[proof_buf, hash].concat())
-                .as_slice()
-                .try_into()
-                .expect("Wrong length")
-        };
+        let hash: &[u8] = match bytes_cmp(hash, proof_buf) {
+            Ordering::Less => {
+                sha3::Keccak256::digest(&[hash, proof_buf].concat())
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| ContractError::WrongLength {})
+            },
+            _ => {
+                sha3::Keccak256::digest(&[proof_buf, hash].concat())
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| ContractError::WrongLength {})
+            }
+        }?;
     }
 
     let mut root_buf: [u8; 32] = [0; 32];
-    hex::decode_to_slice(merkle_root, &mut root_buf).unwrap();
+    hex::decode_to_slice(merkle_root, &mut root_buf)?;
     if root_buf != hash {
-        return Err(StdError::generic_err("Verification is failed"));
+        return Err(ContractError::VerificationFailed {})
     }
 
     // Update claim index to the current stage
-    store_claimed(&mut deps.storage, &user_raw, stage)?;
+    CLAIM.save(deps.storage, info.sender.clone(), &true)?;
 
-    Ok(HandleResponse {
-        messages: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: deps.api.human_address(&config.cw20_token_address)?,
-            funds: vec![],
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: env.message.sender.clone(),
-                amount,
-            })?,
-        })],
-        log: vec![
-            log("action", "claim"),
-            log("stage", stage),
-            log("address", env.message.sender),
-            log("amount", amount),
+    let msgs: Vec<SubMsg> = vec![WasmMsg::Execute {
+        contract_addr: deps.api.human_address(&config.cw20_token_address)?,
+        funds: vec![],
+        msg: to_binary(&Cw20ExecuteMsg::Transfer {
+            recipient: env.message.sender.clone(),
+            amount,
+        })?,
+    }.into()];
+    Ok(Response {
+        messages: msgs,
+        attributes: vec![
+            attr("action", "claim"),
+            attr("stage", stage),
+            attr("address", info.sender),
+            attr("amount", amount),
         ],
         data: None,
+        events: vec![]
     })
 }
 
