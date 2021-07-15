@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
+use cosmwasm_std::{to_vec, StdError, StdResult, Storage, Addr, WasmQuery, to_binary};
 
 use crate::helpers::{may_deserialize, must_deserialize};
 
@@ -70,6 +70,11 @@ where
         let output = action(input)?;
         self.save(store, &output)?;
         Ok(output)
+    }
+
+    pub fn query_msg(&self, contract_addr: String) -> StdResult<WasmQuery> {
+        let key = to_binary(self.as_slice())?;
+        Ok(WasmQuery::Raw {contract_addr, key})
     }
 }
 

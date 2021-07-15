@@ -1,0 +1,33 @@
+[package]
+name = "cw20-merkle-airdrop"
+version = "0.7.0"
+authors = ["Orkun Kulce <orkunkl@users.noreply.github.com>", "Terraform Labs, PTE."]
+edition = "2018"
+description = "An Airdrop contract for allowing users to claim rewards with Merkle Tree based proof"
+license = "Apache-2.0"
+
+exclude = [
+  "contract.wasm",
+  "hash.txt",
+]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+library = []
+
+[dependencies]
+
+cw20 = { path = "../../packages/cw20", version = "0.7.0" }
+cosmwasm-std = { version = "0.15.0", features = ["iterator"] }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.7.0", features = ["iterator"] }
+schemars = "0.8.1"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.23" }
+hex = "0.4"
+sha3 = { version = "0.9.1", default-features = false }
+
+[dev-dependencies]
+cosmwasm-schema = "0.15.0"
