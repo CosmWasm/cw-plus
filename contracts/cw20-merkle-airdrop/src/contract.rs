@@ -258,8 +258,23 @@ pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Respons
 mod tests {
     use super::*;
 
-    use cosmwasm_std::from_binary;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{from_binary, OwnedDeps, MemoryStorage};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier};
+
+    fn setup_test_case() -> (OwnedDeps<MemoryStorage, MockApi, MockQuerier>, Env) {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            owner: "owner0000".to_string(),
+            cw20_token_address: "anchor0000".to_string(),
+        };
+
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+
+        let _ = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+        (deps, env)
+    }
 
     #[test]
     fn proper_initialization() {
@@ -285,5 +300,35 @@ mod tests {
         let res = query(deps.as_ref(), env, QueryMsg::LatestStage {}).unwrap();
         let latest_stage: LatestStageResponse = from_binary(&res).unwrap();
         assert_eq!(0u8, latest_stage.latest_stage);
+    }
+
+    #[test]
+    fn test_update_config() {
+        let (mut deps, env) = setup_test_case();
+
+        // it worked, let's query the state
+        let config: ConfigResponse = query_config(deps.as_ref()).unwrap();
+        //let config: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!("owner0000", config.owner.as_str());
+        assert_eq!("anchor0000", config.cw20_token_address.as_str());
+
+        let new_owner = "owner0000";
+        let msg = ExecuteMsg::UpdateConfig { owner: Some(new_owner.to_string()) };
+
+        // random cannot update
+        let info = mock_info("random", &[]);
+        let resp = execute(deps.as_mut(), env.clone(), info, msg.clone());
+        match resp {
+            Ok(_) => panic!("expected error"),
+            Err(_) => {}
+        }
+
+        // owner can update
+        let info = mock_info("owner0000", &[]);
+        let resp = execute(deps.as_mut(), env, info, msg);
+        match resp {
+            Ok(_) => {},
+            Err(_) => panic!("expected ok")
+        }
     }
 }
