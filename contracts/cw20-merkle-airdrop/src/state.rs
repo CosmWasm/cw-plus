@@ -25,4 +25,4 @@ pub const MERKLE_ROOT_PREFIX: &str = "merkle_root";
 pub const MERKLE_ROOT: Map<U8Key, String> = Map::new(MERKLE_ROOT_PREFIX);
 
 pub const CLAIM_PREFIX: &str = "claim";
-pub const CLAIM: Map<Addr, bool> = Map::new(CLAIM_PREFIX);
+pub const CLAIM: Map<(Addr, U8Key), bool> = Map::new(CLAIM_PREFIX);
