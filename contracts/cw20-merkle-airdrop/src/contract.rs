@@ -1,12 +1,15 @@
-use cosmwasm_std::{log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, StdResult, Storage, Uint128, WasmMsg, Response, DepsMut, MessageInfo};
+use cosmwasm_std::{log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, StdResult, Response, HumanAddr, InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, Storage, Uint128, WasmMsg, DepsMut, MessageInfo, attr};
 
-use crate::state::{read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config, store_latest_stage, store_merkle_root, Config, STAGE, CONFIG_KEY, CONFIG};
+use crate::state::{read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config, store_latest_stage, store_merkle_root, Config, STAGE, CONFIG_KEY, CONFIG, MERKLE_ROOT};
 
-use cw20::Cw20HandleMsg;
+use cw20::Cw20ExecuteMsg;
 use hex;
 use sha3::Digest;
 use std::convert::TryInto;
-use crate::msg::InstantiateMsg;
+use crate::msg::{InstantiateMsg, ExecuteMsg};
+use std::borrow::Borrow;
+use crate::error::ContractError;
+use cw_storage_plus::U8Key;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
@@ -26,17 +29,19 @@ pub fn instantiate(deps: DepsMut, _env: Env, _info: MessageInfo, msg: Instantiat
     Ok(Response::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn execute(
+    deps: DepsMut,
     env: Env,
-    msg: HandleMsg,
-) -> HandleResult {
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
-        HandleMsg::UpdateConfig { owner } => update_config(deps, env, owner),
-        HandleMsg::RegisterMerkleRoot { merkle_root } => {
-            register_merkle_root(deps, env, merkle_root)
+        ExecuteMsg::UpdateConfig { owner } => execute_update_config(deps, env, info, owner),
+        ExecuteMsg::RegisterMerkleRoot { merkle_root } => {
+            execute_register_merkle_root(deps, env, info, merkle_root)
         }
-        HandleMsg::Claim {
+        ExecuteMsg::Claim {
             stage,
             amount,
             proof,
@@ -44,58 +49,68 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     }
 }
 
-pub fn update_config<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    owner: Option<HumanAddr>,
-) -> StdResult<HandleResponse> {
-    let mut config: Config = read_config(&deps.storage)?;
-    if deps.api.canonical_address(&env.message.sender)? != config.owner {
-        return Err(StdError::unauthorized());
+pub fn execute_update_config(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    owner: Option<String>,
+) -> Result<Response, ContractError> {
+    // authorize owner
+    let cfg = CONFIG.load(deps.storage)?;
+    if info.sender != cfg.owner {
+        return Err(ContractError::Unauthorized {})
     }
 
-    if let Some(owner) = owner {
-        config.owner = deps.api.canonical_address(&owner)?;
-    }
+    // validate owner change
+    let new_owner = owner
+        .ok_or(ContractError::InvalidInput {})
+        .and_then(|o| deps.api.addr_validate(o.as_str()))?;
 
-    store_config(&mut deps.storage, &config)?;
-    Ok(HandleResponse {
+
+    CONFIG.update(deps.storage, |mut exists| {
+        exists.owner = new_owner;
+        Ok(exists)
+    })?;
+
+    Ok(Response {
         messages: vec![],
-        log: vec![log("action", "update_config")],
+        attributes: vec![attr("action", "update_config")],
         data: None,
+        events: vec![]
     })
 }
 
-pub fn register_merkle_root<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
+
+pub fn execute_register_merkle_root(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
     merkle_root: String,
-) -> StdResult<HandleResponse> {
-    let config: Config = read_config(&deps.storage)?;
-    if deps.api.canonical_address(&env.message.sender)? != config.owner {
-        return Err(StdError::unauthorized());
+) -> Result<Response, ContractError> {
+    // authorize owner
+    let cfg = CONFIG.load(deps.storage)?;
+    if info.sender != cfg.owner {
+        return Err(ContractError::Unauthorized {})
     }
 
     let mut root_buf: [u8; 32] = [0; 32];
-    match hex::decode_to_slice(merkle_root.to_string(), &mut root_buf) {
-        Ok(()) => {}
-        _ => return Err(StdError::generic_err("Invalid hex encoded merkle root")),
-    }
+    hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
 
-    let latest_stage: u8 = read_latest_stage(&deps.storage)?;
+    let latest_stage: u8 = STAGE.load(deps.storage)?;
     let stage = latest_stage + 1;
 
-    store_merkle_root(&mut deps.storage, stage, merkle_root.to_string())?;
-    store_latest_stage(&mut deps.storage, stage)?;
+    MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
+    STAGE.save(deps.storage, &stage)?;
 
-    Ok(HandleResponse {
+    Ok(Response {
         messages: vec![],
-        log: vec![
-            log("action", "register_merkle_root"),
-            log("stage", stage),
-            log("merkle_root", merkle_root),
+        attributes: vec![
+            attr("action", "register_merkle_root"),
+            attr("stage", stage),
+            attr("merkle_root", merkle_root),
         ],
         data: None,
+        events: vec![]
     })
 }
 
@@ -153,12 +168,12 @@ pub fn claim<S: Storage, A: Api, Q: Querier>(
 
     Ok(HandleResponse {
         messages: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: deps.api.human_address(&config.anchor_token)?,
-            msg: to_binary(&Cw20HandleMsg::Transfer {
+            contract_addr: deps.api.human_address(&config.cw20_token_address)?,
+            funds: vec![],
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: env.message.sender.clone(),
                 amount,
             })?,
-            funds: vec![]
         })],
         log: vec![
             log("action", "claim"),
