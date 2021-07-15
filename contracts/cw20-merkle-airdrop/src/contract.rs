@@ -1,36 +1,29 @@
-use cosmwasm_std::{
-    log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr,
-    InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, StdResult,
-    Storage, Uint128, WasmMsg,
-};
+use cosmwasm_std::{log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, HandleResult, HumanAddr, InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, StdResult, Storage, Uint128, WasmMsg, Response, DepsMut, MessageInfo};
 
-use crate::state::{
-    read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config,
-    store_latest_stage, store_merkle_root, Config,
-};
+use crate::state::{read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config, store_latest_stage, store_merkle_root, Config, STAGE, CONFIG_KEY, CONFIG};
 
 use cw20::Cw20HandleMsg;
 use hex;
 use sha3::Digest;
 use std::convert::TryInto;
+use crate::msg::InstantiateMsg;
 
-pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _env: Env,
-    msg: InitMsg,
-) -> InitResult {
-    store_config(
-        &mut deps.storage,
-        &Config {
-            owner: deps.api.canonical_address(&msg.owner)?,
-            anchor_token: deps.api.canonical_address(&msg.anchor_token)?,
-        },
-    )?;
+// Version info, for migration info
+const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn instantiate(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InstantiateMsg) -> StdResult<Response> {
+    let config = &Config {
+            owner: deps.api.addr_validate(&msg.owner)?,
+            cw20_token_address: deps.api.addr_validate(&msg.cw20_token_address)?,
+        };
+    CONFIG.save(deps.storage, config)?;
 
     let stage: u8 = 0;
-    store_latest_stage(&mut deps.storage, stage)?;
+    STAGE.save(deps.storage, &stage)?;
 
-    Ok(InitResponse::default())
+    Ok(Response::default())
 }
 
 pub fn handle<S: Storage, A: Api, Q: Querier>(
@@ -212,7 +205,7 @@ pub fn query_config<S: Storage, A: Api, Q: Querier>(
     let state = read_config(&deps.storage)?;
     let resp = ConfigResponse {
         owner: deps.api.human_address(&state.owner)?,
-        anchor_token: deps.api.human_address(&state.anchor_token)?,
+        anchor_token: deps.api.human_address(&state.cw20_token_address)?,
     };
 
     Ok(resp)
