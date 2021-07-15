@@ -1,29 +1,44 @@
-use cosmwasm_std::{log, to_binary, Api, Binary, CosmosMsg, Env, Extern, HandleResponse, StdResult, Response, HumanAddr, InitResponse, InitResult, MigrateResponse, MigrateResult, Querier, StdError, Storage, Uint128, WasmMsg, DepsMut, MessageInfo, attr, SubMsg, Deps, Addr};
+use cosmwasm_std::{
+    attr, log, to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Env, Extern, HandleResponse,
+    HumanAddr, InitResponse, InitResult, MessageInfo, MigrateResponse, MigrateResult, Querier,
+    Response, StdError, StdResult, Storage, SubMsg, Uint128, WasmMsg,
+};
 
-use crate::state::{read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config, store_latest_stage, store_merkle_root, Config, STAGE, CONFIG_KEY, CONFIG, MERKLE_ROOT, CLAIM};
+use crate::state::{
+    read_claimed, read_config, read_latest_stage, read_merkle_root, store_claimed, store_config,
+    store_latest_stage, store_merkle_root, Config, CLAIM, CONFIG, CONFIG_KEY, MERKLE_ROOT, STAGE,
+};
 
+use crate::error::ContractError;
+use crate::error::ContractError::Claimed;
+use crate::msg::QueryMsg::MerkleRoot;
+use crate::msg::{
+    ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
+    MerkleRootResponse, MigrateMsg, QueryMsg,
+};
 use cw20::Cw20ExecuteMsg;
+use cw_storage_plus::U8Key;
 use hex;
 use sha3::Digest;
-use std::convert::TryInto;
-use crate::msg::{InstantiateMsg, ExecuteMsg, QueryMsg, ConfigResponse, MerkleRootResponse, LatestStageResponse, IsClaimedResponse, MigrateMsg};
 use std::borrow::Borrow;
-use crate::error::ContractError;
-use cw_storage_plus::U8Key;
-use crate::msg::QueryMsg::MerkleRoot;
 use std::cmp::Ordering;
-use crate::error::ContractError::Claimed;
+use std::convert::TryInto;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn instantiate(deps: DepsMut, _env: Env, _info: MessageInfo, msg: InstantiateMsg) -> StdResult<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> StdResult<Response> {
     let config = &Config {
-            owner: deps.api.addr_validate(&msg.owner)?,
-            cw20_token_address: deps.api.addr_validate(&msg.cw20_token_address)?,
-        };
+        owner: deps.api.addr_validate(&msg.owner)?,
+        cw20_token_address: deps.api.addr_validate(&msg.cw20_token_address)?,
+    };
     CONFIG.save(deps.storage, config)?;
 
     let stage: u8 = 0;
@@ -61,14 +76,13 @@ pub fn execute_update_config(
     // authorize owner
     let cfg = CONFIG.load(deps.storage)?;
     if info.sender != cfg.owner {
-        return Err(ContractError::Unauthorized {})
+        return Err(ContractError::Unauthorized {});
     }
 
     // validate owner change
     let new_owner = owner
         .ok_or(ContractError::InvalidInput {})
         .and_then(|o| deps.api.addr_validate(o.as_str()))?;
-
 
     CONFIG.update(deps.storage, |mut exists| {
         exists.owner = new_owner;
@@ -79,10 +93,9 @@ pub fn execute_update_config(
         messages: vec![],
         attributes: vec![attr("action", "update_config")],
         data: None,
-        events: vec![]
+        events: vec![],
     })
 }
-
 
 pub fn execute_register_merkle_root(
     deps: DepsMut,
@@ -93,7 +106,7 @@ pub fn execute_register_merkle_root(
     // authorize owner
     let cfg = CONFIG.load(deps.storage)?;
     if info.sender != cfg.owner {
-        return Err(ContractError::Unauthorized {})
+        return Err(ContractError::Unauthorized {});
     }
 
     let mut root_buf: [u8; 32] = [0; 32];
@@ -113,7 +126,7 @@ pub fn execute_register_merkle_root(
             attr("merkle_root", merkle_root),
         ],
         data: None,
-        events: vec![]
+        events: vec![],
     })
 }
 
@@ -128,7 +141,7 @@ pub fn execute_claim(
     // verify not claimed
     let claimed = CLAIM.may_load(deps.storage, (info.sender, stage.into()))?;
     if claimed.is_some() {
-        return Err(ContractError::Claimed {})
+        return Err(ContractError::Claimed {});
     }
 
     let config = CONFIG.load(deps.storage)?;
@@ -145,25 +158,21 @@ pub fn execute_claim(
         hex::decode_to_slice(p, &mut proof_buf)?;
 
         let hash: &[u8] = match bytes_cmp(hash, proof_buf) {
-            Ordering::Less => {
-                sha3::Keccak256::digest(&[hash, proof_buf].concat())
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| ContractError::WrongLength {})
-            },
-            _ => {
-                sha3::Keccak256::digest(&[proof_buf, hash].concat())
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| ContractError::WrongLength {})
-            }
+            Ordering::Less => sha3::Keccak256::digest(&[hash, proof_buf].concat())
+                .as_slice()
+                .try_into()
+                .map_err(|_| ContractError::WrongLength {}),
+            _ => sha3::Keccak256::digest(&[proof_buf, hash].concat())
+                .as_slice()
+                .try_into()
+                .map_err(|_| ContractError::WrongLength {}),
         }?;
     }
 
     let mut root_buf: [u8; 32] = [0; 32];
     hex::decode_to_slice(merkle_root, &mut root_buf)?;
     if root_buf != hash {
-        return Err(ContractError::VerificationFailed {})
+        return Err(ContractError::VerificationFailed {});
     }
 
     // Update claim index to the current stage
@@ -176,7 +185,8 @@ pub fn execute_claim(
             recipient: env.message.sender.clone(),
             amount,
         })?,
-    }.into()];
+    }
+    .into()];
     Ok(Response {
         messages: msgs,
         attributes: vec![
@@ -186,7 +196,7 @@ pub fn execute_claim(
             attr("amount", amount),
         ],
         data: None,
-        events: vec![]
+        events: vec![],
     })
 }
 
@@ -224,10 +234,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 
 pub fn query_merkle_root(deps: Deps, stage: u8) -> StdResult<MerkleRootResponse> {
     let merkle_root = MERKLE_ROOT.load(deps.storage, U8Key::from(stage))?;
-    let resp = MerkleRootResponse {
-        stage,
-        merkle_root,
-    };
+    let resp = MerkleRootResponse { stage, merkle_root };
 
     Ok(resp)
 }
@@ -239,11 +246,7 @@ pub fn query_latest_stage(deps: Deps) -> StdResult<LatestStageResponse> {
     Ok(resp)
 }
 
-pub fn query_is_claimed(
-    deps: Deps,
-    stage: u8,
-    address: String,
-) -> StdResult<IsClaimedResponse> {
+pub fn query_is_claimed(deps: Deps, stage: u8, address: String) -> StdResult<IsClaimedResponse> {
     let key: (Addr, U8Key) = (deps.api.addr_validate(&address)?, stage.into());
     let is_claimed = CLAIM.load(deps.storage, key)?;
     let resp = IsClaimedResponse { is_claimed };

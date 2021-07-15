@@ -1,6 +1,6 @@
 use cosmwasm_std::StdError;
-use thiserror::Error;
 use hex::FromHexError;
+use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
@@ -17,7 +17,7 @@ pub enum ContractError {
     InvalidInput {},
 
     #[error("Already claimed")]
-    Claimed{},
+    Claimed {},
 
     #[error("Wrong length")]
     WrongLength {},

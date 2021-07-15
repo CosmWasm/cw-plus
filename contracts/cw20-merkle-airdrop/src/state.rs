@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, StdResult, Storage, Addr};
+use cosmwasm_std::{Addr, CanonicalAddr, StdResult, Storage};
 use cosmwasm_storage::{singleton, singleton_read, Bucket, ReadonlyBucket};
-use cw_storage_plus::{Item, U8Key, Map};
+use cw_storage_plus::{Item, Map, U8Key};
 
 static PREFIX_MERKLE_ROOT: &[u8] = b"merkle_root";
 static PREFIX_CLAIM_INDEX: &[u8] = b"claim_index";
@@ -16,7 +16,6 @@ pub struct Config {
 
 pub const CONFIG_KEY: &str = "config";
 pub const CONFIG: Item<Config> = Item::new(CONFIG_KEY);
-
 
 pub const STAGE_KEY: &str = "stage";
 pub const STAGE: Item<u8> = Item::new(CONFIG_KEY);
