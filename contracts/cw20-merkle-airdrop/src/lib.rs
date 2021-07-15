@@ -1,7 +1,6 @@
 pub mod contract;
-pub mod error;
+mod error;
 pub mod msg;
 pub mod state;
 
-#[cfg(test)]
-mod testing;
+pub use crate::error::ContractError;

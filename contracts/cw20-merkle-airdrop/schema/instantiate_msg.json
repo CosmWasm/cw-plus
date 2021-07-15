@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ConfigResponse",
+  "title": "InstantiateMsg",
   "type": "object",
   "required": [
     "cw20_token_address",
