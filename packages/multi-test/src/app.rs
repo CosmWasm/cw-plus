@@ -8,6 +8,7 @@ use cosmwasm_std::{
     QueryRequest, Reply, ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, SystemError,
     SystemResult, WasmMsg,
 };
+use cosmwasm_storage::{prefixed, prefixed_read};
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
@@ -17,7 +18,8 @@ use std::fmt;
 
 use crate::transactions::{RepLog, StorageTransaction};
 use prost::Message;
-// use bytes::buf::BufMut;
+
+const NAMESPACE_BANK: &[u8] = b"bank";
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
@@ -146,8 +148,8 @@ where
 
     /// This is an "admin" function to let us adjust bank accounts
     pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
-        self.bank
-            .set_balance(self.storage.as_mut(), account, amount)
+        let mut storage = prefixed(self.storage.as_mut(), NAMESPACE_BANK);
+        self.bank.set_balance(&mut storage, account, amount)
     }
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
@@ -167,7 +169,10 @@ where
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
         match request {
             QueryRequest::Wasm(req) => self.wasm.query(self, req),
-            QueryRequest::Bank(req) => self.bank.query(self.storage.as_ref(), req),
+            QueryRequest::Bank(req) => {
+                let storage = prefixed_read(self.storage.as_ref(), NAMESPACE_BANK);
+                self.bank.query(&storage, req)
+            }
             _ => unimplemented!(),
         }
     }
@@ -362,7 +367,8 @@ where
                 self.process_response(resender, res, false)
             }
             CosmosMsg::Bank(msg) => {
-                self.bank.execute(&mut self.storage, sender, msg)?;
+                let mut storage = prefixed(&mut self.storage, NAMESPACE_BANK);
+                self.bank.execute(&mut storage, sender, msg)?;
                 Ok(AppResponse::default())
             }
             _ => unimplemented!(),
@@ -524,7 +530,8 @@ where
                 to_address: recipient,
                 amount: amount.to_vec(),
             };
-            self.bank.execute(&mut self.storage, sender.into(), msg)?;
+            let mut storage = prefixed(&mut self.storage, NAMESPACE_BANK);
+            self.bank.execute(&mut storage, sender.into(), msg)?;
         }
         Ok(AppResponse::default())
     }
@@ -945,7 +952,9 @@ mod test {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        let res = cache.bank.query(&cache.storage, query).unwrap();
+        // TODO: this needs to be more transparent, done in AppCache, not tests
+        let storage = prefixed_read(&cache.storage, NAMESPACE_BANK);
+        let res = cache.bank.query(&storage, query).unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
@@ -957,7 +966,7 @@ mod test {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        let res = app.bank.query(app.storage.as_ref(), query).unwrap();
+        let res = app.query(query.into()).unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
