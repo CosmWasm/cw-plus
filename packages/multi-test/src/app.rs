@@ -540,7 +540,7 @@ mod test {
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, Reply};
+    use cosmwasm_std::{attr, coin, coins, AllBalanceResponse, BankQuery, Reply};
 
     fn mock_router() -> App {
         let env = mock_env();
@@ -936,5 +936,79 @@ mod test {
         assert_eq!(res.id, 456);
         assert!(res.result.is_err());
         // TODO: check error?
+    }
+
+    fn query_cache<C>(cache: &AppCache<C>, rcpt: &Addr) -> Vec<Coin>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        let query = BankQuery::AllBalances {
+            address: rcpt.into(),
+        };
+        let res = cache.bank.query(&cache.storage, query).unwrap();
+        let val: AllBalanceResponse = from_slice(&res).unwrap();
+        val.amount
+    }
+
+    fn query_app<C>(app: &App<C>, rcpt: &Addr) -> Vec<Coin>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        let query = BankQuery::AllBalances {
+            address: rcpt.into(),
+        };
+        let res = app.bank.query(app.storage.as_ref(), query).unwrap();
+        let val: AllBalanceResponse = from_slice(&res).unwrap();
+        val.amount
+    }
+
+    #[test]
+    fn multi_level_bank_cache() {
+        let mut router = mock_router();
+
+        // set personal balance
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("recipient");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        router.set_bank_balance(&owner, init_funds).unwrap();
+
+        // cache 1 - send some tokens
+        let mut cache = router.cache();
+        let msg = BankMsg::Send {
+            to_address: rcpt.clone().into(),
+            amount: coins(25, "eth"),
+        };
+        cache.execute(owner.clone(), msg.into()).unwrap();
+
+        // shows up in cache
+        let cached_rcpt = query_cache(&cache, &rcpt);
+        assert_eq!(coins(25, "eth"), cached_rcpt);
+        let router_rcpt = query_app(&router, &rcpt);
+        assert_eq!(router_rcpt, vec![]);
+
+        // now, second level cache
+        let mut cache2 = cache.cache();
+        let msg = BankMsg::Send {
+            to_address: rcpt.clone().into(),
+            amount: coins(12, "eth"),
+        };
+        cache2.execute(owner, msg.into()).unwrap();
+
+        // shows up in 2nd cache
+        let cached_rcpt = query_cache(&cache, &rcpt);
+        assert_eq!(coins(25, "eth"), cached_rcpt);
+        let cached2_rcpt = query_cache(&cache2, &rcpt);
+        assert_eq!(coins(37, "eth"), cached2_rcpt);
+
+        // apply second to first
+        let ops = cache2.prepare();
+        ops.commit(&mut cache);
+
+        // apply first to router
+        let ops = cache.prepare();
+        ops.commit(&mut router);
+
+        let committed = query_app(&router, &rcpt);
+        assert_eq!(coins(37, "eth"), committed);
     }
 }
