@@ -155,19 +155,6 @@ where
     }
 }
 
-impl<T1, T2, T3, E1, E2, E3, C, E5> ContractWrapper<T1, T2, T3, E1, E2, E3, C, Empty, String, E5>
-where
-    T1: DeserializeOwned + 'static,
-    T2: DeserializeOwned + 'static,
-    T3: DeserializeOwned + 'static,
-    E1: ToString + 'static,
-    E2: ToString + 'static,
-    E3: ToString + 'static,
-    E5: ToString + 'static,
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
-}
-
 fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
 where
     T: DeserializeOwned + 'static,
