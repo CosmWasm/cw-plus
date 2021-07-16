@@ -12,7 +12,7 @@ use cosmwasm_storage::{prefixed, prefixed_read};
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
-use crate::wasm::{StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRouter};
+use crate::wasm::WasmRouter;
 use schemars::JsonSchema;
 use std::fmt;
 
@@ -20,6 +20,7 @@ use crate::transactions::{RepLog, StorageTransaction};
 use prost::Message;
 
 const NAMESPACE_BANK: &[u8] = b"bank";
+const NAMESPACE_WASM: &[u8] = b"wasm";
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
@@ -106,7 +107,6 @@ where
 {
     wasm: WasmRouter<C>,
     bank: Box<dyn Bank>,
-    // TODO: right now just for bank, let's generalize this
     storage: Box<dyn Storage>,
 }
 
@@ -118,12 +118,12 @@ where
         api: Box<dyn Api>,
         block: BlockInfo,
         bank: impl Bank + 'static,
-        storage_factory: StorageFactory,
+        storage: Box<dyn Storage>,
     ) -> Self {
         App {
-            wasm: WasmRouter::new(api, block, storage_factory),
+            wasm: WasmRouter::new(api, block),
             bank: Box::new(bank),
-            storage: storage_factory(),
+            storage,
         }
     }
 
@@ -168,7 +168,10 @@ where
     /// is nicer to use.
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
         match request {
-            QueryRequest::Wasm(req) => self.wasm.query(self, req),
+            QueryRequest::Wasm(req) => {
+                let storage = prefixed_read(self.storage.as_ref(), NAMESPACE_WASM);
+                self.wasm.query(&storage, self, req)
+            }
             QueryRequest::Bank(req) => {
                 let storage = prefixed_read(self.storage.as_ref(), NAMESPACE_BANK);
                 self.bank.query(&storage, req)
@@ -282,14 +285,13 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     querier: &'a dyn Querier,
-    wasm: WasmCache<'a, C>,
+    wasm: &'a WasmRouter<C>,
     bank: &'a dyn Bank,
     storage: StorageTransaction<'a>,
 }
 
 pub trait AppCommittable {
     fn commit_to(&mut self) -> &mut dyn Storage;
-    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable;
 }
 
 impl<'a, C> AppCommittable for AppCache<'a, C>
@@ -298,9 +300,6 @@ where
 {
     fn commit_to(&mut self) -> &mut dyn Storage {
         &mut self.storage
-    }
-    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
-        &mut self.wasm
     }
 }
 
@@ -311,19 +310,14 @@ where
     fn commit_to(&mut self) -> &mut dyn Storage {
         self.storage.as_mut()
     }
-    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
-        &mut self.wasm
-    }
 }
 
 pub struct AppOps {
-    wasm: WasmOps,
     ops: RepLog,
 }
 
 impl AppOps {
     pub fn commit(self, commit: &mut dyn AppCommittable) {
-        self.wasm.commit(commit.commit_wasm());
         self.ops.commit(commit.commit_to());
     }
 }
@@ -335,7 +329,7 @@ where
     fn new(router: &'a App<C>) -> Self {
         AppCache {
             querier: router,
-            wasm: router.wasm.cache(),
+            wasm: &router.wasm,
             bank: router.bank.as_ref(),
             storage: StorageTransaction::new(router.storage.as_ref()),
         }
@@ -344,7 +338,7 @@ where
     pub fn cache(&self) -> AppCache<C> {
         AppCache {
             querier: self.querier,
-            wasm: self.wasm.cache(),
+            wasm: self.wasm,
             bank: self.bank,
             storage: self.storage.cache(),
         }
@@ -355,7 +349,6 @@ where
     /// 2. RouterOps::commit() can now take &mut Router and updates the underlying state
     pub fn prepare(self) -> AppOps {
         AppOps {
-            wasm: self.wasm.prepare(),
             ops: self.storage.prepare(),
         }
     }
@@ -428,8 +421,11 @@ where
     }
 
     fn _reply(&mut self, contract: Addr, reply: Reply) -> Result<AppResponse, String> {
+        let mut storage = prefixed(&mut self.storage, NAMESPACE_WASM);
+        let res = self
+            .wasm
+            .reply(&mut storage, contract.clone(), self.querier, reply)?;
         // TODO: process result better, combine events / data from parent
-        let res = self.wasm.reply(contract.clone(), self.querier, reply)?;
         self.process_response(contract, res, true)
     }
 
@@ -471,7 +467,10 @@ where
     }
 
     fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
-        let res = self.wasm.sudo(contract_addr.clone(), self.querier, msg)?;
+        let mut storage = prefixed(&mut self.storage, NAMESPACE_WASM);
+        let res = self
+            .wasm
+            .sudo(&mut storage, contract_addr.clone(), self.querier, msg)?;
         self.process_response(contract_addr, res, false)
     }
 
@@ -486,11 +485,17 @@ where
                 let contract_addr = Addr::unchecked(contract_addr);
                 // first move the cash
                 self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
+
                 // then call the contract
                 let info = MessageInfo { sender, funds };
-                let res =
-                    self.wasm
-                        .execute(contract_addr.clone(), self.querier, info, msg.to_vec())?;
+                let mut wasm_storage = prefixed(&mut self.storage, NAMESPACE_WASM);
+                let res = self.wasm.execute(
+                    &mut wasm_storage,
+                    contract_addr.clone(),
+                    self.querier,
+                    info,
+                    msg.to_vec(),
+                )?;
                 Ok((contract_addr, res))
             }
             WasmMsg::Instantiate {
@@ -500,12 +505,19 @@ where
                 funds,
                 label: _,
             } => {
-                let contract_addr = Addr::unchecked(self.wasm.register_contract(code_id as usize)?);
+                let mut wasm_storage = prefixed(&mut self.storage, NAMESPACE_WASM);
+                let contract_addr = Addr::unchecked(
+                    self.wasm
+                        .register_contract(&mut wasm_storage, code_id as usize)?,
+                );
                 // move the cash
                 self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
+
                 // then call the contract
                 let info = MessageInfo { sender, funds };
+                let mut storage = prefixed(&mut self.storage, NAMESPACE_WASM);
                 let mut res = self.wasm.instantiate(
+                    &mut storage,
                     contract_addr.clone(),
                     self.querier,
                     info,
