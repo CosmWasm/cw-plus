@@ -35,6 +35,10 @@ impl<'a> StorageTransaction<'a> {
         }
     }
 
+    pub fn cache(&self) -> StorageTransaction {
+        StorageTransaction::new(self)
+    }
+
     /// prepares this transaction to be committed to storage
     pub fn prepare(self) -> RepLog {
         self.rep_log

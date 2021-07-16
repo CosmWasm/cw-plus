@@ -15,7 +15,7 @@ use crate::wasm::{StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRoute
 use schemars::JsonSchema;
 use std::fmt;
 
-use crate::transactions::StorageTransaction;
+use crate::transactions::{RepLog, StorageTransaction};
 use prost::Message;
 // use bytes::buf::BufMut;
 
@@ -103,7 +103,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     wasm: WasmRouter<C>,
-    bank: Bank,
+    bank: Box<dyn Bank>,
     // TODO: right now just for bank, let's generalize this
     storage: Box<dyn Storage>,
 }
@@ -112,15 +112,15 @@ impl<C> App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    pub fn new<B: Bank + 'static>(
+    pub fn new(
         api: Box<dyn Api>,
         block: BlockInfo,
-        bank: B,
+        bank: impl Bank + 'static,
         storage_factory: StorageFactory,
     ) -> Self {
         App {
             wasm: WasmRouter::new(api, block, storage_factory),
-            bank,
+            bank: Box::new(bank),
             storage: storage_factory(),
         }
     }
@@ -146,7 +146,8 @@ where
 
     /// This is an "admin" function to let us adjust bank accounts
     pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
-        self.bank.set_balance(account, amount)
+        self.bank
+            .set_balance(self.storage.as_mut(), account, amount)
     }
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
@@ -166,7 +167,7 @@ where
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
         match request {
             QueryRequest::Wasm(req) => self.wasm.query(self, req),
-            QueryRequest::Bank(req) => self.bank.query(req),
+            QueryRequest::Bank(req) => self.bank.query(self.storage.as_ref(), req),
             _ => unimplemented!(),
         }
     }
@@ -282,7 +283,7 @@ where
 }
 
 pub trait AppCommittable {
-    fn commit(&mut self) -> &mut dyn BankCommittable;
+    fn commit_to(&mut self) -> &mut dyn Storage;
     fn commit_wasm(&mut self) -> &mut dyn WasmCommittable;
 }
 
@@ -290,8 +291,8 @@ impl<'a, C> AppCommittable for AppCache<'a, C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn commit_bank(&mut self) -> &mut dyn BankCommittable {
-        &mut self.bank
+    fn commit_to(&mut self) -> &mut dyn Storage {
+        &mut self.storage
     }
     fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
         &mut self.wasm
@@ -302,8 +303,8 @@ impl<C> AppCommittable for App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn commit_bank(&mut self) -> &mut dyn BankCommittable {
-        &mut self.bank
+    fn commit_to(&mut self) -> &mut dyn Storage {
+        self.storage.as_mut()
     }
     fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
         &mut self.wasm
@@ -312,13 +313,13 @@ where
 
 pub struct AppOps {
     wasm: WasmOps,
-    bank: BankOps,
+    ops: RepLog,
 }
 
 impl AppOps {
     pub fn commit(self, commit: &mut dyn AppCommittable) {
-        self.bank.commit(commit.commit_bank());
         self.wasm.commit(commit.commit_wasm());
+        self.ops.commit(commit.commit_to());
     }
 }
 
@@ -330,7 +331,8 @@ where
         AppCache {
             querier: router,
             wasm: router.wasm.cache(),
-            bank: router.bank.cache(),
+            bank: router.bank.as_ref(),
+            storage: StorageTransaction::new(router.storage.as_ref()),
         }
     }
 
@@ -338,7 +340,8 @@ where
         AppCache {
             querier: self.querier,
             wasm: self.wasm.cache(),
-            bank: self.bank.cache(),
+            bank: self.bank,
+            storage: self.storage.cache(),
         }
     }
 
@@ -348,7 +351,7 @@ where
     pub fn prepare(self) -> AppOps {
         AppOps {
             wasm: self.wasm.prepare(),
-            bank: self.bank.prepare(),
+            ops: self.storage.prepare(),
         }
     }
 
@@ -359,7 +362,7 @@ where
                 self.process_response(resender, res, false)
             }
             CosmosMsg::Bank(msg) => {
-                self.bank.execute(sender, msg)?;
+                self.bank.execute(&mut self.storage, sender, msg)?;
                 Ok(AppResponse::default())
             }
             _ => unimplemented!(),
@@ -521,7 +524,7 @@ where
                 to_address: recipient,
                 amount: amount.to_vec(),
             };
-            self.bank.execute(sender.into(), msg)?;
+            self.bank.execute(&mut self.storage, sender.into(), msg)?;
         }
         Ok(AppResponse::default())
     }
