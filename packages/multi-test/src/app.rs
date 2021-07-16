@@ -253,7 +253,7 @@ where
         // this only happens if all messages run successfully
         if res.is_ok() {
             let ops = cache.prepare();
-            ops.commit(self);
+            ops.commit(self.storage.as_mut());
         }
         res
     }
@@ -274,7 +274,7 @@ where
         // this only happens if all messages run successfully
         if res.is_ok() {
             let ops = cache.prepare();
-            ops.commit(self);
+            ops.commit(self.storage.as_mut());
         }
         res
     }
@@ -288,38 +288,6 @@ where
     wasm: &'a WasmKeeper<C>,
     bank: &'a dyn Bank,
     storage: StorageTransaction<'a>,
-}
-
-pub trait AppCommittable {
-    fn commit_to(&mut self) -> &mut dyn Storage;
-}
-
-impl<'a, C> AppCommittable for AppCache<'a, C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn commit_to(&mut self) -> &mut dyn Storage {
-        &mut self.storage
-    }
-}
-
-impl<C> AppCommittable for App<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn commit_to(&mut self) -> &mut dyn Storage {
-        self.storage.as_mut()
-    }
-}
-
-pub struct AppOps {
-    ops: RepLog,
-}
-
-impl AppOps {
-    pub fn commit(self, commit: &mut dyn AppCommittable) {
-        self.ops.commit(commit.commit_to());
-    }
 }
 
 impl<'a, C> AppCache<'a, C>
@@ -347,10 +315,8 @@ where
     /// When we want to commit the RouterCache, we need a 2 step process to satisfy Rust reference counting:
     /// 1. prepare() consumes RouterCache, releasing &Router, and creating a self-owned update info.
     /// 2. RouterOps::commit() can now take &mut Router and updates the underlying state
-    pub fn prepare(self) -> AppOps {
-        AppOps {
-            ops: self.storage.prepare(),
-        }
+    pub fn prepare(self) -> RepLog {
+        self.storage.prepare()
     }
 
     pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
@@ -379,7 +345,7 @@ where
         let mut subtx = self.cache();
         let res = subtx.execute(contract.clone(), msg.msg);
         if res.is_ok() {
-            subtx.prepare().commit(self);
+            subtx.prepare().commit(&mut self.storage);
         }
 
         // call reply if meaningful
