@@ -15,7 +15,7 @@ fn mock_app() -> App {
     let api = Box::new(MockApi::default());
     let bank = SimpleBank {};
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, Box::new(MockStorage::new()))
 }
 
 pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract<Empty>> {

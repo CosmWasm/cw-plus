@@ -497,7 +497,7 @@ mod tests {
         let api = Box::new(MockApi::default());
         let bank = SimpleBank {};
 
-        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }
 
     // uploads code and returns address of group contract

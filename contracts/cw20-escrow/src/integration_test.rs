@@ -12,7 +12,7 @@ fn mock_app() -> App {
     let api = Box::new(MockApi::default());
     let bank = SimpleBank {};
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, Box::new(MockStorage::new()))
 }
 
 pub fn contract_escrow() -> Box<dyn Contract<Empty>> {
