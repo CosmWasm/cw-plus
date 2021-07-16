@@ -120,7 +120,7 @@ impl RepLog {
     }
 
     /// applies the stored list of `Op`s to the provided `Storage`
-    pub fn commit<S: Storage + ?Sized>(self, storage: &mut S) {
+    pub fn commit(self, storage: &mut dyn Storage) {
         for op in self.ops_log {
             op.apply(storage);
         }
@@ -142,7 +142,7 @@ enum Op {
 
 impl Op {
     /// applies this `Op` to the provided storage
-    pub fn apply<S: Storage + ?Sized>(&self, storage: &mut S) {
+    pub fn apply(&self, storage: &mut dyn Storage) {
         match self {
             Op::Set { key, value } => storage.set(&key, &value),
             Op::Delete { key } => storage.remove(&key),
