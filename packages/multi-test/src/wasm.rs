@@ -13,6 +13,9 @@ use cw_storage_plus::Map;
 
 use crate::contracts::Contract;
 
+// Contracts is in storage (from Router, or from Cache)
+const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
+
 /// Contract Data is just a code_id that can be used to lookup the actual code from the Router
 /// We can add other info here in the future, like admin
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -31,11 +34,7 @@ pub fn next_block(block: &mut BlockInfo) {
     block.height += 1;
 }
 
-// Contracts is in storage (from Router, or from Cache)
-const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
-
-// TODO: rename to WasmHandler
-pub struct WasmRouter<C>
+pub struct WasmKeeper<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
@@ -48,12 +47,12 @@ where
     api: Box<dyn Api>,
 }
 
-impl<C> WasmRouter<C>
+impl<C> WasmKeeper<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     pub fn new(api: Box<dyn Api>, block: BlockInfo) -> Self {
-        WasmRouter {
+        WasmKeeper {
             codes: HashMap::new(),
             block,
             api,
@@ -74,38 +73,11 @@ where
         self.block.clone()
     }
 
+    // Add a new contract. Must be done on the base object, when no contracts running
     pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
         let idx = self.codes.len() + 1;
         self.codes.insert(idx, code);
         idx
-    }
-
-    // FIXME: revisit how we store these?
-    pub fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
-        let mut name = b"contract_data".to_vec();
-        name.extend_from_slice(contract.as_bytes());
-        name
-    }
-
-    pub fn contract_storage<'a>(
-        &self,
-        storage: &'a mut dyn Storage,
-        address: &Addr,
-    ) -> Result<Box<dyn Storage + 'a>, String> {
-        let namespace = self.contract_namespace(address);
-        let storage = prefixed(storage, &namespace);
-        Ok(Box::new(storage))
-    }
-
-    // fails RUNTIME if you try to write. please don't
-    pub fn contract_storage_readonly<'a>(
-        &self,
-        storage: &'a dyn Storage,
-        address: &Addr,
-    ) -> Result<Box<dyn Storage + 'a>, String> {
-        let namespace = self.contract_namespace(address);
-        let storage = prefixed_read(storage, &namespace);
-        Ok(Box::new(storage))
     }
 
     pub fn query(
@@ -132,7 +104,7 @@ where
         querier: &dyn Querier,
         msg: Vec<u8>,
     ) -> Result<Binary, String> {
-        self.with_storage(storage, querier, address, |handler, deps, env| {
+        self.with_storage_readonly(storage, querier, address, |handler, deps, env| {
             handler.query(deps, env, msg)
         })
     }
@@ -148,6 +120,75 @@ where
         Ok(data.into())
     }
 
+    /// This just creates an address and empty storage instance, returning the new address
+    /// You must call init after this to set up the contract properly.
+    /// These are separated into two steps to have cleaner return values.
+    pub fn register_contract(
+        &self,
+        storage: &mut dyn Storage,
+        code_id: usize,
+    ) -> Result<Addr, String> {
+        if !self.codes.contains_key(&code_id) {
+            return Err("Cannot init contract with unregistered code id".to_string());
+        }
+        let addr = self.next_address(storage);
+        let info = ContractData::new(code_id);
+        CONTRACTS
+            .save(storage, &addr, &info)
+            .map_err(|e| e.to_string())?;
+        Ok(addr)
+    }
+
+    pub fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        address: Addr,
+        querier: &dyn Querier,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, querier, address, |contract, deps, env| {
+            contract.execute(deps, env, info, msg)
+        })
+    }
+
+    pub fn instantiate(
+        &self,
+        storage: &mut dyn Storage,
+        address: Addr,
+        querier: &dyn Querier,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, querier, address, |contract, deps, env| {
+            contract.instantiate(deps, env, info, msg)
+        })
+    }
+
+    pub fn reply(
+        &self,
+        storage: &mut dyn Storage,
+        address: Addr,
+        querier: &dyn Querier,
+        reply: Reply,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, querier, address, |contract, deps, env| {
+            contract.reply(deps, env, reply)
+        })
+    }
+
+    pub fn sudo(
+        &self,
+        storage: &mut dyn Storage,
+        address: Addr,
+        querier: &dyn Querier,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, querier, address, |contract, deps, env| {
+            contract.sudo(deps, env, msg)
+        })
+    }
+
     fn get_env<T: Into<Addr>>(&self, address: T) -> Env {
         Env {
             block: self.block.clone(),
@@ -157,7 +198,7 @@ where
         }
     }
 
-    fn with_storage<F, T>(
+    fn with_storage_readonly<F, T>(
         &self,
         storage: &dyn Storage,
         querier: &dyn Querier,
@@ -185,7 +226,7 @@ where
         action(handler, deps, env)
     }
 
-    fn with_writable_storage<F, T>(
+    fn with_storage<F, T>(
         &self,
         storage: &mut dyn Storage,
         querier: &dyn Querier,
@@ -223,73 +264,32 @@ where
         Addr::unchecked(format!("Contract #{}", count.to_string()))
     }
 
-    /// This just creates an address and empty storage instance, returning the new address
-    /// You must call init after this to set up the contract properly.
-    /// These are separated into two steps to have cleaner return values.
-    pub fn register_contract(
-        &self,
-        storage: &mut dyn Storage,
-        code_id: usize,
-    ) -> Result<Addr, String> {
-        if !self.codes.contains_key(&code_id) {
-            return Err("Cannot init contract with unregistered code id".to_string());
-        }
-        let addr = self.next_address(storage);
-        let info = ContractData::new(code_id);
-        CONTRACTS
-            .save(storage, &addr, &info)
-            .map_err(|e| e.to_string())?;
-        Ok(addr)
+    fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
+        // FIXME: revisit how we namespace? (no conflicts with CONTRACTS, other?)
+        let mut name = b"contract_data".to_vec();
+        name.extend_from_slice(contract.as_bytes());
+        name
     }
 
-    pub fn execute(
+    fn contract_storage<'a>(
         &self,
-        storage: &mut dyn Storage,
-        address: Addr,
-        querier: &dyn Querier,
-        info: MessageInfo,
-        msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
-        self.with_writable_storage(storage, querier, address, |contract, deps, env| {
-            contract.execute(deps, env, info, msg)
-        })
+        storage: &'a mut dyn Storage,
+        address: &Addr,
+    ) -> Result<Box<dyn Storage + 'a>, String> {
+        let namespace = self.contract_namespace(address);
+        let storage = prefixed(storage, &namespace);
+        Ok(Box::new(storage))
     }
 
-    pub fn instantiate(
+    // fails RUNTIME if you try to write. please don't
+    fn contract_storage_readonly<'a>(
         &self,
-        storage: &mut dyn Storage,
-        address: Addr,
-        querier: &dyn Querier,
-        info: MessageInfo,
-        msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
-        self.with_writable_storage(storage, querier, address, |contract, deps, env| {
-            contract.instantiate(deps, env, info, msg)
-        })
-    }
-
-    pub fn reply(
-        &self,
-        storage: &mut dyn Storage,
-        address: Addr,
-        querier: &dyn Querier,
-        reply: Reply,
-    ) -> Result<Response<C>, String> {
-        self.with_writable_storage(storage, querier, address, |contract, deps, env| {
-            contract.reply(deps, env, reply)
-        })
-    }
-
-    pub fn sudo(
-        &self,
-        storage: &mut dyn Storage,
-        address: Addr,
-        querier: &dyn Querier,
-        msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
-        self.with_writable_storage(storage, querier, address, |contract, deps, env| {
-            contract.sudo(deps, env, msg)
-        })
+        storage: &'a dyn Storage,
+        address: &Addr,
+    ) -> Result<Box<dyn Storage + 'a>, String> {
+        let namespace = self.contract_namespace(address);
+        let storage = prefixed_read(storage, &namespace);
+        Ok(Box::new(storage))
     }
 }
 
@@ -301,10 +301,10 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, BlockInfo, Coin, CosmosMsg, Empty};
 
-    fn mock_router() -> WasmRouter<Empty> {
+    fn mock_router() -> WasmKeeper<Empty> {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        WasmRouter::new(api, env.block, || Box::new(MockStorage::new()))
+        WasmKeeper::new(api, env.block, || Box::new(MockStorage::new()))
     }
 
     #[test]

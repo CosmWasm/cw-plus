@@ -12,7 +12,7 @@ use cosmwasm_storage::{prefixed, prefixed_read};
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
-use crate::wasm::WasmRouter;
+use crate::wasm::WasmKeeper;
 use schemars::JsonSchema;
 use std::fmt;
 
@@ -105,7 +105,7 @@ pub struct App<C = Empty>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    wasm: WasmRouter<C>,
+    wasm: WasmKeeper<C>,
     bank: Box<dyn Bank>,
     storage: Box<dyn Storage>,
 }
@@ -121,7 +121,7 @@ where
         storage: Box<dyn Storage>,
     ) -> Self {
         App {
-            wasm: WasmRouter::new(api, block),
+            wasm: WasmKeeper::new(api, block),
             bank: Box::new(bank),
             storage,
         }
@@ -285,7 +285,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     querier: &'a dyn Querier,
-    wasm: &'a WasmRouter<C>,
+    wasm: &'a WasmKeeper<C>,
     bank: &'a dyn Bank,
     storage: StorageTransaction<'a>,
 }
