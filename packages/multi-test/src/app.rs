@@ -532,7 +532,7 @@ mod test {
         let api = Box::new(MockApi::default());
         let bank = SimpleBank {};
 
-        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }
 
     fn custom_router() -> App<CustomMsg> {
@@ -540,7 +540,7 @@ mod test {
         let api = Box::new(MockApi::default());
         let bank = SimpleBank {};
 
-        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }
 
     fn get_balance<C>(router: &App<C>, addr: &Addr) -> Vec<Coin>
@@ -989,11 +989,11 @@ mod test {
 
         // apply second to first
         let ops = cache2.prepare();
-        ops.commit(&mut cache);
+        ops.commit(&mut cache.storage);
 
         // apply first to router
         let ops = cache.prepare();
-        ops.commit(&mut router);
+        ops.commit(router.storage.as_mut());
 
         let committed = query_app(&router, &rcpt);
         assert_eq!(coins(37, "eth"), committed);
