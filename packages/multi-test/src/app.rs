@@ -5,16 +5,17 @@ use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
     ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError,
+    QueryRequest, Reply, ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, SystemError,
     SystemResult, WasmMsg,
 };
 
-use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
+use crate::bank::Bank;
 use crate::contracts::Contract;
 use crate::wasm::{StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRouter};
 use schemars::JsonSchema;
 use std::fmt;
 
+use crate::transactions::StorageTransaction;
 use prost::Message;
 // use bytes::buf::BufMut;
 
@@ -102,7 +103,9 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     wasm: WasmRouter<C>,
-    bank: BankRouter,
+    bank: Bank,
+    // TODO: right now just for bank, let's generalize this
+    storage: Box<dyn Storage>,
 }
 
 impl<C> App<C>
@@ -117,7 +120,8 @@ where
     ) -> Self {
         App {
             wasm: WasmRouter::new(api, block, storage_factory),
-            bank: BankRouter::new(bank, storage_factory()),
+            bank,
+            storage: storage_factory(),
         }
     }
 
@@ -273,11 +277,12 @@ where
 {
     querier: &'a dyn Querier,
     wasm: WasmCache<'a, C>,
-    bank: BankCache<'a>,
+    bank: &'a dyn Bank,
+    storage: StorageTransaction<'a>,
 }
 
 pub trait AppCommittable {
-    fn commit_bank(&mut self) -> &mut dyn BankCommittable;
+    fn commit(&mut self) -> &mut dyn BankCommittable;
     fn commit_wasm(&mut self) -> &mut dyn WasmCommittable;
 }
 
