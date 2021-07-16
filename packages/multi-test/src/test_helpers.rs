@@ -128,12 +128,8 @@ fn query_payout(deps: Deps, _env: Env, msg: PayoutQueryMsg) -> Result<Binary, St
 }
 
 pub fn contract_payout() -> Box<dyn Contract<Empty>> {
-    let contract = ContractWrapper::new_with_sudo(
-        execute_payout,
-        instantiate_payout,
-        query_payout,
-        sudo_payout,
-    );
+    let contract = ContractWrapper::new(execute_payout, instantiate_payout, query_payout)
+        .with_sudo(sudo_payout);
     Box::new(contract)
 }
 
@@ -221,11 +217,7 @@ fn reply_reflect(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<Custom
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
-    let contract = ContractWrapper::new_with_reply(
-        execute_reflect,
-        instantiate_reflect,
-        query_reflect,
-        reply_reflect,
-    );
+    let contract = ContractWrapper::new(execute_reflect, instantiate_reflect, query_reflect)
+        .with_reply(reply_reflect);
     Box::new(contract)
 }

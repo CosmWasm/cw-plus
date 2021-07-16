@@ -108,7 +108,7 @@ where
     }
 }
 
-impl<T1, T2, T3, E1, E2, E3, C, T4, E4> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4>
+impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5>
 where
     T1: DeserializeOwned + 'static,
     T2: DeserializeOwned + 'static,
@@ -118,20 +118,39 @@ where
     E2: ToString + 'static,
     E3: ToString + 'static,
     E4: ToString + 'static,
+    E5: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new_with_sudo(
-        execute_fn: ContractFn<T1, C, E1>,
-        instantiate_fn: ContractFn<T2, C, E2>,
-        query_fn: QueryFn<T3, E3>,
-        sudo_fn: SudoFn<T4, C, E4>,
-    ) -> Self {
+    pub fn with_sudo<T4A, E4A>(
+        self,
+        sudo_fn: SudoFn<T4A, C, E4A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4A, E4A, E5>
+    where
+        T4A: DeserializeOwned + 'static,
+        E4A: ToString + 'static,
+    {
         ContractWrapper {
-            execute_fn: Box::new(execute_fn),
-            instantiate_fn: Box::new(instantiate_fn),
-            query_fn: Box::new(query_fn),
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
             sudo_fn: Some(Box::new(sudo_fn)),
-            reply_fn: None,
+            reply_fn: self.reply_fn,
+        }
+    }
+
+    pub fn with_reply<E5A>(
+        self,
+        reply_fn: ReplyFn<C, E5A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A>
+    where
+        E5A: ToString + 'static,
+    {
+        ContractWrapper {
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
+            sudo_fn: self.sudo_fn,
+            reply_fn: Some(Box::new(reply_fn)),
         }
     }
 }
@@ -147,20 +166,6 @@ where
     E5: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new_with_reply(
-        execute_fn: ContractFn<T1, C, E1>,
-        instantiate_fn: ContractFn<T2, C, E2>,
-        query_fn: QueryFn<T3, E3>,
-        reply_fn: ReplyFn<C, E5>,
-    ) -> Self {
-        ContractWrapper {
-            execute_fn: Box::new(execute_fn),
-            instantiate_fn: Box::new(instantiate_fn),
-            query_fn: Box::new(query_fn),
-            sudo_fn: None,
-            reply_fn: Some(Box::new(reply_fn)),
-        }
-    }
 }
 
 fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
