@@ -9,7 +9,7 @@ use cosmwasm_std::{
 };
 use cw_storage_plus::{Item, Map, U64Key};
 
-use crate::wasm::{Contract, ContractWrapper};
+use crate::contracts::{Contract, ContractWrapper};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EmptyMsg {}
