@@ -46,10 +46,10 @@ OPTIONS
 
 EXAMPLE
   $ merkle-airdrop-cli hello
-  hello world from ./src/hello.ts!
+  hello world from ./src/root.ts!
 ```
 
-_See code: [src/commands/hello.ts](https://github.com/orkunkl/merkle-airdrop-cli/blob/v0.1.0/src/commands/hello.ts)_
+_See code: [src/commands/root.ts](https://github.com/orkunkl/merkle-airdrop-cli/blob/v0.1.0/src/commands/hello.ts)_
 
 ## `merkle-airdrop-cli help [COMMAND]`
 
