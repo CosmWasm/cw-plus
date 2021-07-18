@@ -258,20 +258,8 @@ pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Respons
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::contract::{execute, instantiate, query};
-    use crate::msg::{
-        ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
-        MerkleRootResponse, QueryMsg,
-    };
-    use crate::ContractError;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier};
-    use cosmwasm_std::{
-        attr, from_binary, to_binary, Addr, CosmosMsg, Empty, MemoryStorage, OwnedDeps, Response,
-        SubMsg, Uint128, WasmMsg,
-    };
-    use cw20::Cw20ExecuteMsg;
-    use serde::Deserialize;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{from_binary, CosmosMsg};
 
     #[test]
     fn proper_instantiateialization() {
@@ -286,7 +274,7 @@ mod tests {
         let info = mock_info("addr0000", &[]);
 
         // we can just call .unwrap() to assert this was a success
-        let _res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        let _res = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
@@ -294,7 +282,7 @@ mod tests {
         assert_eq!("owner0000", config.owner.as_str());
         assert_eq!("anchor0000", config.cw20_token_address.as_str());
 
-        let res = query(deps.as_ref(), env.clone(), QueryMsg::LatestStage {}).unwrap();
+        let res = query(deps.as_ref(), env, QueryMsg::LatestStage {}).unwrap();
         let latest_stage: LatestStageResponse = from_binary(&res).unwrap();
         assert_eq!(0u8, latest_stage.latest_stage);
     }
@@ -310,7 +298,7 @@ mod tests {
 
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        let _res = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
 
         // update owner
         let env = mock_env();
@@ -319,11 +307,11 @@ mod tests {
             owner: Some("owner0001".to_string()),
         };
 
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
+        let res = query(deps.as_ref(), env, QueryMsg::Config {}).unwrap();
         let config: ConfigResponse = from_binary(&res).unwrap();
         assert_eq!("owner0001", config.owner.as_str());
 
@@ -350,7 +338,7 @@ mod tests {
 
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        let _res = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
 
         // register new merkle root
         let env = mock_env();
@@ -379,7 +367,7 @@ mod tests {
 
         let res = query(
             deps.as_ref(),
-            env.clone(),
+            env,
             QueryMsg::MerkleRoot {
                 stage: latest_stage.latest_stage,
             },
@@ -457,8 +445,7 @@ mod tests {
             ]
         );
 
-        assert_eq!(
-            true,
+        assert!(
             from_binary::<IsClaimedResponse>(
                 &query(
                     deps.as_ref(),
@@ -474,7 +461,7 @@ mod tests {
             .is_claimed
         );
 
-        let res = execute(deps.as_mut(), env.clone(), info, msg.clone());
+        let res = execute(deps.as_mut(), env, info, msg);
         match res {
             Err(ContractError::Claimed {}) => {}
             _ => panic!("DO NOT ENTER HERE"),
@@ -494,8 +481,8 @@ mod tests {
 
         let env = mock_env();
         let info = mock_info("terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8", &[]);
-        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
-        let expected: SubMsg<CosmosMsg> = SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
+        let expected: SubMsg<_> = SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "anchor0000".to_string(),
             funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
@@ -504,7 +491,7 @@ mod tests {
             })
             .unwrap(),
         }));
-        assert_eq!(res.messages, vec![]);
+        assert_eq!(res.messages, vec![expected]);
 
         assert_eq!(
             res.attributes,
