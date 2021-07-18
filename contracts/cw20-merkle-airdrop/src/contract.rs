@@ -104,8 +104,9 @@ pub fn execute_register_merkle_root(
         return Err(ContractError::Unauthorized {});
     }
 
+    // check merkle root length
     let mut root_buf: [u8; 32] = [0; 32];
-    hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
+    hex::decode_to_slice(merkle_root.to_string().replace("0x", ""), &mut root_buf)?;
 
     let latest_stage: u8 = STAGE.load(deps.storage)?;
     let stage = latest_stage + 1;
@@ -258,8 +259,32 @@ pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Respons
 mod tests {
     use super::*;
 
-    use cosmwasm_std::{from_binary, OwnedDeps, MemoryStorage};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier};
+    use cosmwasm_std::{from_binary, MemoryStorage, OwnedDeps};
+    use serde::Deserialize;
+
+    const AIRDROP_RECEIVERS_TEST_JSON: &str = "./testdata/airdrop.json";
+    const PROOF_TEST_JSON: &str = "./testdata/proof.json";
+
+    #[derive(Deserialize, Debug)]
+    #[serde(rename_all = "snake_case")]
+    struct TestData {
+        root: String,
+        address: String,
+        balance: Uint128,
+        proofs: Vec<String>,
+    }
+
+    fn read_test_data() -> TestData {
+        use std::fs::File;
+        use std::io::BufReader;
+
+        // Open the file in read-only mode with buffer.
+        let file = File::open(PROOF_TEST_JSON).unwrap();
+        let reader = BufReader::new(file);
+
+        serde_json::from_reader(reader).unwrap()
+    }
 
     fn setup_test_case() -> (OwnedDeps<MemoryStorage, MockApi, MockQuerier>, Env) {
         let mut deps = mock_dependencies(&[]);
@@ -313,7 +338,9 @@ mod tests {
         assert_eq!("anchor0000", config.cw20_token_address.as_str());
 
         let new_owner = "owner0000";
-        let msg = ExecuteMsg::UpdateConfig { owner: Some(new_owner.to_string()) };
+        let msg = ExecuteMsg::UpdateConfig {
+            owner: Some(new_owner.to_string()),
+        };
 
         // random cannot update
         let info = mock_info("random", &[]);
@@ -327,8 +354,24 @@ mod tests {
         let info = mock_info("owner0000", &[]);
         let resp = execute(deps.as_mut(), env, info, msg);
         match resp {
-            Ok(_) => {},
-            Err(_) => panic!("expected ok")
+            Ok(_) => {}
+            Err(_) => panic!("expected ok"),
         }
+    }
+    #[test]
+    fn test_register_merkle_root() {
+        let (mut deps, env) = setup_test_case();
+
+        let test_data = read_test_data();
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: test_data.root.clone(),
+        };
+        let info = mock_info("owner0000", &[]);
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        let query_msg = QueryMsg::MerkleRoot { stage: 1 };
+        let query: MerkleRootResponse =
+            from_binary(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
+        assert_eq!(query.merkle_root, test_data.root)
     }
 }
