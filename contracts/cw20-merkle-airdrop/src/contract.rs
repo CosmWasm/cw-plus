@@ -106,7 +106,7 @@ pub fn execute_register_merkle_root(
 
     // check merkle root length
     let mut root_buf: [u8; 32] = [0; 32];
-    hex::decode_to_slice(merkle_root.to_string().replace("0x", ""), &mut root_buf)?;
+    hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
 
     let latest_stage: u8 = STAGE.load(deps.storage)?;
     let stage = latest_stage + 1;
@@ -259,50 +259,22 @@ pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Respons
 mod tests {
     use super::*;
 
+    use crate::contract::{execute, instantiate, query};
+    use crate::msg::{
+        ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
+        MerkleRootResponse, QueryMsg,
+    };
+    use crate::ContractError;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier};
-    use cosmwasm_std::{from_binary, MemoryStorage, OwnedDeps};
+    use cosmwasm_std::{
+        attr, from_binary, to_binary, Addr, CosmosMsg, Empty, MemoryStorage, OwnedDeps, Response,
+        SubMsg, Uint128, WasmMsg,
+    };
+    use cw20::Cw20ExecuteMsg;
     use serde::Deserialize;
 
-    const AIRDROP_RECEIVERS_TEST_JSON: &str = "./testdata/airdrop.json";
-    const PROOF_TEST_JSON: &str = "./testdata/proof.json";
-
-    #[derive(Deserialize, Debug)]
-    #[serde(rename_all = "snake_case")]
-    struct TestData {
-        root: String,
-        address: String,
-        balance: Uint128,
-        proofs: Vec<String>,
-    }
-
-    fn read_test_data() -> TestData {
-        use std::fs::File;
-        use std::io::BufReader;
-
-        // Open the file in read-only mode with buffer.
-        let file = File::open(PROOF_TEST_JSON).unwrap();
-        let reader = BufReader::new(file);
-
-        serde_json::from_reader(reader).unwrap()
-    }
-
-    fn setup_test_case() -> (OwnedDeps<MemoryStorage, MockApi, MockQuerier>, Env) {
-        let mut deps = mock_dependencies(&[]);
-
-        let msg = InstantiateMsg {
-            owner: "owner0000".to_string(),
-            cw20_token_address: "anchor0000".to_string(),
-        };
-
-        let env = mock_env();
-        let info = mock_info("addr0000", &[]);
-
-        let _ = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
-        (deps, env)
-    }
-
     #[test]
-    fn proper_initialization() {
+    fn proper_instantiateialization() {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
@@ -314,64 +286,234 @@ mod tests {
         let info = mock_info("addr0000", &[]);
 
         // we can just call .unwrap() to assert this was a success
-        let _ = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
         // it worked, let's query the state
-        let config: ConfigResponse = query_config(deps.as_ref()).unwrap();
-        //let config: ConfigResponse = from_binary(&res).unwrap();
+        let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
+        let config: ConfigResponse = from_binary(&res).unwrap();
         assert_eq!("owner0000", config.owner.as_str());
         assert_eq!("anchor0000", config.cw20_token_address.as_str());
 
-        let res = query(deps.as_ref(), env, QueryMsg::LatestStage {}).unwrap();
+        let res = query(deps.as_ref(), env.clone(), QueryMsg::LatestStage {}).unwrap();
         let latest_stage: LatestStageResponse = from_binary(&res).unwrap();
         assert_eq!(0u8, latest_stage.latest_stage);
     }
 
     #[test]
-    fn test_update_config() {
-        let (mut deps, env) = setup_test_case();
+    fn update_config() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            owner: "owner0000".to_string(),
+            cw20_token_address: "anchor0000".to_string(),
+        };
+
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+        let _res = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // update owner
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+        let msg = ExecuteMsg::UpdateConfig {
+            owner: Some("owner0001".to_string()),
+        };
+
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let config: ConfigResponse = query_config(deps.as_ref()).unwrap();
-        //let config: ConfigResponse = from_binary(&res).unwrap();
-        assert_eq!("owner0000", config.owner.as_str());
-        assert_eq!("anchor0000", config.cw20_token_address.as_str());
+        let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
+        let config: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!("owner0001", config.owner.as_str());
 
-        let new_owner = "owner0000";
-        let msg = ExecuteMsg::UpdateConfig {
-            owner: Some(new_owner.to_string()),
-        };
-
-        // random cannot update
-        let info = mock_info("random", &[]);
-        let resp = execute(deps.as_mut(), env.clone(), info, msg.clone());
-        match resp {
-            Ok(_) => panic!("expected error"),
-            Err(_) => {}
-        }
-
-        // owner can update
+        // Unauthorzied err
+        let env = mock_env();
         let info = mock_info("owner0000", &[]);
-        let resp = execute(deps.as_mut(), env, info, msg);
-        match resp {
-            Ok(_) => {}
-            Err(_) => panic!("expected ok"),
+        let msg = ExecuteMsg::UpdateConfig { owner: None };
+
+        let res = execute(deps.as_mut(), env, info, msg);
+        match res {
+            Err(ContractError::Unauthorized { .. }) => {}
+            _ => panic!("Must return unauthorized error"),
         }
     }
+
     #[test]
-    fn test_register_merkle_root() {
-        let (mut deps, env) = setup_test_case();
+    fn register_merkle_root() {
+        let mut deps = mock_dependencies(&[]);
 
-        let test_data = read_test_data();
-        let msg = ExecuteMsg::RegisterMerkleRoot {
-            merkle_root: test_data.root.clone(),
+        let msg = InstantiateMsg {
+            owner: "owner0000".to_string(),
+            cw20_token_address: "anchor0000".to_string(),
         };
-        let info = mock_info("owner0000", &[]);
-        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
-        let query_msg = QueryMsg::MerkleRoot { stage: 1 };
-        let query: MerkleRootResponse =
-            from_binary(&query(deps.as_ref(), env, query_msg).unwrap()).unwrap();
-        assert_eq!(query.merkle_root, test_data.root)
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+        let _res = instantiate(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // register new merkle root
+        let env = mock_env();
+        let info = mock_info("owner0000", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "634de21cde1044f41d90373733b0f0fb1c1c71f9652b905cdf159e73c4cf0d37"
+                .to_string(),
+        };
+
+        let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "register_merkle_root"),
+                attr("stage", "1"),
+                attr(
+                    "merkle_root",
+                    "634de21cde1044f41d90373733b0f0fb1c1c71f9652b905cdf159e73c4cf0d37"
+                )
+            ]
+        );
+
+        let res = query(deps.as_ref(), env.clone(), QueryMsg::LatestStage {}).unwrap();
+        let latest_stage: LatestStageResponse = from_binary(&res).unwrap();
+        assert_eq!(1u8, latest_stage.latest_stage);
+
+        let res = query(
+            deps.as_ref(),
+            env.clone(),
+            QueryMsg::MerkleRoot {
+                stage: latest_stage.latest_stage,
+            },
+        )
+        .unwrap();
+        let merkle_root: MerkleRootResponse = from_binary(&res).unwrap();
+        assert_eq!(
+            "634de21cde1044f41d90373733b0f0fb1c1c71f9652b905cdf159e73c4cf0d37".to_string(),
+            merkle_root.merkle_root
+        );
+    }
+
+    #[test]
+    fn claim() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            owner: "owner0000".to_string(),
+            cw20_token_address: "anchor0000".to_string(),
+        };
+
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+        let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+
+        // Register merkle roots
+        let env = mock_env();
+        let info = mock_info("owner0000", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "85e33930e7a8f015316cb4a53a4c45d26a69f299fc4c83f17357e1fd62e8fd95"
+                .to_string(),
+        };
+        let _res = execute(deps.as_mut(), env, info, msg).unwrap();
+
+        let env = mock_env();
+        let info = mock_info("owner0000", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "634de21cde1044f41d90373733b0f0fb1c1c71f9652b905cdf159e73c4cf0d37"
+                .to_string(),
+        };
+        let _res = execute(deps.as_mut(), env, info, msg).unwrap();
+
+        let msg = ExecuteMsg::Claim {
+            amount: Uint128::from(1000001u128),
+            stage: 1u8,
+            proof: vec![
+                "b8ee25ffbee5ee215c4ad992fe582f20175868bc310ad9b2b7bdf440a224b2df".to_string(),
+                "98d73e0a035f23c490fef5e307f6e74652b9d3688c2aa5bff70eaa65956a24e1".to_string(),
+                "f328b89c766a62b8f1c768fefa1139c9562c6e05bab57a2af87f35e83f9e9dcf".to_string(),
+                "fe19ca2434f87cadb0431311ac9a484792525eb66a952e257f68bf02b4561950".to_string(),
+            ],
+        };
+
+        let env = mock_env();
+        let info = mock_info("terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8", &[]);
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
+        let expected = SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "anchor0000".to_string(),
+            funds: vec![],
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8".into(),
+                amount: Uint128::from(1000001u128),
+            })
+            .unwrap(),
+        }));
+        assert_eq!(res.messages, vec![expected]);
+
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "claim"),
+                attr("stage", "1"),
+                attr("address", "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8"),
+                attr("amount", "1000001")
+            ]
+        );
+
+        assert_eq!(
+            true,
+            from_binary::<IsClaimedResponse>(
+                &query(
+                    deps.as_ref(),
+                    env.clone(),
+                    QueryMsg::IsClaimed {
+                        stage: 1,
+                        address: "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8".into(),
+                    }
+                )
+                .unwrap()
+            )
+            .unwrap()
+            .is_claimed
+        );
+
+        let res = execute(deps.as_mut(), env.clone(), info, msg.clone());
+        match res {
+            Err(ContractError::Claimed {}) => {}
+            _ => panic!("DO NOT ENTER HERE"),
+        }
+
+        // Claim next airdrop
+        let msg = ExecuteMsg::Claim {
+            amount: Uint128::from(2000001u128),
+            stage: 2u8,
+            proof: vec![
+                "ca2784085f944e5594bb751c3237d6162f7c2b24480b3a37e9803815b7a5ce42".to_string(),
+                "5b07b5898fc9aa101f27344dab0737aede6c3aa7c9f10b4b1fda6d26eb669b0f".to_string(),
+                "4847b2b9a6432a7bdf2bdafacbbeea3aab18c524024fc6e1bc655e04cbc171f3".to_string(),
+                "cad1958c1a5c815f23450f1a2761a5a75ab2b894a258601bf93cd026469d42f2".to_string(),
+            ],
+        };
+
+        let env = mock_env();
+        let info = mock_info("terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8", &[]);
+        let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
+        let expected: SubMsg<CosmosMsg> = SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: "anchor0000".to_string(),
+            funds: vec![],
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8".into(),
+                amount: Uint128::new(2000001u128),
+            })
+            .unwrap(),
+        }));
+        assert_eq!(res.messages, vec![]);
+
+        assert_eq!(
+            res.attributes,
+            vec![
+                attr("action", "claim"),
+                attr("stage", "2"),
+                attr("address", "terra1qfqa2eu9wp272ha93lj4yhcenrc6ymng079nu8"),
+                attr("amount", "2000001")
+            ]
+        );
     }
 }
