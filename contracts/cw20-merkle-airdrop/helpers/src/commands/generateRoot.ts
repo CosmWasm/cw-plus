@@ -1,9 +1,6 @@
 import {Command, flags} from '@oclif/command'
 import { readFileSync } from 'fs';
-import * as path from 'path';
-import * as helpers from '../helpers';
-import { MerkleTree } from 'typescript-solidity-merkle-tree';
-import { keccak256 } from 'ethereumjs-util';
+import {Airdrop} from '../airdrop';
 
 export default class GenerateRoot extends Command {
   static description = 'Generates merkle root'
@@ -33,10 +30,9 @@ hello world from ./src/hello.ts!
       this.error(e)
     }
 
-    let receivers: helpers.AirdropReceiver[] = JSON.parse(file);
-    let elements: Buffer[] = receivers.map(e => e.address.concat(e.balance)).map(e => Buffer.from(e))
+    let receivers: Array<{ address: string; amount: string }> = JSON.parse(file);
 
-    let tree = new MerkleTree(elements, keccak256);
-    console.log(tree)
+    let airdrop = new Airdrop(receivers)
+    console.log(airdrop.getMerkleRoot())
   }
 }

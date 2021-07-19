@@ -13,7 +13,8 @@
     "@oclif/plugin-help": "^3",
     "ethereumjs-util": "^7.1.0",
     "tslib": "^1",
-    "typescript-solidity-merkle-tree": "^0.3.0"
+    "keccak256": "^1.0.3",
+    "merkletreejs": "^0.2.23"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1",
