@@ -91,7 +91,7 @@ where
                 self.query_smart(storage, Addr::unchecked(contract_addr), querier, msg.into())
             }
             WasmQuery::Raw { contract_addr, key } => {
-                self.query_raw(storage, Addr::unchecked(contract_addr), &key)
+                Ok(self.query_raw(storage, Addr::unchecked(contract_addr), &key))
             }
             q => panic!("Unsupported wasm query: {:?}", q),
         }
@@ -109,15 +109,10 @@ where
         })
     }
 
-    pub fn query_raw(
-        &self,
-        storage: &dyn Storage,
-        address: Addr,
-        key: &[u8],
-    ) -> Result<Binary, String> {
-        let storage = self.contract_storage_readonly(storage, &address)?;
+    pub fn query_raw(&self, storage: &dyn Storage, address: Addr, key: &[u8]) -> Binary {
+        let storage = self.contract_storage_readonly(storage, &address);
         let data = storage.get(&key).unwrap_or_default();
-        Ok(data.into())
+        data.into()
     }
 
     /// This just creates an address and empty storage instance, returning the new address
@@ -215,7 +210,7 @@ where
             .codes
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
-        let storage = self.contract_storage_readonly(storage, &address)?;
+        let storage = self.contract_storage_readonly(storage, &address);
         let env = self.get_env(address);
 
         let deps = Deps {
@@ -243,7 +238,7 @@ where
             .codes
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
-        let mut storage = self.contract_storage(storage, &address)?;
+        let mut storage = self.contract_storage(storage, &address);
         let env = self.get_env(address);
 
         let deps = DepsMut {
@@ -275,10 +270,10 @@ where
         &self,
         storage: &'a mut dyn Storage,
         address: &Addr,
-    ) -> Result<Box<dyn Storage + 'a>, String> {
+    ) -> Box<dyn Storage + 'a> {
         let namespace = self.contract_namespace(address);
         let storage = prefixed(storage, &namespace);
-        Ok(Box::new(storage))
+        Box::new(storage)
     }
 
     // fails RUNTIME if you try to write. please don't
@@ -286,10 +281,10 @@ where
         &self,
         storage: &'a dyn Storage,
         address: &Addr,
-    ) -> Result<Box<dyn Storage + 'a>, String> {
+    ) -> Box<dyn Storage + 'a> {
         let namespace = self.contract_namespace(address);
         let storage = prefixed_read(storage, &namespace);
-        Ok(Box::new(storage))
+        Box::new(storage)
     }
 }
 
