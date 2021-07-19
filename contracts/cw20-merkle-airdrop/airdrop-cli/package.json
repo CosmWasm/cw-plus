@@ -1,0 +1,12 @@
+{
+  "name": "cw20-airdrop-cli",
+  "version": "0.1.0",
+  "description": "TypeScript client application for interacting with cw20-merkle-airdrop",
+  "main": "index.js",
+  "author": "orkunkl",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "keccak256": "^1.0.3",
+    "merkletreejs": "^0.2.23"
+  }
+}
