@@ -305,18 +305,18 @@ mod tests {
 
         // owner can send
         let res = query_can_execute(deps.as_ref(), alice.to_string(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
 
         // owner can stake
         let res = query_can_execute(deps.as_ref(), bob.to_string(), staking_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
 
         // anyone cannot send
         let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
 
         // anyone cannot stake
         let res = query_can_execute(deps.as_ref(), anyone.to_string(), staking_msg).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
     }
 }
