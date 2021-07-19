@@ -1,3 +1,12 @@
+// TODO:
+// 1. Move BlockInfo from WasmKeeper to App
+// 2. Rename AppCache -> Router (keep no state in it, just act on state passed in)
+// 3. Router has execute, query, and admin functions - meant to handle messages, not called by library user
+// 4. App maintains state -> calls Router with a cached store
+// 5. Add "block" helpers to execute one "tx" in a block... or let them manually execute many.
+//    All timing / block height manipulations happen in App
+// 6. Consider how to add (fixed) staking or (flexible) custom keeper -> in another PR?
+
 use serde::Serialize;
 
 #[cfg(test)]
@@ -37,6 +46,7 @@ impl AppResponse {
     }
 }
 
+// TODO: move this into WasmKeeper
 #[derive(Clone, PartialEq, Message)]
 pub struct InstantiateData {
     #[prost(string, tag = "1")]
@@ -61,6 +71,7 @@ where
     res.data = Some(new_data.into());
 }
 
+// TODO: move to WasmKeeper (export public)
 // this parses the result from a wasm contract init
 pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
     let bin = data
@@ -258,7 +269,7 @@ where
         res
     }
 
-    /// Runs arbitrary CosmosMsg.
+    /// Runs arbitrary CosmosMsg in "sudo" mode.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
     pub fn sudo<T: Serialize, U: Into<Addr>>(
@@ -289,6 +300,29 @@ where
     bank: &'a dyn Bank,
     storage: StorageTransaction<'a>,
 }
+
+// TODO: make this for modules?
+pub trait Module<M, Q> {
+    // TODO: make Deps/DepsMut like struct to hold this?
+    fn query(
+        &self,
+        querier: &QuerierWrapper,
+        storage: &dyn Storage,
+        block: BlockInfo,
+        query: Q,
+    ) -> Result<Binary, String>;
+
+    fn execute<C>(
+        &self,
+        router: &Router<C>,
+        storage: &mut dyn Storage,
+        block: BlockInfo,
+        sender: Addr,
+        msg: M,
+    ) -> Result<AppResponse, String>;
+}
+
+// TODO: Router implements Querier -> so QuerierWrapper is accessible in execute
 
 impl<'a, C> AppCache<'a, C>
 where
@@ -334,6 +368,17 @@ where
         }
     }
 
+    // TODO: this along with many wasm functions -> WasmKeeper
+    // Needed changes:
+    // 1. No storage/cache in AppCache (passed as arg) -> no more &mut self calls (?)
+    // 2. Pass entire (not name-spaced) storage to WasmKeeper
+    // 3. Pass &Router to WasmKeeper (so it can call back into other modules)
+    // 4. All logic into WasmKeeper, very high level here.
+    //
+    // -> Modules can just take their "namespaced" storage and be an island (Bank)
+    // -> Or they can take reference to all data and Router and have full access
+    // -> -> Message calling between modules
+    //
     /// This will execute the given messages, making all changes to the local cache.
     /// This *will* write some data to the cache if the message fails half-way through.
     /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
