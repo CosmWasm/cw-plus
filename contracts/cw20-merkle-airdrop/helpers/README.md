@@ -1,70 +1,38 @@
 merkle-airdrop-cli
 ==================
 
+This is a helper client shipped along contract. 
+Use this to generate root, generate proofs and verify proofs
 
+## Installation
 
-[![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
-[![Version](https://img.shields.io/npm/v/merkle-airdrop-cli.svg)](https://npmjs.org/package/merkle-airdrop-cli)
-[![Downloads/week](https://img.shields.io/npm/dw/merkle-airdrop-cli.svg)](https://npmjs.org/package/merkle-airdrop-cli)
-[![License](https://img.shields.io/npm/l/merkle-airdrop-cli.svg)](https://github.com/orkunkl/merkle-airdrop-cli/blob/master/package.json)
-
-<!-- toc -->
-* [Usage](#usage)
-* [Commands](#commands)
-<!-- tocstop -->
-# Usage
-<!-- usage -->
-```sh-session
-$ npm install -g merkle-airdrop-cli
-$ merkle-airdrop-cli COMMAND
-running command...
-$ merkle-airdrop-cli (-v|--version|version)
-merkle-airdrop-cli/0.1.0 darwin-arm64 node-v16.5.0
-$ merkle-airdrop-cli --help [COMMAND]
-USAGE
-  $ merkle-airdrop-cli COMMAND
-...
-```
-<!-- usagestop -->
-# Commands
-<!-- commands -->
-* [`merkle-airdrop-cli hello [FILE]`](#merkle-airdrop-cli-hello-file)
-* [`merkle-airdrop-cli help [COMMAND]`](#merkle-airdrop-cli-help-command)
-
-## `merkle-airdrop-cli hello [FILE]`
-
-describe the command here
-
-```
-USAGE
-  $ merkle-airdrop-cli hello [FILE]
-
-OPTIONS
-  -f, --force
-  -h, --help       show CLI help
-  -n, --name=name  name to print
-
-EXAMPLE
-  $ merkle-airdrop-cli hello
-  hello world from ./src/root.ts!
+```shell
+yarn install
+yarn link
 ```
 
-_See code: [src/commands/root.ts](https://github.com/orkunkl/merkle-airdrop-cli/blob/v0.1.0/src/commands/hello.ts)_
+Binary will be placed to path.
 
-## `merkle-airdrop-cli help [COMMAND]`
+## Commands
 
-display help for merkle-airdrop-cli
-
-```
-USAGE
-  $ merkle-airdrop-cli help [COMMAND]
-
-ARGUMENTS
-  COMMAND  command to show help for
-
-OPTIONS
-  --all  see all commands in CLI
+**Generate Root:**
+```shell
+merkle-airdrop-cli generateRoot --file ../testdata/airdrop_stage_2.json
 ```
 
-_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v3.2.2/src/commands/help.ts)_
-<!-- commandsstop -->
+**Generate proof:**
+```shell
+merkle-airdrop-cli generateProofs --file ../testdata/airdrop_stage_2.json \
+  --address wasm1ylna88nach9sn5n7qe7u5l6lh7dmt6lp2y63xx \
+  --amount 1000000000
+```
+
+**Verify proof:**
+```shell
+PROOFS='[ "27e9b1ec8cb64709d0a8d3702344561674199fe81b885f1f9c9b2fb268795962","280777995d054081cbf208bccb70f8d736c1766b81d90a1fd21cd97d2d83a5cc","3946ea1758a5a2bf55bae1186168ad35aa0329805bc8bff1ca3d51345faec04a"
+]'
+merkle-airdrop-cli verifyProofs --file ../testdata/airdrop.json \
+  --address wasm1k9hwzxs889jpvd7env8z49gad3a3633vg350tq \ 
+  --amount 100 
+  --proofs $PROOFS
+```
