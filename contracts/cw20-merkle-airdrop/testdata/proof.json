@@ -1,10 +1,10 @@
 {
-  "root": "0x330f42706aca3f3c05877910680a38b32b6daf76eaa1abbf10b985c5d448908d",
+  "root": "330f42706aca3f3c05877910680a38b32b6daf76eaa1abbf10b985c5d448908d",
   "address": "wasm1uy9ucvgerneekxpnfwyfnpxvlsx5dzdpf0mzjd",
   "balance": "1010",
   "proofs": [
-    "0x5ba8fa1244aedc7db257ad8958e1a548e62cebac3ea4ead8957b67c2d93fe8d0",
-    "0xfd0bbb2b46703954d2e54a548b4f191ffd52d57ad56c76e9e2f2ff231eb46b2f",
-    "0x75f527bfbaf45295b7640bd2bf7251968a98f4e2df391b0a5ad9c52b29838be0"
+    "5ba8fa1244aedc7db257ad8958e1a548e62cebac3ea4ead8957b67c2d93fe8d0",
+    "fd0bbb2b46703954d2e54a548b4f191ffd52d57ad56c76e9e2f2ff231eb46b2f",
+    "75f527bfbaf45295b7640bd2bf7251968a98f4e2df391b0a5ad9c52b29838be0"
   ]
 }
