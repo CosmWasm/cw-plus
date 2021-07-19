@@ -13,14 +13,14 @@ hello world from ./src/hello.ts!
 
   static flags = {
     help: flags.help({char: 'h'}),
-    file: flags.string({char: 'f', description: 'balances file location'}),
+    file: flags.string({char: 'f', description: 'Airdrop file location'}),
   }
 
   async run() {
     const {flags} = this.parse(GenerateRoot)
 
     if (!flags.file) {
-      this.error(new Error('balance file location not defined'))
+      this.error(new Error('Airdrop file location not defined'))
     }
 
     let file;
