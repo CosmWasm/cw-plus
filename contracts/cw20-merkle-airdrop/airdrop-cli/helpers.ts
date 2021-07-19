@@ -159,7 +159,6 @@ class Airdrop {
   }
 }
 
-
 /*
   Responses
  */
