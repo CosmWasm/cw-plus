@@ -84,16 +84,10 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     // Wrap `msgs` in SubMsg.
-    let msgs = msgs.into_iter().map(SubMsg::new).collect();
+    let msgs: Vec<SubMsg<_>> = msgs.into_iter().map(SubMsg::new).collect();
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    // this is the admin behavior (same as cw1-whitelist)
-    if cfg.is_admin(info.sender.as_ref()) {
-        let res = Response {
-            messages: msgs,
-            attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
-            ..Response::default()
-        };
-        Ok(res)
+    // This is the admin behavior (same as cw1-whitelist)
+    if cfg.is_admin(info.sender.as_ref()) { // Just relay the messages
     } else {
         for msg in &msgs {
             match &msg.msg {
@@ -123,14 +117,14 @@ where
                 }
             }
         }
-        // Relay messages
-        let res = Response {
-            messages: msgs,
-            attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
-            ..Response::default()
-        };
-        Ok(res)
     }
+    // Relay messages
+    let res = Response {
+        messages: msgs,
+        attributes: vec![attr("action", "execute"), attr("owner", info.sender)],
+        ..Response::default()
+    };
+    Ok(res)
 }
 
 pub fn check_staking_permissions(
@@ -1487,10 +1481,10 @@ mod tests {
 
         // owner can send big or small
         let res = query_can_execute(deps.as_ref(), owner.to_string(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
         let res =
             query_can_execute(deps.as_ref(), owner.to_string(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
         // owner can stake
         let res = query_can_execute(
             deps.as_ref(),
@@ -1498,15 +1492,15 @@ mod tests {
             staking_delegate_msg.clone(),
         )
         .unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
 
         // spender can send small
         let res = query_can_execute(deps.as_ref(), spender.to_string(), send_msg.clone()).unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
         // not too big
         let res =
             query_can_execute(deps.as_ref(), spender.to_string(), send_msg_large.clone()).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
         // spender can send staking msgs if permissioned
         let res = query_can_execute(
             deps.as_ref(),
@@ -1514,25 +1508,25 @@ mod tests {
             staking_delegate_msg.clone(),
         )
         .unwrap();
-        assert_eq!(res.can_execute, true);
+        assert!(res.can_execute);
         let res = query_can_execute(
             deps.as_ref(),
             spender.to_string(),
             staking_withdraw_msg.clone(),
         )
         .unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
 
         // random person cannot do anything
         let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
         let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg_large).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
         let res =
             query_can_execute(deps.as_ref(), anyone.to_string(), staking_delegate_msg).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
         let res =
             query_can_execute(deps.as_ref(), anyone.to_string(), staking_withdraw_msg).unwrap();
-        assert_eq!(res.can_execute, false);
+        assert!(!res.can_execute);
     }
 }
