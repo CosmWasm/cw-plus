@@ -15,6 +15,10 @@ pub trait Bank {
 
     fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String>;
 
+    // TODO: how to make "generic" admin extensions?
+    // App includes `pub bank: C <C: Bank>`, and just calls this directly
+    // Also `pub fn with_state_cache(Fn<(BlockInfo, &mut Storage) -> Result<T, String>) -> Result<T, String>`
+    // App.storage is not public, but you can get a cache to write to (with admin methods)
     // this is an "admin" function to let us adjust bank accounts
     fn set_balance(
         &self,
@@ -23,6 +27,7 @@ pub trait Bank {
         amount: Vec<Coin>,
     ) -> Result<(), String>;
 
+    // TODO: remove need for clone
     fn clone(&self) -> Box<dyn Bank>;
 }
 

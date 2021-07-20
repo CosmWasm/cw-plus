@@ -35,6 +35,7 @@ impl<'a> StorageTransaction<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn cache(&self) -> StorageTransaction {
         StorageTransaction::new(self)
     }
