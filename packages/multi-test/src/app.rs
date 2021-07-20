@@ -14,8 +14,8 @@ use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
     from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
     ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgExecutionResponse,
-    SystemError, SystemResult, WasmMsg,
+    QueryRequest, Reply, ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, SystemError,
+    SystemResult, WasmMsg,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 
@@ -27,7 +27,6 @@ use std::fmt;
 
 use crate::transactions::StorageTransaction;
 use prost::Message;
-use serde::de::DeserializeOwned;
 
 const NAMESPACE_BANK: &[u8] = b"bank";
 const NAMESPACE_WASM: &[u8] = b"wasm";
@@ -101,6 +100,17 @@ where
     storage: Box<dyn Storage>,
 }
 
+impl<C> Querier for App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+        self.router
+            .querier(self.storage.as_ref())
+            .raw_query(bin_request)
+    }
+}
+
 impl<C> App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -145,30 +155,9 @@ where
     }
 
     /// Simple helper so we get access to all the QuerierWrapper helpers,
-    /// eg. query_wasm_smart, query_all_balances, ...
-    pub fn querier(&self) -> RouterQuerier<C> {
-        self.router.querier(self.storage.as_ref())
-    }
-
-    // helpers as we cannot return a QuerierWrapper due to lifetimes
-    pub fn query_wasm_smart<T: DeserializeOwned, U: Serialize, V: Into<String>>(
-        &self,
-        contract_addr: V,
-        msg: &U,
-    ) -> StdResult<T> {
-        let querier = self.querier();
-        let wrapped = QuerierWrapper::new(&querier);
-        wrapped.query_wasm_smart(contract_addr, msg)
-    }
-
-    pub fn query_balance<U: Into<String>, V: Into<String>>(
-        &self,
-        address: U,
-        denom: V,
-    ) -> StdResult<Coin> {
-        let querier = self.querier();
-        let wrapped = QuerierWrapper::new(&querier);
-        wrapped.query_balance(address, denom)
+    /// eg. wrap().query_wasm_smart, query_all_balances, ...
+    pub fn wrap(&self) -> QuerierWrapper {
+        QuerierWrapper::new(self)
     }
 
     /// Handles arbitrary QueryRequest, this is wrapped by the Querier interface, but this
@@ -244,10 +233,7 @@ where
         // run all messages, stops at first error
         let res: Result<Vec<AppResponse>, String> = msgs
             .into_iter()
-            .map(|msg| {
-                self.router
-                    .execute(&self.querier(), &mut cache, sender.clone(), msg)
-            })
+            .map(|msg| self.router.execute(self, &mut cache, sender.clone(), msg))
             .collect();
 
         // this only happens if all messages run successfully
@@ -270,7 +256,7 @@ where
 
         let res = self
             .router
-            .sudo(&self.querier(), &mut cache, contract_addr.into(), msg);
+            .sudo(self, &mut cache, contract_addr.into(), msg);
 
         // this only happens if all messages run successfully
         if res.is_ok() {
@@ -644,7 +630,7 @@ mod test {
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, AllBalanceResponse, BankQuery, QuerierWrapper, Reply};
+    use cosmwasm_std::{attr, coin, coins, AllBalanceResponse, BankQuery, Reply};
 
     fn mock_app() -> App {
         let env = mock_env();
@@ -666,9 +652,7 @@ mod test {
     where
         C: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
-        let querier = app.querier();
-        let wrapped = QuerierWrapper::new(&querier);
-        wrapped.query_all_balances(addr).unwrap()
+        app.wrap().query_all_balances(addr).unwrap()
     }
 
     #[test]
@@ -787,6 +771,7 @@ mod test {
         assert_eq!(funds, vec![]);
         // reflect count is 1
         let qres: PayoutCountResponse = app
+            .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(0, qres.count);
@@ -831,6 +816,7 @@ mod test {
 
         // reflect count updated
         let qres: PayoutCountResponse = app
+            .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
@@ -884,6 +870,7 @@ mod test {
 
         // reflect count should be updated to 1
         let qres: PayoutCountResponse = app
+            .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
@@ -911,6 +898,7 @@ mod test {
 
         // failure should not update reflect count
         let qres: PayoutCountResponse = app
+            .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
@@ -933,6 +921,7 @@ mod test {
 
         // count is 1
         let PayoutCountResponse { count } = app
+            .wrap()
             .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
         assert_eq!(1, count);
@@ -943,6 +932,7 @@ mod test {
 
         // count is 25
         let PayoutCountResponse { count } = app
+            .wrap()
             .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
         assert_eq!(25, count);
@@ -972,7 +962,8 @@ mod test {
 
         // no reply writen beforehand
         let query = ReflectQueryMsg::Reply { id: 123 };
-        app.query_wasm_smart::<Reply, _, _>(&reflect_addr, &query)
+        app.wrap()
+            .query_wasm_smart::<Reply, _, _>(&reflect_addr, &query)
             .unwrap_err();
 
         // reflect sends 7 eth, success
@@ -1002,7 +993,7 @@ mod test {
         assert_eq!(&attr("to", "test"), &second.attributes[1]);
 
         // ensure success was written
-        let res: Reply = app.query_wasm_smart(&reflect_addr, &query).unwrap();
+        let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 123);
         assert!(res.result.is_ok());
         // TODO: any more checks on reply data???
@@ -1024,7 +1015,7 @@ mod test {
 
         // ensure error was written
         let query = ReflectQueryMsg::Reply { id: 456 };
-        let res: Reply = app.query_wasm_smart(&reflect_addr, &query).unwrap();
+        let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 456);
         assert!(res.result.is_err());
         // TODO: check error?
