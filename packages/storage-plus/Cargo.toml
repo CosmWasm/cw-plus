@@ -10,6 +10,7 @@ homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
 [features]
+default = ["iterator"]
 iterator = ["cosmwasm-std/iterator"]
 
 [dependencies]
