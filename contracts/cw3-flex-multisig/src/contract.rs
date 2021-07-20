@@ -454,7 +454,7 @@ mod tests {
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
-    use cw_multi_test::{next_block, App, Contract, ContractWrapper, SimpleBank};
+    use cw_multi_test::{next_block, App, Contract, ContractWrapper, Executor, SimpleBank};
 
     use super::*;
     use crate::msg::Threshold;
