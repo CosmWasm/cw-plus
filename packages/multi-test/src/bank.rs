@@ -3,6 +3,7 @@ use cosmwasm_std::{
     Storage,
 };
 
+use crate::executor::AppResponse;
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw0::NativeBalance;
 use cw_storage_plus::Map;
@@ -14,7 +15,12 @@ pub const NAMESPACE_BANK: &[u8] = b"bank";
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
 pub trait Bank {
-    fn execute(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String>;
+    fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        sender: Addr,
+        msg: BankMsg,
+    ) -> Result<AppResponse, String>;
 
     fn query(&self, storage: &dyn Storage, request: BankQuery) -> Result<Binary, String>;
 
@@ -87,17 +93,30 @@ impl SimpleBank {
 }
 
 impl Bank for SimpleBank {
-    fn execute(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg) -> Result<(), String> {
+    fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        sender: Addr,
+        msg: BankMsg,
+    ) -> Result<AppResponse, String> {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         match msg {
-            BankMsg::Send { to_address, amount } => self.send(
-                &mut bank_storage,
-                sender,
-                Addr::unchecked(to_address),
-                amount,
-            ),
-            BankMsg::Burn { amount } => self.burn(&mut bank_storage, sender, amount),
-            m => panic!("Unsupported bank message: {:?}", m),
+            BankMsg::Send { to_address, amount } => {
+                self.send(
+                    &mut bank_storage,
+                    sender,
+                    Addr::unchecked(to_address),
+                    amount,
+                )?;
+                // TODO: add some proper events here
+                Ok(AppResponse::default())
+            }
+            BankMsg::Burn { amount } => {
+                self.burn(&mut bank_storage, sender, amount)?;
+                // TODO: add some proper events here
+                Ok(AppResponse::default())
+            }
+            m => Err(format!("Unsupported bank message: {:?}", m)),
         }
     }
 

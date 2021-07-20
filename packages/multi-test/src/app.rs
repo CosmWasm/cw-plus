@@ -224,10 +224,7 @@ where
     ) -> Result<AppResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(storage, &self, block, sender, msg),
-            CosmosMsg::Bank(msg) => {
-                self.bank.execute(storage, sender, msg)?;
-                Ok(AppResponse::default())
-            }
+            CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
             _ => unimplemented!(),
         }
     }
