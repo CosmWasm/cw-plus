@@ -1,8 +1,8 @@
 // TODO:
 // 1. Move BlockInfo from WasmKeeper to App
-// 2. Rename AppCache -> Router (keep no state in it, just act on state passed in)
+// X. Rename AppCache -> Router (keep no state in it, just act on state passed in)
 // 3. Router has execute, query, and admin functions - meant to handle messages, not called by library user
-// 4. App maintains state -> calls Router with a cached store
+// X. App maintains state -> calls Router with a cached store
 // 5. Add "block" helpers to execute one "tx" in a block... or let them manually execute many.
 //    All timing / block height manipulations happen in App
 // 6. Consider how to add (fixed) staking or (flexible) custom keeper -> in another PR?
@@ -98,6 +98,7 @@ where
 {
     router: Router<C>,
     storage: Box<dyn Storage>,
+    block: BlockInfo,
 }
 
 impl<C> Querier for App<C>
@@ -106,7 +107,7 @@ where
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
-            .querier(self.storage.as_ref())
+            .querier(self.storage.as_ref(), &self.block)
             .raw_query(bin_request)
     }
 }
@@ -122,24 +123,24 @@ where
         storage: Box<dyn Storage>,
     ) -> Self {
         App {
-            router: Router::new(api, block, bank),
+            router: Router::new(api, bank),
             storage,
+            block,
         }
     }
 
-    /// This can set the block info to any value. Must be done before taking a cache
     pub fn set_block(&mut self, block: BlockInfo) {
-        self.router.wasm.set_block(block);
+        self.block = block;
     }
 
-    /// This let's use use "next block" steps that add eg. one height and 5 seconds
+    // this let's use use "next block" steps that add eg. one height and 5 seconds
     pub fn update_block<F: Fn(&mut BlockInfo)>(&mut self, action: F) {
-        self.router.wasm.update_block(action);
+        action(&mut self.block);
     }
 
     /// Returns a copy of the current block_info
     pub fn block_info(&self) -> BlockInfo {
-        self.router.wasm.block_info()
+        self.block.clone()
     }
 
     /// This is an "admin" function to let us adjust bank accounts
@@ -163,7 +164,8 @@ where
     /// Handles arbitrary QueryRequest, this is wrapped by the Querier interface, but this
     /// is nicer to use.
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
-        self.router.query(self.storage.as_ref(), request)
+        self.router
+            .query(self.storage.as_ref(), &self.block, request)
     }
 
     /// Create a contract and get the new address.
@@ -233,7 +235,10 @@ where
         // run all messages, stops at first error
         let res: Result<Vec<AppResponse>, String> = msgs
             .into_iter()
-            .map(|msg| self.router.execute(self, &mut cache, sender.clone(), msg))
+            .map(|msg| {
+                self.router
+                    .execute(self, &mut cache, &self.block, sender.clone(), msg)
+            })
             .collect();
 
         // this only happens if all messages run successfully
@@ -256,7 +261,7 @@ where
 
         let res = self
             .router
-            .sudo(self, &mut cache, contract_addr.into(), msg);
+            .sudo(self, &mut cache, &self.block, contract_addr.into(), msg);
 
         // this only happens if all messages run successfully
         if res.is_ok() {
@@ -301,17 +306,22 @@ impl<C> Router<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    pub fn new(api: Box<dyn Api>, block: BlockInfo, bank: impl Bank + 'static) -> Self {
+    pub fn new(api: Box<dyn Api>, bank: impl Bank + 'static) -> Self {
         Router {
-            wasm: WasmKeeper::new(api, block),
+            wasm: WasmKeeper::new(api),
             bank: Box::new(bank),
         }
     }
 
-    pub fn querier<'a>(&'a self, storage: &'a dyn Storage) -> RouterQuerier<'a, C> {
+    pub fn querier<'a>(
+        &'a self,
+        storage: &'a dyn Storage,
+        block_info: &'a BlockInfo,
+    ) -> RouterQuerier<'a, C> {
         RouterQuerier {
             router: self,
             storage,
+            block_info,
         }
     }
 
@@ -320,13 +330,15 @@ where
     pub fn query(
         &self,
         storage: &dyn Storage,
+        block: &BlockInfo,
         request: QueryRequest<Empty>,
     ) -> Result<Binary, String> {
         match request {
             QueryRequest::Wasm(req) => {
                 // TODO: pull out namespacing here
                 let wasm_storage = prefixed_read(storage, NAMESPACE_WASM);
-                self.wasm.query(&wasm_storage, &self.querier(storage), req)
+                self.wasm
+                    .query(&wasm_storage, &self.querier(storage, block), block, req)
             }
             QueryRequest::Bank(req) => {
                 let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
@@ -340,13 +352,14 @@ where
         &self,
         querier: &dyn Querier,
         storage: &mut dyn Storage,
+        block: &BlockInfo,
         sender: Addr,
         msg: CosmosMsg<C>,
     ) -> Result<AppResponse, String> {
         match msg {
             CosmosMsg::Wasm(msg) => {
-                let (resender, res) = self.execute_wasm(querier, storage, sender, msg)?;
-                self.process_response(querier, storage, resender, res, false)
+                let (resender, res) = self.execute_wasm(querier, storage, block, sender, msg)?;
+                self.process_response(querier, storage, block, resender, res, false)
             }
             CosmosMsg::Bank(msg) => {
                 let mut storage = prefixed(storage, NAMESPACE_BANK);
@@ -378,6 +391,7 @@ where
         &self,
         querier: &dyn Querier,
         storage: &mut dyn Storage,
+        block: &BlockInfo,
         contract: Addr,
         msg: SubMsg<C>,
     ) -> Result<AppResponse, String> {
@@ -385,7 +399,7 @@ where
         // TODO: we need to make a new querier here that has access to storage (not just app.storage)
         // Need to rethink a bit how we pass down the queriers...
         let mut subtx = StorageTransaction::new(storage);
-        let res = self.execute(querier, &mut subtx, contract.clone(), msg.msg);
+        let res = self.execute(querier, &mut subtx, block, contract.clone(), msg.msg);
         if res.is_ok() {
             subtx.prepare().commit(storage);
         }
@@ -402,7 +416,7 @@ where
                     }),
                 };
                 // do reply and combine it with the original response
-                let res2 = self._reply(querier, storage, contract, reply)?;
+                let res2 = self._reply(querier, storage, block, contract, reply)?;
                 // override data if set
                 if let Some(data) = res2.data {
                     orig.data = Some(data);
@@ -419,7 +433,7 @@ where
                     id: msg.id,
                     result: ContractResult::Err(e),
                 };
-                self._reply(querier, storage, contract, reply)
+                self._reply(querier, storage, block, contract, reply)
             } else {
                 Err(e)
             }
@@ -432,21 +446,23 @@ where
         &self,
         querier: &dyn Querier,
         storage: &mut dyn Storage,
+        block: &BlockInfo,
         contract: Addr,
         reply: Reply,
     ) -> Result<AppResponse, String> {
         let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
         let res = self
             .wasm
-            .reply(&mut wasm_storage, contract.clone(), querier, reply)?;
+            .reply(contract.clone(), &mut wasm_storage, querier, block, reply)?;
         // TODO: process result better, combine events / data from parent
-        self.process_response(querier, storage, contract, res, true)
+        self.process_response(querier, storage, block, contract, res, true)
     }
 
     fn process_response(
         &self,
         querier: &dyn Querier,
         storage: &mut dyn Storage,
+        block: &BlockInfo,
         contract: Addr,
         response: Response<C>,
         ignore_attributes: bool,
@@ -473,7 +489,7 @@ where
 
         // recurse in all messages
         for resend in response.messages {
-            let subres = self.execute_submsg(querier, storage, contract.clone(), resend)?;
+            let subres = self.execute_submsg(querier, storage, block, contract.clone(), resend)?;
             events.extend_from_slice(&subres.events);
         }
         Ok(AppResponse {
@@ -486,14 +502,19 @@ where
         &self,
         querier: &dyn Querier,
         storage: &mut dyn Storage,
+        block: &BlockInfo,
         contract_addr: Addr,
         msg: Vec<u8>,
     ) -> Result<AppResponse, String> {
         let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-        let res = self
-            .wasm
-            .sudo(&mut wasm_storage, contract_addr.clone(), querier, msg)?;
-        self.process_response(querier, storage, contract_addr, res, false)
+        let res = self.wasm.sudo(
+            contract_addr.clone(),
+            &mut wasm_storage,
+            querier,
+            block,
+            msg,
+        )?;
+        self.process_response(querier, storage, block, contract_addr, res, false)
     }
 
     // this returns the contract address as well, so we can properly resend the data
@@ -501,6 +522,7 @@ where
         &self,
         querier: &dyn Querier,
         storage: &mut dyn Storage,
+        block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
     ) -> Result<(Addr, Response<C>), String> {
@@ -527,6 +549,7 @@ where
                     &mut wasm_storage,
                     contract_addr.clone(),
                     querier,
+                    block,
                     info,
                     msg.to_vec(),
                 )?;
@@ -557,9 +580,10 @@ where
                 let info = MessageInfo { sender, funds };
                 let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
                 let mut res = self.wasm.instantiate(
-                    &mut wasm_storage,
                     contract_addr.clone(),
+                    &mut wasm_storage,
                     querier,
+                    block,
                     info,
                     msg.to_vec(),
                 )?;
@@ -597,6 +621,7 @@ where
 {
     router: &'a Router<C>,
     storage: &'a dyn Storage,
+    block_info: &'a BlockInfo,
 }
 
 impl<'a, C> Querier for RouterQuerier<'a, C>
@@ -614,8 +639,10 @@ where
                 })
             }
         };
-        let contract_result: ContractResult<Binary> =
-            self.router.query(self.storage, request).into();
+        let contract_result: ContractResult<Binary> = self
+            .router
+            .query(self.storage, self.block_info, request)
+            .into();
         SystemResult::Ok(contract_result)
     }
 }

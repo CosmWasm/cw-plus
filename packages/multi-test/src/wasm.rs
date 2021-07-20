@@ -43,7 +43,6 @@ where
     codes: HashMap<usize, Box<dyn Contract<C>>>,
 
     // WasmConst
-    block: BlockInfo,
     api: Box<dyn Api>,
 }
 
@@ -51,26 +50,11 @@ impl<C> WasmKeeper<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    pub fn new(api: Box<dyn Api>, block: BlockInfo) -> Self {
+    pub fn new(api: Box<dyn Api>) -> Self {
         WasmKeeper {
             codes: HashMap::new(),
-            block,
             api,
         }
-    }
-
-    pub fn set_block(&mut self, block: BlockInfo) {
-        self.block = block;
-    }
-
-    // this let's use use "next block" steps that add eg. one height and 5 seconds
-    pub fn update_block<F: Fn(&mut BlockInfo)>(&mut self, action: F) {
-        action(&mut self.block);
-    }
-
-    /// Returns a copy of the current block_info
-    pub fn block_info(&self) -> BlockInfo {
-        self.block.clone()
     }
 
     // Add a new contract. Must be done on the base object, when no contracts running
@@ -84,14 +68,23 @@ where
         &self,
         storage: &dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         request: WasmQuery,
     ) -> Result<Binary, String> {
         match request {
             WasmQuery::Smart { contract_addr, msg } => {
-                self.query_smart(storage, Addr::unchecked(contract_addr), querier, msg.into())
+                let addr = self
+                    .api
+                    .addr_validate(&contract_addr)
+                    .map_err(|e| e.to_string())?;
+                self.query_smart(addr, storage, querier, block, msg.into())
             }
             WasmQuery::Raw { contract_addr, key } => {
-                Ok(self.query_raw(storage, Addr::unchecked(contract_addr), &key))
+                let addr = self
+                    .api
+                    .addr_validate(&contract_addr)
+                    .map_err(|e| e.to_string())?;
+                Ok(self.query_raw(addr, storage, &key))
             }
             q => panic!("Unsupported wasm query: {:?}", q),
         }
@@ -99,17 +92,18 @@ where
 
     pub fn query_smart(
         &self,
-        storage: &dyn Storage,
         address: Addr,
+        storage: &dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Binary, String> {
-        self.with_storage_readonly(storage, querier, address, |handler, deps, env| {
+        self.with_storage_readonly(storage, querier, block, address, |handler, deps, env| {
             handler.query(deps, env, msg)
         })
     }
 
-    pub fn query_raw(&self, storage: &dyn Storage, address: Addr, key: &[u8]) -> Binary {
+    pub fn query_raw(&self, address: Addr, storage: &dyn Storage, key: &[u8]) -> Binary {
         let storage = self.contract_storage_readonly(storage, &address);
         let data = storage.get(&key).unwrap_or_default();
         data.into()
@@ -139,54 +133,58 @@ where
         storage: &mut dyn Storage,
         address: Addr,
         querier: &dyn Querier,
+        block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, querier, address, |contract, deps, env| {
+        self.with_storage(storage, querier, block, address, |contract, deps, env| {
             contract.execute(deps, env, info, msg)
         })
     }
 
     pub fn instantiate(
         &self,
-        storage: &mut dyn Storage,
         address: Addr,
+        storage: &mut dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, querier, address, |contract, deps, env| {
+        self.with_storage(storage, querier, block, address, |contract, deps, env| {
             contract.instantiate(deps, env, info, msg)
         })
     }
 
     pub fn reply(
         &self,
-        storage: &mut dyn Storage,
         address: Addr,
+        storage: &mut dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         reply: Reply,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, querier, address, |contract, deps, env| {
+        self.with_storage(storage, querier, block, address, |contract, deps, env| {
             contract.reply(deps, env, reply)
         })
     }
 
     pub fn sudo(
         &self,
-        storage: &mut dyn Storage,
         address: Addr,
+        storage: &mut dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, querier, address, |contract, deps, env| {
+        self.with_storage(storage, querier, block, address, |contract, deps, env| {
             contract.sudo(deps, env, msg)
         })
     }
 
-    fn get_env<T: Into<Addr>>(&self, address: T) -> Env {
+    fn get_env<T: Into<Addr>>(&self, address: T, block: &BlockInfo) -> Env {
         Env {
-            block: self.block.clone(),
+            block: block.clone(),
             contract: ContractInfo {
                 address: address.into(),
             },
@@ -197,6 +195,7 @@ where
         &self,
         storage: &dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         address: Addr,
         action: F,
     ) -> Result<T, String>
@@ -211,7 +210,7 @@ where
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let storage = self.contract_storage_readonly(storage, &address);
-        let env = self.get_env(address);
+        let env = self.get_env(address, block);
 
         let deps = Deps {
             storage: storage.as_ref(),
@@ -225,6 +224,7 @@ where
         &self,
         storage: &mut dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         address: Addr,
         action: F,
     ) -> Result<T, String>
@@ -239,7 +239,7 @@ where
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
         let mut storage = self.contract_storage(storage, &address);
-        let env = self.get_env(address);
+        let env = self.get_env(address, block);
 
         let deps = DepsMut {
             storage: storage.as_mut(),
