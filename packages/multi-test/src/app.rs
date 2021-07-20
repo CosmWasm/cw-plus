@@ -1,5 +1,5 @@
 // TODO:
-// X Move BlockInfo from WasmKeeper to App
+// X. Move BlockInfo from WasmKeeper to App
 // X. Rename AppCache -> Router (keep no state in it, just act on state passed in)
 // 3. Router has execute, query, and admin functions - meant to handle messages, not called by library user
 // X. App maintains state -> calls Router with a cached store
@@ -12,24 +12,21 @@ use serde::Serialize;
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
-    ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Reply, ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, SystemError,
-    SystemResult, WasmMsg,
+    from_slice, to_binary, to_vec, Addr, Api, Attribute, Binary, BlockInfo, Coin, ContractResult,
+    CosmosMsg, Empty, Event, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage,
+    SystemError, SystemResult, WasmMsg,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
-use crate::wasm::WasmKeeper;
+use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};
 use schemars::JsonSchema;
 use std::fmt;
 
 use crate::transactions::StorageTransaction;
-use prost::Message;
 
 const NAMESPACE_BANK: &[u8] = b"bank";
-const NAMESPACE_WASM: &[u8] = b"wasm";
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
@@ -51,46 +48,6 @@ pub fn next_block(block: &mut BlockInfo) {
     block.height += 1;
 }
 
-// TODO: move this into WasmKeeper
-#[derive(Clone, PartialEq, Message)]
-pub struct InstantiateData {
-    #[prost(string, tag = "1")]
-    pub address: ::prost::alloc::string::String,
-    /// Unique ID number for this person.
-    #[prost(bytes, tag = "2")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
-}
-
-fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    let data = res.data.clone().unwrap_or_default().to_vec();
-    let init_data = InstantiateData {
-        address: contact_address.into(),
-        data,
-    };
-    let mut new_data = Vec::<u8>::with_capacity(init_data.encoded_len());
-    // the data must encode successfully
-    init_data.encode(&mut new_data).unwrap();
-    res.data = Some(new_data.into());
-}
-
-// TODO: move to WasmKeeper (export public)
-// this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
-    let bin = data
-        .as_ref()
-        .ok_or_else(|| "No data response".to_string())?
-        .to_vec();
-    // parse the protobuf struct
-    let init_data = InstantiateData::decode(bin.as_slice()).map_err(|e| e.to_string())?;
-    if init_data.address.is_empty() {
-        return Err("no contract address provided".into());
-    }
-    Ok(Addr::unchecked(init_data.address))
-}
-
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
 /// We offer .execute() as a wrapper around cache, execute, commit/rollback process.
@@ -99,7 +56,7 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
 /// All contracts must return Response<C> or Response<Empty>
 pub struct App<C = Empty>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     router: Router<C>,
     storage: Box<dyn Storage>,
@@ -108,7 +65,7 @@ where
 
 impl<C> Querier for App<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
@@ -119,7 +76,7 @@ where
 
 impl<C> App<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
         api: Box<dyn Api>,
@@ -264,9 +221,13 @@ where
         let msg = to_vec(msg).map_err(|e| e.to_string())?;
         let mut cache = StorageTransaction::new(self.storage.as_ref());
 
-        let res = self
-            .router
-            .sudo(self, &mut cache, &self.block, contract_addr.into(), msg);
+        let res = self.router.wasm.sudo(
+            contract_addr.into(),
+            &mut cache,
+            &self.router,
+            &self.block,
+            msg,
+        );
 
         // this only happens if all messages run successfully
         if res.is_ok() {
@@ -278,42 +239,20 @@ where
 
 pub struct Router<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    wasm: WasmKeeper<C>,
+    // TODO: maybe use concrete type later, this tests interfaces
+    wasm: Box<dyn Wasm<C>>,
     bank: Box<dyn Bank>,
 }
 
-// // TODO: make this for modules?
-// pub trait Module<M, Q> {
-//     // TODO: make Deps/DepsMut like struct to hold this?
-//     fn query(
-//         &self,
-//         querier: &QuerierWrapper,
-//         storage: &dyn Storage,
-//         block: BlockInfo,
-//         query: Q,
-//     ) -> Result<Binary, String>;
-//
-//     fn execute<C>(
-//         &self,
-//         router: &Router<C>,
-//         storage: &mut dyn Storage,
-//         block: BlockInfo,
-//         sender: Addr,
-//         msg: M,
-//     ) -> Result<AppResponse, String>;
-// }
-
-// TODO: Router implements Querier -> so QuerierWrapper is accessible in execute
-
 impl<C> Router<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(api: Box<dyn Api>, bank: impl Bank + 'static) -> Self {
         Router {
-            wasm: WasmKeeper::new(api),
+            wasm: Box::new(WasmKeeper::new(api)),
             bank: Box::new(bank),
         }
     }
@@ -340,10 +279,8 @@ where
     ) -> Result<Binary, String> {
         match request {
             QueryRequest::Wasm(req) => {
-                // TODO: pull out namespacing here
-                let wasm_storage = prefixed_read(storage, NAMESPACE_WASM);
                 self.wasm
-                    .query(&wasm_storage, &self.querier(storage, block), block, req)
+                    .query(storage, &self.querier(storage, block), block, req)
             }
             QueryRequest::Bank(req) => {
                 let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
@@ -355,17 +292,14 @@ where
 
     pub fn execute(
         &self,
-        querier: &dyn Querier,
+        _querier: &dyn Querier,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
         msg: CosmosMsg<C>,
     ) -> Result<AppResponse, String> {
         match msg {
-            CosmosMsg::Wasm(msg) => {
-                let (resender, res) = self.execute_wasm(querier, storage, block, sender, msg)?;
-                self.process_response(querier, storage, block, resender, res, false)
-            }
+            CosmosMsg::Wasm(msg) => self.wasm.execute(storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => {
                 let mut storage = prefixed(storage, NAMESPACE_BANK);
                 self.bank.execute(&mut storage, sender, msg)?;
@@ -374,264 +308,32 @@ where
             _ => unimplemented!(),
         }
     }
-
-    // TODO: this along with many wasm functions -> WasmKeeper
-    // Needed changes:
-    // 1. No storage/cache in AppCache (passed as arg) -> no more &mut self calls (?)
-    // 2. Pass entire (not name-spaced) storage to WasmKeeper
-    // 3. Pass &Router to WasmKeeper (so it can call back into other modules)
-    // 4. All logic into WasmKeeper, very high level here.
-    //
-    // -> Modules can just take their "namespaced" storage and be an island (Bank)
-    // -> Or they can take reference to all data and Router and have full access
-    // -> -> Message calling between modules
-    //
-    /// This will execute the given messages, making all changes to the local cache.
-    /// This *will* write some data to the cache if the message fails half-way through.
-    /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
-    ///
-    /// For normal use cases, you can use Router::execute() or Router::execute_multi().
-    /// This is designed to be handled internally as part of larger process flows.
-    fn execute_submsg(
-        &self,
-        querier: &dyn Querier,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        contract: Addr,
-        msg: SubMsg<C>,
-    ) -> Result<AppResponse, String> {
-        // execute in cache
-        // TODO: we need to make a new querier here that has access to storage (not just app.storage)
-        // Need to rethink a bit how we pass down the queriers...
-        let mut subtx = StorageTransaction::new(storage);
-        let res = self.execute(querier, &mut subtx, block, contract.clone(), msg.msg);
-        if res.is_ok() {
-            subtx.prepare().commit(storage);
-        }
-
-        // call reply if meaningful
-        if let Ok(r) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
-                let mut orig = r.clone();
-                let reply = Reply {
-                    id: msg.id,
-                    result: ContractResult::Ok(SubMsgExecutionResponse {
-                        events: r.events,
-                        data: r.data,
-                    }),
-                };
-                // do reply and combine it with the original response
-                let res2 = self._reply(querier, storage, block, contract, reply)?;
-                // override data if set
-                if let Some(data) = res2.data {
-                    orig.data = Some(data);
-                }
-                // append the events
-                orig.events.extend_from_slice(&res2.events);
-                Ok(orig)
-            } else {
-                Ok(r)
-            }
-        } else if let Err(e) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
-                let reply = Reply {
-                    id: msg.id,
-                    result: ContractResult::Err(e),
-                };
-                self._reply(querier, storage, block, contract, reply)
-            } else {
-                Err(e)
-            }
-        } else {
-            res
-        }
-    }
-
-    fn _reply(
-        &self,
-        querier: &dyn Querier,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        contract: Addr,
-        reply: Reply,
-    ) -> Result<AppResponse, String> {
-        let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-        let res = self
-            .wasm
-            .reply(contract.clone(), &mut wasm_storage, querier, block, reply)?;
-        // TODO: process result better, combine events / data from parent
-        self.process_response(querier, storage, block, contract, res, true)
-    }
-
-    fn process_response(
-        &self,
-        querier: &dyn Querier,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        contract: Addr,
-        response: Response<C>,
-        ignore_attributes: bool,
-    ) -> Result<AppResponse, String> {
-        // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
-        // fake system level event types, like transfer from the bank module)
-        let mut events: Vec<_> = response
-            .events
-            .into_iter()
-            .map(|mut ev| {
-                ev.ty = format!("wasm-{}", ev.ty);
-                ev
-            })
-            .collect();
-        // hmmm... we don't need this for reply, right?
-        if !ignore_attributes {
-            // turn attributes into event and place it first
-            let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
-            wasm_event
-                .attributes
-                .extend_from_slice(&response.attributes);
-            events.insert(0, wasm_event);
-        }
-
-        // recurse in all messages
-        for resend in response.messages {
-            let subres = self.execute_submsg(querier, storage, block, contract.clone(), resend)?;
-            events.extend_from_slice(&subres.events);
-        }
-        Ok(AppResponse {
-            events,
-            data: response.data,
-        })
-    }
-
-    fn sudo(
-        &self,
-        querier: &dyn Querier,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        contract_addr: Addr,
-        msg: Vec<u8>,
-    ) -> Result<AppResponse, String> {
-        let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-        let res = self.wasm.sudo(
-            contract_addr.clone(),
-            &mut wasm_storage,
-            querier,
-            block,
-            msg,
-        )?;
-        self.process_response(querier, storage, block, contract_addr, res, false)
-    }
-
-    // this returns the contract address as well, so we can properly resend the data
-    fn execute_wasm(
-        &self,
-        querier: &dyn Querier,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        sender: Addr,
-        msg: WasmMsg,
-    ) -> Result<(Addr, Response<C>), String> {
-        match msg {
-            WasmMsg::Execute {
-                contract_addr,
-                msg,
-                funds,
-            } => {
-                let contract_addr = Addr::unchecked(contract_addr);
-                // first move the cash
-                self.send(
-                    querier,
-                    storage,
-                    sender.clone(),
-                    contract_addr.clone().into(),
-                    &funds,
-                )?;
-
-                // then call the contract
-                let info = MessageInfo { sender, funds };
-                let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-                let res = self.wasm.execute(
-                    &mut wasm_storage,
-                    contract_addr.clone(),
-                    querier,
-                    block,
-                    info,
-                    msg.to_vec(),
-                )?;
-                Ok((contract_addr, res))
-            }
-            WasmMsg::Instantiate {
-                admin: _,
-                code_id,
-                msg,
-                funds,
-                label: _,
-            } => {
-                let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-                let contract_addr = Addr::unchecked(
-                    self.wasm
-                        .register_contract(&mut wasm_storage, code_id as usize)?,
-                );
-                // move the cash
-                self.send(
-                    querier,
-                    storage,
-                    sender.clone(),
-                    contract_addr.clone().into(),
-                    &funds,
-                )?;
-
-                // then call the contract
-                let info = MessageInfo { sender, funds };
-                let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-                let mut res = self.wasm.instantiate(
-                    contract_addr.clone(),
-                    &mut wasm_storage,
-                    querier,
-                    block,
-                    info,
-                    msg.to_vec(),
-                )?;
-                init_response(&mut res, &contract_addr);
-                Ok((contract_addr, res))
-            }
-            WasmMsg::Migrate { .. } => unimplemented!(),
-            m => panic!("Unsupported wasm message: {:?}", m),
-        }
-    }
-
-    fn send<T: Into<Addr>>(
-        &self,
-        _querier: &dyn Querier,
-        storage: &mut dyn Storage,
-        sender: T,
-        recipient: String,
-        amount: &[Coin],
-    ) -> Result<AppResponse, String> {
-        if !amount.is_empty() {
-            let msg = BankMsg::Send {
-                to_address: recipient,
-                amount: amount.to_vec(),
-            };
-            let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
-            self.bank.execute(&mut bank_storage, sender.into(), msg)?;
-        }
-        Ok(AppResponse::default())
-    }
 }
 
 pub struct RouterQuerier<'a, C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     router: &'a Router<C>,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
+impl<'a, C> RouterQuerier<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    pub fn new(router: &'a Router<C>, storage: &'a dyn Storage, block_info: &'a BlockInfo) -> Self {
+        Self {
+            router,
+            storage,
+            block_info,
+        }
+    }
+}
 
 impl<'a, C> Querier for RouterQuerier<'a, C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         // TODO: we need to make a new custom type for queries

@@ -26,9 +26,6 @@ pub trait Bank {
         account: &Addr,
         amount: Vec<Coin>,
     ) -> Result<(), String>;
-
-    // TODO: remove need for clone
-    fn clone(&self) -> Box<dyn Bank>;
 }
 
 #[derive(Default)]
@@ -122,10 +119,6 @@ impl Bank for SimpleBank {
         BALANCES
             .save(storage, account, &balance)
             .map_err(|e| e.to_string())
-    }
-
-    fn clone(&self) -> Box<dyn Bank> {
-        Box::new(SimpleBank {})
     }
 }
 
