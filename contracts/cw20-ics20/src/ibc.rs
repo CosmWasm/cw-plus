@@ -2,10 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, DepsMut, Env,
-    IbcAcknowledgementWithPacket, IbcBasicResponse, IbcChannel, IbcChannelConnectMsg,
-    IbcChannelOpenMsg, IbcEndpoint, IbcOrder, IbcPacket, IbcReceiveResponse, StdResult, SubMsg,
-    Uint128, WasmMsg,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, DepsMut, Env, IbcBasicResponse,
+    IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcEndpoint, IbcOrder,
+    IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse,
+    StdResult, SubMsg, Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
@@ -130,7 +130,7 @@ fn enforce_order_and_version(
 pub fn ibc_channel_close(
     _deps: DepsMut,
     _env: Env,
-    _channel: IbcChannel,
+    _channel: IbcChannelCloseMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: what to do here?
     // we will have locked funds that need to be returned somehow
@@ -143,8 +143,10 @@ pub fn ibc_channel_close(
 pub fn ibc_packet_receive(
     deps: DepsMut,
     _env: Env,
-    packet: IbcPacket,
+    msg: IbcPacketReceiveMsg,
 ) -> Result<IbcReceiveResponse, Never> {
+    let packet = msg.packet;
+
     let res = match do_ibc_packet_receive(deps, &packet) {
         Ok(msg) => {
             // build attributes first so we don't have to clone msg below
@@ -242,9 +244,10 @@ fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packe
 pub fn ibc_packet_ack(
     deps: DepsMut,
     _env: Env,
-    ack: IbcAcknowledgementWithPacket,
+    msg: IbcPacketAckMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: trap error like in receive?
+    let ack = msg.ack;
     let msg: Ics20Ack = from_binary(&ack.acknowledgement.data)?;
     match msg {
         Ics20Ack::Result(_) => on_packet_success(deps, ack.original_packet),
@@ -257,9 +260,10 @@ pub fn ibc_packet_ack(
 pub fn ibc_packet_timeout(
     deps: DepsMut,
     _env: Env,
-    packet: IbcPacket,
+    msg: IbcPacketTimeoutMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: trap error like in receive?
+    let packet = msg.packet;
     on_packet_failure(deps, packet, "timeout".to_string())
 }
 
@@ -349,7 +353,10 @@ mod test {
 
     use crate::contract::query_channel;
     use cosmwasm_std::testing::mock_env;
-    use cosmwasm_std::{coins, to_vec, IbcAcknowledgement, IbcEndpoint, IbcTimeout, Timestamp};
+    use cosmwasm_std::{
+        coins, to_vec, IbcAcknowledgement, IbcAcknowledgementWithPacket, IbcEndpoint, IbcTimeout,
+        Timestamp,
+    };
 
     #[test]
     fn check_ack_json() {
@@ -462,8 +469,9 @@ mod test {
         let recv_high_packet =
             mock_receive_packet(send_channel, 1876543210, cw20_denom, "local-rcpt");
 
+        let msg = IbcPacketReceiveMsg::new(recv_packet.clone());
         // cannot receive this denom yet
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap();
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
@@ -474,7 +482,8 @@ mod test {
             acknowledgement: IbcAcknowledgement::new(ack_success()),
             original_packet: sent_packet,
         };
-        let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
+        let msg = IbcPacketAckMsg::new(ack);
+        let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // query channel state|_|
@@ -483,13 +492,15 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
 
         // cannot receive more than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_high_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
             cw20_payment(876543210, cw20_addr, "local-rcpt"),
@@ -517,7 +528,8 @@ mod test {
         let recv_high_packet = mock_receive_packet(send_channel, 1876543210, denom, "local-rcpt");
 
         // cannot receive this denom yet
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_packet.clone());
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
@@ -528,7 +540,8 @@ mod test {
             acknowledgement: IbcAcknowledgement::new(ack_success()),
             original_packet: sent_packet,
         };
-        let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
+        let msg = IbcPacketAckMsg::new(ack);
+        let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // query channel state|_|
@@ -537,13 +550,15 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
 
         // cannot receive more than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_high_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
             native_payment(876543210, denom, "local-rcpt"),
