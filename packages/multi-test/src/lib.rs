@@ -1,6 +1,7 @@
 mod app;
 mod bank;
 mod contracts;
+mod executor;
 mod test_helpers;
 mod transactions;
 mod wasm;

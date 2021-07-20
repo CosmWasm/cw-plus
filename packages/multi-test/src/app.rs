@@ -1,47 +1,31 @@
 // TODO:
 // X. Move BlockInfo from WasmKeeper to App
 // X. Rename AppCache -> Router (keep no state in it, just act on state passed in)
-// 3. Router has execute, query, and admin functions - meant to handle messages, not called by library user
+// X. Router has execute, query, and admin functions - meant to handle messages, not called by library user
 // X. App maintains state -> calls Router with a cached store
 // 5. Add "block" helpers to execute one "tx" in a block... or let them manually execute many.
 //    All timing / block height manipulations happen in App
 // 6. Consider how to add (fixed) staking or (flexible) custom keeper -> in another PR?
 
-use serde::Serialize;
+use std::fmt;
 
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Api, Attribute, Binary, BlockInfo, Coin, ContractResult,
-    CosmosMsg, Empty, Event, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage,
-    SystemError, SystemResult, WasmMsg,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
-use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};
-use schemars::JsonSchema;
-use std::fmt;
-
+use crate::executor::{AppResponse, Executor};
 use crate::transactions::StorageTransaction;
+use crate::wasm::{Wasm, WasmKeeper};
 
 const NAMESPACE_BANK: &[u8] = b"bank";
-
-#[derive(Default, Clone, Debug)]
-pub struct AppResponse {
-    pub events: Vec<Event>,
-    pub data: Option<Binary>,
-}
-
-impl AppResponse {
-    // Return all custom attributes returned by the contract in the `idx` event.
-    // We assert the type is wasm, and skip the contract_address attribute.
-    pub fn custom_attrs(&self, idx: usize) -> &[Attribute] {
-        assert_eq!(self.events[idx].ty.as_str(), "wasm");
-        &self.events[idx].attributes[1..]
-    }
-}
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -58,7 +42,7 @@ pub struct App<C = Empty>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    router: Router<C>,
+    pub router: Router<C>,
     storage: Box<dyn Storage>,
     block: BlockInfo,
 }
@@ -68,10 +52,20 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        println!("Query on app storage");
         self.router
             .querier(self.storage.as_ref(), &self.block)
             .raw_query(bin_request)
+    }
+}
+
+impl<C> Executor<C> for App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+        let mut all = self.execute_multi(sender, vec![msg])?;
+        let res = all.pop().unwrap();
+        Ok(res)
     }
 }
 
@@ -106,18 +100,6 @@ where
         self.block.clone()
     }
 
-    /// This is an "admin" function to let us adjust bank accounts
-    pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
-        let mut storage = prefixed(self.storage.as_mut(), NAMESPACE_BANK);
-        self.router.bank.set_balance(&mut storage, account, amount)
-    }
-
-    /// This registers contract code (like uploading wasm bytecode on a chain),
-    /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
-        self.router.wasm.store_code(code) as u64
-    }
-
     /// Simple helper so we get access to all the QuerierWrapper helpers,
     /// eg. wrap().query_wasm_smart, query_all_balances, ...
     pub fn wrap(&self) -> QuerierWrapper {
@@ -129,56 +111,6 @@ where
     pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
         self.router
             .query(self.storage.as_ref(), &self.block, request)
-    }
-
-    /// Create a contract and get the new address.
-    /// This is just a helper around execute()
-    pub fn instantiate_contract<T: Serialize, U: Into<String>>(
-        &mut self,
-        code_id: u64,
-        sender: Addr,
-        init_msg: &T,
-        send_funds: &[Coin],
-        label: U,
-    ) -> Result<Addr, String> {
-        // instantiate contract
-        let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
-        let msg = WasmMsg::Instantiate {
-            admin: None,
-            code_id,
-            msg: init_msg,
-            funds: send_funds.to_vec(),
-            label: label.into(),
-        };
-        let res = self.execute(sender, msg.into())?;
-        parse_contract_addr(&res.data)
-    }
-
-    /// Execute a contract and process all returned messages.
-    /// This is just a helper around execute()
-    pub fn execute_contract<T: Serialize>(
-        &mut self,
-        sender: Addr,
-        contract_addr: Addr,
-        msg: &T,
-        send_funds: &[Coin],
-    ) -> Result<AppResponse, String> {
-        let msg = to_binary(msg).map_err(|e| e.to_string())?;
-        let msg = WasmMsg::Execute {
-            contract_addr: contract_addr.into(),
-            msg,
-            funds: send_funds.to_vec(),
-        };
-        self.execute(sender, msg.into())
-    }
-
-    /// Runs arbitrary CosmosMsg.
-    /// This will create a cache before the execution, so no state changes are persisted if this
-    /// returns an error, but all are persisted on success.
-    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
-        let mut all = self.execute_multi(sender, vec![msg])?;
-        let res = all.pop().unwrap();
-        Ok(res)
     }
 
     /// Runs multiple CosmosMsg in one atomic operation.
@@ -206,10 +138,21 @@ where
 
         // this only happens if all messages run successfully
         if res.is_ok() {
-            println!("Committing execute_multi");
             cache.prepare().commit(self.storage.as_mut())
         }
         res
+    }
+
+    /// This is an "admin" function to let us adjust bank accounts
+    pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
+        let mut storage = prefixed(self.storage.as_mut(), NAMESPACE_BANK);
+        self.router.bank.set_balance(&mut storage, account, amount)
+    }
+
+    /// This registers contract code (like uploading wasm bytecode on a chain),
+    /// so it can later be used to instantiate a contract.
+    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
+        self.router.wasm.store_code(code) as u64
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
@@ -358,15 +301,19 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::{
+        attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Reply, SubMsg, WasmMsg,
+    };
+
     use crate::test_helpers::{
         contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
         PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
         ReflectQueryMsg,
     };
     use crate::SimpleBank;
-    use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Reply, SubMsg};
+
+    use super::*;
 
     fn mock_app() -> App {
         let env = mock_env();
