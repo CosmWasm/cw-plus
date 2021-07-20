@@ -155,21 +155,13 @@ where
         msg: &T,
     ) -> Result<AppResponse, String> {
         let msg = to_vec(msg).map_err(|e| e.to_string())?;
-        let mut cache = StorageTransaction::new(self.storage.as_ref());
-
-        let res = self.router.wasm.sudo(
+        self.router.wasm.sudo(
             contract_addr.into(),
-            &mut cache,
+            self.storage.as_mut(),
             &self.router,
             &self.block,
             msg,
-        );
-
-        // this only happens if all messages run successfully
-        if res.is_ok() {
-            cache.prepare().commit(self.storage.as_mut())
-        }
-        res
+        )
     }
 }
 
