@@ -114,6 +114,7 @@ impl Bank for BankKeeper {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         match msg {
             BankMsg::Send { to_address, amount } => {
+                // see https://github.com/cosmos/cosmos-sdk/blob/v0.42.7/x/bank/keeper/send.go#L142-L147
                 let events = vec![Event::new("transfer")
                     .attr("recipient", &to_address)
                     .attr("sender", &sender)
@@ -127,8 +128,8 @@ impl Bank for BankKeeper {
                 Ok(AppResponse { events, data: None })
             }
             BankMsg::Burn { amount } => {
+                // burn doesn't seem to emit any events
                 self.burn(&mut bank_storage, sender, amount)?;
-                // TODO: add some proper events here
                 Ok(AppResponse::default())
             }
             m => Err(format!("Unsupported bank message: {:?}", m)),
