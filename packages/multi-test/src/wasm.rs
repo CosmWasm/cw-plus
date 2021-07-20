@@ -7,7 +7,7 @@ use cosmwasm_std::{
     Event, MessageInfo, Order, Querier, QuerierWrapper, Reply, ReplyOn, Response, Storage, SubMsg,
     SubMsgExecutionResponse, WasmMsg, WasmQuery,
 };
-use cosmwasm_storage::{prefixed, prefixed_read};
+use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -549,8 +549,7 @@ where
     }
 
     fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
-        // FIXME: revisit how we namespace? (no conflicts with CONTRACTS, other?)
-        let mut name = b"contract_data".to_vec();
+        let mut name = b"contract_data/".to_vec();
         name.extend_from_slice(contract.as_bytes());
         name
     }
@@ -560,10 +559,10 @@ where
         storage: &'a mut dyn Storage,
         address: &Addr,
     ) -> Box<dyn Storage + 'a> {
-        // TODO: how to properly double-namespace this
-        // WASM_NAMESPACE, contract_namespace?
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
         let namespace = self.contract_namespace(address);
-        let storage = prefixed(storage, &namespace);
+        let storage = PrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
         Box::new(storage)
     }
 
@@ -573,8 +572,10 @@ where
         storage: &'a dyn Storage,
         address: &Addr,
     ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
         let namespace = self.contract_namespace(address);
-        let storage = prefixed_read(storage, &namespace);
+        let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
         Box::new(storage)
     }
 }
