@@ -68,6 +68,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+        println!("Query on app storage");
         self.router
             .querier(self.storage.as_ref(), &self.block)
             .raw_query(bin_request)
@@ -205,6 +206,7 @@ where
 
         // this only happens if all messages run successfully
         if res.is_ok() {
+            println!("Committing execute_multi");
             cache.prepare().commit(self.storage.as_mut())
         }
         res
@@ -242,8 +244,8 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     // TODO: maybe use concrete type later, this tests interfaces
-    wasm: Box<dyn Wasm<C>>,
-    bank: Box<dyn Bank>,
+    pub wasm: Box<dyn Wasm<C>>,
+    pub bank: Box<dyn Bank>,
 }
 
 impl<C> Router<C>
@@ -364,7 +366,7 @@ mod test {
     };
     use crate::SimpleBank;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, AllBalanceResponse, BankQuery, Reply};
+    use cosmwasm_std::{attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Reply, SubMsg};
 
     fn mock_app() -> App {
         let env = mock_env();
