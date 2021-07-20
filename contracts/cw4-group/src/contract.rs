@@ -94,8 +94,8 @@ pub fn execute_update_members(
 ) -> Result<Response, ContractError> {
     let attributes = vec![
         attr("action", "update_members"),
-        attr("added", add.len()),
-        attr("removed", remove.len()),
+        attr("added", add.len().to_string()),
+        attr("removed", remove.len().to_string()),
         attr("sender", &info.sender),
     ];
 

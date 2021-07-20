@@ -610,7 +610,7 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token1),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("to", &user1),
                 ],
                 ..Response::default()
@@ -676,7 +676,7 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token1),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user1),
                     attr("to", &user2),
                 ],
@@ -729,11 +729,11 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token2),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("to", &user2),
                     attr("action", "transfer"),
                     attr("token_id", &token3),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("to", &user2),
                 ],
                 ..Response::default()
@@ -786,17 +786,17 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token1),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user2),
                     attr("to", &user1),
                     attr("action", "transfer"),
                     attr("token_id", &token2),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user2),
                     attr("to", &user1),
                     attr("action", "transfer"),
                     attr("token_id", &token3),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user2),
                     attr("to", &user1),
                 ],
@@ -877,7 +877,7 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token1),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user1),
                 ],
                 ..Response::default()
@@ -900,11 +900,11 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token2),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user1),
                     attr("action", "transfer"),
                     attr("token_id", &token3),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user1),
                 ],
                 ..Response::default()
@@ -970,7 +970,7 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token1),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("to", &receiver),
                 ],
                 ..Response::default()
@@ -1005,7 +1005,7 @@ mod tests {
                 attributes: vec![
                     attr("action", "transfer"),
                     attr("token_id", &token2),
-                    attr("amount", 1u64),
+                    attr("amount", 1u64.to_string()),
                     attr("from", &user1),
                     attr("to", &receiver),
                 ],

@@ -132,7 +132,7 @@ pub fn execute_propose(
         attributes: vec![
             attr("action", "propose"),
             attr("sender", info.sender),
-            attr("proposal_id", id),
+            attr("proposal_id", id.to_string()),
             attr("status", format!("{:?}", prop.status)),
         ],
         events: vec![],
@@ -188,7 +188,7 @@ pub fn execute_vote(
         attributes: vec![
             attr("action", "vote"),
             attr("sender", info.sender),
-            attr("proposal_id", proposal_id),
+            attr("proposal_id", proposal_id.to_string()),
             attr("status", format!("{:?}", prop.status)),
         ],
         events: vec![],
@@ -221,7 +221,7 @@ pub fn execute_execute(
         attributes: vec![
             attr("action", "execute"),
             attr("sender", info.sender),
-            attr("proposal_id", proposal_id),
+            attr("proposal_id", proposal_id.to_string()),
         ],
         events: vec![],
         data: None,
@@ -256,7 +256,7 @@ pub fn execute_close(
         attributes: vec![
             attr("action", "close"),
             attr("sender", info.sender),
-            attr("proposal_id", proposal_id),
+            attr("proposal_id", proposal_id.to_string()),
         ],
         events: vec![],
         data: None,
@@ -755,7 +755,7 @@ mod tests {
             &[
                 attr("action", "propose"),
                 attr("sender", VOTER3),
-                attr("proposal_id", 1),
+                attr("proposal_id", 1.to_string()),
                 attr("status", "Open"),
             ],
         );
@@ -769,7 +769,7 @@ mod tests {
             &[
                 attr("action", "propose"),
                 attr("sender", VOTER4),
-                attr("proposal_id", 2),
+                attr("proposal_id", 2.to_string()),
                 attr("status", "Passed"),
             ],
         );
@@ -957,7 +957,7 @@ mod tests {
             &[
                 attr("action", "vote"),
                 attr("sender", VOTER1),
-                attr("proposal_id", proposal_id),
+                attr("proposal_id", proposal_id.to_string()),
                 attr("status", "Open"),
             ],
         );
@@ -1010,7 +1010,7 @@ mod tests {
             &[
                 attr("action", "vote"),
                 attr("sender", VOTER4),
-                attr("proposal_id", proposal_id),
+                attr("proposal_id", proposal_id.to_string()),
                 attr("status", "Passed"),
             ],
         );
@@ -1108,7 +1108,7 @@ mod tests {
             &[
                 attr("action", "vote"),
                 attr("sender", VOTER3),
-                attr("proposal_id", proposal_id),
+                attr("proposal_id", proposal_id.to_string()),
                 attr("status", "Passed"),
             ],
         );
@@ -1134,7 +1134,7 @@ mod tests {
             &[
                 attr("action", "execute"),
                 attr("sender", SOMEBODY),
-                attr("proposal_id", proposal_id),
+                attr("proposal_id", proposal_id.to_string()),
             ],
         );
 
@@ -1191,7 +1191,7 @@ mod tests {
             &[
                 attr("action", "close"),
                 attr("sender", SOMEBODY),
-                attr("proposal_id", proposal_id),
+                attr("proposal_id", proposal_id.to_string()),
             ],
         );
 

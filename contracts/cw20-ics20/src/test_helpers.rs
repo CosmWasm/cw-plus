@@ -7,7 +7,9 @@ use crate::state::ChannelInfo;
 use cosmwasm_std::testing::{
     mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
 };
-use cosmwasm_std::{DepsMut, IbcChannel, IbcEndpoint, OwnedDeps};
+use cosmwasm_std::{
+    DepsMut, IbcChannel, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcEndpoint, OwnedDeps,
+};
 
 use crate::msg::InitMsg;
 
@@ -28,7 +30,6 @@ pub fn mock_channel(channel_id: &str) -> IbcChannel {
         },
         order: ICS20_ORDERING,
         version: ICS20_VERSION.into(),
-        counterparty_version: None,
         connection_id: CONNECTION_ID.into(),
     }
 }
@@ -46,10 +47,11 @@ pub fn mock_channel_info(channel_id: &str) -> ChannelInfo {
 
 // we simulate instantiate and ack here
 pub fn add_channel(mut deps: DepsMut, channel_id: &str) {
-    let mut channel = mock_channel(channel_id);
-    ibc_channel_open(deps.branch(), mock_env(), channel.clone()).unwrap();
-    channel.counterparty_version = Some(ICS20_VERSION.into());
-    ibc_channel_connect(deps.branch(), mock_env(), channel).unwrap();
+    let channel = mock_channel(channel_id);
+    let open_msg = IbcChannelOpenMsg::new_init(channel.clone());
+    ibc_channel_open(deps.branch(), mock_env(), open_msg).unwrap();
+    let connect_msg = IbcChannelConnectMsg::new_ack(channel, ICS20_VERSION);
+    ibc_channel_connect(deps.branch(), mock_env(), connect_msg).unwrap();
 }
 
 pub fn setup(channels: &[&str]) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {

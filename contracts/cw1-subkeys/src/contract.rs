@@ -289,7 +289,7 @@ where
             attr("action", "set_permissions"),
             attr("owner", info.sender),
             attr("spender", spender),
-            attr("permissions", perm),
+            attr("permissions", perm.to_string()),
         ],
         ..Response::default()
     };

@@ -117,7 +117,7 @@ pub fn execute_transfer(
         attr("sender", &packet.sender),
         attr("receiver", &packet.receiver),
         attr("denom", &packet.denom),
-        attr("amount", &packet.amount),
+        attr("amount", &packet.amount.to_string()),
     ];
 
     // send response

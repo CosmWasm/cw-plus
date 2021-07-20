@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
     attr, entry_point, from_binary, to_binary, BankMsg, Binary, DepsMut, Env,
-    IbcAcknowledgementWithPacket, IbcBasicResponse, IbcChannel, IbcEndpoint, IbcOrder, IbcPacket,
-    IbcReceiveResponse, StdResult, SubMsg, Uint128, WasmMsg,
+    IbcAcknowledgementWithPacket, IbcBasicResponse, IbcChannel, IbcChannelConnectMsg,
+    IbcChannelOpenMsg, IbcEndpoint, IbcOrder, IbcPacket, IbcReceiveResponse, StdResult, SubMsg,
+    Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
@@ -76,9 +77,9 @@ fn ack_fail(err: String) -> Binary {
 pub fn ibc_channel_open(
     _deps: DepsMut,
     _env: Env,
-    channel: IbcChannel,
+    msg: IbcChannelOpenMsg,
 ) -> Result<(), ContractError> {
-    enforce_order_and_version(&channel)?;
+    enforce_order_and_version(msg.channel(), msg.counterparty_version())?;
     Ok(())
 }
 
@@ -87,11 +88,12 @@ pub fn ibc_channel_open(
 pub fn ibc_channel_connect(
     deps: DepsMut,
     _env: Env,
-    channel: IbcChannel,
+    msg: IbcChannelConnectMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // we need to check the counter party version in try and ack (sometimes here)
-    enforce_order_and_version(&channel)?;
+    enforce_order_and_version(msg.channel(), msg.counterparty_version())?;
 
+    let channel: IbcChannel = msg.into();
     let info = ChannelInfo {
         id: channel.endpoint.channel_id,
         counterparty_endpoint: channel.counterparty_endpoint,
@@ -102,16 +104,19 @@ pub fn ibc_channel_connect(
     Ok(IbcBasicResponse::default())
 }
 
-fn enforce_order_and_version(channel: &IbcChannel) -> Result<(), ContractError> {
+fn enforce_order_and_version(
+    channel: &IbcChannel,
+    counterparty_version: Option<&str>,
+) -> Result<(), ContractError> {
     if channel.version != ICS20_VERSION {
         return Err(ContractError::InvalidIbcVersion {
             version: channel.version.clone(),
         });
     }
-    if let Some(version) = &channel.counterparty_version {
+    if let Some(version) = counterparty_version {
         if version != ICS20_VERSION {
             return Err(ContractError::InvalidIbcVersion {
-                version: version.clone(),
+                version: version.to_string(),
             });
         }
     }
@@ -162,6 +167,7 @@ pub fn ibc_packet_receive(
                 acknowledgement: ack_success(),
                 messages: vec![msg],
                 attributes,
+                ..IbcReceiveResponse::default()
             }
         }
         Err(err) => IbcReceiveResponse {
@@ -170,8 +176,9 @@ pub fn ibc_packet_receive(
             attributes: vec![
                 attr("action", "receive"),
                 attr("success", "false"),
-                attr("error", err),
+                attr("error", err.to_string()),
             ],
+            ..IbcReceiveResponse::default()
         },
     };
 
@@ -282,6 +289,7 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
     Ok(IbcBasicResponse {
         messages: vec![],
         attributes,
+        ..IbcBasicResponse::default()
     })
 }
 
@@ -298,7 +306,7 @@ fn on_packet_failure(
         attr("sender", &msg.sender),
         attr("receiver", &msg.receiver),
         attr("denom", &msg.denom),
-        attr("amount", &msg.amount),
+        attr("amount", &msg.amount.to_string()),
         attr("success", "false"),
         attr("error", err),
     ];
@@ -308,6 +316,7 @@ fn on_packet_failure(
     let res = IbcBasicResponse {
         messages: vec![msg],
         attributes,
+        ..IbcBasicResponse::default()
     };
     Ok(res)
 }
