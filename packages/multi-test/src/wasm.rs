@@ -29,11 +29,6 @@ impl ContractData {
     }
 }
 
-pub fn next_block(block: &mut BlockInfo) {
-    block.time = block.time.plus_seconds(5);
-    block.height += 1;
-}
-
 pub struct WasmKeeper<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -295,18 +290,18 @@ mod test {
     use crate::test_helpers::{contract_error, contract_payout, PayoutInitMessage, PayoutQueryMsg};
     use crate::transactions::StorageTransaction;
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, BlockInfo, Coin, CosmosMsg, Empty};
+    use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty};
 
     fn mock_router() -> WasmKeeper<Empty> {
-        let env = mock_env();
         let api = Box::new(MockApi::default());
-        WasmKeeper::new(api, env.block)
+        WasmKeeper::new(api)
     }
 
     #[test]
     fn register_contract() {
         let mut wasm_storage = MockStorage::new();
         let mut router = mock_router();
+        let block = mock_env().block;
         let code_id = router.store_code(contract_error());
 
         let mut cache = StorageTransaction::new(&wasm_storage);
@@ -323,7 +318,14 @@ mod test {
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let info = mock_info("foobar", &[]);
         let err = router
-            .instantiate(&mut cache, contract_addr, &querier, info, b"{}".to_vec())
+            .instantiate(
+                contract_addr,
+                &mut cache,
+                &querier,
+                &block,
+                info,
+                b"{}".to_vec(),
+            )
             .unwrap_err();
         // StdError from contract_error auto-converted to string
         assert_eq!(err, "Generic error: Init failed");
@@ -332,9 +334,10 @@ mod test {
         let info = mock_info("foobar", &[]);
         let err = router
             .instantiate(
-                &mut cache,
                 Addr::unchecked("unregistered"),
+                &mut cache,
                 &querier,
+                &block,
                 info,
                 b"{}".to_vec(),
             )
@@ -347,20 +350,9 @@ mod test {
     }
 
     #[test]
-    fn update_block() {
-        let mut router = mock_router();
-
-        let BlockInfo { time, height, .. } = router.get_env(Addr::unchecked("foo")).block;
-        router.update_block(next_block);
-        let next = router.get_env(Addr::unchecked("foo")).block;
-
-        assert_eq!(time.plus_seconds(5), next.time);
-        assert_eq!(height + 1, next.height);
-    }
-
-    #[test]
     fn contract_send_coins() {
         let mut router = mock_router();
+        let block = mock_env().block;
         let code_id = router.store_code(contract_payout());
 
         let mut wasm_storage = MockStorage::new();
@@ -378,7 +370,14 @@ mod test {
         })
         .unwrap();
         let res = router
-            .instantiate(&mut cache, contract_addr.clone(), &querier, info, init_msg)
+            .instantiate(
+                contract_addr.clone(),
+                &mut cache,
+                &querier,
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -389,6 +388,7 @@ mod test {
                 &mut cache,
                 contract_addr.clone(),
                 &querier,
+                &block,
                 info,
                 b"{}".to_vec(),
             )
@@ -408,7 +408,7 @@ mod test {
         // query the contract
         let query = to_vec(&PayoutQueryMsg::Payout {}).unwrap();
         let data = router
-            .query_smart(&wasm_storage, contract_addr, &querier, query)
+            .query_smart(contract_addr, &wasm_storage, &querier, &block, query)
             .unwrap();
         let res: PayoutInitMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
@@ -427,6 +427,7 @@ mod test {
                 storage,
                 contract_addr.clone(),
                 &querier,
+                &mock_env().block,
                 info,
                 b"{}".to_vec(),
             )
@@ -449,6 +450,7 @@ mod test {
     #[test]
     fn multi_level_wasm_cache() {
         let mut router = mock_router();
+        let block = mock_env().block;
         let code_id = router.store_code(contract_payout());
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
 
@@ -464,7 +466,14 @@ mod test {
         })
         .unwrap();
         let _res = router
-            .instantiate(&mut cache, contract1.clone(), &querier, info, init_msg)
+            .instantiate(
+                contract1.clone(),
+                &mut cache,
+                &querier,
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
         cache.prepare().commit(&mut wasm_storage);
 
@@ -481,7 +490,14 @@ mod test {
         })
         .unwrap();
         let _res = router
-            .instantiate(&mut cache, contract2.clone(), &querier, info, init_msg)
+            .instantiate(
+                contract2.clone(),
+                &mut cache,
+                &querier,
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
         assert_payout(&router, &mut cache, &contract2, &payout2);
 
@@ -499,7 +515,14 @@ mod test {
         })
         .unwrap();
         let _res = router
-            .instantiate(&mut cache2, contract3.clone(), &querier, info, init_msg)
+            .instantiate(
+                contract3.clone(),
+                &mut cache2,
+                &querier,
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
         assert_payout(&router, &mut cache2, &contract3, &payout3);
 

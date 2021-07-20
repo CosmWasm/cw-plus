@@ -1,5 +1,5 @@
 // TODO:
-// 1. Move BlockInfo from WasmKeeper to App
+// X Move BlockInfo from WasmKeeper to App
 // X. Rename AppCache -> Router (keep no state in it, just act on state passed in)
 // 3. Router has execute, query, and admin functions - meant to handle messages, not called by library user
 // X. App maintains state -> calls Router with a cached store
@@ -44,6 +44,11 @@ impl AppResponse {
         assert_eq!(self.events[idx].ty.as_str(), "wasm");
         &self.events[idx].attributes[1..]
     }
+}
+
+pub fn next_block(block: &mut BlockInfo) {
+    block.time = block.time.plus_seconds(5);
+    block.height += 1;
 }
 
 // TODO: move this into WasmKeeper
@@ -683,6 +688,17 @@ mod test {
     }
 
     #[test]
+    fn update_block() {
+        let mut app = mock_app();
+
+        let BlockInfo { time, height, .. } = app.block;
+        app.update_block(next_block);
+
+        assert_eq!(time.plus_seconds(5), app.block.time);
+        assert_eq!(height + 1, app.block.height);
+    }
+
+    #[test]
     fn send_tokens() {
         let mut app = mock_app();
 
@@ -1090,9 +1106,9 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
         };
-        let querier = app.router.querier(app.storage.as_ref());
+        let querier = app.router.querier(app.storage.as_ref(), &app.block);
         app.router
-            .execute(&querier, &mut cache, owner.clone(), msg.into())
+            .execute(&querier, &mut cache, &app.block, owner.clone(), msg.into())
             .unwrap();
 
         // shows up in cache
@@ -1107,9 +1123,9 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: coins(12, "eth"),
         };
-        let querier = app.router.querier(&cache);
+        let querier = app.router.querier(&cache, &app.block);
         app.router
-            .execute(&querier, &mut cache2, owner, msg.into())
+            .execute(&querier, &mut cache2, &app.block, owner, msg.into())
             .unwrap();
 
         // shows up in 2nd cache
