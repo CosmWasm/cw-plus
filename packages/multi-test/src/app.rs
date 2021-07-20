@@ -146,7 +146,7 @@ where
 
     /// Simple helper so we get access to all the QuerierWrapper helpers,
     /// eg. query_wasm_smart, query_all_balances, ...
-    pub fn querier<'a>(&'a self) -> RouterQuerier<'a, C> {
+    pub fn querier(&self) -> RouterQuerier<C> {
         self.router.querier(self.storage.as_ref())
     }
 
@@ -396,6 +396,8 @@ where
         msg: SubMsg<C>,
     ) -> Result<AppResponse, String> {
         // execute in cache
+        // TODO: we need to make a new querier here that has access to storage (not just app.storage)
+        // Need to rethink a bit how we pass down the queriers...
         let mut subtx = StorageTransaction::new(storage);
         let res = self.execute(querier, &mut subtx, contract.clone(), msg.msg);
         if res.is_ok() {
