@@ -15,7 +15,6 @@ use cosmwasm_std::{
     from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
     Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
-use cosmwasm_storage::{prefixed, prefixed_read};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -24,8 +23,6 @@ use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::StorageTransaction;
 use crate::wasm::{Wasm, WasmKeeper};
-
-const NAMESPACE_BANK: &[u8] = b"bank";
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -137,9 +134,10 @@ where
     }
 
     /// This is an "admin" function to let us adjust bank accounts
-    pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
-        let mut storage = prefixed(self.storage.as_mut(), NAMESPACE_BANK);
-        self.router.bank.set_balance(&mut storage, account, amount)
+    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
+        self.router
+            .bank
+            .init_balance(self.storage.as_mut(), account, amount)
     }
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
@@ -220,10 +218,7 @@ where
                 self.wasm
                     .query(storage, &self.querier(storage, block), block, req)
             }
-            QueryRequest::Bank(req) => {
-                let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
-                self.bank.query(&bank_storage, req)
-            }
+            QueryRequest::Bank(req) => self.bank.query(storage, req),
             _ => unimplemented!(),
         }
     }
@@ -239,8 +234,7 @@ where
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => {
-                let mut storage = prefixed(storage, NAMESPACE_BANK);
-                self.bank.execute(&mut storage, sender, msg)?;
+                self.bank.execute(storage, sender, msg)?;
                 Ok(AppResponse::default())
             }
             _ => unimplemented!(),
@@ -352,8 +346,8 @@ mod test {
         let rcpt_funds = vec![coin(5, "btc")];
 
         // set money
-        app.set_bank_balance(&owner, init_funds).unwrap();
-        app.set_bank_balance(&rcpt, rcpt_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&rcpt, rcpt_funds).unwrap();
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
@@ -390,7 +384,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up contract
         let code_id = app.store_code(contract_payout());
@@ -436,7 +430,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up payout contract
         let payout_id = app.store_code(contract_payout_custom());
@@ -516,7 +510,7 @@ mod test {
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
         let reflect_id = app.store_code(contract_reflect());
@@ -597,7 +591,7 @@ mod test {
 
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(100, "eth")];
-        app.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
         let payout_id = app.store_code(contract_payout());
         let msg = PayoutInitMessage {
             payout: coin(5, "eth"),
@@ -633,7 +627,7 @@ mod test {
         let owner = Addr::unchecked("owner");
         let random = Addr::unchecked("random");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
         let reflect_id = app.store_code(contract_reflect());
@@ -715,9 +709,7 @@ mod test {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        // TODO: this needs to be more transparent, done in AppCache, not tests
-        let storage = prefixed_read(storage, NAMESPACE_BANK);
-        let res = router.bank.query(&storage, query).unwrap();
+        let res = router.bank.query(storage, query).unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
@@ -742,7 +734,7 @@ mod test {
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("recipient");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // cache 1 - send some tokens
         let mut cache = StorageTransaction::new(app.storage.as_ref());

@@ -23,7 +23,7 @@ use crate::transactions::StorageTransaction;
 // Contracts is in storage (from Router, or from Cache)
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
-const NAMESPACE_WASM: &[u8] = b"wasm";
+pub const NAMESPACE_WASM: &[u8] = b"wasm";
 
 /// Contract Data is just a code_id that can be used to lookup the actual code from the Router
 /// We can add other info here in the future, like admin
