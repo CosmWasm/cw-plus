@@ -1,12 +1,3 @@
-// TODO:
-// X. Move BlockInfo from WasmKeeper to App
-// X. Rename AppCache -> Router (keep no state in it, just act on state passed in)
-// X. Router has execute, query, and admin functions - meant to handle messages, not called by library user
-// X. App maintains state -> calls Router with a cached store
-// 5. Add "block" helpers to execute one "tx" in a block... or let them manually execute many.
-//    All timing / block height manipulations happen in App
-// 6. Consider how to add (fixed) staking or (flexible) custom keeper -> in another PR?
-
 use std::fmt;
 
 #[cfg(test)]
@@ -169,7 +160,6 @@ pub struct Router<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    // TODO: maybe use concrete type later, this tests interfaces
     pub wasm: Box<dyn Wasm<C>>,
     pub bank: Box<dyn Bank>,
 }
@@ -665,7 +655,6 @@ mod test {
         let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 123);
         assert!(res.result.is_ok());
-        // TODO: any more checks on reply data???
 
         // reflect sends 300 btc, failure, but error caught by submessage (so shows success)
         let msg = SubMsg::reply_always(
