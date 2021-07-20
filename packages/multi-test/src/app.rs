@@ -122,7 +122,7 @@ where
             .into_iter()
             .map(|msg| {
                 self.router
-                    .execute(self, &mut cache, &self.block, sender.clone(), msg)
+                    .execute(&mut cache, &self.block, sender.clone(), msg)
             })
             .collect();
 
@@ -217,7 +217,6 @@ where
 
     pub fn execute(
         &self,
-        _querier: &dyn Querier,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
@@ -734,9 +733,8 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
         };
-        let querier = app.router.querier(app.storage.as_ref(), &app.block);
         app.router
-            .execute(&querier, &mut cache, &app.block, owner.clone(), msg.into())
+            .execute(&mut cache, &app.block, owner.clone(), msg.into())
             .unwrap();
 
         // shows up in cache
@@ -751,9 +749,8 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: coins(12, "eth"),
         };
-        let querier = app.router.querier(&cache, &app.block);
         app.router
-            .execute(&querier, &mut cache2, &app.block, owner, msg.into())
+            .execute(&mut cache2, &app.block, owner, msg.into())
             .unwrap();
 
         // shows up in 2nd cache

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 
-use cosmwasm_std::testing::MockStorage;
 use cosmwasm_std::{
     Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult, Deps, DepsMut, Env,
     Event, MessageInfo, Order, Querier, QuerierWrapper, Reply, ReplyOn, Response, Storage, SubMsg,
@@ -192,10 +191,8 @@ where
                 to_address: recipient,
                 amount: amount.to_vec(),
             };
-            // TODO: how to make this better when we actually use it
-            let mock_store = MockStorage::new();
-            let querier = RouterQuerier::new(router, &mock_store, block);
-            router.execute(&querier, storage, block, sender.into(), msg.into())
+            let res = router.execute(storage, block, sender.into(), msg.into())?;
+            Ok(res)
         } else {
             Ok(AppResponse::default())
         }
@@ -276,17 +273,6 @@ where
         }
     }
 
-    // TODO: this along with many wasm functions -> WasmKeeper
-    // Needed changes:
-    // 1. No storage/cache in AppCache (passed as arg) -> no more &mut self calls (?)
-    // 2. Pass entire (not name-spaced) storage to WasmKeeper
-    // 3. Pass &Router to WasmKeeper (so it can call back into other modules)
-    // 4. All logic into WasmKeeper, very high level here.
-    //
-    // -> Modules can just take their "namespaced" storage and be an island (Bank)
-    // -> Or they can take reference to all data and Router and have full access
-    // -> -> Message calling between modules
-    //
     /// This will execute the given messages, making all changes to the local cache.
     /// This *will* write some data to the cache if the message fails half-way through.
     /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
@@ -302,12 +288,11 @@ where
         msg: SubMsg<C>,
     ) -> Result<AppResponse, String> {
         // execute in cache
-        // TODO: we need to make a new querier here that has access to storage (not just app.storage)
-        // Need to rethink a bit how we pass down the queriers...
-        // TODO: better querier
-        let fake_store = MockStorage::new();
-        let querier = RouterQuerier::new(router, &fake_store, block);
-        let res = router.execute(&querier, storage, block, contract.clone(), msg.msg);
+        let mut cache = StorageTransaction::new(storage);
+        let res = router.execute(&mut cache, block, contract.clone(), msg.msg);
+        if res.is_ok() {
+            cache.prepare().commit(storage);
+        }
 
         // call reply if meaningful
         if let Ok(r) = res {
@@ -594,7 +579,6 @@ where
     }
 }
 
-// TODO: move this into WasmKeeper
 #[derive(Clone, PartialEq, Message)]
 pub struct InstantiateData {
     #[prost(string, tag = "1")]
@@ -619,7 +603,6 @@ where
     res.data = Some(new_data.into());
 }
 
-// TODO: move to WasmKeeper (export public)
 // this parses the result from a wasm contract init
 pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
     let bin = data
