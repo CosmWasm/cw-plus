@@ -106,13 +106,6 @@ where
         QuerierWrapper::new(self)
     }
 
-    /// Handles arbitrary QueryRequest, this is wrapped by the Querier interface, but this
-    /// is nicer to use.
-    pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
-        self.router
-            .query(self.storage.as_ref(), &self.block, request)
-    }
-
     /// Runs multiple CosmosMsg in one atomic operation.
     /// This will create a cache before the execution, so no state changes are persisted if any of them
     /// return an error. But all writes are persisted on success.
@@ -735,9 +728,9 @@ mod test {
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
-        };
-        let res = app.query(query.into()).unwrap();
-        let val: AllBalanceResponse = from_slice(&res).unwrap();
+        }
+        .into();
+        let val: AllBalanceResponse = app.wrap().query(&query).unwrap();
         val.amount
     }
 
