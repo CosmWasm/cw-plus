@@ -10,7 +10,8 @@ use cosmwasm_std::{
 };
 
 use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
-use crate::wasm::{Contract, StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRouter};
+use crate::contracts::Contract;
+use crate::wasm::{StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRouter};
 use schemars::JsonSchema;
 use std::fmt;
 
