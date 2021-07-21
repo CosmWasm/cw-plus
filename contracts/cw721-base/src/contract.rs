@@ -507,25 +507,22 @@ fn query_tokens(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_addr = maybe_addr(deps.api, start_after)?;
-    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+    let start = start_after.map(|token_id| Bound::exclusive(token_id));
 
     let owner_addr = deps.api.addr_validate(&owner)?;
     let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
-        .pks(
-            deps.storage,
-            Vec::from(owner_addr.as_ref()),
-            start,
-            None,
-            Order::Ascending,
-        )
+        .prefix(Vec::from(owner_addr.as_ref()))
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .collect();
-    let pks = res?;
+    let tokens = res?;
 
-    let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
+    let res: Result<Vec<_>, _> = tokens
+        .iter()
+        .map(|v| String::from_utf8(v.0.clone()))
+        .collect();
     let tokens = res.map_err(StdError::invalid_utf8)?;
     Ok(TokensResponse { tokens })
 }
