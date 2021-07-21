@@ -513,16 +513,18 @@ fn query_tokens(
     let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
-        .prefix(Vec::from(owner_addr.as_ref()))
-        .range(deps.storage, start, None, Order::Ascending)
+        .pks(
+            deps.storage,
+            Vec::from(owner_addr.as_ref()),
+            start,
+            None,
+            Order::Ascending,
+        )
         .take(limit)
         .collect();
-    let tokens = res?;
+    let pks = res?;
 
-    let res: Result<Vec<_>, _> = tokens
-        .iter()
-        .map(|v| String::from_utf8(v.0.clone()))
-        .collect();
+    let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
     let tokens = res.map_err(StdError::invalid_utf8)?;
     Ok(TokensResponse { tokens })
 }
