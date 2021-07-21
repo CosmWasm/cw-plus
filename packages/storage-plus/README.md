@@ -541,9 +541,12 @@ and just use the indexed data.
 
 An example of use, where `owner` is a `String` value passed as a parameter, and `start_after` and `limit` optionally
 define the pagination range:
+
+Notice this uses `prefix()`, explained above in the `Map` section.
+
 ```rust
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(|token_id| Bound::exclusive(token_id));
+    let start = start_after.map(Bound::exclusive);
     let owner_addr = deps.api.addr_validate(&owner)?;
 
     let res: Result<Vec<_>, _> = tokens()
@@ -554,5 +557,24 @@ define the pagination range:
         .take(limit)
         .collect();
     let tokens = res?;
-``
+```
 Now `tokens` contains `(token_id, TokenInfo)` pairs for the given `owner`.
+The pk values are `Vec<u8>`, as this is a limitation of the current implementation.
+
+Another example that is slightly similar, but returning only the `token_id`s, using the `pks()` method:
+```rust
+    let res: Result<Vec<_>, _> = tokens()
+        .idx
+        .owner
+        .pks(
+            deps.storage,
+            Vec::from(owner_addr.as_ref()),
+            start,
+            None,
+            Order::Ascending,
+        )
+        .take(limit)
+        .collect();
+    let pks = res?;
+```
+Now `pks` contains `token_id` values (as `Vec<u8>`s) for the given `owner`.
