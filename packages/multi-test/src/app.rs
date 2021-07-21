@@ -187,8 +187,9 @@ where
         }
     }
 
-    /// Handles arbitrary QueryRequest, this is wrapped by the Querier interface, but this
-    /// is nicer to use.
+    /// this is used by `RouterQuerier` to actual implement the `Querier` interface.
+    /// you most likely want to use `router.querier(storage, block).wrap()` to get a
+    /// QuerierWrapper to interact with
     pub fn query(
         &self,
         storage: &dyn Storage,
