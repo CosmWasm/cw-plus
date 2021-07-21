@@ -454,7 +454,7 @@ mod tests {
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
-    use cw_multi_test::{next_block, App, Contract, ContractWrapper, Executor, SimpleBank};
+    use cw_multi_test::{next_block, App, BankKeeper, Contract, ContractWrapper, Executor};
 
     use super::*;
     use crate::msg::Threshold;
@@ -495,7 +495,7 @@ mod tests {
     fn mock_app() -> App {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
 
         App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }

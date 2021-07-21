@@ -19,7 +19,7 @@ use crate::contracts::Contract;
 use crate::executor::AppResponse;
 use crate::transactions::StorageTransaction;
 
-// Contracts is in storage (from Router, or from Cache)
+// Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
@@ -79,7 +79,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     /// code is in-memory lookup that stands in for wasm code
-    /// this can only be editted on the WasmRouter, and just read in caches
+    /// this can only be edited on the WasmRouter, and just read in caches
     codes: HashMap<usize, Box<dyn Contract<C>>>,
 
     // WasmConst
@@ -625,7 +625,7 @@ mod test {
 
     use crate::test_helpers::{contract_error, contract_payout, PayoutInitMessage, PayoutQueryMsg};
     use crate::transactions::StorageTransaction;
-    use crate::SimpleBank;
+    use crate::BankKeeper;
 
     use super::*;
 
@@ -636,7 +636,7 @@ mod test {
 
     fn mock_router() -> Router<Empty> {
         let api = Box::new(MockApi::default());
-        Router::new(api, SimpleBank {})
+        Router::new(api, BankKeeper {})
     }
 
     #[test]

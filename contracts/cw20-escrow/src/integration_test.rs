@@ -3,14 +3,14 @@
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{coins, to_binary, Addr, Empty, Uint128};
 use cw20::{Cw20Coin, Cw20Contract, Cw20ExecuteMsg};
-use cw_multi_test::{App, Contract, ContractWrapper, Executor, SimpleBank};
+use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
 
 fn mock_app() -> App {
     let env = mock_env();
     let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let bank = BankKeeper::new();
 
     App::new(api, env.block, bank, Box::new(MockStorage::new()))
 }

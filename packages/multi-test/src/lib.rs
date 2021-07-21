@@ -15,7 +15,7 @@ mod transactions;
 mod wasm;
 
 pub use crate::app::{next_block, App, Router};
-pub use crate::bank::{Bank, SimpleBank};
+pub use crate::bank::{Bank, BankKeeper};
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::executor::{AppResponse, Executor};
 pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};

@@ -39,11 +39,15 @@ You can create an App for use in your testcode like:
 fn mock_app() -> App {
     let env = mock_env();
     let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let bank = BankKeeper::new();
 
     App::new(api, env.block, bank, Box::new(MockStorage::new()))
 }
 ```
+
+Inside App, it maintains the root `Storage`, and the `BlockInfo` for the current block.
+It also contains a `Router` (discussed below), which can process any `CosmosMsg` variant
+by passing it to the proper "Keeper".
 
 Note: This properly handles submessages and reply blocks.
 
@@ -54,7 +58,7 @@ Note: While the API currently supports custom messages, we don't currently have 
 Before you can call contracts, you must `instantiate` them. And to instantiate them, you need a `code_id`.
 In `wasmd`, this `code_id` points to some stored Wasm code that is then run. In multitest, we use it to
 point to a `Box<dyn Contract>` that should be run. That is, you need to implement the `Contract` trait
-and then add to to the app via `app.store_code(my_contract)`.
+and then add the contract to the app via `app.store_code(my_contract)`.
 
 The `Contract` trait defines the major entry points to any CosmWasm contract: `execute`, `instantiate`, `query`,
 `sudo`, and `reply` (for submessages). Migration and IBC are currently not supported.
@@ -65,10 +69,11 @@ or how to do so (and useful mocks for some test cases). Here is an example of wr
 a `Contract` trait to add to an `App`:
 
 ```rust
-pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {
-    let contract = ContractWrapper::new(execute_reflect, instantiate_reflect, query_reflect)
-        .with_reply(reply_reflect);
-    Box::new(contract)
+use cw20_escrow::contract::{ execute, instantiate, query };
+
+pub fn contract_escrow() -> Box<dyn Contract<Empty>> {
+  let contract = ContractWrapper::new(execute, instantiate, query);
+  Box::new(contract)
 }
 ```
 

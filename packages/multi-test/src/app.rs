@@ -277,14 +277,14 @@ mod test {
         PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
         ReflectQueryMsg,
     };
-    use crate::SimpleBank;
+    use crate::BankKeeper;
 
     use super::*;
 
     fn mock_app() -> App {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
 
         App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }
@@ -292,7 +292,7 @@ mod test {
     fn custom_app() -> App<CustomMsg> {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
 
         App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }

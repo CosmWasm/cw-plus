@@ -34,9 +34,13 @@ pub trait Bank {
 }
 
 #[derive(Default)]
-pub struct SimpleBank {}
+pub struct BankKeeper {}
 
-impl SimpleBank {
+impl BankKeeper {
+    pub fn new() -> Self {
+        BankKeeper {}
+    }
+
     fn set_balance(
         &self,
         bank_storage: &mut dyn Storage,
@@ -92,7 +96,7 @@ impl SimpleBank {
     }
 }
 
-impl Bank for SimpleBank {
+impl Bank for BankKeeper {
     fn execute(
         &self,
         storage: &mut dyn Storage,
@@ -162,7 +166,7 @@ mod test {
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{coins, from_slice};
 
-    fn query_balance(bank: &SimpleBank, store: &dyn Storage, rcpt: &Addr) -> Vec<Coin> {
+    fn query_balance(bank: &BankKeeper, store: &dyn Storage, rcpt: &Addr) -> Vec<Coin> {
         let req = BankQuery::AllBalances {
             address: rcpt.clone().into(),
         };
@@ -181,7 +185,7 @@ mod test {
         let norm = vec![coin(20, "btc"), coin(100, "eth")];
 
         // set money
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
         bank.init_balance(&mut store, &owner, init_funds).unwrap();
         let bank_storage = prefixed_read(&store, NAMESPACE_BANK);
 
@@ -241,7 +245,7 @@ mod test {
         let rcpt_funds = vec![coin(5, "btc")];
 
         // set money
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
         bank.init_balance(&mut store, &owner, init_funds).unwrap();
         bank.init_balance(&mut store, &rcpt, rcpt_funds).unwrap();
 
@@ -281,7 +285,7 @@ mod test {
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
 
         // set money
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
         bank.init_balance(&mut store, &owner, init_funds).unwrap();
 
         // burn both tokens
