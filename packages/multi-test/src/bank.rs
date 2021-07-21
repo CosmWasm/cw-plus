@@ -1,12 +1,13 @@
 use cosmwasm_std::{
     coin, to_binary, Addr, AllBalanceResponse, BalanceResponse, BankMsg, BankQuery, Binary, Coin,
-    Storage,
+    Event, Storage,
 };
 
 use crate::executor::AppResponse;
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw0::NativeBalance;
 use cw_storage_plus::Map;
+use itertools::Itertools;
 
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
@@ -96,6 +97,13 @@ impl BankKeeper {
     }
 }
 
+fn coins_to_string(coins: &[Coin]) -> String {
+    coins
+        .iter()
+        .map(|c| format!("{}{}", c.amount, c.denom))
+        .join(",")
+}
+
 impl Bank for BankKeeper {
     fn execute(
         &self,
@@ -106,18 +114,22 @@ impl Bank for BankKeeper {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         match msg {
             BankMsg::Send { to_address, amount } => {
+                // see https://github.com/cosmos/cosmos-sdk/blob/v0.42.7/x/bank/keeper/send.go#L142-L147
+                let events = vec![Event::new("transfer")
+                    .attr("recipient", &to_address)
+                    .attr("sender", &sender)
+                    .attr("amount", coins_to_string(&amount))];
                 self.send(
                     &mut bank_storage,
                     sender,
                     Addr::unchecked(to_address),
                     amount,
                 )?;
-                // TODO: add some proper events here
-                Ok(AppResponse::default())
+                Ok(AppResponse { events, data: None })
             }
             BankMsg::Burn { amount } => {
+                // burn doesn't seem to emit any events
                 self.burn(&mut bank_storage, sender, amount)?;
-                // TODO: add some proper events here
                 Ok(AppResponse::default())
             }
             m => Err(format!("Unsupported bank message: {:?}", m)),

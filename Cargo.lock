@@ -213,6 +213,7 @@ dependencies = [
  "cosmwasm-storage",
  "cw-storage-plus",
  "cw0",
+ "itertools",
  "prost",
  "schemars",
  "serde",
