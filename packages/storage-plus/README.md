@@ -10,8 +10,8 @@ You currently should not be using this crate outside of the `cosmwasm-plus`
 repo. This is a first draft of many types. We will update the status
 after they have been used more heavily and the interfaces stabilized.
 
-The ideas/desired functionality in here should be more or final, 
-just the form to express them that is not final. As we add new functionality,
+The ideas/desired functionality in here should be more or less final,
+it's just the form to express them that is not final. As we add new functionality,
 we will continue to refine the foundations, but maintain semver.
 
 ## Usage Overview
@@ -29,14 +29,14 @@ to require less typing for developers and less gas usage in the contracts.
 
 ## Item
 
-The usage of an [`Item`](./src/item.rs) is pretty straight-forward. 
-You must simply provide the proper type, as well as a database key not 
-used by any other item. Then it will provide you with a nice interface 
-to interact with such data. 
+The usage of an [`Item`](./src/item.rs) is pretty straight-forward.
+You must simply provide the proper type, as well as a database key not
+used by any other item. Then it will provide you with a nice interface
+to interact with such data.
 
 If you are coming from using `Singleton`, the biggest change is that
 we no longer store `Storage` inside, meaning we don't need read and write
-variants of the object, just one type. Furthermore, we use `const fn` 
+variants of the object, just one type. Furthermore, we use `const fn`
 to create the `Item`, allowing it to be defined as a global compile-time
 constant rather than a function that must be constructed each time,
 which saves gas as well as typing.
@@ -105,7 +105,7 @@ The usage of an [`Map`](./src/item.rs) is a little more complex, but
 is still pretty straight-forward. You can imagine it as a storage-backed
 `BTreeMap`, allowing key-value lookups with typed values. In addition,
 we support not only simple binary keys (`&[u8]`), but tuples, which are
-combined. This allows us to store allowances as composite keys 
+combined. This allows us to store allowances as composite keys
 eg. `(owner, spender)` to look up the balance.
 
 Beyond direct lookups, we have a super power not found in Ethereum -
@@ -117,7 +117,7 @@ This requires the `iterator` feature to be enabled in `cw-storage-plus`
 
 If you are coming from using `Bucket`, the biggest change is that
 we no longer store `Storage` inside, meaning we don't need read and write
-variants of the object, just one type. Furthermore, we use `const fn` 
+variants of the object, just one type. Furthermore, we use `const fn`
 to create the `Bucket`, allowing it to be defined as a global compile-time
 constant rather than a function that must be constructed each time,
 which saves gas as well as typing. In addition, the composite indexes
@@ -238,9 +238,9 @@ Under the scenes, we create a `Path` from the `Map` when accessing a key.
 `Map.key()` returns a `Path`, which has the same interface as `Item`,
 reusing the calculated path to this key.
 
-For simple keys, this is just a bit less typing and a bit less gas if you 
-use the same key for many calls. However, for composite keys, like 
-`(b"owner", b"spender")` it is **much** less typing. And highly recommended anywhere 
+For simple keys, this is just a bit less typing and a bit less gas if you
+use the same key for many calls. However, for composite keys, like
+`(b"owner", b"spender")` it is **much** less typing. And highly recommended anywhere
 you will use the a composite key even twice:
 
 ```rust
@@ -287,7 +287,7 @@ fn demo() -> StdResult<()> {
 }
 ```
 
-### Prefix 
+### Prefix
 
 In addition to getting one particular item out of a map, we can iterate over the map
 (or a subset of the map). This let's us answer questions like "show me all tokens",
@@ -384,7 +384,172 @@ fn demo() -> StdResult<()> {
 }
 ```
 
-## Indexed Map
+## IndexedMap
 
-TODO: we are working on a version of a map that manages multiple
-secondary indexed transparently. That work is coming soon.
+In cosmwasm-plus, there's currently one example of `IndexedMap` usage, in the `cw721-base` contract.
+Let's use it to illustrate `IndexedMap` definition and usage.
+
+### Definition
+
+```rust
+pub struct TokenIndexes<'a> {
+  // pk goes to second tuple element
+  pub owner: MultiIndex<'a, (Vec<u8>, Vec<u8>), TokenInfo>,
+}
+
+impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
+  fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<TokenInfo>> + '_> {
+    let v: Vec<&dyn Index<TokenInfo>> = vec![&self.owner];
+    Box::new(v.into_iter())
+  }
+}
+
+pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
+  let indexes = TokenIndexes {
+    owner: MultiIndex::new(
+      |d, k| (Vec::from(d.owner.as_ref()), k),
+      "tokens",
+      "tokens__owner",
+    ),
+  };
+  IndexedMap::new("tokens", indexes)
+}
+```
+
+Let's discuss this piece by piece:
+```rust
+pub struct TokenIndexes<'a> {
+  // pk goes to second tuple element
+  pub owner: MultiIndex<'a, (Vec<u8>, Vec<u8>), TokenInfo>,
+}
+```
+
+These are the index definitions. Here there's only one index, called `owner`. There could be more, as public
+members of the `TokenIndexes` struct.
+
+We see that the `owner` index is a `MultiIndex`. A multi-index can have repeated values as keys. That's why
+the primary key is being added as the last element of the multi-index key.
+Like the name implies, this is an index over tokens, by owner. Given that an owner can have multiple tokens,
+we need a `MultiIndex` to be able to list / iterate over all the tokens a given owner has.
+
+So, to recap, the `TokenInfo`  data will originally be stored by `token_id` (which is a string value).
+You can see this in the token creation code:
+```rust
+    tokens().update(deps.storage, &msg.token_id, |old| match old {
+        Some(_) => Err(ContractError::Claimed {}),
+        None => Ok(token),
+    })?;
+```
+(Incidentally, this is using `update` instead of `save`, to avoid overwriting an already existing token).
+
+Then, it will be indexed by token `owner` (which is an `Addr`), so that we can list all the tokens an owner has.
+That's why the `owner` index key is `(Vec<u8>, Vec<u8>)`. The first owned element is the `owner` data
+(converted to `Vec<u8>`), whereas the second one is the `token_id` (also converted to `Vec<u8>`).
+
+The important thing here is that the key (and its components, in the case of a combined key) must implement
+the `PrimaryKey` trait. You can see that both the 2-tuple `(_, _)` and `Vec<u8>` do implement `PrimaryKey`:
+
+```rust
+impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U) {
+    type Prefix = T;
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        let mut keys = self.0.key();
+        keys.extend(&self.1.key());
+        keys
+    }
+}
+```
+
+```rust
+impl<'a> PrimaryKey<'a> for Vec<u8> {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        vec![&self]
+    }
+}
+```
+
+---
+
+We can now see how it all works, taking a look at the remaining code:
+
+```rust
+impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<TokenInfo>> + '_> {
+        let v: Vec<&dyn Index<TokenInfo>> = vec![&self.owner];
+        Box::new(v.into_iter())
+    }
+}
+```
+
+This implements the `IndexList` trait for `TokenIndexes`. This kind of serves two purposes (which are really
+one and the same): it allows the indexes to be queries through `get_indexes`, and, it allows `TokenIndexes`
+to be treated as an `IndexList`. So that it can be passed as a parameter during `IndexedMap` construction, below:
+
+```rust
+pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
+    let indexes = TokenIndexes {
+        owner: MultiIndex::new(
+            |d, k| (Vec::from(d.owner.as_ref()), k),
+            "tokens",
+            "tokens__owner",
+        ),
+    };
+    IndexedMap::new("tokens", indexes)
+}
+```
+
+Here `tokens()` is just a helper function, that simplifies the `IndexedMap` construction for us. First the
+index (es) is (are) created, and then, the `IndexedMap` is created (using `IndexedMap::new`), and returned.
+
+During index creation, we must supply an index function per index
+```rust
+        owner: MultiIndex::new(
+            |d, k| (Vec::from(d.owner.as_ref()), k),
+```
+
+, which is the one that will take the value and the primary key (which is always in `Vec<u8>` form) of the
+original map, and create the index key from them. Of course, this requires that the elements required
+for the index key are present in the value (which makes sense).
+Besides the index function, we must also supply the namespace of the pk, and the one for the new index.
+
+---
+
+After that, we just create (and return) the `IndexedMap`:
+
+```rust
+    IndexedMap::new("tokens", indexes)
+```
+
+Here of course, the namespace of the pk must match the one used during index(es) creation. And, we pass our
+`TokenIndexes` (as an `IndexList`-type parameter) as second argument. Connecting in this way the underlying `Map`
+for the pk, with the defined indexes.
+
+So, `IndexedMap` (and the other `Indexed*` types) is just a wrapper / extension around `Map`, that provides
+a number of index functions and namespaces to create indexes over the original `Map` data. It also implements
+calling these index functions during value storage / update / removal, so that you can forget about it,
+and just use the indexed data.
+
+### Usage
+
+An example of use, where `owner` is a `String` value passed as a parameter, and `start_after` and `limit` optionally
+define the pagination range:
+```rust
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = start_after.map(|token_id| Bound::exclusive(token_id));
+    let owner_addr = deps.api.addr_validate(&owner)?;
+
+    let res: Result<Vec<_>, _> = tokens()
+        .idx
+        .owner
+        .prefix(Vec::from(owner_addr.as_ref()))
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .collect();
+    let tokens = res?;
+``
+Now `tokens` contains `(token_id, TokenInfo)` pairs for the given `owner`.
