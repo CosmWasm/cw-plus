@@ -3,19 +3,19 @@
 use crate::contract::{execute, instantiate, query};
 use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{from_binary, to_binary, Addr, Empty, Uint128, WasmMsg, WasmQuery};
+use cosmwasm_std::{to_binary, Addr, Empty, Uint128, WasmMsg};
 use cw0::Duration;
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
-use cw_multi_test::{App, Contract, ContractWrapper, SimpleBank};
+use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 fn mock_app() -> App {
     let env = mock_env();
     let api = Box::new(MockApi::default());
-    let bank = SimpleBank {};
+    let bank = BankKeeper::new();
 
-    App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, Box::new(MockStorage::new()))
 }
 
 pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract<Empty>> {
@@ -139,12 +139,10 @@ fn cw3_controls_cw20() {
     let cw20_balance_query = QueryMsg::Balance {
         address: mint_recipient.to_string(),
     };
-    let wasm_query = WasmQuery::Smart {
-        contract_addr: cw20_addr.to_string(),
-        msg: to_binary(&cw20_balance_query).unwrap(),
-    };
-    let query_res = router.query(wasm_query.into()).unwrap();
-    let balance: BalanceResponse = from_binary(&query_res).unwrap();
+    let balance: BalanceResponse = router
+        .wrap()
+        .query_wasm_smart(&cw20_addr, &cw20_balance_query)
+        .unwrap();
 
     // compare minted amount
     assert_eq!(balance.balance, mint_amount);

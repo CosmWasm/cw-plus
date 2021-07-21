@@ -1,94 +1,23 @@
-use serde::Serialize;
+use std::fmt;
 
 #[cfg(test)]
 use cosmwasm_std::testing::{mock_env, MockApi};
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin,
-    ContractResult, CosmosMsg, Empty, Event, MessageInfo, Querier, QuerierResult, QuerierWrapper,
-    QueryRequest, Reply, ReplyOn, Response, SubMsg, SubMsgExecutionResponse, SystemError,
-    SystemResult, WasmMsg,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
-
-use crate::bank::{Bank, BankCache, BankCommittable, BankOps, BankRouter};
-use crate::contracts::Contract;
-use crate::wasm::{StorageFactory, WasmCache, WasmCommittable, WasmOps, WasmRouter};
 use schemars::JsonSchema;
-use std::fmt;
+use serde::Serialize;
 
-use prost::Message;
-// use bytes::buf::BufMut;
+use crate::bank::Bank;
+use crate::contracts::Contract;
+use crate::executor::{AppResponse, Executor};
+use crate::transactions::StorageTransaction;
+use crate::wasm::{Wasm, WasmKeeper};
 
-#[derive(Default, Clone, Debug)]
-pub struct AppResponse {
-    pub events: Vec<Event>,
-    pub data: Option<Binary>,
-}
-
-impl AppResponse {
-    // Return all custom attributes returned by the contract in the `idx` event.
-    // We assert the type is wasm, and skip the contract_address attribute.
-    pub fn custom_attrs(&self, idx: usize) -> &[Attribute] {
-        assert_eq!(self.events[idx].ty.as_str(), "wasm");
-        &self.events[idx].attributes[1..]
-    }
-}
-
-#[derive(Clone, PartialEq, Message)]
-pub struct InstantiateData {
-    #[prost(string, tag = "1")]
-    pub address: ::prost::alloc::string::String,
-    /// Unique ID number for this person.
-    #[prost(bytes, tag = "2")]
-    pub data: ::prost::alloc::vec::Vec<u8>,
-}
-
-fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    let data = res.data.clone().unwrap_or_default().to_vec();
-    let init_data = InstantiateData {
-        address: contact_address.into(),
-        data,
-    };
-    let mut new_data = Vec::<u8>::with_capacity(init_data.encoded_len());
-    // the data must encode successfully
-    init_data.encode(&mut new_data).unwrap();
-    res.data = Some(new_data.into());
-}
-
-// this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
-    let bin = data
-        .as_ref()
-        .ok_or_else(|| "No data response".to_string())?
-        .to_vec();
-    // parse the protobuf struct
-    let init_data = InstantiateData::decode(bin.as_slice()).map_err(|e| e.to_string())?;
-    if init_data.address.is_empty() {
-        return Err("no contract address provided".into());
-    }
-    Ok(Addr::unchecked(init_data.address))
-}
-
-impl<C> Querier for App<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        // TODO: we need to make a new custom type for queries
-        let request: QueryRequest<Empty> = match from_slice(bin_request) {
-            Ok(v) => v,
-            Err(e) => {
-                return SystemResult::Err(SystemError::InvalidRequest {
-                    error: format!("Parsing query request: {}", e.to_string()),
-                    request: bin_request.into(),
-                })
-            }
-        };
-        let contract_result: ContractResult<Binary> = self.query(request).into();
-        SystemResult::Ok(contract_result)
-    }
+pub fn next_block(block: &mut BlockInfo) {
+    block.time = block.time.plus_seconds(5);
+    block.height += 1;
 }
 
 /// Router is a persisted state. You can query this.
@@ -99,122 +28,70 @@ where
 /// All contracts must return Response<C> or Response<Empty>
 pub struct App<C = Empty>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    wasm: WasmRouter<C>,
-    bank: BankRouter,
+    pub router: Router<C>,
+    storage: Box<dyn Storage>,
+    block: BlockInfo,
+}
+
+impl<C> Querier for App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+        self.router
+            .querier(self.storage.as_ref(), &self.block)
+            .raw_query(bin_request)
+    }
+}
+
+impl<C> Executor<C> for App<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+        let mut all = self.execute_multi(sender, vec![msg])?;
+        let res = all.pop().unwrap();
+        Ok(res)
+    }
 }
 
 impl<C> App<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new<B: Bank + 'static>(
+    pub fn new(
         api: Box<dyn Api>,
         block: BlockInfo,
-        bank: B,
-        storage_factory: StorageFactory,
+        bank: impl Bank + 'static,
+        storage: Box<dyn Storage>,
     ) -> Self {
         App {
-            wasm: WasmRouter::new(api, block, storage_factory),
-            bank: BankRouter::new(bank, storage_factory()),
+            router: Router::new(api, bank),
+            storage,
+            block,
         }
     }
 
-    pub fn cache(&'_ self) -> AppCache<'_, C> {
-        AppCache::new(self)
-    }
-
-    /// This can set the block info to any value. Must be done before taking a cache
     pub fn set_block(&mut self, block: BlockInfo) {
-        self.wasm.set_block(block);
+        self.block = block;
     }
 
-    /// This let's use use "next block" steps that add eg. one height and 5 seconds
+    // this let's use use "next block" steps that add eg. one height and 5 seconds
     pub fn update_block<F: Fn(&mut BlockInfo)>(&mut self, action: F) {
-        self.wasm.update_block(action);
+        action(&mut self.block);
     }
 
     /// Returns a copy of the current block_info
     pub fn block_info(&self) -> BlockInfo {
-        self.wasm.block_info()
-    }
-
-    /// This is an "admin" function to let us adjust bank accounts
-    pub fn set_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
-        self.bank.set_balance(account, amount)
-    }
-
-    /// This registers contract code (like uploading wasm bytecode on a chain),
-    /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
-        self.wasm.store_code(code) as u64
+        self.block.clone()
     }
 
     /// Simple helper so we get access to all the QuerierWrapper helpers,
-    /// eg. query_wasm_smart, query_all_balances, ...
+    /// eg. wrap().query_wasm_smart, query_all_balances, ...
     pub fn wrap(&self) -> QuerierWrapper {
         QuerierWrapper::new(self)
-    }
-
-    /// Handles arbitrary QueryRequest, this is wrapped by the Querier interface, but this
-    /// is nicer to use.
-    pub fn query(&self, request: QueryRequest<Empty>) -> Result<Binary, String> {
-        match request {
-            QueryRequest::Wasm(req) => self.wasm.query(self, req),
-            QueryRequest::Bank(req) => self.bank.query(req),
-            _ => unimplemented!(),
-        }
-    }
-
-    /// Create a contract and get the new address.
-    /// This is just a helper around execute()
-    pub fn instantiate_contract<T: Serialize, U: Into<String>>(
-        &mut self,
-        code_id: u64,
-        sender: Addr,
-        init_msg: &T,
-        send_funds: &[Coin],
-        label: U,
-    ) -> Result<Addr, String> {
-        // instantiate contract
-        let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
-        let msg = WasmMsg::Instantiate {
-            admin: None,
-            code_id,
-            msg: init_msg,
-            funds: send_funds.to_vec(),
-            label: label.into(),
-        };
-        let res = self.execute(sender, msg.into())?;
-        parse_contract_addr(&res.data)
-    }
-
-    /// Execute a contract and process all returned messages.
-    /// This is just a helper around execute()
-    pub fn execute_contract<T: Serialize>(
-        &mut self,
-        sender: Addr,
-        contract_addr: Addr,
-        msg: &T,
-        send_funds: &[Coin],
-    ) -> Result<AppResponse, String> {
-        let msg = to_binary(msg).map_err(|e| e.to_string())?;
-        let msg = WasmMsg::Execute {
-            contract_addr: contract_addr.into(),
-            msg,
-            funds: send_funds.to_vec(),
-        };
-        self.execute(sender, msg.into())
-    }
-
-    /// Runs arbitrary CosmosMsg.
-    /// This will create a cache before the execution, so no state changes are persisted if this
-    /// returns an error, but all are persisted on success.
-    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
-        let mut all = self.execute_multi(sender, vec![msg])?;
-        let res = all.pop().unwrap();
-        Ok(res)
     }
 
     /// Runs multiple CosmosMsg in one atomic operation.
@@ -229,23 +106,38 @@ where
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
 
-        let mut cache = self.cache();
+        let mut cache = StorageTransaction::new(self.storage.as_ref());
 
         // run all messages, stops at first error
         let res: Result<Vec<AppResponse>, String> = msgs
             .into_iter()
-            .map(|msg| cache.execute(sender.clone(), msg))
+            .map(|msg| {
+                self.router
+                    .execute(&mut cache, &self.block, sender.clone(), msg)
+            })
             .collect();
 
         // this only happens if all messages run successfully
         if res.is_ok() {
-            let ops = cache.prepare();
-            ops.commit(self);
+            cache.prepare().commit(self.storage.as_mut())
         }
         res
     }
 
-    /// Runs arbitrary CosmosMsg.
+    /// This is an "admin" function to let us adjust bank accounts
+    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
+        self.router
+            .bank
+            .init_balance(self.storage.as_mut(), account, amount)
+    }
+
+    /// This registers contract code (like uploading wasm bytecode on a chain),
+    /// so it can later be used to instantiate a contract.
+    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
+        self.router.wasm.store_code(code) as u64
+    }
+
+    /// Runs arbitrary CosmosMsg in "sudo" mode.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
     pub fn sudo<T: Serialize, U: Into<Addr>>(
@@ -254,312 +146,178 @@ where
         msg: &T,
     ) -> Result<AppResponse, String> {
         let msg = to_vec(msg).map_err(|e| e.to_string())?;
-        let mut cache = self.cache();
-
-        let res = cache.sudo(contract_addr.into(), msg);
-
-        // this only happens if all messages run successfully
-        if res.is_ok() {
-            let ops = cache.prepare();
-            ops.commit(self);
-        }
-        res
+        self.router.wasm.sudo(
+            contract_addr.into(),
+            self.storage.as_mut(),
+            &self.router,
+            &self.block,
+            msg,
+        )
     }
 }
 
-pub struct AppCache<'a, C>
+pub struct Router<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    querier: &'a dyn Querier,
-    wasm: WasmCache<'a, C>,
-    bank: BankCache<'a>,
+    pub wasm: Box<dyn Wasm<C>>,
+    pub bank: Box<dyn Bank>,
 }
 
-pub trait AppCommittable {
-    fn commit_bank(&mut self) -> &mut dyn BankCommittable;
-    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable;
-}
-
-impl<'a, C> AppCommittable for AppCache<'a, C>
+impl<C> Router<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    fn commit_bank(&mut self) -> &mut dyn BankCommittable {
-        &mut self.bank
-    }
-    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
-        &mut self.wasm
-    }
-}
-
-impl<C> AppCommittable for App<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn commit_bank(&mut self) -> &mut dyn BankCommittable {
-        &mut self.bank
-    }
-    fn commit_wasm(&mut self) -> &mut dyn WasmCommittable {
-        &mut self.wasm
-    }
-}
-
-pub struct AppOps {
-    wasm: WasmOps,
-    bank: BankOps,
-}
-
-impl AppOps {
-    pub fn commit(self, commit: &mut dyn AppCommittable) {
-        self.bank.commit(commit.commit_bank());
-        self.wasm.commit(commit.commit_wasm());
-    }
-}
-
-impl<'a, C> AppCache<'a, C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn new(router: &'a App<C>) -> Self {
-        AppCache {
-            querier: router,
-            wasm: router.wasm.cache(),
-            bank: router.bank.cache(),
+    pub fn new(api: Box<dyn Api>, bank: impl Bank + 'static) -> Self {
+        Router {
+            wasm: Box::new(WasmKeeper::new(api)),
+            bank: Box::new(bank),
         }
     }
 
-    pub fn cache(&self) -> AppCache<C> {
-        AppCache {
-            querier: self.querier,
-            wasm: self.wasm.cache(),
-            bank: self.bank.cache(),
+    pub fn querier<'a>(
+        &'a self,
+        storage: &'a dyn Storage,
+        block_info: &'a BlockInfo,
+    ) -> RouterQuerier<'a, C> {
+        RouterQuerier {
+            router: self,
+            storage,
+            block_info,
         }
     }
 
-    /// When we want to commit the RouterCache, we need a 2 step process to satisfy Rust reference counting:
-    /// 1. prepare() consumes RouterCache, releasing &Router, and creating a self-owned update info.
-    /// 2. RouterOps::commit() can now take &mut Router and updates the underlying state
-    pub fn prepare(self) -> AppOps {
-        AppOps {
-            wasm: self.wasm.prepare(),
-            bank: self.bank.prepare(),
-        }
-    }
-
-    pub fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
-        match msg {
-            CosmosMsg::Wasm(msg) => {
-                let (resender, res) = self.execute_wasm(sender, msg)?;
-                self.process_response(resender, res, false)
+    /// this is used by `RouterQuerier` to actual implement the `Querier` interface.
+    /// you most likely want to use `router.querier(storage, block).wrap()` to get a
+    /// QuerierWrapper to interact with
+    pub fn query(
+        &self,
+        storage: &dyn Storage,
+        block: &BlockInfo,
+        request: QueryRequest<Empty>,
+    ) -> Result<Binary, String> {
+        match request {
+            QueryRequest::Wasm(req) => {
+                self.wasm
+                    .query(storage, &self.querier(storage, block), block, req)
             }
-            CosmosMsg::Bank(msg) => {
-                self.bank.execute(sender, msg)?;
-                Ok(AppResponse::default())
-            }
+            QueryRequest::Bank(req) => self.bank.query(storage, req),
             _ => unimplemented!(),
         }
     }
 
-    /// This will execute the given messages, making all changes to the local cache.
-    /// This *will* write some data to the cache if the message fails half-way through.
-    /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
-    ///
-    /// For normal use cases, you can use Router::execute() or Router::execute_multi().
-    /// This is designed to be handled internally as part of larger process flows.
-    fn execute_submsg(&mut self, contract: Addr, msg: SubMsg<C>) -> Result<AppResponse, String> {
-        // execute in cache
-        let mut subtx = self.cache();
-        let res = subtx.execute(contract.clone(), msg.msg);
-        if res.is_ok() {
-            subtx.prepare().commit(self);
-        }
-
-        // call reply if meaningful
-        if let Ok(r) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
-                let mut orig = r.clone();
-                let reply = Reply {
-                    id: msg.id,
-                    result: ContractResult::Ok(SubMsgExecutionResponse {
-                        events: r.events,
-                        data: r.data,
-                    }),
-                };
-                // do reply and combine it with the original response
-                let res2 = self._reply(contract, reply)?;
-                // override data if set
-                if let Some(data) = res2.data {
-                    orig.data = Some(data);
-                }
-                // append the events
-                orig.events.extend_from_slice(&res2.events);
-                Ok(orig)
-            } else {
-                Ok(r)
-            }
-        } else if let Err(e) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
-                let reply = Reply {
-                    id: msg.id,
-                    result: ContractResult::Err(e),
-                };
-                self._reply(contract, reply)
-            } else {
-                Err(e)
-            }
-        } else {
-            res
-        }
-    }
-
-    fn _reply(&mut self, contract: Addr, reply: Reply) -> Result<AppResponse, String> {
-        // TODO: process result better, combine events / data from parent
-        let res = self.wasm.reply(contract.clone(), self.querier, reply)?;
-        self.process_response(contract, res, true)
-    }
-
-    fn process_response(
-        &mut self,
-        contract: Addr,
-        response: Response<C>,
-        ignore_attributes: bool,
+    pub fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: CosmosMsg<C>,
     ) -> Result<AppResponse, String> {
-        // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
-        // fake system level event types, like transfer from the bank module)
-        let mut events: Vec<_> = response
-            .events
-            .into_iter()
-            .map(|mut ev| {
-                ev.ty = format!("wasm-{}", ev.ty);
-                ev
-            })
-            .collect();
-        // hmmm... we don't need this for reply, right?
-        if !ignore_attributes {
-            // turn attributes into event and place it first
-            let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
-            wasm_event
-                .attributes
-                .extend_from_slice(&response.attributes);
-            events.insert(0, wasm_event);
-        }
-
-        // recurse in all messages
-        for resend in response.messages {
-            let subres = self.execute_submsg(contract.clone(), resend)?;
-            events.extend_from_slice(&subres.events);
-        }
-        Ok(AppResponse {
-            events,
-            data: response.data,
-        })
-    }
-
-    fn sudo(&mut self, contract_addr: Addr, msg: Vec<u8>) -> Result<AppResponse, String> {
-        let res = self.wasm.sudo(contract_addr.clone(), self.querier, msg)?;
-        self.process_response(contract_addr, res, false)
-    }
-
-    // this returns the contract address as well, so we can properly resend the data
-    fn execute_wasm(&mut self, sender: Addr, msg: WasmMsg) -> Result<(Addr, Response<C>), String> {
         match msg {
-            WasmMsg::Execute {
-                contract_addr,
-                msg,
-                funds,
-            } => {
-                let contract_addr = Addr::unchecked(contract_addr);
-                // first move the cash
-                self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
-                // then call the contract
-                let info = MessageInfo { sender, funds };
-                let res =
-                    self.wasm
-                        .execute(contract_addr.clone(), self.querier, info, msg.to_vec())?;
-                Ok((contract_addr, res))
-            }
-            WasmMsg::Instantiate {
-                admin: _,
-                code_id,
-                msg,
-                funds,
-                label: _,
-            } => {
-                let contract_addr = Addr::unchecked(self.wasm.register_contract(code_id as usize)?);
-                // move the cash
-                self.send(sender.clone(), contract_addr.clone().into(), &funds)?;
-                // then call the contract
-                let info = MessageInfo { sender, funds };
-                let mut res = self.wasm.instantiate(
-                    contract_addr.clone(),
-                    self.querier,
-                    info,
-                    msg.to_vec(),
-                )?;
-                init_response(&mut res, &contract_addr);
-                Ok((contract_addr, res))
-            }
-            WasmMsg::Migrate { .. } => unimplemented!(),
-            m => panic!("Unsupported wasm message: {:?}", m),
+            CosmosMsg::Wasm(msg) => self.wasm.execute(storage, &self, block, sender, msg),
+            CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
+            _ => unimplemented!(),
         }
     }
+}
 
-    fn send<T: Into<Addr>>(
-        &mut self,
-        sender: T,
-        recipient: String,
-        amount: &[Coin],
-    ) -> Result<AppResponse, String> {
-        if !amount.is_empty() {
-            let msg = BankMsg::Send {
-                to_address: recipient,
-                amount: amount.to_vec(),
-            };
-            self.bank.execute(sender.into(), msg)?;
+pub struct RouterQuerier<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    router: &'a Router<C>,
+    storage: &'a dyn Storage,
+    block_info: &'a BlockInfo,
+}
+impl<'a, C> RouterQuerier<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    pub fn new(router: &'a Router<C>, storage: &'a dyn Storage, block_info: &'a BlockInfo) -> Self {
+        Self {
+            router,
+            storage,
+            block_info,
         }
-        Ok(AppResponse::default())
+    }
+}
+
+impl<'a, C> Querier for RouterQuerier<'a, C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
+        // TODO: we need to make a new custom type for queries
+        let request: QueryRequest<Empty> = match from_slice(bin_request) {
+            Ok(v) => v,
+            Err(e) => {
+                return SystemResult::Err(SystemError::InvalidRequest {
+                    error: format!("Parsing query request: {}", e.to_string()),
+                    request: bin_request.into(),
+                })
+            }
+        };
+        let contract_result: ContractResult<Binary> = self
+            .router
+            .query(self.storage, self.block_info, request)
+            .into();
+        SystemResult::Ok(contract_result)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::{
+        attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Reply, SubMsg, WasmMsg,
+    };
+
     use crate::test_helpers::{
         contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
         PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
         ReflectQueryMsg,
     };
-    use crate::SimpleBank;
-    use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::{attr, coin, coins, Reply};
+    use crate::BankKeeper;
 
-    fn mock_router() -> App {
+    use super::*;
+
+    fn mock_app() -> App {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
 
-        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }
 
-    fn custom_router() -> App<CustomMsg> {
+    fn custom_app() -> App<CustomMsg> {
         let env = mock_env();
         let api = Box::new(MockApi::default());
-        let bank = SimpleBank {};
+        let bank = BankKeeper::new();
 
-        App::new(api, env.block, bank, || Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, Box::new(MockStorage::new()))
     }
 
-    fn get_balance<C>(router: &App<C>, addr: &Addr) -> Vec<Coin>
+    fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
     where
         C: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
-        router.wrap().query_all_balances(addr).unwrap()
+        app.wrap().query_all_balances(addr).unwrap()
+    }
+
+    #[test]
+    fn update_block() {
+        let mut app = mock_app();
+
+        let BlockInfo { time, height, .. } = app.block;
+        app.update_block(next_block);
+
+        assert_eq!(time.plus_seconds(5), app.block.time);
+        assert_eq!(height + 1, app.block.height);
     }
 
     #[test]
     fn send_tokens() {
-        let mut router = mock_router();
+        let mut app = mock_app();
 
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("receiver");
@@ -567,8 +325,8 @@ mod test {
         let rcpt_funds = vec![coin(5, "btc")];
 
         // set money
-        router.set_bank_balance(&owner, init_funds).unwrap();
-        router.set_bank_balance(&rcpt, rcpt_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&rcpt, rcpt_funds).unwrap();
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
@@ -577,14 +335,14 @@ mod test {
             amount: to_send,
         }
         .into();
-        router.execute(owner.clone(), msg.clone()).unwrap();
-        let rich = get_balance(&router, &owner);
+        app.execute(owner.clone(), msg.clone()).unwrap();
+        let rich = get_balance(&app, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
-        let poor = get_balance(&router, &rcpt);
+        let poor = get_balance(&app, &rcpt);
         assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
 
         // can send from other account (but funds will be deducted from sender)
-        router.execute(rcpt.clone(), msg).unwrap();
+        app.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
         let msg = BankMsg::Send {
@@ -592,44 +350,44 @@ mod test {
             amount: coins(20, "btc"),
         }
         .into();
-        router.execute(owner.clone(), msg).unwrap_err();
+        app.execute(owner.clone(), msg).unwrap_err();
 
-        let rich = get_balance(&router, &owner);
+        let rich = get_balance(&app, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
     }
 
     #[test]
     fn simple_contract() {
-        let mut router = mock_router();
+        let mut app = mock_app();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up contract
-        let code_id = router.store_code(contract_payout());
+        let code_id = app.store_code(contract_payout());
         let msg = PayoutInitMessage {
             payout: coin(5, "eth"),
         };
-        let contract_addr = router
+        let contract_addr = app
             .instantiate_contract(code_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
             .unwrap();
 
         // sender funds deducted
-        let sender = get_balance(&router, &owner);
+        let sender = get_balance(&app, &owner);
         assert_eq!(sender, vec![coin(20, "btc"), coin(77, "eth")]);
         // get contract address, has funds
-        let funds = get_balance(&router, &contract_addr);
+        let funds = get_balance(&app, &contract_addr);
         assert_eq!(funds, coins(23, "eth"));
 
         // create empty account
         let random = Addr::unchecked("random");
-        let funds = get_balance(&router, &random);
+        let funds = get_balance(&app, &random);
         assert_eq!(funds, vec![]);
 
         // do one payout and see money coming in
-        let res = router
+        let res = app
             .execute_contract(random.clone(), contract_addr.clone(), &EmptyMsg {}, &[])
             .unwrap();
         assert_eq!(1, res.events.len());
@@ -637,42 +395,42 @@ mod test {
         assert_eq!(&[attr("action", "payout")], &custom_attrs);
 
         // random got cash
-        let funds = get_balance(&router, &random);
+        let funds = get_balance(&app, &random);
         assert_eq!(funds, coins(5, "eth"));
         // contract lost it
-        let funds = get_balance(&router, &contract_addr);
+        let funds = get_balance(&app, &contract_addr);
         assert_eq!(funds, coins(18, "eth"));
     }
 
     #[test]
     fn reflect_success() {
-        let mut router = custom_router();
+        let mut app = custom_app();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up payout contract
-        let payout_id = router.store_code(contract_payout_custom());
+        let payout_id = app.store_code(contract_payout_custom());
         let msg = PayoutInitMessage {
             payout: coin(5, "eth"),
         };
-        let payout_addr = router
+        let payout_addr = app
             .instantiate_contract(payout_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
             .unwrap();
 
         // set up reflect contract
-        let reflect_id = router.store_code(contract_reflect());
-        let reflect_addr = router
+        let reflect_id = app.store_code(contract_reflect());
+        let reflect_addr = app
             .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect")
             .unwrap();
 
         // reflect account is empty
-        let funds = get_balance(&router, &reflect_addr);
+        let funds = get_balance(&app, &reflect_addr);
         assert_eq!(funds, vec![]);
         // reflect count is 1
-        let qres: PayoutCountResponse = router
+        let qres: PayoutCountResponse = app
             .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
@@ -687,7 +445,7 @@ mod test {
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
-        let res = router
+        let res = app
             .execute_contract(Addr::unchecked("random"), reflect_addr.clone(), &msgs, &[])
             .unwrap();
 
@@ -713,11 +471,11 @@ mod test {
         // FIXME? reply didn't add any more events itself...
 
         // ensure transfer was executed with reflect as sender
-        let funds = get_balance(&router, &reflect_addr);
+        let funds = get_balance(&app, &reflect_addr);
         assert_eq!(funds, coins(5, "eth"));
 
         // reflect count updated
-        let qres: PayoutCountResponse = router
+        let qres: PayoutCountResponse = app
             .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
@@ -726,16 +484,16 @@ mod test {
 
     #[test]
     fn reflect_error() {
-        let mut router = custom_router();
+        let mut app = custom_app();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
-        let reflect_id = router.store_code(contract_reflect());
-        let reflect_addr = router
+        let reflect_id = app.store_code(contract_reflect());
+        let reflect_addr = app
             .instantiate_contract(
                 reflect_id,
                 owner,
@@ -746,7 +504,7 @@ mod test {
             .unwrap();
 
         // reflect has 40 eth
-        let funds = get_balance(&router, &reflect_addr);
+        let funds = get_balance(&app, &reflect_addr);
         assert_eq!(funds, coins(40, "eth"));
         let random = Addr::unchecked("random");
 
@@ -758,7 +516,7 @@ mod test {
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
-        let res = router
+        let res = app
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
         // only one wasm event with no custom attributes
@@ -767,11 +525,11 @@ mod test {
         assert_eq!("wasm", res.events[0].ty.as_str());
         assert_eq!("contract_address", res.events[0].attributes[0].key.as_str());
         // ensure random got paid
-        let funds = get_balance(&router, &random);
+        let funds = get_balance(&app, &random);
         assert_eq!(funds, coins(7, "eth"));
 
         // reflect count should be updated to 1
-        let qres: PayoutCountResponse = router
+        let qres: PayoutCountResponse = app
             .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
@@ -789,17 +547,17 @@ mod test {
         let msgs = ReflectMessage {
             messages: vec![msg, msg2],
         };
-        let err = router
+        let err = app
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap_err();
         assert_eq!("Overflow: Cannot Sub with 0 and 3", err.as_str());
 
         // first one should have been rolled-back on error (no second payment)
-        let funds = get_balance(&router, &random);
+        let funds = get_balance(&app, &random);
         assert_eq!(funds, coins(7, "eth"));
 
         // failure should not update reflect count
-        let qres: PayoutCountResponse = router
+        let qres: PayoutCountResponse = app
             .wrap()
             .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
             .unwrap();
@@ -808,21 +566,21 @@ mod test {
 
     #[test]
     fn sudo_works() {
-        let mut router = mock_router();
+        let mut app = mock_app();
 
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds).unwrap();
-        let payout_id = router.store_code(contract_payout());
+        app.init_bank_balance(&owner, init_funds).unwrap();
+        let payout_id = app.store_code(contract_payout());
         let msg = PayoutInitMessage {
             payout: coin(5, "eth"),
         };
-        let payout_addr = router
+        let payout_addr = app
             .instantiate_contract(payout_id, owner, &msg, &coins(23, "eth"), "Payout")
             .unwrap();
 
         // count is 1
-        let PayoutCountResponse { count } = router
+        let PayoutCountResponse { count } = app
             .wrap()
             .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
@@ -830,10 +588,10 @@ mod test {
 
         // sudo
         let msg = PayoutSudoMsg { set_count: 25 };
-        router.sudo(payout_addr.clone(), &msg).unwrap();
+        app.sudo(payout_addr.clone(), &msg).unwrap();
 
         // count is 25
-        let PayoutCountResponse { count } = router
+        let PayoutCountResponse { count } = app
             .wrap()
             .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
             .unwrap();
@@ -842,17 +600,17 @@ mod test {
 
     #[test]
     fn reflect_submessage_reply_works() {
-        let mut router = custom_router();
+        let mut app = custom_app();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
         let random = Addr::unchecked("random");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        router.set_bank_balance(&owner, init_funds).unwrap();
+        app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
-        let reflect_id = router.store_code(contract_reflect());
-        let reflect_addr = router
+        let reflect_id = app.store_code(contract_reflect());
+        let reflect_addr = app
             .instantiate_contract(
                 reflect_id,
                 owner,
@@ -864,8 +622,7 @@ mod test {
 
         // no reply writen beforehand
         let query = ReflectQueryMsg::Reply { id: 123 };
-        router
-            .wrap()
+        app.wrap()
             .query_wasm_smart::<Reply, _, _>(&reflect_addr, &query)
             .unwrap_err();
 
@@ -880,7 +637,7 @@ mod test {
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
-        let res = router
+        let res = app
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
         // we should get 2 events, the wasm one and the custom event
@@ -896,13 +653,9 @@ mod test {
         assert_eq!(&attr("to", "test"), &second.attributes[1]);
 
         // ensure success was written
-        let res: Reply = router
-            .wrap()
-            .query_wasm_smart(&reflect_addr, &query)
-            .unwrap();
+        let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 123);
         assert!(res.result.is_ok());
-        // TODO: any more checks on reply data???
 
         // reflect sends 300 btc, failure, but error caught by submessage (so shows success)
         let msg = SubMsg::reply_always(
@@ -915,18 +668,93 @@ mod test {
         let msgs = ReflectMessage {
             messages: vec![msg],
         };
-        let _res = router
+        let _res = app
             .execute_contract(random, reflect_addr.clone(), &msgs, &[])
             .unwrap();
 
         // ensure error was written
         let query = ReflectQueryMsg::Reply { id: 456 };
-        let res: Reply = router
-            .wrap()
-            .query_wasm_smart(&reflect_addr, &query)
-            .unwrap();
+        let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 456);
         assert!(res.result.is_err());
         // TODO: check error?
+    }
+
+    fn query_router<C>(router: &Router<C>, storage: &dyn Storage, rcpt: &Addr) -> Vec<Coin>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        let query = BankQuery::AllBalances {
+            address: rcpt.into(),
+        };
+        let res = router.bank.query(storage, query).unwrap();
+        let val: AllBalanceResponse = from_slice(&res).unwrap();
+        val.amount
+    }
+
+    fn query_app<C>(app: &App<C>, rcpt: &Addr) -> Vec<Coin>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        let query = BankQuery::AllBalances {
+            address: rcpt.into(),
+        }
+        .into();
+        let val: AllBalanceResponse = app.wrap().query(&query).unwrap();
+        val.amount
+    }
+
+    #[test]
+    fn multi_level_bank_cache() {
+        let mut app = mock_app();
+
+        // set personal balance
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("recipient");
+        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
+        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        // cache 1 - send some tokens
+        let mut cache = StorageTransaction::new(app.storage.as_ref());
+        let msg = BankMsg::Send {
+            to_address: rcpt.clone().into(),
+            amount: coins(25, "eth"),
+        };
+        app.router
+            .execute(&mut cache, &app.block, owner.clone(), msg.into())
+            .unwrap();
+
+        // shows up in cache
+        let cached_rcpt = query_router(&app.router, &cache, &rcpt);
+        assert_eq!(coins(25, "eth"), cached_rcpt);
+        let router_rcpt = query_app(&app, &rcpt);
+        assert_eq!(router_rcpt, vec![]);
+
+        // now, second level cache
+        let mut cache2 = cache.cache();
+        let msg = BankMsg::Send {
+            to_address: rcpt.clone().into(),
+            amount: coins(12, "eth"),
+        };
+        app.router
+            .execute(&mut cache2, &app.block, owner, msg.into())
+            .unwrap();
+
+        // shows up in 2nd cache
+        let cached_rcpt = query_router(&app.router, &cache, &rcpt);
+        assert_eq!(coins(25, "eth"), cached_rcpt);
+        let cached2_rcpt = query_router(&app.router, &cache2, &rcpt);
+        assert_eq!(coins(37, "eth"), cached2_rcpt);
+
+        // apply second to first
+        let ops = cache2.prepare();
+        ops.commit(&mut cache);
+
+        // apply first to router
+        let ops = cache.prepare();
+        ops.commit(app.storage.as_mut());
+
+        let committed = query_app(&app, &rcpt);
+        assert_eq!(coins(37, "eth"), committed);
     }
 }

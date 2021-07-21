@@ -1,620 +1,706 @@
-use schemars::JsonSchema;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 
 use cosmwasm_std::{
-    Addr, Api, Binary, BlockInfo, ContractInfo, Deps, DepsMut, Env, MessageInfo, Querier,
-    QuerierWrapper, Reply, Response, Storage, WasmQuery,
+    Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult, Deps, DepsMut, Env,
+    Event, MessageInfo, Order, Querier, QuerierWrapper, Reply, ReplyOn, Response, Storage, SubMsg,
+    SubMsgExecutionResponse, WasmMsg, WasmQuery,
 };
+use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
+use prost::Message;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
+use cw_storage_plus::Map;
+
+use crate::app::{Router, RouterQuerier};
 use crate::contracts::Contract;
-use crate::transactions::{RepLog, StorageTransaction};
+use crate::executor::AppResponse;
+use crate::transactions::StorageTransaction;
 
+// Contract state is kept in Storage, separate from the contracts themselves
+const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
+
+pub const NAMESPACE_WASM: &[u8] = b"wasm";
+
+/// Contract Data is just a code_id that can be used to lookup the actual code from the Router
+/// We can add other info here in the future, like admin
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 struct ContractData {
-    code_id: usize,
-    storage: Box<dyn Storage>,
+    pub code_id: usize,
 }
 
 impl ContractData {
-    fn new(code_id: usize, storage: Box<dyn Storage>) -> Self {
-        ContractData { code_id, storage }
-    }
-
-    fn as_mut(&mut self) -> ContractMut {
-        ContractMut {
-            code_id: self.code_id,
-            storage: self.storage.as_mut(),
-        }
-    }
-
-    fn as_ref(&self) -> ContractRef {
-        ContractRef {
-            code_id: self.code_id,
-            storage: self.storage.as_ref(),
-        }
+    fn new(code_id: usize) -> Self {
+        ContractData { code_id }
     }
 }
 
-struct ContractMut<'a> {
-    code_id: usize,
-    storage: &'a mut dyn Storage,
-}
-
-impl<'a> ContractMut<'a> {
-    fn new(code_id: usize, storage: &'a mut dyn Storage) -> Self {
-        ContractMut { code_id, storage }
-    }
-}
-
-struct ContractRef<'a> {
-    code_id: usize,
-    storage: &'a dyn Storage,
-}
-
-impl<'a> ContractRef<'a> {
-    fn new(code_id: usize, storage: &'a dyn Storage) -> Self {
-        ContractRef { code_id, storage }
-    }
-}
-
-pub fn next_block(block: &mut BlockInfo) {
-    block.time = block.time.plus_seconds(5);
-    block.height += 1;
-}
-
-pub type StorageFactory = fn() -> Box<dyn Storage>;
-
-pub struct WasmRouter<C>
+pub trait Wasm<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    // WasmState - cache this, pass in separate?
+    /// Handles all WasmQuery requests
+    fn query(
+        &self,
+        storage: &dyn Storage,
+        querier: &dyn Querier,
+        block: &BlockInfo,
+        request: WasmQuery,
+    ) -> Result<Binary, String>;
+
+    /// Handles all WasmMsg messages
+    fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: WasmMsg,
+    ) -> Result<AppResponse, String>;
+
+    // Add a new contract. Must be done on the base object, when no contracts running
+    fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize;
+
+    /// Admin interface, cannot be called via CosmosMsg
+    fn sudo(
+        &self,
+        contract_addr: Addr,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        msg: Vec<u8>,
+    ) -> Result<AppResponse, String>;
+}
+
+pub struct WasmKeeper<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    /// code is in-memory lookup that stands in for wasm code
+    /// this can only be edited on the WasmRouter, and just read in caches
     codes: HashMap<usize, Box<dyn Contract<C>>>,
-    contracts: HashMap<Addr, ContractData>,
+
     // WasmConst
-    block: BlockInfo,
     api: Box<dyn Api>,
-    storage_factory: StorageFactory,
 }
 
-impl<C> WasmRouter<C>
+impl<C> Wasm<C> for WasmKeeper<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    pub fn new(api: Box<dyn Api>, block: BlockInfo, storage_factory: StorageFactory) -> Self {
-        WasmRouter {
-            codes: HashMap::new(),
-            contracts: HashMap::new(),
-            block,
-            api,
-            storage_factory,
+    fn query(
+        &self,
+        storage: &dyn Storage,
+        querier: &dyn Querier,
+        block: &BlockInfo,
+        request: WasmQuery,
+    ) -> Result<Binary, String> {
+        match request {
+            WasmQuery::Smart { contract_addr, msg } => {
+                let addr = self
+                    .api
+                    .addr_validate(&contract_addr)
+                    .map_err(|e| e.to_string())?;
+                self.query_smart(addr, storage, querier, block, msg.into())
+            }
+            WasmQuery::Raw { contract_addr, key } => {
+                let addr = self
+                    .api
+                    .addr_validate(&contract_addr)
+                    .map_err(|e| e.to_string())?;
+                Ok(self.query_raw(addr, storage, &key))
+            }
+            q => panic!("Unsupported wasm query: {:?}", q),
         }
     }
 
-    pub fn set_block(&mut self, block: BlockInfo) {
-        self.block = block;
+    fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: WasmMsg,
+    ) -> Result<AppResponse, String> {
+        let (resender, res) = self.execute_wasm(storage, router, block, sender, msg)?;
+        self.process_response(router, storage, block, resender, res, false)
     }
 
-    // this let's use use "next block" steps that add eg. one height and 5 seconds
-    pub fn update_block<F: Fn(&mut BlockInfo)>(&mut self, action: F) {
-        action(&mut self.block);
-    }
-
-    /// Returns a copy of the current block_info
-    pub fn block_info(&self) -> BlockInfo {
-        self.block.clone()
-    }
-
-    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
+    fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
         let idx = self.codes.len() + 1;
         self.codes.insert(idx, code);
         idx
     }
 
-    pub fn cache(&'_ self) -> WasmCache<'_, C> {
-        WasmCache::new(self)
+    fn sudo(
+        &self,
+        contract_addr: Addr,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        msg: Vec<u8>,
+    ) -> Result<AppResponse, String> {
+        let res = self.call_sudo(contract_addr.clone(), storage, router, block, msg)?;
+        self.process_response(router, storage, block, contract_addr, res, false)
     }
+}
 
-    pub fn query(&self, querier: &dyn Querier, request: WasmQuery) -> Result<Binary, String> {
-        match request {
-            WasmQuery::Smart { contract_addr, msg } => {
-                self.query_smart(Addr::unchecked(contract_addr), querier, msg.into())
-            }
-            WasmQuery::Raw { contract_addr, key } => {
-                self.query_raw(Addr::unchecked(contract_addr), &key)
-            }
-            q => panic!("Unsupported wasm query: {:?}", q),
+impl<C> WasmKeeper<C>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    pub fn new(api: Box<dyn Api>) -> Self {
+        WasmKeeper {
+            codes: HashMap::new(),
+            api,
         }
     }
 
     pub fn query_smart(
         &self,
         address: Addr,
+        storage: &dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Binary, String> {
-        self.with_storage(querier, address, |handler, deps, env| {
+        self.with_storage_readonly(storage, querier, block, address, |handler, deps, env| {
             handler.query(deps, env, msg)
         })
     }
 
-    pub fn query_raw(&self, address: Addr, key: &[u8]) -> Result<Binary, String> {
-        let contract = self
-            .contracts
-            .get(&address)
-            .ok_or_else(|| "Unregistered contract address".to_string())?;
-        let data = contract.storage.get(&key).unwrap_or_default();
-        Ok(data.into())
+    pub fn query_raw(&self, address: Addr, storage: &dyn Storage, key: &[u8]) -> Binary {
+        let storage = self.contract_storage_readonly(storage, &address);
+        let data = storage.get(&key).unwrap_or_default();
+        data.into()
     }
 
-    fn get_env<T: Into<Addr>>(&self, address: T) -> Env {
+    fn send<T: Into<Addr>>(
+        &self,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        sender: T,
+        recipient: String,
+        amount: &[Coin],
+    ) -> Result<AppResponse, String> {
+        if !amount.is_empty() {
+            let msg = BankMsg::Send {
+                to_address: recipient,
+                amount: amount.to_vec(),
+            };
+            let res = router.execute(storage, block, sender.into(), msg.into())?;
+            Ok(res)
+        } else {
+            Ok(AppResponse::default())
+        }
+    }
+
+    // this returns the contract address as well, so we can properly resend the data
+    fn execute_wasm(
+        &self,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: WasmMsg,
+    ) -> Result<(Addr, Response<C>), String> {
+        match msg {
+            WasmMsg::Execute {
+                contract_addr,
+                msg,
+                funds,
+            } => {
+                let contract_addr = Addr::unchecked(contract_addr);
+                // first move the cash
+                self.send(
+                    storage,
+                    router,
+                    block,
+                    sender.clone(),
+                    contract_addr.clone().into(),
+                    &funds,
+                )?;
+
+                // then call the contract
+                let info = MessageInfo { sender, funds };
+                let res = self.call_execute(
+                    storage,
+                    contract_addr.clone(),
+                    router,
+                    block,
+                    info,
+                    msg.to_vec(),
+                )?;
+                Ok((contract_addr, res))
+            }
+            WasmMsg::Instantiate {
+                admin: _,
+                code_id,
+                msg,
+                funds,
+                label: _,
+            } => {
+                let contract_addr =
+                    Addr::unchecked(self.register_contract(storage, code_id as usize)?);
+                // move the cash
+                self.send(
+                    storage,
+                    router,
+                    block,
+                    sender.clone(),
+                    contract_addr.clone().into(),
+                    &funds,
+                )?;
+
+                // then call the contract
+                let info = MessageInfo { sender, funds };
+                let mut res = self.call_instantiate(
+                    contract_addr.clone(),
+                    storage,
+                    router,
+                    block,
+                    info,
+                    msg.to_vec(),
+                )?;
+                init_response(&mut res, &contract_addr);
+                Ok((contract_addr, res))
+            }
+            WasmMsg::Migrate { .. } => unimplemented!(),
+            m => panic!("Unsupported wasm message: {:?}", m),
+        }
+    }
+
+    /// This will execute the given messages, making all changes to the local cache.
+    /// This *will* write some data to the cache if the message fails half-way through.
+    /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
+    ///
+    /// For normal use cases, you can use Router::execute() or Router::execute_multi().
+    /// This is designed to be handled internally as part of larger process flows.
+    fn execute_submsg(
+        &self,
+        router: &Router<C>,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        contract: Addr,
+        msg: SubMsg<C>,
+    ) -> Result<AppResponse, String> {
+        // execute in cache
+        let mut cache = StorageTransaction::new(storage);
+        let res = router.execute(&mut cache, block, contract.clone(), msg.msg);
+        if res.is_ok() {
+            cache.prepare().commit(storage);
+        }
+
+        // call reply if meaningful
+        if let Ok(r) = res {
+            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
+                let mut orig = r.clone();
+                let reply = Reply {
+                    id: msg.id,
+                    result: ContractResult::Ok(SubMsgExecutionResponse {
+                        events: r.events,
+                        data: r.data,
+                    }),
+                };
+                // do reply and combine it with the original response
+                let res2 = self._reply(router, storage, block, contract, reply)?;
+                // override data if set
+                if let Some(data) = res2.data {
+                    orig.data = Some(data);
+                }
+                // append the events
+                orig.events.extend_from_slice(&res2.events);
+                Ok(orig)
+            } else {
+                Ok(r)
+            }
+        } else if let Err(e) = res {
+            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
+                let reply = Reply {
+                    id: msg.id,
+                    result: ContractResult::Err(e),
+                };
+                self._reply(router, storage, block, contract, reply)
+            } else {
+                Err(e)
+            }
+        } else {
+            res
+        }
+    }
+
+    fn _reply(
+        &self,
+        router: &Router<C>,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        contract: Addr,
+        reply: Reply,
+    ) -> Result<AppResponse, String> {
+        let res = self.call_reply(contract.clone(), storage, router, block, reply)?;
+        // TODO: process result better, combine events / data from parent
+        self.process_response(router, storage, block, contract, res, true)
+    }
+
+    fn process_response(
+        &self,
+        router: &Router<C>,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        contract: Addr,
+        response: Response<C>,
+        ignore_attributes: bool,
+    ) -> Result<AppResponse, String> {
+        // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
+        // fake system level event types, like transfer from the bank module)
+        let mut events: Vec<_> = response
+            .events
+            .into_iter()
+            .map(|mut ev| {
+                ev.ty = format!("wasm-{}", ev.ty);
+                ev
+            })
+            .collect();
+        // hmmm... we don't need this for reply, right?
+        if !ignore_attributes {
+            // turn attributes into event and place it first
+            let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
+            wasm_event
+                .attributes
+                .extend_from_slice(&response.attributes);
+            events.insert(0, wasm_event);
+        }
+
+        // recurse in all messages
+        for resend in response.messages {
+            let subres = self.execute_submsg(router, storage, block, contract.clone(), resend)?;
+            events.extend_from_slice(&subres.events);
+        }
+        Ok(AppResponse {
+            events,
+            data: response.data,
+        })
+    }
+
+    /// This just creates an address and empty storage instance, returning the new address
+    /// You must call init after this to set up the contract properly.
+    /// These are separated into two steps to have cleaner return values.
+    pub fn register_contract(
+        &self,
+        storage: &mut dyn Storage,
+        code_id: usize,
+    ) -> Result<Addr, String> {
+        let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
+
+        if !self.codes.contains_key(&code_id) {
+            return Err("Cannot init contract with unregistered code id".to_string());
+        }
+        let addr = self.next_address(&wasm_storage);
+        let info = ContractData::new(code_id);
+        CONTRACTS
+            .save(&mut wasm_storage, &addr, &info)
+            .map_err(|e| e.to_string())?;
+        Ok(addr)
+    }
+
+    pub fn call_execute(
+        &self,
+        storage: &mut dyn Storage,
+        address: Addr,
+        router: &Router<C>,
+        block: &BlockInfo,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, router, block, address, |contract, deps, env| {
+            contract.execute(deps, env, info, msg)
+        })
+    }
+
+    pub fn call_instantiate(
+        &self,
+        address: Addr,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        info: MessageInfo,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, router, block, address, |contract, deps, env| {
+            contract.instantiate(deps, env, info, msg)
+        })
+    }
+
+    pub fn call_reply(
+        &self,
+        address: Addr,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        reply: Reply,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, router, block, address, |contract, deps, env| {
+            contract.reply(deps, env, reply)
+        })
+    }
+
+    pub fn call_sudo(
+        &self,
+        address: Addr,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, router, block, address, |contract, deps, env| {
+            contract.sudo(deps, env, msg)
+        })
+    }
+
+    fn get_env<T: Into<Addr>>(&self, address: T, block: &BlockInfo) -> Env {
         Env {
-            block: self.block.clone(),
+            block: block.clone(),
             contract: ContractInfo {
                 address: address.into(),
             },
         }
     }
 
-    fn with_storage<F, T>(
+    fn with_storage_readonly<F, T>(
         &self,
+        storage: &dyn Storage,
         querier: &dyn Querier,
+        block: &BlockInfo,
         address: Addr,
         action: F,
     ) -> Result<T, String>
     where
         F: FnOnce(&Box<dyn Contract<C>>, Deps, Env) -> Result<T, String>,
     {
-        let contract = self
-            .contracts
-            .get(&address)
-            .ok_or_else(|| "Unregistered contract address".to_string())?;
+        let contract = self.load_contract(storage, &address)?;
         let handler = self
             .codes
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
-        let env = self.get_env(address);
+        let storage = self.contract_storage_readonly(storage, &address);
+        let env = self.get_env(address, block);
 
         let deps = Deps {
-            storage: contract.storage.as_ref(),
+            storage: storage.as_ref(),
             api: self.api.deref(),
             querier: QuerierWrapper::new(querier),
         };
         action(handler, deps, env)
     }
-}
-
-trait ContractProvider {
-    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<ContractRef<'a>>;
-    fn num_contracts(&self) -> usize;
-}
-
-impl<C> ContractProvider for WasmRouter<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    // Option<&'a ContractData> {
-    fn get_contract<'a>(&'a self, addr: &Addr) -> Option<ContractRef<'a>> {
-        self.contracts.get(addr).map(|x| x.as_ref())
-    }
-
-    fn num_contracts(&self) -> usize {
-        self.contracts.len()
-    }
-}
-
-/// A writable transactional cache over the wasm state.
-///
-/// Reads hit local hashmap or then hit router
-/// Getting storage wraps the internal contract storage
-///  - adding handler
-///  - adding contract
-///  - writing existing contract
-/// Return op-log to flush, like transactional:
-///  - consume this struct (release router) and return list of ops to perform
-///  - pass ops &mut WasmRouter to update them
-///
-/// In Router, we use this exclusively in all the calls in execute (not self.wasm)
-/// In Querier, we use self.wasm
-pub struct WasmCache<'a, C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    // and this into one with reference
-    router: &'a WasmRouter<C>,
-    parent_contracts: &'a dyn ContractProvider,
-    state: WasmCacheState<'a>,
-}
-
-impl<'a, C> ContractProvider for WasmCache<'a, C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn get_contract<'b>(&'b self, addr: &Addr) -> Option<ContractRef<'b>> {
-        self.state.get_contract_ref(self.parent_contracts, addr)
-    }
-
-    fn num_contracts(&self) -> usize {
-        self.parent_contracts.num_contracts() + self.state.contracts.len()
-    }
-}
-
-/// This is the mutable state of the cached.
-/// Separated out so we can grab a mutable reference to both these HashMaps,
-/// while still getting an immutable reference to router.
-/// (We cannot take &mut WasmCache)
-pub struct WasmCacheState<'a> {
-    contracts: HashMap<Addr, ContractData>,
-    contract_diffs: HashMap<Addr, StorageTransaction<'a>>,
-}
-
-impl<'a> WasmCacheState<'a> {
-    pub fn new() -> Self {
-        WasmCacheState {
-            contracts: HashMap::new(),
-            contract_diffs: HashMap::new(),
-        }
-    }
-}
-
-/// This is a set of data from the WasmCache with no external reference,
-/// which can be used to commit to the underlying WasmRouter.
-pub struct WasmOps {
-    new_contracts: HashMap<Addr, ContractData>,
-    contract_diffs: Vec<(Addr, RepLog)>,
-}
-
-impl WasmOps {
-    pub fn commit(self, committable: &mut dyn WasmCommittable) {
-        committable.apply_ops(self)
-    }
-}
-
-pub trait WasmCommittable {
-    fn apply_ops(&mut self, ops: WasmOps);
-}
-
-impl<C> WasmCommittable for WasmRouter<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn apply_ops(&mut self, ops: WasmOps) {
-        ops.new_contracts.into_iter().for_each(|(k, v)| {
-            self.contracts.insert(k, v);
-        });
-        ops.contract_diffs.into_iter().for_each(|(k, ops)| {
-            let storage = self.contracts.get_mut(&k).unwrap().storage.as_mut();
-            ops.commit(storage);
-        });
-    }
-}
-
-impl<'a, C> WasmCommittable for WasmCache<'a, C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn apply_ops(&mut self, ops: WasmOps) {
-        ops.new_contracts.into_iter().for_each(|(k, v)| {
-            self.state.contracts.insert(k, v);
-        });
-        ops.contract_diffs.into_iter().for_each(|(k, ops)| {
-            match self.state.get_contract_mut(self.parent_contracts, &k) {
-                Some(contract) => ops.commit(contract.storage),
-                None => panic!("No contract at {}, but applying diff", k),
-            }
-        });
-    }
-}
-
-impl<'a, C> WasmCache<'a, C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn new(router: &'a WasmRouter<C>) -> Self {
-        WasmCache {
-            router,
-            parent_contracts: router,
-            state: WasmCacheState::new(),
-        }
-    }
-
-    pub fn cache(&self) -> WasmCache<C> {
-        WasmCache {
-            router: self.router,
-            parent_contracts: self,
-            state: WasmCacheState::new(),
-        }
-    }
-
-    /// When we want to commit the WasmCache, we need a 2 step process to satisfy Rust reference counting:
-    /// 1. prepare() consumes WasmCache, releasing &WasmRouter, and creating a self-owned update info.
-    /// 2. WasmOps::commit() can now take &mut WasmRouter and updates the underlying state
-    pub fn prepare(self) -> WasmOps {
-        self.state.prepare()
-    }
-
-    /// This just creates an address and empty storage instance, returning the new address
-    /// You must call init after this to set up the contract properly.
-    /// These are separated into two steps to have cleaner return values.
-    pub fn register_contract(&mut self, code_id: usize) -> Result<Addr, String> {
-        if !self.router.codes.contains_key(&code_id) {
-            return Err("Cannot init contract with unregistered code id".to_string());
-        }
-        let addr = self.next_address();
-        let info = ContractData::new(code_id, (self.router.storage_factory)());
-        self.state.contracts.insert(addr.clone(), info);
-        Ok(addr)
-    }
-
-    // TODO: better addr generation
-    fn next_address(&self) -> Addr {
-        let count = self.parent_contracts.num_contracts() + self.state.contracts.len();
-        // we make this longer so it is not rejected by tests
-        Addr::unchecked("Contract #".to_string() + &count.to_string())
-    }
-
-    pub fn execute(
-        &mut self,
-        address: Addr,
-        querier: &dyn Querier,
-        info: MessageInfo,
-        msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
-        let parent = &self.router.codes;
-        let env = self.router.get_env(address.clone());
-        let api = self.router.api.as_ref();
-
-        self.state.with_storage(
-            querier,
-            self.parent_contracts,
-            address,
-            env,
-            api,
-            |code_id, deps, env| {
-                let handler = parent
-                    .get(&code_id)
-                    .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.execute(deps, env, info, msg)
-            },
-        )
-    }
-
-    pub fn instantiate(
-        &mut self,
-        address: Addr,
-        querier: &dyn Querier,
-        info: MessageInfo,
-        msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
-        let parent = &self.router.codes;
-        let env = self.router.get_env(address.clone());
-        let api = self.router.api.as_ref();
-
-        self.state.with_storage(
-            querier,
-            self.parent_contracts,
-            address,
-            env,
-            api,
-            |code_id, deps, env| {
-                let handler = parent
-                    .get(&code_id)
-                    .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.instantiate(deps, env, info, msg)
-            },
-        )
-    }
-
-    pub fn reply(
-        &mut self,
-        address: Addr,
-        querier: &dyn Querier,
-        reply: Reply,
-    ) -> Result<Response<C>, String> {
-        // this errors if the sender is not a contract
-        let parent = &self.router.codes;
-        let env = self.router.get_env(address.clone());
-        let api = self.router.api.as_ref();
-
-        self.state.with_storage(
-            querier,
-            self.parent_contracts,
-            address,
-            env,
-            api,
-            |code_id, deps, env| {
-                let handler = parent
-                    .get(&code_id)
-                    .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.reply(deps, env, reply)
-            },
-        )
-    }
-
-    pub fn sudo(
-        &mut self,
-        address: Addr,
-        querier: &dyn Querier,
-        msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
-        let parent = &self.router.codes;
-        let env = self.router.get_env(address.clone());
-        let api = self.router.api.as_ref();
-
-        self.state.with_storage(
-            querier,
-            self.parent_contracts,
-            address,
-            env,
-            api,
-            |code_id, deps, env| {
-                let handler = parent
-                    .get(&code_id)
-                    .ok_or_else(|| "Unregistered code id".to_string())?;
-                handler.sudo(deps, env, msg)
-            },
-        )
-    }
-}
-
-impl<'a> WasmCacheState<'a> {
-    pub fn prepare(self) -> WasmOps {
-        let diffs: Vec<_> = self
-            .contract_diffs
-            .into_iter()
-            .map(|(k, store)| (k, store.prepare()))
-            .collect();
-
-        WasmOps {
-            new_contracts: self.contracts,
-            contract_diffs: diffs,
-        }
-    }
-
-    fn get_contract_mut<'b>(
-        &'b mut self,
-        parent: &'a dyn ContractProvider,
-        addr: &Addr,
-    ) -> Option<ContractMut<'b>> {
-        // if we created this transaction
-        if let Some(x) = self.contracts.get_mut(addr) {
-            return Some(x.as_mut());
-        }
-        if let Some(c) = parent.get_contract(addr) {
-            let code_id = c.code_id;
-            if self.contract_diffs.contains_key(addr) {
-                let storage = self.contract_diffs.get_mut(addr).unwrap();
-                return Some(ContractMut::new(code_id, storage));
-            }
-            // else make a new transaction
-            let wrap = StorageTransaction::new(c.storage);
-            self.contract_diffs.insert(addr.clone(), wrap);
-            let storage = self.contract_diffs.get_mut(addr).unwrap();
-            return Some(ContractMut::new(code_id, storage));
-        } else {
-            None
-        }
-    }
-
-    fn get_contract_ref<'b>(
-        &'b self,
-        parent: &'a dyn ContractProvider,
-        addr: &Addr,
-    ) -> Option<ContractRef<'b>> {
-        // if we created this transaction
-        if let Some(x) = self.contracts.get(addr) {
-            return Some(x.as_ref());
-        }
-        if let Some(c) = parent.get_contract(addr) {
-            let code_id = c.code_id;
-            if self.contract_diffs.contains_key(addr) {
-                let storage = self.contract_diffs.get(addr).unwrap();
-                return Some(ContractRef::new(code_id, storage));
-            }
-            Some(c)
-        } else {
-            None
-        }
-    }
 
     fn with_storage<F, T>(
-        &mut self,
-        querier: &dyn Querier,
-        parent: &'a dyn ContractProvider,
+        &self,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
         address: Addr,
-        env: Env,
-        api: &dyn Api,
         action: F,
     ) -> Result<T, String>
     where
-        F: FnOnce(usize, DepsMut, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract<C>>, DepsMut, Env) -> Result<T, String>,
     {
-        let ContractMut { code_id, storage } = self
-            .get_contract_mut(parent, &address)
-            .ok_or_else(|| "Unregistered contract address".to_string())?;
+        let contract = self.load_contract(storage, &address)?;
+        let handler = self
+            .codes
+            .get(&contract.code_id)
+            .ok_or_else(|| "Unregistered code id".to_string())?;
+
+        let mut cache = StorageTransaction::new(storage);
+        let mut contract_storage = self.contract_storage(&mut cache, &address);
+        let querier = RouterQuerier::new(router, storage, block);
+        let env = self.get_env(address, block);
+
         let deps = DepsMut {
-            storage,
-            api,
-            querier: QuerierWrapper::new(querier),
+            storage: contract_storage.as_mut(),
+            api: self.api.deref(),
+            querier: QuerierWrapper::new(&querier),
         };
-        action(code_id, deps, env)
+        let res = action(handler, deps, env)?;
+
+        // forces drop, so we can write to cache
+        drop(contract_storage);
+        // if this succeeds, commit
+        cache.prepare().commit(storage);
+        Ok(res)
     }
+
+    fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String> {
+        CONTRACTS
+            .load(&prefixed_read(storage, NAMESPACE_WASM), address)
+            .map_err(|e| e.to_string())
+    }
+
+    // FIXME: better addr generation
+    fn next_address(&self, storage: &dyn Storage) -> Addr {
+        // FIXME: quite inefficient if we actually had 100s of contracts
+        let count = CONTRACTS
+            .range(storage, None, None, Order::Ascending)
+            .count();
+        // we make this longer so it is not rejected by tests
+        Addr::unchecked(format!("Contract #{}", count.to_string()))
+    }
+
+    fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
+        let mut name = b"contract_data/".to_vec();
+        name.extend_from_slice(contract.as_bytes());
+        name
+    }
+
+    fn contract_storage<'a>(
+        &self,
+        storage: &'a mut dyn Storage,
+        address: &Addr,
+    ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
+        let namespace = self.contract_namespace(address);
+        let storage = PrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
+        Box::new(storage)
+    }
+
+    // fails RUNTIME if you try to write. please don't
+    fn contract_storage_readonly<'a>(
+        &self,
+        storage: &'a dyn Storage,
+        address: &Addr,
+    ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
+        let namespace = self.contract_namespace(address);
+        let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
+        Box::new(storage)
+    }
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct InstantiateData {
+    #[prost(string, tag = "1")]
+    pub address: ::prost::alloc::string::String,
+    /// Unique ID number for this person.
+    #[prost(bytes, tag = "2")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+}
+
+fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    let data = res.data.clone().unwrap_or_default().to_vec();
+    let init_data = InstantiateData {
+        address: contact_address.into(),
+        data,
+    };
+    let mut new_data = Vec::<u8>::with_capacity(init_data.encoded_len());
+    // the data must encode successfully
+    init_data.encode(&mut new_data).unwrap();
+    res.data = Some(new_data.into());
+}
+
+// this parses the result from a wasm contract init
+pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
+    let bin = data
+        .as_ref()
+        .ok_or_else(|| "No data response".to_string())?
+        .to_vec();
+    // parse the protobuf struct
+    let init_data = InstantiateData::decode(bin.as_slice()).map_err(|e| e.to_string())?;
+    if init_data.address.is_empty() {
+        return Err("no contract address provided".into());
+    }
+    Ok(Addr::unchecked(init_data.address))
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
+    use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty};
 
     use crate::test_helpers::{contract_error, contract_payout, PayoutInitMessage, PayoutQueryMsg};
-    use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, BlockInfo, Coin, CosmosMsg, Empty};
+    use crate::transactions::StorageTransaction;
+    use crate::BankKeeper;
 
-    fn mock_router() -> WasmRouter<Empty> {
-        let env = mock_env();
+    use super::*;
+
+    fn mock_keeper() -> WasmKeeper<Empty> {
         let api = Box::new(MockApi::default());
-        WasmRouter::new(api, env.block, || Box::new(MockStorage::new()))
+        WasmKeeper::new(api)
+    }
+
+    fn mock_router() -> Router<Empty> {
+        let api = Box::new(MockApi::default());
+        Router::new(api, BankKeeper {})
     }
 
     #[test]
     fn register_contract() {
-        let mut router = mock_router();
-        let code_id = router.store_code(contract_error());
-        let mut cache = router.cache();
+        let mut wasm_storage = MockStorage::new();
+        let mut keeper = mock_keeper();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(contract_error());
+
+        let mut cache = StorageTransaction::new(&wasm_storage);
 
         // cannot register contract with unregistered codeId
-        cache.register_contract(code_id + 1).unwrap_err();
+        keeper
+            .register_contract(&mut cache, code_id + 1)
+            .unwrap_err();
 
         // we can register a new instance of this code
-        let contract_addr = cache.register_contract(code_id).unwrap();
+        let contract_addr = keeper.register_contract(&mut cache, code_id).unwrap();
 
         // now, we call this contract and see the error message from the contract
-        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let info = mock_info("foobar", &[]);
-        let err = cache
-            .instantiate(contract_addr, &querier, info, b"{}".to_vec())
+        let err = keeper
+            .call_instantiate(
+                contract_addr,
+                &mut cache,
+                &mock_router(),
+                &block,
+                info,
+                b"{}".to_vec(),
+            )
             .unwrap_err();
         // StdError from contract_error auto-converted to string
         assert_eq!(err, "Generic error: Init failed");
 
         // and the error for calling an unregistered contract
         let info = mock_info("foobar", &[]);
-        let err = cache
-            .instantiate(
+        let err = keeper
+            .call_instantiate(
                 Addr::unchecked("unregistered"),
-                &querier,
+                &mut cache,
+                &mock_router(),
+                &block,
                 info,
                 b"{}".to_vec(),
             )
             .unwrap_err();
         // Default error message from router when not found
-        assert_eq!(err, "Unregistered contract address");
+        assert_eq!(err, "cw_multi_test::wasm::ContractData not found");
 
         // and flush
-        cache.prepare().commit(&mut router);
-    }
-
-    #[test]
-    fn update_block() {
-        let mut router = mock_router();
-
-        let BlockInfo { time, height, .. } = router.get_env(Addr::unchecked("foo")).block;
-        router.update_block(next_block);
-        let next = router.get_env(Addr::unchecked("foo")).block;
-
-        assert_eq!(time.plus_seconds(5), next.time);
-        assert_eq!(height + 1, next.height);
+        cache.prepare().commit(&mut wasm_storage);
     }
 
     #[test]
     fn contract_send_coins() {
-        let mut router = mock_router();
-        let code_id = router.store_code(contract_payout());
-        let mut cache = router.cache();
+        let mut keeper = mock_keeper();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(contract_payout());
 
-        let contract_addr = cache.register_contract(code_id).unwrap();
+        let mut wasm_storage = MockStorage::new();
+        let mut cache = StorageTransaction::new(&wasm_storage);
 
-        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let contract_addr = keeper.register_contract(&mut cache, code_id).unwrap();
+
         let payout = coin(100, "TGD");
 
         // init the contract
@@ -623,15 +709,29 @@ mod test {
             payout: payout.clone(),
         })
         .unwrap();
-        let res = cache
-            .instantiate(contract_addr.clone(), &querier, info, init_msg)
+        let res = keeper
+            .call_instantiate(
+                contract_addr.clone(),
+                &mut cache,
+                &mock_router(),
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
         assert_eq!(0, res.messages.len());
 
         // execute the contract
         let info = mock_info("foobar", &[]);
-        let res = cache
-            .execute(contract_addr.clone(), &querier, info, b"{}".to_vec())
+        let res = keeper
+            .call_execute(
+                &mut cache,
+                contract_addr.clone(),
+                &mock_router(),
+                &block,
+                info,
+                b"{}".to_vec(),
+            )
             .unwrap();
         assert_eq!(1, res.messages.len());
         match &res.messages[0].msg {
@@ -643,20 +743,34 @@ mod test {
         }
 
         // and flush before query
-        cache.prepare().commit(&mut router);
+        cache.prepare().commit(&mut wasm_storage);
 
         // query the contract
         let query = to_vec(&PayoutQueryMsg::Payout {}).unwrap();
-        let data = router.query_smart(contract_addr, &querier, query).unwrap();
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let data = keeper
+            .query_smart(contract_addr, &wasm_storage, &querier, &block, query)
+            .unwrap();
         let res: PayoutInitMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
     }
 
-    fn assert_payout(cache: &mut WasmCache<Empty>, contract_addr: &Addr, payout: &Coin) {
-        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+    fn assert_payout(
+        router: &WasmKeeper<Empty>,
+        storage: &mut dyn Storage,
+        contract_addr: &Addr,
+        payout: &Coin,
+    ) {
         let info = mock_info("silly", &[]);
-        let res = cache
-            .execute(contract_addr.clone(), &querier, info, b"{}".to_vec())
+        let res = router
+            .call_execute(
+                storage,
+                contract_addr.clone(),
+                &mock_router(),
+                &mock_env().block,
+                info,
+                b"{}".to_vec(),
+            )
             .unwrap();
         assert_eq!(1, res.messages.len());
         match &res.messages[0].msg {
@@ -668,82 +782,104 @@ mod test {
         }
     }
 
-    fn assert_no_contract(cache: &WasmCache<Empty>, contract_addr: &Addr) {
-        let contract = cache.get_contract(contract_addr);
+    fn assert_no_contract(storage: &dyn Storage, contract_addr: &Addr) {
+        let contract = CONTRACTS.may_load(storage, contract_addr).unwrap();
         assert!(contract.is_none(), "{:?}", contract_addr);
     }
 
     #[test]
     fn multi_level_wasm_cache() {
-        let mut router = mock_router();
-        let code_id = router.store_code(contract_payout());
-        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let mut keeper = mock_keeper();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(contract_payout());
+
+        let mut wasm_storage = MockStorage::new();
+        let mut cache = StorageTransaction::new(&wasm_storage);
 
         // set contract 1 and commit (on router)
-        let mut cache = router.cache();
-        let contract1 = cache.register_contract(code_id).unwrap();
+        let contract1 = keeper.register_contract(&mut cache, code_id).unwrap();
         let payout1 = coin(100, "TGD");
         let info = mock_info("foobar", &[]);
         let init_msg = to_vec(&PayoutInitMessage {
             payout: payout1.clone(),
         })
         .unwrap();
-        let _res = cache
-            .instantiate(contract1.clone(), &querier, info, init_msg)
+        let _res = keeper
+            .call_instantiate(
+                contract1.clone(),
+                &mut cache,
+                &mock_router(),
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
-        cache.prepare().commit(&mut router);
+        cache.prepare().commit(&mut wasm_storage);
 
         // create a new cache and check we can use contract 1
-        let mut cache = router.cache();
-        assert_payout(&mut cache, &contract1, &payout1);
+        let mut cache = StorageTransaction::new(&wasm_storage);
+        assert_payout(&keeper, &mut cache, &contract1, &payout1);
 
         // create contract 2 and use it
-        let contract2 = cache.register_contract(code_id).unwrap();
+        let contract2 = keeper.register_contract(&mut cache, code_id).unwrap();
         let payout2 = coin(50, "BTC");
         let info = mock_info("foobar", &[]);
         let init_msg = to_vec(&PayoutInitMessage {
             payout: payout2.clone(),
         })
         .unwrap();
-        let _res = cache
-            .instantiate(contract2.clone(), &querier, info, init_msg)
+        let _res = keeper
+            .call_instantiate(
+                contract2.clone(),
+                &mut cache,
+                &mock_router(),
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
-        assert_payout(&mut cache, &contract2, &payout2);
+        assert_payout(&keeper, &mut cache, &contract2, &payout2);
 
         // create a level2 cache and check we can use contract 1 and contract 2
         let mut cache2 = cache.cache();
-        assert_payout(&mut cache2, &contract1, &payout1);
-        assert_payout(&mut cache2, &contract2, &payout2);
+        assert_payout(&keeper, &mut cache2, &contract1, &payout1);
+        assert_payout(&keeper, &mut cache2, &contract2, &payout2);
 
         // create a contract on level 2
-        let contract3 = cache2.register_contract(code_id).unwrap();
+        let contract3 = keeper.register_contract(&mut cache2, code_id).unwrap();
         let payout3 = coin(1234, "ATOM");
         let info = mock_info("johnny", &[]);
         let init_msg = to_vec(&PayoutInitMessage {
             payout: payout3.clone(),
         })
         .unwrap();
-        let _res = cache2
-            .instantiate(contract3.clone(), &querier, info, init_msg)
+        let _res = keeper
+            .call_instantiate(
+                contract3.clone(),
+                &mut cache2,
+                &mock_router(),
+                &block,
+                info,
+                init_msg,
+            )
             .unwrap();
-        assert_payout(&mut cache2, &contract3, &payout3);
+        assert_payout(&keeper, &mut cache2, &contract3, &payout3);
 
         // ensure first cache still doesn't see this contract
         assert_no_contract(&cache, &contract3);
 
         // apply second to first, all contracts present
         cache2.prepare().commit(&mut cache);
-        assert_payout(&mut cache, &contract1, &payout1);
-        assert_payout(&mut cache, &contract2, &payout2);
-        assert_payout(&mut cache, &contract3, &payout3);
+        assert_payout(&keeper, &mut cache, &contract1, &payout1);
+        assert_payout(&keeper, &mut cache, &contract2, &payout2);
+        assert_payout(&keeper, &mut cache, &contract3, &payout3);
 
         // apply to router
-        cache.prepare().commit(&mut router);
+        cache.prepare().commit(&mut wasm_storage);
 
         // make new cache and see all contracts there
-        let mut cache3 = router.cache();
-        assert_payout(&mut cache3, &contract1, &payout1);
-        assert_payout(&mut cache3, &contract2, &payout2);
-        assert_payout(&mut cache3, &contract3, &payout3);
+        assert_payout(&keeper, &mut wasm_storage, &contract1, &payout1);
+        assert_payout(&keeper, &mut wasm_storage, &contract2, &payout2);
+        assert_payout(&keeper, &mut wasm_storage, &contract3, &payout3);
     }
 }
