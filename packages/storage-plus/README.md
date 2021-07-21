@@ -290,7 +290,7 @@ fn demo() -> StdResult<()> {
 ### Prefix
 
 In addition to getting one particular item out of a map, we can iterate over the map
-(or a subset of the map). This let's us answer questions like "show me all tokens",
+(or a subset of the map). This let us answer questions like "show me all tokens",
 and we provide some nice `Bound`s helpers to easily allow pagination or custom ranges.
 
 The general format is to get a `Prefix` by calling `map.prefix(k)`, where `k` is exactly
@@ -486,9 +486,12 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 }
 ```
 
-This implements the `IndexList` trait for `TokenIndexes`. This kind of serves two purposes (which are really
-one and the same): it allows the indexes to be queries through `get_indexes`, and, it allows `TokenIndexes`
-to be treated as an `IndexList`. So that it can be passed as a parameter during `IndexedMap` construction, below:
+This implements the `IndexList` trait for `TokenIndexes`.
+Note: this code is more or less boiler-plate, and needed for the internals. Do not try to customize this,
+just return a list of all indexes.
+Implementing this trait serves two purposes (which are really one and the same): it allows the indexes
+to be queried through `get_indexes`, and, it allows `TokenIndexes` to be treated as an `IndexList`. So that
+it can be passed as a parameter during `IndexedMap` construction, below:
 
 ```rust
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
