@@ -513,13 +513,7 @@ fn query_tokens(
     let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
-        .pks(
-            deps.storage,
-            Vec::from(owner_addr.as_ref()),
-            start,
-            None,
-            Order::Ascending,
-        )
+        .pks(deps.storage, owner_addr, start, None, Order::Ascending)
         .take(limit)
         .collect();
     let pks = res?;
