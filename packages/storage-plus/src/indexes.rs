@@ -185,6 +185,17 @@ where
         self.sub_prefix(K::SubPrefix::new())
             .range(store, min, max, order)
     }
+
+    pub fn keys<'c>(
+        &'c self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        self.sub_prefix(K::SubPrefix::new())
+            .keys(store, min, max, order)
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -299,5 +310,16 @@ where
     {
         self.sub_prefix(K::SubPrefix::new())
             .range(store, min, max, order)
+    }
+
+    pub fn keys<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        self.sub_prefix(K::SubPrefix::new())
+            .keys(store, min, max, order)
     }
 }
