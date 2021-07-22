@@ -36,7 +36,7 @@ pub struct Allowance {
 
 #[cfg(test)]
 impl Allowance {
-    /// Utility function forconverting message to its canonical form, so two messages with
+    /// Utility function for converting message to its canonical form, so two messages with
     /// different representation but same semantical meaning can be easly compared.
     ///
     /// It could be encapsulated in custom `PartialEq` implementation, but `PartialEq` is expected
