@@ -34,5 +34,38 @@ pub struct Allowance {
     pub expires: Expiration,
 }
 
+impl Allowance {
+    /// Utility function forconverting message to its canonical form, so two messages with
+    /// different representation but same semantical meaning can be easly compared.
+    ///
+    /// It could be encapsulated in custom `PartialEq` implementation, but `PartialEq` is expected
+    /// to be quickly, so it seems to be reasonable to keep it as representation-equality, and
+    /// canonicalize message only when it is needed
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// # use cw0::{Expiration, NativeBalance};
+    /// # use cw1_subkeys::state::Allowance;
+    /// # use cosmwasm_std::coin;
+    ///
+    /// let allow1 = Allowance {
+    ///   balance: NativeBalance(vec![coin(1, "token1"), coin(0, "token2"), coin(2, "token1"), coin(3, "token3")]),
+    ///   expires: Expiration::Never {},
+    /// };
+    ///
+    /// let allow2 = Allowance {
+    ///   balance: NativeBalance(vec![coin(3, "token3"), coin(3, "token1")]),
+    ///   expires: Expiration::Never {},
+    /// };
+    ///
+    /// assert_eq!(allow1.canonical(), allow2.canonical());
+    /// ```
+    pub fn canonical(mut self) -> Self {
+        self.balance.normalize();
+        self
+    }
+}
+
 pub const PERMISSIONS: Map<&Addr, Permissions> = Map::new("permissions");
 pub const ALLOWANCES: Map<&Addr, Allowance> = Map::new("allowances");
