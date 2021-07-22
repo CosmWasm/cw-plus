@@ -53,7 +53,7 @@ pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
 
 pub struct TokenIndexes<'a> {
     // pk goes to second tuple element
-    pub owner: MultiIndex<'a, (Vec<u8>, Vec<u8>), TokenInfo>,
+    pub owner: MultiIndex<'a, (Addr, Vec<u8>), TokenInfo>,
 }
 
 impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
@@ -65,11 +65,7 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
-        owner: MultiIndex::new(
-            |d, k| (Vec::from(d.owner.as_ref()), k),
-            "tokens",
-            "tokens__owner",
-        ),
+        owner: MultiIndex::new(|d, k| (d.owner.clone(), k), "tokens", "tokens__owner"),
     };
     IndexedMap::new("tokens", indexes)
 }
