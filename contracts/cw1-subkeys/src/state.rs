@@ -40,7 +40,7 @@ impl Allowance {
     /// different representation but same semantical meaning can be easly compared.
     ///
     /// It could be encapsulated in custom `PartialEq` implementation, but `PartialEq` is expected
-    /// to be quickly, so it seems to be reasonable to keep it as representation-equality, and
+    /// to be fast, so it seems to be reasonable to keep it as representation-equality, and
     /// canonicalize message only when it is needed
     ///
     /// Example:
