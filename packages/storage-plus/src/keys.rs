@@ -165,6 +165,23 @@ impl<'a> Prefixer<'a> for &'a Addr {
     }
 }
 
+/// owned variant.
+impl<'a> PrimaryKey<'a> for Addr {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_bytes()]
+    }
+}
+
+impl<'a> Prefixer<'a> for Addr {
+    fn prefix(&self) -> Vec<&[u8]> {
+        vec![&self.as_bytes()]
+    }
+}
+
 // this auto-implements PrimaryKey for all the IntKey types
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T> {
     type Prefix = ();
