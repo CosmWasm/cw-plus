@@ -34,6 +34,7 @@ pub struct Allowance {
     pub expires: Expiration,
 }
 
+#[cfg(test)]
 impl Allowance {
     /// Utility function forconverting message to its canonical form, so two messages with
     /// different representation but same semantical meaning can be easly compared.
