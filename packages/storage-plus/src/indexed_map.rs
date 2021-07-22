@@ -603,13 +603,8 @@ mod test {
          -> usize {
             map.idx
                 .name
-                .pks(
-                    store,
-                    name.as_bytes().to_vec(),
-                    None,
-                    None,
-                    Order::Ascending,
-                )
+                .prefix(name.as_bytes().to_vec())
+                .keys(store, None, None, Order::Ascending)
                 .count()
         };
 

@@ -142,43 +142,24 @@ where
         k.joined_key()
     }
 
-    // FIXME?: Move to Prefix<T> for ergonomics
-    pub fn pks<'c>(
-        &self,
-        store: &'c dyn Storage,
-        p: K::Prefix,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Vec<u8>>> + 'c>
-    where
-        T: 'c,
-    {
-        let prefix = self.prefix(p);
-        let mapped = prefix.range(store, min, max, order).map(|res| {
-            let t = res?;
-            Ok(t.0)
-        });
-        Box::new(mapped)
-    }
-
     #[cfg(test)]
     pub fn count(&self, store: &dyn Storage, p: K::Prefix) -> usize {
-        self.pks(store, p, None, None, Order::Ascending).count()
+        let prefix = self.prefix(p);
+        prefix.keys(store, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
     pub fn all_pks(&self, store: &dyn Storage, p: K::Prefix) -> Vec<Vec<u8>> {
-        self.pks(store, p, None, None, Order::Ascending)
-            .collect::<StdResult<Vec<Vec<u8>>>>()
-            .unwrap()
+        let prefix = self.prefix(p);
+        prefix
+            .keys(store, None, None, Order::Ascending)
+            .collect::<Vec<Vec<u8>>>()
     }
 
     #[cfg(test)]
-    pub fn all_items(&self, store: &dyn Storage, prefix: K::Prefix) -> StdResult<Vec<Pair<T>>> {
-        self.prefix(prefix)
-            .range(store, None, None, Order::Ascending)
-            .collect()
+    pub fn all_items(&self, store: &dyn Storage, p: K::Prefix) -> StdResult<Vec<Pair<T>>> {
+        let prefix = self.prefix(p);
+        prefix.range(store, None, None, Order::Ascending).collect()
     }
 }
 
