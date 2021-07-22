@@ -394,7 +394,7 @@ Let's use it to illustrate `IndexedMap` definition and usage.
 ```rust
 pub struct TokenIndexes<'a> {
   // pk goes to second tuple element
-  pub owner: MultiIndex<'a, (Vec<u8>, Vec<u8>), TokenInfo>,
+  pub owner: MultiIndex<'a, (Addr, Vec<u8>), TokenInfo>,
 }
 
 impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
@@ -407,7 +407,7 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
   let indexes = TokenIndexes {
     owner: MultiIndex::new(
-      |d, k| (Vec::from(d.owner.as_ref()), k),
+      |d, k| (d.owner.clone(), k),
       "tokens",
       "tokens__owner",
     ),
@@ -420,7 +420,7 @@ Let's discuss this piece by piece:
 ```rust
 pub struct TokenIndexes<'a> {
   // pk goes to second tuple element
-  pub owner: MultiIndex<'a, (Vec<u8>, Vec<u8>), TokenInfo>,
+  pub owner: MultiIndex<'a, (Addr, Vec<u8>), TokenInfo>,
 }
 ```
 
@@ -443,11 +443,11 @@ You can see this in the token creation code:
 (Incidentally, this is using `update` instead of `save`, to avoid overwriting an already existing token).
 
 Then, it will be indexed by token `owner` (which is an `Addr`), so that we can list all the tokens an owner has.
-That's why the `owner` index key is `(Vec<u8>, Vec<u8>)`. The first owned element is the `owner` data
-(converted to `Vec<u8>`), whereas the second one is the `token_id` (also converted to `Vec<u8>`).
+That's why the `owner` index key is `(Addr, Vec<u8>)`. The first owned element is the `owner` data
+, whereas the second one is the `token_id` (converted internally to `Vec<u8>`).
 
 The important thing here is that the key (and its components, in the case of a combined key) must implement
-the `PrimaryKey` trait. You can see that both the 2-tuple `(_, _)` and `Vec<u8>` do implement `PrimaryKey`:
+the `PrimaryKey` trait. You can see that the 2-tuple `(_, _)`, `Addr`, and `Vec<u8>` do implement `PrimaryKey`:
 
 ```rust
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U) {
@@ -458,6 +458,18 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for
         let mut keys = self.0.key();
         keys.extend(&self.1.key());
         keys
+    }
+}
+```
+
+```rust
+impl<'a> PrimaryKey<'a> for Addr {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        // this is simple, we don't add more prefixes
+        vec![self.as_bytes()]
     }
 }
 ```
@@ -487,9 +499,9 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 ```
 
 This implements the `IndexList` trait for `TokenIndexes`.
-Note: this code is more or less boiler-plate, and needed for the internals. Do not try to customize this,
+Note: this code is more or less boiler-plate, and needed for the internals. Do not try to customize this;
 just return a list of all indexes.
-Implementing this trait serves two purposes (which are really one and the same): it allows the indexes
+Implementing this trait serves two purposes (which are really one, and the same): it allows the indexes
 to be queried through `get_indexes`, and, it allows `TokenIndexes` to be treated as an `IndexList`. So that
 it can be passed as a parameter during `IndexedMap` construction, below:
 
@@ -497,7 +509,7 @@ it can be passed as a parameter during `IndexedMap` construction, below:
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
         owner: MultiIndex::new(
-            |d, k| (Vec::from(d.owner.as_ref()), k),
+            |d, k| (d.owner.clone(), k),
             "tokens",
             "tokens__owner",
         ),
@@ -512,17 +524,17 @@ index (es) is (are) created, and then, the `IndexedMap` is created (using `Index
 During index creation, we must supply an index function per index
 ```rust
         owner: MultiIndex::new(
-            |d, k| (Vec::from(d.owner.as_ref()), k),
+            |d, k| (d.owner.clone, k),
 ```
 
-, which is the one that will take the value and the primary key (which is always in `Vec<u8>` form) of the
+, which is the one that will take the value, and the primary key (which is always in `Vec<u8>` form) of the
 original map, and create the index key from them. Of course, this requires that the elements required
 for the index key are present in the value (which makes sense).
 Besides the index function, we must also supply the namespace of the pk, and the one for the new index.
 
 ---
 
-After that, we just create (and return) the `IndexedMap`:
+After that, we just create and return the `IndexedMap`:
 
 ```rust
     IndexedMap::new("tokens", indexes)
@@ -552,7 +564,7 @@ Notice this uses `prefix()`, explained above in the `Map` section.
     let res: Result<Vec<_>, _> = tokens()
         .idx
         .owner
-        .prefix(Vec::from(owner_addr.as_ref()))
+        .prefix(owner_addr)
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .collect();
@@ -568,7 +580,7 @@ Another example that is slightly similar, but returning only the `token_id`s, us
         .owner
         .pks(
             deps.storage,
-            Vec::from(owner_addr.as_ref()),
+            owner_addr,
             start,
             None,
             Order::Ascending,
