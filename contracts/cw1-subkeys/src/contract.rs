@@ -651,7 +651,7 @@ mod tests {
 
         // Check allowances work for accounts with no balance
         let allowance = query_allowance(deps.as_ref(), SPENDER3.to_string()).unwrap();
-        assert_eq!(allowance, Allowance::default(),);
+        assert_eq!(allowance, Allowance::default());
     }
 
     #[test]
