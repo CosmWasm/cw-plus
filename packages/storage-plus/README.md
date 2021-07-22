@@ -407,7 +407,7 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
   let indexes = TokenIndexes {
     owner: MultiIndex::new(
-      |d, k| (d.owner.clone(), k),
+      |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
       "tokens",
       "tokens__owner",
     ),
@@ -509,7 +509,7 @@ it can be passed as a parameter during `IndexedMap` construction, below:
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
         owner: MultiIndex::new(
-            |d, k| (d.owner.clone(), k),
+            |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
             "tokens",
             "tokens__owner",
         ),
@@ -524,7 +524,7 @@ index (es) is (are) created, and then, the `IndexedMap` is created (using `Index
 During index creation, we must supply an index function per index
 ```rust
         owner: MultiIndex::new(
-            |d, k| (d.owner.clone, k),
+            |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
 ```
 
 , which is the one that will take the value, and the primary key (which is always in `Vec<u8>` form) of the

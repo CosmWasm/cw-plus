@@ -65,7 +65,11 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 
 pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
     let indexes = TokenIndexes {
-        owner: MultiIndex::new(|d, k| (d.owner.clone(), k), "tokens", "tokens__owner"),
+        owner: MultiIndex::new(
+            |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
+            "tokens",
+            "tokens__owner",
+        ),
     };
     IndexedMap::new("tokens", indexes)
 }
