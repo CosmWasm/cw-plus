@@ -573,20 +573,19 @@ Notice this uses `prefix()`, explained above in the `Map` section.
 Now `tokens` contains `(token_id, TokenInfo)` pairs for the given `owner`.
 The pk values are `Vec<u8>`, as this is a limitation of the current implementation.
 
-Another example that is slightly similar, but returning only the `token_id`s, using the `pks()` method:
+Another example that is similar, but returning only the `token_id`s, using the `keys()` method:
 ```rust
-    let res: Result<Vec<_>, _> = tokens()
+    let pks: Vec<_> = tokens()
         .idx
         .owner
-        .pks(
+        .prefix(owner_addr)
+        .keys(
             deps.storage,
-            owner_addr,
             start,
             None,
             Order::Ascending,
         )
         .take(limit)
         .collect();
-    let pks = res?;
 ```
 Now `pks` contains `token_id` values (as `Vec<u8>`s) for the given `owner`.

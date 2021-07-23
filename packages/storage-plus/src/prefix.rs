@@ -117,10 +117,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a>
-    where
-        T: 'a,
-    {
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
         let mapped =
             range_with_prefix(store, &self.storage_prefix, min, max, order).map(|(k, _)| k);
         Box::new(mapped)

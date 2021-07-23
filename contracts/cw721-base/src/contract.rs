@@ -510,13 +510,13 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let owner_addr = deps.api.addr_validate(&owner)?;
-    let res: Result<Vec<_>, _> = tokens()
+    let pks: Vec<_> = tokens()
         .idx
         .owner
-        .pks(deps.storage, owner_addr, start, None, Order::Ascending)
+        .prefix(owner_addr)
+        .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .collect();
-    let pks = res?;
 
     let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
     let tokens = res.map_err(StdError::invalid_utf8)?;
