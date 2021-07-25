@@ -81,6 +81,19 @@ pub struct AllAllowancesResponse {
     pub allowances: Vec<AllowanceInfo>,
 }
 
+#[cfg(test)]
+impl AllAllowancesResponse {
+    pub fn canonical(mut self) -> Self {
+        self.allowances = self
+            .allowances
+            .into_iter()
+            .map(AllowanceInfo::canonical)
+            .collect();
+        self.allowances.sort_by(AllowanceInfo::cmp_by_spender);
+        self
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct AllowanceInfo {
     pub spender: String,
@@ -122,6 +135,11 @@ impl AllowanceInfo {
     /// ```
     pub fn cmp_by_spender(left: &Self, right: &Self) -> std::cmp::Ordering {
         left.spender.cmp(&right.spender)
+    }
+
+    pub fn canonical(mut self) -> Self {
+        self.balance.normalize();
+        self
     }
 }
 
