@@ -590,7 +590,7 @@ mod tests {
     }
 
     /// Helper function for comparing vectors or another slice-like object as they would represent
-    /// set with duplications. Compares sets by first sorting elements usning provided ordering.
+    /// set with duplications. Compares sets by first sorting elements using provided ordering.
     /// This functions reshufless elements inplace, as it should never matter as compared
     /// containers should represent same value regardless of ordering, and making this inplace just
     /// safes obsolete copying.
