@@ -147,7 +147,7 @@ pub fn check_staking_permissions(
                 return Err(ContractError::ReDelegatePerm {});
             }
         }
-        s => panic!("Unsupported staking message: {:?}", s),
+        _ => return Err(ContractError::UnsupportedMessage {}),
     }
     Ok(true)
 }
@@ -167,7 +167,7 @@ pub fn check_distribution_permissions(
                 return Err(ContractError::WithdrawPerm {});
             }
         }
-        s => panic!("Unsupported distribution message: {:?}", s),
+        _ => return Err(ContractError::UnsupportedMessage {}),
     }
     Ok(true)
 }
@@ -359,6 +359,15 @@ fn can_execute(deps: Deps, sender: String, msg: CosmosMsg) -> StdResult<bool> {
             let perm_opt = PERMISSIONS.may_load(deps.storage, &sender)?;
             match perm_opt {
                 Some(permission) => Ok(check_staking_permissions(&staking_msg, permission).is_ok()),
+                None => Ok(false),
+            }
+        }
+        CosmosMsg::Distribution(distribution_msg) => {
+            let perm_opt = PERMISSIONS.may_load(deps.storage, &sender)?;
+            match perm_opt {
+                Some(permission) => {
+                    Ok(check_distribution_permissions(&distribution_msg, permission).is_ok())
+                }
                 None => Ok(false),
             }
         }
