@@ -19,7 +19,7 @@ pub enum Cw20QueryMsg {
     /// Return type: AllowanceResponse.
     Allowance { owner: String, spender: String },
     /// Only with "mintable" extension.
-    /// Returns who can mint and how much.
+    /// Returns who can mint and the hard cap on maximum tokens after minting.
     /// Return type: MinterResponse.
     Minter {},
     /// Only with "enumerable" extension (and "allowances")
@@ -61,7 +61,9 @@ pub struct AllowanceResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterResponse {
     pub minter: String,
-    /// cap is how many more tokens can be issued by the minter
+    /// cap is a hard cap on total supply that can be achieved by minting.
+    /// Note that this refers to total_supply.
+    /// If None, there is unlimited cap.
     pub cap: Option<Uint128>,
 }
 

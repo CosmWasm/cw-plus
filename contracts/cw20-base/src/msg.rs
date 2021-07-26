@@ -119,7 +119,7 @@ pub enum QueryMsg {
     /// Return type: TokenInfoResponse.
     TokenInfo {},
     /// Only with "mintable" extension.
-    /// Returns who can mint and how much.
+    /// Returns who can mint and the hard cap on maximum tokens after minting.
     /// Return type: MinterResponse.
     Minter {},
     /// Only with "allowance" extension.
