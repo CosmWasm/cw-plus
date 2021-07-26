@@ -2,8 +2,8 @@
 
 CW20 is a specification for fungible tokens based on CosmWasm.
 The name and design is loosely based on Ethereum's ERC20 standard,
-but many changes have been made. The types in here can be imported by 
-contracts that wish to implement this  spec, or by contracts that call 
+but many changes have been made. The types in here can be imported by
+contracts that wish to implement this  spec, or by contracts that call
 to any standard cw20 contract.
 
 The specification is split into multiple sections, a contract may only
@@ -13,19 +13,19 @@ implement some of this functionality, but must implement the base.
 
 This handles balances and transfers. Note that all amounts are
 handled as `Uint128` (128 bit integers with JSON string representation).
-Handling decimals is left to the UI and not interpreted 
+Handling decimals is left to the UI and not interpreted
 
 ### Messages
 
-`Transfer{recipient, amount}` - Moves `amount` tokens from the 
+`Transfer{recipient, amount}` - Moves `amount` tokens from the
 `env.sender` account to the `recipient` account. This is designed to
 send to an address controlled by a private key and *does not* trigger
 any actions on the recipient if it is a contract.
 
-`Send{contract, amount, msg}` - Moves `amount` tokens from the 
-`env.sender` account to the `recipient` account. `contract` must be an 
+`Send{contract, amount, msg}` - Moves `amount` tokens from the
+`env.sender` account to the `recipient` account. `contract` must be an
 address of a contract that implements the `Receiver` interface. The `msg`
-will be passed to the recipient contract, along with the amount. 
+will be passed to the recipient contract, along with the amount.
 
 `Burn{amount}` - Remove `amount` tokens from the balance of `env.sender`
 and reduce `total_supply` by the same amount.
@@ -52,9 +52,9 @@ the token contract it expects to handle, and not allow arbitrary addresses.
 
 The `sender` is the original account requesting to move the tokens
 and `msg` is a `Binary` data that can be decoded into a contract-specific
-message. This can be empty if we have only one default action, 
+message. This can be empty if we have only one default action,
 or it may be a `ReceiveMsg` variant to clarify the intention. For example,
-if I send to a uniswap contract, I can specify which token I want to swap 
+if I send to a uniswap contract, I can specify which token I want to swap
 against using this field.
 
 ## Allowances
@@ -76,24 +76,24 @@ The solution discussed in the Ethereum community was an `IncreaseAllowance`
 and `DecreaseAllowance` operator (instead of `Approve`). To originally set
 an approval, use `IncreaseAllowance`, which works fine with no previous allowance.
 `DecreaseAllowance` is meant to be robust, that is if you decrease by more than
-the current allowance (eg. the user spent some in the middle), it will just round 
+the current allowance (eg. the user spent some in the middle), it will just round
 down to 0 and not make any underflow error.
 
 ### Messages
 
-`IncreaseAllowance{spender, amount, expires}` - Set or increase the allowance 
-such that `spender` may access up to `amount + current_allowance` tokens 
+`IncreaseAllowance{spender, amount, expires}` - Set or increase the allowance
+such that `spender` may access up to `amount + current_allowance` tokens
 from the `env.sender` account. This may optionally come with an `Expiration`
 time, which if set limits when the approval can be used (by time or height).
 
-`DecreaseAllowance{spender, amount, expires}` - Decrease or clear the allowance 
-such that `spender` may access up to `current_allowance - amount` tokens 
+`DecreaseAllowance{spender, amount, expires}` - Decrease or clear the allowance
+such that `spender` may access up to `current_allowance - amount` tokens
 from the `env.sender` account. This may optionally come with an `Expiration`
 time, which if set limits when the approval can be used (by time or height).
 If `amount >= current_allowance`, this will clear the allowance (delete it).
 
 `TransferFrom{owner, recipient, amount}` - This makes use of an allowance
-and if there was a valid, un-expired pre-approval for the `env.sender`, 
+and if there was a valid, un-expired pre-approval for the `env.sender`,
 then we move `amount` tokens from `owner` to `recipient` and deduct it
 from the available allowance.
 
@@ -105,8 +105,8 @@ to be the `env.sender` (the account that triggered the transfer)
 rather than the `owner` account (the account the money is coming from).
 This is an open question whether we should switch this?
 
-`BurnFrom{owner, amount}` - This works like `TransferFrom`, but burns 
-the tokens instead of transfering them. This will reduce the owner's 
+`BurnFrom{owner, amount}` - This works like `TransferFrom`, but burns
+the tokens instead of transfering them. This will reduce the owner's
 balance, `total_supply` and the caller's allowance.
 
 ### Queries
@@ -114,7 +114,7 @@ balance, `total_supply` and the caller's allowance.
 `Allowance{owner, spender}` - This returns the available allowance
 that `spender` can access from the `owner`'s account, along with the
 expiration info. Return type is `AllowanceResponse{balance, expiration}`.
- 
+
 ## Mintable
 
 This allows another contract to mint new tokens, possibly with a cap.
@@ -126,12 +126,18 @@ minter address and handle updating the ACL there.
 
 `Mint{recipient, amount}` - If the `env.sender` is the allowed minter,
 this will create `amount` new tokens (updating total supply) and
-add them to the balance of `recipient`.
+add them to the balance of `recipient`, as long as it does not exceed the cap.
 
 ### Queries
 
 `Minter{}` - Returns who and how much can be minted. Return type is
 `MinterResponse {minter, cap}`. Cap may be unset.
+
+If the cap is set, it defines the maximum `total_supply` that may ever exist.
+If initial supply is 1000 and cap is `Some(2000)`, you can only mint 1000 more tokens.
+However, if someone then burns 500 tokens, the minter can mint those 500 again.
+This allows for dynamic token supply within a set of parameters, especially when
+the minter is a smart contract.
 
 ## Enumerable
 
@@ -141,7 +147,7 @@ It allows us to get lists of results with pagination.
 ### Queries
 
 `AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
-by the given owner. `start_after` and `limit` provide pagination. 
+by the given owner. `start_after` and `limit` provide pagination.
 
 `AllAccounts{start_after, limit}` - Returns the list of all accounts that have been created on
-the contract (just the addresses). `start_after` and `limit` provide pagination. 
+the contract (just the addresses). `start_after` and `limit` provide pagination.

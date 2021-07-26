@@ -62,7 +62,7 @@
       "additionalProperties": false
     },
     {
-      "description": "Only with \"mintable\" extension. Returns who can mint and how much. Return type: MinterResponse.",
+      "description": "Only with \"mintable\" extension. Returns who can mint and the hard cap on maximum tokens after minting. Return type: MinterResponse.",
       "type": "object",
       "required": [
         "minter"
