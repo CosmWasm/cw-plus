@@ -247,11 +247,10 @@ pub fn ibc_packet_ack(
     msg: IbcPacketAckMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: trap error like in receive?
-    let ack = msg.ack;
-    let msg: Ics20Ack = from_binary(&ack.acknowledgement.data)?;
-    match msg {
-        Ics20Ack::Result(_) => on_packet_success(deps, ack.original_packet),
-        Ics20Ack::Error(err) => on_packet_failure(deps, ack.original_packet, err),
+    let ics20msg: Ics20Ack = from_binary(&msg.acknowledgement.data)?;
+    match ics20msg {
+        Ics20Ack::Result(_) => on_packet_success(deps, msg.original_packet),
+        Ics20Ack::Error(err) => on_packet_failure(deps, msg.original_packet, err),
     }
 }
 
@@ -353,10 +352,7 @@ mod test {
 
     use crate::contract::query_channel;
     use cosmwasm_std::testing::mock_env;
-    use cosmwasm_std::{
-        coins, to_vec, IbcAcknowledgement, IbcAcknowledgementWithPacket, IbcEndpoint, IbcTimeout,
-        Timestamp,
-    };
+    use cosmwasm_std::{coins, to_vec, IbcAcknowledgement, IbcEndpoint, IbcTimeout, Timestamp};
 
     #[test]
     fn check_ack_json() {
@@ -478,11 +474,10 @@ mod test {
         assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
-        let ack = IbcAcknowledgementWithPacket {
+        let msg = IbcPacketAckMsg {
             acknowledgement: IbcAcknowledgement::new(ack_success()),
             original_packet: sent_packet,
         };
-        let msg = IbcPacketAckMsg::new(ack);
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -536,11 +531,10 @@ mod test {
         assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
-        let ack = IbcAcknowledgementWithPacket {
+        let msg = IbcPacketAckMsg {
             acknowledgement: IbcAcknowledgement::new(ack_success()),
             original_packet: sent_packet,
         };
-        let msg = IbcPacketAckMsg::new(ack);
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 

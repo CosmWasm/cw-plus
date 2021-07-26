@@ -11,9 +11,9 @@ documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
 cw0 = { path = "../../packages/cw0", version = "0.7.0" }
-cosmwasm-std = { version = "0.16.0-rc2" }
+cosmwasm-std = { version = "0.16.0-rc4" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "0.16.0-rc2" }
+cosmwasm-schema = { version = "0.16.0-rc4" }
