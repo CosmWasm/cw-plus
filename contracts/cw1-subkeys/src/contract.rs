@@ -428,7 +428,7 @@ mod tests {
     use cosmwasm_std::testing::{
         mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage,
     };
-    use cosmwasm_std::{coin, coins, Addr, OwnedDeps, StakingMsg, Timestamp};
+    use cosmwasm_std::{coin, coins, OwnedDeps, StakingMsg, Timestamp};
 
     use cw0::NativeBalance;
     use cw1_whitelist::msg::AdminListResponse;
@@ -607,35 +607,6 @@ mod tests {
 
             assert_eq!(left, right);
         };
-    }
-
-    // this will set up instantiation for other tests
-    fn setup_test_case(
-        mut deps: DepsMut,
-        info: &MessageInfo,
-        admins: &[&str],
-        spenders: &[&str],
-        allowances: &[Coin],
-        expirations: &[Expiration],
-    ) {
-        // Instantiate a contract with admins
-        let instantiate_msg = InstantiateMsg {
-            admins: admins.iter().map(|x| x.to_string()).collect(),
-            mutable: true,
-        };
-        instantiate(deps.branch(), mock_env(), info.clone(), instantiate_msg).unwrap();
-
-        // Add subkeys with initial allowances
-        for (spender, expiration) in spenders.iter().zip(expirations) {
-            for amount in allowances {
-                let msg = ExecuteMsg::IncreaseAllowance {
-                    spender: spender.to_string(),
-                    amount: amount.clone(),
-                    expires: Some(*expiration),
-                };
-                execute(deps.branch(), mock_env(), info.clone(), msg).unwrap();
-            }
-        }
     }
 
     #[test]
@@ -1707,148 +1678,279 @@ mod tests {
         }
     }
 
-    #[test]
-    fn staking_permission_checks() {
-        let mut deps = mock_dependencies(&[]);
+    mod staking_permission {
+        use super::*;
 
-        let owner = "admin0001";
-        let admins = vec![owner.to_string()];
+        #[test]
+        fn allowed() {
+            let Suite { mut deps, .. } = SuiteConfig::new()
+                .with_permissions(SPENDER1, ALL_PERMS)
+                .init();
 
-        // spender1 has every permission to stake
-        let spender1 = "spender0001";
-        // spender2 do not have permission
-        let spender2 = "spender0002";
-        let denom = "token1";
-        let amount = 10000;
-        let coin1 = coin(amount, denom);
+            let msgs = vec![
+                StakingMsg::Delegate {
+                    validator: "validator1".to_owned(),
+                    amount: coin(10, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Redelegate {
+                    src_validator: "validator1".to_owned(),
+                    dst_validator: "validator2".to_owned(),
+                    amount: coin(15, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Undelegate {
+                    validator: "validator1".to_owned(),
+                    amount: coin(10, TOKEN1),
+                }
+                .into(),
+                DistributionMsg::WithdrawDelegatorReward {
+                    validator: "validator1".to_owned(),
+                }
+                .into(),
+            ];
 
-        let god_mode = Permissions {
-            delegate: true,
-            redelegate: true,
-            undelegate: true,
-            withdraw: true,
-        };
+            for msg in msgs {
+                let msgs = vec![msg];
+                let rsp = execute(
+                    deps.as_mut(),
+                    mock_env(),
+                    mock_info(SPENDER1, &[]),
+                    ExecuteMsg::Execute { msgs: msgs.clone() },
+                )
+                .unwrap();
 
-        let info = mock_info(owner, &[]);
-        // Instantiate a contract with admins
-        let instantiate_msg = InstantiateMsg {
-            admins,
-            mutable: true,
-        };
-        instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
-
-        let setup_perm_msg1 = ExecuteMsg::SetPermissions {
-            spender: spender1.to_string(),
-            permissions: god_mode,
-        };
-        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg1).unwrap();
-
-        let setup_perm_msg2 = ExecuteMsg::SetPermissions {
-            spender: spender2.to_string(),
-            // default is no permission
-            permissions: Default::default(),
-        };
-        // default is no permission
-        execute(deps.as_mut(), mock_env(), info.clone(), setup_perm_msg2).unwrap();
-
-        let msg_delegate = vec![StakingMsg::Delegate {
-            validator: "validator1".into(),
-            amount: coin1.clone(),
-        }
-        .into()];
-        let msg_redelegate = vec![StakingMsg::Redelegate {
-            src_validator: "validator1".into(),
-            dst_validator: "validator2".into(),
-            amount: coin1.clone(),
-        }
-        .into()];
-        let msg_undelegate = vec![StakingMsg::Undelegate {
-            validator: "validator1".into(),
-            amount: coin1,
-        }
-        .into()];
-        let msg_withdraw = vec![DistributionMsg::WithdrawDelegatorReward {
-            validator: "validator1".into(),
-        }
-        .into()];
-
-        let msgs = vec![
-            msg_delegate.clone(),
-            msg_redelegate.clone(),
-            msg_undelegate.clone(),
-            msg_withdraw.clone(),
-        ];
-
-        // spender1 can execute
-        for msg in &msgs {
-            let info = mock_info(spender1, &[]);
-            let res = execute(
-                deps.as_mut(),
-                mock_env(),
-                info,
-                ExecuteMsg::Execute { msgs: msg.clone() },
-            );
-            assert!(res.is_ok())
+                assert_eq!(
+                    rsp.messages,
+                    msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
+                );
+                assert_eq!(rsp.events, vec![]);
+                assert_eq!(rsp.data, None);
+            }
         }
 
-        // spender2 cannot execute (no permission)
-        for msg in &msgs {
-            let info = mock_info(spender2, &[]);
-            let res = execute(
-                deps.as_mut(),
-                mock_env(),
-                info.clone(),
-                ExecuteMsg::Execute { msgs: msg.clone() },
-            );
-            assert!(res.is_err())
+        #[test]
+        fn admin() {
+            let Suite { mut deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+
+            let msgs = vec![
+                StakingMsg::Delegate {
+                    validator: "validator1".to_owned(),
+                    amount: coin(10, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Redelegate {
+                    src_validator: "validator1".to_owned(),
+                    dst_validator: "validator2".to_owned(),
+                    amount: coin(15, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Undelegate {
+                    validator: "validator1".to_owned(),
+                    amount: coin(10, TOKEN1),
+                }
+                .into(),
+                DistributionMsg::WithdrawDelegatorReward {
+                    validator: "validator1".to_owned(),
+                }
+                .into(),
+            ];
+
+            for msg in msgs {
+                let msgs = vec![msg];
+                let rsp = execute(
+                    deps.as_mut(),
+                    mock_env(),
+                    mock_info(ADMIN1, &[]),
+                    ExecuteMsg::Execute { msgs: msgs.clone() },
+                )
+                .unwrap();
+
+                assert_eq!(
+                    rsp.messages,
+                    msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
+                );
+                assert_eq!(rsp.events, vec![]);
+                assert_eq!(rsp.data, None);
+            }
         }
 
-        // test mixed permissions
-        let spender3 = "spender0003";
-        let setup_perm_msg3 = ExecuteMsg::SetPermissions {
-            spender: spender3.to_string(),
-            permissions: Permissions {
-                delegate: false,
-                redelegate: true,
-                undelegate: true,
-                withdraw: false,
-            },
-        };
-        execute(deps.as_mut(), mock_env(), info, setup_perm_msg3).unwrap();
-        let info = mock_info(spender3, &[]);
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            info.clone(),
-            ExecuteMsg::Execute { msgs: msg_delegate },
-        );
-        // FIXME need better error check here
-        assert!(res.is_err());
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            info.clone(),
-            ExecuteMsg::Execute {
-                msgs: msg_redelegate,
-            },
-        );
-        assert!(res.is_ok());
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            info.clone(),
-            ExecuteMsg::Execute {
-                msgs: msg_undelegate,
-            },
-        );
-        assert!(res.is_ok());
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            info,
-            ExecuteMsg::Execute { msgs: msg_withdraw },
-        );
-        assert!(res.is_err())
+        #[test]
+        fn reject() {
+            let Suite { mut deps, .. } = Suite::init();
+
+            let msgs = vec![
+                StakingMsg::Delegate {
+                    validator: "validator1".to_owned(),
+                    amount: coin(10, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Redelegate {
+                    src_validator: "validator1".to_owned(),
+                    dst_validator: "validator2".to_owned(),
+                    amount: coin(15, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Undelegate {
+                    validator: "validator1".to_owned(),
+                    amount: coin(10, TOKEN1),
+                }
+                .into(),
+                DistributionMsg::WithdrawDelegatorReward {
+                    validator: "validator1".to_owned(),
+                }
+                .into(),
+            ];
+
+            for msg in msgs {
+                let msgs = vec![msg];
+                execute(
+                    deps.as_mut(),
+                    mock_env(),
+                    mock_info(SPENDER1, &[]),
+                    ExecuteMsg::Execute { msgs },
+                )
+                .unwrap_err();
+            }
+        }
+    }
+
+    mod can_execute {
+        use super::*;
+
+        #[test]
+        #[ignore]
+        fn allowed() {
+            let Suite { deps, .. } = SuiteConfig::new()
+                .with_permissions(SPENDER1, ALL_PERMS)
+                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .init();
+
+            let msgs: Vec<CosmosMsg> = vec![
+                BankMsg::Send {
+                    to_address: SPENDER2.to_owned(),
+                    amount: coins(5, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Delegate {
+                    validator: SPENDER2.to_owned(),
+                    amount: coin(8, TOKEN),
+                }
+                .into(),
+                DistributionMsg::WithdrawDelegatorReward {
+                    validator: SPENDER2.to_owned(),
+                }
+                .into(),
+            ];
+
+            for msg in msgs {
+                let resp =
+                    query_can_execute(deps.as_ref(), SPENDER1.to_owned(), msg.clone()).unwrap();
+
+                assert_eq!(
+                    resp,
+                    CanExecuteResponse { can_execute: true },
+                    "Original message: {:#?}",
+                    msg
+                );
+            }
+        }
+
+        #[test]
+        fn not_enough_allowance() {
+            let Suite { deps, .. } = SuiteConfig::new()
+                .with_allowance(SPENDER1, coin(10, TOKEN1))
+                .init();
+
+            let msg: CosmosMsg = BankMsg::Send {
+                to_address: SPENDER2.to_owned(),
+                amount: coins(16, TOKEN1),
+            }
+            .into();
+
+            let resp = query_can_execute(deps.as_ref(), SPENDER1.to_owned(), msg).unwrap();
+
+            assert_eq!(resp, CanExecuteResponse { can_execute: false });
+        }
+
+        #[test]
+        fn missing_permissions() {
+            let Suite { deps, .. } = SuiteConfig::new()
+                .with_permissions(SPENDER1, NO_PERMS)
+                .init();
+
+            let msgs: Vec<CosmosMsg> = vec![
+                StakingMsg::Delegate {
+                    validator: SPENDER2.to_owned(),
+                    amount: coin(8, TOKEN),
+                }
+                .into(),
+                DistributionMsg::WithdrawDelegatorReward {
+                    validator: SPENDER2.to_owned(),
+                }
+                .into(),
+            ];
+
+            for msg in msgs {
+                let resp =
+                    query_can_execute(deps.as_ref(), SPENDER1.to_owned(), msg.clone()).unwrap();
+
+                assert_eq!(
+                    resp,
+                    CanExecuteResponse { can_execute: false },
+                    "Original message: {:#?}",
+                    msg
+                );
+            }
+        }
+
+        #[test]
+        fn custom() {
+            let Suite { deps, .. } = SuiteConfig::new()
+                .with_permissions(SPENDER1, ALL_PERMS)
+                .init();
+
+            let msg: CosmosMsg = CosmosMsg::Custom(Empty {});
+
+            let resp = query_can_execute(deps.as_ref(), SPENDER1.to_owned(), msg).unwrap();
+
+            assert_eq!(resp, CanExecuteResponse { can_execute: false });
+        }
+
+        #[test]
+        fn admin() {
+            let Suite { deps, .. } = SuiteConfig::new().with_admin(ADMIN1).init();
+
+            let msgs = vec![
+                BankMsg::Send {
+                    to_address: SPENDER2.to_owned(),
+                    amount: coins(5, TOKEN1),
+                }
+                .into(),
+                StakingMsg::Delegate {
+                    validator: SPENDER2.to_owned(),
+                    amount: coin(8, TOKEN),
+                }
+                .into(),
+                DistributionMsg::WithdrawDelegatorReward {
+                    validator: SPENDER2.to_owned(),
+                }
+                .into(),
+                CosmosMsg::Custom(Empty {}),
+            ];
+
+            for msg in msgs {
+                let resp =
+                    query_can_execute(deps.as_ref(), ADMIN1.to_owned(), msg.clone()).unwrap();
+
+                assert_eq!(
+                    resp,
+                    CanExecuteResponse { can_execute: true },
+                    "Original message: {:#?}",
+                    msg
+                );
+            }
+        }
     }
 
     // tests permissions and allowances are independent features and does not affect each other
@@ -1922,103 +2024,5 @@ mod tests {
         assert_eq!(perm, res_perm);
         let res_allow = query_allowance(deps.as_ref(), spender2.to_string()).unwrap();
         assert_eq!(allow, res_allow);
-    }
-
-    #[test]
-    fn can_execute_query_works() {
-        let mut deps = mock_dependencies(&[]);
-
-        let owner = "admin007";
-        let spender = "spender808";
-        let anyone = "anyone";
-
-        let info = mock_info(owner, &[]);
-        // spender has allowance of 55000 ushell
-        setup_test_case(
-            deps.as_mut(),
-            &info,
-            &[owner],
-            &[spender],
-            &coins(55000, "ushell"),
-            &[Expiration::Never {}],
-        );
-
-        let perm = Permissions {
-            delegate: true,
-            redelegate: true,
-            undelegate: false,
-            withdraw: false,
-        };
-
-        let spender_addr = Addr::unchecked(spender);
-        let _ = PERMISSIONS.save(&mut deps.storage, &spender_addr, &perm);
-
-        // let us make some queries... different msg types by owner and by other
-        let send_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: anyone.to_string(),
-            amount: coins(12345, "ushell"),
-        });
-        let send_msg_large = CosmosMsg::Bank(BankMsg::Send {
-            to_address: anyone.to_string(),
-            amount: coins(1234567, "ushell"),
-        });
-        let staking_delegate_msg = CosmosMsg::Staking(StakingMsg::Delegate {
-            validator: anyone.to_string(),
-            amount: coin(70000, "ureef"),
-        });
-        let staking_withdraw_msg =
-            CosmosMsg::Distribution(DistributionMsg::WithdrawDelegatorReward {
-                validator: anyone.to_string(),
-            });
-
-        // owner can send big or small
-        let res = query_can_execute(deps.as_ref(), owner.to_string(), send_msg.clone()).unwrap();
-        assert!(res.can_execute);
-        let res =
-            query_can_execute(deps.as_ref(), owner.to_string(), send_msg_large.clone()).unwrap();
-        assert!(res.can_execute);
-        // owner can stake
-        let res = query_can_execute(
-            deps.as_ref(),
-            owner.to_string(),
-            staking_delegate_msg.clone(),
-        )
-        .unwrap();
-        assert!(res.can_execute);
-
-        // spender can send small
-        let res = query_can_execute(deps.as_ref(), spender.to_string(), send_msg.clone()).unwrap();
-        assert!(res.can_execute);
-        // not too big
-        let res =
-            query_can_execute(deps.as_ref(), spender.to_string(), send_msg_large.clone()).unwrap();
-        assert!(!res.can_execute);
-        // spender can send staking msgs if permissioned
-        let res = query_can_execute(
-            deps.as_ref(),
-            spender.to_string(),
-            staking_delegate_msg.clone(),
-        )
-        .unwrap();
-        assert!(res.can_execute);
-        let res = query_can_execute(
-            deps.as_ref(),
-            spender.to_string(),
-            staking_withdraw_msg.clone(),
-        )
-        .unwrap();
-        assert!(!res.can_execute);
-
-        // random person cannot do anything
-        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg).unwrap();
-        assert!(!res.can_execute);
-        let res = query_can_execute(deps.as_ref(), anyone.to_string(), send_msg_large).unwrap();
-        assert!(!res.can_execute);
-        let res =
-            query_can_execute(deps.as_ref(), anyone.to_string(), staking_delegate_msg).unwrap();
-        assert!(!res.can_execute);
-        let res =
-            query_can_execute(deps.as_ref(), anyone.to_string(), staking_withdraw_msg).unwrap();
-        assert!(!res.can_execute);
     }
 }
