@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
+test-utils = []
 
 [dependencies]
 cw0 = { path = "../../packages/cw0", version = "0.7.0" }
@@ -30,3 +31,4 @@ thiserror = { version = "1.0.23" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "0.15.0" }
+cw1-whitelist = { path = "../cw1-whitelist", version = "0.7.0", features = ["library", "test-utils"] }
