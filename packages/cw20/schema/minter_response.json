@@ -7,7 +7,7 @@
   ],
   "properties": {
     "cap": {
-      "description": "cap is how many more tokens can be issued by the minter",
+      "description": "cap is a hard cap on total supply that can be achieved by minting. Note that this refers to total_supply. If None, there is unlimited cap.",
       "anyOf": [
         {
           "$ref": "#/definitions/Uint128"
