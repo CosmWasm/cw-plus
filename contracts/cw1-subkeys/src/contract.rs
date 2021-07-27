@@ -107,7 +107,7 @@ where
                 }) => {
                     ALLOWANCES.update::<_, ContractError>(deps.storage, &info.sender, |allow| {
                         let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
-                        if is_expired(&env, allowance.expires) {
+                        if allowance.expires.is_expired(&env.block) {
                             return Err(ContractError::NoAllowance {});
                         }
 
@@ -129,14 +129,6 @@ where
         ..Response::default()
     };
     Ok(res)
-}
-
-pub fn is_expired(env: &Env, expire: Expiration) -> bool {
-    match expire {
-        Expiration::AtTime(timestamp) => timestamp <= env.block.time,
-        Expiration::AtHeight(height) => height < env.block.height,
-        _ => false,
-    }
 }
 
 pub fn check_staking_permissions(
@@ -212,16 +204,16 @@ where
             .unwrap_or_default();
 
         let mut allowance = allow
-            .filter(|allow| !is_expired(&env, allow.expires))
+            .filter(|allow| !allow.expires.is_expired(&env.block))
             .unwrap_or_default();
 
         if let Some(exp) = expires {
-            if is_expired(&env, exp) {
+            if exp.is_expired(&env.block) {
                 return Err(ContractError::SettingExpiredAllowance(exp));
             }
 
             allowance.expires = exp;
-        } else if is_expired(&env, prev_expires) {
+        } else if prev_expires.is_expired(&env.block) {
             return Err(ContractError::SettingExpiredAllowance(prev_expires));
         }
 
@@ -267,11 +259,11 @@ where
         ALLOWANCES.update::<_, ContractError>(deps.storage, &spender_addr, |allow| {
             // Fail fast
             let mut allowance = allow
-                .filter(|allow| !is_expired(&env, allow.expires))
+                .filter(|allow| !allow.expires.is_expired(&env.block))
                 .ok_or(ContractError::NoAllowance {})?;
 
             if let Some(exp) = expires {
-                if is_expired(&env, exp) {
+                if exp.is_expired(&env.block) {
                     return Err(ContractError::SettingExpiredAllowance(exp));
                 }
 
@@ -356,7 +348,7 @@ pub fn query_allowance(deps: Deps, env: Env, spender: String) -> StdResult<Allow
     let spender = deps.api.addr_validate(&spender)?;
     let allow = ALLOWANCES
         .may_load(deps.storage, &spender)?
-        .filter(|allow| !is_expired(&env, allow.expires))
+        .filter(|allow| !allow.expires.is_expired(&env.block))
         .unwrap_or_default();
 
     Ok(allow)
@@ -397,7 +389,7 @@ fn can_execute(deps: Deps, env: Env, sender: String, msg: CosmosMsg) -> StdResul
             match allowance {
                 // if there is an allowance, we subtract the requested amount to ensure it is covered (error on underflow)
                 Some(allow) => {
-                    Ok(!is_expired(&env, allow.expires) && allow.balance.sub(amount).is_ok())
+                    Ok(!allow.expires.is_expired(&env.block) && allow.balance.sub(amount).is_ok())
                 }
                 None => Ok(false),
             }
@@ -444,7 +436,7 @@ pub fn query_all_allowances(
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|item| {
             if let Ok((_, allow)) = item {
-                !is_expired(&env, allow.expires)
+                !allow.expires.is_expired(&env.block)
             } else {
                 true
             }
@@ -1295,7 +1287,7 @@ mod tests {
                 .expire_allowances(SPENDER1, NON_EXPIRED_HEIGHT)
                 .init();
 
-            execute(
+            let rsp = execute(
                 deps.as_mut(),
                 mock_env(),
                 owner,
@@ -1304,8 +1296,11 @@ mod tests {
                     amount: coin(2, TOKEN2),
                     expires: Some(EXPIRED_TIME),
                 },
-            )
-            .unwrap_err();
+            );
+            assert_eq!(
+                rsp,
+                Err(ContractError::SettingExpiredAllowance(EXPIRED_TIME))
+            );
 
             assert_eq!(
                 query_all_allowances(deps.as_ref(), mock_env(), None, None)
