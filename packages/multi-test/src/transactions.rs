@@ -17,6 +17,16 @@ use cosmwasm_std::{Order, Pair};
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
+pub fn transactional<F, T, E>(base: &mut dyn Storage, action: F) -> Result<T, E>
+where
+    F: FnOnce(&dyn Storage, &mut dyn Storage) -> Result<T, E>,
+{
+    let mut cache = StorageTransaction::new(base);
+    let res = action(base, &mut cache)?;
+    cache.prepare().commit(base);
+    Ok(res)
+}
+
 pub struct StorageTransaction<'a> {
     /// read-only access to backing storage
     storage: &'a dyn Storage,
@@ -35,14 +45,14 @@ impl<'a> StorageTransaction<'a> {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn cache(&self) -> StorageTransaction {
-        StorageTransaction::new(self)
-    }
-
     /// prepares this transaction to be committed to storage
     pub fn prepare(self) -> RepLog {
         self.rep_log
+    }
+
+    #[allow(dead_code)]
+    pub fn cache(&self) -> StorageTransaction {
+        StorageTransaction::new(self)
     }
 
     /// rollback will consume the checkpoint and drop all changes (not really needed, going out of scope does the same, but nice for clarity)

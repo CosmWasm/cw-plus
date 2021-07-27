@@ -12,7 +12,7 @@ use serde::Serialize;
 use crate::bank::Bank;
 use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
-use crate::transactions::StorageTransaction;
+use crate::transactions::transactional;
 use crate::wasm::{Wasm, WasmKeeper};
 
 pub fn next_block(block: &mut BlockInfo) {
@@ -106,22 +106,12 @@ where
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
 
-        let mut cache = StorageTransaction::new(self.storage.as_ref());
-
-        // run all messages, stops at first error
-        let res: Result<Vec<AppResponse>, String> = msgs
-            .into_iter()
-            .map(|msg| {
-                self.router
-                    .execute(&mut cache, &self.block, sender.clone(), msg)
-            })
-            .collect();
-
-        // this only happens if all messages run successfully
-        if res.is_ok() {
-            cache.prepare().commit(self.storage.as_mut())
-        }
-        res
+        let (block, router) = (&self.block, &self.router);
+        transactional(self.storage.as_mut(), |_read_store, write_cache| {
+            msgs.into_iter()
+                .map(|msg| router.execute(write_cache, block, sender.clone(), msg))
+                .collect()
+        })
     }
 
     /// This is an "admin" function to let us adjust bank accounts
@@ -277,6 +267,7 @@ mod test {
         PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
         ReflectQueryMsg,
     };
+    use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
 
     use super::*;
