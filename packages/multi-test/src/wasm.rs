@@ -515,6 +515,10 @@ where
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
 
+        // We don't actually need a transaction here, as it is already embedded in a transactional.
+        // execute_submsg or App.execute_multi.
+        // However, we need to get write and read access to the same storage in two different objects,
+        // and this is the only way I know how to do so.
         transactional(storage, |write_cache, read_store| {
             let mut contract_storage = self.contract_storage(write_cache, &address);
             let querier = RouterQuerier::new(router, read_store, block);
