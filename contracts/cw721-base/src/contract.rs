@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
-    StdError, StdResult, SubMsg,
+    StdError, StdResult,
 };
 
 use cw0::maybe_addr;
@@ -102,16 +102,11 @@ pub fn execute_mint(
 
     increment_tokens(deps.storage)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "mint"),
-            attr("minter", info.sender),
-            attr("token_id", msg.token_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "mint"),
+        attr("minter", info.sender),
+        attr("token_id", msg.token_id),
+    ]))
 }
 
 pub fn execute_transfer_nft(
@@ -123,17 +118,12 @@ pub fn execute_transfer_nft(
 ) -> Result<Response, ContractError> {
     _transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "transfer_nft"),
-            attr("sender", info.sender),
-            attr("recipient", recipient),
-            attr("token_id", token_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "transfer_nft"),
+        attr("sender", info.sender),
+        attr("recipient", recipient),
+        attr("token_id", token_id),
+    ]))
 }
 
 pub fn execute_send_nft(
@@ -154,17 +144,14 @@ pub fn execute_send_nft(
     };
 
     // Send message
-    Ok(Response {
-        messages: vec![SubMsg::new(send.into_cosmos_msg(contract.clone())?)],
-        attributes: vec![
+    Ok(Response::new()
+        .add_message(send.into_cosmos_msg(contract.clone())?)
+        .add_attributes(vec![
             attr("action", "send_nft"),
             attr("sender", info.sender),
             attr("recipient", contract),
             attr("token_id", token_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+        ]))
 }
 
 pub fn _transfer_nft(
@@ -194,17 +181,12 @@ pub fn execute_approve(
 ) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "approve"),
-            attr("sender", info.sender),
-            attr("spender", spender),
-            attr("token_id", token_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "approve"),
+        attr("sender", info.sender),
+        attr("spender", spender),
+        attr("token_id", token_id),
+    ]))
 }
 
 pub fn execute_revoke(
@@ -216,17 +198,12 @@ pub fn execute_revoke(
 ) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "revoke"),
-            attr("sender", info.sender),
-            attr("spender", spender),
-            attr("token_id", token_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "revoke"),
+        attr("sender", info.sender),
+        attr("spender", spender),
+        attr("token_id", token_id),
+    ]))
 }
 
 pub fn _update_approvals(
@@ -287,16 +264,11 @@ pub fn execute_approve_all(
     let operator_addr = deps.api.addr_validate(&operator)?;
     OPERATORS.save(deps.storage, (&info.sender, &operator_addr), &expires)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "approve_all"),
-            attr("sender", info.sender),
-            attr("operator", operator),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "approve_all"),
+        attr("sender", info.sender),
+        attr("operator", operator),
+    ]))
 }
 
 pub fn execute_revoke_all(
@@ -308,16 +280,11 @@ pub fn execute_revoke_all(
     let operator_addr = deps.api.addr_validate(&operator)?;
     OPERATORS.remove(deps.storage, (&info.sender, &operator_addr));
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "revoke_all"),
-            attr("sender", info.sender),
-            attr("operator", operator),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "revoke_all"),
+        attr("sender", info.sender),
+        attr("operator", operator),
+    ]))
 }
 
 /// returns true iff the sender can execute approve or reject on the contract
@@ -752,15 +719,12 @@ mod tests {
 
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "transfer_nft"),
-                    attr("sender", "venus"),
-                    attr("recipient", "random"),
-                    attr("token_id", token_id),
-                ],
-                ..Response::default()
-            }
+            Response::new().add_attributes(vec![
+                attr("action", "transfer_nft"),
+                attr("sender", "venus"),
+                attr("recipient", "random"),
+                attr("token_id", token_id),
+            ])
         );
     }
 
@@ -806,9 +770,9 @@ mod tests {
             token_id: token_id.clone(),
             msg,
         };
-        let expected = SubMsg::new(payload.into_cosmos_msg(target.clone()).unwrap());
+        let expected = payload.into_cosmos_msg(target.clone()).unwrap();
         // ensure expected serializes as we think it should
-        match &expected.msg {
+        match &expected {
             CosmosMsg::Wasm(WasmMsg::Execute { contract_addr, .. }) => {
                 assert_eq!(contract_addr, &target)
             }
@@ -817,16 +781,12 @@ mod tests {
         // and make sure this is the request sent by the contract
         assert_eq!(
             res,
-            Response {
-                messages: vec![expected],
-                attributes: vec![
-                    attr("action", "send_nft"),
-                    attr("sender", "venus"),
-                    attr("recipient", "another_contract"),
-                    attr("token_id", token_id),
-                ],
-                ..Response::default()
-            }
+            Response::new().add_message(expected).add_attributes(vec![
+                attr("action", "send_nft"),
+                attr("sender", "venus"),
+                attr("recipient", "another_contract"),
+                attr("token_id", token_id),
+            ])
         );
     }
 
@@ -861,15 +821,12 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), owner, approve_msg).unwrap();
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "approve"),
-                    attr("sender", "demeter"),
-                    attr("spender", "random"),
-                    attr("token_id", token_id.clone()),
-                ],
-                ..Response::default()
-            }
+            Response::new().add_attributes(vec![
+                attr("action", "approve"),
+                attr("sender", "demeter"),
+                attr("spender", "random"),
+                attr("token_id", token_id.clone()),
+            ])
         );
 
         // random can now transfer
@@ -973,14 +930,11 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), owner, approve_all_msg).unwrap();
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "approve_all"),
-                    attr("sender", "demeter"),
-                    attr("operator", "random"),
-                ],
-                ..Response::default()
-            }
+            Response::new().add_attributes(vec![
+                attr("action", "approve_all"),
+                attr("sender", "demeter"),
+                attr("operator", "random"),
+            ])
         );
 
         // random can now transfer

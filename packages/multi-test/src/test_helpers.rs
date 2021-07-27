@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, Event, MessageInfo, Reply,
+    to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, Event, MessageInfo, Reply,
     Response, StdError, SubMsg,
 };
 use cw_storage_plus::{Item, Map, U64Key};
@@ -95,17 +95,13 @@ fn execute_payout(
 ) -> Result<Response, StdError> {
     // always try to payout what was set originally
     let payout = PAYOUT.load(deps.storage)?;
-    let msg = SubMsg::new(BankMsg::Send {
+    let msg = BankMsg::Send {
         to_address: info.sender.into(),
         amount: vec![payout.payout],
-    });
-    let res = Response {
-        messages: vec![msg],
-        attributes: vec![attr("action", "payout")],
-        events: vec![],
-        data: None,
     };
-    Ok(res)
+    Ok(Response::new()
+        .add_message(msg)
+        .add_attribute("action", "payout"))
 }
 
 fn sudo_payout(deps: DepsMut, _env: Env, msg: PayoutSudoMsg) -> Result<Response, StdError> {
@@ -181,13 +177,7 @@ fn execute_reflect(
 ) -> Result<Response<CustomMsg>, StdError> {
     COUNT.update::<_, StdError>(deps.storage, |old| Ok(old + 1))?;
 
-    let res = Response {
-        messages: msg.messages,
-        attributes: vec![],
-        events: vec![],
-        data: None,
-    };
-    Ok(res)
+    Ok(Response::new().add_submessages(msg.messages))
 }
 
 fn query_reflect(deps: Deps, _env: Env, msg: ReflectQueryMsg) -> Result<Binary, StdError> {
@@ -208,12 +198,9 @@ fn reply_reflect(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<Custom
     REFLECT.save(deps.storage, msg.id.into(), &msg)?;
     // add custom event here to test
     let event = Event::new("custom")
-        .attr("from", "reply")
-        .attr("to", "test");
-    Ok(Response {
-        events: vec![event],
-        ..Response::default()
-    })
+        .add_attribute("from", "reply")
+        .add_attribute("to", "test");
+    Ok(Response::new().add_event(event))
 }
 
 pub fn contract_reflect() -> Box<dyn Contract<CustomMsg>> {

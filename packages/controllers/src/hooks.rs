@@ -87,12 +87,7 @@ impl<'a> Hooks<'a> {
             attr("hook", addr),
             attr("sender", info.sender),
         ];
-        Ok(Response {
-            messages: vec![],
-            attributes,
-            events: vec![],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(attributes))
     }
 
     pub fn execute_remove_hook(
@@ -110,12 +105,7 @@ impl<'a> Hooks<'a> {
             attr("hook", addr),
             attr("sender", info.sender),
         ];
-        Ok(Response {
-            messages: vec![],
-            attributes,
-            events: vec![],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(attributes))
     }
 
     pub fn query_hooks(&self, deps: Deps) -> StdResult<HooksResponse> {

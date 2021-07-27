@@ -119,12 +119,9 @@ pub fn execute_bond(
         attr("amount", amount),
         attr("sender", sender),
     ];
-    Ok(Response {
-        messages,
-        attributes,
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_submessages(messages)
+        .add_attributes(attributes))
 }
 
 pub fn execute_receive(
@@ -183,12 +180,9 @@ pub fn execute_unbond(
         attr("amount", amount),
         attr("sender", info.sender),
     ];
-    Ok(Response {
-        messages,
-        attributes,
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_submessages(messages)
+        .add_attributes(attributes))
 }
 
 pub fn must_pay_funds(balance: &NativeBalance, denom: &str) -> Result<Uint128, ContractError> {
@@ -292,12 +286,9 @@ pub fn execute_claim(
         attr("tokens", amount_str),
         attr("sender", info.sender),
     ];
-    Ok(Response {
-        messages: vec![message],
-        attributes,
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_submessage(message)
+        .add_attributes(attributes))
 }
 
 #[inline]

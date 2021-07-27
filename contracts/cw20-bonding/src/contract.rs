@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coins, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult, SubMsg, Uint128,
+    StdError, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -160,15 +160,12 @@ pub fn execute_buy(
     execute_mint(deps, env, sub_info, info.sender.to_string(), minted)?;
 
     // bond them to the validator
-    let res = Response {
-        attributes: vec![
-            attr("action", "buy"),
-            attr("from", info.sender),
-            attr("reserve", payment),
-            attr("supply", minted),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![
+        attr("action", "buy"),
+        attr("from", info.sender),
+        attr("reserve", payment),
+        attr("supply", minted),
+    ]);
     Ok(res)
 }
 
@@ -254,19 +251,15 @@ fn do_sell(
     CURVE_STATE.save(deps.storage, &state)?;
 
     // now send the tokens to the sender (TODO: for sell_from we do something else, right???)
-    let msg = SubMsg::new(BankMsg::Send {
+    let msg = BankMsg::Send {
         to_address: receiver.to_string(),
         amount: coins(released.u128(), state.reserve_denom),
-    });
-    let res = Response {
-        messages: vec![msg],
-        attributes: vec![
-            attr("from", info.sender),
-            attr("supply", amount),
-            attr("reserve", released),
-        ],
-        ..Response::default()
     };
+    let res = Response::new()
+        .add_message(msg)
+        .add_attribute("from", info.sender)
+        .add_attribute("supply", amount)
+        .add_attribute("reserve", released);
     Ok(res)
 }
 
@@ -321,7 +314,7 @@ mod tests {
     use super::*;
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, Decimal, OverflowError, OverflowOperation, StdError};
+    use cosmwasm_std::{coin, Decimal, OverflowError, OverflowOperation, StdError, SubMsg};
     use cw0::PaymentError;
 
     const DENOM: &str = "satoshi";

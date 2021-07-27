@@ -394,9 +394,9 @@ mod test {
         let custom_attrs = res.custom_attrs(0);
         assert_eq!(&[attr("action", "payout")], &custom_attrs);
         let expected_transfer = Event::new("transfer")
-            .attr("recipient", "random")
-            .attr("sender", &contract_addr)
-            .attr("amount", "5eth");
+            .add_attribute("recipient", "random")
+            .add_attribute("sender", &contract_addr)
+            .add_attribute("amount", "5eth");
         assert_eq!(&expected_transfer, &res.events[1]);
 
         // random got cash

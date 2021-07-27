@@ -165,23 +165,18 @@ pub fn ibc_packet_receive(
             ];
             let to_send = Amount::from_parts(denom.into(), msg.amount);
             let msg = send_amount(to_send, msg.receiver);
-            IbcReceiveResponse {
-                acknowledgement: ack_success(),
-                messages: vec![msg],
-                attributes,
-                ..IbcReceiveResponse::default()
-            }
+            IbcReceiveResponse::new()
+                .set_ack(ack_success())
+                .add_submessage(msg)
+                .add_attributes(attributes)
         }
-        Err(err) => IbcReceiveResponse {
-            acknowledgement: ack_fail(err.to_string()),
-            messages: vec![],
-            attributes: vec![
+        Err(err) => IbcReceiveResponse::new()
+            .set_ack(ack_fail(err.to_string()))
+            .add_attributes(vec![
                 attr("action", "receive"),
                 attr("success", "false"),
                 attr("error", err.to_string()),
-            ],
-            ..IbcReceiveResponse::default()
-        },
+            ]),
     };
 
     // if we have funds, now send the tokens to the requested recipient
@@ -289,11 +284,7 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         Ok(state)
     })?;
 
-    Ok(IbcBasicResponse {
-        messages: vec![],
-        attributes,
-        ..IbcBasicResponse::default()
-    })
+    Ok(IbcBasicResponse::new().add_attributes(attributes))
 }
 
 // return the tokens to sender
@@ -316,12 +307,9 @@ fn on_packet_failure(
 
     let amount = Amount::from_parts(msg.denom, msg.amount);
     let msg = send_amount(amount, msg.sender);
-    let res = IbcBasicResponse {
-        messages: vec![msg],
-        attributes,
-        ..IbcBasicResponse::default()
-    };
-    Ok(res)
+    Ok(IbcBasicResponse::new()
+        .add_attributes(attributes)
+        .add_submessage(msg))
 }
 
 fn send_amount(amount: Amount, recipient: String) -> SubMsg {
@@ -408,19 +396,19 @@ mod test {
             sender: sender.to_string(),
             receiver: "remote-rcpt".to_string(),
         };
-        IbcPacket {
-            data: to_binary(&data).unwrap(),
-            src: IbcEndpoint {
+        IbcPacket::new(
+            to_binary(&data).unwrap(),
+            IbcEndpoint {
                 port_id: CONTRACT_PORT.to_string(),
                 channel_id: my_channel.to_string(),
             },
-            dest: IbcEndpoint {
+            IbcEndpoint {
                 port_id: REMOTE_PORT.to_string(),
                 channel_id: "channel-1234".to_string(),
             },
-            sequence: 2,
-            timeout: IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
-        }
+            2,
+            IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
+        )
     }
     fn mock_receive_packet(
         my_channel: &str,
@@ -436,19 +424,19 @@ mod test {
             receiver: receiver.to_string(),
         };
         print!("Packet denom: {}", &data.denom);
-        IbcPacket {
-            data: to_binary(&data).unwrap(),
-            src: IbcEndpoint {
+        IbcPacket::new(
+            to_binary(&data).unwrap(),
+            IbcEndpoint {
                 port_id: REMOTE_PORT.to_string(),
                 channel_id: "channel-1234".to_string(),
             },
-            dest: IbcEndpoint {
+            IbcEndpoint {
                 port_id: CONTRACT_PORT.to_string(),
                 channel_id: my_channel.to_string(),
             },
-            sequence: 3,
-            timeout: Timestamp::from_seconds(1665321069).into(),
-        }
+            3,
+            Timestamp::from_seconds(1665321069).into(),
+        )
     }
 
     #[test]
@@ -474,10 +462,7 @@ mod test {
         assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
-        let msg = IbcPacketAckMsg {
-            acknowledgement: IbcAcknowledgement::new(ack_success()),
-            original_packet: sent_packet,
-        };
+        let msg = IbcPacketAckMsg::new(IbcAcknowledgement::new(ack_success()), sent_packet);
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
@@ -531,10 +516,7 @@ mod test {
         assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
-        let msg = IbcPacketAckMsg {
-            acknowledgement: IbcAcknowledgement::new(ack_success()),
-            original_packet: sent_packet,
-        };
+        let msg = IbcPacketAckMsg::new(IbcAcknowledgement::new(ack_success()), sent_packet);
         let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 

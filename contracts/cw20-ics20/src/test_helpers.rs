@@ -19,19 +19,19 @@ pub const REMOTE_PORT: &str = "transfer";
 pub const CONNECTION_ID: &str = "connection-2";
 
 pub fn mock_channel(channel_id: &str) -> IbcChannel {
-    IbcChannel {
-        endpoint: IbcEndpoint {
+    IbcChannel::new(
+        IbcEndpoint {
             port_id: CONTRACT_PORT.into(),
             channel_id: channel_id.into(),
         },
-        counterparty_endpoint: IbcEndpoint {
+        IbcEndpoint {
             port_id: REMOTE_PORT.into(),
             channel_id: format!("{}5", channel_id),
         },
-        order: ICS20_ORDERING,
-        version: ICS20_VERSION.into(),
-        connection_id: CONNECTION_ID.into(),
-    }
+        ICS20_ORDERING,
+        ICS20_VERSION,
+        CONNECTION_ID,
+    )
 }
 
 pub fn mock_channel_info(channel_id: &str) -> ChannelInfo {

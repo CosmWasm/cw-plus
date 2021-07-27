@@ -116,9 +116,9 @@ impl Bank for BankKeeper {
             BankMsg::Send { to_address, amount } => {
                 // see https://github.com/cosmos/cosmos-sdk/blob/v0.42.7/x/bank/keeper/send.go#L142-L147
                 let events = vec![Event::new("transfer")
-                    .attr("recipient", &to_address)
-                    .attr("sender", &sender)
-                    .attr("amount", coins_to_string(&amount))];
+                    .add_attribute("recipient", &to_address)
+                    .add_attribute("sender", &sender)
+                    .add_attribute("amount", coins_to_string(&amount))];
                 self.send(
                     &mut bank_storage,
                     sender,

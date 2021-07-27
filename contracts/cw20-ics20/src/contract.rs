@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo,
-    Order, PortIdResponse, Response, StdResult, SubMsg,
+    Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -121,11 +121,7 @@ pub fn execute_transfer(
     ];
 
     // send response
-    let res = Response {
-        messages: vec![SubMsg::new(msg)],
-        attributes,
-        ..Response::default()
-    };
+    let res = Response::new().add_message(msg).add_attributes(attributes);
     Ok(res)
 }
 

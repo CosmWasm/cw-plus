@@ -103,14 +103,11 @@ pub fn execute_update_members(
     let diff = update_members(deps.branch(), env.block.height, info.sender, add, remove)?;
     // call all registered hooks
     let messages = HOOKS.prepare_hooks(deps.storage, |h| {
-        diff.clone().into_cosmos_msg(h).map(SubMsg::new)
+        diff.clone().into_cosmos_msg(h).map(|m| SubMsg::new(m))
     })?;
-    Ok(Response {
-        messages,
-        attributes,
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_submessages(messages)
+        .add_attributes(attributes))
 }
 
 // the logic from execute_update_members extracted for easier import

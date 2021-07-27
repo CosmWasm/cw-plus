@@ -112,10 +112,7 @@ pub fn execute_create(
         Some(_) => Err(ContractError::AlreadyInUse {}),
     })?;
 
-    let res = Response {
-        attributes: vec![attr("action", "create"), attr("id", msg.id)],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![("action", "create"), ("id", msg.id.as_str())]);
     Ok(res)
 }
 
@@ -142,10 +139,7 @@ pub fn execute_top_up(
     // and save
     ESCROWS.save(deps.storage, &id, &escrow)?;
 
-    let res = Response {
-        attributes: vec![attr("action", "top_up"), attr("id", id)],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![("action", "top_up"), ("id", id.as_str())]);
     Ok(res)
 }
 
@@ -174,12 +168,9 @@ pub fn execute_approve(
             attr("id", id),
             attr("to", escrow.recipient),
         ];
-        Ok(Response {
-            messages,
-            attributes,
-            events: vec![],
-            data: None,
-        })
+        Ok(Response::new()
+            .add_submessages(messages)
+            .add_attributes(attributes))
     }
 }
 
@@ -207,12 +198,9 @@ pub fn execute_refund(
             attr("id", id),
             attr("to", escrow.source),
         ];
-        Ok(Response {
-            messages,
-            attributes,
-            events: vec![],
-            data: None,
-        })
+        Ok(Response::new()
+            .add_submessages(messages)
+            .add_attributes(attributes))
     }
 }
 

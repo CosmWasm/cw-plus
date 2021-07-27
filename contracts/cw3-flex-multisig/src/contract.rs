@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    Response, StdResult, SubMsg,
+    Response, StdResult,
 };
 
 use cw0::{maybe_addr, Expiration};
@@ -127,17 +127,12 @@ pub fn execute_propose(
     };
     BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "propose"),
-            attr("sender", info.sender),
-            attr("proposal_id", id.to_string()),
-            attr("status", format!("{:?}", prop.status)),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "propose"),
+        attr("sender", info.sender),
+        attr("proposal_id", id.to_string()),
+        attr("status", format!("{:?}", prop.status)),
+    ]))
 }
 
 pub fn execute_vote(
@@ -183,17 +178,12 @@ pub fn execute_vote(
     prop.update_status(&env.block);
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "vote"),
-            attr("sender", info.sender),
-            attr("proposal_id", proposal_id.to_string()),
-            attr("status", format!("{:?}", prop.status)),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "vote"),
+        attr("sender", info.sender),
+        attr("proposal_id", proposal_id.to_string()),
+        attr("status", format!("{:?}", prop.status)),
+    ]))
 }
 
 pub fn execute_execute(
@@ -216,16 +206,11 @@ pub fn execute_execute(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
-    Ok(Response {
-        messages: prop.msgs.into_iter().map(SubMsg::new).collect(),
-        attributes: vec![
-            attr("action", "execute"),
-            attr("sender", info.sender),
-            attr("proposal_id", proposal_id.to_string()),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_messages(prop.msgs).add_attributes(vec![
+        attr("action", "execute"),
+        attr("sender", info.sender),
+        attr("proposal_id", proposal_id.to_string()),
+    ]))
 }
 
 pub fn execute_close(
@@ -251,16 +236,11 @@ pub fn execute_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "close"),
-            attr("sender", info.sender),
-            attr("proposal_id", proposal_id.to_string()),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_attributes(vec![
+        attr("action", "close"),
+        attr("sender", info.sender),
+        attr("proposal_id", proposal_id.to_string()),
+    ]))
 }
 
 pub fn execute_membership_hook(

@@ -2,8 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, coin, to_binary, Addr, BankMsg, Binary, Decimal, Deps, DepsMut, DistributionMsg, Env,
-    MessageInfo, QuerierWrapper, Response, StakingMsg, StdError, StdResult, SubMsg, Uint128,
-    WasmMsg,
+    MessageInfo, QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -204,19 +203,17 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
     execute_mint(deps, env, sub_info, info.sender.to_string(), to_mint)?;
 
     // bond them to the validator
-    let res = Response {
-        messages: vec![SubMsg::new(StakingMsg::Delegate {
+    let res = Response::new()
+        .add_message(StakingMsg::Delegate {
             validator: invest.validator,
             amount: payment.clone(),
-        })],
-        attributes: vec![
+        })
+        .add_attributes(vec![
             attr("action", "bond"),
             attr("from", info.sender),
             attr("bonded", payment.amount),
             attr("minted", to_mint),
-        ],
-        ..Response::default()
-    };
+        ]);
     Ok(res)
 }
 
@@ -282,19 +279,17 @@ pub fn unbond(
     )?;
 
     // unbond them
-    let res = Response {
-        messages: vec![SubMsg::new(StakingMsg::Undelegate {
+    let res = Response::new()
+        .add_message(StakingMsg::Undelegate {
             validator: invest.validator,
             amount: coin(unbond.u128(), &invest.bond_denom),
-        })],
-        attributes: vec![
+        })
+        .add_attributes(vec![
             attr("action", "unbond"),
             attr("to", info.sender),
             attr("unbonded", unbond),
             attr("burnt", amount),
-        ],
-        ..Response::default()
-    };
+        ]);
     Ok(res)
 }
 
@@ -324,18 +319,16 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
 
     // transfer tokens to the sender
     balance.amount = to_send;
-    let res = Response {
-        messages: vec![SubMsg::new(BankMsg::Send {
+    let res = Response::new()
+        .add_message(BankMsg::Send {
             to_address: info.sender.to_string(),
             amount: vec![balance],
-        })],
-        attributes: vec![
+        })
+        .add_attributes(vec![
             attr("action", "claim"),
             attr("from", info.sender),
             attr("amount", to_send),
-        ],
-        ..Response::default()
-    };
+        ]);
     Ok(res)
 }
 
@@ -348,19 +341,15 @@ pub fn reinvest(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response,
     let msg = to_binary(&ExecuteMsg::_BondAllTokens {})?;
 
     // and bond them to the validator
-    let res = Response {
-        messages: vec![
-            SubMsg::new(DistributionMsg::WithdrawDelegatorReward {
-                validator: invest.validator,
-            }),
-            SubMsg::new(WasmMsg::Execute {
-                contract_addr: contract_addr.to_string(),
-                msg,
-                funds: vec![],
-            }),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new()
+        .add_message(DistributionMsg::WithdrawDelegatorReward {
+            validator: invest.validator,
+        })
+        .add_message(WasmMsg::Execute {
+            contract_addr: contract_addr.to_string(),
+            msg,
+            funds: vec![],
+        });
     Ok(res)
 }
 
@@ -396,14 +385,15 @@ pub fn _bond_all_tokens(
     }
 
     // and bond them to the validator
-    let res = Response {
-        messages: vec![SubMsg::new(StakingMsg::Delegate {
+    let res = Response::new()
+        .add_message(StakingMsg::Delegate {
             validator: invest.validator,
             amount: balance.clone(),
-        })],
-        attributes: vec![attr("action", "reinvest"), attr("bonded", balance.amount)],
-        ..Response::default()
-    };
+        })
+        .add_attributes(vec![
+            attr("action", "reinvest"),
+            attr("bonded", balance.amount),
+        ]);
     Ok(res)
 }
 

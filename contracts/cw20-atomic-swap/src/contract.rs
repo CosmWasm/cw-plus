@@ -113,15 +113,12 @@ pub fn execute_create(
         Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
 
-    let res = Response {
-        attributes: vec![
-            attr("action", "create"),
-            attr("id", msg.id),
-            attr("hash", msg.hash),
-            attr("recipient", msg.recipient),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![
+        attr("action", "create"),
+        attr("id", msg.id),
+        attr("hash", msg.hash),
+        attr("recipient", msg.recipient),
+    ]);
     Ok(res)
 }
 
@@ -146,17 +143,12 @@ pub fn execute_release(
 
     // Send all tokens out
     let msgs = send_tokens(&swap.recipient, swap.balance)?;
-    Ok(Response {
-        messages: msgs,
-        attributes: vec![
-            attr("action", "release"),
-            attr("id", id),
-            attr("preimage", preimage),
-            attr("to", swap.recipient.to_string()),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_submessages(msgs).add_attributes(vec![
+        attr("action", "release"),
+        attr("id", id),
+        attr("preimage", preimage),
+        attr("to", swap.recipient.to_string()),
+    ]))
 }
 
 pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, ContractError> {
@@ -170,16 +162,11 @@ pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, C
     SWAPS.remove(deps.storage, &id);
 
     let msgs = send_tokens(&swap.source, swap.balance)?;
-    Ok(Response {
-        messages: msgs,
-        attributes: vec![
-            attr("action", "refund"),
-            attr("id", id),
-            attr("to", swap.source.to_string()),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new().add_submessages(msgs).add_attributes(vec![
+        attr("action", "refund"),
+        attr("id", id),
+        attr("to", swap.source.to_string()),
+    ]))
 }
 
 fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {

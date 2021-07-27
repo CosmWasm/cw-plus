@@ -367,7 +367,7 @@ where
         // hmmm... we don't need this for reply, right?
         if !ignore_attributes {
             // turn attributes into event and place it first
-            let mut wasm_event = Event::new("wasm").attr("contract_address", &contract);
+            let mut wasm_event = Event::new("wasm").add_attribute("contract_address", &contract);
             wasm_event
                 .attributes
                 .extend_from_slice(&response.attributes);
