@@ -206,6 +206,11 @@ where
     }
 
     ALLOWANCES.update::<_, ContractError>(deps.storage, &spender_addr, |allow| {
+        let prev_expires = allow
+            .as_ref()
+            .map(|allow| allow.expires)
+            .unwrap_or_default();
+
         let mut allowance = allow
             .filter(|allow| !is_expired(&env, allow.expires))
             .unwrap_or_default();
@@ -216,6 +221,8 @@ where
             }
 
             allowance.expires = exp;
+        } else if is_expired(&env, prev_expires) {
+            return Err(ContractError::SettingExpiredAllowance(prev_expires));
         }
 
         allowance.balance.add_assign(amount.clone());
@@ -1312,6 +1319,35 @@ mod tests {
                     }]
                 }
                 .canonical(),
+            );
+        }
+
+        #[test]
+        fn update_expired_with_no_expiration() {
+            let Suite {
+                mut deps, owner, ..
+            } = SuiteConfig::new()
+                .with_allowance(SPENDER1, coin(1, TOKEN1))
+                .expire_allowances(SPENDER1, EXPIRED_HEIGHT)
+                .init();
+
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                owner,
+                ExecuteMsg::IncreaseAllowance {
+                    spender: SPENDER1.to_owned(),
+                    amount: coin(2, TOKEN2),
+                    expires: None,
+                },
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                query_all_allowances(deps.as_ref(), mock_env(), None, None)
+                    .unwrap()
+                    .canonical(),
+                AllAllowancesResponse { allowances: vec![] }.canonical(),
             );
         }
     }
