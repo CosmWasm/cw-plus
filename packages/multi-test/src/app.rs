@@ -107,7 +107,7 @@ where
         // returns a success do we flush it (otherwise drop it)
 
         let (block, router) = (&self.block, &self.router);
-        transactional(self.storage.as_mut(), |_read_store, write_cache| {
+        transactional(self.storage.as_mut(), |write_cache, _| {
             msgs.into_iter()
                 .map(|msg| router.execute(write_cache, block, sender.clone(), msg))
                 .collect()

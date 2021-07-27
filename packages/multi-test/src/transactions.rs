@@ -19,10 +19,10 @@ type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
 pub fn transactional<F, T, E>(base: &mut dyn Storage, action: F) -> Result<T, E>
 where
-    F: FnOnce(&dyn Storage, &mut dyn Storage) -> Result<T, E>,
+    F: FnOnce(&mut dyn Storage, &dyn Storage) -> Result<T, E>,
 {
     let mut cache = StorageTransaction::new(base);
-    let res = action(base, &mut cache)?;
+    let res = action(&mut cache, base)?;
     cache.prepare().commit(base);
     Ok(res)
 }

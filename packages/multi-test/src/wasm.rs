@@ -17,7 +17,7 @@ use cw_storage_plus::Map;
 use crate::app::{Router, RouterQuerier};
 use crate::contracts::Contract;
 use crate::executor::AppResponse;
-use crate::transactions::StorageTransaction;
+use crate::transactions::transactional;
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -287,19 +287,21 @@ where
         contract: Addr,
         msg: SubMsg<C>,
     ) -> Result<AppResponse, String> {
+        let SubMsg {
+            msg, id, reply_on, ..
+        } = msg;
+
         // execute in cache
-        let mut cache = StorageTransaction::new(storage);
-        let res = router.execute(&mut cache, block, contract.clone(), msg.msg);
-        if res.is_ok() {
-            cache.prepare().commit(storage);
-        }
+        let res = transactional(storage, |write_cache, _| {
+            router.execute(write_cache, block, contract.clone(), msg)
+        });
 
         // call reply if meaningful
         if let Ok(r) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
+            if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
                 let mut orig = r.clone();
                 let reply = Reply {
-                    id: msg.id,
+                    id,
                     result: ContractResult::Ok(SubMsgExecutionResponse {
                         events: r.events,
                         data: r.data,
@@ -318,9 +320,9 @@ where
                 Ok(r)
             }
         } else if let Err(e) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
+            if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
                 let reply = Reply {
-                    id: msg.id,
+                    id,
                     result: ContractResult::Err(e),
                 };
                 self._reply(router, storage, block, contract, reply)
@@ -513,23 +515,18 @@ where
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
 
-        let mut cache = StorageTransaction::new(storage);
-        let mut contract_storage = self.contract_storage(&mut cache, &address);
-        let querier = RouterQuerier::new(router, storage, block);
-        let env = self.get_env(address, block);
+        transactional(storage, |write_cache, read_store| {
+            let mut contract_storage = self.contract_storage(write_cache, &address);
+            let querier = RouterQuerier::new(router, read_store, block);
+            let env = self.get_env(address, block);
 
-        let deps = DepsMut {
-            storage: contract_storage.as_mut(),
-            api: self.api.deref(),
-            querier: QuerierWrapper::new(&querier),
-        };
-        let res = action(handler, deps, env)?;
-
-        // forces drop, so we can write to cache
-        drop(contract_storage);
-        // if this succeeds, commit
-        cache.prepare().commit(storage);
-        Ok(res)
+            let deps = DepsMut {
+                storage: contract_storage.as_mut(),
+                api: self.api.deref(),
+                querier: QuerierWrapper::new(&querier),
+            };
+            action(handler, deps, env)
+        })
     }
 
     fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String> {
