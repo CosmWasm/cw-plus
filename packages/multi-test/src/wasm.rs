@@ -28,10 +28,15 @@ pub const NAMESPACE_WASM: &[u8] = b"wasm";
 /// interface.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 struct ContractData {
+    /// Identifier of stored contract code
     pub code_id: usize,
+    /// Address of node who initially instantiated the contract
     pub creator: Addr,
+    /// Optional address of node who can execute migrations
     pub admin: Option<Addr>,
+    /// Optional metadata passed while contract instantiation
     pub label: String,
+    /// Blockchain height in the moment of instanciating the contract
     pub created: u64,
 }
 
