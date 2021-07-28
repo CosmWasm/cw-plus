@@ -2,9 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, DepsMut, Env,
-    IbcAcknowledgementWithPacket, IbcBasicResponse, IbcChannel, IbcEndpoint, IbcOrder, IbcPacket,
-    IbcReceiveResponse, StdResult, SubMsg, Uint128, WasmMsg,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, DepsMut, Env, IbcBasicResponse,
+    IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcEndpoint, IbcOrder,
+    IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse,
+    StdResult, SubMsg, Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
@@ -76,9 +77,9 @@ fn ack_fail(err: String) -> Binary {
 pub fn ibc_channel_open(
     _deps: DepsMut,
     _env: Env,
-    channel: IbcChannel,
+    msg: IbcChannelOpenMsg,
 ) -> Result<(), ContractError> {
-    enforce_order_and_version(&channel)?;
+    enforce_order_and_version(msg.channel(), msg.counterparty_version())?;
     Ok(())
 }
 
@@ -87,11 +88,12 @@ pub fn ibc_channel_open(
 pub fn ibc_channel_connect(
     deps: DepsMut,
     _env: Env,
-    channel: IbcChannel,
+    msg: IbcChannelConnectMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // we need to check the counter party version in try and ack (sometimes here)
-    enforce_order_and_version(&channel)?;
+    enforce_order_and_version(msg.channel(), msg.counterparty_version())?;
 
+    let channel: IbcChannel = msg.into();
     let info = ChannelInfo {
         id: channel.endpoint.channel_id,
         counterparty_endpoint: channel.counterparty_endpoint,
@@ -102,16 +104,19 @@ pub fn ibc_channel_connect(
     Ok(IbcBasicResponse::default())
 }
 
-fn enforce_order_and_version(channel: &IbcChannel) -> Result<(), ContractError> {
+fn enforce_order_and_version(
+    channel: &IbcChannel,
+    counterparty_version: Option<&str>,
+) -> Result<(), ContractError> {
     if channel.version != ICS20_VERSION {
         return Err(ContractError::InvalidIbcVersion {
             version: channel.version.clone(),
         });
     }
-    if let Some(version) = &channel.counterparty_version {
+    if let Some(version) = counterparty_version {
         if version != ICS20_VERSION {
             return Err(ContractError::InvalidIbcVersion {
-                version: version.clone(),
+                version: version.to_string(),
             });
         }
     }
@@ -125,7 +130,7 @@ fn enforce_order_and_version(channel: &IbcChannel) -> Result<(), ContractError> 
 pub fn ibc_channel_close(
     _deps: DepsMut,
     _env: Env,
-    _channel: IbcChannel,
+    _channel: IbcChannelCloseMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: what to do here?
     // we will have locked funds that need to be returned somehow
@@ -138,8 +143,10 @@ pub fn ibc_channel_close(
 pub fn ibc_packet_receive(
     deps: DepsMut,
     _env: Env,
-    packet: IbcPacket,
+    msg: IbcPacketReceiveMsg,
 ) -> Result<IbcReceiveResponse, Never> {
+    let packet = msg.packet;
+
     let res = match do_ibc_packet_receive(deps, &packet) {
         Ok(msg) => {
             // build attributes first so we don't have to clone msg below
@@ -158,21 +165,18 @@ pub fn ibc_packet_receive(
             ];
             let to_send = Amount::from_parts(denom.into(), msg.amount);
             let msg = send_amount(to_send, msg.receiver);
-            IbcReceiveResponse {
-                acknowledgement: ack_success(),
-                messages: vec![msg],
-                attributes,
-            }
+            IbcReceiveResponse::new()
+                .set_ack(ack_success())
+                .add_submessage(msg)
+                .add_attributes(attributes)
         }
-        Err(err) => IbcReceiveResponse {
-            acknowledgement: ack_fail(err.to_string()),
-            messages: vec![],
-            attributes: vec![
+        Err(err) => IbcReceiveResponse::new()
+            .set_ack(ack_fail(err.to_string()))
+            .add_attributes(vec![
                 attr("action", "receive"),
                 attr("success", "false"),
-                attr("error", err),
-            ],
-        },
+                attr("error", err.to_string()),
+            ]),
     };
 
     // if we have funds, now send the tokens to the requested recipient
@@ -235,13 +239,13 @@ fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packe
 pub fn ibc_packet_ack(
     deps: DepsMut,
     _env: Env,
-    ack: IbcAcknowledgementWithPacket,
+    msg: IbcPacketAckMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: trap error like in receive?
-    let msg: Ics20Ack = from_binary(&ack.acknowledgement.data)?;
-    match msg {
-        Ics20Ack::Result(_) => on_packet_success(deps, ack.original_packet),
-        Ics20Ack::Error(err) => on_packet_failure(deps, ack.original_packet, err),
+    let ics20msg: Ics20Ack = from_binary(&msg.acknowledgement.data)?;
+    match ics20msg {
+        Ics20Ack::Result(_) => on_packet_success(deps, msg.original_packet),
+        Ics20Ack::Error(err) => on_packet_failure(deps, msg.original_packet, err),
     }
 }
 
@@ -250,9 +254,10 @@ pub fn ibc_packet_ack(
 pub fn ibc_packet_timeout(
     deps: DepsMut,
     _env: Env,
-    packet: IbcPacket,
+    msg: IbcPacketTimeoutMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
     // TODO: trap error like in receive?
+    let packet = msg.packet;
     on_packet_failure(deps, packet, "timeout".to_string())
 }
 
@@ -279,10 +284,7 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         Ok(state)
     })?;
 
-    Ok(IbcBasicResponse {
-        messages: vec![],
-        attributes,
-    })
+    Ok(IbcBasicResponse::new().add_attributes(attributes))
 }
 
 // return the tokens to sender
@@ -298,18 +300,16 @@ fn on_packet_failure(
         attr("sender", &msg.sender),
         attr("receiver", &msg.receiver),
         attr("denom", &msg.denom),
-        attr("amount", &msg.amount),
+        attr("amount", &msg.amount.to_string()),
         attr("success", "false"),
         attr("error", err),
     ];
 
     let amount = Amount::from_parts(msg.denom, msg.amount);
     let msg = send_amount(amount, msg.sender);
-    let res = IbcBasicResponse {
-        messages: vec![msg],
-        attributes,
-    };
-    Ok(res)
+    Ok(IbcBasicResponse::new()
+        .add_attributes(attributes)
+        .add_submessage(msg))
 }
 
 fn send_amount(amount: Amount, recipient: String) -> SubMsg {
@@ -396,19 +396,19 @@ mod test {
             sender: sender.to_string(),
             receiver: "remote-rcpt".to_string(),
         };
-        IbcPacket {
-            data: to_binary(&data).unwrap(),
-            src: IbcEndpoint {
+        IbcPacket::new(
+            to_binary(&data).unwrap(),
+            IbcEndpoint {
                 port_id: CONTRACT_PORT.to_string(),
                 channel_id: my_channel.to_string(),
             },
-            dest: IbcEndpoint {
+            IbcEndpoint {
                 port_id: REMOTE_PORT.to_string(),
                 channel_id: "channel-1234".to_string(),
             },
-            sequence: 2,
-            timeout: IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
-        }
+            2,
+            IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
+        )
     }
     fn mock_receive_packet(
         my_channel: &str,
@@ -424,19 +424,19 @@ mod test {
             receiver: receiver.to_string(),
         };
         print!("Packet denom: {}", &data.denom);
-        IbcPacket {
-            data: to_binary(&data).unwrap(),
-            src: IbcEndpoint {
+        IbcPacket::new(
+            to_binary(&data).unwrap(),
+            IbcEndpoint {
                 port_id: REMOTE_PORT.to_string(),
                 channel_id: "channel-1234".to_string(),
             },
-            dest: IbcEndpoint {
+            IbcEndpoint {
                 port_id: CONTRACT_PORT.to_string(),
                 channel_id: my_channel.to_string(),
             },
-            sequence: 3,
-            timeout: Timestamp::from_seconds(1665321069).into(),
-        }
+            3,
+            Timestamp::from_seconds(1665321069).into(),
+        )
     }
 
     #[test]
@@ -453,19 +453,17 @@ mod test {
         let recv_high_packet =
             mock_receive_packet(send_channel, 1876543210, cw20_denom, "local-rcpt");
 
+        let msg = IbcPacketReceiveMsg::new(recv_packet.clone());
         // cannot receive this denom yet
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap();
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
         assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
-        let ack = IbcAcknowledgementWithPacket {
-            acknowledgement: IbcAcknowledgement::new(ack_success()),
-            original_packet: sent_packet,
-        };
-        let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
+        let msg = IbcPacketAckMsg::new(IbcAcknowledgement::new(ack_success()), sent_packet);
+        let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // query channel state|_|
@@ -474,13 +472,15 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::cw20(987654321, cw20_addr)]);
 
         // cannot receive more than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_high_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
             cw20_payment(876543210, cw20_addr, "local-rcpt"),
@@ -508,18 +508,16 @@ mod test {
         let recv_high_packet = mock_receive_packet(send_channel, 1876543210, denom, "local-rcpt");
 
         // cannot receive this denom yet
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet.clone()).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_packet.clone());
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         let no_funds = Ics20Ack::Error(ContractError::InsufficientFunds {}.to_string());
         assert_eq!(ack, no_funds);
 
         // we get a success cache (ack) for a send
-        let ack = IbcAcknowledgementWithPacket {
-            acknowledgement: IbcAcknowledgement::new(ack_success()),
-            original_packet: sent_packet,
-        };
-        let res = ibc_packet_ack(deps.as_mut(), mock_env(), ack).unwrap();
+        let msg = IbcPacketAckMsg::new(IbcAcknowledgement::new(ack_success()), sent_packet);
+        let res = ibc_packet_ack(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // query channel state|_|
@@ -528,13 +526,15 @@ mod test {
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
 
         // cannot receive more than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_high_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_high_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert!(res.messages.is_empty());
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         assert_eq!(ack, no_funds);
 
         // we can receive less than we sent
-        let res = ibc_packet_receive(deps.as_mut(), mock_env(), recv_packet).unwrap();
+        let msg = IbcPacketReceiveMsg::new(recv_packet);
+        let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
             native_payment(876543210, denom, "local-rcpt"),

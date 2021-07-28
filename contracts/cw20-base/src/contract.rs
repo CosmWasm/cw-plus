@@ -1,8 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    SubMsg, Uint128,
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -139,17 +138,11 @@ pub fn execute_transfer(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "transfer"),
-            attr("from", info.sender),
-            attr("to", recipient),
-            attr("amount", amount),
-        ],
-        events: vec![],
-        data: None,
-    };
+    let res = Response::new()
+        .add_attribute("action", "transfer")
+        .add_attribute("from", info.sender)
+        .add_attribute("to", recipient)
+        .add_attribute("amount", amount);
     Ok(res)
 }
 
@@ -177,16 +170,10 @@ pub fn execute_burn(
         Ok(info)
     })?;
 
-    let res = Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "burn"),
-            attr("from", info.sender),
-            attr("amount", amount),
-        ],
-        events: vec![],
-        data: None,
-    };
+    let res = Response::new()
+        .add_attribute("action", "burn")
+        .add_attribute("from", info.sender)
+        .add_attribute("amount", amount);
     Ok(res)
 }
 
@@ -223,14 +210,10 @@ pub fn execute_mint(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = Response {
-        attributes: vec![
-            attr("action", "mint"),
-            attr("to", recipient),
-            attr("amount", amount),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new()
+        .add_attribute("action", "mint")
+        .add_attribute("to", recipient)
+        .add_attribute("amount", amount);
     Ok(res)
 }
 
@@ -262,28 +245,19 @@ pub fn execute_send(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let attrs = vec![
-        attr("action", "send"),
-        attr("from", &info.sender),
-        attr("to", &contract),
-        attr("amount", amount),
-    ];
-
-    // create a send message
-    let msg = SubMsg::new(
-        Cw20ReceiveMsg {
-            sender: info.sender.into(),
-            amount,
-            msg,
-        }
-        .into_cosmos_msg(contract)?,
-    );
-
-    let res = Response {
-        messages: vec![msg],
-        attributes: attrs,
-        ..Response::default()
-    };
+    let res = Response::new()
+        .add_attribute("action", "send")
+        .add_attribute("from", &info.sender)
+        .add_attribute("to", &contract)
+        .add_attribute("amount", amount)
+        .add_message(
+            Cw20ReceiveMsg {
+                sender: info.sender.into(),
+                amount,
+                msg,
+            }
+            .into_cosmos_msg(contract)?,
+        );
     Ok(res)
 }
 
@@ -341,7 +315,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, WasmMsg};
+    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, SubMsg, WasmMsg};
 
     use super::*;
 

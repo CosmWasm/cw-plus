@@ -172,12 +172,12 @@ fn customize_response<C>(resp: Response<Empty>) -> Response<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    Response::<C> {
-        messages: resp.messages.into_iter().map(customize_msg::<C>).collect(),
-        events: resp.events,
-        attributes: resp.attributes,
-        data: resp.data,
-    }
+    let mut customized_resp = Response::<C>::new()
+        .add_submessages(resp.messages.into_iter().map(customize_msg::<C>))
+        .add_events(resp.events)
+        .add_attributes(resp.attributes);
+    customized_resp.data = resp.data;
+    customized_resp
 }
 
 fn customize_msg<C>(msg: SubMsg<Empty>) -> SubMsg<C>

@@ -78,12 +78,7 @@ impl<'a> Admin<'a> {
 
         self.set(deps, new_admin)?;
 
-        Ok(Response {
-            messages: vec![],
-            attributes,
-            events: vec![],
-            data: None,
-        })
+        Ok(Response::new().add_attributes(attributes))
     }
 
     pub fn query_admin(&self, deps: Deps) -> StdResult<AdminResponse> {

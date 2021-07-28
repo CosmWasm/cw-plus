@@ -4,8 +4,8 @@ use std::fmt;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
-    Response, StdResult, SubMsg,
+    to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    StdResult,
 };
 
 use cw1::CanExecuteResponse;
@@ -64,16 +64,12 @@ pub fn execute_execute<T>(
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    // Wrap `msgs` in SubMsg.
-    let msgs = msgs.into_iter().map(SubMsg::new).collect();
     if !can_execute(deps.as_ref(), info.sender.as_ref())? {
         Err(ContractError::Unauthorized {})
     } else {
-        let res = Response {
-            messages: msgs,
-            attributes: vec![attr("action", "execute")],
-            ..Response::default()
-        };
+        let res = Response::new()
+            .add_messages(msgs)
+            .add_attribute("action", "execute");
         Ok(res)
     }
 }
@@ -90,10 +86,7 @@ pub fn execute_freeze(
         cfg.mutable = false;
         ADMIN_LIST.save(deps.storage, &cfg)?;
 
-        let res = Response {
-            attributes: vec![attr("action", "freeze")],
-            ..Response::default()
-        };
+        let res = Response::new().add_attribute("action", "freeze");
         Ok(res)
     }
 }
@@ -111,10 +104,7 @@ pub fn execute_update_admins(
         cfg.admins = map_validate(deps.api, &admins)?;
         ADMIN_LIST.save(deps.storage, &cfg)?;
 
-        let res = Response {
-            attributes: vec![attr("action", "update_admins")],
-            ..Response::default()
-        };
+        let res = Response::new().add_attribute("action", "update_admins");
         Ok(res)
     }
 }
@@ -155,7 +145,7 @@ pub fn query_can_execute(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, WasmMsg};
+    use cosmwasm_std::{coin, coins, BankMsg, StakingMsg, SubMsg, WasmMsg};
 
     #[test]
     fn instantiate_and_modify_config() {
@@ -273,7 +263,7 @@ mod tests {
             res.messages,
             msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
         );
-        assert_eq!(res.attributes, vec![attr("action", "execute")]);
+        assert_eq!(res.attributes, [("action", "execute")]);
     }
 
     #[test]

@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    Response, StdResult, SubMsg,
+    to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    Response, StdResult,
 };
 
 use cw0::Expiration;
@@ -134,17 +134,11 @@ pub fn execute_propose(
     };
     BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "propose"),
-            attr("sender", info.sender),
-            attr("proposal_id", id),
-            attr("status", format!("{:?}", prop.status)),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "propose")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", id.to_string())
+        .add_attribute("status", format!("{:?}", prop.status)))
 }
 
 pub fn execute_vote(
@@ -191,17 +185,11 @@ pub fn execute_vote(
         PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
     }
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "vote"),
-            attr("sender", info.sender),
-            attr("proposal_id", proposal_id),
-            attr("status", format!("{:?}", prop.status)),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "vote")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", proposal_id.to_string())
+        .add_attribute("status", format!("{:?}", prop.status)))
 }
 
 pub fn execute_execute(
@@ -224,16 +212,11 @@ pub fn execute_execute(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
-    Ok(Response {
-        messages: prop.msgs.into_iter().map(SubMsg::new).collect(),
-        attributes: vec![
-            attr("action", "execute"),
-            attr("sender", info.sender),
-            attr("proposal_id", proposal_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_messages(prop.msgs)
+        .add_attribute("action", "execute")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", proposal_id.to_string()))
 }
 
 pub fn execute_close(
@@ -259,16 +242,10 @@ pub fn execute_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "close"),
-            attr("sender", info.sender),
-            attr("proposal_id", proposal_id),
-        ],
-        events: vec![],
-        data: None,
-    })
+    Ok(Response::new()
+        .add_attribute("action", "close")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", proposal_id.to_string()))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -639,15 +616,11 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "propose"),
-                    attr("sender", VOTER3),
-                    attr("proposal_id", 1),
-                    attr("status", "Open"),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_attribute("action", "propose")
+                .add_attribute("sender", VOTER3)
+                .add_attribute("proposal_id", 1.to_string())
+                .add_attribute("status", "Open")
         );
 
         // Proposal from voter with enough vote power directly passes
@@ -657,15 +630,11 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "propose"),
-                    attr("sender", VOTER4),
-                    attr("proposal_id", 2),
-                    attr("status", "Passed"),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_attribute("action", "propose")
+                .add_attribute("sender", VOTER4)
+                .add_attribute("proposal_id", 2.to_string())
+                .add_attribute("status", "Passed")
         );
     }
 
@@ -716,15 +685,11 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "vote"),
-                    attr("sender", VOTER1),
-                    attr("proposal_id", proposal_id),
-                    attr("status", "Open"),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER1)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Open")
         );
 
         // No/Veto votes have no effect on the tally
@@ -773,15 +738,11 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "vote"),
-                    attr("sender", VOTER4),
-                    attr("proposal_id", proposal_id),
-                    attr("status", "Passed"),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER4)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Passed")
         );
 
         // non-Open proposals cannot be voted
@@ -833,15 +794,11 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "vote"),
-                    attr("sender", VOTER3),
-                    attr("proposal_id", proposal_id),
-                    attr("status", "Passed"),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER3)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Passed")
         );
 
         // In passing: Try to close Passed fails
@@ -853,19 +810,14 @@ mod tests {
         let info = mock_info(SOMEBODY, &[]);
         let res = execute(deps.as_mut(), mock_env(), info.clone(), execution).unwrap();
 
-        let msgs: Vec<_> = msgs.into_iter().map(SubMsg::new).collect();
         // Verify
         assert_eq!(
             res,
-            Response {
-                messages: msgs,
-                attributes: vec![
-                    attr("action", "execute"),
-                    attr("sender", SOMEBODY),
-                    attr("proposal_id", proposal_id),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_messages(msgs)
+                .add_attribute("action", "execute")
+                .add_attribute("sender", SOMEBODY)
+                .add_attribute("proposal_id", proposal_id.to_string())
         );
 
         // In passing: Try to close Executed fails
@@ -939,14 +891,10 @@ mod tests {
         // Verify
         assert_eq!(
             res,
-            Response {
-                attributes: vec![
-                    attr("action", "close"),
-                    attr("sender", SOMEBODY),
-                    attr("proposal_id", proposal_id),
-                ],
-                ..Response::default()
-            }
+            Response::new()
+                .add_attribute("action", "close")
+                .add_attribute("sender", SOMEBODY)
+                .add_attribute("proposal_id", proposal_id.to_string())
         );
 
         // Trying to close it again fails

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     attr, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
-    Storage, SubMsg, Uint128,
+    Storage, Uint128,
 };
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
@@ -33,15 +33,12 @@ pub fn execute_increase_allowance(
         },
     )?;
 
-    let res = Response {
-        attributes: vec![
-            attr("action", "increase_allowance"),
-            attr("owner", info.sender),
-            attr("spender", spender),
-            attr("amount", amount),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![
+        attr("action", "increase_allowance"),
+        attr("owner", info.sender),
+        attr("spender", spender),
+        attr("amount", amount),
+    ]);
     Ok(res)
 }
 
@@ -75,15 +72,12 @@ pub fn execute_decrease_allowance(
         ALLOWANCES.remove(deps.storage, key);
     }
 
-    let res = Response {
-        attributes: vec![
-            attr("action", "decrease_allowance"),
-            attr("owner", info.sender),
-            attr("spender", spender),
-            attr("amount", amount),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![
+        attr("action", "decrease_allowance"),
+        attr("owner", info.sender),
+        attr("spender", spender),
+        attr("amount", amount),
+    ]);
     Ok(res)
 }
 
@@ -141,16 +135,13 @@ pub fn execute_transfer_from(
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
     )?;
 
-    let res = Response {
-        attributes: vec![
-            attr("action", "transfer_from"),
-            attr("from", owner),
-            attr("to", recipient),
-            attr("by", info.sender),
-            attr("amount", amount),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![
+        attr("action", "transfer_from"),
+        attr("from", owner),
+        attr("to", recipient),
+        attr("by", info.sender),
+        attr("amount", amount),
+    ]);
     Ok(res)
 }
 
@@ -181,15 +172,12 @@ pub fn execute_burn_from(
         Ok(meta)
     })?;
 
-    let res = Response {
-        attributes: vec![
-            attr("action", "burn_from"),
-            attr("from", owner),
-            attr("by", info.sender),
-            attr("amount", amount),
-        ],
-        ..Response::default()
-    };
+    let res = Response::new().add_attributes(vec![
+        attr("action", "burn_from"),
+        attr("from", owner),
+        attr("by", info.sender),
+        attr("amount", amount),
+    ]);
     Ok(res)
 }
 
@@ -231,20 +219,14 @@ pub fn execute_send_from(
     ];
 
     // create a send message
-    let msg = SubMsg::new(
-        Cw20ReceiveMsg {
-            sender: info.sender.into(),
-            amount,
-            msg,
-        }
-        .into_cosmos_msg(contract)?,
-    );
+    let msg = Cw20ReceiveMsg {
+        sender: info.sender.into(),
+        amount,
+        msg,
+    }
+    .into_cosmos_msg(contract)?;
 
-    let res = Response {
-        messages: vec![msg],
-        attributes: attrs,
-        ..Response::default()
-    };
+    let res = Response::new().add_message(msg).add_attributes(attrs);
     Ok(res)
 }
 
@@ -262,7 +244,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, CosmosMsg, Timestamp, WasmMsg};
+    use cosmwasm_std::{coins, CosmosMsg, SubMsg, Timestamp, WasmMsg};
     use cw20::{Cw20Coin, TokenInfoResponse};
 
     use crate::contract::{execute, instantiate, query_balance, query_token_info};
