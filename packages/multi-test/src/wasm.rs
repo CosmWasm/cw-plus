@@ -728,7 +728,7 @@ mod test {
         // verify contract data are as expected
         let contract_data = CONTRACTS
             .load(
-                &prefixed_read(&mut wasm_storage, NAMESPACE_WASM),
+                &prefixed_read(&wasm_storage, NAMESPACE_WASM),
                 &contract_addr,
             )
             .unwrap();
