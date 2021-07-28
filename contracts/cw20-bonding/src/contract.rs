@@ -160,12 +160,11 @@ pub fn execute_buy(
     execute_mint(deps, env, sub_info, info.sender.to_string(), minted)?;
 
     // bond them to the validator
-    let res = Response::new().add_attributes(vec![
-        attr("action", "buy"),
-        attr("from", info.sender),
-        attr("reserve", payment),
-        attr("supply", minted),
-    ]);
+    let res = Response::new()
+        .add_attribute("action", "buy")
+        .add_attribute("from", info.sender)
+        .add_attribute("reserve", payment)
+        .add_attribute("supply", minted);
     Ok(res)
 }
 

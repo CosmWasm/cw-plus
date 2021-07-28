@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coins, from_slice, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
-    Order, Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,
+    coins, from_slice, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Order,
+    Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,
 };
 
 use cw0::{maybe_addr, NativeBalance};
@@ -114,14 +114,11 @@ pub fn execute_bond(
         env.block.height,
     )?;
 
-    let attributes = vec![
-        attr("action", "bond"),
-        attr("amount", amount),
-        attr("sender", sender),
-    ];
     Ok(Response::new()
         .add_submessages(messages)
-        .add_attributes(attributes))
+        .add_attribute("action", "bond")
+        .add_attribute("amount", amount)
+        .add_attribute("sender", sender))
 }
 
 pub fn execute_receive(
@@ -175,14 +172,11 @@ pub fn execute_unbond(
         env.block.height,
     )?;
 
-    let attributes = vec![
-        attr("action", "unbond"),
-        attr("amount", amount),
-        attr("sender", info.sender),
-    ];
     Ok(Response::new()
         .add_submessages(messages)
-        .add_attributes(attributes))
+        .add_attribute("action", "unbond")
+        .add_attribute("amount", amount)
+        .add_attribute("sender", info.sender))
 }
 
 pub fn must_pay_funds(balance: &NativeBalance, denom: &str) -> Result<Uint128, ContractError> {
@@ -281,14 +275,11 @@ pub fn execute_claim(
         }
     };
 
-    let attributes = vec![
-        attr("action", "claim"),
-        attr("tokens", amount_str),
-        attr("sender", info.sender),
-    ];
     Ok(Response::new()
         .add_submessage(message)
-        .add_attributes(attributes))
+        .add_attribute("action", "claim")
+        .add_attribute("tokens", amount_str)
+        .add_attribute("sender", info.sender))
 }
 
 #[inline]

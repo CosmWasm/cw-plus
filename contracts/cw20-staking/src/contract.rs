@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, coin, to_binary, Addr, BankMsg, Binary, Decimal, Deps, DepsMut, DistributionMsg, Env,
+    coin, to_binary, Addr, BankMsg, Binary, Decimal, Deps, DepsMut, DistributionMsg, Env,
     MessageInfo, QuerierWrapper, Response, StakingMsg, StdError, StdResult, Uint128, WasmMsg,
 };
 
@@ -208,12 +208,10 @@ pub fn bond(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Cont
             validator: invest.validator,
             amount: payment.clone(),
         })
-        .add_attributes(vec![
-            attr("action", "bond"),
-            attr("from", info.sender),
-            attr("bonded", payment.amount),
-            attr("minted", to_mint),
-        ]);
+        .add_attribute("action", "bond")
+        .add_attribute("from", info.sender)
+        .add_attribute("bonded", payment.amount)
+        .add_attribute("minted", to_mint);
     Ok(res)
 }
 
@@ -284,12 +282,10 @@ pub fn unbond(
             validator: invest.validator,
             amount: coin(unbond.u128(), &invest.bond_denom),
         })
-        .add_attributes(vec![
-            attr("action", "unbond"),
-            attr("to", info.sender),
-            attr("unbonded", unbond),
-            attr("burnt", amount),
-        ]);
+        .add_attribute("action", "unbond")
+        .add_attribute("to", info.sender)
+        .add_attribute("unbonded", unbond)
+        .add_attribute("burnt", amount);
     Ok(res)
 }
 
@@ -324,11 +320,9 @@ pub fn claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, Con
             to_address: info.sender.to_string(),
             amount: vec![balance],
         })
-        .add_attributes(vec![
-            attr("action", "claim"),
-            attr("from", info.sender),
-            attr("amount", to_send),
-        ]);
+        .add_attribute("action", "claim")
+        .add_attribute("from", info.sender)
+        .add_attribute("amount", to_send);
     Ok(res)
 }
 
@@ -390,10 +384,8 @@ pub fn _bond_all_tokens(
             validator: invest.validator,
             amount: balance.clone(),
         })
-        .add_attributes(vec![
-            attr("action", "reinvest"),
-            attr("bonded", balance.amount),
-        ]);
+        .add_attribute("action", "reinvest")
+        .add_attribute("bonded", balance.amount);
     Ok(res)
 }
 

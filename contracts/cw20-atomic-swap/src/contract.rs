@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdResult, SubMsg, WasmMsg,
 };
 use sha2::{Digest, Sha256};
@@ -113,12 +113,11 @@ pub fn execute_create(
         Some(_) => Err(ContractError::AlreadyExists {}),
     })?;
 
-    let res = Response::new().add_attributes(vec![
-        attr("action", "create"),
-        attr("id", msg.id),
-        attr("hash", msg.hash),
-        attr("recipient", msg.recipient),
-    ]);
+    let res = Response::new()
+        .add_attribute("action", "create")
+        .add_attribute("id", msg.id)
+        .add_attribute("hash", msg.hash)
+        .add_attribute("recipient", msg.recipient);
     Ok(res)
 }
 
@@ -143,12 +142,12 @@ pub fn execute_release(
 
     // Send all tokens out
     let msgs = send_tokens(&swap.recipient, swap.balance)?;
-    Ok(Response::new().add_submessages(msgs).add_attributes(vec![
-        attr("action", "release"),
-        attr("id", id),
-        attr("preimage", preimage),
-        attr("to", swap.recipient.to_string()),
-    ]))
+    Ok(Response::new()
+        .add_submessages(msgs)
+        .add_attribute("action", "release")
+        .add_attribute("id", id)
+        .add_attribute("preimage", preimage)
+        .add_attribute("to", swap.recipient.to_string()))
 }
 
 pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, ContractError> {
@@ -162,11 +161,11 @@ pub fn execute_refund(deps: DepsMut, env: Env, id: String) -> Result<Response, C
     SWAPS.remove(deps.storage, &id);
 
     let msgs = send_tokens(&swap.source, swap.balance)?;
-    Ok(Response::new().add_submessages(msgs).add_attributes(vec![
-        attr("action", "refund"),
-        attr("id", id),
-        attr("to", swap.source.to_string()),
-    ]))
+    Ok(Response::new()
+        .add_submessages(msgs)
+        .add_attribute("action", "refund")
+        .add_attribute("id", id)
+        .add_attribute("to", swap.source.to_string()))
 }
 
 fn parse_hex_32(data: &str) -> Result<Vec<u8>, ContractError> {
@@ -375,7 +374,7 @@ mod tests {
         };
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        assert_eq!(("action", "create"), res.attributes[0]);
 
         // Cannot re-create (modify), already existing
         let new_balance = coins(1, "tokens");
@@ -462,7 +461,7 @@ mod tests {
             preimage: preimage(),
         };
         let res = execute(deps.as_mut(), mock_env(), info.clone(), release.clone()).unwrap();
-        assert_eq!(attr("action", "release"), res.attributes[0]);
+        assert_eq!(("action", "release"), res.attributes[0]);
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
@@ -520,7 +519,7 @@ mod tests {
             id: "swap0001".to_string(),
         };
         let res = execute(deps.as_mut(), env.clone(), info.clone(), refund.clone()).unwrap();
-        assert_eq!(attr("action", "refund"), res.attributes[0]);
+        assert_eq!(("action", "refund"), res.attributes[0]);
         assert_eq!(1, res.messages.len());
         assert_eq!(
             res.messages[0],
@@ -650,7 +649,7 @@ mod tests {
         let info = mock_info(&native_sender, &native_coins);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Create(create)).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        assert_eq!(("action", "create"), res.attributes[0]);
 
         // Cw20 side (counter offer (1:1000))
         let cw20_sender = String::from("B_on_Y");
@@ -683,7 +682,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        assert_eq!(("action", "create"), res.attributes[0]);
 
         // Somebody (typically, A) releases the swap side on the Cw20 (Y) blockchain,
         // using her knowledge of the preimage
@@ -699,8 +698,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(attr("action", "release"), res.attributes[0]);
-        assert_eq!(attr("id", cw20_swap_id), res.attributes[1]);
+        assert_eq!(("action", "release"), res.attributes[0]);
+        assert_eq!(("id", cw20_swap_id), res.attributes[1]);
 
         // Verify the resulting Cw20 transfer message
         let send_msg = Cw20ExecuteMsg::Transfer {
@@ -731,8 +730,8 @@ mod tests {
         };
         let res = execute(deps.as_mut(), mock_env(), info, release).unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(attr("action", "release"), res.attributes[0]);
-        assert_eq!(attr("id", native_swap_id), res.attributes[1]);
+        assert_eq!(("action", "release"), res.attributes[0]);
+        assert_eq!(("id", native_swap_id), res.attributes[1]);
 
         // Verify the resulting Native send message
         assert_eq!(

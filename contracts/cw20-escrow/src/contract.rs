@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
+    from_binary, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdResult, SubMsg, WasmMsg,
 };
 
@@ -163,14 +163,11 @@ pub fn execute_approve(
         // send all tokens out
         let messages: Vec<SubMsg> = send_tokens(&escrow.recipient, &escrow.balance)?;
 
-        let attributes = vec![
-            attr("action", "approve"),
-            attr("id", id),
-            attr("to", escrow.recipient),
-        ];
         Ok(Response::new()
-            .add_submessages(messages)
-            .add_attributes(attributes))
+            .add_attribute("action", "approve")
+            .add_attribute("id", id)
+            .add_attribute("to", escrow.recipient)
+            .add_submessages(messages))
     }
 }
 
@@ -193,14 +190,11 @@ pub fn execute_refund(
         // send all tokens out
         let messages = send_tokens(&escrow.source, &escrow.balance)?;
 
-        let attributes = vec![
-            attr("action", "refund"),
-            attr("id", id),
-            attr("to", escrow.source),
-        ];
         Ok(Response::new()
-            .add_submessages(messages)
-            .add_attributes(attributes))
+            .add_attribute("action", "refund")
+            .add_attribute("id", id)
+            .add_attribute("to", escrow.source)
+            .add_submessages(messages))
     }
 }
 
@@ -317,7 +311,7 @@ mod tests {
         let msg = ExecuteMsg::Create(create.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        assert_eq!(("action", "create"), res.attributes[0]);
 
         // ensure the details is what we expect
         let details = query_details(deps.as_ref(), "foobar".to_string()).unwrap();
@@ -341,7 +335,7 @@ mod tests {
         let info = mock_info(&create.arbiter, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(attr("action", "approve"), res.attributes[0]);
+        assert_eq!(("action", "approve"), res.attributes[0]);
         assert_eq!(
             res.messages[0],
             SubMsg::new(CosmosMsg::Bank(BankMsg::Send {
@@ -386,7 +380,7 @@ mod tests {
         let msg = ExecuteMsg::Receive(receive.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        assert_eq!(("action", "create"), res.attributes[0]);
 
         // ensure the whitelist is what we expect
         let details = query_details(deps.as_ref(), "foobar".to_string()).unwrap();
@@ -413,7 +407,7 @@ mod tests {
         let info = mock_info(&create.arbiter, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(attr("action", "approve"), res.attributes[0]);
+        assert_eq!(("action", "approve"), res.attributes[0]);
         let send_msg = Cw20ExecuteMsg::Transfer {
             recipient: create.recipient,
             amount: receive.amount,
@@ -505,7 +499,7 @@ mod tests {
         let msg = ExecuteMsg::Create(create.clone());
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "create"), res.attributes[0]);
+        assert_eq!(("action", "create"), res.attributes[0]);
 
         // top it up with 2 more native tokens
         let extra_native = vec![coin(250, "random"), coin(300, "stake")];
@@ -515,7 +509,7 @@ mod tests {
         };
         let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "top_up"), res.attributes[0]);
+        assert_eq!(("action", "top_up"), res.attributes[0]);
 
         // top up with one foreign token
         let bar_token = String::from("bar_token");
@@ -530,7 +524,7 @@ mod tests {
         let info = mock_info(&bar_token, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "top_up"), res.attributes[0]);
+        assert_eq!(("action", "top_up"), res.attributes[0]);
 
         // top with a foreign token not on the whitelist
         // top up with one foreign token
@@ -560,13 +554,13 @@ mod tests {
         let info = mock_info(&foo_token, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, top_up).unwrap();
         assert_eq!(0, res.messages.len());
-        assert_eq!(attr("action", "top_up"), res.attributes[0]);
+        assert_eq!(("action", "top_up"), res.attributes[0]);
 
         // approve it
         let id = create.id.clone();
         let info = mock_info(&create.arbiter, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Approve { id }).unwrap();
-        assert_eq!(attr("action", "approve"), res.attributes[0]);
+        assert_eq!(("action", "approve"), res.attributes[0]);
         assert_eq!(3, res.messages.len());
 
         // first message releases all native coins

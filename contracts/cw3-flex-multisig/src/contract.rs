@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
     Response, StdResult,
 };
 
@@ -127,12 +127,11 @@ pub fn execute_propose(
     };
     BALLOTS.save(deps.storage, (id.into(), &info.sender), &ballot)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "propose"),
-        attr("sender", info.sender),
-        attr("proposal_id", id.to_string()),
-        attr("status", format!("{:?}", prop.status)),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "propose")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", id.to_string())
+        .add_attribute("status", format!("{:?}", prop.status)))
 }
 
 pub fn execute_vote(
@@ -178,12 +177,11 @@ pub fn execute_vote(
     prop.update_status(&env.block);
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "vote"),
-        attr("sender", info.sender),
-        attr("proposal_id", proposal_id.to_string()),
-        attr("status", format!("{:?}", prop.status)),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "vote")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", proposal_id.to_string())
+        .add_attribute("status", format!("{:?}", prop.status)))
 }
 
 pub fn execute_execute(
@@ -206,11 +204,11 @@ pub fn execute_execute(
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
     // dispatch all proposed messages
-    Ok(Response::new().add_messages(prop.msgs).add_attributes(vec![
-        attr("action", "execute"),
-        attr("sender", info.sender),
-        attr("proposal_id", proposal_id.to_string()),
-    ]))
+    Ok(Response::new()
+        .add_messages(prop.msgs)
+        .add_attribute("action", "execute")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", proposal_id.to_string()))
 }
 
 pub fn execute_close(
@@ -236,11 +234,10 @@ pub fn execute_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id.into(), &prop)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "close"),
-        attr("sender", info.sender),
-        attr("proposal_id", proposal_id.to_string()),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "close")
+        .add_attribute("sender", info.sender)
+        .add_attribute("proposal_id", proposal_id.to_string()))
 }
 
 pub fn execute_membership_hook(
@@ -732,11 +729,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "propose"),
-                attr("sender", VOTER3),
-                attr("proposal_id", 1.to_string()),
-                attr("status", "Open"),
+            [
+                ("action", "propose"),
+                ("sender", VOTER3),
+                ("proposal_id", "1"),
+                ("status", "Open"),
             ],
         );
 
@@ -746,11 +743,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "propose"),
-                attr("sender", VOTER4),
-                attr("proposal_id", 2.to_string()),
-                attr("status", "Passed"),
+            [
+                ("action", "propose"),
+                ("sender", VOTER4),
+                ("proposal_id", "2"),
+                ("status", "Passed"),
             ],
         );
     }
@@ -934,11 +931,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "vote"),
-                attr("sender", VOTER1),
-                attr("proposal_id", proposal_id.to_string()),
-                attr("status", "Open"),
+            [
+                ("action", "vote"),
+                ("sender", VOTER1),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Open"),
             ],
         );
 
@@ -987,11 +984,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "vote"),
-                attr("sender", VOTER4),
-                attr("proposal_id", proposal_id.to_string()),
-                attr("status", "Passed"),
+            [
+                ("action", "vote"),
+                ("sender", VOTER4),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Passed"),
             ],
         );
 
@@ -1085,11 +1082,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "vote"),
-                attr("sender", VOTER3),
-                attr("proposal_id", proposal_id.to_string()),
-                attr("status", "Passed"),
+            [
+                ("action", "vote"),
+                ("sender", VOTER3),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Passed"),
             ],
         );
 
@@ -1111,10 +1108,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "execute"),
-                attr("sender", SOMEBODY),
-                attr("proposal_id", proposal_id.to_string()),
+            [
+                ("action", "execute"),
+                ("sender", SOMEBODY),
+                ("proposal_id", proposal_id.to_string().as_str()),
             ],
         );
 
@@ -1168,10 +1165,10 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.custom_attrs(0),
-            &[
-                attr("action", "close"),
-                attr("sender", SOMEBODY),
-                attr("proposal_id", proposal_id.to_string()),
+            [
+                ("action", "close"),
+                ("sender", SOMEBODY),
+                ("proposal_id", proposal_id.to_string().as_str()),
             ],
         );
 

@@ -5,7 +5,7 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
+    to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
     MessageInfo, Order, Response, StakingMsg, StdResult,
 };
 use cw0::Expiration;
@@ -123,7 +123,8 @@ where
     // Relay messages
     let res = Response::new()
         .add_messages(msgs)
-        .add_attributes(vec![attr("action", "execute"), attr("owner", info.sender)]);
+        .add_attribute("action", "execute")
+        .add_attribute("owner", info.sender);
     Ok(res)
 }
 
@@ -217,13 +218,12 @@ where
         Ok(allowance)
     })?;
 
-    let res = Response::new().add_attributes(vec![
-        attr("action", "increase_allowance"),
-        attr("owner", info.sender),
-        attr("spender", spender),
-        attr("denomination", amount.denom),
-        attr("amount", amount.amount),
-    ]);
+    let res = Response::new()
+        .add_attribute("action", "increase_allowance")
+        .add_attribute("owner", info.sender)
+        .add_attribute("spender", spender)
+        .add_attribute("denomination", amount.denom)
+        .add_attribute("amount", amount.amount);
     Ok(res)
 }
 
@@ -271,13 +271,12 @@ where
         ALLOWANCES.remove(deps.storage, &spender_addr);
     }
 
-    let res = Response::new().add_attributes(vec![
-        attr("action", "decrease_allowance"),
-        attr("owner", info.sender),
-        attr("spender", spender),
-        attr("denomination", amount.denom),
-        attr("amount", amount.amount),
-    ]);
+    let res = Response::new()
+        .add_attribute("action", "decrease_allowance")
+        .add_attribute("owner", info.sender)
+        .add_attribute("spender", spender)
+        .add_attribute("denomination", amount.denom)
+        .add_attribute("amount", amount.amount);
     Ok(res)
 }
 
@@ -302,12 +301,11 @@ where
     }
     PERMISSIONS.save(deps.storage, &spender_addr, &perm)?;
 
-    let res = Response::new().add_attributes(vec![
-        attr("action", "set_permissions"),
-        attr("owner", info.sender),
-        attr("spender", spender),
-        attr("permissions", perm.to_string()),
-    ]);
+    let res = Response::new()
+        .add_attribute("action", "set_permissions")
+        .add_attribute("owner", info.sender)
+        .add_attribute("spender", spender)
+        .add_attribute("permissions", perm.to_string());
     Ok(res)
 }
 

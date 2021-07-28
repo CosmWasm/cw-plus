@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
-    StdError, StdResult,
+    to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response, StdError,
+    StdResult,
 };
 
 use cw0::maybe_addr;
@@ -102,11 +102,10 @@ pub fn execute_mint(
 
     increment_tokens(deps.storage)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "mint"),
-        attr("minter", info.sender),
-        attr("token_id", msg.token_id),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "mint")
+        .add_attribute("minter", info.sender)
+        .add_attribute("token_id", msg.token_id))
 }
 
 pub fn execute_transfer_nft(
@@ -118,12 +117,11 @@ pub fn execute_transfer_nft(
 ) -> Result<Response, ContractError> {
     _transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "transfer_nft"),
-        attr("sender", info.sender),
-        attr("recipient", recipient),
-        attr("token_id", token_id),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "transfer_nft")
+        .add_attribute("sender", info.sender)
+        .add_attribute("recipient", recipient)
+        .add_attribute("token_id", token_id))
 }
 
 pub fn execute_send_nft(
@@ -146,12 +144,10 @@ pub fn execute_send_nft(
     // Send message
     Ok(Response::new()
         .add_message(send.into_cosmos_msg(contract.clone())?)
-        .add_attributes(vec![
-            attr("action", "send_nft"),
-            attr("sender", info.sender),
-            attr("recipient", contract),
-            attr("token_id", token_id),
-        ]))
+        .add_attribute("action", "send_nft")
+        .add_attribute("sender", info.sender)
+        .add_attribute("recipient", contract)
+        .add_attribute("token_id", token_id))
 }
 
 pub fn _transfer_nft(
@@ -181,12 +177,11 @@ pub fn execute_approve(
 ) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "approve"),
-        attr("sender", info.sender),
-        attr("spender", spender),
-        attr("token_id", token_id),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "approve")
+        .add_attribute("sender", info.sender)
+        .add_attribute("spender", spender)
+        .add_attribute("token_id", token_id))
 }
 
 pub fn execute_revoke(
@@ -198,12 +193,11 @@ pub fn execute_revoke(
 ) -> Result<Response, ContractError> {
     _update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "revoke"),
-        attr("sender", info.sender),
-        attr("spender", spender),
-        attr("token_id", token_id),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "revoke")
+        .add_attribute("sender", info.sender)
+        .add_attribute("spender", spender)
+        .add_attribute("token_id", token_id))
 }
 
 pub fn _update_approvals(
@@ -264,11 +258,10 @@ pub fn execute_approve_all(
     let operator_addr = deps.api.addr_validate(&operator)?;
     OPERATORS.save(deps.storage, (&info.sender, &operator_addr), &expires)?;
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "approve_all"),
-        attr("sender", info.sender),
-        attr("operator", operator),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "approve_all")
+        .add_attribute("sender", info.sender)
+        .add_attribute("operator", operator))
 }
 
 pub fn execute_revoke_all(
@@ -280,11 +273,10 @@ pub fn execute_revoke_all(
     let operator_addr = deps.api.addr_validate(&operator)?;
     OPERATORS.remove(deps.storage, (&info.sender, &operator_addr));
 
-    Ok(Response::new().add_attributes(vec![
-        attr("action", "revoke_all"),
-        attr("sender", info.sender),
-        attr("operator", operator),
-    ]))
+    Ok(Response::new()
+        .add_attribute("action", "revoke_all")
+        .add_attribute("sender", info.sender)
+        .add_attribute("operator", operator))
 }
 
 /// returns true iff the sender can execute approve or reject on the contract
@@ -719,12 +711,11 @@ mod tests {
 
         assert_eq!(
             res,
-            Response::new().add_attributes(vec![
-                attr("action", "transfer_nft"),
-                attr("sender", "venus"),
-                attr("recipient", "random"),
-                attr("token_id", token_id),
-            ])
+            Response::new()
+                .add_attribute("action", "transfer_nft")
+                .add_attribute("sender", "venus")
+                .add_attribute("recipient", "random")
+                .add_attribute("token_id", token_id)
         );
     }
 
@@ -781,12 +772,12 @@ mod tests {
         // and make sure this is the request sent by the contract
         assert_eq!(
             res,
-            Response::new().add_message(expected).add_attributes(vec![
-                attr("action", "send_nft"),
-                attr("sender", "venus"),
-                attr("recipient", "another_contract"),
-                attr("token_id", token_id),
-            ])
+            Response::new()
+                .add_message(expected)
+                .add_attribute("action", "send_nft")
+                .add_attribute("sender", "venus")
+                .add_attribute("recipient", "another_contract")
+                .add_attribute("token_id", token_id)
         );
     }
 
@@ -821,12 +812,11 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), owner, approve_msg).unwrap();
         assert_eq!(
             res,
-            Response::new().add_attributes(vec![
-                attr("action", "approve"),
-                attr("sender", "demeter"),
-                attr("spender", "random"),
-                attr("token_id", token_id.clone()),
-            ])
+            Response::new()
+                .add_attribute("action", "approve")
+                .add_attribute("sender", "demeter")
+                .add_attribute("spender", "random")
+                .add_attribute("token_id", token_id.clone())
         );
 
         // random can now transfer
@@ -930,11 +920,10 @@ mod tests {
         let res = execute(deps.as_mut(), mock_env(), owner, approve_all_msg).unwrap();
         assert_eq!(
             res,
-            Response::new().add_attributes(vec![
-                attr("action", "approve_all"),
-                attr("sender", "demeter"),
-                attr("operator", "random"),
-            ])
+            Response::new()
+                .add_attribute("action", "approve_all")
+                .add_attribute("sender", "demeter")
+                .add_attribute("operator", "random")
         );
 
         // random can now transfer

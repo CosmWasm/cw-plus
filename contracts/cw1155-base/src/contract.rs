@@ -542,7 +542,7 @@ fn query_all_tokens(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{attr, OverflowError, StdError};
+    use cosmwasm_std::{OverflowError, StdError};
 
     use super::*;
 
@@ -606,12 +606,11 @@ mod tests {
                 mint_msg,
             )
             .unwrap(),
-            Response::new().add_attributes(vec![
-                attr("action", "transfer"),
-                attr("token_id", &token1),
-                attr("amount", 1u64.to_string()),
-                attr("to", &user1),
-            ])
+            Response::new()
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token1)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("to", &user1)
         );
 
         // query balance
@@ -669,13 +668,12 @@ mod tests {
                 transfer_msg,
             )
             .unwrap(),
-            Response::new().add_attributes(vec![
-                attr("action", "transfer"),
-                attr("token_id", &token1),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user1),
-                attr("to", &user2),
-            ])
+            Response::new()
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token1)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user1)
+                .add_attribute("to", &user2)
         );
 
         // query balance
@@ -719,16 +717,15 @@ mod tests {
                 },
             )
             .unwrap(),
-            Response::new().add_attributes(vec![
-                attr("action", "transfer"),
-                attr("token_id", &token2),
-                attr("amount", 1u64.to_string()),
-                attr("to", &user2),
-                attr("action", "transfer"),
-                attr("token_id", &token3),
-                attr("amount", 1u64.to_string()),
-                attr("to", &user2),
-            ])
+            Response::new()
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token2)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("to", &user2)
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token3)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("to", &user2)
         );
 
         // invalid batch transfer, (user2 not approved yet)
@@ -773,23 +770,22 @@ mod tests {
                 batch_transfer_msg,
             )
             .unwrap(),
-            Response::new().add_attributes(vec![
-                attr("action", "transfer"),
-                attr("token_id", &token1),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user2),
-                attr("to", &user1),
-                attr("action", "transfer"),
-                attr("token_id", &token2),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user2),
-                attr("to", &user1),
-                attr("action", "transfer"),
-                attr("token_id", &token3),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user2),
-                attr("to", &user1),
-            ]),
+            Response::new()
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token1)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user2)
+                .add_attribute("to", &user1)
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token2)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user2)
+                .add_attribute("to", &user1)
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token3)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user2)
+                .add_attribute("to", &user1)
         );
 
         // batch query
@@ -861,12 +857,11 @@ mod tests {
                 }
             )
             .unwrap(),
-            Response::new().add_attributes(vec![
-                attr("action", "transfer"),
-                attr("token_id", &token1),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user1),
-            ])
+            Response::new()
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token1)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user1)
         );
 
         // burn them all
@@ -881,16 +876,15 @@ mod tests {
                 }
             )
             .unwrap(),
-            Response::new().add_attributes(vec![
-                attr("action", "transfer"),
-                attr("token_id", &token2),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user1),
-                attr("action", "transfer"),
-                attr("token_id", &token3),
-                attr("amount", 1u64.to_string()),
-                attr("from", &user1),
-            ])
+            Response::new()
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token2)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user1)
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token3)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user1)
         );
     }
 
@@ -949,12 +943,10 @@ mod tests {
                     .into_cosmos_msg(receiver.clone())
                     .unwrap()
                 )
-                .add_attributes(vec![
-                    attr("action", "transfer"),
-                    attr("token_id", &token1),
-                    attr("amount", 1u64.to_string()),
-                    attr("to", &receiver),
-                ])
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token1)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("to", &receiver)
         );
 
         // BatchSendFrom
@@ -982,13 +974,11 @@ mod tests {
                     .into_cosmos_msg(receiver.clone())
                     .unwrap()
                 )
-                .add_attributes(vec![
-                    attr("action", "transfer"),
-                    attr("token_id", &token2),
-                    attr("amount", 1u64.to_string()),
-                    attr("from", &user1),
-                    attr("to", &receiver),
-                ])
+                .add_attribute("action", "transfer")
+                .add_attribute("token_id", &token2)
+                .add_attribute("amount", 1u64.to_string())
+                .add_attribute("from", &user1)
+                .add_attribute("to", &receiver)
         );
     }
 

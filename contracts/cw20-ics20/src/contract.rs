@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo,
-    Order, PortIdResponse, Response, StdResult,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
+    PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -112,16 +112,15 @@ pub fn execute_transfer(
 
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
     // similar event messages like ibctransfer module
-    let attributes = vec![
-        attr("action", "transfer"),
-        attr("sender", &packet.sender),
-        attr("receiver", &packet.receiver),
-        attr("denom", &packet.denom),
-        attr("amount", &packet.amount.to_string()),
-    ];
 
     // send response
-    let res = Response::new().add_message(msg).add_attributes(attributes);
+    let res = Response::new()
+        .add_message(msg)
+        .add_attribute("action", "transfer")
+        .add_attribute("sender", &packet.sender)
+        .add_attribute("receiver", &packet.receiver)
+        .add_attribute("denom", &packet.denom)
+        .add_attribute("amount", &packet.amount.to_string());
     Ok(res)
 }
 
