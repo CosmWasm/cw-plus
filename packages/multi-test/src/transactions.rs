@@ -17,9 +17,9 @@ use cosmwasm_std::{Order, Pair};
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
-pub fn transactional<F, T, E>(base: &mut dyn Storage, action: F) -> Result<T, E>
+pub fn transactional<F, T>(base: &mut dyn Storage, action: F) -> Result<T, String>
 where
-    F: FnOnce(&mut dyn Storage, &dyn Storage) -> Result<T, E>,
+    F: FnOnce(&mut dyn Storage, &dyn Storage) -> Result<T, String>,
 {
     let mut cache = StorageTransaction::new(base);
     let res = action(&mut cache, base)?;
@@ -48,11 +48,6 @@ impl<'a> StorageTransaction<'a> {
     /// prepares this transaction to be committed to storage
     pub fn prepare(self) -> RepLog {
         self.rep_log
-    }
-
-    #[allow(dead_code)]
-    pub fn cache(&self) -> StorageTransaction {
-        StorageTransaction::new(self)
     }
 }
 

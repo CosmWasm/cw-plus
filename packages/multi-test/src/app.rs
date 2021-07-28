@@ -736,28 +736,26 @@ mod test {
         assert_eq!(router_rcpt, vec![]);
 
         // now, second level cache
-        let mut cache2 = cache.cache();
-        let msg = BankMsg::Send {
-            to_address: rcpt.clone().into(),
-            amount: coins(12, "eth"),
-        };
-        app.router
-            .execute(&mut cache2, &app.block, owner, msg.into())
-            .unwrap();
+        transactional(&mut cache, |cache2, read| {
+            let msg = BankMsg::Send {
+                to_address: rcpt.clone().into(),
+                amount: coins(12, "eth"),
+            };
+            app.router
+                .execute(cache2, &app.block, owner, msg.into())
+                .unwrap();
 
-        // shows up in 2nd cache
-        let cached_rcpt = query_router(&app.router, &cache, &rcpt);
-        assert_eq!(coins(25, "eth"), cached_rcpt);
-        let cached2_rcpt = query_router(&app.router, &cache2, &rcpt);
-        assert_eq!(coins(37, "eth"), cached2_rcpt);
-
-        // apply second to first
-        let ops = cache2.prepare();
-        ops.commit(&mut cache);
+            // shows up in 2nd cache
+            let cached_rcpt = query_router(&app.router, read, &rcpt);
+            assert_eq!(coins(25, "eth"), cached_rcpt);
+            let cached2_rcpt = query_router(&app.router, cache2, &rcpt);
+            assert_eq!(coins(37, "eth"), cached2_rcpt);
+            Ok(())
+        })
+        .unwrap();
 
         // apply first to router
-        let ops = cache.prepare();
-        ops.commit(app.storage.as_mut());
+        cache.prepare().commit(app.storage.as_mut());
 
         let committed = query_app(&app, &rcpt);
         assert_eq!(coins(37, "eth"), committed);
