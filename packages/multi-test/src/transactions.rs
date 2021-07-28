@@ -54,10 +54,6 @@ impl<'a> StorageTransaction<'a> {
     pub fn cache(&self) -> StorageTransaction {
         StorageTransaction::new(self)
     }
-
-    /// rollback will consume the checkpoint and drop all changes (not really needed, going out of scope does the same, but nice for clarity)
-    #[allow(dead_code)]
-    pub fn rollback(self) {}
 }
 
 impl<'a> Storage for StorageTransaction<'a> {
@@ -580,19 +576,6 @@ mod test {
 
         stxn1.prepare().commit(&mut base);
         assert_eq!(base.get(b"subtx"), Some(b"works".to_vec()));
-    }
-
-    #[test]
-    fn rollback_has_no_effect() {
-        let mut base = MemoryStorage::new();
-        base.set(b"foo", b"bar");
-
-        let mut check = StorageTransaction::new(&base);
-        assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
-        check.set(b"subtx", b"works");
-        check.rollback();
-
-        assert_eq!(base.get(b"subtx"), None);
     }
 
     #[test]
