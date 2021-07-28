@@ -1,4 +1,5 @@
 use cosmwasm_std::StdError;
+use cw0::Expiration;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -38,6 +39,9 @@ pub enum ContractError {
 
     #[error("Unsupported message")]
     UnsupportedMessage {},
+
+    #[error("Allowance already expired while setting: {0}")]
+    SettingExpiredAllowance(Expiration),
 }
 
 impl From<cw1_whitelist::ContractError> for ContractError {
