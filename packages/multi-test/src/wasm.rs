@@ -666,64 +666,64 @@ mod test {
         let block = mock_env().block;
         let code_id = keeper.store_code(contract_error());
 
-        let mut cache = StorageTransaction::new(&wasm_storage);
+        let contract_addr = transactional(&mut wasm_storage, |cache, _| {
+            // cannot register contract with unregistered codeId
+            keeper
+                .register_contract(
+                    cache,
+                    code_id + 1,
+                    Addr::unchecked("foobar"),
+                    Addr::unchecked("admin"),
+                    "label".to_owned(),
+                    1000,
+                )
+                .unwrap_err();
 
-        // cannot register contract with unregistered codeId
-        keeper
-            .register_contract(
-                &mut cache,
-                code_id + 1,
-                Addr::unchecked("foobar"),
-                Addr::unchecked("admin"),
-                "label".to_owned(),
-                1000,
-            )
-            .unwrap_err();
+            // we can register a new instance of this code
+            let contract_addr = keeper
+                .register_contract(
+                    cache,
+                    code_id,
+                    Addr::unchecked("foobar"),
+                    Addr::unchecked("admin"),
+                    "label".to_owned(),
+                    1000,
+                )
+                .unwrap();
 
-        // we can register a new instance of this code
-        let contract_addr = keeper
-            .register_contract(
-                &mut cache,
-                code_id,
-                Addr::unchecked("foobar"),
-                Addr::unchecked("admin"),
-                "label".to_owned(),
-                1000,
-            )
-            .unwrap();
+            // now, we call this contract and see the error message from the contract
+            let info = mock_info("foobar", &[]);
+            let err = keeper
+                .call_instantiate(
+                    contract_addr.clone(),
+                    cache,
+                    &mock_router(),
+                    &block,
+                    info,
+                    b"{}".to_vec(),
+                )
+                .unwrap_err();
+            // StdError from contract_error auto-converted to string
+            assert_eq!(err, "Generic error: Init failed");
 
-        // now, we call this contract and see the error message from the contract
-        let info = mock_info("foobar", &[]);
-        let err = keeper
-            .call_instantiate(
-                contract_addr.clone(),
-                &mut cache,
-                &mock_router(),
-                &block,
-                info,
-                b"{}".to_vec(),
-            )
-            .unwrap_err();
-        // StdError from contract_error auto-converted to string
-        assert_eq!(err, "Generic error: Init failed");
+            // and the error for calling an unregistered contract
+            let info = mock_info("foobar", &[]);
+            let err = keeper
+                .call_instantiate(
+                    Addr::unchecked("unregistered"),
+                    cache,
+                    &mock_router(),
+                    &block,
+                    info,
+                    b"{}".to_vec(),
+                )
+                .unwrap_err();
+            // Default error message from router when not found
+            assert_eq!(err, "cw_multi_test::wasm::ContractData not found");
 
-        // and the error for calling an unregistered contract
-        let info = mock_info("foobar", &[]);
-        let err = keeper
-            .call_instantiate(
-                Addr::unchecked("unregistered"),
-                &mut cache,
-                &mock_router(),
-                &block,
-                info,
-                b"{}".to_vec(),
-            )
-            .unwrap_err();
-        // Default error message from router when not found
-        assert_eq!(err, "cw_multi_test::wasm::ContractData not found");
-
-        // and flush
-        cache.prepare().commit(&mut wasm_storage);
+            Ok(contract_addr)
+        })
+        .unwrap();
 
         // verify contract data are as expected
         let contract_data = CONTRACTS
