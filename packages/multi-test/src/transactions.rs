@@ -17,6 +17,16 @@ use cosmwasm_std::{Order, Pair};
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
+pub fn transactional<F, T>(base: &mut dyn Storage, action: F) -> Result<T, String>
+where
+    F: FnOnce(&mut dyn Storage, &dyn Storage) -> Result<T, String>,
+{
+    let mut cache = StorageTransaction::new(base);
+    let res = action(&mut cache, base)?;
+    cache.prepare().commit(base);
+    Ok(res)
+}
+
 pub struct StorageTransaction<'a> {
     /// read-only access to backing storage
     storage: &'a dyn Storage,
@@ -35,19 +45,10 @@ impl<'a> StorageTransaction<'a> {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn cache(&self) -> StorageTransaction {
-        StorageTransaction::new(self)
-    }
-
     /// prepares this transaction to be committed to storage
     pub fn prepare(self) -> RepLog {
         self.rep_log
     }
-
-    /// rollback will consume the checkpoint and drop all changes (not really needed, going out of scope does the same, but nice for clarity)
-    #[allow(dead_code)]
-    pub fn rollback(self) {}
 }
 
 impl<'a> Storage for StorageTransaction<'a> {
@@ -570,19 +571,6 @@ mod test {
 
         stxn1.prepare().commit(&mut base);
         assert_eq!(base.get(b"subtx"), Some(b"works".to_vec()));
-    }
-
-    #[test]
-    fn rollback_has_no_effect() {
-        let mut base = MemoryStorage::new();
-        base.set(b"foo", b"bar");
-
-        let mut check = StorageTransaction::new(&base);
-        assert_eq!(check.get(b"foo"), Some(b"bar".to_vec()));
-        check.set(b"subtx", b"works");
-        check.rollback();
-
-        assert_eq!(base.get(b"subtx"), None);
     }
 
     #[test]

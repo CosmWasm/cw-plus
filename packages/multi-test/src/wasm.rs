@@ -17,7 +17,7 @@ use cw_storage_plus::Map;
 use crate::app::{Router, RouterQuerier};
 use crate::contracts::Contract;
 use crate::executor::AppResponse;
-use crate::transactions::StorageTransaction;
+use crate::transactions::transactional;
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -287,19 +287,21 @@ where
         contract: Addr,
         msg: SubMsg<C>,
     ) -> Result<AppResponse, String> {
+        let SubMsg {
+            msg, id, reply_on, ..
+        } = msg;
+
         // execute in cache
-        let mut cache = StorageTransaction::new(storage);
-        let res = router.execute(&mut cache, block, contract.clone(), msg.msg);
-        if res.is_ok() {
-            cache.prepare().commit(storage);
-        }
+        let res = transactional(storage, |write_cache, _| {
+            router.execute(write_cache, block, contract.clone(), msg)
+        });
 
         // call reply if meaningful
         if let Ok(r) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Success) {
+            if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
                 let mut orig = r.clone();
                 let reply = Reply {
-                    id: msg.id,
+                    id,
                     result: ContractResult::Ok(SubMsgExecutionResponse {
                         events: r.events,
                         data: r.data,
@@ -318,9 +320,9 @@ where
                 Ok(r)
             }
         } else if let Err(e) = res {
-            if matches!(msg.reply_on, ReplyOn::Always | ReplyOn::Error) {
+            if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
                 let reply = Reply {
-                    id: msg.id,
+                    id,
                     result: ContractResult::Err(e),
                 };
                 self._reply(router, storage, block, contract, reply)
@@ -513,23 +515,22 @@ where
             .get(&contract.code_id)
             .ok_or_else(|| "Unregistered code id".to_string())?;
 
-        let mut cache = StorageTransaction::new(storage);
-        let mut contract_storage = self.contract_storage(&mut cache, &address);
-        let querier = RouterQuerier::new(router, storage, block);
-        let env = self.get_env(address, block);
+        // We don't actually need a transaction here, as it is already embedded in a transactional.
+        // execute_submsg or App.execute_multi.
+        // However, we need to get write and read access to the same storage in two different objects,
+        // and this is the only way I know how to do so.
+        transactional(storage, |write_cache, read_store| {
+            let mut contract_storage = self.contract_storage(write_cache, &address);
+            let querier = RouterQuerier::new(router, read_store, block);
+            let env = self.get_env(address, block);
 
-        let deps = DepsMut {
-            storage: contract_storage.as_mut(),
-            api: self.api.deref(),
-            querier: QuerierWrapper::new(&querier),
-        };
-        let res = action(handler, deps, env)?;
-
-        // forces drop, so we can write to cache
-        drop(contract_storage);
-        // if this succeeds, commit
-        cache.prepare().commit(storage);
-        Ok(res)
+            let deps = DepsMut {
+                storage: contract_storage.as_mut(),
+                api: self.api.deref(),
+                querier: QuerierWrapper::new(&querier),
+            };
+            action(handler, deps, env)
+        })
     }
 
     fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String> {
@@ -816,68 +817,77 @@ mod test {
             .unwrap();
         cache.prepare().commit(&mut wasm_storage);
 
-        // create a new cache and check we can use contract 1
-        let mut cache = StorageTransaction::new(&wasm_storage);
-        assert_payout(&keeper, &mut cache, &contract1, &payout1);
-
-        // create contract 2 and use it
-        let contract2 = keeper.register_contract(&mut cache, code_id).unwrap();
         let payout2 = coin(50, "BTC");
-        let info = mock_info("foobar", &[]);
-        let init_msg = to_vec(&PayoutInitMessage {
-            payout: payout2.clone(),
-        })
-        .unwrap();
-        let _res = keeper
-            .call_instantiate(
-                contract2.clone(),
-                &mut cache,
-                &mock_router(),
-                &block,
-                info,
-                init_msg,
-            )
-            .unwrap();
-        assert_payout(&keeper, &mut cache, &contract2, &payout2);
-
-        // create a level2 cache and check we can use contract 1 and contract 2
-        let mut cache2 = cache.cache();
-        assert_payout(&keeper, &mut cache2, &contract1, &payout1);
-        assert_payout(&keeper, &mut cache2, &contract2, &payout2);
-
-        // create a contract on level 2
-        let contract3 = keeper.register_contract(&mut cache2, code_id).unwrap();
         let payout3 = coin(1234, "ATOM");
-        let info = mock_info("johnny", &[]);
-        let init_msg = to_vec(&PayoutInitMessage {
-            payout: payout3.clone(),
+
+        // create a new cache and check we can use contract 1
+        let (contract2, contract3) = transactional(&mut wasm_storage, |cache, wasm_reader| {
+            assert_payout(&keeper, cache, &contract1, &payout1);
+
+            // create contract 2 and use it
+            let contract2 = keeper.register_contract(cache, code_id).unwrap();
+            let info = mock_info("foobar", &[]);
+            let init_msg = to_vec(&PayoutInitMessage {
+                payout: payout2.clone(),
+            })
+            .unwrap();
+            let _res = keeper
+                .call_instantiate(
+                    contract2.clone(),
+                    cache,
+                    &mock_router(),
+                    &block,
+                    info,
+                    init_msg,
+                )
+                .unwrap();
+            assert_payout(&keeper, cache, &contract2, &payout2);
+
+            // create a level2 cache and check we can use contract 1 and contract 2
+            let contract3 = transactional(cache, |cache2, read| {
+                assert_payout(&keeper, cache2, &contract1, &payout1);
+                assert_payout(&keeper, cache2, &contract2, &payout2);
+
+                // create a contract on level 2
+                let contract3 = keeper.register_contract(cache2, code_id).unwrap();
+                let info = mock_info("johnny", &[]);
+                let init_msg = to_vec(&PayoutInitMessage {
+                    payout: payout3.clone(),
+                })
+                .unwrap();
+                let _res = keeper
+                    .call_instantiate(
+                        contract3.clone(),
+                        cache2,
+                        &mock_router(),
+                        &block,
+                        info,
+                        init_msg,
+                    )
+                    .unwrap();
+                assert_payout(&keeper, cache2, &contract3, &payout3);
+
+                // ensure first cache still doesn't see this contract
+                assert_no_contract(read, &contract3);
+                Ok(contract3)
+            })
+            .unwrap();
+
+            // after applying transaction, all contracts present on cache
+            assert_payout(&keeper, cache, &contract1, &payout1);
+            assert_payout(&keeper, cache, &contract2, &payout2);
+            assert_payout(&keeper, cache, &contract3, &payout3);
+
+            // but not yet the root router
+            assert_no_contract(wasm_reader, &contract1);
+            assert_no_contract(wasm_reader, &contract2);
+            assert_no_contract(wasm_reader, &contract3);
+
+            Ok((contract2, contract3))
         })
         .unwrap();
-        let _res = keeper
-            .call_instantiate(
-                contract3.clone(),
-                &mut cache2,
-                &mock_router(),
-                &block,
-                info,
-                init_msg,
-            )
-            .unwrap();
-        assert_payout(&keeper, &mut cache2, &contract3, &payout3);
 
-        // ensure first cache still doesn't see this contract
-        assert_no_contract(&cache, &contract3);
-
-        // apply second to first, all contracts present
-        cache2.prepare().commit(&mut cache);
-        assert_payout(&keeper, &mut cache, &contract1, &payout1);
-        assert_payout(&keeper, &mut cache, &contract2, &payout2);
-        assert_payout(&keeper, &mut cache, &contract3, &payout3);
-
-        // apply to router
-        cache.prepare().commit(&mut wasm_storage);
-
-        // make new cache and see all contracts there
+        // ensure that it is now applied to the router
         assert_payout(&keeper, &mut wasm_storage, &contract1, &payout1);
         assert_payout(&keeper, &mut wasm_storage, &contract2, &payout2);
         assert_payout(&keeper, &mut wasm_storage, &contract3, &payout3);
