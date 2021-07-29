@@ -13,6 +13,15 @@ yarn link
 
 Binary will be placed to path.
 
+## Airdrop file format
+
+```json
+[
+  { "address": "wasm1k9hwzxs889jpvd7env8z49gad3a3633vg350tq", "amount": "100"},
+  { "address": "wasm1uy9ucvgerneekxpnfwyfnpxvlsx5dzdpf0mzjd", "amount": "1010"},
+]
+```
+
 ## Commands
 
 **Generate Root:**
