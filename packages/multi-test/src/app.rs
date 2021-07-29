@@ -269,7 +269,7 @@ mod test {
         attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Event, Reply, SubMsg, WasmMsg,
     };
 
-    use crate::test_helpers::contracts::{payout, reflect};
+    use crate::test_helpers::contracts::{hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
@@ -775,5 +775,46 @@ mod test {
 
         let committed = query_app(&app, &rcpt);
         assert_eq!(coins(37, "eth"), committed);
+    }
+
+    #[test]
+    fn sent_funds_properly_visible_on_execution() {
+        // Testing if funds on contract are properly visible on contract.
+        // Hackatom contract is initialized with 10btc. Then, the contract is executed, with
+        // additional 20btc. Then beneficiary balance is checked - expeced value is 30btc. 10btc
+        // would mean that sending tokens with message is not visible for this very message, and
+        // 20btc means, that only such just send funds are visible.
+        let mut app = mock_app();
+
+        let owner = Addr::unchecked("owner");
+        let beneficiary = Addr::unchecked("beneficiary");
+        app.init_bank_balance(&owner, coins(30, "btc")).unwrap();
+
+        let contract_id = app.store_code(hackatom::contract());
+        let contract = app
+            .instantiate_contract(
+                contract_id,
+                owner.clone(),
+                &hackatom::InitMsg {
+                    beneficiary: beneficiary.as_str().to_owned(),
+                },
+                &coins(10, "btc"),
+                "Hackatom",
+            )
+            .unwrap();
+
+        app.execute_contract(
+            owner.clone(),
+            contract.clone(),
+            &EmptyMsg {},
+            &coins(20, "btc"),
+        )
+        .unwrap();
+
+        // Check balance of all accounts to ensure no tokens where burned or created, and they are
+        // in correct places
+        assert_eq!(get_balance(&app, &owner), &[]);
+        assert_eq!(get_balance(&app, &contract), &[]);
+        assert_eq!(get_balance(&app, &beneficiary), coins(30, "btc"));
     }
 }
