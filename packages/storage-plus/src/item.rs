@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, StdError, StdResult, Storage, Addr};
+use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 
 use crate::helpers::{may_deserialize, must_deserialize};
 
