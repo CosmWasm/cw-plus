@@ -654,8 +654,7 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty};
 
-    use crate::test_helpers::contract_error;
-    use crate::test_helpers::contracts::payout;
+    use crate::test_helpers::contracts::{error, payout};
     use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
 
@@ -676,7 +675,7 @@ mod test {
         let mut wasm_storage = MockStorage::new();
         let mut keeper = mock_keeper();
         let block = mock_env().block;
-        let code_id = keeper.store_code(contract_error());
+        let code_id = keeper.store_code(error::contract());
 
         transactional(&mut wasm_storage, |cache, _| {
             // cannot register contract with unregistered codeId
