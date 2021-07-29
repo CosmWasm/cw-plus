@@ -36,35 +36,50 @@ where
 
 type ContractFn<T, C, E> =
     fn(deps: DepsMut, env: Env, info: MessageInfo, msg: T) -> Result<Response<C>, E>;
-type SudoFn<T, C, E> = fn(deps: DepsMut, env: Env, msg: T) -> Result<Response<C>, E>;
+type PermissionedFn<T, C, E> = fn(deps: DepsMut, env: Env, msg: T) -> Result<Response<C>, E>;
 type ReplyFn<C, E> = fn(deps: DepsMut, env: Env, msg: Reply) -> Result<Response<C>, E>;
 type QueryFn<T, E> = fn(deps: Deps, env: Env, msg: T) -> Result<Binary, E>;
 
 type ContractClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, MessageInfo, T) -> Result<Response<C>, E>>;
-type SudoClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, T) -> Result<Response<C>, E>>;
+type PermissionedClosure<T, C, E> = Box<dyn Fn(DepsMut, Env, T) -> Result<Response<C>, E>>;
 type ReplyClosure<C, E> = Box<dyn Fn(DepsMut, Env, Reply) -> Result<Response<C>, E>>;
 type QueryClosure<T, E> = Box<dyn Fn(Deps, Env, T) -> Result<Binary, E>>;
 
 /// Wraps the exported functions from a contract and provides the normalized format
 /// Place T4 and E4 at the end, as we just want default placeholders for most contracts that don't have sudo
-pub struct ContractWrapper<T1, T2, T3, E1, E2, E3, C = Empty, T4 = Empty, E4 = String, E5 = String>
-where
+pub struct ContractWrapper<
+    T1,
+    T2,
+    T3,
+    E1,
+    E2,
+    E3,
+    C = Empty,
+    T4 = Empty,
+    E4 = String,
+    E5 = String,
+    T6 = Empty,
+    E6 = String,
+> where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
+    T6: DeserializeOwned,
     E1: ToString,
     E2: ToString,
     E3: ToString,
     E4: ToString,
     E5: ToString,
+    E6: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     execute_fn: ContractClosure<T1, C, E1>,
     instantiate_fn: ContractClosure<T2, C, E2>,
     query_fn: QueryClosure<T3, E3>,
-    sudo_fn: Option<SudoClosure<T4, C, E4>>,
+    sudo_fn: Option<PermissionedClosure<T4, C, E4>>,
     reply_fn: Option<ReplyClosure<C, E5>>,
+    migrate_fn: Option<PermissionedClosure<T6, C, E6>>,
 }
 
 impl<T1, T2, T3, E1, E2, E3, C> ContractWrapper<T1, T2, T3, E1, E2, E3, C>
@@ -88,6 +103,7 @@ where
             query_fn: Box::new(query_fn),
             sudo_fn: None,
             reply_fn: None,
+            migrate_fn: None,
         }
     }
 
@@ -104,27 +120,31 @@ where
             query_fn: Box::new(query_fn),
             sudo_fn: None,
             reply_fn: None,
+            migrate_fn: None,
         }
     }
 }
 
-impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5>
+impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
+    ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
 where
     T1: DeserializeOwned + 'static,
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
     T4: DeserializeOwned + 'static,
+    T6: DeserializeOwned + 'static,
     E1: ToString + 'static,
     E2: ToString + 'static,
     E3: ToString + 'static,
     E4: ToString + 'static,
-    E5: ToString,
+    E5: ToString + 'static,
+    E6: ToString + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn with_sudo<T4A, E4A>(
         self,
-        sudo_fn: SudoFn<T4A, C, E4A>,
-    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4A, E4A, E5>
+        sudo_fn: PermissionedFn<T4A, C, E4A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4A, E4A, E5, T6, E6>
     where
         T4A: DeserializeOwned + 'static,
         E4A: ToString + 'static,
@@ -135,13 +155,14 @@ where
             query_fn: self.query_fn,
             sudo_fn: Some(Box::new(sudo_fn)),
             reply_fn: self.reply_fn,
+            migrate_fn: self.migrate_fn,
         }
     }
 
     pub fn with_reply<E5A>(
         self,
         reply_fn: ReplyFn<C, E5A>,
-    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A>
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A, T6, E6>
     where
         E5A: ToString + 'static,
     {
@@ -151,6 +172,25 @@ where
             query_fn: self.query_fn,
             sudo_fn: self.sudo_fn,
             reply_fn: Some(Box::new(reply_fn)),
+            migrate_fn: self.migrate_fn,
+        }
+    }
+
+    pub fn with_migrate<T6A, E6A>(
+        self,
+        migrate_fn: PermissionedFn<T6A, C, E6A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6A, E6A>
+    where
+        T6A: DeserializeOwned + 'static,
+        E6A: ToString + 'static,
+    {
+        ContractWrapper {
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
+            sudo_fn: self.sudo_fn,
+            reply_fn: self.reply_fn,
+            migrate_fn: Some(Box::new(migrate_fn)),
         }
     }
 }
