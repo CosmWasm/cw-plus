@@ -366,7 +366,14 @@ mod test {
             payout: coin(5, "eth"),
         };
         let contract_addr = app
-            .instantiate_contract(code_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
+            .instantiate_contract(
+                code_id,
+                owner.clone(),
+                &msg,
+                &coins(23, "eth"),
+                "Payout",
+                None,
+            )
             .unwrap();
 
         let contract_data = app.contract_data(&contract_addr).unwrap();
@@ -429,13 +436,20 @@ mod test {
             payout: coin(5, "eth"),
         };
         let payout_addr = app
-            .instantiate_contract(payout_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
+            .instantiate_contract(
+                payout_id,
+                owner.clone(),
+                &msg,
+                &coins(23, "eth"),
+                "Payout",
+                None,
+            )
             .unwrap();
 
         // set up reflect contract
         let reflect_id = app.store_code(reflect::contract());
         let reflect_addr = app
-            .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect")
+            .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect", None)
             .unwrap();
 
         // reflect account is empty
@@ -514,6 +528,7 @@ mod test {
                 &EmptyMsg {},
                 &coins(40, "eth"),
                 "Reflect",
+                None,
             )
             .unwrap();
 
@@ -594,7 +609,7 @@ mod test {
             payout: coin(5, "eth"),
         };
         let payout_addr = app
-            .instantiate_contract(payout_id, owner, &msg, &coins(23, "eth"), "Payout")
+            .instantiate_contract(payout_id, owner, &msg, &coins(23, "eth"), "Payout", None)
             .unwrap();
 
         // count is 1
@@ -635,6 +650,7 @@ mod test {
                 &EmptyMsg {},
                 &coins(40, "eth"),
                 "Reflect",
+                None,
             )
             .unwrap();
 
@@ -800,6 +816,7 @@ mod test {
                 },
                 &coins(10, "btc"),
                 "Hackatom",
+                None,
             )
             .unwrap();
 
@@ -816,5 +833,74 @@ mod test {
         assert_eq!(get_balance(&app, &owner), &[]);
         assert_eq!(get_balance(&app, &contract), &[]);
         assert_eq!(get_balance(&app, &beneficiary), coins(30, "btc"));
+    }
+
+    #[test]
+    fn sent_wasm_migration_works() {
+        // The plan:
+        // create a hackatom contract with some funds
+        // check admin set properly
+        // check beneficiary set properly
+        // migrate fails if not admin
+        // migrate succeeds if admin
+        // check beneficiary updated
+        let mut app = mock_app();
+
+        let owner = Addr::unchecked("owner");
+        let beneficiary = Addr::unchecked("beneficiary");
+        app.init_bank_balance(&owner, coins(30, "btc")).unwrap();
+
+        // create a hackatom contract with some funds
+        let contract_id = app.store_code(hackatom::contract());
+        let contract = app
+            .instantiate_contract(
+                contract_id,
+                owner.clone(),
+                &hackatom::InstantiateMsg {
+                    beneficiary: beneficiary.as_str().to_owned(),
+                },
+                &coins(20, "btc"),
+                "Hackatom",
+                Some(owner.to_string()),
+            )
+            .unwrap();
+
+        // check admin set properly
+        let info = app.contract_data(&contract).unwrap();
+        assert_eq!(info.admin, Some(owner.clone()));
+        // check beneficiary set properly
+        let state: hackatom::InstantiateMsg = app
+            .wrap()
+            .query_wasm_smart(&contract, &hackatom::QueryMsg::Beneficiary {})
+            .unwrap();
+        assert_eq!(state.beneficiary, beneficiary);
+
+        // migrate fails if not admin
+        let random = Addr::unchecked("random");
+        let migrate_msg = hackatom::MigrateMsg {
+            new_guy: random.to_string(),
+        };
+        app.migrate_contract(beneficiary, contract.clone(), &migrate_msg, contract_id)
+            .unwrap_err();
+
+        // migrate fails if unregistred code id
+        app.migrate_contract(
+            owner.clone(),
+            contract.clone(),
+            &migrate_msg,
+            contract_id + 7,
+        )
+        .unwrap_err();
+
+        // migrate succeeds when the stars align
+        app.migrate_contract(owner, contract.clone(), &migrate_msg, contract_id)
+            .unwrap_err();
+
+        // check beneficiary updated
+        let state: hackatom::InstantiateMsg = app
+            .wrap()
+            .query_wasm_smart(&contract, &hackatom::QueryMsg::Beneficiary {})
+            .unwrap();
+        assert_eq!(state.beneficiary, random);
     }
 }
