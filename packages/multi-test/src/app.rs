@@ -13,7 +13,7 @@ use crate::bank::Bank;
 use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
-use crate::wasm::{Wasm, WasmKeeper};
+use crate::wasm::{ContractData, Wasm, WasmKeeper};
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -125,6 +125,13 @@ where
     /// so it can later be used to instantiate a contract.
     pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
         self.router.wasm.store_code(code) as u64
+    }
+
+    /// This allows to get `ContractData` for specific contract
+    pub fn contract_data(&self, address: &Addr) -> Result<ContractData, String> {
+        self.router
+            .wasm
+            .contract_data(self.storage.as_ref(), address)
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
@@ -364,6 +371,18 @@ mod test {
         let contract_addr = app
             .instantiate_contract(code_id, owner.clone(), &msg, &coins(23, "eth"), "Payout")
             .unwrap();
+
+        let contract_data = app.contract_data(&contract_addr).unwrap();
+        assert_eq!(
+            contract_data,
+            ContractData {
+                code_id: code_id as usize,
+                creator: owner.clone(),
+                admin: None,
+                label: "Payout".to_owned(),
+                created: app.block_info().height
+            }
+        );
 
         // sender funds deducted
         let sender = get_balance(&app, &owner);

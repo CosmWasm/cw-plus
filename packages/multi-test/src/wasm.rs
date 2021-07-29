@@ -24,17 +24,20 @@ const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
 
-/// Contract Data is just a code_id that can be used to lookup the actual code from the Router
-/// We can add other info here in the future, like admin
+/// Contract Data includes information about contract, equivalent of `ContractInfo` in wasmd
+/// interface.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-struct ContractData {
+pub struct ContractData {
+    /// Identifier of stored contract code
     pub code_id: usize,
-}
-
-impl ContractData {
-    fn new(code_id: usize) -> Self {
-        ContractData { code_id }
-    }
+    /// Address of account who initially instantiated the contract
+    pub creator: Addr,
+    /// Optional address of account who can execute migrations
+    pub admin: Option<Addr>,
+    /// Metadata passed while contract instantiation
+    pub label: String,
+    /// Blockchain height in the moment of instantiating the contract
+    pub created: u64,
 }
 
 pub trait Wasm<C>
@@ -62,6 +65,9 @@ where
 
     // Add a new contract. Must be done on the base object, when no contracts running
     fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize;
+
+    // Helper for querying for specific contract data
+    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String>;
 
     /// Admin interface, cannot be called via CosmosMsg
     fn sudo(
@@ -132,6 +138,10 @@ where
         let idx = self.codes.len() + 1;
         self.codes.insert(idx, code);
         idx
+    }
+
+    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String> {
+        self.load_contract(storage, address)
     }
 
     fn sudo(
@@ -237,14 +247,20 @@ where
                 Ok((contract_addr, res))
             }
             WasmMsg::Instantiate {
-                admin: _,
+                admin,
                 code_id,
                 msg,
                 funds,
-                label: _,
+                label,
             } => {
-                let contract_addr =
-                    Addr::unchecked(self.register_contract(storage, code_id as usize)?);
+                let contract_addr = self.register_contract(
+                    storage,
+                    code_id as usize,
+                    sender.clone(),
+                    admin.map(Addr::unchecked),
+                    label,
+                    block.height,
+                )?;
                 // move the cash
                 self.send(
                     storage,
@@ -394,6 +410,10 @@ where
         &self,
         storage: &mut dyn Storage,
         code_id: usize,
+        creator: Addr,
+        admin: impl Into<Option<Addr>>,
+        label: String,
+        created: u64,
     ) -> Result<Addr, String> {
         let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
 
@@ -401,7 +421,13 @@ where
             return Err("Cannot init contract with unregistered code id".to_string());
         }
         let addr = self.next_address(&wasm_storage);
-        let info = ContractData::new(code_id);
+        let info = ContractData {
+            code_id,
+            creator,
+            admin: admin.into(),
+            label,
+            created,
+        };
         CONTRACTS
             .save(&mut wasm_storage, &addr, &info)
             .map_err(|e| e.to_string())?;
@@ -533,7 +559,11 @@ where
         })
     }
 
-    fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String> {
+    pub fn load_contract(
+        &self,
+        storage: &dyn Storage,
+        address: &Addr,
+    ) -> Result<ContractData, String> {
         CONTRACTS
             .load(&prefixed_read(storage, NAMESPACE_WASM), address)
             .map_err(|e| e.to_string())
@@ -647,48 +677,79 @@ mod test {
         let block = mock_env().block;
         let code_id = keeper.store_code(contract_error());
 
-        let mut cache = StorageTransaction::new(&wasm_storage);
+        transactional(&mut wasm_storage, |cache, _| {
+            // cannot register contract with unregistered codeId
+            keeper.register_contract(
+                cache,
+                code_id + 1,
+                Addr::unchecked("foobar"),
+                Addr::unchecked("admin"),
+                "label".to_owned(),
+                1000,
+            )
+        })
+        .unwrap_err();
 
-        // cannot register contract with unregistered codeId
-        keeper
-            .register_contract(&mut cache, code_id + 1)
-            .unwrap_err();
+        let contract_addr = transactional(&mut wasm_storage, |cache, _| {
+            // we can register a new instance of this code
+            keeper.register_contract(
+                cache,
+                code_id,
+                Addr::unchecked("foobar"),
+                Addr::unchecked("admin"),
+                "label".to_owned(),
+                1000,
+            )
+        })
+        .unwrap();
 
-        // we can register a new instance of this code
-        let contract_addr = keeper.register_contract(&mut cache, code_id).unwrap();
+        // verify contract data are as expected
+        let contract_data = keeper.load_contract(&wasm_storage, &contract_addr).unwrap();
 
-        // now, we call this contract and see the error message from the contract
-        let info = mock_info("foobar", &[]);
-        let err = keeper
-            .call_instantiate(
-                contract_addr,
-                &mut cache,
+        assert_eq!(
+            contract_data,
+            ContractData {
+                code_id,
+                creator: Addr::unchecked("foobar"),
+                admin: Some(Addr::unchecked("admin")),
+                label: "label".to_owned(),
+                created: 1000,
+            }
+        );
+
+        let err = transactional(&mut wasm_storage, |cache, _| {
+            // now, we call this contract and see the error message from the contract
+            let info = mock_info("foobar", &[]);
+            keeper.call_instantiate(
+                contract_addr.clone(),
+                cache,
                 &mock_router(),
                 &block,
                 info,
                 b"{}".to_vec(),
             )
-            .unwrap_err();
+        })
+        .unwrap_err();
+
         // StdError from contract_error auto-converted to string
         assert_eq!(err, "Generic error: Init failed");
 
-        // and the error for calling an unregistered contract
-        let info = mock_info("foobar", &[]);
-        let err = keeper
-            .call_instantiate(
+        let err = transactional(&mut wasm_storage, |cache, _| {
+            // and the error for calling an unregistered contract
+            let info = mock_info("foobar", &[]);
+            keeper.call_instantiate(
                 Addr::unchecked("unregistered"),
-                &mut cache,
+                cache,
                 &mock_router(),
                 &block,
                 info,
                 b"{}".to_vec(),
             )
-            .unwrap_err();
+        })
+        .unwrap_err();
+
         // Default error message from router when not found
         assert_eq!(err, "cw_multi_test::wasm::ContractData not found");
-
-        // and flush
-        cache.prepare().commit(&mut wasm_storage);
     }
 
     #[test]
@@ -700,7 +761,16 @@ mod test {
         let mut wasm_storage = MockStorage::new();
         let mut cache = StorageTransaction::new(&wasm_storage);
 
-        let contract_addr = keeper.register_contract(&mut cache, code_id).unwrap();
+        let contract_addr = keeper
+            .register_contract(
+                &mut cache,
+                code_id,
+                Addr::unchecked("foobar"),
+                None,
+                "label".to_owned(),
+                1000,
+            )
+            .unwrap();
 
         let payout = coin(100, "TGD");
 
@@ -795,27 +865,40 @@ mod test {
         let code_id = keeper.store_code(contract_payout());
 
         let mut wasm_storage = MockStorage::new();
-        let mut cache = StorageTransaction::new(&wasm_storage);
+
+        let payout1 = coin(100, "TGD");
 
         // set contract 1 and commit (on router)
-        let contract1 = keeper.register_contract(&mut cache, code_id).unwrap();
-        let payout1 = coin(100, "TGD");
-        let info = mock_info("foobar", &[]);
-        let init_msg = to_vec(&PayoutInitMessage {
-            payout: payout1.clone(),
+        let contract1 = transactional(&mut wasm_storage, |cache, _| {
+            let contract = keeper
+                .register_contract(
+                    cache,
+                    code_id,
+                    Addr::unchecked("foobar"),
+                    None,
+                    "".to_string(),
+                    1000,
+                )
+                .unwrap();
+            let info = mock_info("foobar", &[]);
+            let init_msg = to_vec(&PayoutInitMessage {
+                payout: payout1.clone(),
+            })
+            .unwrap();
+            keeper
+                .call_instantiate(
+                    contract.clone(),
+                    cache,
+                    &mock_router(),
+                    &block,
+                    info,
+                    init_msg,
+                )
+                .unwrap();
+
+            Ok(contract)
         })
         .unwrap();
-        let _res = keeper
-            .call_instantiate(
-                contract1.clone(),
-                &mut cache,
-                &mock_router(),
-                &block,
-                info,
-                init_msg,
-            )
-            .unwrap();
-        cache.prepare().commit(&mut wasm_storage);
 
         let payout2 = coin(50, "BTC");
         let payout3 = coin(1234, "ATOM");
@@ -825,7 +908,16 @@ mod test {
             assert_payout(&keeper, cache, &contract1, &payout1);
 
             // create contract 2 and use it
-            let contract2 = keeper.register_contract(cache, code_id).unwrap();
+            let contract2 = keeper
+                .register_contract(
+                    cache,
+                    code_id,
+                    Addr::unchecked("foobar"),
+                    None,
+                    "".to_owned(),
+                    1000,
+                )
+                .unwrap();
             let info = mock_info("foobar", &[]);
             let init_msg = to_vec(&PayoutInitMessage {
                 payout: payout2.clone(),
@@ -849,7 +941,16 @@ mod test {
                 assert_payout(&keeper, cache2, &contract2, &payout2);
 
                 // create a contract on level 2
-                let contract3 = keeper.register_contract(cache2, code_id).unwrap();
+                let contract3 = keeper
+                    .register_contract(
+                        cache2,
+                        code_id,
+                        Addr::unchecked("foobar"),
+                        None,
+                        "".to_owned(),
+                        1000,
+                    )
+                    .unwrap();
                 let info = mock_info("johnny", &[]);
                 let init_msg = to_vec(&PayoutInitMessage {
                     payout: payout3.clone(),
