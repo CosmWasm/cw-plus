@@ -14,7 +14,6 @@ use crate::msg::{
 };
 use cw20::Cw20ExecuteMsg;
 use cw_storage_plus::U8Key;
-use hex;
 use sha3::Digest;
 use std::convert::TryInto;
 
