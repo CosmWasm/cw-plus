@@ -16,7 +16,6 @@ use cw20::Cw20ExecuteMsg;
 use cw_storage_plus::U8Key;
 use hex;
 use sha3::Digest;
-use std::cmp::Ordering;
 use std::convert::TryInto;
 
 // Version info, for migration info
@@ -36,7 +35,7 @@ pub fn instantiate(
     };
     CONFIG.save(deps.storage, &config)?;
 
-    let stage: u8 = 0;
+    let stage = 0;
     STAGE.save(deps.storage, &stage)?;
 
     Ok(Response::default())
@@ -75,9 +74,8 @@ pub fn execute_update_config(
     }
 
     // validate owner change
-    let new_owner = owner
-        .ok_or(ContractError::InvalidInput {})
-        .and_then(|o| deps.api.addr_validate(o.as_str()).map_err(|err| err.into()))?;
+    let new_owner = owner.ok_or(ContractError::InvalidInput {})?;
+    let new_owner = deps.api.addr_validate(&new_owner)?;
 
     CONFIG.update(deps.storage, |mut exists| -> StdResult<_> {
         exists.owner = new_owner;
@@ -144,26 +142,21 @@ pub fn execute_claim(
     let merkle_root = MERKLE_ROOT.load(deps.storage, stage.into())?;
 
     let user_input: String = info.sender.to_string() + &amount.to_string();
-    let mut hash: [u8; 32] = sha3::Keccak256::digest(user_input.as_bytes())
+    let hash = sha3::Keccak256::digest(user_input.as_bytes())
         .as_slice()
         .try_into()
         .map_err(|_| ContractError::WrongLength {})?;
 
-    for p in proof {
-        let mut proof_buf: [u8; 32] = [0; 32];
+    let hash = proof.into_iter().try_fold(hash, |hash, p| {
+        let mut proof_buf = [0; 32];
         hex::decode_to_slice(p, &mut proof_buf)?;
-
-        hash = match bytes_cmp(hash, proof_buf) {
-            Ordering::Less => sha3::Keccak256::digest(&[hash, proof_buf].concat())
-                .as_slice()
-                .try_into()
-                .map_err(|_| ContractError::WrongLength {}),
-            _ => sha3::Keccak256::digest(&[proof_buf, hash].concat())
-                .as_slice()
-                .try_into()
-                .map_err(|_| ContractError::WrongLength {}),
-        }?;
-    }
+        let mut hashes = [hash, proof_buf];
+        hashes.sort();
+        sha3::Keccak256::digest(&hashes.concat())
+            .as_slice()
+            .try_into()
+            .map_err(|_| ContractError::WrongLength {})
+    })?;
 
     let mut root_buf: [u8; 32] = [0; 32];
     hex::decode_to_slice(merkle_root, &mut root_buf)?;
@@ -193,19 +186,6 @@ pub fn execute_claim(
         data: None,
         events: vec![],
     })
-}
-
-fn bytes_cmp(a: [u8; 32], b: [u8; 32]) -> std::cmp::Ordering {
-    let mut i = 0;
-    while i < 32 {
-        match a[i].cmp(&b[i]) {
-            Ordering::Less => return Ordering::Less,
-            Ordering::Greater => return std::cmp::Ordering::Greater,
-            Ordering::Equal => i += 1,
-        }
-    }
-
-    std::cmp::Ordering::Equal
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -302,7 +282,7 @@ mod tests {
 
         // update owner
         let env = mock_env();
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::UpdateConfig {
             owner: Some("owner0001".to_string()),
         };
@@ -315,7 +295,7 @@ mod tests {
         let config: ConfigResponse = from_binary(&res).unwrap();
         assert_eq!("owner0001", config.owner.as_str());
 
-        // Unauthorzied err
+        // Unauthorized err
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::UpdateConfig { owner: None };
@@ -436,7 +416,7 @@ mod tests {
         );
 
         /*
-        TODO enable after 0.16 release https://github.com/CosmWasm/cosmwasm/pull/989/files
+        TODO: enable after 0.16 release https://github.com/CosmWasm/cosmwasm/pull/989/files
         assert!(
             from_binary::<IsClaimedResponse>(
                 &query(
