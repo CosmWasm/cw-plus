@@ -48,7 +48,7 @@
       "@oclif/plugin-help"
     ]
   },
-  "repository": "orkunkl/merkle-airdrop-cli",
+  "repository": "CosmWasm/cosmwasm-plus/cw20-merkle-airdrop/merkle-airdrop-cli",
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
     "posttest": "eslint . --ext .ts --config .eslintrc",
