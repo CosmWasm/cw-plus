@@ -27,11 +27,13 @@ where
         msg: Vec<u8>,
     ) -> Result<Response<T>, String>;
 
+    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
+
     fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<T>, String>;
 
     fn reply(&self, deps: DepsMut, env: Env, msg: Reply) -> Result<Response<T>, String>;
 
-    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String>;
+    fn migrate(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<T>, String>;
 }
 
 type ContractFn<T, C, E> =
@@ -242,18 +244,20 @@ where
     }
 }
 
-impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5> Contract<C>
-    for ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5>
+impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6> Contract<C>
+    for ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
 where
     T1: DeserializeOwned,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
+    T6: DeserializeOwned,
     E1: ToString,
     E2: ToString,
     E3: ToString,
     E4: ToString,
     E5: ToString,
+    E6: ToString,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     fn execute(
@@ -263,7 +267,7 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        let msg: T1 = from_slice(&msg).map_err(|e| e.to_string())?;
+        let msg = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.execute_fn)(deps, env, info, msg);
         res.map_err(|e| e.to_string())
     }
@@ -275,14 +279,20 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        let msg: T2 = from_slice(&msg).map_err(|e| e.to_string())?;
+        let msg = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = (self.instantiate_fn)(deps, env, info, msg);
+        res.map_err(|e| e.to_string())
+    }
+
+    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
+        let msg = from_slice(&msg).map_err(|e| e.to_string())?;
+        let res = (self.query_fn)(deps, env, msg);
         res.map_err(|e| e.to_string())
     }
 
     // this returns an error if the contract doesn't implement sudo
     fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<C>, String> {
-        let msg: T4 = from_slice(&msg).map_err(|e| e.to_string())?;
+        let msg = from_slice(&msg).map_err(|e| e.to_string())?;
         let res = match &self.sudo_fn {
             Some(sudo) => sudo(deps, env, msg),
             None => return Err("sudo not implemented for contract".to_string()),
@@ -299,9 +309,13 @@ where
         res.map_err(|e| e.to_string())
     }
 
-    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, String> {
-        let msg: T3 = from_slice(&msg).map_err(|e| e.to_string())?;
-        let res = (self.query_fn)(deps, env, msg);
+    // this returns an error if the contract doesn't implement migrate
+    fn migrate(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<C>, String> {
+        let msg = from_slice(&msg).map_err(|e| e.to_string())?;
+        let res = match &self.migrate_fn {
+            Some(migrate) => migrate(deps, env, msg),
+            None => return Err("migrate not implemented for contract".to_string()),
+        };
         res.map_err(|e| e.to_string())
     }
 }
