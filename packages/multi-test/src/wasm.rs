@@ -297,12 +297,18 @@ where
                     .addr_validate(&contract_addr)
                     .map_err(|e| e.to_string())?;
 
-                // update the stored code_id
+                // check admin status and update the stored code_id
                 let new_code_id = new_code_id as usize;
                 if !self.codes.contains_key(&new_code_id) {
                     return Err("Cannot migrate contract to unregistered code id".to_string());
                 }
                 let mut data = self.load_contract(storage, &contract_addr)?;
+                if data.admin != Some(sender) {
+                    return Err(format!(
+                        "Only admin can migrate contract: {:?}",
+                        &data.admin
+                    ));
+                }
                 data.code_id = new_code_id;
                 self.save_contract(storage, &contract_addr, &data)?;
 

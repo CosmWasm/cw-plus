@@ -894,7 +894,7 @@ mod test {
 
         // migrate succeeds when the stars align
         app.migrate_contract(owner, contract.clone(), &migrate_msg, contract_id)
-            .unwrap_err();
+            .unwrap();
 
         // check beneficiary updated
         let state: hackatom::InstantiateMsg = app
