@@ -369,8 +369,6 @@ mod tests {
         let res = instantiate(deps.branch(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        let query_msg = TOKEN_INFO.query_msg(String::from("wasm1....")).unwrap();
-        deps.querier.query(query_msg.into());
         let meta = query_token_info(deps.as_ref()).unwrap();
         assert_eq!(
             meta,
