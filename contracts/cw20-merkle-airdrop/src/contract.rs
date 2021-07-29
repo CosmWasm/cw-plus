@@ -151,7 +151,7 @@ pub fn execute_claim(
         let mut proof_buf = [0; 32];
         hex::decode_to_slice(p, &mut proof_buf)?;
         let mut hashes = [hash, proof_buf];
-        hashes.sort();
+        hashes.sort_unstable();
         sha3::Keccak256::digest(&hashes.concat())
             .as_slice()
             .try_into()
