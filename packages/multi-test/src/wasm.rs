@@ -654,7 +654,7 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty};
 
-    use crate::test_helpers::{contract_error, contract_payout, PayoutInitMessage, PayoutQueryMsg};
+    use crate::test_helpers::contracts::{error, payout};
     use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
 
@@ -675,7 +675,7 @@ mod test {
         let mut wasm_storage = MockStorage::new();
         let mut keeper = mock_keeper();
         let block = mock_env().block;
-        let code_id = keeper.store_code(contract_error());
+        let code_id = keeper.store_code(error::contract());
 
         transactional(&mut wasm_storage, |cache, _| {
             // cannot register contract with unregistered codeId
@@ -756,7 +756,7 @@ mod test {
     fn contract_send_coins() {
         let mut keeper = mock_keeper();
         let block = mock_env().block;
-        let code_id = keeper.store_code(contract_payout());
+        let code_id = keeper.store_code(payout::contract());
 
         let mut wasm_storage = MockStorage::new();
         let mut cache = StorageTransaction::new(&wasm_storage);
@@ -776,7 +776,7 @@ mod test {
 
         // init the contract
         let info = mock_info("foobar", &[]);
-        let init_msg = to_vec(&PayoutInitMessage {
+        let init_msg = to_vec(&payout::InitMessage {
             payout: payout.clone(),
         })
         .unwrap();
@@ -817,12 +817,12 @@ mod test {
         cache.prepare().commit(&mut wasm_storage);
 
         // query the contract
-        let query = to_vec(&PayoutQueryMsg::Payout {}).unwrap();
+        let query = to_vec(&payout::QueryMsg::Payout {}).unwrap();
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let data = keeper
             .query_smart(contract_addr, &wasm_storage, &querier, &block, query)
             .unwrap();
-        let res: PayoutInitMessage = from_slice(&data).unwrap();
+        let res: payout::InitMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
     }
 
@@ -862,7 +862,7 @@ mod test {
     fn multi_level_wasm_cache() {
         let mut keeper = mock_keeper();
         let block = mock_env().block;
-        let code_id = keeper.store_code(contract_payout());
+        let code_id = keeper.store_code(payout::contract());
 
         let mut wasm_storage = MockStorage::new();
 
@@ -881,7 +881,7 @@ mod test {
                 )
                 .unwrap();
             let info = mock_info("foobar", &[]);
-            let init_msg = to_vec(&PayoutInitMessage {
+            let init_msg = to_vec(&payout::InitMessage {
                 payout: payout1.clone(),
             })
             .unwrap();
@@ -919,7 +919,7 @@ mod test {
                 )
                 .unwrap();
             let info = mock_info("foobar", &[]);
-            let init_msg = to_vec(&PayoutInitMessage {
+            let init_msg = to_vec(&payout::InitMessage {
                 payout: payout2.clone(),
             })
             .unwrap();
@@ -952,7 +952,7 @@ mod test {
                     )
                     .unwrap();
                 let info = mock_info("johnny", &[]);
-                let init_msg = to_vec(&PayoutInitMessage {
+                let init_msg = to_vec(&payout::InitMessage {
                     payout: payout3.clone(),
                 })
                 .unwrap();

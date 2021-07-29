@@ -269,11 +269,8 @@ mod test {
         attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Event, Reply, SubMsg, WasmMsg,
     };
 
-    use crate::test_helpers::{
-        contract_payout, contract_payout_custom, contract_reflect, CustomMsg, EmptyMsg,
-        PayoutCountResponse, PayoutInitMessage, PayoutQueryMsg, PayoutSudoMsg, ReflectMessage,
-        ReflectQueryMsg,
-    };
+    use crate::test_helpers::contracts::{payout, reflect};
+    use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
 
@@ -364,8 +361,8 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up contract
-        let code_id = app.store_code(contract_payout());
-        let msg = PayoutInitMessage {
+        let code_id = app.store_code(payout::contract());
+        let msg = payout::InitMessage {
             payout: coin(5, "eth"),
         };
         let contract_addr = app
@@ -427,8 +424,8 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up payout contract
-        let payout_id = app.store_code(contract_payout_custom());
-        let msg = PayoutInitMessage {
+        let payout_id = app.store_code(payout::contract());
+        let msg = payout::InitMessage {
             payout: coin(5, "eth"),
         };
         let payout_addr = app
@@ -436,7 +433,7 @@ mod test {
             .unwrap();
 
         // set up reflect contract
-        let reflect_id = app.store_code(contract_reflect());
+        let reflect_id = app.store_code(reflect::contract());
         let reflect_addr = app
             .instantiate_contract(reflect_id, owner, &EmptyMsg {}, &[], "Reflect")
             .unwrap();
@@ -445,9 +442,9 @@ mod test {
         let funds = get_balance(&app, &reflect_addr);
         assert_eq!(funds, vec![]);
         // reflect count is 1
-        let qres: PayoutCountResponse = app
+        let qres: payout::CountResponse = app
             .wrap()
-            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
+            .query_wasm_smart(&reflect_addr, &reflect::QueryMsg::Count {})
             .unwrap();
         assert_eq!(0, qres.count);
 
@@ -457,7 +454,7 @@ mod test {
             msg: b"{}".into(),
             funds: vec![],
         });
-        let msgs = ReflectMessage {
+        let msgs = reflect::Message {
             messages: vec![msg],
         };
         let res = app
@@ -492,9 +489,9 @@ mod test {
         assert_eq!(funds, coins(5, "eth"));
 
         // reflect count updated
-        let qres: PayoutCountResponse = app
+        let qres: payout::CountResponse = app
             .wrap()
-            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
+            .query_wasm_smart(&reflect_addr, &reflect::QueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
     }
@@ -509,7 +506,7 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
-        let reflect_id = app.store_code(contract_reflect());
+        let reflect_id = app.store_code(reflect::contract());
         let reflect_addr = app
             .instantiate_contract(
                 reflect_id,
@@ -530,7 +527,7 @@ mod test {
             to_address: random.clone().into(),
             amount: coins(7, "eth"),
         });
-        let msgs = ReflectMessage {
+        let msgs = reflect::Message {
             messages: vec![msg],
         };
         let res = app
@@ -550,9 +547,9 @@ mod test {
         assert_eq!(funds, coins(7, "eth"));
 
         // reflect count should be updated to 1
-        let qres: PayoutCountResponse = app
+        let qres: payout::CountResponse = app
             .wrap()
-            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
+            .query_wasm_smart(&reflect_addr, &reflect::QueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
 
@@ -565,7 +562,7 @@ mod test {
             to_address: random.clone().into(),
             amount: coins(3, "btc"),
         });
-        let msgs = ReflectMessage {
+        let msgs = reflect::Message {
             messages: vec![msg, msg2],
         };
         let err = app
@@ -578,9 +575,9 @@ mod test {
         assert_eq!(funds, coins(7, "eth"));
 
         // failure should not update reflect count
-        let qres: PayoutCountResponse = app
+        let qres: payout::CountResponse = app
             .wrap()
-            .query_wasm_smart(&reflect_addr, &ReflectQueryMsg::Count {})
+            .query_wasm_smart(&reflect_addr, &reflect::QueryMsg::Count {})
             .unwrap();
         assert_eq!(1, qres.count);
     }
@@ -592,8 +589,8 @@ mod test {
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(100, "eth")];
         app.init_bank_balance(&owner, init_funds).unwrap();
-        let payout_id = app.store_code(contract_payout());
-        let msg = PayoutInitMessage {
+        let payout_id = app.store_code(payout::contract());
+        let msg = payout::InitMessage {
             payout: coin(5, "eth"),
         };
         let payout_addr = app
@@ -601,20 +598,20 @@ mod test {
             .unwrap();
 
         // count is 1
-        let PayoutCountResponse { count } = app
+        let payout::CountResponse { count } = app
             .wrap()
-            .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
+            .query_wasm_smart(&payout_addr, &payout::QueryMsg::Count {})
             .unwrap();
         assert_eq!(1, count);
 
         // sudo
-        let msg = PayoutSudoMsg { set_count: 25 };
+        let msg = payout::SudoMsg { set_count: 25 };
         app.sudo(payout_addr.clone(), &msg).unwrap();
 
         // count is 25
-        let PayoutCountResponse { count } = app
+        let payout::CountResponse { count } = app
             .wrap()
-            .query_wasm_smart(&payout_addr, &PayoutQueryMsg::Count {})
+            .query_wasm_smart(&payout_addr, &payout::QueryMsg::Count {})
             .unwrap();
         assert_eq!(25, count);
     }
@@ -630,7 +627,7 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up reflect contract
-        let reflect_id = app.store_code(contract_reflect());
+        let reflect_id = app.store_code(reflect::contract());
         let reflect_addr = app
             .instantiate_contract(
                 reflect_id,
@@ -642,7 +639,7 @@ mod test {
             .unwrap();
 
         // no reply writen beforehand
-        let query = ReflectQueryMsg::Reply { id: 123 };
+        let query = reflect::QueryMsg::Reply { id: 123 };
         app.wrap()
             .query_wasm_smart::<Reply, _, _>(&reflect_addr, &query)
             .unwrap_err();
@@ -655,7 +652,7 @@ mod test {
             },
             123,
         );
-        let msgs = ReflectMessage {
+        let msgs = reflect::Message {
             messages: vec![msg],
         };
         let res = app
@@ -689,7 +686,7 @@ mod test {
             },
             456,
         );
-        let msgs = ReflectMessage {
+        let msgs = reflect::Message {
             messages: vec![msg],
         };
         let _res = app
@@ -697,7 +694,7 @@ mod test {
             .unwrap();
 
         // ensure error was written
-        let query = ReflectQueryMsg::Reply { id: 456 };
+        let query = reflect::QueryMsg::Reply { id: 456 };
         let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 456);
         assert!(res.result.is_err());
