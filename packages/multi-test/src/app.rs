@@ -362,7 +362,7 @@ mod test {
 
         // set up contract
         let code_id = app.store_code(payout::contract());
-        let msg = payout::InitMessage {
+        let msg = payout::InstantiateMessage {
             payout: coin(5, "eth"),
         };
         let contract_addr = app
@@ -425,7 +425,7 @@ mod test {
 
         // set up payout contract
         let payout_id = app.store_code(payout::contract());
-        let msg = payout::InitMessage {
+        let msg = payout::InstantiateMessage {
             payout: coin(5, "eth"),
         };
         let payout_addr = app
@@ -590,7 +590,7 @@ mod test {
         let init_funds = vec![coin(100, "eth")];
         app.init_bank_balance(&owner, init_funds).unwrap();
         let payout_id = app.store_code(payout::contract());
-        let msg = payout::InitMessage {
+        let msg = payout::InstantiateMessage {
             payout: coin(5, "eth"),
         };
         let payout_addr = app
@@ -795,7 +795,7 @@ mod test {
             .instantiate_contract(
                 contract_id,
                 owner.clone(),
-                &hackatom::InitMsg {
+                &hackatom::InstantiateMsg {
                     beneficiary: beneficiary.as_str().to_owned(),
                 },
                 &coins(10, "btc"),

@@ -824,7 +824,7 @@ mod test {
 
         // init the contract
         let info = mock_info("foobar", &[]);
-        let init_msg = to_vec(&payout::InitMessage {
+        let init_msg = to_vec(&payout::InstantiateMessage {
             payout: payout.clone(),
         })
         .unwrap();
@@ -870,7 +870,7 @@ mod test {
         let data = keeper
             .query_smart(contract_addr, &wasm_storage, &querier, &block, query)
             .unwrap();
-        let res: payout::InitMessage = from_slice(&data).unwrap();
+        let res: payout::InstantiateMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
     }
 
@@ -929,7 +929,7 @@ mod test {
                 )
                 .unwrap();
             let info = mock_info("foobar", &[]);
-            let init_msg = to_vec(&payout::InitMessage {
+            let init_msg = to_vec(&payout::InstantiateMessage {
                 payout: payout1.clone(),
             })
             .unwrap();
@@ -967,7 +967,7 @@ mod test {
                 )
                 .unwrap();
             let info = mock_info("foobar", &[]);
-            let init_msg = to_vec(&payout::InitMessage {
+            let init_msg = to_vec(&payout::InstantiateMessage {
                 payout: payout2.clone(),
             })
             .unwrap();
@@ -1000,7 +1000,7 @@ mod test {
                     )
                     .unwrap();
                 let info = mock_info("johnny", &[]);
-                let init_msg = to_vec(&payout::InitMessage {
+                let init_msg = to_vec(&payout::InstantiateMessage {
                     payout: payout3.clone(),
                 })
                 .unwrap();

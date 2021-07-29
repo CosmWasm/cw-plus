@@ -11,7 +11,7 @@ use crate::contracts::{Contract, ContractWrapper};
 use crate::test_helpers::{EmptyMsg, COUNT};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct InitMessage {
+pub struct InstantiateMessage {
     pub payout: Coin,
 }
 
@@ -31,13 +31,13 @@ pub struct CountResponse {
     pub count: u32,
 }
 
-const PAYOUT: Item<InitMessage> = Item::new("payout");
+const PAYOUT: Item<InstantiateMessage> = Item::new("payout");
 
 fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMessage,
+    msg: InstantiateMessage,
 ) -> Result<Response, StdError> {
     PAYOUT.save(deps.storage, &msg)?;
     COUNT.save(deps.storage, &1)?;
