@@ -215,15 +215,18 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         sender: Addr,
-        msg: WasmMsg,
+        wasm_msg: WasmMsg,
     ) -> Result<(Addr, Response<C>), String> {
-        match msg {
+        match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
                 msg,
                 funds,
             } => {
-                let contract_addr = Addr::unchecked(contract_addr);
+                let contract_addr = self
+                    .api
+                    .addr_validate(&contract_addr)
+                    .map_err(|e| e.to_string())?;
                 // first move the cash
                 self.send(
                     storage,
@@ -284,7 +287,30 @@ where
                 init_response(&mut res, &contract_addr);
                 Ok((contract_addr, res))
             }
-            WasmMsg::Migrate { .. } => unimplemented!(),
+            WasmMsg::Migrate {
+                contract_addr,
+                new_code_id,
+                msg,
+            } => {
+                let contract_addr = self
+                    .api
+                    .addr_validate(&contract_addr)
+                    .map_err(|e| e.to_string())?;
+
+                // update the stored code_id
+                let new_code_id = new_code_id as usize;
+                if !self.codes.contains_key(&new_code_id) {
+                    return Err("Cannot migrate contract to unregistered code id".to_string());
+                }
+                let mut data = self.load_contract(storage, &contract_addr)?;
+                data.code_id = new_code_id;
+                self.save_contract(storage, &contract_addr, &data)?;
+
+                // then call migrate
+                let res =
+                    self.call_migrate(contract_addr.clone(), storage, router, block, msg.to_vec())?;
+                Ok((contract_addr, res))
+            }
             m => panic!("Unsupported wasm message: {:?}", m),
         }
     }
@@ -415,12 +441,12 @@ where
         label: String,
         created: u64,
     ) -> Result<Addr, String> {
-        let mut wasm_storage = prefixed(storage, NAMESPACE_WASM);
-
         if !self.codes.contains_key(&code_id) {
             return Err("Cannot init contract with unregistered code id".to_string());
         }
-        let addr = self.next_address(&wasm_storage);
+
+        let addr = self.next_address(&prefixed_read(storage, NAMESPACE_WASM));
+
         let info = ContractData {
             code_id,
             creator,
@@ -428,9 +454,7 @@ where
             label,
             created,
         };
-        CONTRACTS
-            .save(&mut wasm_storage, &addr, &info)
-            .map_err(|e| e.to_string())?;
+        self.save_contract(storage, &addr, &info)?;
         Ok(addr)
     }
 
@@ -485,6 +509,19 @@ where
     ) -> Result<Response<C>, String> {
         self.with_storage(storage, router, block, address, |contract, deps, env| {
             contract.sudo(deps, env, msg)
+        })
+    }
+
+    pub fn call_migrate(
+        &self,
+        address: Addr,
+        storage: &mut dyn Storage,
+        router: &Router<C>,
+        block: &BlockInfo,
+        msg: Vec<u8>,
+    ) -> Result<Response<C>, String> {
+        self.with_storage(storage, router, block, address, |contract, deps, env| {
+            contract.migrate(deps, env, msg)
         })
     }
 
@@ -566,6 +603,17 @@ where
     ) -> Result<ContractData, String> {
         CONTRACTS
             .load(&prefixed_read(storage, NAMESPACE_WASM), address)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn save_contract(
+        &self,
+        storage: &mut dyn Storage,
+        address: &Addr,
+        contract: &ContractData,
+    ) -> Result<(), String> {
+        CONTRACTS
+            .save(&mut prefixed(storage, NAMESPACE_WASM), address, contract)
             .map_err(|e| e.to_string())
     }
 
