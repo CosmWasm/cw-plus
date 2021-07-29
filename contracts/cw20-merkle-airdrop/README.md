@@ -3,6 +3,8 @@
 This is a merkle airdrop smart contract that works with cw20 token specification Mass airdrop distributions made cheap
 and efficient.
 
+Explanation of merkle airdrop: [Medium Merkle Airdrop: the Basics](https://medium.com/smartz-blog/merkle-airdrop-the-basics-9a0857fcc930)
+
 Traditional and non-efficient airdrops:
 
 - Distributor creates a list of airdrop
