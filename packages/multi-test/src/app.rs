@@ -424,7 +424,7 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // set up payout contract
-        let payout_id = app.store_code(payout::contract_custom());
+        let payout_id = app.store_code(payout::contract());
         let msg = payout::InitMessage {
             payout: coin(5, "eth"),
         };
