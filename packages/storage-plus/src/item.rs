@@ -50,7 +50,7 @@ where
         must_deserialize(&value)
     }
 
-    /// may_load will parse the data stored at the key if present, returns Ok(None) if no data there.
+    /// may_load will parse the data stored at the key if present, returns `Ok(None)` if no data there.
     /// returns an error on issues parsing
     pub fn may_load(&self, store: &dyn Storage) -> StdResult<Option<T>> {
         let value = store.get(self.storage_key);
@@ -60,7 +60,8 @@ where
     /// Loads the data, perform the specified action, and store the result
     /// in the database. This is shorthand for some common sequences, which may be useful.
     ///
-    /// If the data exists, `action(Some(value))` is called. Otherwise `action(None)` is called.
+    /// It assumes, that data was initialized before, and if it doesn't exist, `Err(StdError::NotFound)`
+    /// is returned.
     pub fn update<A, E>(&self, store: &mut dyn Storage, action: A) -> Result<T, E>
     where
         A: FnOnce(T) -> Result<T, E>,
