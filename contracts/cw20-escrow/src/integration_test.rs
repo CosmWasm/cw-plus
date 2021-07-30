@@ -56,13 +56,20 @@ fn escrow_happy_path_cw20_tokens() {
         mint: None,
     };
     let cash_addr = router
-        .instantiate_contract(cw20_id, owner.clone(), &msg, &[], "CASH")
+        .instantiate_contract(cw20_id, owner.clone(), &msg, &[], "CASH", None)
         .unwrap();
 
     // set up reflect contract
     let escrow_id = router.store_code(contract_escrow());
     let escrow_addr = router
-        .instantiate_contract(escrow_id, owner.clone(), &InstantiateMsg {}, &[], "Escrow")
+        .instantiate_contract(
+            escrow_id,
+            owner.clone(),
+            &InstantiateMsg {},
+            &[],
+            "Escrow",
+            None,
+        )
         .unwrap();
 
     // they are different

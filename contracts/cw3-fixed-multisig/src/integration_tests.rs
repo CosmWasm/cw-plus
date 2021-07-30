@@ -69,6 +69,7 @@ fn cw3_controls_cw20() {
             &cw3_instantiate_msg,
             &[],
             "Consortium",
+            None,
         )
         .unwrap();
 
@@ -92,6 +93,7 @@ fn cw3_controls_cw20() {
             &cw20_instantiate_msg,
             &[],
             "Consortium",
+            None,
         )
         .unwrap();
 

@@ -484,7 +484,7 @@ mod tests {
             admin: Some(OWNER.into()),
             members,
         };
-        app.instantiate_contract(group_id, Addr::unchecked(OWNER), &msg, &[], "group")
+        app.instantiate_contract(group_id, Addr::unchecked(OWNER), &msg, &[], "group", None)
             .unwrap()
     }
 
@@ -500,7 +500,7 @@ mod tests {
             threshold,
             max_voting_period,
         };
-        app.instantiate_contract(flex_id, Addr::unchecked(OWNER), &msg, &[], "flex")
+        app.instantiate_contract(flex_id, Addr::unchecked(OWNER), &msg, &[], "flex", None)
             .unwrap()
     }
 
@@ -614,6 +614,7 @@ mod tests {
                 &instantiate_msg,
                 &[],
                 "zero required weight",
+                None,
             )
             .unwrap_err();
         assert_eq!(err, ContractError::ZeroThreshold {}.to_string());
@@ -631,6 +632,7 @@ mod tests {
                 &instantiate_msg,
                 &[],
                 "high required weight",
+                None,
             )
             .unwrap_err();
         assert_eq!(err, ContractError::UnreachableThreshold {}.to_string());
@@ -648,6 +650,7 @@ mod tests {
                 &instantiate_msg,
                 &[],
                 "all good",
+                None,
             )
             .unwrap();
 

@@ -9,17 +9,30 @@ use serde::{Deserialize, Serialize};
 use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     pub beneficiary: String,
 }
 
-const HACKATOM: Item<InitMsg> = Item::new("hackatom");
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MigrateMsg {
+    // just use some other string so we see there are other types
+    pub new_guy: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    // returns InstantiateMsg
+    Beneficiary {},
+}
+
+const HACKATOM: Item<InstantiateMsg> = Item::new("hackatom");
 
 fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InitMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, StdError> {
     HACKATOM.save(deps.storage, &msg)?;
     Ok(Response::default())
@@ -42,11 +55,25 @@ fn execute(
     Ok(resp)
 }
 
-fn query(_deps: Deps, _env: Env, msg: EmptyMsg) -> Result<Binary, StdError> {
-    to_binary(&msg)
+fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, StdError> {
+    match msg {
+        QueryMsg::Beneficiary {} => {
+            let res = HACKATOM.load(deps.storage)?;
+            to_binary(&res)
+        }
+    }
+}
+
+fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, StdError> {
+    HACKATOM.update::<_, StdError>(deps.storage, |mut state| {
+        state.beneficiary = msg.new_guy;
+        Ok(state)
+    })?;
+    let resp = Response::new().add_attribute("migrate", "successful");
+    Ok(resp)
 }
 
 pub fn contract() -> Box<dyn Contract<Empty>> {
-    let contract = ContractWrapper::new(execute, instantiate, query);
+    let contract = ContractWrapper::new(execute, instantiate, query).with_migrate(migrate);
     Box::new(contract)
 }
