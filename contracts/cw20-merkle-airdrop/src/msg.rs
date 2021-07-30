@@ -5,7 +5,7 @@ use cosmwasm_std::Uint128;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
-    /// Owner if none set to info.sender
+    /// Owner if none set to info.sender.
     pub owner: Option<String>,
     pub cw20_token_address: String,
 }
@@ -19,13 +19,14 @@ pub enum ExecuteMsg {
         new_owner: Option<String>,
     },
     RegisterMerkleRoot {
-        /// MerkleRoot is hex-encoded merkle root
+        /// MerkleRoot is hex-encoded merkle root.
         merkle_root: String,
     },
+    /// Claim does not check if contract has enough funds, owner must ensure it.
     Claim {
         stage: u8,
         amount: Uint128,
-        /// Proof is hex-encoded merkle proof
+        /// Proof is hex-encoded merkle proof.
         proof: Vec<String>,
     },
 }
@@ -46,21 +47,18 @@ pub struct ConfigResponse {
     pub cw20_token_address: String,
 }
 
-// We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MerkleRootResponse {
     pub stage: u8,
-    /// MerkleRoot is hex-encoded merkle root
+    /// MerkleRoot is hex-encoded merkle root.
     pub merkle_root: String,
 }
 
-// We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct LatestStageResponse {
     pub latest_stage: u8,
 }
 
-// We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct IsClaimedResponse {
     pub is_claimed: bool,

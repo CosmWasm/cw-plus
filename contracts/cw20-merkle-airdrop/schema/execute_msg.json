@@ -36,7 +36,7 @@
           ],
           "properties": {
             "merkle_root": {
-              "description": "MerkleRoot is hex-encoded merkle root",
+              "description": "MerkleRoot is hex-encoded merkle root.",
               "type": "string"
             }
           }
@@ -45,6 +45,7 @@
       "additionalProperties": false
     },
     {
+      "description": "Claim does not check if contract has enough funds, owner must ensure it.",
       "type": "object",
       "required": [
         "claim"
@@ -62,7 +63,7 @@
               "$ref": "#/definitions/Uint128"
             },
             "proof": {
-              "description": "Proof is hex-encoded merkle proof",
+              "description": "Proof is hex-encoded merkle proof.",
               "type": "array",
               "items": {
                 "type": "string"

@@ -111,7 +111,9 @@ pub fn execute_register_merkle_root(
     let mut root_buf: [u8; 32] = [0; 32];
     hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
 
-    let stage = LATEST_STAGE.update(deps.storage, |stage| -> StdResult<_> { Ok(stage + 1) })?;
+    let stage = LATEST_STAGE.update(deps.storage, |stage| -> StdResult<_> {
+        Ok(stage + 1)
+    })?;
 
     MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
     LATEST_STAGE.save(deps.storage, &stage)?;
