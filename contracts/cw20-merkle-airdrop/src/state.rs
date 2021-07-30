@@ -6,7 +6,8 @@ use cw_storage_plus::{Item, Map, U8Key};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
-    pub owner: Addr,
+    /// Owner If None set, contract is frozen.
+    pub owner: Option<Addr>,
     pub cw20_token_address: Addr,
 }
 

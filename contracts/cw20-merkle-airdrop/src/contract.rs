@@ -35,7 +35,7 @@ pub fn instantiate(
         .map_or(Ok(info.sender), |o| deps.api.addr_validate(&o))?;
 
     let config = Config {
-        owner,
+        owner: Some(owner),
         cw20_token_address: deps.api.addr_validate(&msg.cw20_token_address)?,
     };
     CONFIG.save(deps.storage, &config)?;
@@ -54,7 +54,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::UpdateConfig { owner } => execute_update_config(deps, env, info, owner),
+        ExecuteMsg::UpdateConfig { new_owner } => execute_update_config(deps, env, info, new_owner),
         ExecuteMsg::RegisterMerkleRoot { merkle_root } => {
             execute_register_merkle_root(deps, env, info, merkle_root)
         }
@@ -70,20 +70,23 @@ pub fn execute_update_config(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    owner: Option<String>,
+    new_owner: Option<String>,
 ) -> Result<Response, ContractError> {
     // authorize owner
     let cfg = CONFIG.load(deps.storage)?;
-    if info.sender != cfg.owner {
+    let owner = cfg.owner.ok_or(ContractError::Unauthorized {})?;
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
-    // validate owner change
-    let new_owner = owner.ok_or(ContractError::InvalidInput {})?;
-    let new_owner = deps.api.addr_validate(&new_owner)?;
+    // if owner some validated to addr, otherwise set to none
+    let mut tmp_owner = None;
+    if let Some(addr) = new_owner {
+        tmp_owner = Some(deps.api.addr_validate(&addr)?)
+    }
 
     CONFIG.update(deps.storage, |mut exists| -> StdResult<_> {
-        exists.owner = new_owner;
+        exists.owner = tmp_owner;
         Ok(exists)
     })?;
 
@@ -97,9 +100,11 @@ pub fn execute_register_merkle_root(
     info: MessageInfo,
     merkle_root: String,
 ) -> Result<Response, ContractError> {
-    // authorize owner
     let cfg = CONFIG.load(deps.storage)?;
-    if info.sender != cfg.owner {
+
+    // if owner set validate, otherwise unauthorized
+    let owner = cfg.owner.ok_or(ContractError::Unauthorized {})?;
+    if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -196,7 +201,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     Ok(ConfigResponse {
-        owner: cfg.owner.to_string(),
+        owner: cfg.owner.map(|o| o.to_string()),
         cw20_token_address: cfg.cw20_token_address.to_string(),
     })
 }
@@ -252,7 +257,7 @@ mod tests {
         // it worked, let's query the state
         let res = query(deps.as_ref(), env.clone(), QueryMsg::Config {}).unwrap();
         let config: ConfigResponse = from_binary(&res).unwrap();
-        assert_eq!("owner0000", config.owner.as_str());
+        assert_eq!("owner0000", config.owner.unwrap().as_str());
         assert_eq!("anchor0000", config.cw20_token_address.as_str());
 
         let res = query(deps.as_ref(), env, QueryMsg::LatestStage {}).unwrap();
@@ -277,7 +282,7 @@ mod tests {
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::UpdateConfig {
-            owner: Some("owner0001".to_string()),
+            new_owner: Some("owner0001".to_string()),
         };
 
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
@@ -286,12 +291,12 @@ mod tests {
         // it worked, let's query the state
         let res = query(deps.as_ref(), env, QueryMsg::Config {}).unwrap();
         let config: ConfigResponse = from_binary(&res).unwrap();
-        assert_eq!("owner0001", config.owner.as_str());
+        assert_eq!("owner0001", config.owner.unwrap().as_str());
 
         // Unauthorized err
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
-        let msg = ExecuteMsg::UpdateConfig { owner: None };
+        let msg = ExecuteMsg::UpdateConfig { new_owner: None };
 
         let res = execute(deps.as_mut(), env, info, msg);
         match res {
@@ -477,5 +482,70 @@ mod tests {
                 attr("amount", "1000000000")
             ]
         );
+    }
+
+    #[test]
+    fn owner_freeze() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg {
+            owner: Some("owner0000".to_string()),
+            cw20_token_address: "token0000".to_string(),
+        };
+
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+        let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+
+        // can register merkle root
+        let env = mock_env();
+        let info = mock_info("owner0000", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "5d4f48f147cb6cb742b376dce5626b2a036f69faec10cd73631c791780e150fc"
+                .to_string(),
+        };
+        let _res = execute(deps.as_mut(), env, info, msg).unwrap();
+
+        // can update owner
+        let env = mock_env();
+        let info = mock_info("owner0000", &[]);
+        let msg = ExecuteMsg::UpdateConfig {
+            new_owner: Some("owner0001".to_string()),
+        };
+
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // freeze contract
+        let env = mock_env();
+        let info = mock_info("owner0001", &[]);
+        let msg = ExecuteMsg::UpdateConfig { new_owner: None };
+
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // cannot register new drop
+        let env = mock_env();
+        let info = mock_info("owner0001", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
+                .to_string(),
+        };
+        match execute(deps.as_mut(), env, info, msg) {
+            Err(ContractError::Unauthorized { .. }) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+        // cannot update config
+        let env = mock_env();
+        let info = mock_info("owner0001", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
+                .to_string(),
+        };
+        match execute(deps.as_mut(), env, info, msg) {
+            Err(ContractError::Unauthorized { .. }) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
     }
 }

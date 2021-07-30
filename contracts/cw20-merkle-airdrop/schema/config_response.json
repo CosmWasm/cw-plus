@@ -3,15 +3,17 @@
   "title": "ConfigResponse",
   "type": "object",
   "required": [
-    "cw20_token_address",
-    "owner"
+    "cw20_token_address"
   ],
   "properties": {
     "cw20_token_address": {
       "type": "string"
     },
     "owner": {
-      "type": "string"
+      "type": [
+        "string",
+        "null"
+      ]
     }
   }
 }
