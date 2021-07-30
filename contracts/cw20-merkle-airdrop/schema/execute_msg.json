@@ -12,6 +12,7 @@
           "type": "object",
           "properties": {
             "owner": {
+              "description": "Owner if non sent, contract gets locked. Recipients can receive airdrops but owner cannot register new stages.",
               "type": [
                 "string",
                 "null"

@@ -5,7 +5,7 @@ use cosmwasm_std::Uint128;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
-    // If none, set to info.sender
+    /// Owner if none set to info.sender
     pub owner: Option<String>,
     pub cw20_token_address: String,
 }
@@ -14,7 +14,8 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     UpdateConfig {
-        // If none,
+        /// Owner if non sent, contract gets locked. Recipients can receive airdrops
+        /// but owner cannot register new stages.
         owner: Option<String>,
     },
     RegisterMerkleRoot {
