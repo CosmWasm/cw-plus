@@ -103,11 +103,6 @@ pub fn execute_register_merkle_root(
         return Err(ContractError::Unauthorized {});
     }
 
-    /*
-        stage.
-    };
-
-     */
     // check merkle root length
     let mut root_buf: [u8; 32] = [0; 32];
     hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
