@@ -105,8 +105,7 @@ pub fn execute_register_merkle_root(
     let mut root_buf: [u8; 32] = [0; 32];
     hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
 
-    let latest_stage: u8 = STAGE.load(deps.storage)?;
-    let stage = latest_stage + 1;
+    let stage = STAGE.update(deps.storage, |stage| Ok(stage + 1))?;
 
     MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
     STAGE.save(deps.storage, &stage)?;
@@ -140,7 +139,7 @@ pub fn execute_claim(
     let config = CONFIG.load(deps.storage)?;
     let merkle_root = MERKLE_ROOT.load(deps.storage, stage.into())?;
 
-    let user_input: String = info.sender.to_string() + &amount.to_string();
+    let user_input = format!("{}{}", info.sender, amount);
     let hash = sha3::Keccak256::digest(user_input.as_bytes())
         .as_slice()
         .try_into()
