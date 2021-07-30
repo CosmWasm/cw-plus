@@ -1,41 +1,47 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
-    Uint128, WasmMsg,
+    attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    WasmMsg,
 };
-
-use crate::state::{Config, CLAIM, CONFIG, MERKLE_ROOT, STAGE};
+use cw2::set_contract_version;
+use cw20::Cw20ExecuteMsg;
+use cw_storage_plus::U8Key;
+use sha3::Digest;
+use std::convert::TryInto;
 
 use crate::error::ContractError;
 use crate::msg::{
     ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
     MerkleRootResponse, MigrateMsg, QueryMsg,
 };
-use cw20::Cw20ExecuteMsg;
-use cw_storage_plus::U8Key;
-use sha3::Digest;
-use std::convert::TryInto;
+use crate::state::{Config, CLAIM, CONFIG, LATEST_STAGE, MERKLE_ROOT};
 
 // Version info, for migration info
-const _CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
-const _CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
+const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    let owner = msg
+        .owner
+        .map_or(Ok(info.sender), |o| deps.api.addr_validate(&o))?;
+
     let config = Config {
-        owner: deps.api.addr_validate(&msg.owner)?,
+        owner,
         cw20_token_address: deps.api.addr_validate(&msg.cw20_token_address)?,
     };
     CONFIG.save(deps.storage, &config)?;
 
     let stage = 0;
-    STAGE.save(deps.storage, &stage)?;
+    LATEST_STAGE.save(deps.storage, &stage)?;
 
     Ok(Response::default())
 }
@@ -81,12 +87,8 @@ pub fn execute_update_config(
         Ok(exists)
     })?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![attr("action", "update_config")],
-        data: None,
-        events: vec![],
-    })
+    let res = Response::new().add_attribute("action", "update_config");
+    Ok(res)
 }
 
 pub fn execute_register_merkle_root(
@@ -101,25 +103,26 @@ pub fn execute_register_merkle_root(
         return Err(ContractError::Unauthorized {});
     }
 
+    /*
+        stage.
+    };
+
+     */
     // check merkle root length
     let mut root_buf: [u8; 32] = [0; 32];
     hex::decode_to_slice(merkle_root.to_string(), &mut root_buf)?;
 
-    let stage = STAGE.update(deps.storage, |stage| Ok(stage + 1))?;
+    let stage = LATEST_STAGE.update(deps.storage, |stage| -> StdResult<_> { Ok(stage + 1) })?;
 
     MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
-    STAGE.save(deps.storage, &stage)?;
+    LATEST_STAGE.save(deps.storage, &stage)?;
 
-    Ok(Response {
-        messages: vec![],
-        attributes: vec![
-            attr("action", "register_merkle_root"),
-            attr("stage", stage),
-            attr("merkle_root", merkle_root),
-        ],
-        data: None,
-        events: vec![],
-    })
+    let res = Response::new().add_attributes(vec![
+        attr("action", "register_merkle_root"),
+        attr("stage", stage.to_string()),
+        attr("merkle_root", merkle_root),
+    ]);
+    Ok(res)
 }
 
 pub fn execute_claim(
@@ -165,25 +168,22 @@ pub fn execute_claim(
     // Update claim index to the current stage
     CLAIM.save(deps.storage, (&info.sender, stage.into()), &true)?;
 
-    let msgs: Vec<SubMsg> = vec![SubMsg::new(WasmMsg::Execute {
-        contract_addr: config.cw20_token_address.to_string(),
-        funds: vec![],
-        msg: to_binary(&Cw20ExecuteMsg::Transfer {
-            recipient: info.sender.to_string(),
-            amount,
-        })?,
-    })];
-    Ok(Response {
-        messages: msgs,
-        attributes: vec![
+    let res = Response::new()
+        .add_message(WasmMsg::Execute {
+            contract_addr: config.cw20_token_address.to_string(),
+            funds: vec![],
+            msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                recipient: info.sender.to_string(),
+                amount,
+            })?,
+        })
+        .add_attributes(vec![
             attr("action", "claim"),
-            attr("stage", stage),
+            attr("stage", stage.to_string()),
             attr("address", info.sender),
             attr("amount", amount),
-        ],
-        data: None,
-        events: vec![],
-    })
+        ]);
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -214,7 +214,7 @@ pub fn query_merkle_root(deps: Deps, stage: u8) -> StdResult<MerkleRootResponse>
 }
 
 pub fn query_latest_stage(deps: Deps) -> StdResult<LatestStageResponse> {
-    let latest_stage = STAGE.load(deps.storage)?;
+    let latest_stage = LATEST_STAGE.load(deps.storage)?;
     let resp = LatestStageResponse { latest_stage };
 
     Ok(resp)
@@ -237,14 +237,14 @@ pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Respons
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_binary, CosmosMsg};
+    use cosmwasm_std::{from_binary, CosmosMsg, SubMsg};
 
     #[test]
     fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            owner: "owner0000".to_string(),
+            owner: Some("owner0000".to_string()),
             cw20_token_address: "anchor0000".to_string(),
         };
 
@@ -270,12 +270,12 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            owner: "owner0000".to_string(),
+            owner: None,
             cw20_token_address: "anchor0000".to_string(),
         };
 
         let env = mock_env();
-        let info = mock_info("addr0000", &[]);
+        let info = mock_info("owner0000", &[]);
         let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
 
         // update owner
@@ -310,7 +310,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            owner: "owner0000".to_string(),
+            owner: Some("owner0000".to_string()),
             cw20_token_address: "anchor0000".to_string(),
         };
 
@@ -363,7 +363,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         let msg = InstantiateMsg {
-            owner: "owner0000".to_string(),
+            owner: Some("owner0000".to_string()),
             cw20_token_address: "token0000".to_string(),
         };
 

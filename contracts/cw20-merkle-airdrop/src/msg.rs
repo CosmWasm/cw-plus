@@ -5,7 +5,8 @@ use cosmwasm_std::Uint128;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
-    pub owner: String,
+    // If none, set to info.sender
+    pub owner: Option<String>,
     pub cw20_token_address: String,
 }
 
