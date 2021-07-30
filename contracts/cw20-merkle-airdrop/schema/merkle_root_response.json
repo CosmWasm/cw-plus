@@ -8,6 +8,7 @@
   ],
   "properties": {
     "merkle_root": {
+      "description": "MerkleRoot is hex-encoded merkle root",
       "type": "string"
     },
     "stage": {

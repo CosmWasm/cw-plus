@@ -36,6 +36,7 @@
           ],
           "properties": {
             "merkle_root": {
+              "description": "MerkleRoot is hex-encoded merkle root",
               "type": "string"
             }
           }
@@ -61,6 +62,7 @@
               "$ref": "#/definitions/Uint128"
             },
             "proof": {
+              "description": "Proof is hex-encoded merkle proof",
               "type": "array",
               "items": {
                 "type": "string"

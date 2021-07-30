@@ -19,11 +19,13 @@ pub enum ExecuteMsg {
         new_owner: Option<String>,
     },
     RegisterMerkleRoot {
+        /// MerkleRoot is hex-encoded merkle root
         merkle_root: String,
     },
     Claim {
         stage: u8,
         amount: Uint128,
+        /// Proof is hex-encoded merkle proof
         proof: Vec<String>,
     },
 }
@@ -48,6 +50,7 @@ pub struct ConfigResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct MerkleRootResponse {
     pub stage: u8,
+    /// MerkleRoot is hex-encoded merkle root
     pub merkle_root: String,
 }
 
