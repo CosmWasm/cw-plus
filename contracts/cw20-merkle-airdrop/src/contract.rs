@@ -90,8 +90,7 @@ pub fn execute_update_config(
         Ok(exists)
     })?;
 
-    let res = Response::new().add_attribute("action", "update_config");
-    Ok(res)
+    Ok(Response::new().add_attribute("action", "update_config"))
 }
 
 pub fn execute_register_merkle_root(
@@ -117,12 +116,11 @@ pub fn execute_register_merkle_root(
     MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
     LATEST_STAGE.save(deps.storage, &stage)?;
 
-    let res = Response::new().add_attributes(vec![
+    Ok(Response::new().add_attributes(vec![
         attr("action", "register_merkle_root"),
         attr("stage", stage.to_string()),
         attr("merkle_root", merkle_root),
-    ]);
-    Ok(res)
+    ]))
 }
 
 pub fn execute_claim(
