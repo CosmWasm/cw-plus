@@ -302,11 +302,8 @@ mod tests {
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::UpdateConfig { new_owner: None };
 
-        let res = execute(deps.as_mut(), env, info, msg);
-        match res {
-            Err(ContractError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+        let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(res, ContractError::Unauthorized {});
     }
 
     #[test]
@@ -436,11 +433,8 @@ mod tests {
         );
          */
         // check claimed
-        let res = execute(deps.as_mut(), env, info, msg);
-        match res {
-            Err(ContractError::Claimed {}) => {}
-            _ => panic!("DO NOT ENTER HERE"),
-        }
+        let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(res, ContractError::Claimed {});
 
         // register new drop
         let env = mock_env();
@@ -535,10 +529,8 @@ mod tests {
             merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
                 .to_string(),
         };
-        match execute(deps.as_mut(), env, info, msg) {
-            Err(ContractError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+        let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(res, ContractError::Unauthorized {});
 
         // cannot update config
         let env = mock_env();
@@ -547,9 +539,7 @@ mod tests {
             merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
                 .to_string(),
         };
-        match execute(deps.as_mut(), env, info, msg) {
-            Err(ContractError::Unauthorized { .. }) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+        let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(res, ContractError::Unauthorized {});
     }
 }
