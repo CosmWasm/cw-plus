@@ -1,5 +1,6 @@
 CW20-Merkle-Airdrop: A reference implementation for merkle airdrop on CosmWasm
-Copyright (C) 2020 Confio OÜ
+Copyright (C) 2021 Confio OÜ
+Copyright (C) 2021 Terraform Labs, PTE.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
