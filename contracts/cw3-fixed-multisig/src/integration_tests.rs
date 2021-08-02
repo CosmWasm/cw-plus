@@ -12,10 +12,10 @@ use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
 
 fn mock_app() -> App {
     let env = mock_env();
-    let api = Box::new(MockApi::default());
+    let api = MockApi::default();
     let bank = BankKeeper::new();
 
-    App::new(api, env.block, bank, Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, MockStorage::new())
 }
 
 pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract<Empty>> {

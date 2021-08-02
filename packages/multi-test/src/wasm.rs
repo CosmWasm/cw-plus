@@ -47,6 +47,7 @@ where
     /// Handles all WasmQuery requests
     fn query(
         &self,
+        api: &dyn Api,
         storage: &dyn Storage,
         querier: &dyn Querier,
         block: &BlockInfo,
@@ -56,6 +57,7 @@ where
     /// Handles all WasmMsg messages
     fn execute(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
@@ -72,6 +74,7 @@ where
     /// Admin interface, cannot be called via CosmosMsg
     fn sudo(
         &self,
+        api: &dyn Api,
         contract_addr: Addr,
         storage: &mut dyn Storage,
         router: &Router<C>,
@@ -80,24 +83,27 @@ where
     ) -> Result<AppResponse, String>;
 }
 
-pub struct WasmKeeper<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+pub struct WasmKeeper<C> {
     /// code is in-memory lookup that stands in for wasm code
     /// this can only be edited on the WasmRouter, and just read in caches
     codes: HashMap<usize, Box<dyn Contract<C>>>,
+}
 
-    // WasmConst
-    api: Box<dyn Api>,
+impl<C> Default for WasmKeeper<C> {
+    fn default() -> Self {
+        Self {
+            codes: HashMap::default(),
+        }
+    }
 }
 
 impl<C> Wasm<C> for WasmKeeper<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     fn query(
         &self,
+        api: &dyn Api,
         storage: &dyn Storage,
         querier: &dyn Querier,
         block: &BlockInfo,
@@ -105,15 +111,13 @@ where
     ) -> Result<Binary, String> {
         match request {
             WasmQuery::Smart { contract_addr, msg } => {
-                let addr = self
-                    .api
+                let addr = api
                     .addr_validate(&contract_addr)
                     .map_err(|e| e.to_string())?;
-                self.query_smart(addr, storage, querier, block, msg.into())
+                self.query_smart(addr, api, storage, querier, block, msg.into())
             }
             WasmQuery::Raw { contract_addr, key } => {
-                let addr = self
-                    .api
+                let addr = api
                     .addr_validate(&contract_addr)
                     .map_err(|e| e.to_string())?;
                 Ok(self.query_raw(addr, storage, &key))
@@ -124,14 +128,15 @@ where
 
     fn execute(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
     ) -> Result<AppResponse, String> {
-        let (resender, res) = self.execute_wasm(storage, router, block, sender, msg)?;
-        self.process_response(router, storage, block, resender, res, false)
+        let (resender, res) = self.execute_wasm(api, storage, router, block, sender, msg)?;
+        self.process_response(api, router, storage, block, resender, res, false)
     }
 
     fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
@@ -146,39 +151,43 @@ where
 
     fn sudo(
         &self,
+        api: &dyn Api,
         contract_addr: Addr,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<AppResponse, String> {
-        let res = self.call_sudo(contract_addr.clone(), storage, router, block, msg)?;
-        self.process_response(router, storage, block, contract_addr, res, false)
+        let res = self.call_sudo(contract_addr.clone(), api, storage, router, block, msg)?;
+        self.process_response(api, router, storage, block, contract_addr, res, false)
     }
 }
 
 impl<C> WasmKeeper<C>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new(api: Box<dyn Api>) -> Self {
-        WasmKeeper {
-            codes: HashMap::new(),
-            api,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn query_smart(
         &self,
         address: Addr,
+        api: &dyn Api,
         storage: &dyn Storage,
         querier: &dyn Querier,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Binary, String> {
-        self.with_storage_readonly(storage, querier, block, address, |handler, deps, env| {
-            handler.query(deps, env, msg)
-        })
+        self.with_storage_readonly(
+            api,
+            storage,
+            querier,
+            block,
+            address,
+            |handler, deps, env| handler.query(deps, env, msg),
+        )
     }
 
     pub fn query_raw(&self, address: Addr, storage: &dyn Storage, key: &[u8]) -> Binary {
@@ -189,6 +198,7 @@ where
 
     fn send<T: Into<Addr>>(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
@@ -201,7 +211,7 @@ where
                 to_address: recipient,
                 amount: amount.to_vec(),
             };
-            let res = router.execute(storage, block, sender.into(), msg.into())?;
+            let res = router.execute(api, storage, block, sender.into(), msg.into())?;
             Ok(res)
         } else {
             Ok(AppResponse::default())
@@ -211,6 +221,7 @@ where
     // this returns the contract address as well, so we can properly resend the data
     fn execute_wasm(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
@@ -223,12 +234,12 @@ where
                 msg,
                 funds,
             } => {
-                let contract_addr = self
-                    .api
+                let contract_addr = api
                     .addr_validate(&contract_addr)
                     .map_err(|e| e.to_string())?;
                 // first move the cash
                 self.send(
+                    api,
                     storage,
                     router,
                     block,
@@ -240,6 +251,7 @@ where
                 // then call the contract
                 let info = MessageInfo { sender, funds };
                 let res = self.call_execute(
+                    api,
                     storage,
                     contract_addr.clone(),
                     router,
@@ -266,6 +278,7 @@ where
                 )?;
                 // move the cash
                 self.send(
+                    api,
                     storage,
                     router,
                     block,
@@ -278,6 +291,7 @@ where
                 let info = MessageInfo { sender, funds };
                 let mut res = self.call_instantiate(
                     contract_addr.clone(),
+                    api,
                     storage,
                     router,
                     block,
@@ -292,8 +306,7 @@ where
                 new_code_id,
                 msg,
             } => {
-                let contract_addr = self
-                    .api
+                let contract_addr = api
                     .addr_validate(&contract_addr)
                     .map_err(|e| e.to_string())?;
 
@@ -313,8 +326,14 @@ where
                 self.save_contract(storage, &contract_addr, &data)?;
 
                 // then call migrate
-                let res =
-                    self.call_migrate(contract_addr.clone(), storage, router, block, msg.to_vec())?;
+                let res = self.call_migrate(
+                    contract_addr.clone(),
+                    api,
+                    storage,
+                    router,
+                    block,
+                    msg.to_vec(),
+                )?;
                 Ok((contract_addr, res))
             }
             m => panic!("Unsupported wasm message: {:?}", m),
@@ -329,6 +348,7 @@ where
     /// This is designed to be handled internally as part of larger process flows.
     fn execute_submsg(
         &self,
+        api: &dyn Api,
         router: &Router<C>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
@@ -341,7 +361,7 @@ where
 
         // execute in cache
         let res = transactional(storage, |write_cache, _| {
-            router.execute(write_cache, block, contract.clone(), msg)
+            router.execute(api, write_cache, block, contract.clone(), msg)
         });
 
         // call reply if meaningful
@@ -356,7 +376,7 @@ where
                     }),
                 };
                 // do reply and combine it with the original response
-                let res2 = self._reply(router, storage, block, contract, reply)?;
+                let res2 = self._reply(api, router, storage, block, contract, reply)?;
                 // override data if set
                 if let Some(data) = res2.data {
                     orig.data = Some(data);
@@ -373,7 +393,7 @@ where
                     id,
                     result: ContractResult::Err(e),
                 };
-                self._reply(router, storage, block, contract, reply)
+                self._reply(api, router, storage, block, contract, reply)
             } else {
                 Err(e)
             }
@@ -384,19 +404,21 @@ where
 
     fn _reply(
         &self,
+        api: &dyn Api,
         router: &Router<C>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
         reply: Reply,
     ) -> Result<AppResponse, String> {
-        let res = self.call_reply(contract.clone(), storage, router, block, reply)?;
+        let res = self.call_reply(contract.clone(), api, storage, router, block, reply)?;
         // TODO: process result better, combine events / data from parent
-        self.process_response(router, storage, block, contract, res, true)
+        self.process_response(api, router, storage, block, contract, res, true)
     }
 
     fn process_response(
         &self,
+        api: &dyn Api,
         router: &Router<C>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
@@ -426,7 +448,8 @@ where
 
         // recurse in all messages
         for resend in response.messages {
-            let subres = self.execute_submsg(router, storage, block, contract.clone(), resend)?;
+            let subres =
+                self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
             events.extend_from_slice(&subres.events);
         }
         Ok(AppResponse {
@@ -466,6 +489,7 @@ where
 
     pub fn call_execute(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         address: Addr,
         router: &Router<C>,
@@ -473,62 +497,91 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, router, block, address, |contract, deps, env| {
-            contract.execute(deps, env, info, msg)
-        })
+        self.with_storage(
+            api,
+            storage,
+            router,
+            block,
+            address,
+            |contract, deps, env| contract.execute(deps, env, info, msg),
+        )
     }
 
     pub fn call_instantiate(
         &self,
         address: Addr,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, router, block, address, |contract, deps, env| {
-            contract.instantiate(deps, env, info, msg)
-        })
+        self.with_storage(
+            api,
+            storage,
+            router,
+            block,
+            address,
+            |contract, deps, env| contract.instantiate(deps, env, info, msg),
+        )
     }
 
     pub fn call_reply(
         &self,
         address: Addr,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         reply: Reply,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, router, block, address, |contract, deps, env| {
-            contract.reply(deps, env, reply)
-        })
+        self.with_storage(
+            api,
+            storage,
+            router,
+            block,
+            address,
+            |contract, deps, env| contract.reply(deps, env, reply),
+        )
     }
 
     pub fn call_sudo(
         &self,
         address: Addr,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, router, block, address, |contract, deps, env| {
-            contract.sudo(deps, env, msg)
-        })
+        self.with_storage(
+            api,
+            storage,
+            router,
+            block,
+            address,
+            |contract, deps, env| contract.sudo(deps, env, msg),
+        )
     }
 
     pub fn call_migrate(
         &self,
         address: Addr,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(storage, router, block, address, |contract, deps, env| {
-            contract.migrate(deps, env, msg)
-        })
+        self.with_storage(
+            api,
+            storage,
+            router,
+            block,
+            address,
+            |contract, deps, env| contract.migrate(deps, env, msg),
+        )
     }
 
     fn get_env<T: Into<Addr>>(&self, address: T, block: &BlockInfo) -> Env {
@@ -542,6 +595,7 @@ where
 
     fn with_storage_readonly<F, T>(
         &self,
+        api: &dyn Api,
         storage: &dyn Storage,
         querier: &dyn Querier,
         block: &BlockInfo,
@@ -561,7 +615,7 @@ where
 
         let deps = Deps {
             storage: storage.as_ref(),
-            api: self.api.deref(),
+            api: api.deref(),
             querier: QuerierWrapper::new(querier),
         };
         action(handler, deps, env)
@@ -569,6 +623,7 @@ where
 
     fn with_storage<F, T>(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
@@ -590,12 +645,12 @@ where
         // and this is the only way I know how to do so.
         transactional(storage, |write_cache, read_store| {
             let mut contract_storage = self.contract_storage(write_cache, &address);
-            let querier = RouterQuerier::new(router, read_store, block);
+            let querier = RouterQuerier::new(router, api, read_store, block);
             let env = self.get_env(address, block);
 
             let deps = DepsMut {
                 storage: contract_storage.as_mut(),
-                api: self.api.deref(),
+                api: api.deref(),
                 querier: QuerierWrapper::new(&querier),
             };
             action(handler, deps, env)
@@ -715,17 +770,16 @@ mod test {
     use super::*;
 
     fn mock_keeper() -> WasmKeeper<Empty> {
-        let api = Box::new(MockApi::default());
-        WasmKeeper::new(api)
+        WasmKeeper::new()
     }
 
     fn mock_router() -> Router<Empty> {
-        let api = Box::new(MockApi::default());
-        Router::new(api, BankKeeper {})
+        Router::new(BankKeeper {})
     }
 
     #[test]
     fn register_contract() {
+        let api = MockApi::default();
         let mut wasm_storage = MockStorage::new();
         let mut keeper = mock_keeper();
         let block = mock_env().block;
@@ -776,6 +830,7 @@ mod test {
             let info = mock_info("foobar", &[]);
             keeper.call_instantiate(
                 contract_addr.clone(),
+                &api,
                 cache,
                 &mock_router(),
                 &block,
@@ -793,6 +848,7 @@ mod test {
             let info = mock_info("foobar", &[]);
             keeper.call_instantiate(
                 Addr::unchecked("unregistered"),
+                &api,
                 cache,
                 &mock_router(),
                 &block,
@@ -808,6 +864,7 @@ mod test {
 
     #[test]
     fn contract_send_coins() {
+        let api = MockApi::default();
         let mut keeper = mock_keeper();
         let block = mock_env().block;
         let code_id = keeper.store_code(payout::contract());
@@ -837,6 +894,7 @@ mod test {
         let res = keeper
             .call_instantiate(
                 contract_addr.clone(),
+                &api,
                 &mut cache,
                 &mock_router(),
                 &block,
@@ -850,6 +908,7 @@ mod test {
         let info = mock_info("foobar", &[]);
         let res = keeper
             .call_execute(
+                &api,
                 &mut cache,
                 contract_addr.clone(),
                 &mock_router(),
@@ -874,7 +933,7 @@ mod test {
         let query = to_vec(&payout::QueryMsg::Payout {}).unwrap();
         let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
         let data = keeper
-            .query_smart(contract_addr, &wasm_storage, &querier, &block, query)
+            .query_smart(contract_addr, &api, &wasm_storage, &querier, &block, query)
             .unwrap();
         let res: payout::InstantiateMessage = from_slice(&data).unwrap();
         assert_eq!(res.payout, payout);
@@ -886,9 +945,11 @@ mod test {
         contract_addr: &Addr,
         payout: &Coin,
     ) {
+        let api = MockApi::default();
         let info = mock_info("silly", &[]);
         let res = router
             .call_execute(
+                &api,
                 storage,
                 contract_addr.clone(),
                 &mock_router(),
@@ -914,6 +975,7 @@ mod test {
 
     #[test]
     fn multi_level_wasm_cache() {
+        let api = MockApi::default();
         let mut keeper = mock_keeper();
         let block = mock_env().block;
         let code_id = keeper.store_code(payout::contract());
@@ -942,6 +1004,7 @@ mod test {
             keeper
                 .call_instantiate(
                     contract.clone(),
+                    &api,
                     cache,
                     &mock_router(),
                     &block,
@@ -980,6 +1043,7 @@ mod test {
             let _res = keeper
                 .call_instantiate(
                     contract2.clone(),
+                    &api,
                     cache,
                     &mock_router(),
                     &block,
@@ -1013,6 +1077,7 @@ mod test {
                 let _res = keeper
                     .call_instantiate(
                         contract3.clone(),
+                        &api,
                         cache2,
                         &mock_router(),
                         &block,
