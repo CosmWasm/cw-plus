@@ -242,6 +242,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_binary, CosmosMsg, SubMsg};
+    use serde::{Deserialize};
 
     #[test]
     fn proper_instantiation() {
@@ -359,9 +360,33 @@ mod tests {
         );
     }
 
+    const TEST_DATA_1: &str = "./testdata/airdrop_stage_1_test_data.json";
+    const TEST_DATA_2: &str = "./testdata/airdrop_stage_2_test_data.json";
+
+    #[derive(Deserialize, Debug)]
+    struct Encoded {
+        account: String,
+        amount: Uint128,
+        root: String,
+        proofs: Vec<String>,
+    }
+
+    fn read_test_data(path: &str) -> Encoded {
+        use std::fs::File;
+        use std::io::BufReader;
+
+        // Open the file in read-only mode with buffer.
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+
+        serde_json::from_reader(reader).unwrap()
+    }
+
     #[test]
     fn claim() {
+        // Run test 1
         let mut deps = mock_dependencies(&[]);
+        let test_data = read_test_data(TEST_DATA_1);
 
         let msg = InstantiateMsg {
             owner: Some("owner0000".to_string()),
@@ -375,30 +400,25 @@ mod tests {
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::RegisterMerkleRoot {
-            merkle_root: "5d4f48f147cb6cb742b376dce5626b2a036f69faec10cd73631c791780e150fc"
-                .to_string(),
+            merkle_root: test_data.root
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         let msg = ExecuteMsg::Claim {
-            amount: Uint128::from(10220u128),
+            amount: Uint128::from(test_data.amount),
             stage: 1u8,
-            proof: vec![
-                "561b09601236f43b0065d1ea601df754989911ed6da16ba8afed62c458f86352".to_string(),
-                "280777995d054081cbf208bccb70f8d736c1766b81d90a1fd21cd97d2d83a5cc".to_string(),
-                "3946ea1758a5a2bf55bae1186168ad35aa0329805bc8bff1ca3d51345faec04a".to_string(),
-            ],
+            proof: test_data.proofs
         };
 
         let env = mock_env();
-        let info = mock_info("wasm1qzy8rg0f406uvvl54dlww6ptlh30303xq2u3xu", &[]);
+        let info = mock_info(test_data.account.as_str(), &[]);
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone()).unwrap();
         let expected = SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "token0000".to_string(),
             funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: "wasm1qzy8rg0f406uvvl54dlww6ptlh30303xq2u3xu".into(),
-                amount: Uint128::from(10220u128),
+                recipient: test_data.account.clone(),
+                amount: test_data.amount.into(),
             })
             .unwrap(),
         }));
@@ -409,13 +429,11 @@ mod tests {
             vec![
                 attr("action", "claim"),
                 attr("stage", "1"),
-                attr("address", "wasm1qzy8rg0f406uvvl54dlww6ptlh30303xq2u3xu"),
-                attr("amount", "10220")
+                attr("address", test_data.account.clone()),
+                attr("amount", test_data.amount)
             ]
         );
 
-        /*
-        TODO: enable after 0.16 release https://github.com/CosmWasm/cosmwasm/pull/989/files
         assert!(
             from_binary::<IsClaimedResponse>(
                 &query(
@@ -423,7 +441,7 @@ mod tests {
                     env.clone(),
                     QueryMsg::IsClaimed {
                         stage: 1,
-                        address: "wasm1qzy8rg0f406uvvl54dlww6ptlh30303xq2u3xu".to_string(),
+                        address: test_data.account
                     }
                 )
                 .unwrap()
@@ -431,7 +449,10 @@ mod tests {
             .unwrap()
             .is_claimed
         );
-         */
+
+        // Second test
+
+        let test_data = read_test_data(TEST_DATA_2);
         // check claimed
         let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(res, ContractError::Claimed {});
@@ -440,32 +461,26 @@ mod tests {
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::RegisterMerkleRoot {
-            merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
-                .to_string(),
+            merkle_root: test_data.root
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         // Claim next airdrop
         let msg = ExecuteMsg::Claim {
-            amount: Uint128::from(1000000000u128),
+            amount: test_data.amount,
             stage: 2u8,
-            proof: vec![
-                "60493754478e7886afa7fad8f059067244853c4170452d86876ab743059ea6c1".to_string(),
-                "29c9253bb0baf21e54e4b2552703554f5c0d67288621549148a9e1e90aaf3bf8".to_string(),
-                "807a97e1ac2196309938e8c12940f8c259172eb7687dbb5e04e7b88c45e5a5a6".to_string(),
-                "c339fc3f7995f019f5b4b515875e17c00d7146e998b371804cfdfd98f1ae86ea".to_string(),
-            ],
+            proof: test_data.proofs
         };
 
         let env = mock_env();
-        let info = mock_info("wasm1ylna88nach9sn5n7qe7u5l6lh7dmt6lp2y63xx", &[]);
+        let info = mock_info(test_data.account.as_str(), &[]);
         let res = execute(deps.as_mut(), env, info, msg).unwrap();
         let expected: SubMsg<_> = SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: "token0000".to_string(),
             funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: "wasm1ylna88nach9sn5n7qe7u5l6lh7dmt6lp2y63xx".into(),
-                amount: Uint128::new(1000000000u128),
+                recipient: test_data.account.clone(),
+                amount: test_data.amount,
             })
             .unwrap(),
         }));
@@ -476,8 +491,8 @@ mod tests {
             vec![
                 attr("action", "claim"),
                 attr("stage", "2"),
-                attr("address", "wasm1ylna88nach9sn5n7qe7u5l6lh7dmt6lp2y63xx"),
-                attr("amount", "1000000000")
+                attr("address", test_data.account),
+                attr("amount", test_data.amount)
             ]
         );
     }

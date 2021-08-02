@@ -1,0 +1,10 @@
+{
+  "account": "wasm1k9hwzxs889jpvd7env8z49gad3a3633vg350tq",
+  "amount": "100",
+  "root": "b45c1ea28b26adb13e412933c9e055b01fdf7585304b00cd8f1cb220aa6c5e88",
+  "proofs": [
+    "a714186eaedddde26b08b9afda38cf62fdf88d68e3aa0d5a4b55033487fe14a1",
+    "fb57090a813128eeb953a4210dd64ee73d2632b8158231effe2f0a18b2d3b5dd",
+    "c30992d264c74c58b636a31098c6c27a5fc08b3f61b7eafe2a33dcb445822343"
+  ]
+}
