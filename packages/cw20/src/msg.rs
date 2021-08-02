@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::marketing::Logo;
+use crate::logo::Logo;
 use cosmwasm_std::{Binary, Uint128};
 use cw0::Expiration;
 
