@@ -447,15 +447,17 @@ where
         }
 
         // recurse in all messages
-        for resend in response.messages {
-            let subres =
-                self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
-            events.extend_from_slice(&subres.events);
-        }
-        Ok(AppResponse {
-            events,
-            data: response.data,
-        })
+        let data = response
+            .messages
+            .into_iter()
+            .try_fold(response.data, |data, resend| {
+                let subres =
+                    self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
+                events.extend_from_slice(&subres.events);
+                Ok::<_, String>(subres.data.or(data))
+            })?;
+
+        Ok(AppResponse { events, data })
     }
 
     /// This just creates an address and empty storage instance, returning the new address
