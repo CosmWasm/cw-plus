@@ -144,6 +144,36 @@ the minter is a smart contract.
 This should be enabled with all blockchains that have iterator support.
 It allows us to get lists of results with pagination.
 
+## Marketing
+
+This allows us to attach more metadata on the token to help with displaying the token in
+wallets. When you see a token's website, then see it in a wallet, you know what it is.
+However, if you see it in a wallet or a DEX trading pair, there is no clear way to find out
+any more info about it.
+
+This extension allows us to attach more "Marketing" metadata, which has no effect on the
+on-chain functionality of the token, but is very useful in providing a better client-side
+experience. Note, that we add a new role `marketing`, which can update such info, but not
+affect on-chain logic.
+
+### Messages
+
+`Mint{recipient, amount}` - If the `env.sender` is the allowed minter,
+this will create `amount` new tokens (updating total supply) and
+add them to the balance of `recipient`, as long as it does not exceed the cap.
+
+### Queries
+
+`Minter{}` - Returns who and how much can be minted. Return type is
+`MinterResponse {minter, cap}`. Cap may be unset.
+
+If the cap is set, it defines the maximum `total_supply` that may ever exist.
+If initial supply is 1000 and cap is `Some(2000)`, you can only mint 1000 more tokens.
+However, if someone then burns 500 tokens, the minter can mint those 500 again.
+This allows for dynamic token supply within a set of parameters, especially when
+the minter is a smart contract.
+
+
 ### Queries
 
 `AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances

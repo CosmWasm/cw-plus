@@ -15,6 +15,7 @@ mod balance;
 mod coin;
 mod denom;
 mod helpers;
+mod marketing;
 mod msg;
 mod query;
 mod receiver;

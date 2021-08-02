@@ -1,8 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Uint128;
+use cosmwasm_std::{Binary, Uint128};
 
+use crate::marketing::LogoInfo;
 use cw0::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -22,6 +23,16 @@ pub enum Cw20QueryMsg {
     /// Returns who can mint and the hard cap on maximum tokens after minting.
     /// Return type: MinterResponse.
     Minter {},
+    /// Only with "marketing" extension
+    /// Returns more metadata on the contract to display in the client:
+    /// - description, logo, project url, etc.
+    /// Return type: MarketingInfoResponse.
+    MarketingInfo {},
+    /// Only with "marketing" extension
+    /// Downloads the embedded logo data (if stored on chain). Errors if no logo data stored for
+    /// this contract.
+    /// Return type: DownloadLogoResponse.
+    DownloadLogo {},
     /// Only with "enumerable" extension (and "allowances")
     /// Returns all allowances this owner has approved. Supports pagination.
     /// Return type: AllAllowancesResponse.
@@ -65,6 +76,27 @@ pub struct MinterResponse {
     /// Note that this refers to total_supply.
     /// If None, there is unlimited cap.
     pub cap: Option<Uint128>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct MarketingInfoResponse {
+    /// A URL pointing to the project behind this token.
+    /// PLEASE REVIEW: is this dangerous from a security point of view?
+    pub project: Option<String>,
+    /// A longer description of the token and it's utility. Designed for tooltips or such
+    pub description: Option<String>,
+    /// A link to the logo, or a comment there is an on-chain logo stored
+    pub logo: Option<LogoInfo>,
+    /// The address (if any) who can update this data structure
+    pub marketing: Option<String>,
+}
+
+/// When we download an embedded logo, we get this response type.
+/// We expect a SPA to be able to accept this info and display it.
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct DownloadLogoResponse {
+    pub mime_type: String,
+    pub data: Binary,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
