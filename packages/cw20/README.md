@@ -158,21 +158,21 @@ affect on-chain logic.
 
 ### Messages
 
-`Mint{recipient, amount}` - If the `env.sender` is the allowed minter,
-this will create `amount` new tokens (updating total supply) and
-add them to the balance of `recipient`, as long as it does not exceed the cap.
+`UploadLogo{url | embedded}` - If the `env.sender` is the allowed marketing account,
+this will either set a new URL reference where the logo is served, or allow them to upload
+a small (less than 5KB) SVG or PNG logo onto the blockchain to be served.
+
+`UpdateMarketing{project, description, marketing}` - If the `env.sender` is the allowed marketing
+account, this will update some marketing-related metadata on the contract.
 
 ### Queries
 
-`Minter{}` - Returns who and how much can be minted. Return type is
-`MinterResponse {minter, cap}`. Cap may be unset.
+`MarketingInfo{}` - Returns marketing-related metadata. Return type is
+`MarketingInfoResponse {project, description, logo, marketing}`.
 
-If the cap is set, it defines the maximum `total_supply` that may ever exist.
-If initial supply is 1000 and cap is `Some(2000)`, you can only mint 1000 more tokens.
-However, if someone then burns 500 tokens, the minter can mint those 500 again.
-This allows for dynamic token supply within a set of parameters, especially when
-the minter is a smart contract.
-
+`DownloadLogo{}` - If the token's logo was previously uploaded to the blockchain
+(see `UploadLogo` message), then it returns the raw data to be displayed in a browser.
+Return type is `DownloadLogoResponse{ mime_type, data }`.
 
 ### Queries
 
