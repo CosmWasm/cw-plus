@@ -11,10 +11,11 @@
     "@oclif/command": "^1",
     "@oclif/config": "^1",
     "@oclif/plugin-help": "^3",
+    "@types/crypto-js": "^4.0.2",
     "ethereumjs-util": "^7.1.0",
-    "tslib": "^1",
     "keccak256": "^1.0.3",
-    "merkletreejs": "^0.2.23"
+    "merkletreejs": "^0.2.23",
+    "tslib": "^1"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1",
