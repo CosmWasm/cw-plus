@@ -321,10 +321,10 @@
           "description": "Store the Logo as an SVG file. The content must conform to the spec at https://en.wikipedia.org/wiki/Scalable_Vector_Graphics (The contract should do some light-weight sanity-check validation)",
           "type": "object",
           "required": [
-            "s_v_g"
+            "svg"
           ],
           "properties": {
-            "s_v_g": {
+            "svg": {
               "$ref": "#/definitions/Binary"
             }
           },
@@ -334,10 +334,10 @@
           "description": "Store the Logo as a PNG file. This will likely only support up to 64x64 or so within the 5KB limit.",
           "type": "object",
           "required": [
-            "p_n_g"
+            "png"
           ],
           "properties": {
-            "p_n_g": {
+            "png": {
               "$ref": "#/definitions/Binary"
             }
           },
@@ -398,10 +398,10 @@
           "description": "A reference to an externally hosted logo. Must be a valid HTTP or HTTPS URL. PLEASE REVIEW: is this dangerous from a security point of view?",
           "type": "object",
           "required": [
-            "u_r_l"
+            "url"
           ],
           "properties": {
-            "u_r_l": {
+            "url": {
               "type": "string"
             }
           },

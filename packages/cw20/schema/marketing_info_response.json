@@ -50,10 +50,10 @@
           "description": "A reference to an externally hosted logo. Must be a valid HTTP or HTTPS URL.",
           "type": "object",
           "required": [
-            "u_r_l"
+            "url"
           ],
           "properties": {
-            "u_r_l": {
+            "url": {
               "type": "string"
             }
           },
