@@ -28,7 +28,7 @@ schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
 hex = "0.4"
-sha3 = { version = "0.9.1", default-features = false }
+sha2 = { version = "0.9.5", default-features = false }
 
 [dev-dependencies]
 cosmwasm-schema = "0.16.0-rc5"

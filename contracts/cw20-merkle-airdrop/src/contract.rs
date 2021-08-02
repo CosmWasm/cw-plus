@@ -7,7 +7,6 @@ use cosmwasm_std::{
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ExecuteMsg;
 use cw_storage_plus::U8Key;
-use sha3::Digest;
 use std::convert::TryInto;
 
 use crate::error::ContractError;
@@ -16,6 +15,7 @@ use crate::msg::{
     MerkleRootResponse, MigrateMsg, QueryMsg,
 };
 use crate::state::{Config, CLAIM, CONFIG, LATEST_STAGE, MERKLE_ROOT};
+use sha2::Digest;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
@@ -141,7 +141,7 @@ pub fn execute_claim(
     let merkle_root = MERKLE_ROOT.load(deps.storage, stage.into())?;
 
     let user_input = format!("{}{}", info.sender, amount);
-    let hash = sha3::Keccak256::digest(user_input.as_bytes())
+    let hash = sha2::Sha256::digest(user_input.as_bytes())
         .as_slice()
         .try_into()
         .map_err(|_| ContractError::WrongLength {})?;
@@ -151,7 +151,7 @@ pub fn execute_claim(
         hex::decode_to_slice(p, &mut proof_buf)?;
         let mut hashes = [hash, proof_buf];
         hashes.sort_unstable();
-        sha3::Keccak256::digest(&hashes.concat())
+        sha2::Sha256::digest(&hashes.concat())
             .as_slice()
             .try_into()
             .map_err(|_| ContractError::WrongLength {})
