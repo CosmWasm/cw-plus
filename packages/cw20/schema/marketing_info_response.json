@@ -29,7 +29,7 @@
       ]
     },
     "project": {
-      "description": "A URL pointing to the project behind this token. PLEASE REVIEW: is this dangerous from a security point of view?",
+      "description": "A URL pointing to the project behind this token.",
       "type": [
         "string",
         "null"

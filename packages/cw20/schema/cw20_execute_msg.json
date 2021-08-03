@@ -284,7 +284,7 @@
               ]
             },
             "project": {
-              "description": "A URL pointing to the project behind this token. PLEASE REVIEW: is this dangerous from a security point of view?",
+              "description": "A URL pointing to the project behind this token.",
               "type": [
                 "string",
                 "null"
@@ -395,7 +395,7 @@
       "description": "This is used for uploading logo data, or setting it in InstantiateData",
       "anyOf": [
         {
-          "description": "A reference to an externally hosted logo. Must be a valid HTTP or HTTPS URL. PLEASE REVIEW: is this dangerous from a security point of view?",
+          "description": "A reference to an externally hosted logo. Must be a valid HTTP or HTTPS URL.",
           "type": "object",
           "required": [
             "url"

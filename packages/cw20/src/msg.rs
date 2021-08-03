@@ -60,7 +60,6 @@ pub enum Cw20ExecuteMsg {
     /// Setting Some("") will clear this field on the contract storage
     UpdateMarketing {
         /// A URL pointing to the project behind this token.
-        /// PLEASE REVIEW: is this dangerous from a security point of view?
         project: Option<String>,
         /// A longer description of the token and it's utility. Designed for tooltips or such
         description: Option<String>,

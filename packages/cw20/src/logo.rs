@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum Logo {
     /// A reference to an externally hosted logo. Must be a valid HTTP or HTTPS URL.
-    /// PLEASE REVIEW: is this dangerous from a security point of view?
     Url(String),
     /// Logo content stored on the blockchain. Enforce maximum size of 5KB on all variants
     Embedded(EmbeddedLogo),
