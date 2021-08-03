@@ -1,9 +1,11 @@
 //! Very simple echoing contract which just returns incomming string if any, but performming subcall of
-//! given message to test response
+//! given message to test response.
+//!
+//! Additionally it bypass all events and attributes send to it
 
 use cosmwasm_std::{
-    to_binary, Binary, ContractResult, Deps, DepsMut, Empty, Env, MessageInfo, Reply, Response,
-    StdError, SubMsg, SubMsgExecutionResponse,
+    to_binary, Attribute, Binary, ContractResult, Deps, DepsMut, Empty, Env, Event, MessageInfo,
+    Reply, Response, StdError, SubMsg, SubMsgExecutionResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +15,8 @@ use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 pub struct Message {
     pub data: Option<String>,
     pub sub_msg: Vec<SubMsg>,
+    pub attributes: Vec<Attribute>,
+    pub events: Vec<Event>,
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -33,10 +37,15 @@ fn execute(
     msg: Message,
 ) -> Result<Response, StdError> {
     let mut resp = Response::new();
+
     if let Some(data) = msg.data {
         resp = resp.set_data(data.into_bytes());
     }
-    Ok(resp.add_submessages(msg.sub_msg))
+
+    Ok(resp
+        .add_submessages(msg.sub_msg)
+        .add_attributes(msg.attributes)
+        .add_events(msg.events))
 }
 
 fn query(_deps: Deps, _env: Env, msg: EmptyMsg) -> Result<Binary, StdError> {

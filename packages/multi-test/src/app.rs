@@ -281,7 +281,8 @@ where
 mod test {
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{
-        attr, coin, coins, AllBalanceResponse, BankMsg, BankQuery, Event, Reply, SubMsg, WasmMsg,
+        attr, coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event,
+        Reply, SubMsg, WasmMsg,
     };
 
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
@@ -925,10 +926,6 @@ mod test {
     }
 
     mod replay_data_overwrite {
-        use cosmwasm_std::to_binary;
-
-        use crate::test_helpers::EmptyMsg;
-
         use super::*;
 
         fn make_echo_submsg(
@@ -939,7 +936,12 @@ mod test {
             let data = data.into().map(|s| s.to_owned());
             SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract.into(),
-                msg: to_binary(&echo::Message { data, sub_msg }).unwrap(),
+                msg: to_binary(&echo::Message {
+                    data,
+                    sub_msg,
+                    ..echo::Message::default()
+                })
+                .unwrap(),
                 funds: vec![],
             }))
         }
@@ -961,7 +963,7 @@ mod test {
                     contract,
                     &echo::Message {
                         data: Some("Data".to_owned()),
-                        sub_msg: vec![],
+                        ..echo::Message::default()
                     },
                     &[],
                 )
@@ -988,6 +990,7 @@ mod test {
                     &echo::Message {
                         data: Some("First".to_owned()),
                         sub_msg: vec![make_echo_submsg(contract, "Second", vec![])],
+                        ..echo::Message::default()
                     },
                     &[],
                 )
@@ -1014,6 +1017,7 @@ mod test {
                     &echo::Message {
                         data: Some("First".to_owned()),
                         sub_msg: vec![make_echo_submsg(contract, None, vec![])],
+                        ..echo::Message::default()
                     },
                     &[],
                 )
@@ -1045,6 +1049,7 @@ mod test {
                             make_echo_submsg(contract.clone(), "Second", vec![]),
                             make_echo_submsg(contract, None, vec![]),
                         ],
+                        ..echo::Message::default()
                     },
                     &[],
                 )
@@ -1083,12 +1088,162 @@ mod test {
                                 )],
                             )],
                         )],
+                        ..echo::Message::default()
                     },
                     &[],
                 )
                 .unwrap();
 
             assert_eq!(response.data, Some("Second".as_bytes().into()));
+        }
+    }
+
+    mod response_validation {
+        use super::*;
+
+        #[test]
+        fn empty_attribute_key() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let err = app
+                .execute_contract(
+                    owner,
+                    contract,
+                    &echo::Message {
+                        data: None,
+                        attributes: vec![
+                            Attribute::new("   ", "value"),
+                            Attribute::new("proper", "proper_val"),
+                        ],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap_err();
+
+            assert_eq!(err, "Empty attribute key. Value: value");
+        }
+
+        #[test]
+        fn empty_attribute_value() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let err = app
+                .execute_contract(
+                    owner,
+                    contract,
+                    &echo::Message {
+                        data: None,
+                        attributes: vec![
+                            Attribute::new("key", "   "),
+                            Attribute::new("proper", "proper_val"),
+                        ],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap_err();
+
+            assert_eq!(err, "Empty attribute value. Key: key");
+        }
+
+        #[test]
+        fn empty_event_attribute_key() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let err = app
+                .execute_contract(
+                    owner,
+                    contract,
+                    &echo::Message {
+                        data: None,
+                        events: vec![Event::new("event")
+                            .add_attribute("   ", "value")
+                            .add_attribute("proper", "proper_val")],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap_err();
+
+            assert_eq!(err, "Empty attribute key. Value: value");
+        }
+
+        #[test]
+        fn empty_event_attribute_value() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let err = app
+                .execute_contract(
+                    owner,
+                    contract,
+                    &echo::Message {
+                        data: None,
+                        events: vec![Event::new("event")
+                            .add_attribute("key", "   ")
+                            .add_attribute("proper", "proper_val")],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap_err();
+
+            assert_eq!(err, "Empty attribute value. Key: key");
+        }
+
+        #[test]
+        fn too_short_event_type() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let err = app
+                .execute_contract(
+                    owner,
+                    contract,
+                    &echo::Message {
+                        data: None,
+                        events: vec![Event::new(" e "), Event::new("event")],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap_err();
+
+            assert_eq!(err, "Event type too short: e");
         }
     }
 }
