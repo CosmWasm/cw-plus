@@ -3,9 +3,9 @@ use std::fmt;
 use std::ops::Deref;
 
 use cosmwasm_std::{
-    Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult, Deps, DepsMut, Env,
-    Event, MessageInfo, Order, Querier, QuerierWrapper, Reply, ReplyOn, Response, Storage, SubMsg,
-    SubMsgExecutionResponse, WasmMsg, WasmQuery,
+    Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult, Deps,
+    DepsMut, Env, Event, MessageInfo, Order, Querier, QuerierWrapper, Reply, ReplyOn, Response,
+    Storage, SubMsg, SubMsgExecutionResponse, WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
@@ -268,6 +268,10 @@ where
                 funds,
                 label,
             } => {
+                if label.is_empty() {
+                    return Err("Label is required on all contracts".to_owned());
+                }
+
                 let contract_addr = self.register_contract(
                     storage,
                     code_id as usize,
@@ -276,6 +280,7 @@ where
                     label,
                     block.height,
                 )?;
+
                 // move the cash
                 self.send(
                     api,
@@ -412,7 +417,6 @@ where
         reply: Reply,
     ) -> Result<AppResponse, String> {
         let res = self.call_reply(contract.clone(), api, storage, router, block, reply)?;
-        // TODO: process result better, combine events / data from parent
         self.process_response(api, router, storage, block, contract, res, true)
     }
 
@@ -499,14 +503,14 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(
+        Self::verify_response(self.with_storage(
             api,
             storage,
             router,
             block,
             address,
             |contract, deps, env| contract.execute(deps, env, info, msg),
-        )
+        )?)
     }
 
     pub fn call_instantiate(
@@ -519,14 +523,14 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(
+        Self::verify_response(self.with_storage(
             api,
             storage,
             router,
             block,
             address,
             |contract, deps, env| contract.instantiate(deps, env, info, msg),
-        )
+        )?)
     }
 
     pub fn call_reply(
@@ -538,14 +542,14 @@ where
         block: &BlockInfo,
         reply: Reply,
     ) -> Result<Response<C>, String> {
-        self.with_storage(
+        Self::verify_response(self.with_storage(
             api,
             storage,
             router,
             block,
             address,
             |contract, deps, env| contract.reply(deps, env, reply),
-        )
+        )?)
     }
 
     pub fn call_sudo(
@@ -557,14 +561,14 @@ where
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(
+        Self::verify_response(self.with_storage(
             api,
             storage,
             router,
             block,
             address,
             |contract, deps, env| contract.sudo(deps, env, msg),
-        )
+        )?)
     }
 
     pub fn call_migrate(
@@ -576,14 +580,14 @@ where
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<Response<C>, String> {
-        self.with_storage(
+        Self::verify_response(self.with_storage(
             api,
             storage,
             router,
             block,
             address,
             |contract, deps, env| contract.migrate(deps, env, msg),
-        )
+        )?)
     }
 
     fn get_env<T: Into<Addr>>(&self, address: T, block: &BlockInfo) -> Env {
@@ -719,6 +723,47 @@ where
         let namespace = self.contract_namespace(address);
         let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
         Box::new(storage)
+    }
+
+    fn verify_attributes(attributes: &[Attribute]) -> Result<(), String> {
+        for attr in attributes {
+            let key = attr.key.trim();
+            let val = attr.value.trim();
+
+            if key.is_empty() {
+                return Err(format!("Empty attribute key. Value: {}", val));
+            }
+
+            if val.is_empty() {
+                return Err(format!("Empty attribute value. Key: {}", key));
+            }
+
+            if key.starts_with('_') {
+                return Err(format!(
+                    "Attribute key starts with reserved prefix _: {}",
+                    attr.key
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn verify_response<T>(response: Response<T>) -> Result<Response<T>, String>
+    where
+        T: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        Self::verify_attributes(&response.attributes)?;
+
+        for event in &response.events {
+            Self::verify_attributes(&event.attributes)?;
+            let ty = event.ty.trim();
+            if ty.len() < 2 {
+                return Err(format!("Event type too short: {}", ty));
+            }
+        }
+
+        Ok(response)
     }
 }
 
