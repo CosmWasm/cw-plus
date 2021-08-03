@@ -33,6 +33,7 @@
 | cw20-escrow             | [Release v0.7.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.7.0/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
 | cw20-ics20             | [Release v0.7.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.7.0/cw20_ics20.wasm)          | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)    |
 | cw20-staking            | [Release v0.7.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.7.0/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
+| cw20-merkle-airdrop     | [Release v0.7.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.7.0/cw20_merkle_airdrop.wasm)          | [![Docs](https://docs.rs/cw20-merkle-airdrop/badge.svg)](https://docs.rs/cw20-merkle-airdrop)    |
 | cw721-base              | [Release v0.7.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.7.0/cw721_base.wasm)          | [![Docs](https://docs.rs/cw721-base/badge.svg)](https://docs.rs/cw721-base)    |
 | cw1155-base              | [Release v0.7.0](https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.7.0/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
 
@@ -140,6 +141,9 @@ for prices.
 (arbiter can release or refund tokens) that is compatible with all native
 and cw20 tokens. This is a good example to show how to interact with
 cw20 tokens.
+
+* [`cw20-merkle-airdrop`](./contracts/cw20-merkle-airdrop) is a contract
+  for efficient cw20 token airdrop distribution.
 
 CW721 Non-fungible Tokens:
 

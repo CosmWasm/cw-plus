@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InstantiateMsg",
+  "type": "object",
+  "required": [
+    "cw20_token_address"
+  ],
+  "properties": {
+    "cw20_token_address": {
+      "type": "string"
+    },
+    "owner": {
+      "description": "Owner if none set to info.sender.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
