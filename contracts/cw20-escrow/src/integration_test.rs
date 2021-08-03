@@ -9,10 +9,10 @@ use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMs
 
 fn mock_app() -> App {
     let env = mock_env();
-    let api = Box::new(MockApi::default());
+    let api = MockApi::default();
     let bank = BankKeeper::new();
 
-    App::new(api, env.block, bank, Box::new(MockStorage::new()))
+    App::new(api, env.block, bank, MockStorage::new())
 }
 
 pub fn contract_escrow() -> Box<dyn Contract<Empty>> {

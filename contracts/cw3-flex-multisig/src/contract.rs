@@ -471,10 +471,10 @@ mod tests {
 
     fn mock_app() -> App {
         let env = mock_env();
-        let api = Box::new(MockApi::default());
+        let api = MockApi::default();
         let bank = BankKeeper::new();
 
-        App::new(api, env.block, bank, Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, MockStorage::new())
     }
 
     // uploads code and returns address of group contract

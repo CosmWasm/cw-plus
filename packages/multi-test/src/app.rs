@@ -30,7 +30,8 @@ pub struct App<C = Empty>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub router: Router<C>,
+    router: Router<C>,
+    api: Box<dyn Api>,
     storage: Box<dyn Storage>,
     block: BlockInfo,
 }
@@ -41,7 +42,7 @@ where
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
-            .querier(self.storage.as_ref(), &self.block)
+            .querier(&*self.api, &*self.storage, &self.block)
             .raw_query(bin_request)
     }
 }
@@ -62,14 +63,15 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
-        api: Box<dyn Api>,
+        api: impl Api + 'static,
         block: BlockInfo,
         bank: impl Bank + 'static,
-        storage: Box<dyn Storage>,
+        storage: impl Storage + 'static,
     ) -> Self {
         App {
-            router: Router::new(api, bank),
-            storage,
+            router: Router::new(bank),
+            api: Box::new(api),
+            storage: Box::new(storage),
             block,
         }
     }
@@ -106,10 +108,16 @@ where
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
 
-        let (block, router) = (&self.block, &self.router);
-        transactional(self.storage.as_mut(), |write_cache, _| {
+        let Self {
+            block,
+            router,
+            api,
+            storage,
+        } = self;
+
+        transactional(&mut **storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| router.execute(write_cache, block, sender.clone(), msg))
+                .map(|msg| router.execute(&**api, write_cache, block, sender.clone(), msg))
                 .collect()
         })
     }
@@ -118,7 +126,7 @@ where
     pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
         self.router
             .bank
-            .init_balance(self.storage.as_mut(), account, amount)
+            .init_balance(&mut *self.storage, account, amount)
     }
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
@@ -129,9 +137,7 @@ where
 
     /// This allows to get `ContractData` for specific contract
     pub fn contract_data(&self, address: &Addr) -> Result<ContractData, String> {
-        self.router
-            .wasm
-            .contract_data(self.storage.as_ref(), address)
+        self.router.wasm.contract_data(&*self.storage, address)
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
@@ -144,8 +150,9 @@ where
     ) -> Result<AppResponse, String> {
         let msg = to_vec(msg).map_err(|e| e.to_string())?;
         self.router.wasm.sudo(
+            &*self.api,
             contract_addr.into(),
-            self.storage.as_mut(),
+            &mut *self.storage,
             &self.router,
             &self.block,
             msg,
@@ -153,10 +160,7 @@ where
     }
 }
 
-pub struct Router<C>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
+pub struct Router<C> {
     pub wasm: Box<dyn Wasm<C>>,
     pub bank: Box<dyn Bank>,
 }
@@ -165,20 +169,22 @@ impl<C> Router<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new(api: Box<dyn Api>, bank: impl Bank + 'static) -> Self {
+    pub(super) fn new(bank: impl Bank + 'static) -> Self {
         Router {
-            wasm: Box::new(WasmKeeper::new(api)),
+            wasm: Box::new(WasmKeeper::new()),
             bank: Box::new(bank),
         }
     }
 
     pub fn querier<'a>(
         &'a self,
+        api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
     ) -> RouterQuerier<'a, C> {
         RouterQuerier {
             router: self,
+            api,
             storage,
             block_info,
         }
@@ -189,6 +195,7 @@ where
     /// QuerierWrapper to interact with
     pub fn query(
         &self,
+        api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
         request: QueryRequest<Empty>,
@@ -196,22 +203,23 @@ where
         match request {
             QueryRequest::Wasm(req) => {
                 self.wasm
-                    .query(storage, &self.querier(storage, block), block, req)
+                    .query(api, storage, &self.querier(api, storage, block), block, req)
             }
-            QueryRequest::Bank(req) => self.bank.query(storage, req),
+            QueryRequest::Bank(req) => self.bank.query(api, storage, req),
             _ => unimplemented!(),
         }
     }
 
     pub fn execute(
         &self,
+        api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
         msg: CosmosMsg<C>,
     ) -> Result<AppResponse, String> {
         match msg {
-            CosmosMsg::Wasm(msg) => self.wasm.execute(storage, &self, block, sender, msg),
+            CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
             _ => unimplemented!(),
         }
@@ -223,6 +231,7 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     router: &'a Router<C>,
+    api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
@@ -230,9 +239,15 @@ impl<'a, C> RouterQuerier<'a, C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new(router: &'a Router<C>, storage: &'a dyn Storage, block_info: &'a BlockInfo) -> Self {
+    pub fn new(
+        router: &'a Router<C>,
+        api: &'a dyn Api,
+        storage: &'a dyn Storage,
+        block_info: &'a BlockInfo,
+    ) -> Self {
         Self {
             router,
+            api,
             storage,
             block_info,
         }
@@ -256,7 +271,7 @@ where
         };
         let contract_result: ContractResult<Binary> = self
             .router
-            .query(self.storage, self.block_info, request)
+            .query(self.api, self.storage, self.block_info, request)
             .into();
         SystemResult::Ok(contract_result)
     }
@@ -278,18 +293,18 @@ mod test {
 
     fn mock_app() -> App {
         let env = mock_env();
-        let api = Box::new(MockApi::default());
+        let api = MockApi::default();
         let bank = BankKeeper::new();
 
-        App::new(api, env.block, bank, Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, MockStorage::new())
     }
 
     fn custom_app() -> App<CustomMsg> {
         let env = mock_env();
-        let api = Box::new(MockApi::default());
+        let api = MockApi::default();
         let bank = BankKeeper::new();
 
-        App::new(api, env.block, bank, Box::new(MockStorage::new()))
+        App::new(api, env.block, bank, MockStorage::new())
     }
 
     fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
@@ -717,14 +732,19 @@ mod test {
         // TODO: check error?
     }
 
-    fn query_router<C>(router: &Router<C>, storage: &dyn Storage, rcpt: &Addr) -> Vec<Coin>
+    fn query_router<C>(
+        router: &Router<C>,
+        api: &dyn Api,
+        storage: &dyn Storage,
+        rcpt: &Addr,
+    ) -> Vec<Coin>
     where
         C: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        let res = router.bank.query(storage, query).unwrap();
+        let res = router.bank.query(api, storage, query).unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
@@ -752,17 +772,17 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // cache 1 - send some tokens
-        let mut cache = StorageTransaction::new(app.storage.as_ref());
+        let mut cache = StorageTransaction::new(&*app.storage);
         let msg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
         };
         app.router
-            .execute(&mut cache, &app.block, owner.clone(), msg.into())
+            .execute(&*app.api, &mut cache, &app.block, owner.clone(), msg.into())
             .unwrap();
 
         // shows up in cache
-        let cached_rcpt = query_router(&app.router, &cache, &rcpt);
+        let cached_rcpt = query_router(&app.router, &*app.api, &cache, &rcpt);
         assert_eq!(coins(25, "eth"), cached_rcpt);
         let router_rcpt = query_app(&app, &rcpt);
         assert_eq!(router_rcpt, vec![]);
@@ -774,20 +794,20 @@ mod test {
                 amount: coins(12, "eth"),
             };
             app.router
-                .execute(cache2, &app.block, owner, msg.into())
+                .execute(&*app.api, cache2, &app.block, owner, msg.into())
                 .unwrap();
 
             // shows up in 2nd cache
-            let cached_rcpt = query_router(&app.router, read, &rcpt);
+            let cached_rcpt = query_router(&app.router, &*app.api, read, &rcpt);
             assert_eq!(coins(25, "eth"), cached_rcpt);
-            let cached2_rcpt = query_router(&app.router, cache2, &rcpt);
+            let cached2_rcpt = query_router(&app.router, &*app.api, cache2, &rcpt);
             assert_eq!(coins(37, "eth"), cached2_rcpt);
             Ok(())
         })
         .unwrap();
 
         // apply first to router
-        cache.prepare().commit(app.storage.as_mut());
+        cache.prepare().commit(&mut *app.storage);
 
         let committed = query_app(&app, &rcpt);
         assert_eq!(coins(37, "eth"), committed);
