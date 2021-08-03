@@ -307,14 +307,6 @@ mod test {
         App::new(api, env.block, bank, MockStorage::new())
     }
 
-    fn binary_app() -> App<Binary> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
-    }
-
     fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
     where
         C: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -942,8 +934,8 @@ mod test {
         fn make_echo_submsg(
             contract: Addr,
             data: impl Into<Option<&'static str>>,
-            sub_msg: Vec<SubMsg<Binary>>,
-        ) -> SubMsg<Binary> {
+            sub_msg: Vec<SubMsg>,
+        ) -> SubMsg {
             let data = data.into().map(|s| s.to_owned());
             SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: contract.into(),
@@ -954,7 +946,7 @@ mod test {
 
         #[test]
         fn no_submsg() {
-            let mut app = binary_app();
+            let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
 
@@ -975,12 +967,12 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Data".to_owned().into_bytes().into()));
+            assert_eq!(response.data, Some("Data".as_bytes().into()));
         }
 
         #[test]
         fn single_submsg() {
-            let mut app = binary_app();
+            let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
 
@@ -1001,12 +993,12 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".to_owned().into_bytes().into()));
+            assert_eq!(response.data, Some("Second".as_bytes().into()));
         }
 
         #[test]
         fn single_no_data() {
-            let mut app = binary_app();
+            let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
 
@@ -1027,12 +1019,12 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("First".to_owned().into_bytes().into()));
+            assert_eq!(response.data, Some("First".as_bytes().into()));
         }
 
         #[test]
         fn multiple_submsg() {
-            let mut app = binary_app();
+            let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
 
@@ -1058,12 +1050,12 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".to_owned().into_bytes().into()));
+            assert_eq!(response.data, Some("Second".as_bytes().into()));
         }
 
         #[test]
         fn nested_submsg() {
-            let mut app = binary_app();
+            let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
 
@@ -1096,7 +1088,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".to_owned().into_bytes().into()));
+            assert_eq!(response.data, Some("Second".as_bytes().into()));
         }
     }
 }

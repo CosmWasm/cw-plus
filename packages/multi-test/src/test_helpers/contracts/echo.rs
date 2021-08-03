@@ -2,8 +2,8 @@
 //! given message to test response
 
 use cosmwasm_std::{
-    to_binary, Binary, ContractResult, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
-    SubMsg, SubMsgExecutionResponse,
+    to_binary, Binary, ContractResult, Deps, DepsMut, Empty, Env, MessageInfo, Reply, Response,
+    StdError, SubMsg, SubMsgExecutionResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -12,24 +12,26 @@ use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Message {
     pub data: Option<String>,
-    pub sub_msg: Vec<SubMsg<Binary>>,
+    pub sub_msg: Vec<SubMsg>,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn instantiate(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<Response<Binary>, StdError> {
+) -> Result<Response, StdError> {
     Ok(Response::default())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn execute(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: Message,
-) -> Result<Response<Binary>, StdError> {
+) -> Result<Response, StdError> {
     let mut resp = Response::new();
     if let Some(data) = msg.data {
         resp = resp.set_data(data.into_bytes());
@@ -41,7 +43,8 @@ fn query(_deps: Deps, _env: Env, msg: EmptyMsg) -> Result<Binary, StdError> {
     to_binary(&msg)
 }
 
-fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<Binary>, StdError> {
+#[allow(clippy::unnecessary_wraps)]
+fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, StdError> {
     if let Reply {
         result:
             ContractResult::Ok(SubMsgExecutionResponse {
@@ -56,7 +59,7 @@ fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<Binary>, StdE
     }
 }
 
-pub fn contract() -> Box<dyn Contract<Binary>> {
+pub fn contract() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(execute, instantiate, query).with_reply(reply);
     Box::new(contract)
 }
