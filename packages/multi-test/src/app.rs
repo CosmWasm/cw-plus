@@ -42,7 +42,7 @@ where
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
-            .querier(self.api.as_ref(), self.storage.as_ref(), &self.block)
+            .querier(&*self.api, &*self.storage, &self.block)
             .raw_query(bin_request)
     }
 }
@@ -115,9 +115,9 @@ where
             storage,
         } = self;
 
-        transactional(storage.as_mut(), |write_cache, _| {
+        transactional(&mut **storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| router.execute(api.as_ref(), write_cache, block, sender.clone(), msg))
+                .map(|msg| router.execute(&**api, write_cache, block, sender.clone(), msg))
                 .collect()
         })
     }
@@ -126,7 +126,7 @@ where
     pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
         self.router
             .bank
-            .init_balance(self.storage.as_mut(), account, amount)
+            .init_balance(&mut *self.storage, account, amount)
     }
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
@@ -137,9 +137,7 @@ where
 
     /// This allows to get `ContractData` for specific contract
     pub fn contract_data(&self, address: &Addr) -> Result<ContractData, String> {
-        self.router
-            .wasm
-            .contract_data(self.storage.as_ref(), address)
+        self.router.wasm.contract_data(&*self.storage, address)
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
@@ -152,9 +150,9 @@ where
     ) -> Result<AppResponse, String> {
         let msg = to_vec(msg).map_err(|e| e.to_string())?;
         self.router.wasm.sudo(
-            self.api.as_ref(),
+            &*self.api,
             contract_addr.into(),
-            self.storage.as_mut(),
+            &mut *self.storage,
             &self.router,
             &self.block,
             msg,
@@ -774,23 +772,17 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // cache 1 - send some tokens
-        let mut cache = StorageTransaction::new(app.storage.as_ref());
+        let mut cache = StorageTransaction::new(&*app.storage);
         let msg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
         };
         app.router
-            .execute(
-                app.api.as_ref(),
-                &mut cache,
-                &app.block,
-                owner.clone(),
-                msg.into(),
-            )
+            .execute(&*app.api, &mut cache, &app.block, owner.clone(), msg.into())
             .unwrap();
 
         // shows up in cache
-        let cached_rcpt = query_router(&app.router, app.api.as_ref(), &cache, &rcpt);
+        let cached_rcpt = query_router(&app.router, &*app.api, &cache, &rcpt);
         assert_eq!(coins(25, "eth"), cached_rcpt);
         let router_rcpt = query_app(&app, &rcpt);
         assert_eq!(router_rcpt, vec![]);
@@ -802,20 +794,20 @@ mod test {
                 amount: coins(12, "eth"),
             };
             app.router
-                .execute(app.api.as_ref(), cache2, &app.block, owner, msg.into())
+                .execute(&*app.api, cache2, &app.block, owner, msg.into())
                 .unwrap();
 
             // shows up in 2nd cache
-            let cached_rcpt = query_router(&app.router, app.api.as_ref(), read, &rcpt);
+            let cached_rcpt = query_router(&app.router, &*app.api, read, &rcpt);
             assert_eq!(coins(25, "eth"), cached_rcpt);
-            let cached2_rcpt = query_router(&app.router, app.api.as_ref(), cache2, &rcpt);
+            let cached2_rcpt = query_router(&app.router, &*app.api, cache2, &rcpt);
             assert_eq!(coins(37, "eth"), cached2_rcpt);
             Ok(())
         })
         .unwrap();
 
         // apply first to router
-        cache.prepare().commit(app.storage.as_mut());
+        cache.prepare().commit(&mut *app.storage);
 
         let committed = query_app(&app, &rcpt);
         assert_eq!(coins(37, "eth"), committed);
