@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DownloadLogoResponse",
+  "description": "When we download an embedded logo, we get this response type. We expect a SPA to be able to accept this info and display it.",
+  "type": "object",
+  "required": [
+    "data",
+    "mime_type"
+  ],
+  "properties": {
+    "data": {
+      "$ref": "#/definitions/Binary"
+    },
+    "mime_type": {
+      "type": "string"
+    }
+  },
+  "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    }
+  }
+}

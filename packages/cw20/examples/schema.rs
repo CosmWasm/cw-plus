@@ -5,7 +5,8 @@ use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use cw20::{
     AllAccountsResponse, AllAllowancesResponse, AllowanceResponse, BalanceResponse, Cw20ExecuteMsg,
-    Cw20QueryMsg, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse,
+    Cw20QueryMsg, Cw20ReceiveMsg, DownloadLogoResponse, MarketingInfoResponse, MinterResponse,
+    TokenInfoResponse,
 };
 
 fn main() {
@@ -21,6 +22,8 @@ fn main() {
     export_schema(&schema_for!(BalanceResponse), &out_dir);
     export_schema(&schema_for!(TokenInfoResponse), &out_dir);
     export_schema(&schema_for!(MinterResponse), &out_dir);
+    export_schema(&schema_for!(DownloadLogoResponse), &out_dir);
+    export_schema(&schema_for!(MarketingInfoResponse), &out_dir);
     export_schema(&schema_for!(AllAllowancesResponse), &out_dir);
     export_schema(&schema_for!(AllAccountsResponse), &out_dir);
 }

@@ -144,6 +144,36 @@ the minter is a smart contract.
 This should be enabled with all blockchains that have iterator support.
 It allows us to get lists of results with pagination.
 
+## Marketing
+
+This allows us to attach more metadata on the token to help with displaying the token in
+wallets. When you see a token's website, then see it in a wallet, you know what it is.
+However, if you see it in a wallet or a DEX trading pair, there is no clear way to find out
+any more info about it.
+
+This extension allows us to attach more "Marketing" metadata, which has no effect on the
+on-chain functionality of the token, but is very useful in providing a better client-side
+experience. Note, that we add a new role `marketing`, which can update such info, but not
+affect on-chain logic.
+
+### Messages
+
+`UploadLogo{url | embedded}` - If the `env.sender` is the allowed marketing account,
+this will either set a new URL reference where the logo is served, or allow them to upload
+a small (less than 5KB) SVG or PNG logo onto the blockchain to be served.
+
+`UpdateMarketing{project, description, marketing}` - If the `env.sender` is the allowed marketing
+account, this will update some marketing-related metadata on the contract.
+
+### Queries
+
+`MarketingInfo{}` - Returns marketing-related metadata. Return type is
+`MarketingInfoResponse {project, description, logo, marketing}`.
+
+`DownloadLogo{}` - If the token's logo was previously uploaded to the blockchain
+(see `UploadLogo` message), then it returns the raw data to be displayed in a browser.
+Return type is `DownloadLogoResponse{ mime_type, data }`.
+
 ### Queries
 
 `AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
