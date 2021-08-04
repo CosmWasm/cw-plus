@@ -54,6 +54,7 @@ fn escrow_happy_path_cw20_tokens() {
             amount: Uint128::new(5000),
         }],
         mint: None,
+        marketing: None,
     };
     let cash_addr = router
         .instantiate_contract(cw20_id, owner.clone(), &msg, &[], "CASH", None)

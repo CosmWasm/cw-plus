@@ -44,6 +44,9 @@ pub enum ContractError {
 
     #[error("Minting cannot exceed the cap")]
     CannotExceedCap {},
+
+    #[error("Unsupported cw20 error")]
+    Unsupported {},
 }
 
 impl From<cw20_base::ContractError> for ContractError {
@@ -58,6 +61,8 @@ impl From<cw20_base::ContractError> for ContractError {
             cw20_base::ContractError::Expired {} => ContractError::Expired {},
             cw20_base::ContractError::NoAllowance {} => ContractError::NoAllowance {},
             cw20_base::ContractError::CannotExceedCap {} => ContractError::CannotExceedCap {},
+            cw20_base::ContractError::LogoTooBig {}
+            | cw20_base::ContractError::NoLogoUploaded {} => ContractError::Unsupported {},
         }
     }
 }

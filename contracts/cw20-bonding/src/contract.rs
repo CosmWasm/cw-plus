@@ -46,6 +46,7 @@ pub fn instantiate(
             minter: env.contract.address,
             cap: None,
         }),
+        marketing: None,
     };
     TOKEN_INFO.save(deps.storage, &data)?;
 
