@@ -7,6 +7,7 @@ use cosmwasm_std::{
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ExecuteMsg;
 use cw_storage_plus::U8Key;
+use sha2::Digest;
 use std::convert::TryInto;
 
 use crate::error::ContractError;
@@ -15,7 +16,6 @@ use crate::msg::{
     MerkleRootResponse, MigrateMsg, QueryMsg,
 };
 use crate::state::{Config, CLAIM, CONFIG, LATEST_STAGE, MERKLE_ROOT};
-use sha2::Digest;
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
@@ -241,7 +241,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{from_binary, CosmosMsg, SubMsg};
+    use cosmwasm_std::{from_binary, from_slice, CosmosMsg, SubMsg};
     use serde::Deserialize;
 
     #[test]
@@ -360,8 +360,8 @@ mod tests {
         );
     }
 
-    const TEST_DATA_1: &str = "./testdata/airdrop_stage_1_test_data.json";
-    const TEST_DATA_2: &str = "./testdata/airdrop_stage_2_test_data.json";
+    const TEST_DATA_1: &[u8] = include_bytes!("../testdata/airdrop_stage_1_test_data.json");
+    const TEST_DATA_2: &[u8] = include_bytes!("../testdata/airdrop_stage_2_test_data.json");
 
     #[derive(Deserialize, Debug)]
     struct Encoded {
@@ -371,22 +371,11 @@ mod tests {
         proofs: Vec<String>,
     }
 
-    fn read_test_data(path: &str) -> Encoded {
-        use std::fs::File;
-        use std::io::BufReader;
-
-        // Open the file in read-only mode with buffer.
-        let file = File::open(path).unwrap();
-        let reader = BufReader::new(file);
-
-        serde_json::from_reader(reader).unwrap()
-    }
-
     #[test]
     fn claim() {
         // Run test 1
         let mut deps = mock_dependencies(&[]);
-        let test_data = read_test_data(TEST_DATA_1);
+        let test_data: Encoded = from_slice(TEST_DATA_1).unwrap();
 
         let msg = InstantiateMsg {
             owner: Some("owner0000".to_string()),
@@ -452,7 +441,7 @@ mod tests {
 
         // Second test
 
-        let test_data = read_test_data(TEST_DATA_2);
+        let test_data: Encoded = from_slice(TEST_DATA_2).unwrap();
         // check claimed
         let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(res, ContractError::Claimed {});
