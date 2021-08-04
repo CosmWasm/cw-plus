@@ -5,7 +5,10 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
-use cw20::{BalanceResponse, Cw20Coin, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
+use cw20::{
+    BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
+    MarketingInfoResponse, MinterResponse, TokenInfoResponse,
+};
 
 use crate::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
@@ -14,11 +17,26 @@ use crate::allowances::{
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
+use crate::state::{MarketingInfo, MinterData, TokenInfo, BALANCES, TOKEN_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const LOGO_SIZE_CAP: usize = 5 * 1024;
+
+fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
+    if matches!(
+        logo,
+              Logo::Embedded(EmbeddedLogo::Svg(logo))
+            | Logo::Embedded(EmbeddedLogo::Png(logo))
+                if logo.len() > LOGO_SIZE_CAP
+    ) {
+        Err(ContractError::LogoTooBig {})
+    } else {
+        Ok(())
+    }
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -26,7 +44,7 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -35,7 +53,7 @@ pub fn instantiate(
 
     if let Some(limit) = msg.get_cap() {
         if total_supply > limit {
-            return Err(StdError::generic_err("Initial supply greater than cap"));
+            return Err(StdError::generic_err("Initial supply greater than cap").into());
         }
     }
 
@@ -47,6 +65,25 @@ pub fn instantiate(
         None => None,
     };
 
+    let marketing = match msg.marketing {
+        Some(m) => {
+            if let Some(logo) = &m.logo {
+                verify_logo(logo)?;
+            }
+
+            Some(MarketingInfo {
+                project: m.project,
+                description: m.description,
+                marketing: m
+                    .marketing
+                    .map(|addr| deps.api.addr_validate(&addr))
+                    .transpose()?,
+                logo: m.logo,
+            })
+        }
+        None => None,
+    };
+
     // store token info
     let data = TokenInfo {
         name: msg.name,
@@ -54,6 +91,7 @@ pub fn instantiate(
         decimals: msg.decimals,
         total_supply,
         mint,
+        marketing,
     };
     TOKEN_INFO.save(deps.storage, &data)?;
     Ok(Response::default())
@@ -109,6 +147,12 @@ pub fn execute(
             amount,
             msg,
         } => execute_send_from(deps, env, info, owner, contract, amount, msg),
+        ExecuteMsg::UpdateMarketing {
+            project,
+            description,
+            marketing,
+        } => execute_update_marketing(deps, env, info, project, description, marketing),
+        ExecuteMsg::UploadLogo(logo) => execute_upload_logo(deps, env, info, logo),
     }
 }
 
@@ -261,24 +305,119 @@ pub fn execute_send(
     Ok(res)
 }
 
+pub fn execute_update_marketing(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    project: Option<String>,
+    description: Option<String>,
+    marketing: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut config = TOKEN_INFO.load(deps.storage)?;
+
+    // If there is no marketing info, there is also noone who can update it, therefore it cannot be
+    // authorised
+    let marketing_info = config
+        .marketing
+        .as_mut()
+        .ok_or(ContractError::Unauthorized {})?;
+
+    if marketing_info
+        .marketing
+        .as_ref()
+        .ok_or(ContractError::Unauthorized {})?
+        != &info.sender
+    {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    match project {
+        Some(empty) if empty.trim().is_empty() => marketing_info.project = None,
+        Some(project) => marketing_info.project = Some(project),
+        None => (),
+    }
+
+    match description {
+        Some(empty) if empty.trim().is_empty() => marketing_info.description = None,
+        Some(description) => marketing_info.description = Some(description),
+        None => (),
+    }
+
+    match marketing {
+        Some(empty) if empty.trim().is_empty() => marketing_info.marketing = None,
+        Some(marketing) => marketing_info.marketing = Some(deps.api.addr_validate(&marketing)?),
+        None => (),
+    }
+
+    if marketing_info.project.is_none()
+        && marketing_info.description.is_none()
+        && marketing_info.marketing.is_none()
+        && marketing_info.logo.is_none()
+    {
+        config.marketing = None;
+    }
+
+    TOKEN_INFO.save(deps.storage, &config)?;
+
+    let res = Response::new().add_attribute("action", "update_marketing");
+    Ok(res)
+}
+
+pub fn execute_upload_logo(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    logo: Logo,
+) -> Result<Response, ContractError> {
+    let mut config = TOKEN_INFO.load(deps.storage)?;
+
+    // If there is no marketing info, there is also noone who can update it, therefore it cannot be
+    // authorised
+    let marketing_info = config
+        .marketing
+        .as_mut()
+        .ok_or(ContractError::Unauthorized {})?;
+
+    verify_logo(&logo)?;
+
+    if marketing_info
+        .marketing
+        .as_ref()
+        .ok_or(ContractError::Unauthorized {})?
+        != &info.sender
+    {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    marketing_info.logo = Some(logo);
+    TOKEN_INFO.save(deps.storage, &config)?;
+
+    let res = Response::new().add_attribute("action", "upload_logo");
+    Ok(res)
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
-        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
-        QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+    let res = match msg {
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?)?,
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?)?,
+        QueryMsg::Minter {} => to_binary(&query_minter(deps)?)?,
         QueryMsg::Allowance { owner, spender } => {
-            to_binary(&query_allowance(deps, owner, spender)?)
+            to_binary(&query_allowance(deps, owner, spender)?)?
         }
         QueryMsg::AllAllowances {
             owner,
             start_after,
             limit,
-        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?),
+        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?)?,
         QueryMsg::AllAccounts { start_after, limit } => {
-            to_binary(&query_all_accounts(deps, start_after, limit)?)
+            to_binary(&query_all_accounts(deps, start_after, limit)?)?
         }
-    }
+        QueryMsg::MarketingInfo {} => to_binary(&query_marketing_info(deps)?)?,
+        QueryMsg::DownloadLogo {} => to_binary(&query_download_logo(deps)?)?,
+    };
+
+    Ok(res)
 }
 
 pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> {
@@ -310,6 +449,58 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
         None => None,
     };
     Ok(minter)
+}
+
+pub fn query_marketing_info(deps: Deps) -> StdResult<MarketingInfoResponse> {
+    let meta = TOKEN_INFO.load(deps.storage)?;
+    let info = match meta.marketing {
+        Some(marketing) => MarketingInfoResponse {
+            project: marketing.project,
+            description: marketing.description,
+            marketing: marketing.marketing,
+            logo: match marketing.logo {
+                Some(Logo::Url(url)) => Some(LogoInfo::Url(url)),
+                Some(Logo::Embedded(_)) => Some(LogoInfo::Embedded),
+                None => None,
+            },
+        },
+        None => MarketingInfoResponse {
+            project: None,
+            description: None,
+            marketing: None,
+            logo: None,
+        },
+    };
+
+    Ok(info)
+}
+
+pub fn query_download_logo(deps: Deps) -> Result<DownloadLogoResponse, ContractError> {
+    let meta = TOKEN_INFO.load(deps.storage)?;
+    match meta.marketing {
+        Some(MarketingInfo {
+            logo: Some(Logo::Embedded(EmbeddedLogo::Svg(logo))),
+            ..
+        }) => Ok(DownloadLogoResponse {
+            mime_type: "image/svg+xml".to_owned(),
+            data: logo,
+        }),
+        Some(MarketingInfo {
+            logo: Some(Logo::Embedded(EmbeddedLogo::Png(logo))),
+            ..
+        }) => Ok(DownloadLogoResponse {
+            mime_type: "image/png".to_owned(),
+            data: logo,
+        }),
+        // Might look too verbose, but just `_` would not trigger compiler error in case of adding
+        // new `EmbeddedLogo` variant which should be probably handled in separate arm
+        Some(MarketingInfo {
+            logo: Some(Logo::Url(_)),
+            ..
+        })
+        | Some(MarketingInfo { logo: None, .. })
+        | None => Err(ContractError::NoLogoUploaded {}),
+    }
 }
 
 #[cfg(test)]
@@ -363,6 +554,7 @@ mod tests {
                 amount,
             }],
             mint: mint.clone(),
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -397,6 +589,7 @@ mod tests {
                 amount,
             }],
             mint: None,
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -436,6 +629,7 @@ mod tests {
                 minter: minter.clone(),
                 cap: Some(limit),
             }),
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -482,13 +676,14 @@ mod tests {
                 minter,
                 cap: Some(limit),
             }),
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
         let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
         assert_eq!(
             err,
-            StdError::generic_err("Initial supply greater than cap")
+            StdError::generic_err("Initial supply greater than cap").into()
         );
     }
 
@@ -597,6 +792,7 @@ mod tests {
                 },
             ],
             mint: None,
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();

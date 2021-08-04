@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::{Item, Map};
 
-use cw20::AllowanceResponse;
+use cw20::{AllowanceResponse, Logo};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -14,6 +14,7 @@ pub struct TokenInfo {
     pub decimals: u8,
     pub total_supply: Uint128,
     pub mint: Option<MinterData>,
+    pub marketing: Option<MarketingInfo>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -21,6 +22,14 @@ pub struct MinterData {
     pub minter: Addr,
     /// cap is how many more tokens can be issued by the minter
     pub cap: Option<Uint128>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct MarketingInfo {
+    pub project: Option<String>,
+    pub description: Option<String>,
+    pub marketing: Option<Addr>,
+    pub logo: Option<Logo>,
 }
 
 impl TokenInfo {

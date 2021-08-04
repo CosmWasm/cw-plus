@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, Uint128};
+use cosmwasm_std::{Addr, Binary, Uint128};
 
 use crate::logo::LogoInfo;
 use cw0::Expiration;
@@ -87,7 +87,7 @@ pub struct MarketingInfoResponse {
     /// A link to the logo, or a comment there is an on-chain logo stored
     pub logo: Option<LogoInfo>,
     /// The address (if any) who can update this data structure
-    pub marketing: Option<String>,
+    pub marketing: Option<Addr>,
 }
 
 /// When we download an embedded logo, we get this response type.
