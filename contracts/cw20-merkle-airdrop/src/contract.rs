@@ -242,7 +242,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{from_binary, CosmosMsg, SubMsg};
-    use serde::{Deserialize};
+    use serde::Deserialize;
 
     #[test]
     fn proper_instantiation() {
@@ -400,14 +400,14 @@ mod tests {
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::RegisterMerkleRoot {
-            merkle_root: test_data.root
+            merkle_root: test_data.root,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
         let msg = ExecuteMsg::Claim {
-            amount: Uint128::from(test_data.amount),
+            amount: test_data.amount,
             stage: 1u8,
-            proof: test_data.proofs
+            proof: test_data.proofs,
         };
 
         let env = mock_env();
@@ -418,7 +418,7 @@ mod tests {
             funds: vec![],
             msg: to_binary(&Cw20ExecuteMsg::Transfer {
                 recipient: test_data.account.clone(),
-                amount: test_data.amount.into(),
+                amount: test_data.amount,
             })
             .unwrap(),
         }));
@@ -461,7 +461,7 @@ mod tests {
         let env = mock_env();
         let info = mock_info("owner0000", &[]);
         let msg = ExecuteMsg::RegisterMerkleRoot {
-            merkle_root: test_data.root
+            merkle_root: test_data.root,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -469,7 +469,7 @@ mod tests {
         let msg = ExecuteMsg::Claim {
             amount: test_data.amount,
             stage: 2u8,
-            proof: test_data.proofs
+            proof: test_data.proofs,
         };
 
         let env = mock_env();
