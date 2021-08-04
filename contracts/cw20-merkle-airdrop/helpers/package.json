@@ -13,7 +13,6 @@
     "@oclif/plugin-help": "^3",
     "@types/crypto-js": "^4.0.2",
     "ethereumjs-util": "^7.1.0",
-    "keccak256": "^1.0.3",
     "merkletreejs": "^0.2.23",
     "tslib": "^1"
   },
