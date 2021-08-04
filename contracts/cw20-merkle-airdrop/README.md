@@ -23,7 +23,7 @@ Merkle Airdrop is very efficient even when recipient number is massive.
 
 This contract works with multiple airdrop rounds, meaning you can execute several airdrops using same instance.
 
-Uses **SHA3 Keccak 256** for merkle root tree construction.
+Uses **SHA256** for merkle root tree construction.
 
 ## Procedure
 
