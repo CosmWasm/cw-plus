@@ -17,7 +17,7 @@ use crate::allowances::{
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{MarketingInfo, MinterData, TokenInfo, BALANCES, TOKEN_INFO};
+use crate::state::{MarketingInfo, MinterData, TokenInfo, BALANCES, LOGO, TOKEN_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -66,21 +66,15 @@ pub fn instantiate(
     };
 
     let marketing = match msg.marketing {
-        Some(m) => {
-            if let Some(logo) = &m.logo {
-                verify_logo(logo)?;
-            }
-
-            Some(MarketingInfo {
-                project: m.project,
-                description: m.description,
-                marketing: m
-                    .marketing
-                    .map(|addr| deps.api.addr_validate(&addr))
-                    .transpose()?,
-                logo: m.logo,
-            })
-        }
+        Some(m) => Some(MarketingInfo {
+            project: m.project,
+            description: m.description,
+            marketing: m
+                .marketing
+                .map(|addr| deps.api.addr_validate(&addr))
+                .transpose()?,
+            logo: None,
+        }),
         None => None,
     };
 
@@ -389,7 +383,14 @@ pub fn execute_upload_logo(
         return Err(ContractError::Unauthorized {});
     }
 
-    marketing_info.logo = Some(logo);
+    LOGO.save(deps.storage, &logo)?;
+
+    let logo_info = match logo {
+        Logo::Url(url) => LogoInfo::Url(url),
+        Logo::Embedded(_) => LogoInfo::Embedded,
+    };
+
+    marketing_info.logo = Some(logo_info);
     TOKEN_INFO.save(deps.storage, &config)?;
 
     let res = Response::new().add_attribute("action", "upload_logo");
@@ -397,27 +398,25 @@ pub fn execute_upload_logo(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
-    let res = match msg {
-        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?)?,
-        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?)?,
-        QueryMsg::Minter {} => to_binary(&query_minter(deps)?)?,
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
+        QueryMsg::TokenInfo {} => to_binary(&query_token_info(deps)?),
+        QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
         QueryMsg::Allowance { owner, spender } => {
-            to_binary(&query_allowance(deps, owner, spender)?)?
+            to_binary(&query_allowance(deps, owner, spender)?)
         }
         QueryMsg::AllAllowances {
             owner,
             start_after,
             limit,
-        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?)?,
+        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?),
         QueryMsg::AllAccounts { start_after, limit } => {
-            to_binary(&query_all_accounts(deps, start_after, limit)?)?
+            to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
-        QueryMsg::MarketingInfo {} => to_binary(&query_marketing_info(deps)?)?,
-        QueryMsg::DownloadLogo {} => to_binary(&query_download_logo(deps)?)?,
-    };
-
-    Ok(res)
+        QueryMsg::MarketingInfo {} => to_binary(&query_marketing_info(deps)?),
+        QueryMsg::DownloadLogo {} => to_binary(&query_download_logo(deps)?),
+    }
 }
 
 pub fn query_balance(deps: Deps, address: String) -> StdResult<BalanceResponse> {
@@ -458,11 +457,7 @@ pub fn query_marketing_info(deps: Deps) -> StdResult<MarketingInfoResponse> {
             project: marketing.project,
             description: marketing.description,
             marketing: marketing.marketing,
-            logo: match marketing.logo {
-                Some(Logo::Url(url)) => Some(LogoInfo::Url(url)),
-                Some(Logo::Embedded(_)) => Some(LogoInfo::Embedded),
-                None => None,
-            },
+            logo: marketing.logo,
         },
         None => MarketingInfoResponse {
             project: None,
@@ -475,31 +470,18 @@ pub fn query_marketing_info(deps: Deps) -> StdResult<MarketingInfoResponse> {
     Ok(info)
 }
 
-pub fn query_download_logo(deps: Deps) -> Result<DownloadLogoResponse, ContractError> {
-    let meta = TOKEN_INFO.load(deps.storage)?;
-    match meta.marketing {
-        Some(MarketingInfo {
-            logo: Some(Logo::Embedded(EmbeddedLogo::Svg(logo))),
-            ..
-        }) => Ok(DownloadLogoResponse {
+pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
+    let logo = LOGO.load(deps.storage)?;
+    match logo {
+        Logo::Embedded(EmbeddedLogo::Svg(logo)) => Ok(DownloadLogoResponse {
             mime_type: "image/svg+xml".to_owned(),
             data: logo,
         }),
-        Some(MarketingInfo {
-            logo: Some(Logo::Embedded(EmbeddedLogo::Png(logo))),
-            ..
-        }) => Ok(DownloadLogoResponse {
+        Logo::Embedded(EmbeddedLogo::Png(logo)) => Ok(DownloadLogoResponse {
             mime_type: "image/png".to_owned(),
             data: logo,
         }),
-        // Might look too verbose, but just `_` would not trigger compiler error in case of adding
-        // new `EmbeddedLogo` variant which should be probably handled in separate arm
-        Some(MarketingInfo {
-            logo: Some(Logo::Url(_)),
-            ..
-        })
-        | Some(MarketingInfo { logo: None, .. })
-        | None => Err(ContractError::NoLogoUploaded {}),
+        Logo::Url(_) => Err(StdError::not_found("logo")),
     }
 }
 
@@ -707,7 +689,6 @@ mod tests {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
                         marketing: Some("marketing".to_owned()),
-                        logo: Some(Logo::Url("url".to_owned())),
                     }),
                 };
 
@@ -722,13 +703,15 @@ mod tests {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
                         marketing: Some(Addr::unchecked("marketing")),
-                        logo: Some(LogoInfo::Url("url".to_owned())),
+                        logo: None,
                     }
                 );
 
-                assert_eq!(
-                    query_download_logo(deps.as_ref()).unwrap_err(),
-                    ContractError::NoLogoUploaded {}
+                let err = query_download_logo(deps.as_ref()).unwrap_err();
+                assert!(
+                    matches!(err, StdError::NotFound { .. }),
+                    "Expected StdError::NotFound, received {}",
+                    err
                 );
             }
 
@@ -745,149 +728,19 @@ mod tests {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
                         marketing: Some("m".to_owned()),
-                        logo: Some(Logo::Url("url".to_owned())),
                     }),
                 };
 
                 let info = mock_info("creator", &[]);
                 let env = mock_env();
-                let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
+                instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
 
+                let err = query_download_logo(deps.as_ref()).unwrap_err();
                 assert!(
-                    matches!(err, ContractError::Std(_)),
-                    "Expected std error, received {}",
+                    matches!(err, StdError::NotFound { .. }),
+                    "Expected StdError::NotFound, received {}",
                     err
                 );
-            }
-
-            #[test]
-            fn logo_png() {
-                let mut deps = mock_dependencies(&[]);
-                let instantiate_msg = InstantiateMsg {
-                    name: "Cash Token".to_string(),
-                    symbol: "CASH".to_string(),
-                    decimals: 9,
-                    initial_balances: vec![],
-                    mint: None,
-                    marketing: Some(InstantiateMarketingInfo {
-                        project: Some("Project".to_owned()),
-                        description: Some("Description".to_owned()),
-                        marketing: Some("marketing".to_owned()),
-                        logo: Some(Logo::Embedded(EmbeddedLogo::Png("data".as_bytes().into()))),
-                    }),
-                };
-
-                let info = mock_info("creator", &[]);
-                let env = mock_env();
-                let resp = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
-                assert_eq!(resp.messages, vec![]);
-
-                assert_eq!(
-                    query_marketing_info(deps.as_ref()).unwrap(),
-                    MarketingInfoResponse {
-                        project: Some("Project".to_owned()),
-                        description: Some("Description".to_owned()),
-                        marketing: Some(Addr::unchecked("marketing")),
-                        logo: Some(LogoInfo::Embedded),
-                    }
-                );
-
-                assert_eq!(
-                    query_download_logo(deps.as_ref()).unwrap(),
-                    DownloadLogoResponse {
-                        mime_type: "image/png".to_owned(),
-                        data: "data".as_bytes().into(),
-                    }
-                )
-            }
-
-            #[test]
-            fn logo_svg() {
-                let mut deps = mock_dependencies(&[]);
-                let instantiate_msg = InstantiateMsg {
-                    name: "Cash Token".to_string(),
-                    symbol: "CASH".to_string(),
-                    decimals: 9,
-                    initial_balances: vec![],
-                    mint: None,
-                    marketing: Some(InstantiateMarketingInfo {
-                        project: Some("Project".to_owned()),
-                        description: Some("Description".to_owned()),
-                        marketing: Some("marketing".to_owned()),
-                        logo: Some(Logo::Embedded(EmbeddedLogo::Svg("data".as_bytes().into()))),
-                    }),
-                };
-
-                let info = mock_info("creator", &[]);
-                let env = mock_env();
-                let resp = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
-                assert_eq!(resp.messages, vec![]);
-
-                assert_eq!(
-                    query_marketing_info(deps.as_ref()).unwrap(),
-                    MarketingInfoResponse {
-                        project: Some("Project".to_owned()),
-                        description: Some("Description".to_owned()),
-                        marketing: Some(Addr::unchecked("marketing")),
-                        logo: Some(LogoInfo::Embedded),
-                    }
-                );
-
-                assert_eq!(
-                    query_download_logo(deps.as_ref()).unwrap(),
-                    DownloadLogoResponse {
-                        mime_type: "image/svg+xml".to_owned(),
-                        data: "data".as_bytes().into(),
-                    }
-                )
-            }
-
-            #[test]
-            fn logo_png_oversized() {
-                let mut deps = mock_dependencies(&[]);
-                let instantiate_msg = InstantiateMsg {
-                    name: "Cash Token".to_string(),
-                    symbol: "CASH".to_string(),
-                    decimals: 9,
-                    initial_balances: vec![],
-                    mint: None,
-                    marketing: Some(InstantiateMarketingInfo {
-                        project: Some("Project".to_owned()),
-                        description: Some("Description".to_owned()),
-                        marketing: Some("marketing".to_owned()),
-                        logo: Some(Logo::Embedded(EmbeddedLogo::Png([1; 6000].into()))),
-                    }),
-                };
-
-                let info = mock_info("creator", &[]);
-                let env = mock_env();
-                let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
-
-                assert_eq!(err, ContractError::LogoTooBig {});
-            }
-
-            #[test]
-            fn logo_svg_oversized() {
-                let mut deps = mock_dependencies(&[]);
-                let instantiate_msg = InstantiateMsg {
-                    name: "Cash Token".to_string(),
-                    symbol: "CASH".to_string(),
-                    decimals: 9,
-                    initial_balances: vec![],
-                    mint: None,
-                    marketing: Some(InstantiateMarketingInfo {
-                        project: Some("Project".to_owned()),
-                        description: Some("Description".to_owned()),
-                        marketing: Some("marketing".to_owned()),
-                        logo: Some(Logo::Embedded(EmbeddedLogo::Svg([1; 6000].into()))),
-                    }),
-                };
-
-                let info = mock_info("creator", &[]);
-                let env = mock_env();
-                let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
-
-                assert_eq!(err, ContractError::LogoTooBig {});
             }
         }
     }
@@ -1253,7 +1106,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("marketing".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1282,13 +1134,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("marketing")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1305,7 +1159,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1333,13 +1186,15 @@ mod tests {
                     project: Some("New project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1356,7 +1211,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1384,13 +1238,15 @@ mod tests {
                     project: None,
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1407,7 +1263,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1435,13 +1290,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Better description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1458,7 +1315,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1486,13 +1342,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: None,
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1509,7 +1367,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1537,13 +1394,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("marketing")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1560,7 +1419,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1592,13 +1450,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1615,7 +1475,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1643,13 +1502,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: None,
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1666,7 +1527,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1694,9 +1554,11 @@ mod tests {
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1713,7 +1575,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1763,7 +1624,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1813,7 +1673,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1837,13 +1696,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
 
@@ -1860,7 +1721,6 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1884,13 +1744,15 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
+                    logo: None,
                 }
             );
 
-            assert_eq!(
-                query_download_logo(deps.as_ref()).unwrap_err(),
-                ContractError::NoLogoUploaded {}
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
             );
         }
     }

@@ -24,9 +24,6 @@ pub enum ContractError {
     #[error("Minting cannot exceed the cap")]
     CannotExceedCap {},
 
-    #[error("No logo is uploaded for the token")]
-    NoLogoUploaded {},
-
     #[error("Logo binary data exceeds 5KB limit")]
     LogoTooBig {},
 }
