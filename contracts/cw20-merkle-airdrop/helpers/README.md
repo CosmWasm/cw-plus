@@ -18,7 +18,7 @@ Binary will be placed to path.
 ```json
 [
   { "address": "wasm1k9hwzxs889jpvd7env8z49gad3a3633vg350tq", "amount": "100"},
-  { "address": "wasm1uy9ucvgerneekxpnfwyfnpxvlsx5dzdpf0mzjd", "amount": "1010"},
+  { "address": "wasm1uy9ucvgerneekxpnfwyfnpxvlsx5dzdpf0mzjd", "amount": "1010"}
 ]
 ```
 
@@ -42,6 +42,6 @@ PROOFS='[ "27e9b1ec8cb64709d0a8d3702344561674199fe81b885f1f9c9b2fb268795962","28
 ]'
 merkle-airdrop-cli verifyProofs --file ../testdata/airdrop.json \
   --address wasm1k9hwzxs889jpvd7env8z49gad3a3633vg350tq \
-  --amount 100
+  --amount 100 \
   --proofs $PROOFS
 ```

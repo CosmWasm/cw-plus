@@ -95,7 +95,11 @@ pub enum QueryMsg {
 - `{ latest_stage: {}}` returns current airdrop stage, `{"latest_stage": ...}`
 - `{ is_claimed: {stage: "stage", address: "wasm1..."}` returns if address claimed airdrop, `{"is_claimed": "true"}`
 
-## Airdrop helper CLI
+## Merkle Airdrop CLI
 
-[Airdrop helper CLI](helpers) contains js helpers for generating root, generating and verifying proofs for given airdrop
+[Merkle Airdrop CLI](helpers) contains js helpers for generating root, generating and verifying proofs for given airdrop
 file.
+
+## Test Vector Generation
+
+Test vector can be generated using commands at [Merkle Airdrop CLI README](helpers/README.md)
