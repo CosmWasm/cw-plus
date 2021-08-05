@@ -1,6 +1,6 @@
 [package]
 name = "cw20-base"
-version = "0.8.0-rc1"
+version = "0.8.0-rc2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Basic implementation of a CosmWasm-20 compliant token"
@@ -18,10 +18,10 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.8.0-rc1" }
-cw2 = { path = "../../packages/cw2", version = "0.8.0-rc1" }
-cw20 = { path = "../../packages/cw20", version = "0.8.0-rc1" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.8.0-rc1" }
+cw0 = { path = "../../packages/cw0", version = "0.8.0-rc2" }
+cw2 = { path = "../../packages/cw2", version = "0.8.0-rc2" }
+cw20 = { path = "../../packages/cw20", version = "0.8.0-rc2" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.8.0-rc2" }
 cosmwasm-std = { version = "0.16.0" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
