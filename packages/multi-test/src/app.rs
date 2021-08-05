@@ -282,7 +282,7 @@ mod test {
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{
         attr, coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event,
-        Reply, SubMsg, WasmMsg,
+        Reply, StdResult, SubMsg, WasmMsg,
     };
 
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
@@ -672,9 +672,8 @@ mod test {
 
         // no reply writen beforehand
         let query = reflect::QueryMsg::Reply { id: 123 };
-        app.wrap()
-            .query_wasm_smart::<Reply, _, _>(&reflect_addr, &query)
-            .unwrap_err();
+        let res: StdResult<Reply> = app.wrap().query_wasm_smart(&reflect_addr, &query);
+        res.unwrap_err();
 
         // reflect sends 7 eth, success
         let msg = SubMsg::reply_always(
