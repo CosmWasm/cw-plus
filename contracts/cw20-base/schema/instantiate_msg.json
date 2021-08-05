@@ -48,6 +48,10 @@
     }
   },
   "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
     "Cw20Coin": {
       "type": "object",
       "required": [
@@ -63,6 +67,37 @@
         }
       }
     },
+    "EmbeddedLogo": {
+      "description": "This is used to store the logo on the blockchain in an accepted format. Enforce maximum size of 5KB on all variants.",
+      "anyOf": [
+        {
+          "description": "Store the Logo as an SVG file. The content must conform to the spec at https://en.wikipedia.org/wiki/Scalable_Vector_Graphics (The contract should do some light-weight sanity-check validation)",
+          "type": "object",
+          "required": [
+            "svg"
+          ],
+          "properties": {
+            "svg": {
+              "$ref": "#/definitions/Binary"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Store the Logo as a PNG file. This will likely only support up to 64x64 or so within the 5KB limit.",
+          "type": "object",
+          "required": [
+            "png"
+          ],
+          "properties": {
+            "png": {
+              "$ref": "#/definitions/Binary"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "InstantiateMarketingInfo": {
       "type": "object",
       "properties": {
@@ -70,6 +105,16 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "logo": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Logo"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "marketing": {
@@ -85,6 +130,37 @@
           ]
         }
       }
+    },
+    "Logo": {
+      "description": "This is used for uploading logo data, or setting it in InstantiateData",
+      "anyOf": [
+        {
+          "description": "A reference to an externally hosted logo. Must be a valid HTTP or HTTPS URL.",
+          "type": "object",
+          "required": [
+            "url"
+          ],
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Logo content stored on the blockchain. Enforce maximum size of 5KB on all variants",
+          "type": "object",
+          "required": [
+            "embedded"
+          ],
+          "properties": {
+            "embedded": {
+              "$ref": "#/definitions/EmbeddedLogo"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "MinterResponse": {
       "type": "object",

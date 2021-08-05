@@ -78,7 +78,7 @@ pub struct MinterResponse {
     pub cap: Option<Uint128>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct MarketingInfoResponse {
     /// A URL pointing to the project behind this token.
     pub project: Option<String>,

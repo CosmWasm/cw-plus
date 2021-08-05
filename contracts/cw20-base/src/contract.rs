@@ -66,15 +66,29 @@ pub fn instantiate(
     };
 
     let marketing = match msg.marketing {
-        Some(m) => Some(MarketingInfo {
-            project: m.project,
-            description: m.description,
-            marketing: m
-                .marketing
-                .map(|addr| deps.api.addr_validate(&addr))
-                .transpose()?,
-            logo: None,
-        }),
+        Some(m) => {
+            let logo = if let Some(logo) = m.logo {
+                verify_logo(&logo)?;
+                LOGO.save(deps.storage, &logo)?;
+
+                match logo {
+                    Logo::Url(url) => Some(LogoInfo::Url(url)),
+                    Logo::Embedded(_) => Some(LogoInfo::Embedded),
+                }
+            } else {
+                None
+            };
+
+            Some(MarketingInfo {
+                project: m.project,
+                description: m.description,
+                marketing: m
+                    .marketing
+                    .map(|addr| deps.api.addr_validate(&addr))
+                    .transpose()?,
+                logo,
+            })
+        }
         None => None,
     };
 
@@ -459,12 +473,7 @@ pub fn query_marketing_info(deps: Deps) -> StdResult<MarketingInfoResponse> {
             marketing: marketing.marketing,
             logo: marketing.logo,
         },
-        None => MarketingInfoResponse {
-            project: None,
-            description: None,
-            marketing: None,
-            logo: None,
-        },
+        None => MarketingInfoResponse::default(),
     };
 
     Ok(info)
@@ -689,6 +698,7 @@ mod tests {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
                         marketing: Some("marketing".to_owned()),
+                        logo: Some(Logo::Url("url".to_owned())),
                     }),
                 };
 
@@ -703,7 +713,7 @@ mod tests {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
                         marketing: Some(Addr::unchecked("marketing")),
-                        logo: None,
+                        logo: Some(LogoInfo::Url("url".to_owned())),
                     }
                 );
 
@@ -728,6 +738,7 @@ mod tests {
                         project: Some("Project".to_owned()),
                         description: Some("Description".to_owned()),
                         marketing: Some("m".to_owned()),
+                        logo: Some(Logo::Url("url".to_owned())),
                     }),
                 };
 
@@ -1106,6 +1117,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("marketing".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1134,7 +1146,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("marketing")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1159,6 +1171,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1186,7 +1199,7 @@ mod tests {
                     project: Some("New project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1211,6 +1224,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1238,7 +1252,7 @@ mod tests {
                     project: None,
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1263,6 +1277,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1290,7 +1305,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Better description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1315,6 +1330,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1342,7 +1358,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: None,
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1367,6 +1383,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1394,7 +1411,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("marketing")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1419,6 +1436,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1450,7 +1468,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1475,6 +1493,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1502,7 +1521,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: None,
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1527,6 +1546,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1575,6 +1595,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1624,6 +1645,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1673,6 +1695,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1696,7 +1719,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 
@@ -1721,6 +1744,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
                 }),
             };
 
@@ -1744,7 +1768,7 @@ mod tests {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
                     marketing: Some(Addr::unchecked("creator")),
-                    logo: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
 

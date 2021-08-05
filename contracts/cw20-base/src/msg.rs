@@ -1,5 +1,5 @@
 use cosmwasm_std::{StdError, StdResult, Uint128};
-use cw20::{Cw20Coin, MinterResponse};
+use cw20::{Cw20Coin, Logo, MinterResponse};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +10,7 @@ pub struct InstantiateMarketingInfo {
     pub project: Option<String>,
     pub description: Option<String>,
     pub marketing: Option<String>,
+    pub logo: Option<Logo>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
