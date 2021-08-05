@@ -17,7 +17,7 @@ use crate::allowances::{
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{MarketingInfo, MinterData, TokenInfo, BALANCES, LOGO, TOKEN_INFO};
+use crate::state::{MinterData, TokenInfo, BALANCES, LOGO, MARKETING_INFO, TOKEN_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -65,33 +65,6 @@ pub fn instantiate(
         None => None,
     };
 
-    let marketing = match msg.marketing {
-        Some(m) => {
-            let logo = if let Some(logo) = m.logo {
-                verify_logo(&logo)?;
-                LOGO.save(deps.storage, &logo)?;
-
-                match logo {
-                    Logo::Url(url) => Some(LogoInfo::Url(url)),
-                    Logo::Embedded(_) => Some(LogoInfo::Embedded),
-                }
-            } else {
-                None
-            };
-
-            Some(MarketingInfo {
-                project: m.project,
-                description: m.description,
-                marketing: m
-                    .marketing
-                    .map(|addr| deps.api.addr_validate(&addr))
-                    .transpose()?,
-                logo,
-            })
-        }
-        None => None,
-    };
-
     // store token info
     let data = TokenInfo {
         name: msg.name,
@@ -99,9 +72,34 @@ pub fn instantiate(
         decimals: msg.decimals,
         total_supply,
         mint,
-        marketing,
     };
     TOKEN_INFO.save(deps.storage, &data)?;
+
+    if let Some(marketing) = msg.marketing {
+        let logo = if let Some(logo) = marketing.logo {
+            verify_logo(&logo)?;
+            LOGO.save(deps.storage, &logo)?;
+
+            match logo {
+                Logo::Url(url) => Some(LogoInfo::Url(url)),
+                Logo::Embedded(_) => Some(LogoInfo::Embedded),
+            }
+        } else {
+            None
+        };
+
+        let data = MarketingInfoResponse {
+            project: marketing.project,
+            description: marketing.description,
+            marketing: marketing
+                .marketing
+                .map(|addr| deps.api.addr_validate(&addr))
+                .transpose()?,
+            logo,
+        };
+        MARKETING_INFO.save(deps.storage, &data)?;
+    }
+
     Ok(Response::default())
 }
 
@@ -321,13 +319,8 @@ pub fn execute_update_marketing(
     description: Option<String>,
     marketing: Option<String>,
 ) -> Result<Response, ContractError> {
-    let mut config = TOKEN_INFO.load(deps.storage)?;
-
-    // If there is no marketing info, there is also noone who can update it, therefore it cannot be
-    // authorised
-    let marketing_info = config
-        .marketing
-        .as_mut()
+    let mut marketing_info = MARKETING_INFO
+        .may_load(deps.storage)?
         .ok_or(ContractError::Unauthorized {})?;
 
     if marketing_info
@@ -362,10 +355,10 @@ pub fn execute_update_marketing(
         && marketing_info.marketing.is_none()
         && marketing_info.logo.is_none()
     {
-        config.marketing = None;
+        MARKETING_INFO.remove(deps.storage);
+    } else {
+        MARKETING_INFO.save(deps.storage, &marketing_info)?;
     }
-
-    TOKEN_INFO.save(deps.storage, &config)?;
 
     let res = Response::new().add_attribute("action", "update_marketing");
     Ok(res)
@@ -377,13 +370,8 @@ pub fn execute_upload_logo(
     info: MessageInfo,
     logo: Logo,
 ) -> Result<Response, ContractError> {
-    let mut config = TOKEN_INFO.load(deps.storage)?;
-
-    // If there is no marketing info, there is also noone who can update it, therefore it cannot be
-    // authorised
-    let marketing_info = config
-        .marketing
-        .as_mut()
+    let mut marketing_info = MARKETING_INFO
+        .may_load(deps.storage)?
         .ok_or(ContractError::Unauthorized {})?;
 
     verify_logo(&logo)?;
@@ -405,7 +393,7 @@ pub fn execute_upload_logo(
     };
 
     marketing_info.logo = Some(logo_info);
-    TOKEN_INFO.save(deps.storage, &config)?;
+    MARKETING_INFO.save(deps.storage, &marketing_info)?;
 
     let res = Response::new().add_attribute("action", "upload_logo");
     Ok(res)
@@ -465,18 +453,7 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
 }
 
 pub fn query_marketing_info(deps: Deps) -> StdResult<MarketingInfoResponse> {
-    let meta = TOKEN_INFO.load(deps.storage)?;
-    let info = match meta.marketing {
-        Some(marketing) => MarketingInfoResponse {
-            project: marketing.project,
-            description: marketing.description,
-            marketing: marketing.marketing,
-            logo: marketing.logo,
-        },
-        None => MarketingInfoResponse::default(),
-    };
-
-    Ok(info)
+    Ok(MARKETING_INFO.may_load(deps.storage)?.unwrap_or_default())
 }
 
 pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
