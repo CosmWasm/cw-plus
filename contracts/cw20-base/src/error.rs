@@ -26,4 +26,10 @@ pub enum ContractError {
 
     #[error("Logo binary data exceeds 5KB limit")]
     LogoTooBig {},
+
+    #[error("Invalid xml preamble for SVG")]
+    InvalidXMLPreamble {},
+
+    #[error("Invalid png header")]
+    InvalidPNGHeader {},
 }

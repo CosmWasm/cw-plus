@@ -59,7 +59,9 @@ impl From<cw20_base::ContractError> for ContractError {
             cw20_base::ContractError::NoAllowance {} => ContractError::NoAllowance {},
             cw20_base::ContractError::CannotExceedCap {} => ContractError::CannotExceedCap {},
             // This should never happen, as this contract doesn't use logo
-            cw20_base::ContractError::LogoTooBig {} => {
+            cw20_base::ContractError::LogoTooBig {}
+            | cw20_base::ContractError::InvalidPNGHeader {}
+            | cw20_base::ContractError::InvalidXMLPreamble {} => {
                 ContractError::Std(StdError::generic_err(err.to_string()))
             }
         }

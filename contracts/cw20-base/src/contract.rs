@@ -25,16 +25,64 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const LOGO_SIZE_CAP: usize = 5 * 1024;
 
-fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
-    if matches!(
-        logo,
-              Logo::Embedded(EmbeddedLogo::Svg(logo))
-            | Logo::Embedded(EmbeddedLogo::Png(logo))
-                if logo.len() > LOGO_SIZE_CAP
-    ) {
+/// Checks if data starts with XML preamble
+fn verify_xml_preamble(data: &[u8]) -> Result<(), ContractError> {
+    // The easiest way to perform this check would be just match on regex, however regex
+    // compilation is heavy and probably not worth it.
+
+    let preamble = data
+        .split_inclusive(|c| *c == b'>')
+        .next()
+        .ok_or(ContractError::InvalidXMLPreamble {})?;
+
+    const PREFIX: &[u8] = b"<?xml ";
+    const POSTFIX: &[u8] = b"?>";
+
+    if !(preamble.starts_with(PREFIX) && preamble.ends_with(POSTFIX)) {
+        Err(ContractError::InvalidXMLPreamble {})
+    } else {
+        Ok(())
+    }
+
+    // Additionally attributes format could be validated as they are well defined, as well as
+    // comments presence inside of preable, but it is probably not worth it.
+}
+
+/// Validates XML logo
+fn verify_xml_logo(logo: &[u8]) -> Result<(), ContractError> {
+    verify_xml_preamble(logo)?;
+
+    if logo.len() > LOGO_SIZE_CAP {
         Err(ContractError::LogoTooBig {})
     } else {
         Ok(())
+    }
+}
+
+/// Validates png logo
+fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
+    // PNG header format:
+    // 0x89 - magic byte, out of ASCII table to fail on 7-bit systems
+    // "PNG" ascii representation
+    // [0x0d, 0x0a] - dos style line ending
+    // 0x1a - dos control character, stop displaying rest of the file
+    // 0x0a - unix style line ending
+    const HEADER: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+    if logo.len() > LOGO_SIZE_CAP {
+        Err(ContractError::LogoTooBig {})
+    } else if !logo.starts_with(&HEADER) {
+        Err(ContractError::InvalidPNGHeader {})
+    } else {
+        Ok(())
+    }
+}
+
+/// Checks if passed logo is correct, and if not, returns an error
+fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
+    match logo {
+        Logo::Embedded(EmbeddedLogo::Svg(logo)) => verify_xml_logo(&logo),
+        Logo::Embedded(EmbeddedLogo::Png(logo)) => verify_png_logo(&logo),
+        Logo::Url(_) => Ok(()), // Any reasonable url validation would be regex based, probably not worth it
     }
 }
 
@@ -544,6 +592,8 @@ mod tests {
         assert_eq!(query_minter(deps.as_ref()).unwrap(), mint,);
         meta
     }
+
+    const PNG_HEADER: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
 
     mod instantiate {
         use super::*;
@@ -1584,7 +1634,7 @@ mod tests {
                 deps.as_mut(),
                 mock_env(),
                 info,
-                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png("data".as_bytes().into()))),
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png(PNG_HEADER.into()))),
             )
             .unwrap();
 
@@ -1604,7 +1654,7 @@ mod tests {
                 query_download_logo(deps.as_ref()).unwrap(),
                 DownloadLogoResponse {
                     mime_type: "image/png".to_owned(),
-                    data: "data".as_bytes().into(),
+                    data: PNG_HEADER.into(),
                 }
             );
         }
@@ -1630,11 +1680,12 @@ mod tests {
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
+            let img = "<?xml version=\"1.0\"?><svg></svg>".as_bytes();
             let res = execute(
                 deps.as_mut(),
                 mock_env(),
                 info,
-                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg("data".as_bytes().into()))),
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
             )
             .unwrap();
 
@@ -1654,7 +1705,7 @@ mod tests {
                 query_download_logo(deps.as_ref()).unwrap(),
                 DownloadLogoResponse {
                     mime_type: "image/svg+xml".to_owned(),
-                    data: "data".as_bytes().into(),
+                    data: img.into(),
                 }
             );
         }
@@ -1680,11 +1731,12 @@ mod tests {
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
+            let img = [&PNG_HEADER[..], &[1; 6000][..]].concat();
             let err = execute(
                 deps.as_mut(),
                 mock_env(),
                 info,
-                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png([1; 6000].into()))),
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png(img.into()))),
             )
             .unwrap_err();
 
@@ -1729,15 +1781,124 @@ mod tests {
 
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
 
+            let img = [
+                "<?xml version=\"1.0\"?><svg>",
+                std::str::from_utf8(&[b'x'; 6000]).unwrap(),
+                "</svg>",
+            ]
+            .concat()
+            .into_bytes();
+
             let err = execute(
                 deps.as_mut(),
                 mock_env(),
                 info,
-                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg([1; 6000].into()))),
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
             )
             .unwrap_err();
 
             assert_eq!(err, ContractError::LogoTooBig {});
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_png_invalid() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = &[1];
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png(img.into()))),
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::InvalidPNGHeader {});
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_svg_invalid() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = &[1];
+
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::InvalidXMLPreamble {});
 
             assert_eq!(
                 query_marketing_info(deps.as_ref()).unwrap(),
