@@ -85,6 +85,7 @@ fn cw3_controls_cw20() {
             minter: multisig_addr.to_string(),
             cap: None,
         }),
+        marketing: None,
     };
     let cw20_addr = router
         .instantiate_contract(

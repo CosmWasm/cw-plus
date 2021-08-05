@@ -5,7 +5,10 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
-use cw20::{BalanceResponse, Cw20Coin, Cw20ReceiveMsg, MinterResponse, TokenInfoResponse};
+use cw20::{
+    BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
+    MarketingInfoResponse, MinterResponse, TokenInfoResponse,
+};
 
 use crate::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
@@ -14,11 +17,74 @@ use crate::allowances::{
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{MinterData, TokenInfo, BALANCES, TOKEN_INFO};
+use crate::state::{MinterData, TokenInfo, BALANCES, LOGO, MARKETING_INFO, TOKEN_INFO};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const LOGO_SIZE_CAP: usize = 5 * 1024;
+
+/// Checks if data starts with XML preamble
+fn verify_xml_preamble(data: &[u8]) -> Result<(), ContractError> {
+    // The easiest way to perform this check would be just match on regex, however regex
+    // compilation is heavy and probably not worth it.
+
+    let preamble = data
+        .split_inclusive(|c| *c == b'>')
+        .next()
+        .ok_or(ContractError::InvalidXmlPreamble {})?;
+
+    const PREFIX: &[u8] = b"<?xml ";
+    const POSTFIX: &[u8] = b"?>";
+
+    if !(preamble.starts_with(PREFIX) && preamble.ends_with(POSTFIX)) {
+        Err(ContractError::InvalidXmlPreamble {})
+    } else {
+        Ok(())
+    }
+
+    // Additionally attributes format could be validated as they are well defined, as well as
+    // comments presence inside of preable, but it is probably not worth it.
+}
+
+/// Validates XML logo
+fn verify_xml_logo(logo: &[u8]) -> Result<(), ContractError> {
+    verify_xml_preamble(logo)?;
+
+    if logo.len() > LOGO_SIZE_CAP {
+        Err(ContractError::LogoTooBig {})
+    } else {
+        Ok(())
+    }
+}
+
+/// Validates png logo
+fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
+    // PNG header format:
+    // 0x89 - magic byte, out of ASCII table to fail on 7-bit systems
+    // "PNG" ascii representation
+    // [0x0d, 0x0a] - dos style line ending
+    // 0x1a - dos control character, stop displaying rest of the file
+    // 0x0a - unix style line ending
+    const HEADER: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+    if logo.len() > LOGO_SIZE_CAP {
+        Err(ContractError::LogoTooBig {})
+    } else if !logo.starts_with(&HEADER) {
+        Err(ContractError::InvalidPngHeader {})
+    } else {
+        Ok(())
+    }
+}
+
+/// Checks if passed logo is correct, and if not, returns an error
+fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
+    match logo {
+        Logo::Embedded(EmbeddedLogo::Svg(logo)) => verify_xml_logo(&logo),
+        Logo::Embedded(EmbeddedLogo::Png(logo)) => verify_png_logo(&logo),
+        Logo::Url(_) => Ok(()), // Any reasonable url validation would be regex based, probably not worth it
+    }
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -26,7 +92,7 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<Response> {
+) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -35,7 +101,7 @@ pub fn instantiate(
 
     if let Some(limit) = msg.get_cap() {
         if total_supply > limit {
-            return Err(StdError::generic_err("Initial supply greater than cap"));
+            return Err(StdError::generic_err("Initial supply greater than cap").into());
         }
     }
 
@@ -56,6 +122,32 @@ pub fn instantiate(
         mint,
     };
     TOKEN_INFO.save(deps.storage, &data)?;
+
+    if let Some(marketing) = msg.marketing {
+        let logo = if let Some(logo) = marketing.logo {
+            verify_logo(&logo)?;
+            LOGO.save(deps.storage, &logo)?;
+
+            match logo {
+                Logo::Url(url) => Some(LogoInfo::Url(url)),
+                Logo::Embedded(_) => Some(LogoInfo::Embedded),
+            }
+        } else {
+            None
+        };
+
+        let data = MarketingInfoResponse {
+            project: marketing.project,
+            description: marketing.description,
+            marketing: marketing
+                .marketing
+                .map(|addr| deps.api.addr_validate(&addr))
+                .transpose()?,
+            logo,
+        };
+        MARKETING_INFO.save(deps.storage, &data)?;
+    }
+
     Ok(Response::default())
 }
 
@@ -109,6 +201,12 @@ pub fn execute(
             amount,
             msg,
         } => execute_send_from(deps, env, info, owner, contract, amount, msg),
+        ExecuteMsg::UpdateMarketing {
+            project,
+            description,
+            marketing,
+        } => execute_update_marketing(deps, env, info, project, description, marketing),
+        ExecuteMsg::UploadLogo(logo) => execute_upload_logo(deps, env, info, logo),
     }
 }
 
@@ -261,6 +359,94 @@ pub fn execute_send(
     Ok(res)
 }
 
+pub fn execute_update_marketing(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    project: Option<String>,
+    description: Option<String>,
+    marketing: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut marketing_info = MARKETING_INFO
+        .may_load(deps.storage)?
+        .ok_or(ContractError::Unauthorized {})?;
+
+    if marketing_info
+        .marketing
+        .as_ref()
+        .ok_or(ContractError::Unauthorized {})?
+        != &info.sender
+    {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    match project {
+        Some(empty) if empty.trim().is_empty() => marketing_info.project = None,
+        Some(project) => marketing_info.project = Some(project),
+        None => (),
+    }
+
+    match description {
+        Some(empty) if empty.trim().is_empty() => marketing_info.description = None,
+        Some(description) => marketing_info.description = Some(description),
+        None => (),
+    }
+
+    match marketing {
+        Some(empty) if empty.trim().is_empty() => marketing_info.marketing = None,
+        Some(marketing) => marketing_info.marketing = Some(deps.api.addr_validate(&marketing)?),
+        None => (),
+    }
+
+    if marketing_info.project.is_none()
+        && marketing_info.description.is_none()
+        && marketing_info.marketing.is_none()
+        && marketing_info.logo.is_none()
+    {
+        MARKETING_INFO.remove(deps.storage);
+    } else {
+        MARKETING_INFO.save(deps.storage, &marketing_info)?;
+    }
+
+    let res = Response::new().add_attribute("action", "update_marketing");
+    Ok(res)
+}
+
+pub fn execute_upload_logo(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    logo: Logo,
+) -> Result<Response, ContractError> {
+    let mut marketing_info = MARKETING_INFO
+        .may_load(deps.storage)?
+        .ok_or(ContractError::Unauthorized {})?;
+
+    verify_logo(&logo)?;
+
+    if marketing_info
+        .marketing
+        .as_ref()
+        .ok_or(ContractError::Unauthorized {})?
+        != &info.sender
+    {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    LOGO.save(deps.storage, &logo)?;
+
+    let logo_info = match logo {
+        Logo::Url(url) => LogoInfo::Url(url),
+        Logo::Embedded(_) => LogoInfo::Embedded,
+    };
+
+    marketing_info.logo = Some(logo_info);
+    MARKETING_INFO.save(deps.storage, &marketing_info)?;
+
+    let res = Response::new().add_attribute("action", "upload_logo");
+    Ok(res)
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -278,6 +464,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::AllAccounts { start_after, limit } => {
             to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
+        QueryMsg::MarketingInfo {} => to_binary(&query_marketing_info(deps)?),
+        QueryMsg::DownloadLogo {} => to_binary(&query_download_logo(deps)?),
     }
 }
 
@@ -312,12 +500,32 @@ pub fn query_minter(deps: Deps) -> StdResult<Option<MinterResponse>> {
     Ok(minter)
 }
 
+pub fn query_marketing_info(deps: Deps) -> StdResult<MarketingInfoResponse> {
+    Ok(MARKETING_INFO.may_load(deps.storage)?.unwrap_or_default())
+}
+
+pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
+    let logo = LOGO.load(deps.storage)?;
+    match logo {
+        Logo::Embedded(EmbeddedLogo::Svg(logo)) => Ok(DownloadLogoResponse {
+            mime_type: "image/svg+xml".to_owned(),
+            data: logo,
+        }),
+        Logo::Embedded(EmbeddedLogo::Png(logo)) => Ok(DownloadLogoResponse {
+            mime_type: "image/png".to_owned(),
+            data: logo,
+        }),
+        Logo::Url(_) => Err(StdError::not_found("logo")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, CosmosMsg, StdError, SubMsg, WasmMsg};
+    use cosmwasm_std::{coins, from_binary, Addr, CosmosMsg, StdError, SubMsg, WasmMsg};
 
     use super::*;
+    use crate::msg::InstantiateMarketingInfo;
 
     fn get_balance<T: Into<String>>(deps: Deps, address: T) -> Uint128 {
         query_balance(deps, address.into()).unwrap().balance
@@ -363,6 +571,7 @@ mod tests {
                 amount,
             }],
             mint: mint.clone(),
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -384,112 +593,194 @@ mod tests {
         meta
     }
 
-    #[test]
-    fn proper_instantiation() {
-        let mut deps = mock_dependencies(&[]);
-        let amount = Uint128::from(11223344u128);
-        let instantiate_msg = InstantiateMsg {
-            name: "Cash Token".to_string(),
-            symbol: "CASH".to_string(),
-            decimals: 9,
-            initial_balances: vec![Cw20Coin {
-                address: String::from("addr0000"),
-                amount,
-            }],
-            mint: None,
-        };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
-        let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
-        assert_eq!(0, res.messages.len());
+    const PNG_HEADER: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
 
-        assert_eq!(
-            query_token_info(deps.as_ref()).unwrap(),
-            TokenInfoResponse {
+    mod instantiate {
+        use super::*;
+
+        #[test]
+        fn basic() {
+            let mut deps = mock_dependencies(&[]);
+            let amount = Uint128::from(11223344u128);
+            let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
-                total_supply: amount,
-            }
-        );
-        assert_eq!(
-            get_balance(deps.as_ref(), "addr0000"),
-            Uint128::new(11223344)
-        );
-    }
+                initial_balances: vec![Cw20Coin {
+                    address: String::from("addr0000"),
+                    amount,
+                }],
+                mint: None,
+                marketing: None,
+            };
+            let info = mock_info("creator", &[]);
+            let env = mock_env();
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
 
-    #[test]
-    fn instantiate_mintable() {
-        let mut deps = mock_dependencies(&[]);
-        let amount = Uint128::new(11223344);
-        let minter = String::from("asmodat");
-        let limit = Uint128::new(511223344);
-        let instantiate_msg = InstantiateMsg {
-            name: "Cash Token".to_string(),
-            symbol: "CASH".to_string(),
-            decimals: 9,
-            initial_balances: vec![Cw20Coin {
-                address: "addr0000".into(),
-                amount,
-            }],
-            mint: Some(MinterResponse {
-                minter: minter.clone(),
-                cap: Some(limit),
-            }),
-        };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
-        let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
-        assert_eq!(0, res.messages.len());
+            assert_eq!(
+                query_token_info(deps.as_ref()).unwrap(),
+                TokenInfoResponse {
+                    name: "Cash Token".to_string(),
+                    symbol: "CASH".to_string(),
+                    decimals: 9,
+                    total_supply: amount,
+                }
+            );
+            assert_eq!(
+                get_balance(deps.as_ref(), "addr0000"),
+                Uint128::new(11223344)
+            );
+        }
 
-        assert_eq!(
-            query_token_info(deps.as_ref()).unwrap(),
-            TokenInfoResponse {
+        #[test]
+        fn mintable() {
+            let mut deps = mock_dependencies(&[]);
+            let amount = Uint128::new(11223344);
+            let minter = String::from("asmodat");
+            let limit = Uint128::new(511223344);
+            let instantiate_msg = InstantiateMsg {
                 name: "Cash Token".to_string(),
                 symbol: "CASH".to_string(),
                 decimals: 9,
-                total_supply: amount,
-            }
-        );
-        assert_eq!(
-            get_balance(deps.as_ref(), "addr0000"),
-            Uint128::new(11223344)
-        );
-        assert_eq!(
-            query_minter(deps.as_ref()).unwrap(),
-            Some(MinterResponse {
-                minter,
-                cap: Some(limit),
-            }),
-        );
-    }
+                initial_balances: vec![Cw20Coin {
+                    address: "addr0000".into(),
+                    amount,
+                }],
+                mint: Some(MinterResponse {
+                    minter: minter.clone(),
+                    cap: Some(limit),
+                }),
+                marketing: None,
+            };
+            let info = mock_info("creator", &[]);
+            let env = mock_env();
+            let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+            assert_eq!(0, res.messages.len());
 
-    #[test]
-    fn instantiate_mintable_over_cap() {
-        let mut deps = mock_dependencies(&[]);
-        let amount = Uint128::new(11223344);
-        let minter = String::from("asmodat");
-        let limit = Uint128::new(11223300);
-        let instantiate_msg = InstantiateMsg {
-            name: "Cash Token".to_string(),
-            symbol: "CASH".to_string(),
-            decimals: 9,
-            initial_balances: vec![Cw20Coin {
-                address: String::from("addr0000"),
-                amount,
-            }],
-            mint: Some(MinterResponse {
-                minter,
-                cap: Some(limit),
-            }),
-        };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
-        let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
-        assert_eq!(
-            err,
-            StdError::generic_err("Initial supply greater than cap")
-        );
+            assert_eq!(
+                query_token_info(deps.as_ref()).unwrap(),
+                TokenInfoResponse {
+                    name: "Cash Token".to_string(),
+                    symbol: "CASH".to_string(),
+                    decimals: 9,
+                    total_supply: amount,
+                }
+            );
+            assert_eq!(
+                get_balance(deps.as_ref(), "addr0000"),
+                Uint128::new(11223344)
+            );
+            assert_eq!(
+                query_minter(deps.as_ref()).unwrap(),
+                Some(MinterResponse {
+                    minter,
+                    cap: Some(limit),
+                }),
+            );
+        }
+
+        #[test]
+        fn mintable_over_cap() {
+            let mut deps = mock_dependencies(&[]);
+            let amount = Uint128::new(11223344);
+            let minter = String::from("asmodat");
+            let limit = Uint128::new(11223300);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![Cw20Coin {
+                    address: String::from("addr0000"),
+                    amount,
+                }],
+                mint: Some(MinterResponse {
+                    minter,
+                    cap: Some(limit),
+                }),
+                marketing: None,
+            };
+            let info = mock_info("creator", &[]);
+            let env = mock_env();
+            let err = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
+            assert_eq!(
+                err,
+                StdError::generic_err("Initial supply greater than cap").into()
+            );
+        }
+
+        mod marketing {
+            use super::*;
+
+            #[test]
+            fn basic() {
+                let mut deps = mock_dependencies(&[]);
+                let instantiate_msg = InstantiateMsg {
+                    name: "Cash Token".to_string(),
+                    symbol: "CASH".to_string(),
+                    decimals: 9,
+                    initial_balances: vec![],
+                    mint: None,
+                    marketing: Some(InstantiateMarketingInfo {
+                        project: Some("Project".to_owned()),
+                        description: Some("Description".to_owned()),
+                        marketing: Some("marketing".to_owned()),
+                        logo: Some(Logo::Url("url".to_owned())),
+                    }),
+                };
+
+                let info = mock_info("creator", &[]);
+                let env = mock_env();
+                let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
+                assert_eq!(0, res.messages.len());
+
+                assert_eq!(
+                    query_marketing_info(deps.as_ref()).unwrap(),
+                    MarketingInfoResponse {
+                        project: Some("Project".to_owned()),
+                        description: Some("Description".to_owned()),
+                        marketing: Some(Addr::unchecked("marketing")),
+                        logo: Some(LogoInfo::Url("url".to_owned())),
+                    }
+                );
+
+                let err = query_download_logo(deps.as_ref()).unwrap_err();
+                assert!(
+                    matches!(err, StdError::NotFound { .. }),
+                    "Expected StdError::NotFound, received {}",
+                    err
+                );
+            }
+
+            #[test]
+            fn invalid_marketing() {
+                let mut deps = mock_dependencies(&[]);
+                let instantiate_msg = InstantiateMsg {
+                    name: "Cash Token".to_string(),
+                    symbol: "CASH".to_string(),
+                    decimals: 9,
+                    initial_balances: vec![],
+                    mint: None,
+                    marketing: Some(InstantiateMarketingInfo {
+                        project: Some("Project".to_owned()),
+                        description: Some("Description".to_owned()),
+                        marketing: Some("m".to_owned()),
+                        logo: Some(Logo::Url("url".to_owned())),
+                    }),
+                };
+
+                let info = mock_info("creator", &[]);
+                let env = mock_env();
+                instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap_err();
+
+                let err = query_download_logo(deps.as_ref()).unwrap_err();
+                assert!(
+                    matches!(err, StdError::NotFound { .. }),
+                    "Expected StdError::NotFound, received {}",
+                    err
+                );
+            }
+        }
     }
 
     #[test]
@@ -597,6 +888,7 @@ mod tests {
                 },
             ],
             mint: None,
+            marketing: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -834,5 +1126,796 @@ mod tests {
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
         );
+    }
+
+    mod marketing {
+        use super::*;
+
+        #[test]
+        fn update_unauthorised() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("marketing".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: Some("New project".to_owned()),
+                    description: Some("Better description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                },
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::Unauthorized {});
+
+            // Ensure marketing didn't change
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("marketing")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_project() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: Some("New project".to_owned()),
+                    description: None,
+                    marketing: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("New project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn clear_project() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: Some("".to_owned()),
+                    description: None,
+                    marketing: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: None,
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_description() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: None,
+                    description: Some("Better description".to_owned()),
+                    marketing: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Better description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn clear_description() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: None,
+                    description: Some("".to_owned()),
+                    marketing: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: None,
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_marketing() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: None,
+                    description: None,
+                    marketing: Some("marketing".to_owned()),
+                },
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("marketing")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_marketing_invalid() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: None,
+                    description: None,
+                    marketing: Some("m".to_owned()),
+                },
+            )
+            .unwrap_err();
+
+            assert!(
+                matches!(err, ContractError::Std(_)),
+                "Expected Std error, received: {}",
+                err
+            );
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn clear_marketing() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UpdateMarketing {
+                    project: None,
+                    description: None,
+                    marketing: Some("".to_owned()),
+                },
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: None,
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_url() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Url("new_url".to_owned())),
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("new_url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_png() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png(PNG_HEADER.into()))),
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Embedded),
+                }
+            );
+
+            assert_eq!(
+                query_download_logo(deps.as_ref()).unwrap(),
+                DownloadLogoResponse {
+                    mime_type: "image/png".to_owned(),
+                    data: PNG_HEADER.into(),
+                }
+            );
+        }
+
+        #[test]
+        fn update_logo_svg() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = "<?xml version=\"1.0\"?><svg></svg>".as_bytes();
+            let res = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
+            )
+            .unwrap();
+
+            assert_eq!(res.messages, vec![]);
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Embedded),
+                }
+            );
+
+            assert_eq!(
+                query_download_logo(deps.as_ref()).unwrap(),
+                DownloadLogoResponse {
+                    mime_type: "image/svg+xml".to_owned(),
+                    data: img.into(),
+                }
+            );
+        }
+
+        #[test]
+        fn update_logo_png_oversized() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = [&PNG_HEADER[..], &[1; 6000][..]].concat();
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png(img.into()))),
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::LogoTooBig {});
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_svg_oversized() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = [
+                "<?xml version=\"1.0\"?><svg>",
+                std::str::from_utf8(&[b'x'; 6000]).unwrap(),
+                "</svg>",
+            ]
+            .concat()
+            .into_bytes();
+
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::LogoTooBig {});
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_png_invalid() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = &[1];
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Png(img.into()))),
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::InvalidPngHeader {});
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
+
+        #[test]
+        fn update_logo_svg_invalid() {
+            let mut deps = mock_dependencies(&[]);
+            let instantiate_msg = InstantiateMsg {
+                name: "Cash Token".to_string(),
+                symbol: "CASH".to_string(),
+                decimals: 9,
+                initial_balances: vec![],
+                mint: None,
+                marketing: Some(InstantiateMarketingInfo {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some("creator".to_owned()),
+                    logo: Some(Logo::Url("url".to_owned())),
+                }),
+            };
+
+            let info = mock_info("creator", &[]);
+
+            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
+
+            let img = &[1];
+
+            let err = execute(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
+            )
+            .unwrap_err();
+
+            assert_eq!(err, ContractError::InvalidXmlPreamble {});
+
+            assert_eq!(
+                query_marketing_info(deps.as_ref()).unwrap(),
+                MarketingInfoResponse {
+                    project: Some("Project".to_owned()),
+                    description: Some("Description".to_owned()),
+                    marketing: Some(Addr::unchecked("creator")),
+                    logo: Some(LogoInfo::Url("url".to_owned())),
+                }
+            );
+
+            let err = query_download_logo(deps.as_ref()).unwrap_err();
+            assert!(
+                matches!(err, StdError::NotFound { .. }),
+                "Expected StdError::NotFound, received {}",
+                err
+            );
+        }
     }
 }

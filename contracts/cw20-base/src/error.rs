@@ -23,4 +23,13 @@ pub enum ContractError {
 
     #[error("Minting cannot exceed the cap")]
     CannotExceedCap {},
+
+    #[error("Logo binary data exceeds 5KB limit")]
+    LogoTooBig {},
+
+    #[error("Invalid xml preamble for SVG")]
+    InvalidXmlPreamble {},
+
+    #[error("Invalid png header")]
+    InvalidPngHeader {},
 }
