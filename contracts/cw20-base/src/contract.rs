@@ -33,13 +33,13 @@ fn verify_xml_preamble(data: &[u8]) -> Result<(), ContractError> {
     let preamble = data
         .split_inclusive(|c| *c == b'>')
         .next()
-        .ok_or(ContractError::InvalidXMLPreamble {})?;
+        .ok_or(ContractError::InvalidXmlPreamble {})?;
 
     const PREFIX: &[u8] = b"<?xml ";
     const POSTFIX: &[u8] = b"?>";
 
     if !(preamble.starts_with(PREFIX) && preamble.ends_with(POSTFIX)) {
-        Err(ContractError::InvalidXMLPreamble {})
+        Err(ContractError::InvalidXmlPreamble {})
     } else {
         Ok(())
     }
@@ -71,7 +71,7 @@ fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
     if logo.len() > LOGO_SIZE_CAP {
         Err(ContractError::LogoTooBig {})
     } else if !logo.starts_with(&HEADER) {
-        Err(ContractError::InvalidPNGHeader {})
+        Err(ContractError::InvalidPngHeader {})
     } else {
         Ok(())
     }
@@ -1847,7 +1847,7 @@ mod tests {
             )
             .unwrap_err();
 
-            assert_eq!(err, ContractError::InvalidPNGHeader {});
+            assert_eq!(err, ContractError::InvalidPngHeader {});
 
             assert_eq!(
                 query_marketing_info(deps.as_ref()).unwrap(),
@@ -1898,7 +1898,7 @@ mod tests {
             )
             .unwrap_err();
 
-            assert_eq!(err, ContractError::InvalidXMLPreamble {});
+            assert_eq!(err, ContractError::InvalidXmlPreamble {});
 
             assert_eq!(
                 query_marketing_info(deps.as_ref()).unwrap(),

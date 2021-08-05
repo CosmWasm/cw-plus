@@ -28,8 +28,8 @@ pub enum ContractError {
     LogoTooBig {},
 
     #[error("Invalid xml preamble for SVG")]
-    InvalidXMLPreamble {},
+    InvalidXmlPreamble {},
 
     #[error("Invalid png header")]
-    InvalidPNGHeader {},
+    InvalidPngHeader {},
 }
