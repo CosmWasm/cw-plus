@@ -707,6 +707,7 @@ mod test {
         let res = app
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
+
         // expected events: execute, transfer, reply, custom wasm (set in reply)
         assert_eq!(4, res.events.len(), "{:?}", res.events);
         let first = &res.events[0];
@@ -744,7 +745,10 @@ mod test {
         // ensure success was written
         let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 123);
-        assert!(res.result.is_ok());
+        // validate the events written in the reply blob...should just be bank transfer
+        let reply_events = res.result.unwrap().events;
+        assert_eq!(1, reply_events.len());
+        assert_eq!("transfer", &reply_events[0].ty);
 
         // reflect sends 300 btc, failure, but error caught by submessage (so shows success)
         let msg = SubMsg::reply_always(
