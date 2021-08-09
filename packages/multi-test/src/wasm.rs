@@ -136,7 +136,7 @@ where
         msg: WasmMsg,
     ) -> Result<AppResponse, String> {
         let (resender, res) = self.execute_wasm(api, storage, router, block, sender, msg)?;
-        self.process_response(api, router, storage, block, resender, res, false)
+        self.process_response(api, router, storage, block, resender, res)
     }
 
     fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
@@ -159,7 +159,7 @@ where
         msg: Vec<u8>,
     ) -> Result<AppResponse, String> {
         let res = self.call_sudo(contract_addr.clone(), api, storage, router, block, msg)?;
-        self.process_response(api, router, storage, block, contract_addr, res, false)
+        self.process_response(api, router, storage, block, contract_addr, res)
     }
 }
 
@@ -417,7 +417,7 @@ where
         reply: Reply,
     ) -> Result<AppResponse, String> {
         let res = self.call_reply(contract.clone(), api, storage, router, block, reply)?;
-        self.process_response(api, router, storage, block, contract, res, true)
+        self.process_response(api, router, storage, block, contract, res)
     }
 
     fn process_response(
@@ -428,7 +428,6 @@ where
         block: &BlockInfo,
         contract: Addr,
         response: Response<C>,
-        ignore_attributes: bool,
     ) -> Result<AppResponse, String> {
         // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
         // fake system level event types, like transfer from the bank module)
@@ -440,13 +439,13 @@ where
                 ev
             })
             .collect();
-        // hmmm... we don't need this for reply, right?
-        if !ignore_attributes {
+
+        // we only emit this `wasm` event if some attributes are specified
+        if !response.attributes.is_empty() {
             // turn attributes into event and place it first
-            let mut wasm_event = Event::new("wasm").add_attribute("contract_address", &contract);
-            wasm_event
-                .attributes
-                .extend_from_slice(&response.attributes);
+            let wasm_event = Event::new("wasm")
+                .add_attribute("contract_address", &contract)
+                .add_attributes(response.attributes);
             events.insert(0, wasm_event);
         }
 
