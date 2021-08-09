@@ -281,8 +281,8 @@ where
 mod test {
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{
-        attr, coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event,
-        Reply, StdResult, SubMsg, WasmMsg,
+        coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event, Reply,
+        StdResult, SubMsg, WasmMsg,
     };
 
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
@@ -422,7 +422,8 @@ mod test {
             .unwrap();
         assert_eq!(2, res.events.len());
         let custom_attrs = res.custom_attrs(0);
-        assert_eq!(&[attr("action", "payout")], &custom_attrs);
+        assert_eq!(1, custom_attrs.len(), "{:?}", custom_attrs);
+        assert_eq!(custom_attrs[0], ("action", "payout"));
         let expected_transfer = Event::new("transfer")
             .add_attribute("recipient", "random")
             .add_attribute("sender", &contract_addr)
@@ -498,14 +499,15 @@ mod test {
         let first = &res.events[0];
         assert_eq!(first.ty.as_str(), "wasm");
         assert_eq!(2, first.attributes.len());
-        assert_eq!(
-            &attr("contract_address", &payout_addr),
-            &first.attributes[0]
-        );
-        assert_eq!(&attr("action", "payout"), &first.attributes[1]);
+        assert_eq!(first.attributes[0], ("contract_address", &payout_addr));
+        assert_eq!(first.attributes[1], ("action", "payout"));
         // third event is the transfer from bank
         let second = &res.events[1];
         assert_eq!(second.ty.as_str(), "transfer");
+        assert_eq!(3, second.attributes.len());
+        assert_eq!(second.attributes[0], ("recipient", &reflect_addr));
+        assert_eq!(second.attributes[1], ("sender", &payout_addr));
+        assert_eq!(second.attributes[2], ("amount", "5eth"));
 
         // ensure transfer was executed with reflect as sender
         let funds = get_balance(&app, &reflect_addr);
@@ -688,8 +690,8 @@ mod test {
         let custom = &res.events[1];
         assert_eq!("wasm-custom", custom.ty.as_str());
         assert_eq!(2, custom.attributes.len());
-        assert_eq!(&attr("from", "reply"), &custom.attributes[0]);
-        assert_eq!(&attr("to", "test"), &custom.attributes[1]);
+        assert_eq!(custom.attributes[0], ("from", "reply"));
+        assert_eq!(custom.attributes[1], ("to", "test"));
 
         // ensure success was written
         let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
