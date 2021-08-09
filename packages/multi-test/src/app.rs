@@ -420,15 +420,23 @@ mod test {
         let res = app
             .execute_contract(random.clone(), contract_addr.clone(), &EmptyMsg {}, &[])
             .unwrap();
-        assert_eq!(2, res.events.len());
-        let custom_attrs = res.custom_attrs(0);
-        assert_eq!(1, custom_attrs.len(), "{:?}", custom_attrs);
-        assert_eq!(custom_attrs[0], ("action", "payout"));
+        assert_eq!(3, res.events.len());
+
+        // the call to payout does emit this as well as custom attributes
+        let payout_exec = &res.events[0];
+        assert_eq!(payout_exec.ty.as_str(), "execute");
+        assert_eq!(payout_exec.attributes, [("_contract_addr", &contract_addr)]);
+
+        // next is a custom wasm event
+        let custom_attrs = res.custom_attrs(1);
+        assert_eq!(custom_attrs, [("action", "payout")]);
+
+        // then the transfer event
         let expected_transfer = Event::new("transfer")
             .add_attribute("recipient", "random")
             .add_attribute("sender", &contract_addr)
             .add_attribute("amount", "5eth");
-        assert_eq!(&expected_transfer, &res.events[1]);
+        assert_eq!(&expected_transfer, &res.events[2]);
 
         // random got cash
         let funds = get_balance(&app, &random);
@@ -493,16 +501,30 @@ mod test {
             .unwrap();
 
         // ensure the attributes were relayed from the sub-message
-        assert_eq!(2, res.events.len(), "{:?}", res.events);
-        // call to reflect returns no event + attributes, nothing emitted
-        // the call to payout does emit an event, which is returned
-        let first = &res.events[0];
-        assert_eq!(first.ty.as_str(), "wasm");
-        assert_eq!(2, first.attributes.len());
-        assert_eq!(first.attributes[0], ("contract_address", &payout_addr));
-        assert_eq!(first.attributes[1], ("action", "payout"));
-        // third event is the transfer from bank
-        let second = &res.events[1];
+        assert_eq!(4, res.events.len(), "{:?}", res.events);
+
+        // reflect only returns standard wasm-execute event
+        let ref_exec = &res.events[0];
+        assert_eq!(ref_exec.ty.as_str(), "execute");
+        assert_eq!(ref_exec.attributes, [("_contract_addr", &reflect_addr)]);
+
+        // the call to payout does emit this as well as custom attributes
+        let payout_exec = &res.events[1];
+        assert_eq!(payout_exec.ty.as_str(), "execute");
+        assert_eq!(payout_exec.attributes, [("_contract_addr", &payout_addr)]);
+
+        let payout = &res.events[2];
+        assert_eq!(payout.ty.as_str(), "wasm");
+        assert_eq!(
+            payout.attributes,
+            [
+                ("contract_address", payout_addr.as_str()),
+                ("action", "payout")
+            ]
+        );
+
+        // final event is the transfer from bank
+        let second = &res.events[3];
         assert_eq!(second.ty.as_str(), "transfer");
         assert_eq!(3, second.attributes.len());
         assert_eq!(second.attributes[0], ("recipient", &reflect_addr));
@@ -560,9 +582,13 @@ mod test {
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
         // no wasm events as no attributes
-        assert_eq!(1, res.events.len());
+        assert_eq!(2, res.events.len());
+        // standard wasm-execute event
+        let exec = &res.events[0];
+        assert_eq!(exec.ty.as_str(), "execute");
+        assert_eq!(exec.attributes, [("_contract_addr", &reflect_addr)]);
         // only transfer event from bank
-        let transfer = &res.events[0];
+        let transfer = &res.events[1];
         assert_eq!(transfer.ty.as_str(), "transfer");
 
         // ensure random got paid
@@ -681,17 +707,36 @@ mod test {
         let res = app
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap();
-        // we should get 2 events, the transfer event and the custom event
-        assert_eq!(2, res.events.len(), "{:?}", res.events);
-        // first event is the transfer from bank
-        let transfer = &res.events[0];
+        // expected events: execute, transfer, reply, custom wasm (set in reply)
+        assert_eq!(4, res.events.len(), "{:?}", res.events);
+        let first = &res.events[0];
+        assert_eq!(first.ty.as_str(), "execute");
+        assert_eq!(first.attributes, [("_contract_addr", &reflect_addr)]);
+
+        // next event is the transfer from bank
+        let transfer = &res.events[1];
         assert_eq!(transfer.ty.as_str(), "transfer");
-        // the second one is a custom event (from reply)
-        let custom = &res.events[1];
+
+        // then we get notification reply was called
+        let reply = &res.events[2];
+        assert_eq!(reply.ty.as_str(), "reply");
+        assert_eq!(
+            reply.attributes,
+            [("_contract_addr", reflect_addr.as_str()), ("submsg", "ok")]
+        );
+
+        // the last one is a custom event (from reply)
+        let custom = &res.events[3];
         assert_eq!("wasm-custom", custom.ty.as_str());
-        assert_eq!(2, custom.attributes.len());
-        assert_eq!(custom.attributes[0], ("from", "reply"));
-        assert_eq!(custom.attributes[1], ("to", "test"));
+        assert_eq!(
+            custom.attributes,
+            [
+                // TODO
+                // ("_contract_addr", reflect_addr.as_str()),
+                ("from", "reply"),
+                ("to", "test")
+            ]
+        );
 
         // ensure success was written
         let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();

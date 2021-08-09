@@ -449,7 +449,7 @@ where
     fn build_app_response(
         &self,
         contract: &Addr,
-        _custom_event: Event, // entry-point specific custom event added by x/wasm
+        custom_event: Event, // entry-point specific custom event added by x/wasm
         response: Response<C>,
     ) -> (AppResponse, Vec<SubMsg<C>>) {
         let Response {
@@ -462,7 +462,7 @@ where
 
         // always add custom event
         let mut app_events = Vec::with_capacity(2 + events.len());
-        // app_events.push(custom_event);
+        app_events.push(custom_event);
 
         // we only emit the `wasm` event if some attributes are specified
         if !attributes.is_empty() {
