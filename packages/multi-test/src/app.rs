@@ -709,17 +709,16 @@ mod test {
         };
 
         let res = app
-            .execute_contract(owner.clone(), reflect_addr.clone(), &reflect_msg, &[])
+            .execute_contract(owner, reflect_addr, &reflect_msg, &[])
             .unwrap();
 
         // ensure data is empty
         assert_eq!(res.data, None);
         // ensure expected events
-        assert_eq!(res.events.len(), 4, "{:?}", res.events);
+        assert_eq!(res.events.len(), 3, "{:?}", res.events);
         assert_eq!("execute", &res.events[0].ty);
         assert_eq!("execute", &res.events[1].ty);
         assert_eq!("wasm-echo", &res.events[2].ty);
-        assert_eq!("reply", &res.events[1].ty);
     }
 
     #[test]
@@ -754,7 +753,7 @@ mod test {
         };
 
         let res = app
-            .execute_contract(owner.clone(), echo_addr.clone(), &top_msg, &[])
+            .execute_contract(owner, echo_addr, &top_msg, &[])
             .unwrap();
 
         // ensure data is set via reply
@@ -1236,7 +1235,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".as_bytes().into()));
+            assert_eq!(response.data, Some("Orig".as_bytes().into()));
         }
     }
 

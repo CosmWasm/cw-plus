@@ -512,7 +512,12 @@ where
             let subres =
                 self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
             events.extend_from_slice(&subres.events);
-            Ok::<_, String>(subres.data.or(data))
+
+            if data.is_some() {
+                Ok::<_, String>(subres.data.or(data))
+            } else {
+                Ok(None)
+            }
         })?;
 
         Ok(AppResponse { events, data })
