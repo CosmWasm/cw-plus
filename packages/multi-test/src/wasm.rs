@@ -18,6 +18,7 @@ use crate::app::{Router, RouterQuerier};
 use crate::contracts::Contract;
 use crate::executor::AppResponse;
 use crate::transactions::transactional;
+use cosmwasm_std::testing::mock_wasmd_attr;
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -468,7 +469,7 @@ where
         if !attributes.is_empty() {
             // turn attributes into event and place it first
             let wasm_event = Event::new("wasm")
-                .add_attribute("contract_address", contract)
+                .add_attribute(CONTRACT_ATTR, contract)
                 .add_attributes(attributes);
             app_events.push(wasm_event);
         }
@@ -477,6 +478,8 @@ where
         // fake system level event types, like transfer from the bank module)
         let wasm_events = events.into_iter().map(|mut ev| {
             ev.ty = format!("wasm-{}", ev.ty);
+            ev.attributes
+                .insert(0, mock_wasmd_attr(CONTRACT_ATTR, contract));
             ev
         });
         app_events.extend(wasm_events);

@@ -518,7 +518,7 @@ mod test {
         assert_eq!(
             payout.attributes,
             [
-                ("contract_address", payout_addr.as_str()),
+                ("_contract_addr", payout_addr.as_str()),
                 ("action", "payout")
             ]
         );
@@ -732,7 +732,7 @@ mod test {
             custom.attributes,
             [
                 // TODO
-                // ("_contract_addr", reflect_addr.as_str()),
+                ("_contract_addr", reflect_addr.as_str()),
                 ("from", "reply"),
                 ("to", "test")
             ]
