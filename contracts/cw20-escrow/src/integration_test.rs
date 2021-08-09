@@ -105,12 +105,16 @@ fn escrow_happy_path_cw20_tokens() {
     let res = router
         .execute_contract(owner.clone(), cash_addr.clone(), &send_msg, &[])
         .unwrap();
-    assert_eq!(2, res.events.len());
+    assert_eq!(4, res.events.len());
     println!("{:?}", res.events);
-    let cw20_attr = res.custom_attrs(0);
+
+    assert_eq!(res.events[0].ty.as_str(), "execute");
+    let cw20_attr = res.custom_attrs(1);
     println!("{:?}", cw20_attr);
     assert_eq!(4, cw20_attr.len());
-    let escrow_attr = res.custom_attrs(1);
+
+    assert_eq!(res.events[2].ty.as_str(), "execute");
+    let escrow_attr = res.custom_attrs(3);
     println!("{:?}", escrow_attr);
     assert_eq!(2, escrow_attr.len());
 

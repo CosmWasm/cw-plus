@@ -18,11 +18,13 @@ use crate::app::{Router, RouterQuerier};
 use crate::contracts::Contract;
 use crate::executor::AppResponse;
 use crate::transactions::transactional;
+use cosmwasm_std::testing::mock_wasmd_attr;
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
+const CONTRACT_ATTR: &str = "_contract_addr";
 
 /// Contract Data includes information about contract, equivalent of `ContractInfo` in wasmd
 /// interface.
@@ -135,8 +137,11 @@ where
         sender: Addr,
         msg: WasmMsg,
     ) -> Result<AppResponse, String> {
-        let (resender, res) = self.execute_wasm(api, storage, router, block, sender, msg)?;
-        self.process_response(api, router, storage, block, resender, res, false)
+        let (resender, res, custom_event) =
+            self.execute_wasm(api, storage, router, block, sender, msg)?;
+
+        let (res, msgs) = self.build_app_response(&resender, custom_event, res);
+        self.process_response(api, router, storage, block, resender, res, msgs)
     }
 
     fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize {
@@ -152,14 +157,17 @@ where
     fn sudo(
         &self,
         api: &dyn Api,
-        contract_addr: Addr,
+        contract: Addr,
         storage: &mut dyn Storage,
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> Result<AppResponse, String> {
-        let res = self.call_sudo(contract_addr.clone(), api, storage, router, block, msg)?;
-        self.process_response(api, router, storage, block, contract_addr, res, false)
+        let custom_event = Event::new("sudo").add_attribute(CONTRACT_ATTR, &contract);
+
+        let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
+        let (res, msgs) = self.build_app_response(&contract, custom_event, res);
+        self.process_response(api, router, storage, block, contract, res, msgs)
     }
 }
 
@@ -227,7 +235,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
-    ) -> Result<(Addr, Response<C>), String> {
+    ) -> Result<(Addr, Response<C>, Event), String> {
         match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -259,7 +267,10 @@ where
                     info,
                     msg.to_vec(),
                 )?;
-                Ok((contract_addr, res))
+
+                let custom_event =
+                    Event::new("execute").add_attribute(CONTRACT_ATTR, &contract_addr);
+                Ok((contract_addr, res, custom_event))
             }
             WasmMsg::Instantiate {
                 admin,
@@ -304,7 +315,11 @@ where
                     msg.to_vec(),
                 )?;
                 init_response(&mut res, &contract_addr);
-                Ok((contract_addr, res))
+
+                let custom_event = Event::new("instantiate")
+                    .add_attribute(CONTRACT_ATTR, &contract_addr)
+                    .add_attribute("code_id", code_id.to_string());
+                Ok((contract_addr, res, custom_event))
             }
             WasmMsg::Migrate {
                 contract_addr,
@@ -339,7 +354,11 @@ where
                     block,
                     msg.to_vec(),
                 )?;
-                Ok((contract_addr, res))
+
+                let custom_event = Event::new("migrate")
+                    .add_attribute(CONTRACT_ATTR, &contract_addr)
+                    .add_attribute("code_id", new_code_id.to_string());
+                Ok((contract_addr, res, custom_event))
             }
             m => panic!("Unsupported wasm message: {:?}", m),
         }
@@ -416,8 +435,64 @@ where
         contract: Addr,
         reply: Reply,
     ) -> Result<AppResponse, String> {
+        let ok_attr = if reply.result.is_ok() {
+            "handle_success"
+        } else {
+            "handle_failure"
+        };
+        let custom_event = Event::new("reply")
+            .add_attribute(CONTRACT_ATTR, &contract)
+            .add_attribute("mode", ok_attr);
+
         let res = self.call_reply(contract.clone(), api, storage, router, block, reply)?;
-        self.process_response(api, router, storage, block, contract, res, true)
+        let (res, msgs) = self.build_app_response(&contract, custom_event, res);
+        self.process_response(api, router, storage, block, contract, res, msgs)
+    }
+
+    // this captures all the events and data from the contract call.
+    // it does not handle the messages
+    fn build_app_response(
+        &self,
+        contract: &Addr,
+        custom_event: Event, // entry-point specific custom event added by x/wasm
+        response: Response<C>,
+    ) -> (AppResponse, Vec<SubMsg<C>>) {
+        let Response {
+            messages,
+            attributes,
+            events,
+            data,
+            ..
+        } = response;
+
+        // always add custom event
+        let mut app_events = Vec::with_capacity(2 + events.len());
+        app_events.push(custom_event);
+
+        // we only emit the `wasm` event if some attributes are specified
+        if !attributes.is_empty() {
+            // turn attributes into event and place it first
+            let wasm_event = Event::new("wasm")
+                .add_attribute(CONTRACT_ATTR, contract)
+                .add_attributes(attributes);
+            app_events.push(wasm_event);
+        }
+
+        // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
+        // fake system level event types, like transfer from the bank module)
+        let wasm_events = events.into_iter().map(|mut ev| {
+            ev.ty = format!("wasm-{}", ev.ty);
+            ev.attributes
+                .insert(0, mock_wasmd_attr(CONTRACT_ATTR, contract));
+            ev
+        });
+        app_events.extend(wasm_events);
+
+        let app = AppResponse {
+            events: app_events,
+            data,
+        };
+        (app, messages)
     }
 
     fn process_response(
@@ -427,39 +502,18 @@ where
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
-        response: Response<C>,
-        ignore_attributes: bool,
+        response: AppResponse,
+        messages: Vec<SubMsg<C>>,
     ) -> Result<AppResponse, String> {
-        // These need to get `wasm-` prefix to match the wasmd semantics (custom wasm messages cannot
-        // fake system level event types, like transfer from the bank module)
-        let mut events: Vec<_> = response
-            .events
-            .into_iter()
-            .map(|mut ev| {
-                ev.ty = format!("wasm-{}", ev.ty);
-                ev
-            })
-            .collect();
-        // hmmm... we don't need this for reply, right?
-        if !ignore_attributes {
-            // turn attributes into event and place it first
-            let mut wasm_event = Event::new("wasm").add_attribute("contract_address", &contract);
-            wasm_event
-                .attributes
-                .extend_from_slice(&response.attributes);
-            events.insert(0, wasm_event);
-        }
+        let AppResponse { mut events, data } = response;
 
         // recurse in all messages
-        let data = response
-            .messages
-            .into_iter()
-            .try_fold(response.data, |data, resend| {
-                let subres =
-                    self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
-                events.extend_from_slice(&subres.events);
-                Ok::<_, String>(subres.data.or(data))
-            })?;
+        let data = messages.into_iter().try_fold(data, |data, resend| {
+            let subres =
+                self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
+            events.extend_from_slice(&subres.events);
+            Ok::<_, String>(subres.data.or(data))
+        })?;
 
         Ok(AppResponse { events, data })
     }
