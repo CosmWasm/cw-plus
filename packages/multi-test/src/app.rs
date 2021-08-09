@@ -715,12 +715,11 @@ mod test {
         // ensure data is empty
         assert_eq!(res.data, None);
         // ensure expected events
-        assert_eq!(res.events.len(), 3, "{:?}", res.events);
-        // TODO: update with new events
-        // ["execute", "execute", "wasm-echo", "reply"],
-        assert_eq!("wasm", &res.events[0].ty);
-        assert_eq!("wasm", &res.events[1].ty);
+        assert_eq!(res.events.len(), 4, "{:?}", res.events);
+        assert_eq!("execute", &res.events[0].ty);
+        assert_eq!("execute", &res.events[1].ty);
         assert_eq!("wasm-echo", &res.events[2].ty);
+        assert_eq!("reply", &res.events[1].ty);
     }
 
     #[test]
@@ -762,10 +761,9 @@ mod test {
         assert_eq!(res.data.unwrap().as_slice(), b"inside");
         // ensure expected events
         assert_eq!(res.events.len(), 4, "{:?}", res.events);
-        // TODO: update with new events
-        assert_eq!("wasm", &res.events[0].ty);
+        assert_eq!("execute", &res.events[0].ty);
         assert_eq!("wasm-topmsg", &res.events[1].ty);
-        assert_eq!("wasm", &res.events[2].ty);
+        assert_eq!("execute", &res.events[2].ty);
         assert_eq!("wasm-submsg", &res.events[3].ty);
     }
 
