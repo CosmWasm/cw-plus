@@ -389,28 +389,26 @@ where
         });
 
         // call reply if meaningful
-        if let Ok(r) = res {
+        if let Ok(mut r) = res {
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
-                let mut orig = r.clone();
                 let reply = Reply {
                     id,
                     result: ContractResult::Ok(SubMsgExecutionResponse {
-                        events: r.events,
-                        data: r.data,
+                        events: r.events.clone(),
+                        data: r.data.clone(),
                     }),
                 };
                 // do reply and combine it with the original response
                 let res2 = self._reply(api, router, storage, block, contract, reply)?;
-                // override data if set
-                if let Some(data) = res2.data {
-                    orig.data = Some(data);
-                }
+                // override data
+                r.data = res2.data;
                 // append the events
-                orig.events.extend_from_slice(&res2.events);
-                Ok(orig)
+                r.events.extend_from_slice(&res2.events);
             } else {
-                Ok(r)
+                r.data = None;
             }
+
+            Ok(r)
         } else if let Err(e) = res {
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
                 let reply = Reply {
@@ -508,11 +506,13 @@ where
         let AppResponse { mut events, data } = response;
 
         // recurse in all messages
-        let data = messages.into_iter().try_fold(data, |data, resend| {
+        let data = messages.into_iter().try_fold(data, |data, submsg| {
             let subres =
-                self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
+                self.execute_submsg(api, router, storage, block, contract.clone(), submsg)?;
+
             events.extend_from_slice(&subres.events);
 
+            // Data should be overwritten if and only if replay was actually called
             if data.is_some() {
                 Ok::<_, String>(subres.data.or(data))
             } else {
