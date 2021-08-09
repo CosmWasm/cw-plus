@@ -666,111 +666,6 @@ mod test {
     }
 
     #[test]
-    fn no_data_overwrite_from_normal_submessage() {
-        let mut app = custom_app();
-
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
-
-        // set up reflect contract
-        let reflect_id = app.store_code(reflect::contract());
-        let reflect_addr = app
-            .instantiate_contract(
-                reflect_id,
-                owner.clone(),
-                &EmptyMsg {},
-                &[],
-                "Reflect",
-                None,
-            )
-            .unwrap();
-
-        // set up echo contract
-        let echo_id = app.store_code(echo::custom_contract());
-        let echo_addr = app
-            .instantiate_contract(echo_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
-            .unwrap();
-
-        // reflect will call echo
-        // echo will set the data
-        // top-level app will not display the data
-        let echo_msg = echo::Message {
-            data: Some("my echo".into()),
-            events: vec![Event::new("echo").add_attribute("called", "true")],
-            ..echo::Message::default()
-        };
-        let reflect_msg = reflect::Message {
-            messages: vec![SubMsg::new(WasmMsg::Execute {
-                contract_addr: echo_addr.to_string(),
-                msg: to_binary(&echo_msg).unwrap(),
-                funds: vec![],
-            })],
-        };
-
-        let res = app
-            .execute_contract(owner, reflect_addr, &reflect_msg, &[])
-            .unwrap();
-
-        // ensure data is empty
-        assert_eq!(res.data, None);
-        // ensure expected events
-        assert_eq!(res.events.len(), 3, "{:?}", res.events);
-        assert_eq!("execute", &res.events[0].ty);
-        assert_eq!("execute", &res.events[1].ty);
-        assert_eq!("wasm-echo", &res.events[2].ty);
-    }
-
-    #[test]
-    fn data_overwrite_when_set_in_reply() {
-        let mut app = mock_app();
-
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
-
-        // set up echo contract
-        let echo_id = app.store_code(echo::custom_contract());
-        let echo_addr = app
-            .instantiate_contract(echo_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
-            .unwrap();
-
-        // it will call itself and set the data in reply
-        let sub_msg = echo::Message {
-            data: Some("inside".into()),
-            events: vec![Event::new("submsg").add_attribute("called", "true")],
-            ..echo::Message::default()
-        };
-        let top_msg = echo::Message {
-            data: Some("outside".into()),
-            events: vec![Event::new("topmsg").add_attribute("called", "true")],
-            sub_msg: vec![SubMsg::reply_always(
-                WasmMsg::Execute {
-                    contract_addr: echo_addr.to_string(),
-                    msg: to_binary(&sub_msg).unwrap(),
-                    funds: vec![],
-                },
-                1,
-            )],
-            attributes: vec![],
-        };
-
-        let res = app
-            .execute_contract(owner, echo_addr, &top_msg, &[])
-            .unwrap();
-
-        // ensure data is set via reply
-        assert_eq!(res.data.unwrap().as_slice(), b"inside");
-        // ensure expected events
-        assert_eq!(res.events.len(), 5, "{:?}", res.events);
-        assert_eq!("execute", &res.events[0].ty);
-        assert_eq!("wasm-topmsg", &res.events[1].ty);
-        assert_eq!("execute", &res.events[2].ty);
-        assert_eq!("wasm-submsg", &res.events[3].ty);
-        assert_eq!("reply", &res.events[4].ty);
-    }
-
-    #[test]
     fn reflect_submessage_reply_works() {
         let mut app = custom_app();
 
@@ -1070,7 +965,7 @@ mod test {
         assert_eq!(state.beneficiary, random);
     }
 
-    mod replay_data_overwrite {
+    mod reply_data_overwrite {
         use super::*;
 
         fn make_echo_submsg(
@@ -1136,7 +1031,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Data".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Data".into()));
         }
 
         #[test]
@@ -1163,7 +1058,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Second".into()));
         }
 
         #[test]
@@ -1190,11 +1085,11 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("First".as_bytes().into()));
+            assert_eq!(response.data, Some(b"First".into()));
         }
 
         #[test]
-        fn single_no_data() {
+        fn single_no_submsg_data() {
             let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
@@ -1217,7 +1112,89 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("First".as_bytes().into()));
+            assert_eq!(response.data, Some(b"First".into()));
+        }
+
+        #[test]
+        fn single_no_top_level_data() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let response = app
+                .execute_contract(
+                    owner,
+                    contract.clone(),
+                    &echo::Message {
+                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap();
+
+            assert_eq!(response.data, Some(b"Second".into()));
+        }
+
+        #[test]
+        fn single_submsg_reply_returns_none() {
+            let mut app = custom_app();
+
+            // set personal balance
+            let owner = Addr::unchecked("owner");
+            app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
+
+            // set up reflect contract
+            let reflect_id = app.store_code(reflect::contract());
+            let reflect_addr = app
+                .instantiate_contract(
+                    reflect_id,
+                    owner.clone(),
+                    &EmptyMsg {},
+                    &[],
+                    "Reflect",
+                    None,
+                )
+                .unwrap();
+
+            // set up echo contract
+            let echo_id = app.store_code(echo::custom_contract());
+            let echo_addr = app
+                .instantiate_contract(echo_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            // reflect will call echo
+            // echo will set the data
+            // top-level app will not display the data
+            let echo_msg = echo::Message {
+                data: Some("my echo".into()),
+                events: vec![Event::new("echo").add_attribute("called", "true")],
+                ..echo::Message::default()
+            };
+            let reflect_msg = reflect::Message {
+                messages: vec![SubMsg::new(WasmMsg::Execute {
+                    contract_addr: echo_addr.to_string(),
+                    msg: to_binary(&echo_msg).unwrap(),
+                    funds: vec![],
+                })],
+            };
+
+            let res = app
+                .execute_contract(owner, reflect_addr, &reflect_msg, &[])
+                .unwrap();
+
+            // ensure data is empty
+            assert_eq!(res.data, None);
+            // ensure expected events
+            assert_eq!(res.events.len(), 3, "{:?}", res.events);
+            assert_eq!("execute", &res.events[0].ty);
+            assert_eq!("execute", &res.events[1].ty);
+            assert_eq!("wasm-echo", &res.events[2].ty);
         }
 
         #[test]
@@ -1249,7 +1226,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Second".into()));
         }
 
         #[test]
@@ -1281,7 +1258,39 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Orig".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Orig".into()));
+        }
+
+        #[test]
+        fn multiple_submsg_mixed() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let response = app
+                .execute_contract(
+                    owner,
+                    contract.clone(),
+                    &echo::Message {
+                        sub_msg: vec![
+                            make_echo_submsg(contract.clone(), None, vec![], 1),
+                            make_echo_submsg_no_reply(contract.clone(), "Hidden", vec![]),
+                            make_echo_submsg(contract.clone(), "Shown", vec![], 2),
+                            make_echo_submsg(contract.clone(), None, vec![], 3),
+                            make_echo_submsg_no_reply(contract, "Lost", vec![]),
+                        ],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap();
+
+            assert_eq!(response.data, Some(b"Shown".into()));
         }
 
         #[test]
@@ -1323,7 +1332,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Orig".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Second".into()));
         }
     }
 
