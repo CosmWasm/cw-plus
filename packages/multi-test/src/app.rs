@@ -715,14 +715,58 @@ mod test {
         // ensure data is empty
         assert_eq!(res.data, None);
         // ensure expected events
-        assert_eq!(res.events.len(), 1);
+        assert_eq!(res.events.len(), 2);
         // TODO: update with new events
         // ["execute", "execute", "wasm-echo", "reply"],
-        assert_eq!("wasm-echo", &res.events[0].ty);
+        assert_eq!("wasm", &res.events[0].ty);
+        assert_eq!("wasm-echo", &res.events[1].ty);
     }
 
     #[test]
-    fn data_overwrite_when_set_in_reply() {}
+    fn data_overwrite_when_set_in_reply() {
+        let mut app = mock_app();
+
+        // set personal balance
+        let owner = Addr::unchecked("owner");
+        app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
+
+        // set up echo contract
+        let echo_id = app.store_code(echo::custom_contract());
+        let echo_addr = app
+            .instantiate_contract(echo_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+            .unwrap();
+
+        // it will call itself and set the data in reply
+        let sub_msg = echo::Message {
+            data: Some("inside".into()),
+            events: vec![Event::new("submsg").add_attribute("called", "true")],
+            ..echo::Message::default()
+        };
+        let top_msg = echo::Message {
+            data: Some("outside".into()),
+            events: vec![Event::new("topmsg").add_attribute("called", "true")],
+            sub_msg: vec![SubMsg::new(WasmMsg::Execute {
+                contract_addr: echo_addr.to_string(),
+                msg: to_binary(&sub_msg).unwrap(),
+                funds: vec![],
+            })],
+            attributes: vec![],
+        };
+
+        let res = app
+            .execute_contract(owner.clone(), echo_addr.clone(), &top_msg, &[])
+            .unwrap();
+
+        // ensure data is set via reply
+        assert_eq!(res.data.unwrap().as_slice(), b"inside");
+        // ensure expected events
+        assert_eq!(res.events.len(), 4, "{:?}", res.events);
+        // TODO: update with new events
+        assert_eq!("wasm", &res.events[0].ty);
+        assert_eq!("wasm-topmsg", &res.events[1].ty);
+        assert_eq!("wasm", &res.events[2].ty);
+        assert_eq!("wasm-submsg", &res.events[3].ty);
+    }
 
     #[test]
     fn reflect_submessage_reply_works() {
