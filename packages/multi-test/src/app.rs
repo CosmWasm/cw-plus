@@ -715,11 +715,12 @@ mod test {
         // ensure data is empty
         assert_eq!(res.data, None);
         // ensure expected events
-        assert_eq!(res.events.len(), 2);
+        assert_eq!(res.events.len(), 3, "{:?}", res.events);
         // TODO: update with new events
         // ["execute", "execute", "wasm-echo", "reply"],
         assert_eq!("wasm", &res.events[0].ty);
-        assert_eq!("wasm-echo", &res.events[1].ty);
+        assert_eq!("wasm", &res.events[1].ty);
+        assert_eq!("wasm-echo", &res.events[2].ty);
     }
 
     #[test]
