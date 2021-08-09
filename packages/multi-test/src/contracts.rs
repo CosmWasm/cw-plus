@@ -178,6 +178,24 @@ where
         }
     }
 
+    /// A correlate of new_with_empty
+    pub fn with_reply_empty<E5A>(
+        self,
+        reply_fn: ReplyFn<Empty, E5A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A, T6, E6>
+    where
+        E5A: ToString + 'static,
+    {
+        ContractWrapper {
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
+            sudo_fn: self.sudo_fn,
+            reply_fn: Some(customize_permissioned_fn(reply_fn)),
+            migrate_fn: self.migrate_fn,
+        }
+    }
+
     pub fn with_migrate<T6A, E6A>(
         self,
         migrate_fn: PermissionedFn<T6A, C, E6A>,
@@ -197,7 +215,7 @@ where
     }
 }
 
-fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
+pub fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
 where
     T: DeserializeOwned + 'static,
     E: ToString + 'static,
@@ -207,6 +225,20 @@ where
         move |deps: DepsMut, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
             raw_fn(deps, env, info, msg).map(customize_response::<C>)
         };
+    Box::new(customized)
+}
+
+pub fn customize_permissioned_fn<T, C, E>(
+    raw_fn: PermissionedFn<T, Empty, E>,
+) -> PermissionedClosure<T, C, E>
+where
+    T: DeserializeOwned + 'static,
+    E: ToString + 'static,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let customized = move |deps: DepsMut, env: Env, msg: T| -> Result<Response<C>, E> {
+        raw_fn(deps, env, msg).map(customize_response::<C>)
+    };
     Box::new(customized)
 }
 

@@ -666,6 +666,65 @@ mod test {
     }
 
     #[test]
+    fn no_data_overwrite_from_normal_submessage() {
+        let mut app = custom_app();
+
+        // set personal balance
+        let owner = Addr::unchecked("owner");
+        app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
+
+        // set up reflect contract
+        let reflect_id = app.store_code(reflect::contract());
+        let reflect_addr = app
+            .instantiate_contract(
+                reflect_id,
+                owner.clone(),
+                &EmptyMsg {},
+                &[],
+                "Reflect",
+                None,
+            )
+            .unwrap();
+
+        // set up echo contract
+        let echo_id = app.store_code(echo::custom_contract());
+        let echo_addr = app
+            .instantiate_contract(echo_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+            .unwrap();
+
+        // reflect will call echo
+        // echo will set the data
+        // top-level app will not display the data
+        let echo_msg = echo::Message {
+            data: Some("my echo".into()),
+            events: vec![Event::new("echo").add_attribute("called", "true")],
+            ..echo::Message::default()
+        };
+        let reflect_msg = reflect::Message {
+            messages: vec![SubMsg::new(WasmMsg::Execute {
+                contract_addr: echo_addr.to_string(),
+                msg: to_binary(&echo_msg).unwrap(),
+                funds: vec![],
+            })],
+        };
+
+        let res = app
+            .execute_contract(owner.clone(), reflect_addr.clone(), &reflect_msg, &[])
+            .unwrap();
+
+        // ensure data is empty
+        assert_eq!(res.data, None);
+        // ensure expected events
+        assert_eq!(res.events.len(), 1);
+        // TODO: update with new events
+        // ["execute", "execute", "wasm-echo", "reply"],
+        assert_eq!("wasm-echo", &res.events[0].ty);
+    }
+
+    #[test]
+    fn data_overwrite_when_set_in_reply() {}
+
+    #[test]
     fn reflect_submessage_reply_works() {
         let mut app = custom_app();
 
