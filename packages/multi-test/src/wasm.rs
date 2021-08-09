@@ -369,7 +369,12 @@ where
     /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
-    /// This is designed to be handled internally as part of larger process flows.
+    /// This is designed to be used in dispatched messages inside the execute_wasm flow.
+    ///
+    /// It returns both the AppResponse (including any events from a possible reply),
+    /// as well as the data returned by the reply entry point (if any). The second must
+    /// be returned separately, as the submsg response data will never override the parent's
+    /// data, but the reply response data will (if not None).
     fn execute_submsg(
         &self,
         api: &dyn Api,
@@ -378,7 +383,7 @@ where
         block: &BlockInfo,
         contract: Addr,
         msg: SubMsg<C>,
-    ) -> Result<AppResponse, String> {
+    ) -> Result<(AppResponse, Option<Binary>), String> {
         let SubMsg {
             msg, id, reply_on, ..
         } = msg;
@@ -389,40 +394,39 @@ where
         });
 
         // call reply if meaningful
-        if let Ok(r) = res {
-            if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
-                let mut orig = r.clone();
-                let reply = Reply {
-                    id,
-                    result: ContractResult::Ok(SubMsgExecutionResponse {
-                        events: r.events,
-                        data: r.data,
-                    }),
-                };
-                // do reply and combine it with the original response
-                let res2 = self._reply(api, router, storage, block, contract, reply)?;
-                // override data if set
-                if let Some(data) = res2.data {
-                    orig.data = Some(data);
+        match res {
+            Ok(r) => {
+                if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
+                    let mut orig = r.clone();
+                    let reply = Reply {
+                        id,
+                        result: ContractResult::Ok(SubMsgExecutionResponse {
+                            events: r.events,
+                            data: r.data,
+                        }),
+                    };
+                    // do reply and combine it with the original response
+                    let res2 = self._reply(api, router, storage, block, contract, reply)?;
+                    // append the events
+                    orig.events.extend_from_slice(&res2.events);
+                    Ok((orig, res2.data))
+                } else {
+                    Ok((r, None))
                 }
-                // append the events
-                orig.events.extend_from_slice(&res2.events);
-                Ok(orig)
-            } else {
-                Ok(r)
             }
-        } else if let Err(e) = res {
-            if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
-                let reply = Reply {
-                    id,
-                    result: ContractResult::Err(e),
-                };
-                self._reply(api, router, storage, block, contract, reply)
-            } else {
-                Err(e)
+            Err(e) => {
+                if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
+                    let reply = Reply {
+                        id,
+                        result: ContractResult::Err(e),
+                    };
+                    let res = self._reply(api, router, storage, block, contract, reply)?;
+                    let data = res.data.clone();
+                    Ok((res, data))
+                } else {
+                    Err(e)
+                }
             }
-        } else {
-            res
         }
     }
 
@@ -509,10 +513,10 @@ where
 
         // recurse in all messages
         let data = messages.into_iter().try_fold(data, |data, resend| {
-            let subres =
+            let (subres, reply_data) =
                 self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
             events.extend_from_slice(&subres.events);
-            Ok::<_, String>(subres.data.or(data))
+            Ok::<_, String>(reply_data.or(data))
         })?;
 
         Ok(AppResponse { events, data })
