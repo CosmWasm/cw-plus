@@ -161,6 +161,24 @@ where
         }
     }
 
+    pub fn with_sudo_empty<T4A, E4A>(
+        self,
+        sudo_fn: PermissionedFn<T4A, Empty, E4A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4A, E4A, E5, T6, E6>
+    where
+        T4A: DeserializeOwned + 'static,
+        E4A: ToString + 'static,
+    {
+        ContractWrapper {
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
+            sudo_fn: Some(customize_permissioned_fn(sudo_fn)),
+            reply_fn: self.reply_fn,
+            migrate_fn: self.migrate_fn,
+        }
+    }
+
     pub fn with_reply<E5A>(
         self,
         reply_fn: ReplyFn<C, E5A>,
@@ -174,6 +192,24 @@ where
             query_fn: self.query_fn,
             sudo_fn: self.sudo_fn,
             reply_fn: Some(Box::new(reply_fn)),
+            migrate_fn: self.migrate_fn,
+        }
+    }
+
+    /// A correlate of new_with_empty
+    pub fn with_reply_empty<E5A>(
+        self,
+        reply_fn: ReplyFn<Empty, E5A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A, T6, E6>
+    where
+        E5A: ToString + 'static,
+    {
+        ContractWrapper {
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
+            sudo_fn: self.sudo_fn,
+            reply_fn: Some(customize_permissioned_fn(reply_fn)),
             migrate_fn: self.migrate_fn,
         }
     }
@@ -195,6 +231,24 @@ where
             migrate_fn: Some(Box::new(migrate_fn)),
         }
     }
+
+    pub fn with_migrate_empty<T6A, E6A>(
+        self,
+        migrate_fn: PermissionedFn<T6A, Empty, E6A>,
+    ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6A, E6A>
+    where
+        T6A: DeserializeOwned + 'static,
+        E6A: ToString + 'static,
+    {
+        ContractWrapper {
+            execute_fn: self.execute_fn,
+            instantiate_fn: self.instantiate_fn,
+            query_fn: self.query_fn,
+            sudo_fn: self.sudo_fn,
+            reply_fn: self.reply_fn,
+            migrate_fn: Some(customize_permissioned_fn(migrate_fn)),
+        }
+    }
 }
 
 fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
@@ -207,6 +261,20 @@ where
         move |deps: DepsMut, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
             raw_fn(deps, env, info, msg).map(customize_response::<C>)
         };
+    Box::new(customized)
+}
+
+fn customize_permissioned_fn<T, C, E>(
+    raw_fn: PermissionedFn<T, Empty, E>,
+) -> PermissionedClosure<T, C, E>
+where
+    T: DeserializeOwned + 'static,
+    E: ToString + 'static,
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let customized = move |deps: DepsMut, env: Env, msg: T| -> Result<Response<C>, E> {
+        raw_fn(deps, env, msg).map(customize_response::<C>)
+    };
     Box::new(customized)
 }
 

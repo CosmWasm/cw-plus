@@ -10,6 +10,8 @@ use cosmwasm_std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
+use schemars::JsonSchema;
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Message {
@@ -70,5 +72,15 @@ fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, StdError> {
 
 pub fn contract() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(execute, instantiate, query).with_reply(reply);
+    Box::new(contract)
+}
+
+#[allow(dead_code)]
+pub fn custom_contract<C>() -> Box<dyn Contract<C>>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let contract = ContractWrapper::new_with_empty(execute, instantiate, query);
+    let contract = contract.with_reply_empty(reply);
     Box::new(contract)
 }

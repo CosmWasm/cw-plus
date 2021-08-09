@@ -61,10 +61,7 @@ fn execute(
         .add_attribute("action", "payout"))
 }
 
-fn sudo<C>(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response<C>, StdError>
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
+fn sudo(deps: DepsMut, _env: Env, msg: SudoMsg) -> Result<Response, StdError> {
     COUNT.save(deps.storage, &msg.set_count)?;
     Ok(Response::default())
 }
@@ -87,6 +84,7 @@ pub fn contract<C>() -> Box<dyn Contract<C>>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    let contract = ContractWrapper::new_with_empty(execute, instantiate, query).with_sudo(sudo);
+    let contract =
+        ContractWrapper::new_with_empty(execute, instantiate, query).with_sudo_empty(sudo);
     Box::new(contract)
 }
