@@ -731,7 +731,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &proposal, &[])
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "propose"),
                 ("sender", VOTER3),
@@ -745,7 +745,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER4), flex_addr, &proposal, &[])
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "propose"),
                 ("sender", VOTER4),
@@ -812,7 +812,7 @@ mod tests {
         let res = app
             .execute_contract(Addr::unchecked(VOTER1), flex_addr.clone(), &proposal, &[])
             .unwrap();
-        let proposal_id1: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id1: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // another proposal immediately passes
         app.update_block(next_block);
@@ -820,7 +820,7 @@ mod tests {
         let res = app
             .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &proposal, &[])
             .unwrap();
-        let proposal_id2: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id2: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // expire them both
         app.update_block(expire(voting_period));
@@ -830,7 +830,7 @@ mod tests {
         let res = app
             .execute_contract(Addr::unchecked(VOTER2), flex_addr.clone(), &proposal, &[])
             .unwrap();
-        let proposal_id3: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id3: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
         let proposed_at = app.block_info();
 
         // next block, let's query them all... make sure status is properly updated (1 should be rejected in query)
@@ -910,7 +910,7 @@ mod tests {
             .unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Owner cannot vote (again)
         let yes_vote = ExecuteMsg::Vote {
@@ -933,7 +933,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER1), flex_addr.clone(), &yes_vote, &[])
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "vote"),
                 ("sender", VOTER1),
@@ -986,7 +986,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &yes_vote, &[])
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "vote"),
                 ("sender", VOTER4),
@@ -1066,7 +1066,7 @@ mod tests {
             .unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Only Passed can be executed
         let execution = ExecuteMsg::Execute { proposal_id };
@@ -1084,7 +1084,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &vote, &[])
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "vote"),
                 ("sender", VOTER3),
@@ -1110,7 +1110,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "execute"),
                 ("sender", SOMEBODY),
@@ -1152,7 +1152,7 @@ mod tests {
             .unwrap();
 
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Non-expired proposals cannot be closed
         let closing = ExecuteMsg::Close { proposal_id };
@@ -1167,7 +1167,7 @@ mod tests {
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr.clone(), &closing, &[])
             .unwrap();
         assert_eq!(
-            res.custom_attrs(0),
+            res.custom_attrs(1),
             [
                 ("action", "close"),
                 ("sender", SOMEBODY),
@@ -1204,7 +1204,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER1), flex_addr.clone(), &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
         let prop_status = |app: &App, proposal_id: u64| -> Status {
             let query_prop = QueryMsg::Proposal { proposal_id };
             let prop: ProposalResponse = app
@@ -1265,7 +1265,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER1), flex_addr.clone(), &proposal2, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let proposal_id2: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id2: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // VOTER2 can pass this alone with the updated vote (newer height ignores snapshot)
         let yes_vote = ExecuteMsg::Vote {
@@ -1346,7 +1346,7 @@ mod tests {
             )
             .unwrap();
         // Get the proposal id from the logs
-        let update_proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let update_proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // next block...
         app.update_block(|b| b.height += 1);
@@ -1362,7 +1362,7 @@ mod tests {
             )
             .unwrap();
         // Get the proposal id from the logs
-        let cash_proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let cash_proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
         assert_ne!(cash_proposal_id, update_proposal_id);
 
         // query proposal state
@@ -1455,7 +1455,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
         let prop_status = |app: &App| -> Status {
             let query_prop = QueryMsg::Proposal { proposal_id };
             let prop: ProposalResponse = app
@@ -1499,7 +1499,7 @@ mod tests {
             .execute_contract(Addr::unchecked(newbie), flex_addr.clone(), &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let proposal_id2: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id2: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // check proposal2 status
         let query_prop = QueryMsg::Proposal {
@@ -1537,7 +1537,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
         let prop_status = |app: &App| -> Status {
             let query_prop = QueryMsg::Proposal { proposal_id };
             let prop: ProposalResponse = app
@@ -1606,7 +1606,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER5), flex_addr.clone(), &proposal, &[])
             .unwrap();
         // Get the proposal id from the logs
-        let proposal_id: u64 = res.custom_attrs(0)[2].value.parse().unwrap();
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
         let prop_status = |app: &App| -> Status {
             let query_prop = QueryMsg::Proposal { proposal_id };
             let prop: ProposalResponse = app

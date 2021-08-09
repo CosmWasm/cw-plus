@@ -14,6 +14,7 @@ pub struct AppResponse {
 impl AppResponse {
     // Return all custom attributes returned by the contract in the `idx` event.
     // We assert the type is wasm, and skip the contract_address attribute.
+    #[track_caller]
     pub fn custom_attrs(&self, idx: usize) -> &[Attribute] {
         assert_eq!(self.events[idx].ty.as_str(), "wasm");
         &self.events[idx].attributes[1..]

@@ -435,10 +435,14 @@ where
         contract: Addr,
         reply: Reply,
     ) -> Result<AppResponse, String> {
-        let ok_attr = if reply.result.is_ok() { "ok" } else { "err" };
+        let ok_attr = if reply.result.is_ok() {
+            "handle_success"
+        } else {
+            "handle_failure"
+        };
         let custom_event = Event::new("reply")
             .add_attribute(CONTRACT_ATTR, &contract)
-            .add_attribute("submsg", ok_attr);
+            .add_attribute("mode", ok_attr);
 
         let res = self.call_reply(contract.clone(), api, storage, router, block, reply)?;
         let (res, msgs) = self.build_app_response(&contract, custom_event, res);

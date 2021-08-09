@@ -722,7 +722,10 @@ mod test {
         assert_eq!(reply.ty.as_str(), "reply");
         assert_eq!(
             reply.attributes,
-            [("_contract_addr", reflect_addr.as_str()), ("submsg", "ok")]
+            [
+                ("_contract_addr", reflect_addr.as_str()),
+                ("mode", "handle_success")
+            ]
         );
 
         // the last one is a custom event (from reply)
