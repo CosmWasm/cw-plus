@@ -7,6 +7,8 @@ use cw_storage_plus::Item;
 use serde::{Deserialize, Serialize};
 
 use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
+use schemars::JsonSchema;
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstantiateMsg {
@@ -75,5 +77,15 @@ fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, StdErr
 
 pub fn contract() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(execute, instantiate, query).with_migrate(migrate);
+    Box::new(contract)
+}
+
+#[allow(dead_code)]
+pub fn custom_contract<C>() -> Box<dyn Contract<C>>
+where
+    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+{
+    let contract =
+        ContractWrapper::new_with_empty(execute, instantiate, query).with_migrate_empty(migrate);
     Box::new(contract)
 }
