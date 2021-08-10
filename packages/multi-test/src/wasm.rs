@@ -511,13 +511,7 @@ where
                 self.execute_submsg(api, router, storage, block, contract.clone(), submsg)?;
 
             events.extend_from_slice(&subres.events);
-
-            // Data should be overwritten if and only if replay was actually called
-            if data.is_some() {
-                Ok::<_, String>(subres.data.or(data))
-            } else {
-                Ok(None)
-            }
+            Ok::<_, String>(subres.data.or(data))
         })?;
 
         Ok(AppResponse { events, data })
