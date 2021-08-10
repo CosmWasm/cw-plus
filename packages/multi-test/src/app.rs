@@ -965,10 +965,32 @@ mod test {
         assert_eq!(state.beneficiary, random);
     }
 
-    mod replay_data_overwrite {
+    mod reply_data_overwrite {
         use super::*;
 
         fn make_echo_submsg(
+            contract: Addr,
+            data: impl Into<Option<&'static str>>,
+            sub_msg: Vec<SubMsg>,
+            id: u64,
+        ) -> SubMsg {
+            let data = data.into().map(|s| s.to_owned());
+            SubMsg::reply_always(
+                CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: contract.into(),
+                    msg: to_binary(&echo::Message {
+                        data,
+                        sub_msg,
+                        ..echo::Message::default()
+                    })
+                    .unwrap(),
+                    funds: vec![],
+                }),
+                id,
+            )
+        }
+
+        fn make_echo_submsg_no_reply(
             contract: Addr,
             data: impl Into<Option<&'static str>>,
             sub_msg: Vec<SubMsg>,
@@ -1009,7 +1031,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Data".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Data".into()));
         }
 
         #[test]
@@ -1029,18 +1051,18 @@ mod test {
                     contract.clone(),
                     &echo::Message {
                         data: Some("First".to_owned()),
-                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![])],
+                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
                         ..echo::Message::default()
                     },
                     &[],
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Second".into()));
         }
 
         #[test]
-        fn single_no_data() {
+        fn single_submsg_no_reply() {
             let mut app = mock_app();
 
             let owner = Addr::unchecked("owner");
@@ -1056,14 +1078,123 @@ mod test {
                     contract.clone(),
                     &echo::Message {
                         data: Some("First".to_owned()),
-                        sub_msg: vec![make_echo_submsg(contract, None, vec![])],
+                        sub_msg: vec![make_echo_submsg_no_reply(contract, "Second", vec![])],
                         ..echo::Message::default()
                     },
                     &[],
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("First".as_bytes().into()));
+            assert_eq!(response.data, Some(b"First".into()));
+        }
+
+        #[test]
+        fn single_no_submsg_data() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let response = app
+                .execute_contract(
+                    owner,
+                    contract.clone(),
+                    &echo::Message {
+                        data: Some("First".to_owned()),
+                        sub_msg: vec![make_echo_submsg(contract, None, vec![], 1)],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap();
+
+            assert_eq!(response.data, Some(b"First".into()));
+        }
+
+        #[test]
+        fn single_no_top_level_data() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let response = app
+                .execute_contract(
+                    owner,
+                    contract.clone(),
+                    &echo::Message {
+                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap();
+
+            assert_eq!(response.data, Some(b"Second".into()));
+        }
+
+        #[test]
+        fn single_submsg_reply_returns_none() {
+            let mut app = custom_app();
+
+            // set personal balance
+            let owner = Addr::unchecked("owner");
+            app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
+
+            // set up reflect contract
+            let reflect_id = app.store_code(reflect::contract());
+            let reflect_addr = app
+                .instantiate_contract(
+                    reflect_id,
+                    owner.clone(),
+                    &EmptyMsg {},
+                    &[],
+                    "Reflect",
+                    None,
+                )
+                .unwrap();
+
+            // set up echo contract
+            let echo_id = app.store_code(echo::custom_contract());
+            let echo_addr = app
+                .instantiate_contract(echo_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            // reflect will call echo
+            // echo will set the data
+            // top-level app will not display the data
+            let echo_msg = echo::Message {
+                data: Some("my echo".into()),
+                events: vec![Event::new("echo").add_attribute("called", "true")],
+                ..echo::Message::default()
+            };
+            let reflect_msg = reflect::Message {
+                messages: vec![SubMsg::new(WasmMsg::Execute {
+                    contract_addr: echo_addr.to_string(),
+                    msg: to_binary(&echo_msg).unwrap(),
+                    funds: vec![],
+                })],
+            };
+
+            let res = app
+                .execute_contract(owner, reflect_addr, &reflect_msg, &[])
+                .unwrap();
+
+            // ensure data is empty
+            assert_eq!(res.data, None);
+            // ensure expected events
+            assert_eq!(res.events.len(), 3, "{:?}", res.events);
+            assert_eq!("execute", &res.events[0].ty);
+            assert_eq!("execute", &res.events[1].ty);
+            assert_eq!("wasm-echo", &res.events[2].ty);
         }
 
         #[test]
@@ -1084,10 +1215,10 @@ mod test {
                     &echo::Message {
                         data: Some("Orig".to_owned()),
                         sub_msg: vec![
-                            make_echo_submsg(contract.clone(), None, vec![]),
-                            make_echo_submsg(contract.clone(), "First", vec![]),
-                            make_echo_submsg(contract.clone(), "Second", vec![]),
-                            make_echo_submsg(contract, None, vec![]),
+                            make_echo_submsg(contract.clone(), None, vec![], 1),
+                            make_echo_submsg(contract.clone(), "First", vec![], 2),
+                            make_echo_submsg(contract.clone(), "Second", vec![], 3),
+                            make_echo_submsg(contract, None, vec![], 4),
                         ],
                         ..echo::Message::default()
                     },
@@ -1095,7 +1226,71 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Second".into()));
+        }
+
+        #[test]
+        fn multiple_submsg_no_reply() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let response = app
+                .execute_contract(
+                    owner,
+                    contract.clone(),
+                    &echo::Message {
+                        data: Some("Orig".to_owned()),
+                        sub_msg: vec![
+                            make_echo_submsg_no_reply(contract.clone(), None, vec![]),
+                            make_echo_submsg_no_reply(contract.clone(), "First", vec![]),
+                            make_echo_submsg_no_reply(contract.clone(), "Second", vec![]),
+                            make_echo_submsg_no_reply(contract, None, vec![]),
+                        ],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap();
+
+            assert_eq!(response.data, Some(b"Orig".into()));
+        }
+
+        #[test]
+        fn multiple_submsg_mixed() {
+            let mut app = mock_app();
+
+            let owner = Addr::unchecked("owner");
+
+            let contract_id = app.store_code(echo::contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner.clone(), &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            let response = app
+                .execute_contract(
+                    owner,
+                    contract.clone(),
+                    &echo::Message {
+                        sub_msg: vec![
+                            make_echo_submsg(contract.clone(), None, vec![], 1),
+                            make_echo_submsg_no_reply(contract.clone(), "Hidden", vec![]),
+                            make_echo_submsg(contract.clone(), "Shown", vec![], 2),
+                            make_echo_submsg(contract.clone(), None, vec![], 3),
+                            make_echo_submsg_no_reply(contract, "Lost", vec![]),
+                        ],
+                        ..echo::Message::default()
+                    },
+                    &[],
+                )
+                .unwrap();
+
+            assert_eq!(response.data, Some(b"Shown".into()));
         }
 
         #[test]
@@ -1124,9 +1319,12 @@ mod test {
                                 vec![make_echo_submsg(
                                     contract.clone(),
                                     "Second",
-                                    vec![make_echo_submsg(contract, None, vec![])],
+                                    vec![make_echo_submsg(contract, None, vec![], 4)],
+                                    3,
                                 )],
+                                2,
                             )],
+                            1,
                         )],
                         ..echo::Message::default()
                     },
@@ -1134,7 +1332,7 @@ mod test {
                 )
                 .unwrap();
 
-            assert_eq!(response.data, Some("Second".as_bytes().into()));
+            assert_eq!(response.data, Some(b"Second".into()));
         }
     }
 

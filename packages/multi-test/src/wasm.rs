@@ -370,6 +370,9 @@ where
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
     /// This is designed to be handled internally as part of larger process flows.
+    ///
+    /// The `data` on `AppResponse` is data returned from `reply` call, not from execution of
+    /// submessage itself. In case if `reply` is not called, no `data` is set.
     fn execute_submsg(
         &self,
         api: &dyn Api,
@@ -389,28 +392,27 @@ where
         });
 
         // call reply if meaningful
-        if let Ok(r) = res {
+        if let Ok(mut r) = res {
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
-                let mut orig = r.clone();
                 let reply = Reply {
                     id,
                     result: ContractResult::Ok(SubMsgExecutionResponse {
-                        events: r.events,
+                        events: r.events.clone(),
                         data: r.data,
                     }),
                 };
                 // do reply and combine it with the original response
-                let res2 = self._reply(api, router, storage, block, contract, reply)?;
-                // override data if set
-                if let Some(data) = res2.data {
-                    orig.data = Some(data);
-                }
+                let reply_res = self._reply(api, router, storage, block, contract, reply)?;
+                // override data
+                r.data = reply_res.data;
                 // append the events
-                orig.events.extend_from_slice(&res2.events);
-                Ok(orig)
+                r.events.extend_from_slice(&reply_res.events);
             } else {
-                Ok(r)
+                // reply is not called, no data should be rerturned
+                r.data = None;
             }
+
+            Ok(r)
         } else if let Err(e) = res {
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
                 let reply = Reply {
