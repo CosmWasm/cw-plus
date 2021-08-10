@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub use cw20::Cw20ExecuteMsg as ExecuteMsg;
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
 pub struct InstantiateMarketingInfo {
     pub project: Option<String>,
     pub description: Option<String>,
@@ -13,7 +13,7 @@ pub struct InstantiateMarketingInfo {
     pub logo: Option<Logo>,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Clone, PartialEq)]
 pub struct InstantiateMsg {
     pub name: String,
     pub symbol: String,
