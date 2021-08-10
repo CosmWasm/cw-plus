@@ -369,7 +369,11 @@ where
     /// All sequential calls to RouterCache will be one atomic unit (all commit or all fail).
     ///
     /// For normal use cases, you can use Router::execute() or Router::execute_multi().
-    /// This is designed to be handled internally as part of larger process flows.
+    /// This is designed to be used in dispatched messages inside the execute_wasm flow.
+    ///
+    /// It returns both the `AppResponse` but with `data` set only if reply was called, and it
+    /// returned some `data` - if anything is returned there submesage execution itself, it would
+    /// be dropped as it should never override original message response.
     fn execute_submsg(
         &self,
         api: &dyn Api,
