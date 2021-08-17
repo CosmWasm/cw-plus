@@ -5,6 +5,8 @@ use cosmwasm_std::{to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg,
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use anyhow::Result;
+
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
     pub events: Vec<Event>,
@@ -28,7 +30,7 @@ where
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String>;
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse>;
 
     /// Create a contract and get the new address.
     /// This is just a helper around execute()
@@ -40,9 +42,9 @@ where
         send_funds: &[Coin],
         label: U,
         admin: Option<String>,
-    ) -> Result<Addr, String> {
+    ) -> Result<Addr> {
         // instantiate contract
-        let init_msg = to_binary(init_msg).map_err(|e| e.to_string())?;
+        let init_msg = to_binary(init_msg)?;
         let msg = WasmMsg::Instantiate {
             admin,
             code_id,
@@ -62,8 +64,8 @@ where
         contract_addr: Addr,
         msg: &T,
         send_funds: &[Coin],
-    ) -> Result<AppResponse, String> {
-        let msg = to_binary(msg).map_err(|e| e.to_string())?;
+    ) -> Result<AppResponse> {
+        let msg = to_binary(msg)?;
         let msg = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
             msg,
@@ -80,8 +82,8 @@ where
         contract_addr: Addr,
         msg: &T,
         new_code_id: u64,
-    ) -> Result<AppResponse, String> {
-        let msg = to_binary(msg).map_err(|e| e.to_string())?;
+    ) -> Result<AppResponse> {
+        let msg = to_binary(msg)?;
         let msg = WasmMsg::Migrate {
             contract_addr: contract_addr.into(),
             msg,
@@ -95,7 +97,7 @@ where
         sender: Addr,
         recipient: Addr,
         amount: &[Coin],
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         let msg = BankMsg::Send {
             to_address: recipient.to_string(),
             amount: amount.to_vec(),

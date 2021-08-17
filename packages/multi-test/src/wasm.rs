@@ -16,9 +16,12 @@ use cw_storage_plus::Map;
 
 use crate::app::{Router, RouterQuerier};
 use crate::contracts::Contract;
+use crate::error::Error;
 use crate::executor::AppResponse;
 use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
+
+use anyhow::{anyhow, bail, Result};
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -54,7 +57,7 @@ where
         querier: &dyn Querier,
         block: &BlockInfo,
         request: WasmQuery,
-    ) -> Result<Binary, String>;
+    ) -> Result<Binary>;
 
     /// Handles all WasmMsg messages
     fn execute(
@@ -65,13 +68,13 @@ where
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> Result<AppResponse, String>;
+    ) -> Result<AppResponse>;
 
     // Add a new contract. Must be done on the base object, when no contracts running
     fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize;
 
     // Helper for querying for specific contract data
-    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String>;
+    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData>;
 
     /// Admin interface, cannot be called via CosmosMsg
     fn sudo(
@@ -82,7 +85,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<AppResponse, String>;
+    ) -> Result<AppResponse>;
 }
 
 pub struct WasmKeeper<C> {
@@ -110,21 +113,17 @@ where
         querier: &dyn Querier,
         block: &BlockInfo,
         request: WasmQuery,
-    ) -> Result<Binary, String> {
+    ) -> Result<Binary> {
         match request {
             WasmQuery::Smart { contract_addr, msg } => {
-                let addr = api
-                    .addr_validate(&contract_addr)
-                    .map_err(|e| e.to_string())?;
+                let addr = api.addr_validate(&contract_addr)?;
                 self.query_smart(addr, api, storage, querier, block, msg.into())
             }
             WasmQuery::Raw { contract_addr, key } => {
-                let addr = api
-                    .addr_validate(&contract_addr)
-                    .map_err(|e| e.to_string())?;
+                let addr = api.addr_validate(&contract_addr)?;
                 Ok(self.query_raw(addr, storage, &key))
             }
-            q => panic!("Unsupported wasm query: {:?}", q),
+            query => bail!(Error::UnsupportedWasmQuery(query)),
         }
     }
 
@@ -136,7 +135,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         let (resender, res, custom_event) =
             self.execute_wasm(api, storage, router, block, sender, msg)?;
 
@@ -150,7 +149,7 @@ where
         idx
     }
 
-    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData, String> {
+    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData> {
         self.load_contract(storage, address)
     }
 
@@ -162,7 +161,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         let custom_event = Event::new("sudo").add_attribute(CONTRACT_ATTR, &contract);
 
         let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
@@ -187,7 +186,7 @@ where
         querier: &dyn Querier,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<Binary, String> {
+    ) -> Result<Binary> {
         self.with_storage_readonly(
             api,
             storage,
@@ -213,7 +212,7 @@ where
         sender: T,
         recipient: String,
         amount: &[Coin],
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         if !amount.is_empty() {
             let msg = BankMsg::Send {
                 to_address: recipient,
@@ -235,16 +234,14 @@ where
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
-    ) -> Result<(Addr, Response<C>, Event), String> {
+    ) -> Result<(Addr, Response<C>, Event)> {
         match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
                 msg,
                 funds,
             } => {
-                let contract_addr = api
-                    .addr_validate(&contract_addr)
-                    .map_err(|e| e.to_string())?;
+                let contract_addr = api.addr_validate(&contract_addr)?;
                 // first move the cash
                 self.send(
                     api,
@@ -280,7 +277,7 @@ where
                 label,
             } => {
                 if label.is_empty() {
-                    return Err("Label is required on all contracts".to_owned());
+                    bail!("Label is required on all contracts");
                 }
 
                 let contract_addr = self.register_contract(
@@ -326,21 +323,16 @@ where
                 new_code_id,
                 msg,
             } => {
-                let contract_addr = api
-                    .addr_validate(&contract_addr)
-                    .map_err(|e| e.to_string())?;
+                let contract_addr = api.addr_validate(&contract_addr)?;
 
                 // check admin status and update the stored code_id
                 let new_code_id = new_code_id as usize;
                 if !self.codes.contains_key(&new_code_id) {
-                    return Err("Cannot migrate contract to unregistered code id".to_string());
+                    bail!("Cannot migrate contract to unregistered code id");
                 }
                 let mut data = self.load_contract(storage, &contract_addr)?;
                 if data.admin != Some(sender) {
-                    return Err(format!(
-                        "Only admin can migrate contract: {:?}",
-                        &data.admin
-                    ));
+                    bail!("Only admin can migrate contract: {:?}", data.admin);
                 }
                 data.code_id = new_code_id;
                 self.save_contract(storage, &contract_addr, &data)?;
@@ -360,7 +352,7 @@ where
                     .add_attribute("code_id", new_code_id.to_string());
                 Ok((contract_addr, res, custom_event))
             }
-            m => panic!("Unsupported wasm message: {:?}", m),
+            msg => bail!(Error::UnsupportedWasmMsg(msg)),
         }
     }
 
@@ -381,7 +373,7 @@ where
         block: &BlockInfo,
         contract: Addr,
         msg: SubMsg<C>,
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         let SubMsg {
             msg, id, reply_on, ..
         } = msg;
@@ -417,7 +409,7 @@ where
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
                 let reply = Reply {
                     id,
-                    result: ContractResult::Err(e),
+                    result: ContractResult::Err(e.to_string()),
                 };
                 self._reply(api, router, storage, block, contract, reply)
             } else {
@@ -436,7 +428,7 @@ where
         block: &BlockInfo,
         contract: Addr,
         reply: Reply,
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         let ok_attr = if reply.result.is_ok() {
             "handle_success"
         } else {
@@ -506,7 +498,7 @@ where
         contract: Addr,
         response: AppResponse,
         messages: Vec<SubMsg<C>>,
-    ) -> Result<AppResponse, String> {
+    ) -> Result<AppResponse> {
         let AppResponse { mut events, data } = response;
 
         // recurse in all messages
@@ -514,7 +506,7 @@ where
             let subres =
                 self.execute_submsg(api, router, storage, block, contract.clone(), resend)?;
             events.extend_from_slice(&subres.events);
-            Ok::<_, String>(subres.data.or(data))
+            Ok::<_, anyhow::Error>(subres.data.or(data))
         })?;
 
         Ok(AppResponse { events, data })
@@ -531,9 +523,9 @@ where
         admin: impl Into<Option<Addr>>,
         label: String,
         created: u64,
-    ) -> Result<Addr, String> {
+    ) -> Result<Addr> {
         if !self.codes.contains_key(&code_id) {
-            return Err("Cannot init contract with unregistered code id".to_string());
+            bail!("Cannot init contract with unregistered code id");
         }
 
         let addr = self.next_address(&prefixed_read(storage, NAMESPACE_WASM));
@@ -558,7 +550,7 @@ where
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
+    ) -> Result<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -578,7 +570,7 @@ where
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
+    ) -> Result<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -597,7 +589,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         reply: Reply,
-    ) -> Result<Response<C>, String> {
+    ) -> Result<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -616,7 +608,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
+    ) -> Result<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -635,7 +627,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>, String> {
+    ) -> Result<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -663,15 +655,15 @@ where
         block: &BlockInfo,
         address: Addr,
         action: F,
-    ) -> Result<T, String>
+    ) -> Result<T>
     where
-        F: FnOnce(&Box<dyn Contract<C>>, Deps, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract<C>>, Deps, Env) -> Result<T>,
     {
         let contract = self.load_contract(storage, &address)?;
         let handler = self
             .codes
             .get(&contract.code_id)
-            .ok_or_else(|| "Unregistered code id".to_string())?;
+            .ok_or(Error::UnregisteredCodeId(contract.code_id))?;
         let storage = self.contract_storage_readonly(storage, &address);
         let env = self.get_env(address, block);
 
@@ -691,15 +683,15 @@ where
         block: &BlockInfo,
         address: Addr,
         action: F,
-    ) -> Result<T, String>
+    ) -> Result<T>
     where
-        F: FnOnce(&Box<dyn Contract<C>>, DepsMut, Env) -> Result<T, String>,
+        F: FnOnce(&Box<dyn Contract<C>>, DepsMut, Env) -> Result<T>,
     {
         let contract = self.load_contract(storage, &address)?;
         let handler = self
             .codes
             .get(&contract.code_id)
-            .ok_or_else(|| "Unregistered code id".to_string())?;
+            .ok_or(Error::UnregisteredCodeId(contract.code_id))?;
 
         // We don't actually need a transaction here, as it is already embedded in a transactional.
         // execute_submsg or App.execute_multi.
@@ -719,14 +711,10 @@ where
         })
     }
 
-    pub fn load_contract(
-        &self,
-        storage: &dyn Storage,
-        address: &Addr,
-    ) -> Result<ContractData, String> {
+    pub fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData> {
         CONTRACTS
             .load(&prefixed_read(storage, NAMESPACE_WASM), address)
-            .map_err(|e| e.to_string())
+            .map_err(Into::into)
     }
 
     pub fn save_contract(
@@ -734,10 +722,10 @@ where
         storage: &mut dyn Storage,
         address: &Addr,
         contract: &ContractData,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         CONTRACTS
             .save(&mut prefixed(storage, NAMESPACE_WASM), address, contract)
-            .map_err(|e| e.to_string())
+            .map_err(Into::into)
     }
 
     // FIXME: better addr generation
@@ -781,31 +769,28 @@ where
         Box::new(storage)
     }
 
-    fn verify_attributes(attributes: &[Attribute]) -> Result<(), String> {
+    fn verify_attributes(attributes: &[Attribute]) -> Result<()> {
         for attr in attributes {
             let key = attr.key.trim();
             let val = attr.value.trim();
 
             if key.is_empty() {
-                return Err(format!("Empty attribute key. Value: {}", val));
+                bail!(Error::empty_attribute_key(val));
             }
 
             if val.is_empty() {
-                return Err(format!("Empty attribute value. Key: {}", key));
+                bail!(Error::empty_attribute_value(key));
             }
 
             if key.starts_with('_') {
-                return Err(format!(
-                    "Attribute key starts with reserved prefix _: {}",
-                    attr.key
-                ));
+                bail!(Error::reserved_attribute_key(key));
             }
         }
 
         Ok(())
     }
 
-    fn verify_response<T>(response: Response<T>) -> Result<Response<T>, String>
+    fn verify_response<T>(response: Response<T>) -> Result<Response<T>>
     where
         T: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
@@ -815,7 +800,7 @@ where
             Self::verify_attributes(&event.attributes)?;
             let ty = event.ty.trim();
             if ty.len() < 2 {
-                return Err(format!("Event type too short: {}", ty));
+                bail!(Error::event_type_too_short(ty));
             }
         }
 
@@ -848,15 +833,15 @@ where
 }
 
 // this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
+pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr> {
     let bin = data
         .as_ref()
-        .ok_or_else(|| "No data response".to_string())?
+        .ok_or_else(|| anyhow!("No data response"))?
         .to_vec();
     // parse the protobuf struct
-    let init_data = InstantiateData::decode(bin.as_slice()).map_err(|e| e.to_string())?;
+    let init_data = InstantiateData::decode(bin.as_slice())?;
     if init_data.address.is_empty() {
-        return Err("no contract address provided".into());
+        bail!("no contract address provided");
     }
     Ok(Addr::unchecked(init_data.address))
 }
@@ -864,7 +849,7 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr, String> {
 #[cfg(test)]
 mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
-    use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty};
+    use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty, StdError};
 
     use crate::test_helpers::contracts::{error, payout};
     use crate::transactions::StorageTransaction;
@@ -944,7 +929,10 @@ mod test {
         .unwrap_err();
 
         // StdError from contract_error auto-converted to string
-        assert_eq!(err, "Generic error: Init failed");
+        assert_eq!(
+            StdError::generic_err("Init failed"),
+            err.downcast().unwrap()
+        );
 
         let err = transactional(&mut wasm_storage, |cache, _| {
             // and the error for calling an unregistered contract
@@ -961,8 +949,10 @@ mod test {
         })
         .unwrap_err();
 
-        // Default error message from router when not found
-        assert_eq!(err, "cw_multi_test::wasm::ContractData not found");
+        assert_eq!(
+            StdError::not_found("cw_multi_test::wasm::ContractData"),
+            err.downcast().unwrap()
+        );
     }
 
     #[test]
