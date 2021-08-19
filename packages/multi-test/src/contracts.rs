@@ -1,12 +1,12 @@
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use std::fmt;
+use std::fmt::{self, Debug, Display};
 
 use cosmwasm_std::{
     from_slice, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply, Response, SubMsg,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result as AnyResult};
 
 /// Interface to call into a Contract
 pub trait Contract<T>
@@ -19,7 +19,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<T>>;
+    ) -> AnyResult<Response<T>>;
 
     fn instantiate(
         &self,
@@ -27,15 +27,15 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<T>>;
+    ) -> AnyResult<Response<T>>;
 
-    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary>;
+    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary>;
 
-    fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<T>>;
+    fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> AnyResult<Response<T>>;
 
-    fn reply(&self, deps: DepsMut, env: Env, msg: Reply) -> Result<Response<T>>;
+    fn reply(&self, deps: DepsMut, env: Env, msg: Reply) -> AnyResult<Response<T>>;
 
-    fn migrate(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<T>>;
+    fn migrate(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> AnyResult<Response<T>>;
 }
 
 type ContractFn<T, C, E> =
@@ -70,12 +70,12 @@ pub struct ContractWrapper<
     T3: DeserializeOwned,
     T4: DeserializeOwned,
     T6: DeserializeOwned,
-    E1: Into<anyhow::Error>,
-    E2: Into<anyhow::Error>,
-    E3: Into<anyhow::Error>,
-    E4: Into<anyhow::Error>,
-    E5: Into<anyhow::Error>,
-    E6: Into<anyhow::Error>,
+    E1: Display + Debug + Send + Sync + 'static,
+    E2: Display + Debug + Send + Sync + 'static,
+    E3: Display + Debug + Send + Sync + 'static,
+    E4: Display + Debug + Send + Sync + 'static,
+    E5: Display + Debug + Send + Sync + 'static,
+    E6: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     execute_fn: ContractClosure<T1, C, E1>,
@@ -91,9 +91,9 @@ where
     T1: DeserializeOwned + 'static,
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
-    E1: Into<anyhow::Error> + 'static,
-    E2: Into<anyhow::Error> + 'static,
-    E3: Into<anyhow::Error> + 'static,
+    E1: Display + Debug + Send + Sync + 'static,
+    E2: Display + Debug + Send + Sync + 'static,
+    E3: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
@@ -137,12 +137,12 @@ where
     T3: DeserializeOwned + 'static,
     T4: DeserializeOwned + 'static,
     T6: DeserializeOwned + 'static,
-    E1: Into<anyhow::Error> + 'static,
-    E2: Into<anyhow::Error> + 'static,
-    E3: Into<anyhow::Error> + 'static,
-    E4: Into<anyhow::Error> + 'static,
-    E5: Into<anyhow::Error> + 'static,
-    E6: Into<anyhow::Error> + 'static,
+    E1: Display + Debug + Send + Sync + 'static,
+    E2: Display + Debug + Send + Sync + 'static,
+    E3: Display + Debug + Send + Sync + 'static,
+    E4: Display + Debug + Send + Sync + 'static,
+    E5: Display + Debug + Send + Sync + 'static,
+    E6: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn with_sudo<T4A, E4A>(
@@ -151,7 +151,7 @@ where
     ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4A, E4A, E5, T6, E6>
     where
         T4A: DeserializeOwned + 'static,
-        E4A: Into<anyhow::Error> + 'static,
+        E4A: Display + Debug + Send + Sync + 'static,
     {
         ContractWrapper {
             execute_fn: self.execute_fn,
@@ -169,7 +169,7 @@ where
     ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4A, E4A, E5, T6, E6>
     where
         T4A: DeserializeOwned + 'static,
-        E4A: Into<anyhow::Error> + 'static,
+        E4A: Display + Debug + Send + Sync + 'static,
     {
         ContractWrapper {
             execute_fn: self.execute_fn,
@@ -186,7 +186,7 @@ where
         reply_fn: ReplyFn<C, E5A>,
     ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A, T6, E6>
     where
-        E5A: Into<anyhow::Error> + 'static,
+        E5A: Display + Debug + Send + Sync + 'static,
     {
         ContractWrapper {
             execute_fn: self.execute_fn,
@@ -204,7 +204,7 @@ where
         reply_fn: ReplyFn<Empty, E5A>,
     ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5A, T6, E6>
     where
-        E5A: Into<anyhow::Error> + 'static,
+        E5A: Display + Debug + Send + Sync + 'static,
     {
         ContractWrapper {
             execute_fn: self.execute_fn,
@@ -222,7 +222,7 @@ where
     ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6A, E6A>
     where
         T6A: DeserializeOwned + 'static,
-        E6A: Into<anyhow::Error> + 'static,
+        E6A: Display + Debug + Send + Sync + 'static,
     {
         ContractWrapper {
             execute_fn: self.execute_fn,
@@ -240,7 +240,7 @@ where
     ) -> ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6A, E6A>
     where
         T6A: DeserializeOwned + 'static,
-        E6A: Into<anyhow::Error> + 'static,
+        E6A: Display + Debug + Send + Sync + 'static,
     {
         ContractWrapper {
             execute_fn: self.execute_fn,
@@ -256,7 +256,7 @@ where
 fn customize_fn<T, C, E>(raw_fn: ContractFn<T, Empty, E>) -> ContractClosure<T, C, E>
 where
     T: DeserializeOwned + 'static,
-    E: Into<anyhow::Error> + 'static,
+    E: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     let customized =
@@ -271,7 +271,7 @@ fn customize_permissioned_fn<T, C, E>(
 ) -> PermissionedClosure<T, C, E>
 where
     T: DeserializeOwned + 'static,
-    E: Into<anyhow::Error> + 'static,
+    E: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     let customized = move |deps: DepsMut, env: Env, msg: T| -> Result<Response<C>, E> {
@@ -322,12 +322,12 @@ where
     T3: DeserializeOwned,
     T4: DeserializeOwned,
     T6: DeserializeOwned,
-    E1: Into<anyhow::Error>,
-    E2: Into<anyhow::Error>,
-    E3: Into<anyhow::Error>,
-    E4: Into<anyhow::Error>,
-    E5: Into<anyhow::Error>,
-    E6: Into<anyhow::Error>,
+    E1: Display + Debug + Send + Sync + 'static,
+    E2: Display + Debug + Send + Sync + 'static,
+    E3: Display + Debug + Send + Sync + 'static,
+    E4: Display + Debug + Send + Sync + 'static,
+    E5: Display + Debug + Send + Sync + 'static,
+    E6: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     fn execute(
@@ -336,9 +336,9 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         let msg = from_slice(&msg)?;
-        (self.execute_fn)(deps, env, info, msg).map_err(Into::into)
+        (self.execute_fn)(deps, env, info, msg).map_err(|err| anyhow!(err))
     }
 
     fn instantiate(
@@ -347,38 +347,38 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         let msg = from_slice(&msg)?;
-        (self.instantiate_fn)(deps, env, info, msg).map_err(Into::into)
+        (self.instantiate_fn)(deps, env, info, msg).map_err(|err| anyhow!(err))
     }
 
-    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary> {
+    fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
         let msg = from_slice(&msg)?;
-        (self.query_fn)(deps, env, msg).map_err(Into::into)
+        (self.query_fn)(deps, env, msg).map_err(|err| anyhow!(err))
     }
 
     // this returns an error if the contract doesn't implement sudo
-    fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<C>> {
+    fn sudo(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> AnyResult<Response<C>> {
         let msg = from_slice(&msg)?;
         match &self.sudo_fn {
-            Some(sudo) => sudo(deps, env, msg).map_err(Into::into),
+            Some(sudo) => sudo(deps, env, msg).map_err(|err| anyhow!(err)),
             None => bail!("sudo not implemented for contract"),
         }
     }
 
     // this returns an error if the contract doesn't implement reply
-    fn reply(&self, deps: DepsMut, env: Env, reply_data: Reply) -> Result<Response<C>> {
+    fn reply(&self, deps: DepsMut, env: Env, reply_data: Reply) -> AnyResult<Response<C>> {
         match &self.reply_fn {
-            Some(reply) => reply(deps, env, reply_data).map_err(Into::into),
+            Some(reply) => reply(deps, env, reply_data).map_err(|err| anyhow!(err)),
             None => bail!("reply not implemented for contract"),
         }
     }
 
     // this returns an error if the contract doesn't implement migrate
-    fn migrate(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> Result<Response<C>> {
+    fn migrate(&self, deps: DepsMut, env: Env, msg: Vec<u8>) -> AnyResult<Response<C>> {
         let msg = from_slice(&msg)?;
         match &self.migrate_fn {
-            Some(migrate) => migrate(deps, env, msg).map_err(Into::into),
+            Some(migrate) => migrate(deps, env, msg).map_err(|err| anyhow!(err)),
             None => bail!("migrate not implemented for contract"),
         }
     }

@@ -9,7 +9,7 @@ use cw0::NativeBalance;
 use cw_storage_plus::Map;
 use itertools::Itertools;
 
-use anyhow::{bail, Error, Result};
+use anyhow::{bail, Result as AnyResult};
 
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
@@ -18,10 +18,14 @@ pub const NAMESPACE_BANK: &[u8] = b"bank";
 /// Bank is a minimal contract-like interface that implements a bank module
 /// It is initialized outside of the trait
 pub trait Bank {
-    fn execute(&self, storage: &mut dyn Storage, sender: Addr, msg: BankMsg)
-        -> Result<AppResponse>;
+    fn execute(
+        &self,
+        storage: &mut dyn Storage,
+        sender: Addr,
+        msg: BankMsg,
+    ) -> AnyResult<AppResponse>;
 
-    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> Result<Binary>;
+    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary>;
 
     // Admin interface
     fn init_balance(
@@ -29,7 +33,7 @@ pub trait Bank {
         storage: &mut dyn Storage,
         account: &Addr,
         amount: Vec<Coin>,
-    ) -> Result<()>;
+    ) -> AnyResult<()>;
 }
 
 #[derive(Default)]
@@ -45,16 +49,16 @@ impl BankKeeper {
         bank_storage: &mut dyn Storage,
         account: &Addr,
         amount: Vec<Coin>,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         let mut balance = NativeBalance(amount);
         balance.normalize();
         BALANCES
             .save(bank_storage, account, &balance)
-            .map_err(Error::from)
+            .map_err(Into::into)
     }
 
     // this is an "admin" function to let us adjust bank accounts
-    fn get_balance(&self, bank_storage: &dyn Storage, account: &Addr) -> Result<Vec<Coin>> {
+    fn get_balance(&self, bank_storage: &dyn Storage, account: &Addr) -> AnyResult<Vec<Coin>> {
         let val = BALANCES.may_load(bank_storage, &account)?;
         Ok(val.unwrap_or_default().into_vec())
     }
@@ -65,7 +69,7 @@ impl BankKeeper {
         from_address: Addr,
         to_address: Addr,
         amount: Vec<Coin>,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         self.burn(bank_storage, from_address, amount.clone())?;
         self.mint(bank_storage, to_address, amount)
     }
@@ -75,7 +79,7 @@ impl BankKeeper {
         bank_storage: &mut dyn Storage,
         to_address: Addr,
         amount: Vec<Coin>,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         let b = self.get_balance(bank_storage, &to_address)?;
         let b = NativeBalance(b) + NativeBalance(amount);
         self.set_balance(bank_storage, &to_address, b.into_vec())
@@ -86,7 +90,7 @@ impl BankKeeper {
         bank_storage: &mut dyn Storage,
         from_address: Addr,
         amount: Vec<Coin>,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         let a = self.get_balance(bank_storage, &from_address)?;
         let a = (NativeBalance(a) - amount)?;
         self.set_balance(bank_storage, &from_address, a.into_vec())
@@ -106,7 +110,7 @@ impl Bank for BankKeeper {
         storage: &mut dyn Storage,
         sender: Addr,
         msg: BankMsg,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         match msg {
             BankMsg::Send { to_address, amount } => {
@@ -132,7 +136,7 @@ impl Bank for BankKeeper {
         }
     }
 
-    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> Result<Binary> {
+    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary> {
         let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
         match request {
             BankQuery::AllBalances { address } => {
@@ -161,7 +165,7 @@ impl Bank for BankKeeper {
         storage: &mut dyn Storage,
         account: &Addr,
         amount: Vec<Coin>,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         self.set_balance(&mut bank_storage, account, amount)
     }

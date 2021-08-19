@@ -21,7 +21,7 @@ use crate::executor::AppResponse;
 use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Result as AnyResult};
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -57,7 +57,7 @@ where
         querier: &dyn Querier,
         block: &BlockInfo,
         request: WasmQuery,
-    ) -> Result<Binary>;
+    ) -> AnyResult<Binary>;
 
     /// Handles all WasmMsg messages
     fn execute(
@@ -68,13 +68,13 @@ where
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> Result<AppResponse>;
+    ) -> AnyResult<AppResponse>;
 
     // Add a new contract. Must be done on the base object, when no contracts running
     fn store_code(&mut self, code: Box<dyn Contract<C>>) -> usize;
 
     // Helper for querying for specific contract data
-    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData>;
+    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData>;
 
     /// Admin interface, cannot be called via CosmosMsg
     fn sudo(
@@ -85,7 +85,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<AppResponse>;
+    ) -> AnyResult<AppResponse>;
 }
 
 pub struct WasmKeeper<C> {
@@ -113,7 +113,7 @@ where
         querier: &dyn Querier,
         block: &BlockInfo,
         request: WasmQuery,
-    ) -> Result<Binary> {
+    ) -> AnyResult<Binary> {
         match request {
             WasmQuery::Smart { contract_addr, msg } => {
                 let addr = api.addr_validate(&contract_addr)?;
@@ -135,7 +135,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let (resender, res, custom_event) =
             self.execute_wasm(api, storage, router, block, sender, msg)?;
 
@@ -149,7 +149,7 @@ where
         idx
     }
 
-    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData> {
+    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData> {
         self.load_contract(storage, address)
     }
 
@@ -161,7 +161,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let custom_event = Event::new("sudo").add_attribute(CONTRACT_ATTR, &contract);
 
         let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
@@ -186,7 +186,7 @@ where
         querier: &dyn Querier,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<Binary> {
+    ) -> AnyResult<Binary> {
         self.with_storage_readonly(
             api,
             storage,
@@ -212,7 +212,7 @@ where
         sender: T,
         recipient: String,
         amount: &[Coin],
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         if !amount.is_empty() {
             let msg = BankMsg::Send {
                 to_address: recipient,
@@ -234,7 +234,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
-    ) -> Result<(Addr, Response<C>, Event)> {
+    ) -> AnyResult<(Addr, Response<C>, Event)> {
         match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -373,7 +373,7 @@ where
         block: &BlockInfo,
         contract: Addr,
         msg: SubMsg<C>,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let SubMsg {
             msg, id, reply_on, ..
         } = msg;
@@ -428,7 +428,7 @@ where
         block: &BlockInfo,
         contract: Addr,
         reply: Reply,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let ok_attr = if reply.result.is_ok() {
             "handle_success"
         } else {
@@ -498,7 +498,7 @@ where
         contract: Addr,
         response: AppResponse,
         messages: Vec<SubMsg<C>>,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let AppResponse { mut events, data } = response;
 
         // recurse in all messages
@@ -523,7 +523,7 @@ where
         admin: impl Into<Option<Addr>>,
         label: String,
         created: u64,
-    ) -> Result<Addr> {
+    ) -> AnyResult<Addr> {
         if !self.codes.contains_key(&code_id) {
             bail!("Cannot init contract with unregistered code id");
         }
@@ -550,7 +550,7 @@ where
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -570,7 +570,7 @@ where
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -589,7 +589,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         reply: Reply,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -608,7 +608,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -627,7 +627,7 @@ where
         router: &Router<C>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> Result<Response<C>> {
+    ) -> AnyResult<Response<C>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -655,9 +655,9 @@ where
         block: &BlockInfo,
         address: Addr,
         action: F,
-    ) -> Result<T>
+    ) -> AnyResult<T>
     where
-        F: FnOnce(&Box<dyn Contract<C>>, Deps, Env) -> Result<T>,
+        F: FnOnce(&Box<dyn Contract<C>>, Deps, Env) -> AnyResult<T>,
     {
         let contract = self.load_contract(storage, &address)?;
         let handler = self
@@ -683,9 +683,9 @@ where
         block: &BlockInfo,
         address: Addr,
         action: F,
-    ) -> Result<T>
+    ) -> AnyResult<T>
     where
-        F: FnOnce(&Box<dyn Contract<C>>, DepsMut, Env) -> Result<T>,
+        F: FnOnce(&Box<dyn Contract<C>>, DepsMut, Env) -> AnyResult<T>,
     {
         let contract = self.load_contract(storage, &address)?;
         let handler = self
@@ -711,7 +711,7 @@ where
         })
     }
 
-    pub fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> Result<ContractData> {
+    pub fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData> {
         CONTRACTS
             .load(&prefixed_read(storage, NAMESPACE_WASM), address)
             .map_err(Into::into)
@@ -722,7 +722,7 @@ where
         storage: &mut dyn Storage,
         address: &Addr,
         contract: &ContractData,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         CONTRACTS
             .save(&mut prefixed(storage, NAMESPACE_WASM), address, contract)
             .map_err(Into::into)
@@ -769,7 +769,7 @@ where
         Box::new(storage)
     }
 
-    fn verify_attributes(attributes: &[Attribute]) -> Result<()> {
+    fn verify_attributes(attributes: &[Attribute]) -> AnyResult<()> {
         for attr in attributes {
             let key = attr.key.trim();
             let val = attr.value.trim();
@@ -790,7 +790,7 @@ where
         Ok(())
     }
 
-    fn verify_response<T>(response: Response<T>) -> Result<Response<T>>
+    fn verify_response<T>(response: Response<T>) -> AnyResult<Response<T>>
     where
         T: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
@@ -833,7 +833,7 @@ where
 }
 
 // this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> Result<Addr> {
+pub fn parse_contract_addr(data: &Option<Binary>) -> AnyResult<Addr> {
     let bin = data
         .as_ref()
         .ok_or_else(|| anyhow!("No data response"))?
@@ -949,6 +949,7 @@ mod test {
         })
         .unwrap_err();
 
+        // Default error message from router when not found
         assert_eq!(
             StdError::not_found("cw_multi_test::wasm::ContractData"),
             err.downcast().unwrap()

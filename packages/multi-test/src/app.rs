@@ -15,7 +15,7 @@ use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
 
-use anyhow::Result;
+use anyhow::Result as AnyResult;
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -53,7 +53,7 @@ impl<C> Executor<C> for App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse> {
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -105,7 +105,7 @@ where
         &mut self,
         sender: Addr,
         msgs: Vec<CosmosMsg<C>>,
-    ) -> Result<Vec<AppResponse>> {
+    ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
@@ -125,7 +125,7 @@ where
     }
 
     /// This is an "admin" function to let us adjust bank accounts
-    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<()> {
+    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> AnyResult<()> {
         self.router
             .bank
             .init_balance(&mut *self.storage, account, amount)
@@ -138,7 +138,7 @@ where
     }
 
     /// This allows to get `ContractData` for specific contract
-    pub fn contract_data(&self, address: &Addr) -> Result<ContractData> {
+    pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
         self.router.wasm.contract_data(&*self.storage, address)
     }
 
@@ -149,7 +149,7 @@ where
         &mut self,
         contract_addr: U,
         msg: &T,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let msg = to_vec(msg)?;
         self.router.wasm.sudo(
             &*self.api,
@@ -201,7 +201,7 @@ where
         storage: &dyn Storage,
         block: &BlockInfo,
         request: QueryRequest<Empty>,
-    ) -> Result<Binary> {
+    ) -> AnyResult<Binary> {
         match request {
             QueryRequest::Wasm(req) => {
                 self.wasm
@@ -219,7 +219,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         msg: CosmosMsg<C>,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),

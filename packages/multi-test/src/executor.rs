@@ -5,7 +5,7 @@ use cosmwasm_std::{to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg,
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use anyhow::Result;
+use anyhow::Result as AnyResult;
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
@@ -30,7 +30,7 @@ where
     /// Runs arbitrary CosmosMsg.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse>;
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> AnyResult<AppResponse>;
 
     /// Create a contract and get the new address.
     /// This is just a helper around execute()
@@ -42,7 +42,7 @@ where
         send_funds: &[Coin],
         label: U,
         admin: Option<String>,
-    ) -> Result<Addr> {
+    ) -> AnyResult<Addr> {
         // instantiate contract
         let init_msg = to_binary(init_msg)?;
         let msg = WasmMsg::Instantiate {
@@ -64,7 +64,7 @@ where
         contract_addr: Addr,
         msg: &T,
         send_funds: &[Coin],
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let msg = to_binary(msg)?;
         let msg = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
@@ -82,7 +82,7 @@ where
         contract_addr: Addr,
         msg: &T,
         new_code_id: u64,
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let msg = to_binary(msg)?;
         let msg = WasmMsg::Migrate {
             contract_addr: contract_addr.into(),
@@ -97,7 +97,7 @@ where
         sender: Addr,
         recipient: Addr,
         amount: &[Coin],
-    ) -> Result<AppResponse> {
+    ) -> AnyResult<AppResponse> {
         let msg = BankMsg::Send {
             to_address: recipient.to_string(),
             amount: amount.to_vec(),
