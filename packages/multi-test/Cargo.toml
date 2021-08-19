@@ -14,6 +14,7 @@ documentation = "https://docs.cosmwasm.com"
 default = ["iterator"]
 iterator = ["cosmwasm-std/iterator"]
 stargate = ["cosmwasm-std/stargate"]
+backtrace = ["anyhow/backtrace"]
 
 [dependencies]
 cw0 = { path = "../../packages/cw0", version = "0.8.0" }
@@ -24,3 +25,5 @@ itertools = "0.10.1"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 prost = "0.8.0"
+anyhow = "1"
+thiserror = "1"

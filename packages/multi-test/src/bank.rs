@@ -9,6 +9,8 @@ use cw0::NativeBalance;
 use cw_storage_plus::Map;
 use itertools::Itertools;
 
+use anyhow::{bail, Result as AnyResult};
+
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
 pub const NAMESPACE_BANK: &[u8] = b"bank";
@@ -21,14 +23,9 @@ pub trait Bank {
         storage: &mut dyn Storage,
         sender: Addr,
         msg: BankMsg,
-    ) -> Result<AppResponse, String>;
+    ) -> AnyResult<AppResponse>;
 
-    fn query(
-        &self,
-        api: &dyn Api,
-        storage: &dyn Storage,
-        request: BankQuery,
-    ) -> Result<Binary, String>;
+    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary>;
 
     // Admin interface
     fn init_balance(
@@ -36,7 +33,7 @@ pub trait Bank {
         storage: &mut dyn Storage,
         account: &Addr,
         amount: Vec<Coin>,
-    ) -> Result<(), String>;
+    ) -> AnyResult<()>;
 }
 
 #[derive(Default)]
@@ -52,19 +49,17 @@ impl BankKeeper {
         bank_storage: &mut dyn Storage,
         account: &Addr,
         amount: Vec<Coin>,
-    ) -> Result<(), String> {
+    ) -> AnyResult<()> {
         let mut balance = NativeBalance(amount);
         balance.normalize();
         BALANCES
             .save(bank_storage, account, &balance)
-            .map_err(|e| e.to_string())
+            .map_err(Into::into)
     }
 
     // this is an "admin" function to let us adjust bank accounts
-    fn get_balance(&self, bank_storage: &dyn Storage, account: &Addr) -> Result<Vec<Coin>, String> {
-        let val = BALANCES
-            .may_load(bank_storage, &account)
-            .map_err(|e| e.to_string())?;
+    fn get_balance(&self, bank_storage: &dyn Storage, account: &Addr) -> AnyResult<Vec<Coin>> {
+        let val = BALANCES.may_load(bank_storage, &account)?;
         Ok(val.unwrap_or_default().into_vec())
     }
 
@@ -74,7 +69,7 @@ impl BankKeeper {
         from_address: Addr,
         to_address: Addr,
         amount: Vec<Coin>,
-    ) -> Result<(), String> {
+    ) -> AnyResult<()> {
         self.burn(bank_storage, from_address, amount.clone())?;
         self.mint(bank_storage, to_address, amount)
     }
@@ -84,7 +79,7 @@ impl BankKeeper {
         bank_storage: &mut dyn Storage,
         to_address: Addr,
         amount: Vec<Coin>,
-    ) -> Result<(), String> {
+    ) -> AnyResult<()> {
         let b = self.get_balance(bank_storage, &to_address)?;
         let b = NativeBalance(b) + NativeBalance(amount);
         self.set_balance(bank_storage, &to_address, b.into_vec())
@@ -95,9 +90,9 @@ impl BankKeeper {
         bank_storage: &mut dyn Storage,
         from_address: Addr,
         amount: Vec<Coin>,
-    ) -> Result<(), String> {
+    ) -> AnyResult<()> {
         let a = self.get_balance(bank_storage, &from_address)?;
-        let a = (NativeBalance(a) - amount).map_err(|e| e.to_string())?;
+        let a = (NativeBalance(a) - amount)?;
         self.set_balance(bank_storage, &from_address, a.into_vec())
     }
 }
@@ -115,7 +110,7 @@ impl Bank for BankKeeper {
         storage: &mut dyn Storage,
         sender: Addr,
         msg: BankMsg,
-    ) -> Result<AppResponse, String> {
+    ) -> AnyResult<AppResponse> {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         match msg {
             BankMsg::Send { to_address, amount } => {
@@ -137,35 +132,30 @@ impl Bank for BankKeeper {
                 self.burn(&mut bank_storage, sender, amount)?;
                 Ok(AppResponse::default())
             }
-            m => Err(format!("Unsupported bank message: {:?}", m)),
+            m => bail!("Unsupported bank message: {:?}", m),
         }
     }
 
-    fn query(
-        &self,
-        api: &dyn Api,
-        storage: &dyn Storage,
-        request: BankQuery,
-    ) -> Result<Binary, String> {
+    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary> {
         let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
         match request {
             BankQuery::AllBalances { address } => {
-                let address = api.addr_validate(&address).map_err(|err| err.to_string())?;
+                let address = api.addr_validate(&address)?;
                 let amount = self.get_balance(&bank_storage, &address)?;
                 let res = AllBalanceResponse { amount };
-                Ok(to_binary(&res).map_err(|e| e.to_string())?)
+                Ok(to_binary(&res)?)
             }
             BankQuery::Balance { address, denom } => {
-                let address = api.addr_validate(&address).map_err(|err| err.to_string())?;
+                let address = api.addr_validate(&address)?;
                 let all_amounts = self.get_balance(&bank_storage, &address)?;
                 let amount = all_amounts
                     .into_iter()
                     .find(|c| c.denom == denom)
                     .unwrap_or_else(|| coin(0, denom));
                 let res = BalanceResponse { amount };
-                Ok(to_binary(&res).map_err(|e| e.to_string())?)
+                Ok(to_binary(&res)?)
             }
-            q => panic!("Unsupported bank query: {:?}", q),
+            q => bail!("Unsupported bank query: {:?}", q),
         }
     }
 
@@ -175,7 +165,7 @@ impl Bank for BankKeeper {
         storage: &mut dyn Storage,
         account: &Addr,
         amount: Vec<Coin>,
-    ) -> Result<(), String> {
+    ) -> AnyResult<()> {
         let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
         self.set_balance(&mut bank_storage, account, amount)
     }
@@ -186,7 +176,7 @@ mod test {
     use super::*;
 
     use cosmwasm_std::testing::{MockApi, MockStorage};
-    use cosmwasm_std::{coins, from_slice};
+    use cosmwasm_std::{coins, from_slice, StdError};
 
     fn query_balance(
         bank: &BankKeeper,
@@ -330,7 +320,8 @@ mod test {
             amount: coins(20, "btc"),
         };
         let err = bank.execute(&mut store, owner.clone(), msg).unwrap_err();
-        assert!(err.contains("Overflow"));
+        assert!(matches!(err.downcast().unwrap(), StdError::Overflow { .. }));
+
         let rich = query_balance(&bank, &api, &store, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
 
@@ -339,6 +330,6 @@ mod test {
             amount: coins(1, "btc"),
         };
         let err = bank.execute(&mut store, rcpt, msg).unwrap_err();
-        assert!(err.contains("Overflow"));
+        assert!(matches!(err.downcast().unwrap(), StdError::Overflow { .. }));
     }
 }

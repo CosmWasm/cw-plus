@@ -617,7 +617,7 @@ mod tests {
                 None,
             )
             .unwrap_err();
-        assert_eq!(err, ContractError::ZeroThreshold {}.to_string());
+        assert_eq!(ContractError::ZeroThreshold {}, err.downcast().unwrap());
 
         // Total weight less than required weight not allowed
         let instantiate_msg = InstantiateMsg {
@@ -635,7 +635,10 @@ mod tests {
                 None,
             )
             .unwrap_err();
-        assert_eq!(err, ContractError::UnreachableThreshold {}.to_string());
+        assert_eq!(
+            ContractError::UnreachableThreshold {},
+            err.downcast().unwrap()
+        );
 
         // All valid
         let instantiate_msg = InstantiateMsg {
@@ -703,7 +706,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr.clone(), &proposal, &[])
             .unwrap_err();
-        assert_eq!(err, ContractError::Unauthorized {}.to_string());
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         // Wrong expiration option fails
         let msgs = match proposal.clone() {
@@ -724,7 +727,7 @@ mod tests {
                 &[],
             )
             .unwrap_err();
-        assert_eq!(err, ContractError::WrongExpiration {}.to_string());
+        assert_eq!(ContractError::WrongExpiration {}, err.downcast().unwrap());
 
         // Proposal from voter works
         let res = app
@@ -920,13 +923,13 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::AlreadyVoted {}.to_string(), err);
+        assert_eq!(ContractError::AlreadyVoted {}, err.downcast().unwrap());
 
         // Only voters can vote
         let err = app
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}.to_string(), err);
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         // But voter1 can
         let res = app
@@ -971,14 +974,14 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::AlreadyVoted {}.to_string(), err);
+        assert_eq!(ContractError::AlreadyVoted {}, err.downcast().unwrap());
 
         // Expired proposals cannot be voted
         app.update_block(expire(voting_period));
         let err = app
             .execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::Expired {}.to_string(), err);
+        assert_eq!(ContractError::Expired {}, err.downcast().unwrap());
         app.update_block(unexpire(voting_period));
 
         // Powerful voter supports it, so it passes
@@ -999,7 +1002,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(VOTER5), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::NotOpen {}.to_string(), err);
+        assert_eq!(ContractError::NotOpen {}, err.downcast().unwrap());
 
         // query individual votes
         // initial (with 0 weight)
@@ -1073,7 +1076,10 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &execution, &[])
             .unwrap_err();
-        assert_eq!(ContractError::WrongExecuteStatus {}.to_string(), err);
+        assert_eq!(
+            ContractError::WrongExecuteStatus {},
+            err.downcast().unwrap()
+        );
 
         // Vote it, so it passes
         let vote = ExecuteMsg::Vote {
@@ -1098,7 +1104,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &closing, &[])
             .unwrap_err();
-        assert_eq!(ContractError::WrongCloseStatus {}.to_string(), err);
+        assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
 
         // Execute works. Anybody can execute Passed proposals
         let res = app
@@ -1128,7 +1134,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr, &closing, &[])
             .unwrap_err();
-        assert_eq!(ContractError::WrongCloseStatus {}.to_string(), err);
+        assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
     }
 
     #[test]
@@ -1159,7 +1165,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr.clone(), &closing, &[])
             .unwrap_err();
-        assert_eq!(ContractError::NotExpired {}.to_string(), err);
+        assert_eq!(ContractError::NotExpired {}, err.downcast().unwrap());
 
         // Expired proposals can be closed
         app.update_block(expire(voting_period));
@@ -1180,7 +1186,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr, &closing, &[])
             .unwrap_err();
-        assert_eq!(ContractError::WrongCloseStatus {}.to_string(), err);
+        assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
     }
 
     // uses the power from the beginning of the voting period
@@ -1289,7 +1295,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(newbie), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}.to_string(), err);
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         // previously removed VOTER3 can still vote, passing the proposal
         app.execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &yes_vote, &[])
@@ -1420,7 +1426,7 @@ mod tests {
                 &[],
             )
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}.to_string(), err);
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         // extra: ensure no one else can call the hook
         let hook_hack = ExecuteMsg::MemberChangedHook(MemberChangedHookMsg {
@@ -1429,7 +1435,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(VOTER2), flex_addr.clone(), &hook_hack, &[])
             .unwrap_err();
-        assert_eq!(ContractError::Unauthorized {}.to_string(), err);
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
     }
 
     // uses the power from the beginning of the voting period

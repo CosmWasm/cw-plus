@@ -12,14 +12,16 @@ use cosmwasm_std::Storage;
 #[cfg(feature = "iterator")]
 use cosmwasm_std::{Order, Pair};
 
+use anyhow::Result as AnyResult;
+
 #[cfg(feature = "iterator")]
 /// The BTreeMap specific key-value pair reference type, as returned by BTreeMap<Vec<u8>, T>::range.
 /// This is internal as it can change any time if the map implementation is swapped out.
 type BTreeMapPairRef<'a, T = Vec<u8>> = (&'a Vec<u8>, &'a T);
 
-pub fn transactional<F, T>(base: &mut dyn Storage, action: F) -> Result<T, String>
+pub fn transactional<F, T>(base: &mut dyn Storage, action: F) -> AnyResult<T>
 where
-    F: FnOnce(&mut dyn Storage, &dyn Storage) -> Result<T, String>,
+    F: FnOnce(&mut dyn Storage, &dyn Storage) -> AnyResult<T>,
 {
     let mut cache = StorageTransaction::new(base);
     let res = action(&mut cache, base)?;

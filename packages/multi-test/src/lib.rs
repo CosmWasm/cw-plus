@@ -9,6 +9,7 @@
 mod app;
 mod bank;
 mod contracts;
+pub mod error;
 mod executor;
 mod test_helpers;
 mod transactions;
