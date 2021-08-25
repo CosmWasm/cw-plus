@@ -21,6 +21,26 @@ impl AppResponse {
         assert_eq!(self.events[idx].ty.as_str(), "wasm");
         &self.events[idx].attributes[1..]
     }
+
+    /// Check if there is an Event that is a super-set of this.
+    /// It has the same type, and all compare.attributes are included in it as well.
+    /// You don't need to specify them all.
+    #[track_caller]
+    pub fn has_event(&self, compare: Event) -> bool {
+        self.events.iter().any(|ev| {
+            compare.ty == ev.ty
+                && compare
+                    .attributes
+                    .iter()
+                    .all(|cat| ev.attributes.iter().any(|evat| cat == evat))
+        })
+    }
+
+    /// Like has_event but panics if no match
+    #[track_caller]
+    pub fn assert_event(&self, compare: Event) {
+        assert!(self.has_event(compare));
+    }
 }
 
 pub trait Executor<C>
