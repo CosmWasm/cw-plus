@@ -25,21 +25,25 @@ impl AppResponse {
     /// Check if there is an Event that is a super-set of this.
     /// It has the same type, and all compare.attributes are included in it as well.
     /// You don't need to specify them all.
-    #[track_caller]
-    pub fn has_event(&self, compare: Event) -> bool {
+    pub fn has_event(&self, expected: &Event) -> bool {
         self.events.iter().any(|ev| {
-            compare.ty == ev.ty
-                && compare
+            expected.ty == ev.ty
+                && expected
                     .attributes
                     .iter()
-                    .all(|cat| ev.attributes.iter().any(|evat| cat == evat))
+                    .all(|at| ev.attributes.contains(at))
         })
     }
 
     /// Like has_event but panics if no match
     #[track_caller]
-    pub fn assert_event(&self, compare: Event) {
-        assert!(self.has_event(compare));
+    pub fn assert_event(&self, expected: &Event) {
+        assert!(
+            self.has_event(expected),
+            "Expected to find an event {:?}, but received: {:?}",
+            expected,
+            self.events
+        );
     }
 }
 
