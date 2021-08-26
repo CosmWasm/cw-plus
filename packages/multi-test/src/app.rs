@@ -717,45 +717,25 @@ mod test {
 
         // expected events: execute, transfer, reply, custom wasm (set in reply)
         assert_eq!(4, res.events.len(), "{:?}", res.events);
-        let first = &res.events[0];
-        assert_eq!(first.ty.as_str(), "execute");
-        assert_eq!(first.attributes, [("_contract_addr", &reflect_addr)]);
-
-        // next event is the transfer from bank
-        let transfer = &res.events[1];
-        assert_eq!(transfer.ty.as_str(), "transfer");
-
-        // then we get notification reply was called
-        let reply = &res.events[2];
-        assert_eq!(reply.ty.as_str(), "reply");
-        assert_eq!(
-            reply.attributes,
-            [
-                ("_contract_addr", reflect_addr.as_str()),
-                ("mode", "handle_success")
-            ]
+        res.assert_event(&Event::new("execute").add_attribute("_contract_addr", &reflect_addr));
+        res.assert_event(&Event::new("transfer").add_attribute("amount", "7eth"));
+        res.assert_event(
+            &Event::new("reply")
+                .add_attribute("_contract_addr", reflect_addr.as_str())
+                .add_attribute("mode", "handle_success"),
         );
-
-        // the last one is a custom event (from reply)
-        let custom = &res.events[3];
-        assert_eq!("wasm-custom", custom.ty.as_str());
-        assert_eq!(
-            custom.attributes,
-            [
-                // TODO
-                ("_contract_addr", reflect_addr.as_str()),
-                ("from", "reply"),
-                ("to", "test")
-            ]
-        );
+        res.assert_event(&Event::new("wasm-custom").add_attribute("from", "reply"));
 
         // ensure success was written
         let res: Reply = app.wrap().query_wasm_smart(&reflect_addr, &query).unwrap();
         assert_eq!(res.id, 123);
         // validate the events written in the reply blob...should just be bank transfer
-        let reply_events = res.result.unwrap().events;
-        assert_eq!(1, reply_events.len());
-        assert_eq!("transfer", &reply_events[0].ty);
+        let reply = res.result.unwrap();
+        assert_eq!(1, reply.events.len());
+        // Note: this shows we must make the helpers more generic
+        let app_res = AppResponse{ events: reply.events, data: reply.data};
+        app_res
+            .assert_event(&Event::new("transfer").add_attribute("amount", "7eth"));
 
         // reflect sends 300 btc, failure, but error caught by submessage (so shows success)
         let msg = SubMsg::reply_always(
@@ -1192,16 +1172,16 @@ mod test {
             };
 
             let res = app
-                .execute_contract(owner, reflect_addr, &reflect_msg, &[])
+                .execute_contract(owner, reflect_addr.clone(), &reflect_msg, &[])
                 .unwrap();
 
             // ensure data is empty
             assert_eq!(res.data, None);
             // ensure expected events
             assert_eq!(res.events.len(), 3, "{:?}", res.events);
-            assert_eq!("execute", &res.events[0].ty);
-            assert_eq!("execute", &res.events[1].ty);
-            assert_eq!("wasm-echo", &res.events[2].ty);
+            res.assert_event(&Event::new("execute").add_attribute("_contract_addr", &reflect_addr));
+            res.assert_event(&Event::new("execute").add_attribute("_contract_addr", &echo_addr));
+            res.assert_event(&Event::new("wasm-echo"));
         }
 
         #[test]
