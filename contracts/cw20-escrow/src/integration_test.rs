@@ -1,19 +1,10 @@
 #![cfg(test)]
 
-use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{coins, to_binary, Addr, Empty, Uint128};
+use cosmwasm_std::{coins, to_binary, Addr, Api, Empty, Uint128};
 use cw20::{Cw20Coin, Cw20Contract, Cw20ExecuteMsg};
-use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
+use cw_multi_test::{AppBuilder, Bank, Contract, ContractWrapper, Executor};
 
 use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
-
-fn mock_app() -> App {
-    let env = mock_env();
-    let api = MockApi::default();
-    let bank = BankKeeper::new();
-
-    App::new(api, env.block, bank, MockStorage::new())
-}
 
 pub fn contract_escrow() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
@@ -36,15 +27,18 @@ pub fn contract_cw20() -> Box<dyn Contract<Empty>> {
 #[test]
 // receive cw20 tokens and release upon approval
 fn escrow_happy_path_cw20_tokens() {
-    let mut router = mock_app();
+    let (mut app, owner) = AppBuilder::new()
+        .setup(|_, bank, storage, api| {
+            let owner = api.addr_validate("owner")?;
 
-    // set personal balance
-    let owner = Addr::unchecked("owner");
-    let init_funds = coins(2000, "btc");
-    router.init_bank_balance(&owner, init_funds).unwrap();
+            bank.init_balance(storage, &owner, coins(2000, "btc"))?;
+
+            Ok(owner)
+        })
+        .unwrap();
 
     // set up cw20 contract with some tokens
-    let cw20_id = router.store_code(contract_cw20());
+    let cw20_id = app.store_code(contract_cw20());
     let msg = cw20_base::msg::InstantiateMsg {
         name: "Cash Money".to_string(),
         symbol: "CASH".to_string(),
@@ -56,13 +50,13 @@ fn escrow_happy_path_cw20_tokens() {
         mint: None,
         marketing: None,
     };
-    let cash_addr = router
+    let cash_addr = app
         .instantiate_contract(cw20_id, owner.clone(), &msg, &[], "CASH", None)
         .unwrap();
 
     // set up reflect contract
-    let escrow_id = router.store_code(contract_escrow());
-    let escrow_addr = router
+    let escrow_id = app.store_code(contract_escrow());
+    let escrow_addr = app
         .instantiate_contract(
             escrow_id,
             owner.clone(),
@@ -80,9 +74,9 @@ fn escrow_happy_path_cw20_tokens() {
     let cash = Cw20Contract(cash_addr.clone());
 
     // ensure our balances
-    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    let owner_balance = cash.balance(&app, owner.clone()).unwrap();
     assert_eq!(owner_balance, Uint128::new(5000));
-    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    let escrow_balance = cash.balance(&app, escrow_addr.clone()).unwrap();
     assert_eq!(escrow_balance, Uint128::zero());
 
     // send some tokens to create an escrow
@@ -102,7 +96,7 @@ fn escrow_happy_path_cw20_tokens() {
         amount: Uint128::new(1200),
         msg: to_binary(&create_msg).unwrap(),
     };
-    let res = router
+    let res = app
         .execute_contract(owner.clone(), cash_addr.clone(), &send_msg, &[])
         .unwrap();
     assert_eq!(4, res.events.len());
@@ -119,13 +113,13 @@ fn escrow_happy_path_cw20_tokens() {
     assert_eq!(2, escrow_attr.len());
 
     // ensure balances updated
-    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    let owner_balance = cash.balance(&app, owner.clone()).unwrap();
     assert_eq!(owner_balance, Uint128::new(3800));
-    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    let escrow_balance = cash.balance(&app, escrow_addr.clone()).unwrap();
     assert_eq!(escrow_balance, Uint128::new(1200));
 
     // ensure escrow properly created
-    let details: DetailsResponse = router
+    let details: DetailsResponse = app
         .wrap()
         .query_wasm_smart(&escrow_addr, &QueryMsg::Details { id: id.clone() })
         .unwrap();
@@ -142,15 +136,14 @@ fn escrow_happy_path_cw20_tokens() {
 
     // release escrow
     let approve_msg = ExecuteMsg::Approve { id };
-    let _ = router
-        .execute_contract(arb, escrow_addr.clone(), &approve_msg, &[])
+    app.execute_contract(arb, escrow_addr.clone(), &approve_msg, &[])
         .unwrap();
 
     // ensure balances updated - release to ben
-    let owner_balance = cash.balance(&router, owner).unwrap();
+    let owner_balance = cash.balance(&app, owner).unwrap();
     assert_eq!(owner_balance, Uint128::new(3800));
-    let escrow_balance = cash.balance(&router, escrow_addr).unwrap();
+    let escrow_balance = cash.balance(&app, escrow_addr).unwrap();
     assert_eq!(escrow_balance, Uint128::zero());
-    let ben_balance = cash.balance(&router, ben).unwrap();
+    let ben_balance = cash.balance(&app, ben).unwrap();
     assert_eq!(ben_balance, Uint128::new(1200));
 }

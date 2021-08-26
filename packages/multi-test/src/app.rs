@@ -1,15 +1,14 @@
 use std::fmt;
 
-#[cfg(test)]
-use cosmwasm_std::testing::{mock_env, MockApi};
+use cosmwasm_std::testing::{MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
-    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult, CosmosMsg, Empty, Querier,
+    QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult, Timestamp,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::bank::Bank;
+use crate::bank::{Bank, BankKeeper};
 use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
@@ -64,20 +63,6 @@ impl<C> App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new(
-        api: impl Api + 'static,
-        block: BlockInfo,
-        bank: impl Bank + 'static,
-        storage: impl Storage + 'static,
-    ) -> Self {
-        App {
-            router: Router::new(bank),
-            api: Box::new(api),
-            storage: Box::new(storage),
-            block,
-        }
-    }
-
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
     }
@@ -124,13 +109,6 @@ where
         })
     }
 
-    /// This is an "admin" function to let us adjust bank accounts
-    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> AnyResult<()> {
-        self.router
-            .bank
-            .init_balance(&mut *self.storage, account, amount)
-    }
-
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
     pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
@@ -160,24 +138,183 @@ where
             msg,
         )
     }
+
+    /// Gives back access to api
+    pub fn api(&self) -> &dyn Api {
+        self.api.as_ref()
+    }
+}
+
+pub struct AppBuilder<Wasm, Bank, Storage, Api> {
+    wasm: Wasm,
+    bank: Bank,
+    storage: Storage,
+    api: Api,
+    block: BlockInfo,
+}
+
+impl<C> AppBuilder<WasmKeeper<C>, BankKeeper, MockStorage, MockApi>
+where
+    C: std::fmt::Debug + PartialEq + Clone + JsonSchema + 'static,
+{
+    /// Creates `AppBuilder` with default implementation
+    pub fn new() -> Self {
+        Self {
+            wasm: WasmKeeper::new(),
+            bank: BankKeeper::new(),
+            storage: MockStorage::new(),
+            api: MockApi::default(),
+            block: BlockInfo {
+                height: 12_345,
+                time: Timestamp::from_nanos(1_571_797_419_879_305_533),
+                chain_id: "cosmos-testnet-14002".to_string(),
+            },
+        }
+    }
+}
+
+impl<W, B, S, A> AppBuilder<W, B, S, A> {
+    /// Substitutes default wasm executor with custom one
+    pub fn with_wasm<C, NewW>(self, wasm: NewW) -> AppBuilder<NewW, B, S, A>
+    where
+        C: std::fmt::Debug + PartialEq + Clone + JsonSchema + 'static,
+        NewW: Wasm<C> + 'static,
+    {
+        let Self {
+            bank,
+            storage,
+            api,
+            block,
+            ..
+        } = self;
+        AppBuilder {
+            wasm,
+            bank,
+            storage,
+            api,
+            block,
+        }
+    }
+
+    /// Substitutes default bank keeper with custom one
+    pub fn with_bank<NewB: Bank + 'static>(self, bank: NewB) -> AppBuilder<W, NewB, S, A> {
+        let Self {
+            wasm,
+            storage,
+            api,
+            block,
+            ..
+        } = self;
+        AppBuilder {
+            wasm,
+            bank,
+            storage,
+            api,
+            block,
+        }
+    }
+
+    /// Substitutes default mock storage with custom one
+    pub fn with_storage<NewS: Storage + 'static>(self, storage: NewS) -> AppBuilder<W, B, NewS, A> {
+        let Self {
+            wasm,
+            bank,
+            api,
+            block,
+            ..
+        } = self;
+        AppBuilder {
+            wasm,
+            bank,
+            storage,
+            api,
+            block,
+        }
+    }
+
+    /// Substitutes default mock api with custom one
+    pub fn with_api<NewA: Api + 'static>(self, api: NewA) -> AppBuilder<W, B, S, NewA> {
+        let Self {
+            wasm,
+            bank,
+            storage,
+            block,
+            ..
+        } = self;
+        AppBuilder {
+            wasm,
+            bank,
+            storage,
+            api,
+            block,
+        }
+    }
+
+    /// Overwrites initial block info
+    pub fn with_block(mut self, block: BlockInfo) -> Self {
+        self.block = block;
+        self
+    }
+
+    /// Performs one time set up of all components and returns app itself
+    ///
+    /// Takes one argument, which is functor to single step setup of all components if they are not
+    /// pre-configured when passed. At this point there is accurate type information about modules,
+    /// so it is possible to call all administrative functions - after this step type informations
+    /// are lost and only proper traits items may be called.
+    ///
+    /// Result of `builder` callback is returned together with `App` itself
+    pub fn setup<C, R, Builder>(mut self, builder: Builder) -> AnyResult<(App<C>, R)>
+    where
+        C: std::fmt::Debug + PartialEq + Clone + JsonSchema + 'static,
+        W: Wasm<C> + 'static,
+        B: Bank + 'static,
+        S: Storage + 'static,
+        A: Api + 'static,
+        Builder: FnOnce(&mut W, &mut B, &mut S, &mut A) -> AnyResult<R>,
+    {
+        let res = builder(
+            &mut self.wasm,
+            &mut self.bank,
+            &mut self.storage,
+            &mut self.api,
+        )?;
+
+        Ok((self.build(), res))
+    }
+
+    /// Builds final `App` using underlying components
+    pub fn build<C>(self) -> App<C>
+    where
+        C: std::fmt::Debug + PartialEq + Clone + JsonSchema + 'static,
+        W: Wasm<C> + 'static,
+        B: Bank + 'static,
+        S: Storage + 'static,
+        A: Api + 'static,
+    {
+        let router = Router {
+            wasm: Box::new(self.wasm),
+            bank: Box::new(self.bank),
+        };
+
+        App {
+            router,
+            api: Box::new(self.api),
+            storage: Box::new(self.storage),
+            block: self.block,
+        }
+    }
 }
 
 pub struct Router<C> {
-    pub wasm: Box<dyn Wasm<C>>,
-    pub bank: Box<dyn Bank>,
+    wasm: Box<dyn Wasm<C>>,
+    bank: Box<dyn Bank>,
 }
 
 impl<C> Router<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub(super) fn new(bank: impl Bank + 'static) -> Self {
-        Router {
-            wasm: Box::new(WasmKeeper::new()),
-            bank: Box::new(bank),
-        }
-    }
-
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
@@ -281,36 +418,18 @@ where
 
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{
-        coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event, Reply,
-        StdResult, SubMsg, WasmMsg,
+        coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Coin, Event,
+        Reply, StdResult, SubMsg, WasmMsg,
     };
 
     use crate::error::Error;
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
-    use crate::BankKeeper;
     use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
 
     use super::*;
-
-    fn mock_app() -> App<Empty> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
-    }
-
-    fn custom_app() -> App<CustomMsg> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
-    }
 
     fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
     where
@@ -321,7 +440,7 @@ mod test {
 
     #[test]
     fn update_block() {
-        let mut app = mock_app();
+        let mut app = AppBuilder::new().build::<Empty>();
 
         let BlockInfo { time, height, .. } = app.block;
         app.update_block(next_block);
@@ -332,16 +451,18 @@ mod test {
 
     #[test]
     fn send_tokens() {
-        let mut app = mock_app();
+        let (mut app, (owner, rcpt)) = AppBuilder::new()
+            .setup(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
+                let rcpt = api.addr_validate("receiver")?;
 
-        let owner = Addr::unchecked("owner");
-        let rcpt = Addr::unchecked("receiver");
-        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        let rcpt_funds = vec![coin(5, "btc")];
+                // set money
+                bank.init_balance(storage, &owner, vec![coin(20, "btc"), coin(100, "eth")])?;
+                bank.init_balance(storage, &rcpt, coins(5, "btc"))?;
 
-        // set money
-        app.init_bank_balance(&owner, init_funds).unwrap();
-        app.init_bank_balance(&rcpt, rcpt_funds).unwrap();
+                Ok((owner, rcpt))
+            })
+            .unwrap();
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
@@ -373,12 +494,15 @@ mod test {
 
     #[test]
     fn simple_contract() {
-        let mut app = mock_app();
+        let (mut app, owner) = AppBuilder::new()
+            .setup::<Empty, _, _>(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
 
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+                bank.init_balance(storage, &owner, vec![coin(20, "btc"), coin(100, "eth")])?;
+
+                Ok(owner)
+            })
+            .unwrap();
 
         // set up contract
         let code_id = app.store_code(payout::contract());
@@ -452,12 +576,15 @@ mod test {
 
     #[test]
     fn reflect_success() {
-        let mut app = custom_app();
+        let (mut app, owner) = AppBuilder::new()
+            .setup(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
 
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+                bank.init_balance(storage, &owner, vec![coin(20, "btc"), coin(100, "eth")])?;
+
+                Ok(owner)
+            })
+            .unwrap();
 
         // set up payout contract
         let payout_id = app.store_code(payout::contract());
@@ -549,12 +676,15 @@ mod test {
 
     #[test]
     fn reflect_error() {
-        let mut app = custom_app();
+        let (mut app, owner) = AppBuilder::new()
+            .setup(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
 
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+                bank.init_balance(storage, &owner, vec![coin(20, "btc"), coin(100, "eth")])?;
+
+                Ok(owner)
+            })
+            .unwrap();
 
         // set up reflect contract
         let reflect_id = app.store_code(reflect::contract());
@@ -640,11 +770,16 @@ mod test {
 
     #[test]
     fn sudo_works() {
-        let mut app = mock_app();
+        let (mut app, owner) = AppBuilder::new()
+            .setup::<CustomMsg, _, _>(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
 
-        let owner = Addr::unchecked("owner");
-        let init_funds = vec![coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+                bank.init_balance(storage, &owner, coins(100, "eth"))?;
+
+                Ok(owner)
+            })
+            .unwrap();
+
         let payout_id = app.store_code(payout::contract());
         let msg = payout::InstantiateMessage {
             payout: coin(5, "eth"),
@@ -674,13 +809,16 @@ mod test {
 
     #[test]
     fn reflect_submessage_reply_works() {
-        let mut app = custom_app();
+        let (mut app, (owner, random)) = AppBuilder::new()
+            .setup(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
+                let random = api.addr_validate("random")?;
 
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        let random = Addr::unchecked("random");
-        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+                bank.init_balance(storage, &owner, vec![coin(20, "btc"), coin(100, "eth")])?;
+
+                Ok((owner, random))
+            })
+            .unwrap();
 
         // set up reflect contract
         let reflect_id = app.store_code(reflect::contract());
@@ -789,13 +927,16 @@ mod test {
 
     #[test]
     fn multi_level_bank_cache() {
-        let mut app = mock_app();
+        let (mut app, (owner, rcpt)) = AppBuilder::new()
+            .setup::<CustomMsg, _, _>(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
+                let rcpt = api.addr_validate("recipient")?;
 
-        // set personal balance
-        let owner = Addr::unchecked("owner");
-        let rcpt = Addr::unchecked("recipient");
-        let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+                bank.init_balance(storage, &owner, vec![coin(10, "btc"), coin(100, "eth")])?;
+
+                Ok((owner, rcpt))
+            })
+            .unwrap();
 
         // cache 1 - send some tokens
         let mut cache = StorageTransaction::new(&*app.storage);
@@ -846,11 +987,16 @@ mod test {
         // additional 20btc. Then beneficiary balance is checked - expeced value is 30btc. 10btc
         // would mean that sending tokens with message is not visible for this very message, and
         // 20btc means, that only such just send funds are visible.
-        let mut app = mock_app();
+        let (mut app, (owner, beneficiary)) = AppBuilder::new()
+            .setup(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
+                let beneficiary = api.addr_validate("beneficiary")?;
 
-        let owner = Addr::unchecked("owner");
-        let beneficiary = Addr::unchecked("beneficiary");
-        app.init_bank_balance(&owner, coins(30, "btc")).unwrap();
+                bank.init_balance(storage, &owner, coins(30, "btc"))?;
+
+                Ok((owner, beneficiary))
+            })
+            .unwrap();
 
         let contract_id = app.store_code(hackatom::contract());
         let contract = app
@@ -890,11 +1036,16 @@ mod test {
         // migrate fails if not admin
         // migrate succeeds if admin
         // check beneficiary updated
-        let mut app = mock_app();
+        let (mut app, (owner, beneficiary)) = AppBuilder::new()
+            .setup(|_, bank, storage, api| {
+                let owner = api.addr_validate("owner")?;
+                let beneficiary = api.addr_validate("beneficiary")?;
 
-        let owner = Addr::unchecked("owner");
-        let beneficiary = Addr::unchecked("beneficiary");
-        app.init_bank_balance(&owner, coins(30, "btc")).unwrap();
+                bank.init_balance(storage, &owner, coins(30, "btc"))?;
+
+                Ok((owner, beneficiary))
+            })
+            .unwrap();
 
         // create a hackatom contract with some funds
         let contract_id = app.store_code(hackatom::contract());
@@ -995,7 +1146,7 @@ mod test {
 
         #[test]
         fn no_submsg() {
-            let mut app = mock_app();
+            let mut app = AppBuilder::new().build();
 
             let owner = Addr::unchecked("owner");
 
@@ -1021,9 +1172,9 @@ mod test {
 
         #[test]
         fn single_submsg() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1048,9 +1199,9 @@ mod test {
 
         #[test]
         fn single_submsg_no_reply() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1075,9 +1226,9 @@ mod test {
 
         #[test]
         fn single_no_submsg_data() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1102,9 +1253,9 @@ mod test {
 
         #[test]
         fn single_no_top_level_data() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1128,11 +1279,15 @@ mod test {
 
         #[test]
         fn single_submsg_reply_returns_none() {
-            let mut app = custom_app();
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, bank, storage, api| {
+                    let owner = api.addr_validate("owner")?;
 
-            // set personal balance
-            let owner = Addr::unchecked("owner");
-            app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
+                    bank.init_balance(storage, &owner, coins(100, "tgd"))?;
+
+                    Ok(owner)
+                })
+                .unwrap();
 
             // set up reflect contract
             let reflect_id = app.store_code(reflect::contract());
@@ -1184,9 +1339,9 @@ mod test {
 
         #[test]
         fn multiple_submsg() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1216,9 +1371,9 @@ mod test {
 
         #[test]
         fn multiple_submsg_no_reply() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1248,9 +1403,9 @@ mod test {
 
         #[test]
         fn multiple_submsg_mixed() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1280,9 +1435,9 @@ mod test {
 
         #[test]
         fn nested_submsg() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1326,9 +1481,9 @@ mod test {
 
         #[test]
         fn empty_attribute_key() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1356,9 +1511,9 @@ mod test {
 
         #[test]
         fn empty_attribute_value() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1386,9 +1541,9 @@ mod test {
 
         #[test]
         fn empty_event_attribute_key() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1415,9 +1570,9 @@ mod test {
 
         #[test]
         fn empty_event_attribute_value() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app
@@ -1444,9 +1599,9 @@ mod test {
 
         #[test]
         fn too_short_event_type() {
-            let mut app = mock_app();
-
-            let owner = Addr::unchecked("owner");
+            let (mut app, owner) = AppBuilder::new()
+                .setup(|_, _, _, api| api.addr_validate("owner").map_err(Into::into))
+                .unwrap();
 
             let contract_id = app.store_code(echo::contract());
             let contract = app

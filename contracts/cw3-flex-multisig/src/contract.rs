@@ -431,7 +431,7 @@ mod tests {
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
-    use cw_multi_test::{next_block, App, BankKeeper, Contract, ContractWrapper, Executor};
+    use cw_multi_test::{next_block, App, BankKeeper, Contract, ContractWrapper, Executor, Wasm};
 
     use super::*;
     use crate::msg::Threshold;
@@ -469,14 +469,6 @@ mod tests {
         Box::new(contract)
     }
 
-    fn mock_app() -> App {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
-    }
-
     // uploads code and returns address of group contract
     fn instantiate_group(app: &mut App, members: Vec<Member>) -> Addr {
         let group_id = app.store_code(contract_group());
@@ -489,12 +481,12 @@ mod tests {
     }
 
     fn instantiate_flex(
-        app: &mut App,
+        wasm: &mut dyn Wasm<Empty>,
         group: Addr,
         threshold: Threshold,
         max_voting_period: Duration,
     ) -> Addr {
-        let flex_id = app.store_code(contract_flex());
+        let flex_id = wasm.store_code(contract_flex());
         let msg = crate::msg::InstantiateMsg {
             group_addr: group.to_string(),
             threshold,
@@ -526,12 +518,11 @@ mod tests {
     }
 
     fn setup_test_case(
-        app: &mut App,
         threshold: Threshold,
         max_voting_period: Duration,
         init_funds: Vec<Coin>,
         multisig_as_group_admin: bool,
-    ) -> (Addr, Addr) {
+    ) -> (App<Empty>, Addr, Addr) {
         // 1. Instantiate group contract with members (and OWNER as admin)
         let members = vec![
             member(OWNER, 0),

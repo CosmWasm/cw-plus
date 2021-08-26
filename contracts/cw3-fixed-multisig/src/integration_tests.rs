@@ -2,21 +2,12 @@
 
 use crate::contract::{execute, instantiate, query};
 use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
-use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{to_binary, Addr, Empty, Uint128, WasmMsg};
+use cosmwasm_std::{to_binary, Empty, Uint128, WasmMsg};
 use cw0::Duration;
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
-use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
-
-fn mock_app() -> App {
-    let env = mock_env();
-    let api = MockApi::default();
-    let bank = BankKeeper::new();
-
-    App::new(api, env.block, bank, MockStorage::new())
-}
+use cw_multi_test::{AppBuilder, Contract, ContractWrapper, Executor};
 
 pub fn contract_cw3_fixed_multisig() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(execute, instantiate, query);
@@ -35,14 +26,14 @@ pub fn contract_cw20() -> Box<dyn Contract<Empty>> {
 #[test]
 // cw3 multisig account can control cw20 admin actions
 fn cw3_controls_cw20() {
-    let mut router = mock_app();
+    let mut app = AppBuilder::new().build();
 
     // setup cw3 multisig with 3 accounts
-    let cw3_id = router.store_code(contract_cw3_fixed_multisig());
+    let cw3_id = app.store_code(contract_cw3_fixed_multisig());
 
-    let addr1 = Addr::unchecked("addr1");
-    let addr2 = Addr::unchecked("addr2");
-    let addr3 = Addr::unchecked("addr3");
+    let addr1 = app.api().addr_validate("addr1").unwrap();
+    let addr2 = app.api().addr_validate("addr2").unwrap();
+    let addr3 = app.api().addr_validate("addr3").unwrap();
     let cw3_instantiate_msg = InstantiateMsg {
         voters: vec![
             Voter {
@@ -62,7 +53,7 @@ fn cw3_controls_cw20() {
         max_voting_period: Duration::Height(3),
     };
 
-    let multisig_addr = router
+    let multisig_addr = app
         .instantiate_contract(
             cw3_id,
             addr1.clone(),
@@ -74,7 +65,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // setup cw20 as cw3 multisig admin
-    let cw20_id = router.store_code(contract_cw20());
+    let cw20_id = app.store_code(contract_cw20());
 
     let cw20_instantiate_msg = cw20_base::msg::InstantiateMsg {
         name: "Consortium Token".parse().unwrap(),
@@ -87,7 +78,7 @@ fn cw3_controls_cw20() {
         }),
         marketing: None,
     };
-    let cw20_addr = router
+    let cw20_addr = app
         .instantiate_contract(
             cw20_id,
             multisig_addr.clone(),
@@ -99,7 +90,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // mint some cw20 tokens according to proposal result
-    let mint_recipient = Addr::unchecked("recipient");
+    let mint_recipient = app.api().addr_validate("recipient").unwrap();
     let mint_amount = Uint128::new(1000);
     let cw20_mint_msg = cw20_base::msg::ExecuteMsg::Mint {
         recipient: mint_recipient.to_string(),
@@ -118,8 +109,7 @@ fn cw3_controls_cw20() {
         latest: None,
     };
     // propose mint
-    router
-        .execute_contract(addr1.clone(), multisig_addr.clone(), &propose_msg, &[])
+    app.execute_contract(addr1.clone(), multisig_addr.clone(), &propose_msg, &[])
         .unwrap();
 
     // second votes
@@ -127,22 +117,20 @@ fn cw3_controls_cw20() {
         proposal_id: 1,
         vote: Vote::Yes,
     };
-    router
-        .execute_contract(addr2, multisig_addr.clone(), &vote2_msg, &[])
+    app.execute_contract(addr2, multisig_addr.clone(), &vote2_msg, &[])
         .unwrap();
 
     // only 1 vote and msg mint fails
     let execute_proposal_msg = ExecuteMsg::Execute { proposal_id: 1 };
     // execute mint
-    router
-        .execute_contract(addr1, multisig_addr, &execute_proposal_msg, &[])
+    app.execute_contract(addr1, multisig_addr, &execute_proposal_msg, &[])
         .unwrap();
 
     // check the mint is successful
     let cw20_balance_query = QueryMsg::Balance {
         address: mint_recipient.to_string(),
     };
-    let balance: BalanceResponse = router
+    let balance: BalanceResponse = app
         .wrap()
         .query_wasm_smart(&cw20_addr, &cw20_balance_query)
         .unwrap();
