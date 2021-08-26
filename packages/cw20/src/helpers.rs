@@ -2,7 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, Querier, QuerierWrapper, StdResult, Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdResult, Uint128, WasmMsg,
+    WasmQuery,
 };
 
 use crate::{
@@ -32,73 +33,61 @@ impl Cw20Contract {
         .into())
     }
 
-    /// Get token balance for the given address
-    pub fn balance<Q: Querier, T: Into<String>>(
-        &self,
-        querier: &Q,
-        address: T,
-    ) -> StdResult<Uint128> {
-        let msg = Cw20QueryMsg::Balance {
-            address: address.into(),
-        };
-        let query = WasmQuery::Smart {
+    fn encode_smart_query(&self, msg: Cw20QueryMsg) -> StdResult<QueryRequest<Empty>> {
+        Ok(WasmQuery::Smart {
             contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
         }
-        .into();
-        let res: BalanceResponse = QuerierWrapper::new(querier).query(&query)?;
+        .into())
+    }
+
+    /// Get token balance for the given address
+    pub fn balance<T: Into<String>>(
+        &self,
+        querier: &QuerierWrapper,
+        address: T,
+    ) -> StdResult<Uint128> {
+        let query = self.encode_smart_query(Cw20QueryMsg::Balance {
+            address: address.into(),
+        })?;
+        let res: BalanceResponse = querier.query(&query)?;
         Ok(res.balance)
     }
 
     /// Get metadata from the contract. This is a good check that the address
     /// is a valid Cw20 contract.
-    pub fn meta<Q: Querier>(&self, querier: &Q) -> StdResult<TokenInfoResponse> {
-        let msg = Cw20QueryMsg::TokenInfo {};
-        let query = WasmQuery::Smart {
-            contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
-        }
-        .into();
-        QuerierWrapper::new(querier).query(&query)
+    pub fn meta(&self, querier: &QuerierWrapper) -> StdResult<TokenInfoResponse> {
+        let query = self.encode_smart_query(Cw20QueryMsg::TokenInfo {})?;
+        querier.query(&query)
     }
 
     /// Get allowance of spender to use owner's account
-    pub fn allowance<Q: Querier, T: Into<String>, U: Into<String>>(
+    pub fn allowance<T: Into<String>, U: Into<String>>(
         &self,
-        querier: &Q,
+        querier: &QuerierWrapper,
         owner: T,
         spender: U,
     ) -> StdResult<AllowanceResponse> {
-        let msg = Cw20QueryMsg::Allowance {
+        let query = self.encode_smart_query(Cw20QueryMsg::Allowance {
             owner: owner.into(),
             spender: spender.into(),
-        };
-        let query = WasmQuery::Smart {
-            contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
-        }
-        .into();
-        QuerierWrapper::new(querier).query(&query)
+        })?;
+        querier.query(&query)
     }
 
     /// Find info on who can mint, and how much
-    pub fn minter<Q: Querier>(&self, querier: &Q) -> StdResult<Option<MinterResponse>> {
-        let msg = Cw20QueryMsg::Minter {};
-        let query = WasmQuery::Smart {
-            contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
-        }
-        .into();
-        QuerierWrapper::new(querier).query(&query)
+    pub fn minter(&self, querier: &QuerierWrapper) -> StdResult<Option<MinterResponse>> {
+        let query = self.encode_smart_query(Cw20QueryMsg::Minter {})?;
+        querier.query(&query)
     }
 
     /// returns true if the contract supports the allowance extension
-    pub fn has_allowance<Q: Querier>(&self, querier: &Q) -> bool {
+    pub fn has_allowance(&self, querier: &QuerierWrapper) -> bool {
         self.allowance(querier, self.addr(), self.addr()).is_ok()
     }
 
     /// returns true if the contract supports the mintable extension
-    pub fn is_mintable<Q: Querier>(&self, querier: &Q) -> bool {
+    pub fn is_mintable(&self, querier: &QuerierWrapper) -> bool {
         self.minter(querier).is_ok()
     }
 }
