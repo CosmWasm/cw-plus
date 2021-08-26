@@ -80,9 +80,9 @@ fn escrow_happy_path_cw20_tokens() {
     let cash = Cw20Contract(cash_addr.clone());
 
     // ensure our balances
-    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    let owner_balance = cash.balance(&router.wrap(), owner.clone()).unwrap();
     assert_eq!(owner_balance, Uint128::new(5000));
-    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    let escrow_balance = cash.balance(&router.wrap(), escrow_addr.clone()).unwrap();
     assert_eq!(escrow_balance, Uint128::zero());
 
     // send some tokens to create an escrow
@@ -119,9 +119,9 @@ fn escrow_happy_path_cw20_tokens() {
     assert_eq!(2, escrow_attr.len());
 
     // ensure balances updated
-    let owner_balance = cash.balance(&router, owner.clone()).unwrap();
+    let owner_balance = cash.balance(&router.wrap(), owner.clone()).unwrap();
     assert_eq!(owner_balance, Uint128::new(3800));
-    let escrow_balance = cash.balance(&router, escrow_addr.clone()).unwrap();
+    let escrow_balance = cash.balance(&router.wrap(), escrow_addr.clone()).unwrap();
     assert_eq!(escrow_balance, Uint128::new(1200));
 
     // ensure escrow properly created
@@ -147,10 +147,10 @@ fn escrow_happy_path_cw20_tokens() {
         .unwrap();
 
     // ensure balances updated - release to ben
-    let owner_balance = cash.balance(&router, owner).unwrap();
+    let owner_balance = cash.balance(&router.wrap(), owner).unwrap();
     assert_eq!(owner_balance, Uint128::new(3800));
-    let escrow_balance = cash.balance(&router, escrow_addr).unwrap();
+    let escrow_balance = cash.balance(&router.wrap(), escrow_addr).unwrap();
     assert_eq!(escrow_balance, Uint128::zero());
-    let ben_balance = cash.balance(&router, ben).unwrap();
+    let ben_balance = cash.balance(&router.wrap(), ben).unwrap();
     assert_eq!(ben_balance, Uint128::new(1200));
 }
