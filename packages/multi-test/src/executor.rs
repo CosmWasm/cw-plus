@@ -1,7 +1,10 @@
 use std::fmt;
 
 use crate::parse_contract_addr;
-use cosmwasm_std::{to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, WasmMsg};
+use cosmwasm_std::{
+    to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, SubMsgExecutionResponse,
+    WasmMsg,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -44,6 +47,17 @@ impl AppResponse {
             expected,
             self.events
         );
+    }
+}
+
+/// They have the same shape, SubMsgExecutionResponse is what is returned in reply.
+/// This is just to make some test cases easier.
+impl From<SubMsgExecutionResponse> for AppResponse {
+    fn from(reply: SubMsgExecutionResponse) -> Self {
+        AppResponse {
+            data: reply.data,
+            events: reply.events,
+        }
     }
 }
 
