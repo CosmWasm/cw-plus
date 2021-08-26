@@ -733,9 +733,11 @@ mod test {
         let reply = res.result.unwrap();
         assert_eq!(1, reply.events.len());
         // Note: this shows we must make the helpers more generic
-        let app_res = AppResponse{ events: reply.events, data: reply.data};
-        app_res
-            .assert_event(&Event::new("transfer").add_attribute("amount", "7eth"));
+        let app_res = AppResponse {
+            events: reply.events,
+            data: reply.data,
+        };
+        app_res.assert_event(&Event::new("transfer").add_attribute("amount", "7eth"));
 
         // reflect sends 300 btc, failure, but error caught by submessage (so shows success)
         let msg = SubMsg::reply_always(
