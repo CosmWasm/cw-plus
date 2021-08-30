@@ -25,33 +25,8 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const LOGO_SIZE_CAP: usize = 5 * 1024;
 
-/// Checks if data starts with XML preamble
-fn verify_xml_preamble(data: &[u8]) -> Result<(), ContractError> {
-    // The easiest way to perform this check would be just match on regex, however regex
-    // compilation is heavy and probably not worth it.
-
-    let preamble = data
-        .split_inclusive(|c| *c == b'>')
-        .next()
-        .ok_or(ContractError::InvalidXmlPreamble {})?;
-
-    const PREFIX: &[u8] = b"<?xml ";
-    const POSTFIX: &[u8] = b"?>";
-
-    if !(preamble.starts_with(PREFIX) && preamble.ends_with(POSTFIX)) {
-        Err(ContractError::InvalidXmlPreamble {})
-    } else {
-        Ok(())
-    }
-
-    // Additionally attributes format could be validated as they are well defined, as well as
-    // comments presence inside of preable, but it is probably not worth it.
-}
-
 /// Validates XML logo
 fn verify_xml_logo(logo: &[u8]) -> Result<(), ContractError> {
-    verify_xml_preamble(logo)?;
-
     if logo.len() > LOGO_SIZE_CAP {
         Err(ContractError::LogoTooBig {})
     } else {
@@ -1848,57 +1823,6 @@ mod tests {
             .unwrap_err();
 
             assert_eq!(err, ContractError::InvalidPngHeader {});
-
-            assert_eq!(
-                query_marketing_info(deps.as_ref()).unwrap(),
-                MarketingInfoResponse {
-                    project: Some("Project".to_owned()),
-                    description: Some("Description".to_owned()),
-                    marketing: Some(Addr::unchecked("creator")),
-                    logo: Some(LogoInfo::Url("url".to_owned())),
-                }
-            );
-
-            let err = query_download_logo(deps.as_ref()).unwrap_err();
-            assert!(
-                matches!(err, StdError::NotFound { .. }),
-                "Expected StdError::NotFound, received {}",
-                err
-            );
-        }
-
-        #[test]
-        fn update_logo_svg_invalid() {
-            let mut deps = mock_dependencies(&[]);
-            let instantiate_msg = InstantiateMsg {
-                name: "Cash Token".to_string(),
-                symbol: "CASH".to_string(),
-                decimals: 9,
-                initial_balances: vec![],
-                mint: None,
-                marketing: Some(InstantiateMarketingInfo {
-                    project: Some("Project".to_owned()),
-                    description: Some("Description".to_owned()),
-                    marketing: Some("creator".to_owned()),
-                    logo: Some(Logo::Url("url".to_owned())),
-                }),
-            };
-
-            let info = mock_info("creator", &[]);
-
-            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap();
-
-            let img = &[1];
-
-            let err = execute(
-                deps.as_mut(),
-                mock_env(),
-                info,
-                ExecuteMsg::UploadLogo(Logo::Embedded(EmbeddedLogo::Svg(img.into()))),
-            )
-            .unwrap_err();
-
-            assert_eq!(err, ContractError::InvalidXmlPreamble {});
 
             assert_eq!(
                 query_marketing_info(deps.as_ref()).unwrap(),
