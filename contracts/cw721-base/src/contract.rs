@@ -388,23 +388,23 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn query_minter(deps: Deps) -> StdResult<MinterResponse> {
+pub fn query_minter(deps: Deps) -> StdResult<MinterResponse> {
     let minter_addr = MINTER.load(deps.storage)?;
     Ok(MinterResponse {
         minter: minter_addr.to_string(),
     })
 }
 
-fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
+pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
     CONTRACT_INFO.load(deps.storage)
 }
 
-fn query_num_tokens(deps: Deps) -> StdResult<NumTokensResponse> {
+pub fn query_num_tokens(deps: Deps) -> StdResult<NumTokensResponse> {
     let count = num_tokens(deps.storage)?;
     Ok(NumTokensResponse { count })
 }
 
-fn query_nft_info(deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
+pub fn query_nft_info(deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
     let info = tokens().load(deps.storage, &token_id)?;
     Ok(NftInfoResponse {
         name: info.name,
@@ -413,7 +413,7 @@ fn query_nft_info(deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
     })
 }
 
-fn query_owner_of(
+pub fn query_owner_of(
     deps: Deps,
     env: Env,
     token_id: String,
@@ -429,7 +429,7 @@ fn query_owner_of(
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 30;
 
-fn query_all_approvals(
+pub fn query_all_approvals(
     deps: Deps,
     env: Env,
     owner: String,
@@ -459,7 +459,7 @@ fn parse_approval(item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approva
     })
 }
 
-fn query_tokens(
+pub fn query_tokens(
     deps: Deps,
     owner: String,
     start_after: Option<String>,
@@ -482,7 +482,7 @@ fn query_tokens(
     Ok(TokensResponse { tokens })
 }
 
-fn query_all_tokens(
+pub fn query_all_tokens(
     deps: Deps,
     start_after: Option<String>,
     limit: Option<u32>,
@@ -499,7 +499,7 @@ fn query_all_tokens(
     Ok(TokensResponse { tokens: tokens? })
 }
 
-fn query_all_nft_info(
+pub fn query_all_nft_info(
     deps: Deps,
     env: Env,
     token_id: String,
