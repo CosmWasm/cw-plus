@@ -2,18 +2,21 @@ use std::fmt::{self, Debug};
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
-    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, CustomQuery,
+    Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
+    SystemResult,
 };
 use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
+use crate::custom_handler::CustomHandler;
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
-use crate::BankKeeper;
+use crate::{BankKeeper, MockSimpleCustomHandler};
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;
@@ -27,21 +30,26 @@ pub fn next_block(block: &mut BlockInfo) {
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
 /// We offer .execute() as a wrapper around cache, execute, commit/rollback process.
 ///
-/// C is the custom message returned init, handle, sudo (Response<C>).
-/// All contracts must return Response<C> or Response<Empty>
-pub struct App<C = Empty>
+/// ExecC is the custom message returned init, handle, sudo (Response<C>).
+/// All contracts must return Response<C> or Response<Empty>.
+///
+/// Also `ExecC` is the custom message which is handled by custom message handler.
+///
+/// `QueryC` is custom query message handled by custom message handler.
+pub struct App<ExecC = Empty, QueryC = Empty>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    router: Router<C>,
+    router: Router<ExecC, QueryC>,
     api: Box<dyn Api>,
     storage: Box<dyn Storage>,
     block: BlockInfo,
 }
 
-impl<C> Querier for App<C>
+impl<ExecC, QueryC> Querier for App<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
@@ -50,11 +58,12 @@ where
     }
 }
 
-impl<C> Executor<C> for App<C>
+impl<ExecC, QueryC> Executor<ExecC> for App<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> AnyResult<AppResponse> {
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<ExecC>) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -64,21 +73,23 @@ where
 /// Utility to build App in stages. If particular items wont be set, defaults would be used
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub struct AppBuilder<C> {
-    wasm: Option<Box<dyn Wasm<C>>>,
+pub struct AppBuilder<ExecC, QueryC> {
+    wasm: Option<Box<dyn Wasm<ExecC, QueryC>>>,
     bank: Option<Box<dyn Bank>>,
     api: Option<Box<dyn Api>>,
     storage: Option<Box<dyn Storage>>,
+    custom: Option<Box<dyn CustomHandler<ExecC, QueryC>>>,
     block: Option<BlockInfo>,
 }
 
-impl<C> AppBuilder<C>
+impl<ExecC, QueryC> AppBuilder<ExecC, QueryC>
 where
-    C: Debug + PartialEq + Clone + JsonSchema + 'static,
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     /// Overwrites default wasm executor. Panic if already set.
     #[track_caller]
-    pub fn with_wasm(mut self, wasm: impl Wasm<C> + 'static) -> Self {
+    pub fn with_wasm(mut self, wasm: impl Wasm<ExecC, QueryC> + 'static) -> Self {
         assert!(self.wasm.is_none(), "Wasm executor already overwritten");
         self.wasm = Some(Box::new(wasm));
         self
@@ -122,14 +133,17 @@ where
         self
     }
 
-    pub fn build(self) -> App<C> {
+    pub fn build(self) -> App<ExecC, QueryC> {
         let wasm = self.wasm.unwrap_or_else(|| Box::new(WasmKeeper::new()));
         let bank = self.bank.unwrap_or_else(|| Box::new(BankKeeper::new()));
         let api = self.api.unwrap_or_else(|| Box::new(MockApi::default()));
         let storage = self.storage.unwrap_or_else(|| Box::new(MockStorage::new()));
         let block = self.block.unwrap_or_else(|| mock_env().block);
+        let custom = self
+            .custom
+            .unwrap_or_else(|| Box::new(MockSimpleCustomHandler::new()));
 
-        let router = Router { wasm, bank };
+        let router = Router { wasm, bank, custom };
 
         App {
             router,
@@ -140,9 +154,10 @@ where
     }
 }
 
-impl<C> App<C>
+impl<ExecC, QueryC> App<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
@@ -170,7 +185,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<CosmosMsg<C>>,
+        msgs: Vec<CosmosMsg<ExecC>>,
     ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -199,7 +214,7 @@ where
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> u64 {
         self.router.wasm.store_code(code) as u64
     }
 
@@ -228,21 +243,23 @@ where
     }
 }
 
-pub struct Router<C> {
-    pub(crate) wasm: Box<dyn Wasm<C>>,
+pub struct Router<ExecC, QueryC> {
+    pub(crate) wasm: Box<dyn Wasm<ExecC, QueryC>>,
     pub(crate) bank: Box<dyn Bank>,
+    pub(crate) custom: Box<dyn CustomHandler<ExecC, QueryC>>,
 }
 
-impl<C> Router<C>
+impl<ExecC, QueryC> Router<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a, C> {
+    ) -> RouterQuerier<'a, ExecC, QueryC> {
         RouterQuerier {
             router: self,
             api,
@@ -259,7 +276,7 @@ where
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        request: QueryRequest<Empty>,
+        request: QueryRequest<QueryC>,
     ) -> AnyResult<Binary> {
         match request {
             QueryRequest::Wasm(req) => {
@@ -267,6 +284,7 @@ where
                     .query(api, storage, &self.querier(api, storage, block), block, req)
             }
             QueryRequest::Bank(req) => self.bank.query(api, storage, req),
+            QueryRequest::Custom(req) => self.custom.query(api, storage, block, req),
             _ => unimplemented!(),
         }
     }
@@ -277,31 +295,33 @@ where
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: CosmosMsg<C>,
+        msg: CosmosMsg<ExecC>,
     ) -> AnyResult<AppResponse> {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
+            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
             _ => unimplemented!(),
         }
     }
 }
 
-pub struct RouterQuerier<'a, C>
+pub struct RouterQuerier<'a, ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    router: &'a Router<C>,
+    router: &'a Router<ExecC, QueryC>,
     api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
-impl<'a, C> RouterQuerier<'a, C>
+
+impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
-        router: &'a Router<C>,
+        router: &'a Router<ExecC, QueryC>,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
@@ -315,13 +335,13 @@ where
     }
 }
 
-impl<'a, C> Querier for RouterQuerier<'a, C>
+impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        // TODO: we need to make a new custom type for queries
-        let request: QueryRequest<Empty> = match from_slice(bin_request) {
+        let request: QueryRequest<QueryC> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -807,14 +827,14 @@ mod test {
         // TODO: check error?
     }
 
-    fn query_router<C>(
-        router: &Router<C>,
+    fn query_router<ExecC, QueryC>(
+        router: &Router<ExecC, QueryC>,
         api: &dyn Api,
         storage: &dyn Storage,
         rcpt: &Addr,
     ) -> Vec<Coin>
     where
-        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+        ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
