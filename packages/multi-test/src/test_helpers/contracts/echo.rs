@@ -7,37 +7,49 @@ use cosmwasm_std::{
     to_binary, Attribute, Binary, ContractResult, Deps, DepsMut, Empty, Env, Event, MessageInfo,
     Reply, Response, StdError, SubMsg, SubMsgExecutionResponse,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 use schemars::JsonSchema;
-use std::fmt;
+use std::fmt::Debug;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Message {
+use derivative::Derivative;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
+#[derivative(Default(bound = "", new = "true"))]
+pub struct Message<ExecC>
+where
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+{
     pub data: Option<String>,
-    pub sub_msg: Vec<SubMsg>,
+    pub sub_msg: Vec<SubMsg<ExecC>>,
     pub attributes: Vec<Attribute>,
     pub events: Vec<Event>,
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn instantiate(
+fn instantiate<ExecC>(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     _msg: EmptyMsg,
-) -> Result<Response, StdError> {
+) -> Result<Response<ExecC>, StdError>
+where
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+{
     Ok(Response::default())
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn execute(
+fn execute<ExecC>(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: Message,
-) -> Result<Response, StdError> {
+    msg: Message<ExecC>,
+) -> Result<Response<ExecC>, StdError>
+where
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+{
     let mut resp = Response::new();
 
     if let Some(data) = msg.data {
@@ -55,7 +67,10 @@ fn query(_deps: Deps, _env: Env, msg: EmptyMsg) -> Result<Binary, StdError> {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, StdError> {
+fn reply<ExecC>(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<ExecC>, StdError>
+where
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+{
     if let Reply {
         result:
             ContractResult::Ok(SubMsgExecutionResponse {
@@ -71,16 +86,16 @@ fn reply(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, StdError> {
 }
 
 pub fn contract() -> Box<dyn Contract<Empty>> {
-    let contract = ContractWrapper::new(execute, instantiate, query).with_reply(reply);
+    let contract = ContractWrapper::new(execute::<Empty>, instantiate::<Empty>, query)
+        .with_reply(reply::<Empty>);
     Box::new(contract)
 }
 
-#[allow(dead_code)]
 pub fn custom_contract<C>() -> Box<dyn Contract<C>>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    C: Clone + Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
 {
-    let contract = ContractWrapper::new_with_empty(execute, instantiate, query);
-    let contract = contract.with_reply_empty(reply);
+    let contract =
+        ContractWrapper::new(execute::<C>, instantiate::<C>, query).with_reply(reply::<C>);
     Box::new(contract)
 }

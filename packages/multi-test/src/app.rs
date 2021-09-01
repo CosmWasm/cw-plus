@@ -122,6 +122,14 @@ where
         self
     }
 
+    /// Overwrites default custom messages handler
+    #[track_caller]
+    pub fn with_custom(mut self, custom: impl CustomHandler<ExecC, QueryC> + 'static) -> Self {
+        assert!(self.custom.is_none(), "Custom handler already overwritten");
+        self.custom = Some(Box::new(custom));
+        self
+    }
+
     /// Overwrites default initial block
     #[track_caller]
     pub fn with_block(mut self, block: BlockInfo) -> Self {
@@ -1077,7 +1085,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: Some("Data".to_owned()),
                         ..echo::Message::default()
                     },
@@ -1225,7 +1233,7 @@ mod test {
             // reflect will call echo
             // echo will set the data
             // top-level app will not display the data
-            let echo_msg = echo::Message {
+            let echo_msg = echo::Message::<Empty> {
                 data: Some("my echo".into()),
                 events: vec![Event::new("echo").add_attribute("called", "true")],
                 ..echo::Message::default()
@@ -1408,7 +1416,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         attributes: vec![
                             Attribute::new("   ", "value"),
@@ -1438,7 +1446,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         attributes: vec![
                             Attribute::new("key", "   "),
@@ -1468,7 +1476,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         events: vec![Event::new("event")
                             .add_attribute("   ", "value")
@@ -1497,7 +1505,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         events: vec![Event::new("event")
                             .add_attribute("key", "   ")
@@ -1526,7 +1534,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         events: vec![Event::new(" e "), Event::new("event")],
                         ..echo::Message::default()
@@ -1536,6 +1544,56 @@ mod test {
                 .unwrap_err();
 
             assert_eq!(Error::event_type_too_short("e"), err.downcast().unwrap());
+        }
+    }
+
+    mod custom_messages {
+        use super::*;
+        use mockall as ma;
+
+        #[test]
+        fn triggering_custom_msg() {
+            let api = MockApi::default();
+            let sender = api.addr_validate("sender").unwrap();
+            let owner = api.addr_validate("owner").unwrap();
+
+            let mut custom_handler = MockSimpleCustomHandler::<CustomMsg, Empty>::new();
+            custom_handler
+                .expect_execute()
+                .with(
+                    ma::predicate::always(),
+                    ma::predicate::always(),
+                    ma::predicate::eq(CustomMsg::SetAge { age: 20 }),
+                )
+                .returning(|_, _, _| {
+                    Ok(AppResponse {
+                        data: None,
+                        events: vec![],
+                    })
+                });
+
+            let mut app = AppBuilder::new()
+                .with_api(api)
+                .with_custom(custom_handler)
+                .build();
+
+            let contract_id = app.store_code(echo::custom_contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner, &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            app.execute_contract(
+                sender,
+                contract,
+                &echo::Message {
+                    sub_msg: vec![SubMsg::new(CosmosMsg::Custom(CustomMsg::SetAge {
+                        age: 20,
+                    }))],
+                    ..Default::default()
+                },
+                &[],
+            )
+            .unwrap();
         }
     }
 }
