@@ -862,7 +862,10 @@ mod test {
     }
 
     fn mock_router() -> Router<Empty> {
-        Router::new(BankKeeper {})
+        Router {
+            wasm: Box::new(WasmKeeper::new()),
+            bank: Box::new(BankKeeper::new()),
+        }
     }
 
     #[test]

@@ -424,14 +424,13 @@ fn list_voters(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
     use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal, Timestamp};
 
     use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
-    use cw_multi_test::{next_block, App, BankKeeper, Contract, ContractWrapper, Executor};
+    use cw_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
 
     use super::*;
     use crate::msg::Threshold;
@@ -470,11 +469,7 @@ mod tests {
     }
 
     fn mock_app() -> App {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
+        AppBuilder::new().build()
     }
 
     // uploads code and returns address of group contract

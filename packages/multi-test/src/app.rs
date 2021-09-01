@@ -1,7 +1,6 @@
-use std::fmt;
+use std::fmt::{self, Debug};
 
-#[cfg(test)]
-use cosmwasm_std::testing::{mock_env, MockApi};
+use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
     from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
     Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
@@ -14,8 +13,10 @@ use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
+use crate::BankKeeper;
 
 use anyhow::Result as AnyResult;
+use derivative::Derivative;
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -60,24 +61,89 @@ where
     }
 }
 
+/// Utility to build App in stages. If particular items wont be set, defaults would be used
+#[derive(Derivative)]
+#[derivative(Default(bound = "", new = "true"))]
+pub struct AppBuilder<C> {
+    wasm: Option<Box<dyn Wasm<C>>>,
+    bank: Option<Box<dyn Bank>>,
+    api: Option<Box<dyn Api>>,
+    storage: Option<Box<dyn Storage>>,
+    block: Option<BlockInfo>,
+}
+
+impl<C> AppBuilder<C>
+where
+    C: Debug + PartialEq + Clone + JsonSchema + 'static,
+{
+    /// Overwrites default wasm executor. Panic if already set.
+    #[track_caller]
+    pub fn with_wasm(mut self, wasm: impl Wasm<C> + 'static) -> Self {
+        assert!(self.wasm.is_none(), "Wasm executor already overwritten");
+        self.wasm = Some(Box::new(wasm));
+        self
+    }
+
+    /// Overwrites default bank interface
+    #[track_caller]
+    pub fn with_bank(mut self, bank: impl Bank + 'static) -> Self {
+        assert!(self.bank.is_none(), "Bank interface already overwritten");
+        self.bank = Some(Box::new(bank));
+        self
+    }
+
+    /// Overwrites default api interface
+    #[track_caller]
+    pub fn with_api(mut self, api: impl Api + 'static) -> Self {
+        assert!(self.api.is_none(), "API interface already overwritten");
+        self.api = Some(Box::new(api));
+        self
+    }
+
+    /// Overwrites default storage interface
+    #[track_caller]
+    pub fn with_storage(mut self, storage: impl Storage + 'static) -> Self {
+        assert!(
+            self.storage.is_none(),
+            "Storage interface already overwritten"
+        );
+        self.storage = Some(Box::new(storage));
+        self
+    }
+
+    /// Overwrites default initial block
+    #[track_caller]
+    pub fn with_block(mut self, block: BlockInfo) -> Self {
+        assert!(
+            self.block.is_none(),
+            "Initial block info already overwritten"
+        );
+        self.block = Some(block);
+        self
+    }
+
+    pub fn build(self) -> App<C> {
+        let wasm = self.wasm.unwrap_or_else(|| Box::new(WasmKeeper::new()));
+        let bank = self.bank.unwrap_or_else(|| Box::new(BankKeeper::new()));
+        let api = self.api.unwrap_or_else(|| Box::new(MockApi::default()));
+        let storage = self.storage.unwrap_or_else(|| Box::new(MockStorage::new()));
+        let block = self.block.unwrap_or_else(|| mock_env().block);
+
+        let router = Router { wasm, bank };
+
+        App {
+            router,
+            api,
+            storage,
+            block,
+        }
+    }
+}
+
 impl<C> App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub fn new(
-        api: impl Api + 'static,
-        block: BlockInfo,
-        bank: impl Bank + 'static,
-        storage: impl Storage + 'static,
-    ) -> Self {
-        App {
-            router: Router::new(bank),
-            api: Box::new(api),
-            storage: Box::new(storage),
-            block,
-        }
-    }
-
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
     }
@@ -163,21 +229,14 @@ where
 }
 
 pub struct Router<C> {
-    pub wasm: Box<dyn Wasm<C>>,
-    pub bank: Box<dyn Bank>,
+    pub(crate) wasm: Box<dyn Wasm<C>>,
+    pub(crate) bank: Box<dyn Bank>,
 }
 
 impl<C> Router<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub(super) fn new(bank: impl Bank + 'static) -> Self {
-        Router {
-            wasm: Box::new(WasmKeeper::new()),
-            bank: Box::new(bank),
-        }
-    }
-
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
@@ -281,7 +340,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{
         coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event, Reply,
         StdResult, SubMsg, WasmMsg,
@@ -291,25 +349,16 @@ mod test {
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
-    use crate::BankKeeper;
     use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
 
     use super::*;
 
     fn mock_app() -> App<Empty> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
+        AppBuilder::new().build()
     }
 
     fn custom_app() -> App<CustomMsg> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
+        AppBuilder::new().build()
     }
 
     fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
