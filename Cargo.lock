@@ -353,6 +353,7 @@ dependencies = [
 name = "cw1-whitelist"
 version = "0.8.1"
 dependencies = [
+ "anyhow",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -360,6 +361,7 @@ dependencies = [
  "cw0 0.8.1",
  "cw1",
  "cw2",
+ "derivative",
  "schemars",
  "serde",
  "thiserror",
