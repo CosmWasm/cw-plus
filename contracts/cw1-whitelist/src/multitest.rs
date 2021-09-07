@@ -1,8 +1,8 @@
+use anyhow::{anyhow, Result};
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
-use cosmwasm_std::{Addr, Empty};
-use anyhow::Result;
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
 use cw1::Cw1Contract;
+use cw_multi_test::{App, AppResponse, BankKeeper, Contract, ContractWrapper, Executor};
 use derivative::Derivative;
 
 fn mock_app() -> App {
@@ -43,6 +43,22 @@ pub struct Suite {
     pub whitelist: Cw1Contract,
 }
 
+impl Suite {
+    pub fn freeze(&mut self, addr: &Addr) -> Result<AppResponse> {
+        let freeze_msg: crate::msg::ExecuteMsg = crate::msg::ExecuteMsg::Freeze {};
+        let execute: crate::msg::ExecuteMsg = crate::msg::ExecuteMsg::Execute {
+            msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: addr.to_string(),
+                msg: to_binary(&freeze_msg)?,
+                funds: vec![],
+            })],
+        };
+        self.app
+            .execute_contract(self.owner.clone(), self.whitelist.addr(), &execute, &[])
+            .map_err(|err| anyhow!(err))
+    }
+}
+
 #[derive(Default)]
 pub struct Config {
     /// Initial members
@@ -62,7 +78,7 @@ impl Config {
         self
     }
 
-        pub fn init(self, admins: Vec<String>) -> Result<Suite> {
+    pub fn init(self, admins: Vec<String>, mutable: bool) -> Result<Suite> {
         let mut app = mock_app();
         let owner = Addr::unchecked("owner");
         let cw1_id = app.store_code(contract_cw1());
@@ -82,10 +98,7 @@ impl Config {
             .instantiate_contract(
                 cw1_id,
                 owner.clone(),
-                &crate::msg::InstantiateMsg {
-                    admins,
-                    mutable: false,
-                },
+                &crate::msg::InstantiateMsg { admins, mutable },
                 &[],
                 "Whitelist",
                 None,
@@ -111,6 +124,6 @@ fn execute_freeze() {
     let _suite = Config::new()
         .with_member("member1")
         .with_member("member2")
-        .init(vec!["member1".to_owned()])
+        .init(vec!["member1".to_owned()], true)
         .unwrap();
 }
