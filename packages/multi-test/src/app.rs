@@ -16,7 +16,7 @@ use crate::custom_handler::CustomHandler;
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
-use crate::{BankKeeper, MockSimpleCustomHandler};
+use crate::{BankKeeper, PanickingCustomHandler};
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;
@@ -85,7 +85,7 @@ pub struct AppBuilder<ExecC, QueryC> {
 impl<ExecC, QueryC> AppBuilder<ExecC, QueryC>
 where
     ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
-    QueryC: CustomQuery + DeserializeOwned + 'static,
+    QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
 {
     /// Overwrites default wasm executor. Panic if already set.
     #[track_caller]
@@ -149,7 +149,7 @@ where
         let block = self.block.unwrap_or_else(|| mock_env().block);
         let custom = self
             .custom
-            .unwrap_or_else(|| Box::new(MockSimpleCustomHandler::new()));
+            .unwrap_or_else(|| Box::new(PanickingCustomHandler));
 
         let router = Router { wasm, bank, custom };
 
@@ -1549,7 +1549,7 @@ mod test {
 
     mod custom_messages {
         use super::*;
-        use mockall as ma;
+        use crate::custom_handler::CachingCustomHandler;
 
         #[test]
         fn triggering_custom_msg() {
@@ -1557,20 +1557,8 @@ mod test {
             let sender = api.addr_validate("sender").unwrap();
             let owner = api.addr_validate("owner").unwrap();
 
-            let mut custom_handler = MockSimpleCustomHandler::<CustomMsg, Empty>::new();
-            custom_handler
-                .expect_execute()
-                .with(
-                    ma::predicate::always(),
-                    ma::predicate::always(),
-                    ma::predicate::eq(CustomMsg::SetAge { age: 20 }),
-                )
-                .returning(|_, _, _| {
-                    Ok(AppResponse {
-                        data: None,
-                        events: vec![],
-                    })
-                });
+            let custom_handler = CachingCustomHandler::<CustomMsg, Empty>::new();
+            let custom_handler_state = custom_handler.state();
 
             let mut app = AppBuilder::new()
                 .with_api(api)
@@ -1594,6 +1582,13 @@ mod test {
                 &[],
             )
             .unwrap();
+
+            assert_eq!(
+                custom_handler_state.execs().to_owned(),
+                vec![CustomMsg::SetAge { age: 20 }]
+            );
+
+            assert!(custom_handler_state.queries().is_empty());
         }
     }
 }

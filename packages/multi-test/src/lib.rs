@@ -9,7 +9,7 @@
 mod app;
 mod bank;
 mod contracts;
-mod custom_handler;
+pub mod custom_handler;
 pub mod error;
 mod executor;
 mod test_helpers;
@@ -19,6 +19,6 @@ mod wasm;
 pub use crate::app::{next_block, App, AppBuilder, Router};
 pub use crate::bank::{Bank, BankKeeper};
 pub use crate::contracts::{Contract, ContractWrapper};
-pub use crate::custom_handler::{CustomHandler, MockSimpleCustomHandler, SimpleCustomHandler};
+pub use crate::custom_handler::{CustomHandler, PanickingCustomHandler, SimpleCustomHandler};
 pub use crate::executor::{AppResponse, Executor};
 pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};
