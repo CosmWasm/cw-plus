@@ -12,11 +12,11 @@ use serde::Serialize;
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
-use crate::custom_handler::CustomHandler;
+use crate::custom_handler::{CustomHandler, PanickingCustomHandler};
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
-use crate::{BankKeeper, PanickingCustomHandler};
+use crate::BankKeeper;
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;

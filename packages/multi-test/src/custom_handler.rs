@@ -29,50 +29,33 @@ pub trait CustomHandler<ExecC = Empty, QueryC = Empty> {
     ) -> AnyResult<Binary>;
 }
 
-/// Simplified version of `CustomHandler` having only arguments which are not app internals - they
-/// are just discarded. Useful for simpler mocking.
-pub trait SimpleCustomHandler<ExecC = Empty, QueryC = Empty> {
-    fn execute(&self, block: &BlockInfo, sender: Addr, msg: ExecC) -> AnyResult<AppResponse>;
-    fn query(&self, block: &BlockInfo, msg: QueryC) -> AnyResult<Binary>;
-}
-
-impl<ExecC, QueryC, T: SimpleCustomHandler<ExecC, QueryC>> CustomHandler<ExecC, QueryC> for T {
-    fn execute(
-        &self,
-        _: &dyn Api,
-        _: &mut dyn Storage,
-        block: &BlockInfo,
-        sender: Addr,
-        msg: ExecC,
-    ) -> AnyResult<AppResponse> {
-        self.execute(block, sender, msg)
-    }
-
-    fn query(
-        &self,
-        _: &dyn Api,
-        _: &dyn Storage,
-        block: &BlockInfo,
-        msg: QueryC,
-    ) -> AnyResult<Binary> {
-        self.query(block, msg)
-    }
-}
-
 /// Custom handler implementation panicking on each call. Assuming, that unless specific behavior
 /// is implemented, custom messages should not be send.
-pub struct PanickingCustomHandler;
+pub(crate) struct PanickingCustomHandler;
 
-impl<ExecC, QueryC> SimpleCustomHandler<ExecC, QueryC> for PanickingCustomHandler
+impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for PanickingCustomHandler
 where
     ExecC: std::fmt::Debug,
     QueryC: std::fmt::Debug,
 {
-    fn execute(&self, _block: &BlockInfo, sender: Addr, msg: ExecC) -> AnyResult<AppResponse> {
+    fn execute(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _block: &BlockInfo,
+        sender: Addr,
+        msg: ExecC,
+    ) -> AnyResult<AppResponse> {
         panic!("Unexpected custom exec msg {:?} from {:?}", msg, sender)
     }
 
-    fn query(&self, _block: &BlockInfo, msg: QueryC) -> AnyResult<Binary> {
+    fn query(
+        &self,
+        _api: &dyn Api,
+        _storage: &dyn Storage,
+        _block: &BlockInfo,
+        msg: QueryC,
+    ) -> AnyResult<Binary> {
         panic!("Unexpected custom query {:?}", msg)
     }
 }
@@ -116,13 +99,26 @@ impl<ExecC, QueryC> CachingCustomHandler<ExecC, QueryC> {
     }
 }
 
-impl<ExecC, QueryC> SimpleCustomHandler<ExecC, QueryC> for CachingCustomHandler<ExecC, QueryC> {
-    fn execute(&self, _block: &BlockInfo, _sender: Addr, msg: ExecC) -> AnyResult<AppResponse> {
+impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for CachingCustomHandler<ExecC, QueryC> {
+    fn execute(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _block: &BlockInfo,
+        _sender: Addr,
+        msg: ExecC,
+    ) -> AnyResult<AppResponse> {
         self.state.execs.borrow_mut().push(msg);
         Ok(AppResponse::default())
     }
 
-    fn query(&self, _block: &BlockInfo, msg: QueryC) -> AnyResult<Binary> {
+    fn query(
+        &self,
+        _api: &dyn Api,
+        _storage: &dyn Storage,
+        _block: &BlockInfo,
+        msg: QueryC,
+    ) -> AnyResult<Binary> {
         self.state.queries.borrow_mut().push(msg);
         Ok(Binary::default())
     }

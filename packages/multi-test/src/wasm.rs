@@ -854,7 +854,7 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> AnyResult<Addr> {
 
 #[cfg(test)]
 mod test {
-    use crate::PanickingCustomHandler;
+    use crate::custom_handler::PanickingCustomHandler;
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty, StdError};
 
