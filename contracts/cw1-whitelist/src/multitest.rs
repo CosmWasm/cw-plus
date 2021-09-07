@@ -1,3 +1,4 @@
+use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
@@ -30,97 +31,74 @@ pub struct Suite {
     /// Application mock
     #[derivative(Debug = "ignore")]
     pub app: App,
-    /// Special account for performing administrative execution
+    /// Sender of instantiated contract
     pub owner: Addr,
     /// Members of whitelist
-    pub members: Vec<Addr>,
+    pub admins: Vec<Addr>,
     /// cw1 whitelist contract address
     pub whitelist: Cw1Contract,
 }
 
 impl Suite {
-    pub fn freeze(&mut self, addr: &Addr) -> Result<AppResponse> {
-        let freeze_msg: crate::msg::ExecuteMsg = crate::msg::ExecuteMsg::Freeze {};
-        let execute: crate::msg::ExecuteMsg = crate::msg::ExecuteMsg::Execute {
-            msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: addr.to_string(),
-                msg: to_binary(&freeze_msg)?,
-                funds: vec![],
-            })],
-        };
-        self.app
-            .execute_contract(
-                self.members[0].clone(),
-                self.whitelist.addr(),
-                &execute,
-                &[],
-            )
-            .map_err(|err| anyhow!(err))
-    }
-}
-
-#[derive(Default)]
-pub struct Config {
-    /// Initial members
-    members: Vec<Addr>,
-}
-
-impl Config {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_member(mut self, addr: &str) -> Self {
-        self.members.push(Addr::unchecked(addr));
-
-        self
-    }
-
-    pub fn init(self, admins: Vec<String>, mutable: bool) -> Result<Suite> {
+    pub fn init(ads: Vec<String>, mutable: bool) -> Result<Suite> {
         let mut app = mock_app();
-        let owner = Addr::unchecked(admins[0].clone());
+        let owner = Addr::unchecked(ads[0].clone());
         let cw1_id = app.store_code(contract_cw1());
+
+        let admins = ads
+            .iter()
+            .map(|address| Addr::unchecked(address))
+            .collect::<Vec<Addr>>();
 
         let whitelist = app
             .instantiate_contract(
                 cw1_id,
                 owner.clone(),
-                &crate::msg::InstantiateMsg { admins, mutable },
+                &InstantiateMsg {
+                    admins: ads,
+                    mutable,
+                },
                 &[],
                 "Whitelist",
                 None,
             )
             .unwrap();
 
-        let members = self
-            .members
-            .into_iter()
-            .map(|address| Addr::unchecked(address))
-            .collect();
-
         Ok(Suite {
             app,
             owner,
-            members,
+            admins,
             whitelist: Cw1Contract(whitelist),
         })
+    }
+
+    pub fn freeze(&mut self, sender: Addr, contract_addr: &Addr) -> Result<AppResponse> {
+        let freeze_msg: ExecuteMsg = ExecuteMsg::Freeze {};
+        let execute: ExecuteMsg = ExecuteMsg::Execute {
+            msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: contract_addr.to_string(),
+                msg: to_binary(&freeze_msg)?,
+                funds: vec![],
+            })],
+        };
+        self.app
+            .execute_contract(sender, self.whitelist.addr(), &execute, &[])
+            .map_err(|err| anyhow!(err))
     }
 }
 
 #[test]
 fn execute_freeze() {
-    let mut suite = Config::new()
-        .with_member("member1")
-        .init(vec!["member1".to_owned()], true)
-        .unwrap();
+    let owner = Addr::unchecked("owner");
+    let mut suite = Suite::init(vec![owner.to_string()], true).unwrap();
 
     let cw1_id = suite.app.store_code(contract_cw1());
-    let freezable_whitelist = suite
+    let second_contract = suite
         .app
         .instantiate_contract(
             cw1_id,
-            Addr::unchecked("member1"),
-            &crate::msg::InstantiateMsg {
+            owner.clone(),
+            &InstantiateMsg {
                 admins: vec![suite.whitelist.0.to_string()],
                 mutable: true,
             },
@@ -130,20 +108,21 @@ fn execute_freeze() {
         )
         .unwrap();
 
-    assert_ne!(freezable_whitelist, suite.whitelist.0);
-    assert_matches!(suite.freeze(&freezable_whitelist), Ok(_));
+    assert_ne!(second_contract, suite.whitelist.0);
+    assert_matches!(suite.freeze(owner.clone(), &second_contract), Ok(_));
 
-    let query_msg: crate::msg::QueryMsg = crate::msg::QueryMsg::AdminList {};
-    let query_request = QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: freezable_whitelist.to_string(),
-        msg: to_binary(&query_msg).unwrap(),
-    });
-
-    let resposne = suite.app.wrap().query(&query_request);
+    let query_msg: QueryMsg = QueryMsg::AdminList {};
     assert_matches!(
-        resposne,
+        suite
+            .app
+            .wrap()
+            .query(&QueryRequest::Wasm(WasmQuery::Smart {
+                contract_addr: second_contract.to_string(),
+                msg: to_binary(&query_msg).unwrap(),
+            })
+        ),
         Ok(
-            crate::msg::AdminListResponse {
+            AdminListResponse {
                 admins: _,
                 mutable
             }) => {
