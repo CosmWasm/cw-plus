@@ -1,18 +1,13 @@
 #![cfg(test)]
 
-use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{coins, to_binary, Addr, Empty, Uint128};
 use cw20::{Cw20Coin, Cw20Contract, Cw20ExecuteMsg};
-use cw_multi_test::{App, BankKeeper, Contract, ContractWrapper, Executor};
+use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
 
 use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
 
 fn mock_app() -> App {
-    let env = mock_env();
-    let api = MockApi::default();
-    let bank = BankKeeper::new();
-
-    App::new(api, env.block, bank, MockStorage::new())
+    AppBuilder::new().build()
 }
 
 pub fn contract_escrow() -> Box<dyn Contract<Empty>> {

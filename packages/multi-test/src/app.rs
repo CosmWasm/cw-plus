@@ -1,21 +1,25 @@
-use std::fmt;
+use std::fmt::{self, Debug};
 
-#[cfg(test)]
-use cosmwasm_std::testing::{mock_env, MockApi};
+use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, Empty,
-    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, CustomQuery,
+    Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
+    SystemResult,
 };
 use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
+use crate::custom_handler::{CustomHandler, PanickingCustomHandler};
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
+use crate::BankKeeper;
 
 use anyhow::Result as AnyResult;
+use derivative::Derivative;
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -26,21 +30,26 @@ pub fn next_block(block: &mut BlockInfo) {
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
 /// We offer .execute() as a wrapper around cache, execute, commit/rollback process.
 ///
-/// C is the custom message returned init, handle, sudo (Response<C>).
-/// All contracts must return Response<C> or Response<Empty>
-pub struct App<C = Empty>
+/// ExecC is the custom message returned init, handle, sudo (Response<C>).
+/// All contracts must return Response<C> or Response<Empty>.
+///
+/// Also `ExecC` is the custom message which is handled by custom message handler.
+///
+/// `QueryC` is custom query message handled by custom message handler.
+pub struct App<ExecC = Empty, QueryC = Empty>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    router: Router<C>,
+    router: Router<ExecC, QueryC>,
     api: Box<dyn Api>,
     storage: Box<dyn Storage>,
     block: BlockInfo,
 }
 
-impl<C> Querier for App<C>
+impl<ExecC, QueryC> Querier for App<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
@@ -49,35 +58,115 @@ where
     }
 }
 
-impl<C> Executor<C> for App<C>
+impl<ExecC, QueryC> Executor<ExecC> for App<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> AnyResult<AppResponse> {
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<ExecC>) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
     }
 }
 
-impl<C> App<C>
+/// Utility to build App in stages. If particular items wont be set, defaults would be used
+#[derive(Derivative)]
+#[derivative(Default(bound = "", new = "true"))]
+pub struct AppBuilder<ExecC, QueryC> {
+    wasm: Option<Box<dyn Wasm<ExecC, QueryC>>>,
+    bank: Option<Box<dyn Bank>>,
+    api: Option<Box<dyn Api>>,
+    storage: Option<Box<dyn Storage>>,
+    custom: Option<Box<dyn CustomHandler<ExecC, QueryC>>>,
+    block: Option<BlockInfo>,
+}
+
+impl<ExecC, QueryC> AppBuilder<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+    QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
 {
-    pub fn new(
-        api: impl Api + 'static,
-        block: BlockInfo,
-        bank: impl Bank + 'static,
-        storage: impl Storage + 'static,
-    ) -> Self {
+    /// Overwrites default wasm executor. Panic if already set.
+    #[track_caller]
+    pub fn with_wasm(mut self, wasm: impl Wasm<ExecC, QueryC> + 'static) -> Self {
+        assert!(self.wasm.is_none(), "Wasm executor already overwritten");
+        self.wasm = Some(Box::new(wasm));
+        self
+    }
+
+    /// Overwrites default bank interface
+    #[track_caller]
+    pub fn with_bank(mut self, bank: impl Bank + 'static) -> Self {
+        assert!(self.bank.is_none(), "Bank interface already overwritten");
+        self.bank = Some(Box::new(bank));
+        self
+    }
+
+    /// Overwrites default api interface
+    #[track_caller]
+    pub fn with_api(mut self, api: impl Api + 'static) -> Self {
+        assert!(self.api.is_none(), "API interface already overwritten");
+        self.api = Some(Box::new(api));
+        self
+    }
+
+    /// Overwrites default storage interface
+    #[track_caller]
+    pub fn with_storage(mut self, storage: impl Storage + 'static) -> Self {
+        assert!(
+            self.storage.is_none(),
+            "Storage interface already overwritten"
+        );
+        self.storage = Some(Box::new(storage));
+        self
+    }
+
+    /// Overwrites default custom messages handler
+    #[track_caller]
+    pub fn with_custom(mut self, custom: impl CustomHandler<ExecC, QueryC> + 'static) -> Self {
+        assert!(self.custom.is_none(), "Custom handler already overwritten");
+        self.custom = Some(Box::new(custom));
+        self
+    }
+
+    /// Overwrites default initial block
+    #[track_caller]
+    pub fn with_block(mut self, block: BlockInfo) -> Self {
+        assert!(
+            self.block.is_none(),
+            "Initial block info already overwritten"
+        );
+        self.block = Some(block);
+        self
+    }
+
+    pub fn build(self) -> App<ExecC, QueryC> {
+        let wasm = self.wasm.unwrap_or_else(|| Box::new(WasmKeeper::new()));
+        let bank = self.bank.unwrap_or_else(|| Box::new(BankKeeper::new()));
+        let api = self.api.unwrap_or_else(|| Box::new(MockApi::default()));
+        let storage = self.storage.unwrap_or_else(|| Box::new(MockStorage::new()));
+        let block = self.block.unwrap_or_else(|| mock_env().block);
+        let custom = self
+            .custom
+            .unwrap_or_else(|| Box::new(PanickingCustomHandler));
+
+        let router = Router { wasm, bank, custom };
+
         App {
-            router: Router::new(bank),
-            api: Box::new(api),
-            storage: Box::new(storage),
+            router,
+            api,
+            storage,
             block,
         }
     }
+}
 
+impl<ExecC, QueryC> App<ExecC, QueryC>
+where
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
+{
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
     }
@@ -104,7 +193,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<CosmosMsg<C>>,
+        msgs: Vec<CosmosMsg<ExecC>>,
     ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -133,7 +222,7 @@ where
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<C>>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> u64 {
         self.router.wasm.store_code(code) as u64
     }
 
@@ -162,28 +251,23 @@ where
     }
 }
 
-pub struct Router<C> {
-    pub wasm: Box<dyn Wasm<C>>,
-    pub bank: Box<dyn Bank>,
+pub struct Router<ExecC, QueryC> {
+    pub(crate) wasm: Box<dyn Wasm<ExecC, QueryC>>,
+    pub(crate) bank: Box<dyn Bank>,
+    pub(crate) custom: Box<dyn CustomHandler<ExecC, QueryC>>,
 }
 
-impl<C> Router<C>
+impl<ExecC, QueryC> Router<ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
-    pub(super) fn new(bank: impl Bank + 'static) -> Self {
-        Router {
-            wasm: Box::new(WasmKeeper::new()),
-            bank: Box::new(bank),
-        }
-    }
-
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a, C> {
+    ) -> RouterQuerier<'a, ExecC, QueryC> {
         RouterQuerier {
             router: self,
             api,
@@ -200,7 +284,7 @@ where
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        request: QueryRequest<Empty>,
+        request: QueryRequest<QueryC>,
     ) -> AnyResult<Binary> {
         match request {
             QueryRequest::Wasm(req) => {
@@ -208,6 +292,7 @@ where
                     .query(api, storage, &self.querier(api, storage, block), block, req)
             }
             QueryRequest::Bank(req) => self.bank.query(api, storage, req),
+            QueryRequest::Custom(req) => self.custom.query(api, storage, block, req),
             _ => unimplemented!(),
         }
     }
@@ -218,31 +303,33 @@ where
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: CosmosMsg<C>,
+        msg: CosmosMsg<ExecC>,
     ) -> AnyResult<AppResponse> {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
+            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
             _ => unimplemented!(),
         }
     }
 }
 
-pub struct RouterQuerier<'a, C>
+pub struct RouterQuerier<'a, ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    router: &'a Router<C>,
+    router: &'a Router<ExecC, QueryC>,
     api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
-impl<'a, C> RouterQuerier<'a, C>
+
+impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     pub fn new(
-        router: &'a Router<C>,
+        router: &'a Router<ExecC, QueryC>,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
@@ -256,13 +343,13 @@ where
     }
 }
 
-impl<'a, C> Querier for RouterQuerier<'a, C>
+impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
 where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
+    QueryC: CustomQuery + DeserializeOwned,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        // TODO: we need to make a new custom type for queries
-        let request: QueryRequest<Empty> = match from_slice(bin_request) {
+        let request: QueryRequest<QueryC> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -281,7 +368,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{
         coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event, Reply,
         StdResult, SubMsg, WasmMsg,
@@ -291,25 +377,16 @@ mod test {
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
-    use crate::BankKeeper;
     use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
 
     use super::*;
 
     fn mock_app() -> App<Empty> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
+        AppBuilder::new().build()
     }
 
     fn custom_app() -> App<CustomMsg> {
-        let env = mock_env();
-        let api = MockApi::default();
-        let bank = BankKeeper::new();
-
-        App::new(api, env.block, bank, MockStorage::new())
+        AppBuilder::new().build()
     }
 
     fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
@@ -758,14 +835,14 @@ mod test {
         // TODO: check error?
     }
 
-    fn query_router<C>(
-        router: &Router<C>,
+    fn query_router<ExecC, QueryC>(
+        router: &Router<ExecC, QueryC>,
         api: &dyn Api,
         storage: &dyn Storage,
         rcpt: &Addr,
     ) -> Vec<Coin>
     where
-        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+        ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
@@ -1008,7 +1085,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: Some("Data".to_owned()),
                         ..echo::Message::default()
                     },
@@ -1156,7 +1233,7 @@ mod test {
             // reflect will call echo
             // echo will set the data
             // top-level app will not display the data
-            let echo_msg = echo::Message {
+            let echo_msg = echo::Message::<Empty> {
                 data: Some("my echo".into()),
                 events: vec![Event::new("echo").add_attribute("called", "true")],
                 ..echo::Message::default()
@@ -1339,7 +1416,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         attributes: vec![
                             Attribute::new("   ", "value"),
@@ -1369,7 +1446,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         attributes: vec![
                             Attribute::new("key", "   "),
@@ -1399,7 +1476,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         events: vec![Event::new("event")
                             .add_attribute("   ", "value")
@@ -1428,7 +1505,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         events: vec![Event::new("event")
                             .add_attribute("key", "   ")
@@ -1457,7 +1534,7 @@ mod test {
                 .execute_contract(
                     owner,
                     contract,
-                    &echo::Message {
+                    &echo::Message::<Empty> {
                         data: None,
                         events: vec![Event::new(" e "), Event::new("event")],
                         ..echo::Message::default()
@@ -1467,6 +1544,51 @@ mod test {
                 .unwrap_err();
 
             assert_eq!(Error::event_type_too_short("e"), err.downcast().unwrap());
+        }
+    }
+
+    mod custom_messages {
+        use super::*;
+        use crate::custom_handler::CachingCustomHandler;
+
+        #[test]
+        fn triggering_custom_msg() {
+            let api = MockApi::default();
+            let sender = api.addr_validate("sender").unwrap();
+            let owner = api.addr_validate("owner").unwrap();
+
+            let custom_handler = CachingCustomHandler::<CustomMsg, Empty>::new();
+            let custom_handler_state = custom_handler.state();
+
+            let mut app = AppBuilder::new()
+                .with_api(api)
+                .with_custom(custom_handler)
+                .build();
+
+            let contract_id = app.store_code(echo::custom_contract());
+            let contract = app
+                .instantiate_contract(contract_id, owner, &EmptyMsg {}, &[], "Echo", None)
+                .unwrap();
+
+            app.execute_contract(
+                sender,
+                contract,
+                &echo::Message {
+                    sub_msg: vec![SubMsg::new(CosmosMsg::Custom(CustomMsg::SetAge {
+                        age: 20,
+                    }))],
+                    ..Default::default()
+                },
+                &[],
+            )
+            .unwrap();
+
+            assert_eq!(
+                custom_handler_state.execs().to_owned(),
+                vec![CustomMsg::SetAge { age: 20 }]
+            );
+
+            assert!(custom_handler_state.queries().is_empty());
         }
     }
 }

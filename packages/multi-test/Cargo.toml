@@ -27,3 +27,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 prost = "0.8.0"
 anyhow = "1"
 thiserror = "1"
+derivative = "2"
