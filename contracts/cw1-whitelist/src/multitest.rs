@@ -6,6 +6,11 @@ use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, QueryRequest, WasmMsg, Was
 use cw1::Cw1Contract;
 use cw_multi_test::{App, AppResponse, BankKeeper, Contract, ContractWrapper, Executor};
 use derivative::Derivative;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref OWNER: String = "owner".to_string();
+}
 
 fn mock_app() -> App {
     let env = mock_env();
@@ -31,31 +36,21 @@ pub struct Suite {
     /// Application mock
     #[derivative(Debug = "ignore")]
     pub app: App,
-    /// Sender of instantiated contract
-    pub owner: Addr,
-    /// Members of whitelist
-    pub admins: Vec<Addr>,
     /// cw1 whitelist contract address
     pub whitelist: Cw1Contract,
 }
 
 impl Suite {
-    pub fn init(ads: Vec<String>, mutable: bool) -> Result<Suite> {
+    pub fn init(mutable: bool) -> Result<Suite> {
         let mut app = mock_app();
-        let owner = Addr::unchecked(ads[0].clone());
         let cw1_id = app.store_code(contract_cw1());
-
-        let admins = ads
-            .iter()
-            .map(|address| Addr::unchecked(address))
-            .collect::<Vec<Addr>>();
 
         let whitelist = app
             .instantiate_contract(
                 cw1_id,
-                owner.clone(),
+                Addr::unchecked(OWNER.clone()),
                 &InstantiateMsg {
-                    admins: ads,
+                    admins: vec![OWNER.clone()],
                     mutable,
                 },
                 &[],
@@ -66,13 +61,11 @@ impl Suite {
 
         Ok(Suite {
             app,
-            owner,
-            admins,
             whitelist: Cw1Contract(whitelist),
         })
     }
 
-    pub fn freeze(&mut self, sender: Addr, contract_addr: &Addr) -> Result<AppResponse> {
+    pub fn freeze(&mut self, contract_addr: &Addr) -> Result<AppResponse> {
         let freeze_msg: ExecuteMsg = ExecuteMsg::Freeze {};
         let execute: ExecuteMsg = ExecuteMsg::Execute {
             msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
@@ -82,22 +75,26 @@ impl Suite {
             })],
         };
         self.app
-            .execute_contract(sender, self.whitelist.addr(), &execute, &[])
+            .execute_contract(
+                Addr::unchecked(OWNER.clone()),
+                self.whitelist.addr(),
+                &execute,
+                &[],
+            )
             .map_err(|err| anyhow!(err))
     }
 }
 
 #[test]
 fn execute_freeze() {
-    let owner = Addr::unchecked("owner");
-    let mut suite = Suite::init(vec![owner.to_string()], true).unwrap();
+    let mut suite = Suite::init(true).unwrap();
 
     let cw1_id = suite.app.store_code(contract_cw1());
     let second_contract = suite
         .app
         .instantiate_contract(
             cw1_id,
-            owner.clone(),
+            Addr::unchecked(OWNER.clone()),
             &InstantiateMsg {
                 admins: vec![suite.whitelist.0.to_string()],
                 mutable: true,
@@ -109,7 +106,7 @@ fn execute_freeze() {
         .unwrap();
 
     assert_ne!(second_contract, suite.whitelist.0);
-    assert_matches!(suite.freeze(owner.clone(), &second_contract), Ok(_));
+    assert_matches!(suite.freeze(&second_contract), Ok(_));
 
     let query_msg: QueryMsg = QueryMsg::AdminList {};
     assert_matches!(
