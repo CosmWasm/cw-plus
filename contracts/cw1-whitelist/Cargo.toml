@@ -30,6 +30,7 @@ thiserror = { version = "1.0.23" }
 
 [dev-dependencies]
 anyhow = "1"
+assert_matches = "1"
 cosmwasm-schema = { version = "0.16.0" }
 cw-multi-test = "0.8.1"
 derivative = "2"
