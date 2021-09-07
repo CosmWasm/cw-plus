@@ -23,12 +23,6 @@ fn contract_cw1() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
-/// Configuration of single member
-struct MemberConfig {
-    /// Member address
-    addr: String,
-}
-
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Suite {
@@ -62,7 +56,7 @@ impl Suite {
 #[derive(Default)]
 pub struct Config {
     /// Initial members
-    members: Vec<MemberConfig>,
+    members: Vec<Addr>,
 }
 
 impl Config {
@@ -71,25 +65,21 @@ impl Config {
     }
 
     pub fn with_member(mut self, addr: &str) -> Self {
-        self.members.push(MemberConfig {
-            addr: addr.to_owned(),
-        });
+        self.members.push(Addr::unchecked(addr));
 
         self
     }
 
     pub fn init(self, admins: Vec<String>, mutable: bool) -> Result<Suite> {
         let mut app = mock_app();
-        let owner = Addr::unchecked("owner");
+        let owner = Addr::unchecked(admins[0].clone());
         let cw1_id = app.store_code(contract_cw1());
 
         let members: Vec<_> = self
             .members
             .into_iter()
-            .map(|member| -> Result<_> {
-                let member = MemberConfig {
-                    addr: member.addr.to_string(),
-                };
+            .map(|address| -> Result<_> {
+                let member = address.to_string();
                 Ok(member)
             })
             .collect::<Result<Vec<_>>>()?;
@@ -107,7 +97,7 @@ impl Config {
 
         let members = members
             .into_iter()
-            .map(|member| Addr::unchecked(member.addr))
+            .map(|address| Addr::unchecked(address))
             .collect();
 
         Ok(Suite {
@@ -121,9 +111,17 @@ impl Config {
 
 #[test]
 fn execute_freeze() {
-    let _suite = Config::new()
+    let mut suite1 = Config::new()
         .with_member("member1")
-        .with_member("member2")
         .init(vec!["member1".to_owned()], true)
         .unwrap();
+
+    let mut suite2 = Config::new()
+        .with_member("member2")
+        .init(vec!["member2".to_owned()], true)
+        .unwrap();
+
+    let member = suite1.members[0].clone();
+
+    let err_freeze = suite1.freeze(&suite2.members[0]).unwrap_err();
 }
