@@ -34,4 +34,3 @@ assert_matches = "1"
 cosmwasm-schema = { version = "0.16.0" }
 cw-multi-test = "0.8.1"
 derivative = "2"
-lazy_static = "1.4"
