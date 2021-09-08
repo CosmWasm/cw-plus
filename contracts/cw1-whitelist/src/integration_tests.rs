@@ -2,7 +2,7 @@ use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, QueryRequest, WasmMsg, WasmQuery};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError, WasmMsg, WasmQuery};
 use cw1::Cw1Contract;
 use cw_multi_test::{App, AppResponse, BankKeeper, Contract, ContractWrapper, Executor};
 use derivative::Derivative;
@@ -31,47 +31,49 @@ fn contract_cw1() -> Box<dyn Contract<Empty>> {
 pub struct Suite {
     /// Application mock
     #[derivative(Debug = "ignore")]
-    pub app: App,
-    /// cw1 whitelist contract address
-    pub whitelist: Cw1Contract,
+    app: App,
     /// Special account
     pub owner: String,
+    /// ID of stored code for cw1 contract
+    cw1_id: u64,
 }
 
 impl Suite {
-    pub fn init(mutable: bool) -> Result<Suite> {
+    pub fn init() -> Result<Suite> {
         let mut app = mock_app();
-        let cw1_id = app.store_code(contract_cw1());
         let owner = "owner".to_owned();
+        let cw1_id = app.store_code(contract_cw1());
 
-        let whitelist = app
+        Ok(Suite { app, owner, cw1_id })
+    }
+
+    pub fn instantiate_cw1_contract(&mut self, admins: Vec<String>, mutable: bool) -> Cw1Contract {
+        let contract = self
+            .app
             .instantiate_contract(
-                cw1_id,
-                Addr::unchecked(owner.clone()),
-                &InstantiateMsg {
-                    admins: vec![owner.clone()],
-                    mutable,
-                },
+                self.cw1_id,
+                Addr::unchecked(self.owner.clone()),
+                &InstantiateMsg { admins, mutable },
                 &[],
                 "Whitelist",
                 None,
             )
             .unwrap();
-
-        Ok(Suite {
-            app,
-            whitelist: Cw1Contract(whitelist),
-            owner,
-        })
+        Cw1Contract(contract)
     }
 
-    pub fn execute<M>(&mut self, contract_addr: &Addr, msg: M) -> Result<AppResponse>
+    pub fn execute<M>(
+        &mut self,
+        sender_contract: Addr,
+        target_contract: &Addr,
+        msg: M,
+    ) -> Result<AppResponse>
     where
         M: Serialize + DeserializeOwned,
     {
         let execute: ExecuteMsg = ExecuteMsg::Execute {
             msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: contract_addr.to_string(),
+                contract_addr: target_contract.to_string(),
                 msg: to_binary(&msg)?,
                 funds: vec![],
             })],
@@ -79,49 +81,42 @@ impl Suite {
         self.app
             .execute_contract(
                 Addr::unchecked(self.owner.clone()),
-                self.whitelist.addr(),
+                sender_contract,
                 &execute,
                 &[],
             )
             .map_err(|err| anyhow!(err))
     }
+
+    pub fn query<M>(&self, target_contract: Addr, msg: M) -> Result<AdminListResponse, StdError>
+    where
+        M: Serialize + DeserializeOwned,
+    {
+        self.app.wrap().query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: target_contract.to_string(),
+            msg: to_binary(&msg).unwrap(),
+        }))
+    }
 }
 
 #[test]
 fn proxy_freeze_message() {
-    let mut suite = Suite::init(true).unwrap();
+    let mut suite = Suite::init().unwrap();
 
-    let owner = "owner".to_string();
-    let cw1_id = suite.app.store_code(contract_cw1());
-    let second_contract = suite
-        .app
-        .instantiate_contract(
-            cw1_id,
-            Addr::unchecked(owner),
-            &InstantiateMsg {
-                admins: vec![suite.whitelist.0.to_string()],
-                mutable: true,
-            },
-            &[],
-            "Whitelist",
-            None,
-        )
-        .unwrap();
+    let first_contract = suite.instantiate_cw1_contract(vec![suite.owner.clone()], true);
+    let second_contract =
+        suite.instantiate_cw1_contract(vec![first_contract.addr().to_string()], true);
+    assert_ne!(second_contract, first_contract);
 
-    assert_ne!(second_contract, suite.whitelist.0);
     let freeze_msg: ExecuteMsg = ExecuteMsg::Freeze {};
-    assert_matches!(suite.execute(&second_contract, freeze_msg), Ok(_));
+    assert_matches!(
+        suite.execute(first_contract.addr(), &second_contract.addr(), freeze_msg),
+        Ok(_)
+    );
 
     let query_msg: QueryMsg = QueryMsg::AdminList {};
     assert_matches!(
-        suite
-            .app
-            .wrap()
-            .query(&QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: second_contract.to_string(),
-                msg: to_binary(&query_msg).unwrap(),
-            })
-        ),
+        suite.query(second_contract.addr(), query_msg),
         Ok(
             AdminListResponse {
                 mutable,
