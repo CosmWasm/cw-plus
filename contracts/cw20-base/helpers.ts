@@ -1,20 +1,37 @@
-import axios from  "axios"
-import fs from "fs"
-import { SigningCosmWasmClient, CosmWasmFeeTable} from "@cosmjs/cosmwasm-stargate"
-import { GasPrice, Secp256k1HdWallet, GasLimits, makeCosmoshubPath } from "@cosmjs/launchpad"
-import { Slip10RawIndex } from "@cosmjs/crypto"
-import path from "path"
+import axios from  "axios";
+import fs from "fs";
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
+import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
+import { Slip10RawIndex } from "@cosmjs/crypto";
+import path from "path";
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
  * With these you can easily use the cw20 contract without worrying about forming messages and parsing queries.
  *
- * Usage: npx @cosmjs/cli@^0.25 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/cw20-base/helpers.ts
  *
  * Create a client:
- *   const [addr, client] = await useOptions(oysternetOptions).setup('password');
+ *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
  *
  * Get the mnemonic:
- *   await useOptions(oysternetOptions).recoverMnemonic(password)
+ *   await useOptions(pebblenetOptions).recoverMnemonic(password);
+ * 
+ * Create contract:
+ *   const contract = CW20(client, pebblenetOptions.fees);
+ * 
+ * Upload contract:
+ *   const codeId = await contract.upload(addr);
+ * 
+ * Instantiate contract example:
+ *   const initMsg = {
+ *     name: "Potato Coin",
+ *     symbol: "TATER",
+ *     decimals: 2,
+ *     initial_balances: [{ address: addr, amount: "10000" }],
+ *     mint: { "minter": addr }
+ *   };
+ *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!');
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
 */
@@ -24,28 +41,30 @@ interface Options {
   readonly httpUrl: string
   readonly networkId: string
   readonly feeToken: string
-  readonly gasPrice: GasPrice
   readonly bech32prefix: string
   readonly hdPath: readonly Slip10RawIndex[]
   readonly faucetUrl?: string
-  readonly defaultKeyFile: string
-  readonly gasLimits: Partial<GasLimits<CosmWasmFeeTable>> // only set the ones you want to override
+  readonly defaultKeyFile: string,
+  readonly fees: {
+    upload: StdFee,
+    init: StdFee,
+    exec: StdFee
+  }
 }
 
-const oysternetOptions: Options = {
-  httpUrl: 'http://rpc.oysternet.cosmwasm.com',
-  networkId: 'oysternet-1',
-  gasPrice:  GasPrice.fromString("0.01usponge"),
+const pebblenetGasPrice = GasPrice.fromString("0.01upebble");
+const pebblenetOptions: Options = {
+  httpUrl: 'https://rpc.pebblenet.cosmwasm.com',
+  networkId: 'pebblenet-1',
   bech32prefix: 'wasm',
-  feeToken: 'usponge',
-  faucetUrl: 'https://faucet.oysternet.cosmwasm.com/credit',
+  feeToken: 'upebble',
+  faucetUrl: 'https://faucet.pebblenet.cosmwasm.com/credit',
   hdPath: makeCosmoshubPath(0),
-  defaultKeyFile: path.join(process.env.HOME, ".oysternet.key"),
-  gasLimits: {
-    upload: 1500000,
-    init: 600000,
-    register:800000,
-    transfer: 80000,
+  defaultKeyFile: path.join(process.env.HOME, ".pebblenet.key"),
+  fees: {
+    upload: calculateFee(1500000, pebblenetGasPrice),
+    init: calculateFee(500000, pebblenetGasPrice),
+    exec: calculateFee(200000, pebblenetGasPrice),
   },
 }
 
@@ -56,30 +75,28 @@ interface Network {
 
 const useOptions = (options: Options): Network => {
 
-  const loadOrCreateWallet = async (options: Options, filename: string, password: string): Promise<Secp256k1HdWallet> => {
+  const loadOrCreateWallet = async (options: Options, filename: string, password: string): Promise<DirectSecp256k1HdWallet> => {
     let encrypted: string;
     try {
       encrypted = fs.readFileSync(filename, 'utf8');
     } catch (err) {
       // generate if no file exists
-      const wallet = await Secp256k1HdWallet.generate(12, {hdPaths: [options.hdPath], prefix: options.bech32prefix});
+      const wallet = await DirectSecp256k1HdWallet.generate(12, {hdPaths: [options.hdPath], prefix: options.bech32prefix});
       const encrypted = await wallet.serialize(password);
       fs.writeFileSync(filename, encrypted, 'utf8');
       return wallet;
     }
     // otherwise, decrypt the file (we cannot put deserialize inside try or it will over-write on a bad password)
-    const wallet = await Secp256k1HdWallet.deserialize(encrypted, password);
+    const wallet = await DirectSecp256k1HdWallet.deserialize(encrypted, password);
     return wallet;
   };
 
   const connect = async (
-    wallet: Secp256k1HdWallet,
+    wallet: DirectSecp256k1HdWallet,
     options: Options
   ): Promise<SigningCosmWasmClient> => {
     const clientOptions = {
-      prefix: options.bech32prefix,
-      gasPrice: options.gasPrice,
-      gasLimits: options.gasLimits
+      prefix: options.bech32prefix
     }
     return await SigningCosmWasmClient.connectWithSigner(options.httpUrl, wallet, clientOptions)
   };
@@ -94,8 +111,8 @@ const useOptions = (options: Options): Network => {
 
   const setup = async (password: string, filename?: string): Promise<[string, SigningCosmWasmClient]> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(oysternetOptions, keyfile, password);
-    const client = await connect(wallet, oysternetOptions);
+    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
+    const client = await connect(wallet, pebblenetOptions);
 
     const [account] = await wallet.getAccounts();
     // ensure we have some tokens
@@ -112,7 +129,7 @@ const useOptions = (options: Options): Network => {
 
   const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(oysternetOptions, keyfile, password);
+    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
     return wallet.mnemonic;
   }
 
@@ -187,10 +204,10 @@ interface CW20Contract {
   use: (contractAddress: string) => CW20Instance
 }
 
-export const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
+export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20Contract => {
   const use = (contractAddress: string): CW20Instance => {
-    const balance = async (account: string): Promise<string> => {
-      const result = await client.queryContractSmart(contractAddress, {balance: { account }});
+    const balance = async (address: string): Promise<string> => {
+      const result = await client.queryContractSmart(contractAddress, {balance: { address }});
       return result.balance;
     };
 
@@ -217,34 +234,34 @@ export const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
 
     // mints tokens, returns transactionHash
     const mint = async (senderAddress: string, recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {mint: {recipient, amount}});
+      const result = await client.execute(senderAddress, contractAddress, {mint: {recipient, amount}}, fees.exec);
       return result.transactionHash;
     }
 
     // transfers tokens, returns transactionHash
     const transfer = async (senderAddress: string, recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {transfer: {recipient, amount}});
+      const result = await client.execute(senderAddress, contractAddress, {transfer: {recipient, amount}}, fees.exec);
       return result.transactionHash;
     }
 
     // burns tokens, returns transactionHash
     const burn = async (senderAddress: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {burn: {amount}});
+      const result = await client.execute(senderAddress, contractAddress, {burn: {amount}}, fees.exec);
       return result.transactionHash;
     }
 
     const increaseAllowance = async (senderAddress: string, spender: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {increase_allowance: {spender, amount}});
+      const result = await client.execute(senderAddress, contractAddress, {increase_allowance: {spender, amount}}, fees.exec);
       return result.transactionHash;
     }
 
     const decreaseAllowance = async (senderAddress: string, spender: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {decrease_allowance: {spender, amount}});
+      const result = await client.execute(senderAddress, contractAddress, {decrease_allowance: {spender, amount}}, fees.exec);
       return result.transactionHash;
     }
 
     const transferFrom = async (senderAddress: string, owner: string, recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {transfer_from: {owner, recipient, amount}});
+      const result = await client.execute(senderAddress, contractAddress, {transfer_from: {owner, recipient, amount}}, fees.exec);
       return result.transactionHash;
     }
 
@@ -274,18 +291,14 @@ export const CW20 = (client: SigningCosmWasmClient): CW20Contract => {
   }
 
   const upload = async (senderAddress: string): Promise<number> => {
-    const meta = {
-      source: "https://github.com/CosmWasm/cosmwasm-plus/tree/v0.6.2/contracts/cw20-base",
-      builder: "cosmwasm/workspace-optimizer:0.10.7"
-    };
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.6.2/cw20_base.wasm";
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.8.1/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(senderAddress, wasm, meta);
+    const result = await client.upload(senderAddress, wasm, fees.upload);
     return result.codeId;
   }
 
   const instantiate = async (senderAddress: string, codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string): Promise<CW20Instance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, { memo: `Init ${label}`, admin});
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, { memo: `Init ${label}`, admin});
     return use(result.contractAddress);
   }
 
