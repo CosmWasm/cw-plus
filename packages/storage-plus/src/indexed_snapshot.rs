@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
 use crate::prefix::{Bound, Prefix};
-use crate::snapshot::SnapshotMap;
+use crate::snapshot_map::SnapshotMap;
 use crate::{IndexList, Path, Strategy};
 
 /// IndexedSnapshotMap works like a SnapshotMap but has a secondary index
