@@ -19,7 +19,6 @@ use crate::wasm::{ContractData, Wasm, WasmKeeper};
 use crate::BankKeeper;
 
 use anyhow::Result as AnyResult;
-use derivative::Derivative;
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -29,27 +28,35 @@ pub fn next_block(block: &mut BlockInfo) {
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
 /// We offer .execute() as a wrapper around cache, execute, commit/rollback process.
-///
-/// ExecC is the custom message returned init, handle, sudo (Response<C>).
-/// All contracts must return Response<C> or Response<Empty>.
-///
-/// Also `ExecC` is the custom message which is handled by custom message handler.
-///
-/// `QueryC` is custom query message handled by custom message handler.
-pub struct App<ExecC = Empty, QueryC = Empty>
-where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
-    router: Router<ExecC, QueryC>,
+pub struct App<
+    Wasm = WasmKeeper<Empty, Empty>,
+    Bank = BankKeeper,
+    Custom = PanickingCustomHandler<Empty, Empty>,
+> {
+    router: Router<Wasm, Bank, Custom>,
     api: Box<dyn Api>,
     storage: Box<dyn Storage>,
     block: BlockInfo,
 }
 
-impl<ExecC, QueryC> Querier for App<ExecC, QueryC>
+impl<ExecC, QueryC>
+    App<WasmKeeper<ExecC, QueryC>, BankKeeper, PanickingCustomHandler<ExecC, QueryC>>
 where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-    QueryC: CustomQuery + DeserializeOwned,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    QueryC: std::fmt::Debug + CustomQuery + DeserializeOwned + 'static,
+{
+    pub fn new() -> Self {
+        AppBuilder::new().build()
+    }
+}
+
+impl<WasmT, BankT, CustomT> Querier for App<WasmT, BankT, CustomT>
+where
+    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<BankT, CustomT>,
+    BankT: Bank,
+    CustomT: CustomHandler,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
@@ -58,12 +65,15 @@ where
     }
 }
 
-impl<ExecC, QueryC> Executor<ExecC> for App<ExecC, QueryC>
+impl<WasmT, BankT, CustomT> Executor<CustomT::ExecC> for App<WasmT, BankT, CustomT>
 where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-    QueryC: CustomQuery + DeserializeOwned,
+    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<BankT, CustomT>,
+    BankT: Bank,
+    CustomT: CustomHandler,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<ExecC>) -> AnyResult<AppResponse> {
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<CustomT::ExecC>) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -71,36 +81,89 @@ where
 }
 
 /// Utility to build App in stages. If particular items wont be set, defaults would be used
-#[derive(Derivative)]
-#[derivative(Default(bound = "", new = "true"))]
-pub struct AppBuilder<ExecC, QueryC> {
-    wasm: Option<Box<dyn Wasm<ExecC, QueryC>>>,
-    bank: Option<Box<dyn Bank>>,
+pub struct AppBuilder<Wasm, Bank, Custom> {
+    wasm: Wasm,
+    bank: Bank,
     api: Option<Box<dyn Api>>,
     storage: Option<Box<dyn Storage>>,
-    custom: Option<Box<dyn CustomHandler<ExecC, QueryC>>>,
+    custom: Custom,
     block: Option<BlockInfo>,
 }
 
-impl<ExecC, QueryC> AppBuilder<ExecC, QueryC>
+impl<ExecC, QueryC>
+    AppBuilder<WasmKeeper<ExecC, QueryC>, BankKeeper, PanickingCustomHandler<ExecC, QueryC>>
 where
-    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
-    QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
-    /// Overwrites default wasm executor. Panic if already set.
-    #[track_caller]
-    pub fn with_wasm(mut self, wasm: impl Wasm<ExecC, QueryC> + 'static) -> Self {
-        assert!(self.wasm.is_none(), "Wasm executor already overwritten");
-        self.wasm = Some(Box::new(wasm));
-        self
+    /// Creates builder with default components
+    pub fn new() -> Self {
+        Self {
+            wasm: WasmKeeper::<ExecC, QueryC>::new(),
+            bank: BankKeeper::new(),
+            api: None,
+            storage: None,
+            custom: PanickingCustomHandler::<ExecC, QueryC>::new(),
+            block: None,
+        }
+    }
+}
+
+impl<WasmT, BankT, CustomT> AppBuilder<WasmT, BankT, CustomT> {
+    /// Overwrites default wasm executor.
+    ///
+    /// At this point it is needed that new wasm implements some `Wasm` trait, but it doesn't need
+    /// to be bound to Bank or Custom yet - as those may change. The cross-components validation is
+    /// done on final building.
+    ///
+    /// Also it is possible to completely abandon trait bounding here which would not be bad idea,
+    /// however it might make the message on build creepy in many cases, so as for properly build
+    /// `App` we always want `Wasm` to be `Wasm`, some checks are done early.
+    pub fn with_wasm<B, C: CustomHandler, NewWasm: Wasm<B, C>>(
+        self,
+        wasm: NewWasm,
+    ) -> AppBuilder<NewWasm, BankT, CustomT> {
+        let AppBuilder {
+            bank,
+            api,
+            storage,
+            custom,
+            block,
+            ..
+        } = self;
+
+        AppBuilder {
+            wasm,
+            bank,
+            api,
+            storage,
+            custom,
+            block,
+        }
     }
 
     /// Overwrites default bank interface
-    #[track_caller]
-    pub fn with_bank(mut self, bank: impl Bank + 'static) -> Self {
-        assert!(self.bank.is_none(), "Bank interface already overwritten");
-        self.bank = Some(Box::new(bank));
-        self
+    pub fn with_bank<NewBank: Bank>(
+        mut self,
+        bank: NewBank,
+    ) -> AppBuilder<WasmT, NewBank, CustomT> {
+        let AppBuilder {
+            wasm,
+            api,
+            storage,
+            custom,
+            block,
+            ..
+        } = self;
+
+        AppBuilder {
+            wasm,
+            bank,
+            api,
+            storage,
+            custom,
+            block,
+        }
     }
 
     /// Overwrites default api interface
@@ -123,11 +186,35 @@ where
     }
 
     /// Overwrites default custom messages handler
-    #[track_caller]
-    pub fn with_custom(mut self, custom: impl CustomHandler<ExecC, QueryC> + 'static) -> Self {
-        assert!(self.custom.is_none(), "Custom handler already overwritten");
-        self.custom = Some(Box::new(custom));
-        self
+    ///
+    /// At this point it is needed that new custom implements some `CustomHandler` trait, but it doesn't need
+    /// to be bound to ExecC or QueryC yet - as those may change. The cross-components validation is
+    /// done on final building.
+    ///
+    /// Also it is possible to completely abandon trait bounding here which would not be bad idea,
+    /// however it might make the message on build creepy in many cases, so as for properly build
+    /// `App` we always want `Wasm` to be `Wasm`, some checks are done early.
+    pub fn with_custom<NewCustom: CustomHandler>(
+        self,
+        custom: NewCustom,
+    ) -> AppBuilder<WasmT, BankT, NewCustom> {
+        let AppBuilder {
+            wasm,
+            bank,
+            api,
+            storage,
+            block,
+            ..
+        } = self;
+
+        AppBuilder {
+            wasm,
+            bank,
+            api,
+            storage,
+            custom,
+            block,
+        }
     }
 
     /// Overwrites default initial block
@@ -141,17 +228,24 @@ where
         self
     }
 
-    pub fn build(self) -> App<ExecC, QueryC> {
-        let wasm = self.wasm.unwrap_or_else(|| Box::new(WasmKeeper::new()));
-        let bank = self.bank.unwrap_or_else(|| Box::new(BankKeeper::new()));
+    /// Builds final `App`. At this point all components type have to be properly related to each
+    /// other. If there are some generics related compilation error make sure, that all components
+    /// are properly relating to each other.
+    pub fn build(self) -> App<WasmT, BankT, CustomT>
+    where
+        WasmT: Wasm<BankT, CustomT>,
+        BankT: Bank,
+        CustomT: CustomHandler,
+    {
         let api = self.api.unwrap_or_else(|| Box::new(MockApi::default()));
         let storage = self.storage.unwrap_or_else(|| Box::new(MockStorage::new()));
         let block = self.block.unwrap_or_else(|| mock_env().block);
-        let custom = self
-            .custom
-            .unwrap_or_else(|| Box::new(PanickingCustomHandler));
 
-        let router = Router { wasm, bank, custom };
+        let router = Router {
+            wasm: self.wasm,
+            bank: self.bank,
+            custom: self.custom,
+        };
 
         App {
             router,
@@ -162,10 +256,13 @@ where
     }
 }
 
-impl<ExecC, QueryC> App<ExecC, QueryC>
+impl<WasmT, BankT, CustomT> App<WasmT, BankT, CustomT>
 where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-    QueryC: CustomQuery + DeserializeOwned,
+    CustomT::ExecC: std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<BankT, CustomT>,
+    BankT: Bank,
+    CustomT: CustomHandler,
 {
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
@@ -193,7 +290,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<CosmosMsg<ExecC>>,
+        msgs: Vec<CosmosMsg<CustomT::ExecC>>,
     ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -222,7 +319,7 @@ where
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecC>>) -> u64 {
         self.router.wasm.store_code(code) as u64
     }
 
@@ -251,23 +348,19 @@ where
     }
 }
 
-pub struct Router<ExecC, QueryC> {
-    pub(crate) wasm: Box<dyn Wasm<ExecC, QueryC>>,
-    pub(crate) bank: Box<dyn Bank>,
-    pub(crate) custom: Box<dyn CustomHandler<ExecC, QueryC>>,
+pub struct Router<Wasm, Bank, Custom> {
+    pub(crate) wasm: Wasm,
+    pub(crate) bank: Bank,
+    pub(crate) custom: Custom,
 }
 
-impl<ExecC, QueryC> Router<ExecC, QueryC>
-where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-    QueryC: CustomQuery + DeserializeOwned,
-{
+impl<WasmT, BankT, CustomT> Router<WasmT, BankT, CustomT> {
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a, ExecC, QueryC> {
+    ) -> RouterQuerier<'a, WasmT, BankT, CustomT> {
         RouterQuerier {
             router: self,
             api,
@@ -284,8 +377,16 @@ where
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        request: QueryRequest<QueryC>,
-    ) -> AnyResult<Binary> {
+        request: QueryRequest<CustomT::QueryC>,
+    ) -> AnyResult<Binary>
+    where
+        CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+        CustomT::ExecC:
+            std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
+        WasmT: Wasm<BankT, CustomT>,
+        BankT: Bank,
+        CustomT: CustomHandler,
+    {
         match request {
             QueryRequest::Wasm(req) => {
                 self.wasm
@@ -303,8 +404,14 @@ where
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: CosmosMsg<ExecC>,
-    ) -> AnyResult<AppResponse> {
+        msg: CosmosMsg<CustomT::ExecC>,
+    ) -> AnyResult<AppResponse>
+    where
+        CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema,
+        WasmT: Wasm<BankT, CustomT>,
+        BankT: Bank,
+        CustomT: CustomHandler,
+    {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
@@ -314,22 +421,16 @@ where
     }
 }
 
-pub struct RouterQuerier<'a, ExecC, QueryC>
-where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
-    router: &'a Router<ExecC, QueryC>,
+pub struct RouterQuerier<'a, Wasm, Bank, Custom> {
+    router: &'a Router<Wasm, Bank, Custom>,
     api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
 
-impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC>
-where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-{
+impl<'a, Wasm, Bank, Custom> RouterQuerier<'a, Wasm, Bank, Custom> {
     pub fn new(
-        router: &'a Router<ExecC, QueryC>,
+        router: &'a Router<Wasm, Bank, Custom>,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
@@ -343,13 +444,16 @@ where
     }
 }
 
-impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
+impl<'a, WasmT, BankT, CustomT> Querier for RouterQuerier<'a, WasmT, BankT, CustomT>
 where
-    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
-    QueryC: CustomQuery + DeserializeOwned,
+    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<BankT, CustomT>,
+    BankT: Bank,
+    CustomT: CustomHandler,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        let request: QueryRequest<QueryC> = match from_slice(bin_request) {
+        let request: QueryRequest<CustomT::QueryC> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -381,24 +485,23 @@ mod test {
 
     use super::*;
 
-    fn mock_app() -> App<Empty> {
-        AppBuilder::new().build()
-    }
-
-    fn custom_app() -> App<CustomMsg> {
-        AppBuilder::new().build()
-    }
-
-    fn get_balance<C>(app: &App<C>, addr: &Addr) -> Vec<Coin>
+    fn get_balance<WasmT, BankT, CustomT>(
+        app: &App<WasmT, BankT, CustomT>,
+        addr: &Addr,
+    ) -> Vec<Coin>
     where
-        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+        CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+        CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+        WasmT: Wasm<BankT, CustomT>,
+        BankT: Bank,
+        CustomT: CustomHandler,
     {
         app.wrap().query_all_balances(addr).unwrap()
     }
 
     #[test]
     fn update_block() {
-        let mut app = mock_app();
+        let mut app = App::new();
 
         let BlockInfo { time, height, .. } = app.block;
         app.update_block(next_block);
@@ -409,7 +512,7 @@ mod test {
 
     #[test]
     fn send_tokens() {
-        let mut app = mock_app();
+        let mut app = App::new();
 
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("receiver");
@@ -450,7 +553,7 @@ mod test {
 
     #[test]
     fn simple_contract() {
-        let mut app = mock_app();
+        let mut app = App::new();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
@@ -529,7 +632,7 @@ mod test {
 
     #[test]
     fn reflect_success() {
-        let mut app = custom_app();
+        let mut app = App::new();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
@@ -626,7 +729,7 @@ mod test {
 
     #[test]
     fn reflect_error() {
-        let mut app = custom_app();
+        let mut app = App::new();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
@@ -717,7 +820,7 @@ mod test {
 
     #[test]
     fn sudo_works() {
-        let mut app = mock_app();
+        let mut app = App::new();
 
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(100, "eth")];
@@ -751,7 +854,7 @@ mod test {
 
     #[test]
     fn reflect_submessage_reply_works() {
-        let mut app = custom_app();
+        let mut app = App::new();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
@@ -835,14 +938,17 @@ mod test {
         // TODO: check error?
     }
 
-    fn query_router<ExecC, QueryC>(
-        router: &Router<ExecC, QueryC>,
+    fn query_router<WasmT, BankT, CustomT>(
+        router: &Router<WasmT, BankT, CustomT>,
         api: &dyn Api,
         storage: &dyn Storage,
         rcpt: &Addr,
     ) -> Vec<Coin>
     where
-        ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
+        CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
+        WasmT: Wasm<BankT, CustomT>,
+        BankT: Bank,
+        CustomT: CustomHandler,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
@@ -852,9 +958,12 @@ mod test {
         val.amount
     }
 
-    fn query_app<C>(app: &App<C>, rcpt: &Addr) -> Vec<Coin>
+    fn query_app<WasmT, BankT, CustomT>(app: &App<WasmT, BankT, CustomT>, rcpt: &Addr) -> Vec<Coin>
     where
-        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+        CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
+        WasmT: Wasm<BankT, CustomT>,
+        BankT: Bank,
+        CustomT: CustomHandler,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
@@ -866,7 +975,7 @@ mod test {
 
     #[test]
     fn multi_level_bank_cache() {
-        let mut app = mock_app();
+        let mut app = App::new();
 
         // set personal balance
         let owner = Addr::unchecked("owner");
@@ -923,7 +1032,7 @@ mod test {
         // additional 20btc. Then beneficiary balance is checked - expeced value is 30btc. 10btc
         // would mean that sending tokens with message is not visible for this very message, and
         // 20btc means, that only such just send funds are visible.
-        let mut app = mock_app();
+        let mut app = App::new();
 
         let owner = Addr::unchecked("owner");
         let beneficiary = Addr::unchecked("beneficiary");
@@ -967,7 +1076,7 @@ mod test {
         // migrate fails if not admin
         // migrate succeeds if admin
         // check beneficiary updated
-        let mut app = mock_app();
+        let mut app = App::new();
 
         let owner = Addr::unchecked("owner");
         let beneficiary = Addr::unchecked("beneficiary");
@@ -1072,7 +1181,7 @@ mod test {
 
         #[test]
         fn no_submsg() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1098,7 +1207,7 @@ mod test {
 
         #[test]
         fn single_submsg() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1125,7 +1234,7 @@ mod test {
 
         #[test]
         fn single_submsg_no_reply() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1152,7 +1261,7 @@ mod test {
 
         #[test]
         fn single_no_submsg_data() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1179,7 +1288,7 @@ mod test {
 
         #[test]
         fn single_no_top_level_data() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1205,7 +1314,7 @@ mod test {
 
         #[test]
         fn single_submsg_reply_returns_none() {
-            let mut app = custom_app();
+            let mut app = App::new();
 
             // set personal balance
             let owner = Addr::unchecked("owner");
@@ -1261,7 +1370,7 @@ mod test {
 
         #[test]
         fn multiple_submsg() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1293,7 +1402,7 @@ mod test {
 
         #[test]
         fn multiple_submsg_no_reply() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1325,7 +1434,7 @@ mod test {
 
         #[test]
         fn multiple_submsg_mixed() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1357,7 +1466,7 @@ mod test {
 
         #[test]
         fn nested_submsg() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1403,7 +1512,7 @@ mod test {
 
         #[test]
         fn empty_attribute_key() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1433,7 +1542,7 @@ mod test {
 
         #[test]
         fn empty_attribute_value() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1463,7 +1572,7 @@ mod test {
 
         #[test]
         fn empty_event_attribute_key() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1492,7 +1601,7 @@ mod test {
 
         #[test]
         fn empty_event_attribute_value() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
@@ -1521,7 +1630,7 @@ mod test {
 
         #[test]
         fn too_short_event_type() {
-            let mut app = mock_app();
+            let mut app = App::new();
 
             let owner = Addr::unchecked("owner");
 
