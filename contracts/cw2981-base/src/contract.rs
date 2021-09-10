@@ -23,7 +23,7 @@ use cw2981::{CheckRoyaltiesResponse, RoyaltiesInfoResponse, TokenRoyaltiesMintMs
 use percentage::Percentage;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw2981-token-level-royalties";
+const CONTRACT_NAME: &str = "crates.io:cw2981-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -302,10 +302,10 @@ mod tests {
         let description = "Allows the owner to petrify anyone looking at him or her".to_string();
 
         let mint_msg = ExecuteMsg::Mint(TokenRoyaltiesMintMsg {
-            token_id: token_id.clone(),
+            token_id,
             owner: String::from("medusa"),
-            name: name.clone(),
-            description: Some(description.clone()),
+            name,
+            description: Some(description),
             image: None,
             royalty_payments: true,
             royalty_percentage: None,
