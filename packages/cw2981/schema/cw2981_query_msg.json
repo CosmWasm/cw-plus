@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cw2981QueryMsg",
+  "description": "These are the queries you will need to define royalty options",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "royalty_info"
+      ],
+      "properties": {
+        "royalty_info": {
+          "type": "object",
+          "required": [
+            "sale_price",
+            "token_id"
+          ],
+          "properties": {
+            "sale_price": {
+              "type": "integer",
+              "format": "uint128",
+              "minimum": 0.0
+            },
+            "token_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "check_royalties"
+      ],
+      "properties": {
+        "check_royalties": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

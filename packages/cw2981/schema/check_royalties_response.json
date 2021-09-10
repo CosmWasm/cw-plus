@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CheckRoyaltiesResponse",
+  "description": "Shows if the contract implements royalties if royalty_payments is true, marketplaces should pay them",
+  "type": "object",
+  "required": [
+    "royalty_payments"
+  ],
+  "properties": {
+    "royalty_payments": {
+      "type": "boolean"
+    }
+  }
+}

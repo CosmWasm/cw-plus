@@ -1,0 +1,18 @@
+[package]
+name = "cw2981"
+version = "0.8.1"
+authors = ["Alex Lynham <alex@lynh.am>"]
+edition = "2018"
+description = "Definition and types for the CosmWasm-2981 NFT royalties interface"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cw-plus"
+homepage = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
+
+[dependencies]
+cosmwasm-std = { version = "0.16.0" }
+schemars = "0.8.1"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+cosmwasm-schema = { version = "0.16.0" }

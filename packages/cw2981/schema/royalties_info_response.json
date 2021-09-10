@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoyaltiesInfoResponse",
+  "description": "Shows royalty info These are always the same, just the implementation changes depending on the granularity of the above queries.",
+  "type": "object",
+  "required": [
+    "address",
+    "royalty_amount"
+  ],
+  "properties": {
+    "address": {
+      "type": "string"
+    },
+    "royalty_amount": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    }
+  }
+}
