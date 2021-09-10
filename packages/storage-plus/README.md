@@ -188,6 +188,32 @@ fn demo() -> StdResult<()> {
 }
 ```
 
+### Key types
+
+A `Map` key can be anything that implements the `PrimaryKey` trait. There are a series of implementations of
+`PrimaryKey` already provided (see `packages/storage-plus/src/keys.rs`):
+
+ - `impl<'a> PrimaryKey<'a> for &'a [u8]`
+ - `impl<'a> PrimaryKey<'a> for &'a str`
+ - `impl<'a> PrimaryKey<'a> for Vec<u8>`
+ - `impl<'a> PrimaryKey<'a> for String`
+ - `impl<'a> PrimaryKey<'a> for Addr`
+ - `impl<'a> PrimaryKey<'a> for &'a Addr`
+ - `impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U)`
+ - `impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>> PrimaryKey<'a> for (T, U, V)`
+ - `impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>`
+
+That means that byte and string slices, byte vectors, and strings, can be conveniently used as keys.
+Moreover, some other types can be used as well, like addresses and addresses references, pairs and triples, and
+integer types.
+
+If the key represents and address, we suggest using `&Addr` for keys in storage, instead of `String` or string slices. This implies doing address validation
+through `addr_validate` on any address passed in via a message, to ensure it's a legitimate address, and not random text
+which will fail later.
+
+Thus, `pub fn addr_validate(&self, &str) -> Addr` in `deps.api` can be used for address validation, and the returned
+`Addr` can be conveniently used as key in a `Map` or similar structure.
+
 ### Composite Keys
 
 There are times when we want to use multiple items as a key, for example, when
