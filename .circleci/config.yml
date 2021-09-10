@@ -18,6 +18,7 @@ workflows:
       - contract_cw20_merkle_airdrop
       - contract_cw721_base
       - contract_cw1155_base
+      - contract_cw2981_base
       - package_controllers
       - package_cw0
       - package_cw1
@@ -27,6 +28,7 @@ workflows:
       - package_cw20
       - package_cw721
       - package_cw1155
+      - package_cw2981
       - package_multi_test
       - package_storage_plus
       - lint
