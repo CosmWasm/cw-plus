@@ -8,7 +8,10 @@ use crate::keys::{EmptyPrefix, Prefixer};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
-use cosmwasm_std::{StdError, StdResult, Storage};
+use cosmwasm_std::{
+    from_slice, to_vec, Addr, ContractResult, Empty, QuerierWrapper, QueryRequest, StdError,
+    StdResult, Storage, SystemResult, WasmQuery,
+};
 
 #[derive(Debug, Clone)]
 pub struct Map<'a, K, T> {
@@ -82,6 +85,41 @@ where
         E: From<StdError>,
     {
         self.key(k).update(store, action)
+    }
+
+    /// If you import the proper Map from the remote contract, this will let you read the data
+    /// from a remote contract in a type-safe way using WasmQuery::RawQuery
+    pub fn query(
+        &self,
+        querier: &QuerierWrapper,
+        remote_contract: Addr,
+        k: K,
+    ) -> StdResult<Option<T>> {
+        let key = self.key(k).storage_key.into();
+        let request: QueryRequest<Empty> = WasmQuery::Raw {
+            contract_addr: remote_contract.into(),
+            key,
+        }
+        .into();
+
+        let raw = to_vec(&request).map_err(|serialize_err| {
+            StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
+        })?;
+        let result = match querier.raw_query(&raw) {
+            SystemResult::Err(system_err) => Err(StdError::generic_err(format!(
+                "Querier system error: {}",
+                system_err
+            ))),
+            SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::generic_err(
+                format!("Querier contract error: {}", contract_err),
+            )),
+            SystemResult::Ok(ContractResult::Ok(value)) => Ok(value),
+        }?;
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            from_slice(&result).map(Some)
+        }
     }
 }
 

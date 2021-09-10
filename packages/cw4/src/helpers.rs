@@ -2,15 +2,15 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    from_slice, to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty, QuerierWrapper,
-    QueryRequest, StdError, StdResult, SystemResult, WasmMsg, WasmQuery,
+    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdResult, WasmMsg, WasmQuery,
 };
 
 use crate::msg::Cw4ExecuteMsg;
 use crate::query::HooksResponse;
 use crate::{
-    member_key, AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY,
+    AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, MEMBERS_KEY, TOTAL_KEY,
 };
+use cw_storage_plus::{Item, Map};
 
 /// Cw4Contract is a wrapper around Addr that provides a lot of helpers
 /// for working with cw4 contracts
@@ -62,14 +62,6 @@ impl Cw4Contract {
         .into())
     }
 
-    fn encode_raw_query<T: Into<Binary>>(&self, key: T) -> QueryRequest<Empty> {
-        WasmQuery::Raw {
-            contract_addr: self.addr().into(),
-            key: key.into(),
-        }
-        .into()
-    }
-
     /// Show the hooks
     pub fn hooks(&self, querier: &QuerierWrapper) -> StdResult<Vec<String>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Hooks {})?;
@@ -79,36 +71,14 @@ impl Cw4Contract {
 
     /// Read the total weight
     pub fn total_weight(&self, querier: &QuerierWrapper) -> StdResult<u64> {
-        let query = self.encode_raw_query(TOTAL_KEY.as_bytes());
-        querier.query(&query)
+        const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
+        TOTAL.query(querier, self.addr())
     }
 
     /// Check if this address is a member, and if so, with which weight
     pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
-        let path = member_key(addr.as_ref());
-        let query = self.encode_raw_query(path);
-
-        // We have to copy the logic of Querier.query to handle the empty case, and not
-        // try to decode empty result into a u64.
-        // TODO: add similar API on Querier - this is not the first time I came across it
-        let raw = to_vec(&query)?;
-        match querier.raw_query(&raw) {
-            SystemResult::Err(system_err) => Err(StdError::generic_err(format!(
-                "Querier system error: {}",
-                system_err
-            ))),
-            SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::generic_err(
-                format!("Querier contract error: {}", contract_err),
-            )),
-            SystemResult::Ok(ContractResult::Ok(value)) => {
-                // This is the only place we customize
-                if value.is_empty() {
-                    Ok(None)
-                } else {
-                    from_slice(&value)
-                }
-            }
-        }
+        const MEMBERS: Map<&Addr, u64> = Map::new(MEMBERS_KEY);
+        MEMBERS.query(querier, self.addr(), addr)
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
