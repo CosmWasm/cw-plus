@@ -11,12 +11,7 @@ use crate::snapshot_map::SnapshotMap;
 use crate::{IndexList, Path, Strategy};
 
 /// IndexedSnapshotMap works like a SnapshotMap but has a secondary index
-pub struct IndexedSnapshotMap<'a, K, T, I>
-where
-    K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone,
-    I: IndexList<T>,
-{
+pub struct IndexedSnapshotMap<'a, K, T, I> {
     pk_namespace: &'a [u8],
     primary: SnapshotMap<'a, K, T>,
     /// This is meant to be read directly to get the proper types, like:
@@ -24,12 +19,7 @@ where
     pub idx: I,
 }
 
-impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
-where
-    K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone,
-    I: IndexList<T>,
-{
+impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     pub fn new(
         pk_namespace: &'a str,
         checkpoints: &'a str,
