@@ -45,4 +45,4 @@ sha256sum cw20_atomic_swap.wasm
 ```
 
 Or for a production-ready (optimized) build, run a build command in the
-the repository root: https://github.com/CosmWasm/cosmwasm-plus#compiling.
+the repository root: https://github.com/CosmWasm/cw-plus#compiling.

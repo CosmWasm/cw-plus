@@ -62,4 +62,4 @@ sha256sum cw3_fixed_multisig.wasm
 ```
 
 Or for a production-ready (optimized) build, run a build command in the
-repository root: https://github.com/CosmWasm/cosmwasm-plus#compiling.
+repository root: https://github.com/CosmWasm/cw-plus#compiling.

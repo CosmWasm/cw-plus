@@ -31,11 +31,11 @@ with some clever use of the existing system.
 The first case is where we want to do action A, then finish our processing.
 A clear example is in `cw20-staking`, where we want to withdraw all rewards
 from the validator, then reinvest them, as one atomic operation.
-In this case, we simply [return 2 messages](https://github.com/CosmWasm/cosmwasm-plus/blob/master/contracts/cw20-staking/src/contract.rs#L383-L395),
+In this case, we simply [return 2 messages](https://github.com/CosmWasm/cw-plus/blob/master/contracts/cw20-staking/src/contract.rs#L383-L395),
 the first one calling the staking module, and the second one calling a 
 protected function on our own contract `_BondAllTokens`.
 At the beginning of `_BondAllTokens`, we ensure this is 
-[called by our own contract](https://github.com/CosmWasm/cosmwasm-plus/blob/master/contracts/cw20-staking/src/contract.rs#L408-L410)
+[called by our own contract](https://github.com/CosmWasm/cw-plus/blob/master/contracts/cw20-staking/src/contract.rs#L408-L410)
 to keep this a private callback and not a public entry point.
 
 The second case is where we want to get a result from the call, such as
@@ -136,11 +136,11 @@ registers on `cw4-group` to be informed of any changes to the voting set.
 This is essential to manage proper vote counts when the voting set changes
 while a proposal is open.
 
-* [Definition of the hooks in cw4 spec](https://github.com/CosmWasm/cosmwasm-plus/blob/c5e8fc92c0412fecd6cdd951c2c0261aa3c9445a/packages/cw4/src/hook.rs)
-* [Adding/removing hooks](https://github.com/CosmWasm/cosmwasm-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L156-L190) - which may be refactored into common code
-* [Dispatching updates to all registered hooks](https://github.com/CosmWasm/cosmwasm-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L91-L98)
-* [`cw3-flex-multisig` registers ExecuteMsg variant](https://github.com/CosmWasm/cosmwasm-plus/blob/0e58f7ebc24c8a16d27e04a0507bac2e11489d0b/contracts/cw3-flex-multisig/src/msg.rs#L126-L127)
-* [`cw3-flex-multisig` updates state based on the hook](https://github.com/CosmWasm/cosmwasm-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L276-L309)
+* [Definition of the hooks in cw4 spec](https://github.com/CosmWasm/cw-plus/blob/c5e8fc92c0412fecd6cdd951c2c0261aa3c9445a/packages/cw4/src/hook.rs)
+* [Adding/removing hooks](https://github.com/CosmWasm/cw-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L156-L190) - which may be refactored into common code
+* [Dispatching updates to all registered hooks](https://github.com/CosmWasm/cw-plus/blob/11400ddcc18d56961b0592a655e3da9cba7fd5d8/contracts/cw4-group/src/contract.rs#L91-L98)
+* [`cw3-flex-multisig` registers ExecuteMsg variant](https://github.com/CosmWasm/cw-plus/blob/0e58f7ebc24c8a16d27e04a0507bac2e11489d0b/contracts/cw3-flex-multisig/src/msg.rs#L126-L127)
+* [`cw3-flex-multisig` updates state based on the hook](https://github.com/CosmWasm/cw-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L276-L309)
 
 ### Listeners
 
@@ -177,7 +177,7 @@ He was just an admin briefly in the deploy script, so he could swap
 out the permissions once the other contracts were set up.
 
 As an example, we use this pattern when 
-[setting up the `cw3-flex-multisig` test cases](https://github.com/CosmWasm/cosmwasm-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L572-L591).
+[setting up the `cw3-flex-multisig` test cases](https://github.com/CosmWasm/cw-plus/blob/61f436c2203bde7770d9b13724e6548ba26615e7/contracts/cw3-flex-multisig/src/contract.rs#L572-L591).
 The multisig needs to know the group to query memberships, and the group
 needs to have a registered hook to the multisig to update it. We set them
 up as "OWNER" and then step down, leaving the contracts pointing to each other.
