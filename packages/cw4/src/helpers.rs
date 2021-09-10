@@ -71,14 +71,12 @@ impl Cw4Contract {
 
     /// Read the total weight
     pub fn total_weight(&self, querier: &QuerierWrapper) -> StdResult<u64> {
-        const TOTAL: Item<u64> = Item::new(TOTAL_KEY);
-        TOTAL.query(querier, self.addr())
+        Item::new(TOTAL_KEY).query(querier, self.addr())
     }
 
     /// Check if this address is a member, and if so, with which weight
     pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
-        const MEMBERS: Map<&Addr, u64> = Map::new(MEMBERS_KEY);
-        MEMBERS.query(querier, self.addr(), addr)
+        Map::new(MEMBERS_KEY).query(querier, self.addr(), addr)
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
