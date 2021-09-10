@@ -18,7 +18,7 @@ unordered channels for the version negotiation. Once established, it manages a l
 [ts-relayer](https://github.com/confio/ts-relayer) `ibc-setup ics20` command to create these.
 
 After there is at least one channel, you can send any CW20 token to this contract via the
-[receiver pattern](https://github.com/CosmWasm/cosmwasm-plus/blob/master/packages/cw20/README.md#receiver).
+[receiver pattern](https://github.com/CosmWasm/cw-plus/blob/master/packages/cw20/README.md#receiver).
 The receive message must contain the channel to send over and the remote address to send to. It may optionally
 include a custom timeout.
 

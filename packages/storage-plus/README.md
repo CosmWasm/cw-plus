@@ -6,7 +6,7 @@ more powerful and easy to use interfaces. Here are those interfaces.
 
 **Status: experimental**
 
-You currently should not be using this crate outside of the `cosmwasm-plus`
+You currently should not be using this crate outside of the `cw-plus`
 repo. This is a first draft of many types. We will update the status
 after they have been used more heavily and the interfaces stabilized.
 
@@ -386,7 +386,7 @@ fn demo() -> StdResult<()> {
 
 ## IndexedMap
 
-In cosmwasm-plus, there's currently one example of `IndexedMap` usage, in the `cw721-base` contract.
+In cw-plus, there's currently one example of `IndexedMap` usage, in the `cw721-base` contract.
 Let's use it to illustrate `IndexedMap` definition and usage.
 
 ### Definition

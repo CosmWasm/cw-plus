@@ -2,10 +2,10 @@
 
 Warning: **Alpha Software** Designed for internal use only.
 
-This is used for testing cosmwasm-plus contracts, we have no API
+This is used for testing cw-plus contracts, we have no API
 stability currently. We are working on refactoring it and will
 expose a more refined version for use in other contracts. (Ideally
-in cosmwasm-plus 0.9 or 0.10).
+in cw-plus 0.9 or 0.10).
 
 **Use at your own risk**
 
