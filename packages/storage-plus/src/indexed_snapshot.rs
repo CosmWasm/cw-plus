@@ -43,14 +43,6 @@ where
             idx: indexes,
         }
     }
-
-    pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
-        self.primary.add_checkpoint(store, height)
-    }
-
-    pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
-        self.primary.remove_checkpoint(store, height)
-    }
 }
 
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
@@ -59,6 +51,14 @@ where
     K: PrimaryKey<'a> + Prefixer<'a>,
     I: IndexList<T>,
 {
+    pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
+        self.primary.add_checkpoint(store, height)
+    }
+
+    pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
+        self.primary.remove_checkpoint(store, height)
+    }
+
     pub fn may_load_at_height(
         &self,
         store: &dyn Storage,

@@ -9,7 +9,7 @@ use crate::keys::{EmptyPrefix, PrimaryKey, U64Key};
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
-use crate::snapshot::ChangeSet;
+use crate::snapshot::{ChangeSet, Snapshot};
 use crate::{Bound, Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
@@ -17,16 +17,7 @@ use crate::{Bound, Prefixer, Strategy};
 /// What data is snapshotted depends on the Strategy.
 pub struct SnapshotMap<'a, K, T> {
     primary: Map<'a, K, T>,
-
-    // maps height to number of checkpoints (only used for selected)
-    checkpoints: Map<'a, U64Key, u32>,
-
-    // this stores all changes (key, height). Must differentiate between no data written,
-    // and explicit None (just inserted)
-    changelog: Map<'a, (K, U64Key), ChangeSet<T>>,
-
-    // How aggressive we are about checkpointing all data
-    strategy: Strategy,
+    snapshots: Snapshot<'a, K, T>,
 }
 
 impl<'a, K, T> SnapshotMap<'a, K, T> {
@@ -39,31 +30,22 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
     ) -> Self {
         SnapshotMap {
             primary: Map::new(pk),
-            checkpoints: Map::new(checkpoints),
-            changelog: Map::new(changelog),
-            strategy,
+            snapshots: Snapshot::new(checkpoints, changelog, strategy),
         }
     }
+}
 
+impl<'a, K, T> SnapshotMap<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + Prefixer<'a>,
+{
     pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
-        self.checkpoints
-            .update::<_, StdError>(store, height.into(), |count| {
-                Ok(count.unwrap_or_default() + 1)
-            })?;
-        Ok(())
+        self.snapshots.add_checkpoint(store, height)
     }
 
     pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
-        let count = self
-            .checkpoints
-            .may_load(store, height.into())?
-            .unwrap_or_default();
-        if count <= 1 {
-            self.checkpoints.remove(store, height.into());
-            Ok(())
-        } else {
-            self.checkpoints.save(store, height.into(), &(count - 1))
-        }
+        self.snapshots.remove_checkpoint(store, height)
     }
 }
 
@@ -84,45 +66,11 @@ where
         self.primary.sub_prefix(p)
     }
 
-    /// should_checkpoint looks at the strategy and determines if we want to checkpoint
-    fn should_checkpoint(&self, store: &dyn Storage, k: &K) -> StdResult<bool> {
-        match self.strategy {
-            Strategy::EveryBlock => Ok(true),
-            Strategy::Never => Ok(false),
-            Strategy::Selected => self.should_checkpoint_selected(store, k),
-        }
-    }
-
-    /// this is just pulled out from above for the selected block
-    fn should_checkpoint_selected(&self, store: &dyn Storage, k: &K) -> StdResult<bool> {
-        // most recent checkpoint
-        let checkpoint = self
-            .checkpoints
-            .range(store, None, None, Order::Descending)
-            .next()
-            .transpose()?;
-        if let Some((height, _)) = checkpoint {
-            // any changelog for the given key since then?
-            let start = Bound::inclusive(U64Key::from(height));
-            let first = self
-                .changelog
-                .prefix(k.clone())
-                .range(store, Some(start), None, Order::Ascending)
-                .next()
-                .transpose()?;
-            if first.is_none() {
-                // there must be at least one open checkpoint and no changelog for the given address since then
-                return Ok(true);
-            }
-        }
-        // otherwise, we don't save this
-        Ok(false)
-    }
-
     /// load old value and store changelog
     fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
         // if there is already data in the changelog for this key and block, do not write more
         if self
+            .snapshots
             .changelog
             .may_load(store, (k.clone(), U64Key::from(height)))?
             .is_some()
@@ -131,19 +79,20 @@ where
         }
         // otherwise, store the previous value
         let old = self.primary.may_load(store, k.clone())?;
-        self.changelog
+        self.snapshots
+            .changelog
             .save(store, (k, U64Key::from(height)), &ChangeSet { old })
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {
-        if self.should_checkpoint(store, &k)? {
+        if self.snapshots.should_checkpoint(store, &k)? {
             self.write_change(store, k.clone(), height)?;
         }
         self.primary.save(store, k, data)
     }
 
     pub fn remove(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
-        if self.should_checkpoint(store, &k)? {
+        if self.snapshots.should_checkpoint(store, &k)? {
             self.write_change(store, k.clone(), height)?;
         }
         self.primary.remove(store, k);
@@ -178,6 +127,7 @@ where
         // If None, there is no snapshot since that time.
         let start = Bound::inclusive(U64Key::new(height));
         let first = self
+            .snapshots
             .changelog
             .prefix(k.clone())
             .range(store, Some(start), None, Order::Ascending)
@@ -192,17 +142,8 @@ where
         }
     }
 
-    // If there is no checkpoint for that height, then we return StdError::NotFound
     pub fn assert_checkpointed(&self, store: &dyn Storage, height: u64) -> StdResult<()> {
-        let has = match self.strategy {
-            Strategy::EveryBlock => true,
-            Strategy::Never => false,
-            Strategy::Selected => self.checkpoints.may_load(store, height.into())?.is_some(),
-        };
-        match has {
-            true => Ok(()),
-            false => Err(StdError::not_found("checkpoint")),
-        }
+        self.snapshots.assert_checkpointed(store, height)
     }
 
     /// Loads the data, perform the specified action, and store the result
