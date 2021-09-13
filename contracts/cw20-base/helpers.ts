@@ -4,7 +4,7 @@ import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
 import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
 import { Slip10RawIndex } from "@cosmjs/crypto";
-import { toUtf8 } from "@cosmjs/encoding";
+import { toUtf8, toBase64 } from "@cosmjs/encoding";
 import path from "path";
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
@@ -268,13 +268,15 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
       return result.transactionHash;
     }
 
+    const jsonToBinary  = (json: Record<string, unknown>): string => { return toBase64(toUtf8(JSON.stringify(json)))}
+
     const send = async (senderAddress: string, recipient: string, amount: string, msg: Record<string, unknown>): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {send: {recipient, amount, msg: toUtf8(JSON.stringify(msg))}}, fees.exec);
+      const result = await client.execute(senderAddress, contractAddress, {send: {recipient, amount, msg: jsonToBinary(msg)}}, fees.exec);
       return result.transactionHash;
     }
 
     const sendFrom = async (senderAddress: string, owner: string, recipient: string, amount: string, msg: Record<string, unknown>): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, {send_from: {owner, recipient, amount, msg: toUtf8(JSON.stringify(msg))}}, fees.exec);
+      const result = await client.execute(senderAddress, contractAddress, {send_from: {owner, recipient, amount, msg: jsonToBinary(msg)}}, fees.exec);
       return result.transactionHash;
     }
 
