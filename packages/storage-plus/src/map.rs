@@ -9,8 +9,8 @@ use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, ContractResult, Empty, QuerierWrapper, QueryRequest, StdError,
-    StdResult, Storage, SystemResult, WasmQuery,
+    from_slice, to_vec, Addr, Binary, ContractResult, Empty, QuerierWrapper, QueryRequest,
+    StdError, StdResult, Storage, SystemResult, WasmQuery,
 };
 
 #[derive(Debug, Clone)]
@@ -96,30 +96,40 @@ where
         k: K,
     ) -> StdResult<Option<T>> {
         let key = self.key(k).storage_key.into();
-        let request: QueryRequest<Empty> = WasmQuery::Raw {
-            contract_addr: remote_contract.into(),
-            key,
-        }
-        .into();
-
-        let raw = to_vec(&request).map_err(|serialize_err| {
-            StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
-        })?;
-        let result = match querier.raw_query(&raw) {
-            SystemResult::Err(system_err) => Err(StdError::generic_err(format!(
-                "Querier system error: {}",
-                system_err
-            ))),
-            SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::generic_err(
-                format!("Querier contract error: {}", contract_err),
-            )),
-            SystemResult::Ok(ContractResult::Ok(value)) => Ok(value),
-        }?;
+        let result = query_raw(querier, remote_contract, key)?;
         if result.is_empty() {
             Ok(None)
         } else {
             from_slice(&result).map(Some)
         }
+    }
+}
+
+// TODO: move this to a better helpers location
+pub(crate) fn query_raw(
+    querier: &QuerierWrapper,
+    contract_addr: Addr,
+    key: Binary,
+) -> StdResult<Binary> {
+    let request: QueryRequest<Empty> = WasmQuery::Raw {
+        contract_addr: contract_addr.into(),
+        key,
+    }
+    .into();
+
+    let raw = to_vec(&request).map_err(|serialize_err| {
+        StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
+    })?;
+    match querier.raw_query(&raw) {
+        SystemResult::Err(system_err) => Err(StdError::generic_err(format!(
+            "Querier system error: {}",
+            system_err
+        ))),
+        SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::generic_err(format!(
+            "Querier contract error: {}",
+            contract_err
+        ))),
+        SystemResult::Ok(ContractResult::Ok(value)) => Ok(value),
     }
 }
 
