@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use thiserror::Error;
 
 use cosmwasm_std::{attr, Addr, Deps, DepsMut, MessageInfo, Response, StdError, StdResult};
@@ -58,12 +59,15 @@ impl<'a> Admin<'a> {
         }
     }
 
-    pub fn execute_update_admin(
+    pub fn execute_update_admin<C>(
         &self,
         deps: DepsMut,
         info: MessageInfo,
         new_admin: Option<Addr>,
-    ) -> Result<Response, AdminError> {
+    ) -> Result<Response<C>, AdminError>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         self.assert_admin(deps.as_ref(), &info.sender)?;
 
         let admin_str = match new_admin.as_ref() {
@@ -92,6 +96,7 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies, mock_info};
+    use cosmwasm_std::Empty;
 
     #[test]
     fn set_and_get_admin() {
@@ -155,14 +160,14 @@ mod tests {
         let info = mock_info(imposter.as_ref(), &[]);
         let new_admin = Some(friend.clone());
         let err = control
-            .execute_update_admin(deps.as_mut(), info, new_admin.clone())
+            .execute_update_admin::<Empty>(deps.as_mut(), info, new_admin.clone())
             .unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // owner can update
         let info = mock_info(owner.as_ref(), &[]);
         let res = control
-            .execute_update_admin(deps.as_mut(), info, new_admin)
+            .execute_update_admin::<Empty>(deps.as_mut(), info, new_admin)
             .unwrap();
         assert_eq!(0, res.messages.len());
 
