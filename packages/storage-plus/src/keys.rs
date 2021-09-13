@@ -19,6 +19,16 @@ pub trait PrimaryKey<'a>: Clone {
     }
 }
 
+// Empty / no primary key
+impl<'a> PrimaryKey<'a> for () {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        vec![]
+    }
+}
+
 impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Prefix = ();
     type SubPrefix = ();

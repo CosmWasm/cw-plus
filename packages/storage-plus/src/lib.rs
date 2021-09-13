@@ -10,6 +10,8 @@ mod map;
 mod path;
 mod prefix;
 mod snapshot;
+mod snapshot_item;
+mod snapshot_map;
 
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
@@ -27,5 +29,7 @@ pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
 pub use prefix::{range_with_prefix, Bound, Prefix};
+pub use snapshot::Strategy;
+pub use snapshot_item::SnapshotItem;
 #[cfg(feature = "iterator")]
-pub use snapshot::{SnapshotMap, Strategy};
+pub use snapshot_map::SnapshotMap;
