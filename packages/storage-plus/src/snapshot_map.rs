@@ -69,12 +69,7 @@ where
     /// load old value and store changelog
     fn write_change(&self, store: &mut dyn Storage, k: K, height: u64) -> StdResult<()> {
         // if there is already data in the changelog for this key and block, do not write more
-        if self
-            .snapshots
-            .changelog
-            .may_load(store, (k.clone(), U64Key::from(height)))?
-            .is_some()
-        {
+        if self.snapshots.has_changelog(store, k.clone(), height)? {
             return Ok(());
         }
         // otherwise, store the previous value

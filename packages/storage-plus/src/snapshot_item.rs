@@ -47,12 +47,7 @@ where
     /// load old value and store changelog
     fn write_change(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
         // if there is already data in the changelog for this block, do not write more
-        if self
-            .snapshots
-            .changelog
-            .may_load(store, ((), U64Key::from(height)))?
-            .is_some()
-        {
+        if self.snapshots.has_changelog(store, (), height)? {
             return Ok(());
         }
         // otherwise, store the previous value

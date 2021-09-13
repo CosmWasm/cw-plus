@@ -103,6 +103,13 @@ where
         }
     }
 
+    pub fn has_changelog(&self, store: &mut dyn Storage, key: K, height: u64) -> StdResult<bool> {
+        Ok(self
+            .changelog
+            .may_load(store, (key, U64Key::from(height)))?
+            .is_some())
+    }
+
     pub fn write_changelog(
         &self,
         store: &mut dyn Storage,
