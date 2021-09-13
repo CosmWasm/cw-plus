@@ -1,3 +1,10 @@
+mod item;
+mod map;
+
+pub use item::SnapshotItem;
+#[cfg(feature = "iterator")]
+pub use map::SnapshotMap;
+
 use crate::{Bound, Map, Prefixer, PrimaryKey, U64Key};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
