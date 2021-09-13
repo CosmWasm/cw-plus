@@ -120,6 +120,36 @@ where
         self.changelog
             .save(store, (key, U64Key::from(height)), &ChangeSet { old })
     }
+
+    // may_load_at_height reads historical data from given checkpoints.
+    // Only returns `Ok` if we have the data to be able to give the correct answer
+    // (Strategy::EveryBlock or Strategy::Selected and h is registered as checkpoint)
+    //
+    // If there is no checkpoint for that height, then we return StdError::NotFound
+    pub fn may_load_at_height(
+        &self,
+        store: &dyn Storage,
+        key: K,
+        height: u64,
+    ) -> StdResult<Option<Option<T>>> {
+        self.assert_checkpointed(store, height)?;
+
+        // this will look for the first snapshot of the given address >= given height
+        // If None, there is no snapshot since that time.
+        let start = Bound::inclusive(U64Key::new(height));
+        let first = self
+            .changelog
+            .prefix(key)
+            .range(store, Some(start), None, Order::Ascending)
+            .next();
+
+        if let Some(r) = first {
+            // if we found a match, return this last one
+            r.map(|(_, v)| Some(v.old))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]

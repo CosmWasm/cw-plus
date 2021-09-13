@@ -3,11 +3,10 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{Order, StdError, StdResult, Storage};
+use cosmwasm_std::{StdError, StdResult, Storage};
 
-use crate::keys::U64Key;
 use crate::snapshot::Snapshot;
-use crate::{Bound, Item, Strategy};
+use crate::{Item, Strategy};
 
 /// Item that maintains a snapshot of one or more checkpoints.
 /// We can query historical data as well as current state.
@@ -81,26 +80,11 @@ where
         self.primary.may_load(store)
     }
 
-    // may_load_at_height reads historical data from given checkpoints.
-    // Only returns `Ok` if we have the data to be able to give the correct answer
-    // (Strategy::EveryBlock or Strategy::Selected and h is registered as checkpoint)
-    //
-    // If there is no checkpoint for that height, then we return StdError::NotFound
     pub fn may_load_at_height(&self, store: &dyn Storage, height: u64) -> StdResult<Option<T>> {
-        self.assert_checkpointed(store, height)?;
+        let snapshot = self.snapshots.may_load_at_height(store, (), height)?;
 
-        // this will look for the first snapshot of the given address >= given height
-        // If None, there is no snapshot since that time.
-        let start = Bound::inclusive(U64Key::new(height));
-        let first = self
-            .snapshots
-            .changelog
-            .range(store, Some(start), None, Order::Ascending)
-            .next();
-
-        if let Some(r) = first {
-            // if we found a match, return this last one
-            r.map(|(_, v)| v.old)
+        if let Some(r) = snapshot {
+            Ok(r)
         } else {
             // otherwise, return current value
             self.may_load(store)
