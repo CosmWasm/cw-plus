@@ -6,7 +6,7 @@ use serde::Serialize;
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 
 use crate::keys::U64Key;
-use crate::snapshot::{ChangeSet, Snapshot};
+use crate::snapshot::Snapshot;
 use crate::{Bound, Item, Strategy};
 
 /// Item that maintains a snapshot of one or more checkpoints.
@@ -57,9 +57,7 @@ where
         }
         // otherwise, store the previous value
         let old = self.primary.may_load(store)?;
-        self.snapshots
-            .changelog
-            .save(store, ((), U64Key::from(height)), &ChangeSet { old })
+        self.snapshots.write_changelog(store, (), height, old)
     }
 
     pub fn save(&self, store: &mut dyn Storage, data: &T, height: u64) -> StdResult<()> {

@@ -9,7 +9,7 @@ use crate::keys::{EmptyPrefix, PrimaryKey, U64Key};
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
-use crate::snapshot::{ChangeSet, Snapshot};
+use crate::snapshot::Snapshot;
 use crate::{Bound, Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
@@ -79,9 +79,7 @@ where
         }
         // otherwise, store the previous value
         let old = self.primary.may_load(store, k.clone())?;
-        self.snapshots
-            .changelog
-            .save(store, (k, U64Key::from(height)), &ChangeSet { old })
+        self.snapshots.write_changelog(store, k, height, old)
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T, height: u64) -> StdResult<()> {

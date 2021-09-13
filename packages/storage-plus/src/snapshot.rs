@@ -102,6 +102,17 @@ where
             false => Err(StdError::not_found("checkpoint")),
         }
     }
+
+    pub fn write_changelog(
+        &self,
+        store: &mut dyn Storage,
+        key: K,
+        height: u64,
+        old: Option<T>,
+    ) -> StdResult<()> {
+        self.changelog
+            .save(store, (key, U64Key::from(height)), &ChangeSet { old })
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
