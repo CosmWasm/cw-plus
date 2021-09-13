@@ -46,6 +46,12 @@ impl<Exec, Query> PanickingCustomHandler<Exec, Query> {
     }
 }
 
+impl<Exec, Query> Default for PanickingCustomHandler<Exec, Query> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Exec, Query> CustomHandler for PanickingCustomHandler<Exec, Query>
 where
     Exec: std::fmt::Debug,

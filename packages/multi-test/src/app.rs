@@ -26,8 +26,13 @@ pub fn next_block(block: &mut BlockInfo) {
 }
 
 /// Type alias for default build `App` to make its storing simpler in typical scenario
-pub type BasicApp<ExecC = Empty, QueryC = Empty> =
-    App<BankKeeper, MockApi, PanickingCustomHandler<ExecC, QueryC>, WasmKeeper<ExecC, QueryC>>;
+pub type BasicApp<ExecC = Empty, QueryC = Empty> = App<
+    BankKeeper,
+    MockApi,
+    MockStorage,
+    PanickingCustomHandler<ExecC, QueryC>,
+    WasmKeeper<ExecC, QueryC>,
+>;
 
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
@@ -35,13 +40,20 @@ pub type BasicApp<ExecC = Empty, QueryC = Empty> =
 pub struct App<
     Bank = BankKeeper,
     Api = MockApi,
+    Storage = MockStorage,
     Custom = PanickingCustomHandler<Empty, Empty>,
     Wasm = WasmKeeper<Empty, Empty>,
 > {
     router: Router<Bank, Custom, Wasm>,
     api: Api,
-    storage: Box<dyn Storage>,
+    storage: Storage,
     block: BlockInfo,
+}
+
+impl Default for BasicApp {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BasicApp {
@@ -61,29 +73,32 @@ where
     AppBuilder::new_custom().build()
 }
 
-impl<BankT, ApiT, CustomT, WasmT> Querier for App<BankT, ApiT, CustomT, WasmT>
+impl<BankT, ApiT, StorageT, CustomT, WasmT> Querier for App<BankT, ApiT, StorageT, CustomT, WasmT>
 where
     CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
     BankT: Bank,
     ApiT: Api,
+    StorageT: Storage,
     CustomT: CustomHandler,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
-            .querier(&self.api, &*self.storage, &self.block)
+            .querier(&self.api, &self.storage, &self.block)
             .raw_query(bin_request)
     }
 }
 
-impl<BankT, ApiT, CustomT, WasmT> Executor<CustomT::ExecC> for App<BankT, ApiT, CustomT, WasmT>
+impl<BankT, ApiT, StorageT, CustomT, WasmT> Executor<CustomT::ExecC>
+    for App<BankT, ApiT, StorageT, CustomT, WasmT>
 where
     CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
     BankT: Bank,
     ApiT: Api,
+    StorageT: Storage,
     CustomT: CustomHandler,
 {
     fn execute(&mut self, sender: Addr, msg: CosmosMsg<CustomT::ExecC>) -> AnyResult<AppResponse> {
@@ -94,17 +109,37 @@ where
 }
 
 /// Utility to build App in stages. If particular items wont be set, defaults would be used
-pub struct AppBuilder<Bank, Api, Custom, Wasm> {
+pub struct AppBuilder<Bank, Api, Storage, Custom, Wasm> {
     wasm: Wasm,
     bank: Bank,
     api: Api,
-    storage: Option<Box<dyn Storage>>,
+    storage: Storage,
     custom: Custom,
-    block: Option<BlockInfo>,
+    block: BlockInfo,
+}
+
+impl Default
+    for AppBuilder<
+        BankKeeper,
+        MockApi,
+        MockStorage,
+        PanickingCustomHandler<Empty, Empty>,
+        WasmKeeper<Empty, Empty>,
+    >
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl
-    AppBuilder<BankKeeper, MockApi, PanickingCustomHandler<Empty, Empty>, WasmKeeper<Empty, Empty>>
+    AppBuilder<
+        BankKeeper,
+        MockApi,
+        MockStorage,
+        PanickingCustomHandler<Empty, Empty>,
+        WasmKeeper<Empty, Empty>,
+    >
 {
     /// Creates builder with default components working with empty exec and query messages.
     pub fn new() -> Self {
@@ -112,9 +147,9 @@ impl
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),
             api: MockApi::default(),
-            storage: None,
+            storage: MockStorage::new(),
             custom: PanickingCustomHandler::new(),
-            block: None,
+            block: mock_env().block,
         }
     }
 }
@@ -123,6 +158,7 @@ impl<ExecC, QueryC>
     AppBuilder<
         BankKeeper,
         MockApi,
+        MockStorage,
         PanickingCustomHandler<ExecC, QueryC>,
         WasmKeeper<ExecC, QueryC>,
     >
@@ -137,14 +173,14 @@ where
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),
             api: MockApi::default(),
-            storage: None,
+            storage: MockStorage::new(),
             custom: PanickingCustomHandler::new(),
-            block: None,
+            block: mock_env().block,
         }
     }
 }
 
-impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
+impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, CustomT, WasmT> {
     /// Overwrites default wasm executor.
     ///
     /// At this point it is needed that new wasm implements some `Wasm` trait, but it doesn't need
@@ -157,7 +193,7 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
     pub fn with_wasm<B, C: CustomHandler, NewWasm: Wasm<C::ExecC, C::QueryC>>(
         self,
         wasm: NewWasm,
-    ) -> AppBuilder<BankT, ApiT, CustomT, NewWasm> {
+    ) -> AppBuilder<BankT, ApiT, StorageT, CustomT, NewWasm> {
         let AppBuilder {
             bank,
             api,
@@ -181,7 +217,7 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
     pub fn with_bank<NewBank: Bank>(
         self,
         bank: NewBank,
-    ) -> AppBuilder<NewBank, ApiT, CustomT, WasmT> {
+    ) -> AppBuilder<NewBank, ApiT, StorageT, CustomT, WasmT> {
         let AppBuilder {
             wasm,
             api,
@@ -202,7 +238,10 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
     }
 
     /// Overwrites default api interface
-    pub fn with_api<NewApi: Api>(self, api: NewApi) -> AppBuilder<BankT, NewApi, CustomT, WasmT> {
+    pub fn with_api<NewApi: Api>(
+        self,
+        api: NewApi,
+    ) -> AppBuilder<BankT, NewApi, StorageT, CustomT, WasmT> {
         let AppBuilder {
             wasm,
             bank,
@@ -223,14 +262,27 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
     }
 
     /// Overwrites default storage interface
-    #[track_caller]
-    pub fn with_storage(mut self, storage: impl Storage + 'static) -> Self {
-        assert!(
-            self.storage.is_none(),
-            "Storage interface already overwritten"
-        );
-        self.storage = Some(Box::new(storage));
-        self
+    pub fn with_storage<NewStorage: Storage>(
+        self,
+        storage: NewStorage,
+    ) -> AppBuilder<BankT, ApiT, NewStorage, CustomT, WasmT> {
+        let AppBuilder {
+            wasm,
+            api,
+            bank,
+            custom,
+            block,
+            ..
+        } = self;
+
+        AppBuilder {
+            wasm,
+            bank,
+            api,
+            storage,
+            custom,
+            block,
+        }
     }
 
     /// Overwrites default custom messages handler
@@ -245,7 +297,7 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
     pub fn with_custom<NewCustom: CustomHandler>(
         self,
         custom: NewCustom,
-    ) -> AppBuilder<BankT, ApiT, NewCustom, WasmT> {
+    ) -> AppBuilder<BankT, ApiT, StorageT, NewCustom, WasmT> {
         let AppBuilder {
             wasm,
             bank,
@@ -266,30 +318,22 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
     }
 
     /// Overwrites default initial block
-    #[track_caller]
     pub fn with_block(mut self, block: BlockInfo) -> Self {
-        assert!(
-            self.block.is_none(),
-            "Initial block info already overwritten"
-        );
-        self.block = Some(block);
+        self.block = block;
         self
     }
 
     /// Builds final `App`. At this point all components type have to be properly related to each
     /// other. If there are some generics related compilation error make sure, that all components
     /// are properly relating to each other.
-    pub fn build(self) -> App<BankT, ApiT, CustomT, WasmT>
+    pub fn build(self) -> App<BankT, ApiT, StorageT, CustomT, WasmT>
     where
         BankT: Bank,
         ApiT: Api,
+        StorageT: Storage,
         CustomT: CustomHandler,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
     {
-        let api = self.api;
-        let storage = self.storage.unwrap_or_else(|| Box::new(MockStorage::new()));
-        let block = self.block.unwrap_or_else(|| mock_env().block);
-
         let router = Router {
             wasm: self.wasm,
             bank: self.bank,
@@ -298,20 +342,21 @@ impl<BankT, ApiT, CustomT, WasmT> AppBuilder<BankT, ApiT, CustomT, WasmT> {
 
         App {
             router,
-            api,
-            storage,
-            block,
+            api: self.api,
+            storage: self.storage,
+            block: self.block,
         }
     }
 }
 
-impl<BankT, ApiT, CustomT, WasmT> App<BankT, ApiT, CustomT, WasmT>
+impl<BankT, ApiT, StorageT, CustomT, WasmT> App<BankT, ApiT, StorageT, CustomT, WasmT>
 where
     CustomT::ExecC: std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
     BankT: Bank,
     ApiT: Api,
+    StorageT: Storage,
     CustomT: CustomHandler,
 {
     pub fn set_block(&mut self, block: BlockInfo) {
@@ -353,7 +398,7 @@ where
             storage,
         } = self;
 
-        transactional(&mut **storage, |write_cache, _| {
+        transactional(&mut *storage, |write_cache, _| {
             msgs.into_iter()
                 .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg))
                 .collect()
@@ -364,7 +409,7 @@ where
     pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> AnyResult<()> {
         self.router
             .bank
-            .init_balance(&mut *self.storage, account, amount)
+            .init_balance(&mut self.storage, account, amount)
     }
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
@@ -375,7 +420,7 @@ where
 
     /// This allows to get `ContractData` for specific contract
     pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
-        self.router.wasm.contract_data(&*self.storage, address)
+        self.router.wasm.contract_data(&self.storage, address)
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
@@ -390,7 +435,7 @@ where
         self.router.wasm.sudo(
             &self.api,
             contract_addr.into(),
-            &mut *self.storage,
+            &mut self.storage,
             &self.router,
             &self.block,
             msg,
@@ -535,8 +580,8 @@ mod test {
 
     use super::*;
 
-    fn get_balance<BankT, ApiT, CustomT, WasmT>(
-        app: &App<BankT, ApiT, CustomT, WasmT>,
+    fn get_balance<BankT, ApiT, StorageT, CustomT, WasmT>(
+        app: &App<BankT, ApiT, StorageT, CustomT, WasmT>,
         addr: &Addr,
     ) -> Vec<Coin>
     where
@@ -545,6 +590,7 @@ mod test {
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
         BankT: Bank,
         ApiT: Api,
+        StorageT: Storage,
         CustomT: CustomHandler,
     {
         app.wrap().query_all_balances(addr).unwrap()
@@ -1009,8 +1055,8 @@ mod test {
         val.amount
     }
 
-    fn query_app<BankT, ApiT, CustomT, WasmT>(
-        app: &App<BankT, ApiT, CustomT, WasmT>,
+    fn query_app<BankT, ApiT, StorageT, CustomT, WasmT>(
+        app: &App<BankT, ApiT, StorageT, CustomT, WasmT>,
         rcpt: &Addr,
     ) -> Vec<Coin>
     where
@@ -1020,6 +1066,7 @@ mod test {
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
         BankT: Bank,
         ApiT: Api,
+        StorageT: Storage,
         CustomT: CustomHandler,
     {
         let query = BankQuery::AllBalances {
@@ -1041,7 +1088,7 @@ mod test {
         app.init_bank_balance(&owner, init_funds).unwrap();
 
         // cache 1 - send some tokens
-        let mut cache = StorageTransaction::new(&*app.storage);
+        let mut cache = StorageTransaction::new(&app.storage);
         let msg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
@@ -1076,7 +1123,7 @@ mod test {
         .unwrap();
 
         // apply first to router
-        cache.prepare().commit(&mut *app.storage);
+        cache.prepare().commit(&mut app.storage);
 
         let committed = query_app(&app, &rcpt);
         assert_eq!(coins(37, "eth"), committed);
