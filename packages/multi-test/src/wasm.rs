@@ -4,8 +4,8 @@ use std::ops::Deref;
 
 use cosmwasm_std::{
     Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
-    CustomQuery, Deps, DepsMut, Empty, Env, Event, MessageInfo, Order, Querier, QuerierWrapper,
-    Reply, ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, WasmMsg, WasmQuery,
+    CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier, QuerierWrapper, Reply,
+    ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
@@ -47,7 +47,7 @@ pub struct ContractData {
     pub created: u64,
 }
 
-pub trait Wasm<Bank, Custom: CustomHandler> {
+pub trait Wasm<ExecC, QueryC> {
     /// Handles all WasmQuery requests
     fn query(
         &self,
@@ -59,61 +59,63 @@ pub trait Wasm<Bank, Custom: CustomHandler> {
     ) -> AnyResult<Binary>;
 
     /// Handles all WasmMsg messages
-    fn execute(
+    fn execute<BankT, CustomT>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, Bank, Custom>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
     ) -> AnyResult<AppResponse>
     where
-        Self: Sized;
+        Self: Sized,
+        BankT: Bank,
+        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>;
 
     // Add a new contract. Must be done on the base object, when no contracts running
-    fn store_code(&mut self, code: Box<dyn Contract<Custom::ExecC>>) -> usize;
+    fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> usize;
 
     // Helper for querying for specific contract data
     fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData>;
 
     /// Admin interface, cannot be called via CosmosMsg
-    fn sudo(
+    fn sudo<BankT, CustomT>(
         &self,
         api: &dyn Api,
         contract_addr: Addr,
         storage: &mut dyn Storage,
-        router: &Router<Self, Bank, Custom>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<AppResponse>
     where
-        Self: Sized;
+        Self: Sized,
+        BankT: Bank,
+        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>;
 }
 
 pub struct WasmKeeper<ExecC, QueryC> {
     /// code is in-memory lookup that stands in for wasm code
     /// this can only be edited on the WasmRouter, and just read in caches
     codes: HashMap<usize, Box<dyn Contract<ExecC>>>,
-    /// Just marker to make type elision fork when using it as `Wasm` trait
-    _q: std::marker::PhantomData<QueryC>,
+    /// Just markers to make type elision fork when using it as `Wasm` trait
+    _p: std::marker::PhantomData<(ExecC, QueryC)>,
 }
 
 impl<ExecC, QueryC> Default for WasmKeeper<ExecC, QueryC> {
     fn default() -> Self {
         Self {
             codes: HashMap::default(),
-            _q: std::marker::PhantomData,
+            _p: std::marker::PhantomData,
         }
     }
 }
 
-impl<BankT, CustomT> Wasm<BankT, CustomT> for WasmKeeper<CustomT::ExecC, CustomT::QueryC>
+impl<ExecC, QueryC> Wasm<ExecC, QueryC> for WasmKeeper<ExecC, QueryC>
 where
-    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    BankT: Bank,
-    CustomT: CustomHandler,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     fn query(
         &self,
@@ -136,15 +138,19 @@ where
         }
     }
 
-    fn execute(
+    fn execute<BankT, CustomT>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> AnyResult<AppResponse> {
+    ) -> AnyResult<AppResponse>
+    where
+        BankT: Bank,
+        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
+    {
         let (resender, res, custom_event) =
             self.execute_wasm(api, storage, router, block, sender, msg)?;
 
@@ -152,7 +158,7 @@ where
         self.process_response(api, router, storage, block, resender, res, msgs)
     }
 
-    fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecC>>) -> usize {
+    fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> usize {
         let idx = self.codes.len() + 1;
         self.codes.insert(idx, code);
         idx
@@ -162,15 +168,19 @@ where
         self.load_contract(storage, address)
     }
 
-    fn sudo(
+    fn sudo<BankT, CustomT>(
         &self,
         api: &dyn Api,
         contract: Addr,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<AppResponse> {
+    ) -> AnyResult<AppResponse>
+    where
+        BankT: Bank,
+        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
+    {
         let custom_event = Event::new("sudo").add_attribute(CONTRACT_ATTR, &contract);
 
         let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
@@ -217,7 +227,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         sender: T,
         recipient: String,
@@ -245,7 +255,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
@@ -253,8 +263,6 @@ where
     where
         BankT: Bank,
         CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-        ExecC: DeserializeOwned,
-        QueryC: 'static,
     {
         match wasm_msg {
             WasmMsg::Execute {
@@ -389,7 +397,7 @@ where
     fn execute_submsg<BankT, CustomT>(
         &self,
         api: &dyn Api,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -448,7 +456,7 @@ where
     fn _reply<BankT, CustomT>(
         &self,
         api: &dyn Api,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -521,7 +529,7 @@ where
     fn process_response<BankT, CustomT>(
         &self,
         api: &dyn Api,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -579,7 +587,7 @@ where
         api: &dyn Api,
         storage: &mut dyn Storage,
         address: Addr,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -587,8 +595,6 @@ where
     where
         BankT: Bank,
         CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-        ExecC: DeserializeOwned,
-        QueryC: 'static,
     {
         Self::verify_response(self.with_storage(
             api,
@@ -605,7 +611,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -613,8 +619,6 @@ where
     where
         BankT: Bank,
         CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-        ExecC: DeserializeOwned,
-        QueryC: 'static,
     {
         Self::verify_response(self.with_storage(
             api,
@@ -631,7 +635,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         reply: Reply,
     ) -> AnyResult<Response<ExecC>>
@@ -654,7 +658,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<ExecC>>
@@ -677,7 +681,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<ExecC>>
@@ -736,7 +740,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<Self, BankT, CustomT>,
+        router: &Router<BankT, CustomT, Self>,
         block: &BlockInfo,
         address: Addr,
         action: F,
@@ -919,12 +923,8 @@ mod test {
 
     use super::*;
 
-    fn mock_keeper() -> WasmKeeper<Empty, Empty> {
-        WasmKeeper::new()
-    }
-
     fn mock_router(
-    ) -> Router<WasmKeeper<Empty, Empty>, BankKeeper, PanickingCustomHandler<Empty, Empty>> {
+    ) -> Router<BankKeeper, PanickingCustomHandler<Empty, Empty>, WasmKeeper<Empty, Empty>> {
         Router {
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),
@@ -936,7 +936,7 @@ mod test {
     fn register_contract() {
         let api = MockApi::default();
         let mut wasm_storage = MockStorage::new();
-        let mut keeper = mock_keeper();
+        let mut keeper = WasmKeeper::new();
         let block = mock_env().block;
         let code_id = keeper.store_code(error::contract());
 
@@ -1026,7 +1026,7 @@ mod test {
     #[test]
     fn contract_send_coins() {
         let api = MockApi::default();
-        let mut keeper = mock_keeper();
+        let mut keeper = WasmKeeper::new();
         let block = mock_env().block;
         let code_id = keeper.store_code(payout::contract());
 
@@ -1137,7 +1137,7 @@ mod test {
     #[test]
     fn multi_level_wasm_cache() {
         let api = MockApi::default();
-        let mut keeper = mock_keeper();
+        let mut keeper = WasmKeeper::new();
         let block = mock_env().block;
         let code_id = keeper.store_code(payout::contract());
 
