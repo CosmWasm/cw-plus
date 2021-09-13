@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
+use cosmwasm_std::{to_vec, Addr, QuerierWrapper, StdError, StdResult, Storage, WasmQuery};
 
 use crate::helpers::{may_deserialize, must_deserialize};
 
@@ -71,6 +71,18 @@ where
         let output = action(input)?;
         self.save(store, &output)?;
         Ok(output)
+    }
+
+    /// If you import the proper Item from the remote contract, this will let you read the data
+    /// from a remote contract in a type-safe way using WasmQuery::RawQuery.
+    ///
+    /// Note that we expect an Item to be set, and error if there is no data there
+    pub fn query(&self, querier: &QuerierWrapper, remote_contract: Addr) -> StdResult<T> {
+        let request = WasmQuery::Raw {
+            contract_addr: remote_contract.into(),
+            key: self.storage_key.into(),
+        };
+        querier.query(&request.into())
     }
 }
 

@@ -2,13 +2,14 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+use crate::helpers::query_raw;
 use crate::keys::PrimaryKey;
 #[cfg(feature = "iterator")]
 use crate::keys::{EmptyPrefix, Prefixer};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
-use cosmwasm_std::{StdError, StdResult, Storage};
+use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
 pub struct Map<'a, K, T> {
@@ -82,6 +83,23 @@ where
         E: From<StdError>,
     {
         self.key(k).update(store, action)
+    }
+
+    /// If you import the proper Map from the remote contract, this will let you read the data
+    /// from a remote contract in a type-safe way using WasmQuery::RawQuery
+    pub fn query(
+        &self,
+        querier: &QuerierWrapper,
+        remote_contract: Addr,
+        k: K,
+    ) -> StdResult<Option<T>> {
+        let key = self.key(k).storage_key.into();
+        let result = query_raw(querier, remote_contract, key)?;
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            from_slice(&result).map(Some)
+        }
     }
 }
 

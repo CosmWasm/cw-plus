@@ -12,7 +12,7 @@ where
     T: Serialize + DeserializeOwned,
 {
     /// all namespaces prefixes and concatenated with the key
-    storage_key: Vec<u8>,
+    pub(crate) storage_key: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
 }

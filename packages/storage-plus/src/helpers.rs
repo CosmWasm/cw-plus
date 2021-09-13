@@ -7,7 +7,10 @@
 use serde::de::DeserializeOwned;
 use std::any::type_name;
 
-use cosmwasm_std::{from_slice, StdError, StdResult};
+use cosmwasm_std::{
+    from_slice, to_vec, Addr, Binary, ContractResult, Empty, QuerierWrapper, QueryRequest,
+    StdError, StdResult, SystemResult, WasmQuery,
+};
 
 /// may_deserialize parses json bytes from storage (Option), returning Ok(None) if no data present
 ///
@@ -82,6 +85,37 @@ pub(crate) fn encode_length(namespace: &[u8]) -> [u8; 2] {
     }
     let length_bytes = (namespace.len() as u32).to_be_bytes();
     [length_bytes[2], length_bytes[3]]
+}
+
+/// Use this in Map/SnapshotMap/etc when you want to provide a QueryRaw helper.
+/// This is similar to querier.query(WasmQuery::Raw{}), except it does NOT parse the
+/// result, but return a possibly empty Binary to be handled by the calling code.
+/// That is essential to handle b"" as None.
+pub(crate) fn query_raw(
+    querier: &QuerierWrapper,
+    contract_addr: Addr,
+    key: Binary,
+) -> StdResult<Binary> {
+    let request: QueryRequest<Empty> = WasmQuery::Raw {
+        contract_addr: contract_addr.into(),
+        key,
+    }
+    .into();
+
+    let raw = to_vec(&request).map_err(|serialize_err| {
+        StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
+    })?;
+    match querier.raw_query(&raw) {
+        SystemResult::Err(system_err) => Err(StdError::generic_err(format!(
+            "Querier system error: {}",
+            system_err
+        ))),
+        SystemResult::Ok(ContractResult::Err(contract_err)) => Err(StdError::generic_err(format!(
+            "Querier contract error: {}",
+            contract_err
+        ))),
+        SystemResult::Ok(ContractResult::Ok(value)) => Ok(value),
+    }
 }
 
 #[cfg(test)]
