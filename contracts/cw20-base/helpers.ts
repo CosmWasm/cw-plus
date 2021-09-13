@@ -4,6 +4,7 @@ import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
 import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
 import { Slip10RawIndex } from "@cosmjs/crypto";
+import { toUtf8, toBase64 } from "@cosmjs/encoding";
 import path from "path";
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
@@ -16,13 +17,13 @@ import path from "path";
  *
  * Get the mnemonic:
  *   await useOptions(pebblenetOptions).recoverMnemonic(password);
- * 
+ *
  * Create contract:
  *   const contract = CW20(client, pebblenetOptions.fees);
- * 
+ *
  * Upload contract:
  *   const codeId = await contract.upload(addr);
- * 
+ *
  * Instantiate contract example:
  *   const initMsg = {
  *     name: "Potato Coin",
@@ -185,10 +186,12 @@ interface CW20Instance {
   // actions
   mint: (txSigner: string, recipient: string, amount: string) => Promise<string>
   transfer: (txSigner: string, recipient: string, amount: string) => Promise<string>
+  send: (txSigner: string, recipient: string, amount: string, msg: Record<string, unknown>) => Promise<string>
   burn: (txSigner: string, amount: string) => Promise<string>
   increaseAllowance: (txSigner: string, recipient: string, amount: string) => Promise<string>
   decreaseAllowance: (txSigner: string, recipient: string, amount: string) => Promise<string>
   transferFrom: (txSigner: string, owner: string, recipient: string, amount: string) => Promise<string>
+  sendFrom: (txSigner: string, owner: string, recipient: string, amount: string, msg: Record<string, unknown>) => Promise<string>
 }
 
 interface CW20Contract {
@@ -265,6 +268,18 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
       return result.transactionHash;
     }
 
+    const jsonToBinary  = (json: Record<string, unknown>): string => { return toBase64(toUtf8(JSON.stringify(json)))}
+
+    const send = async (senderAddress: string, recipient: string, amount: string, msg: Record<string, unknown>): Promise<string> => {
+      const result = await client.execute(senderAddress, contractAddress, {send: {recipient, amount, msg: jsonToBinary(msg)}}, fees.exec);
+      return result.transactionHash;
+    }
+
+    const sendFrom = async (senderAddress: string, owner: string, recipient: string, amount: string, msg: Record<string, unknown>): Promise<string> => {
+      const result = await client.execute(senderAddress, contractAddress, {send_from: {owner, recipient, amount, msg: jsonToBinary(msg)}}, fees.exec);
+      return result.transactionHash;
+    }
+
     return {
       contractAddress,
       balance,
@@ -279,6 +294,8 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
       increaseAllowance,
       decreaseAllowance,
       transferFrom,
+      send,
+      sendFrom
     };
   }
 
