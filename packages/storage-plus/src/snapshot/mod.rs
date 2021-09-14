@@ -263,10 +263,10 @@ mod tests {
             .write_changelog(&mut storage, DUMMY_KEY, 2, Some(3))
             .unwrap();
         EVERY
-            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(3))
+            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(4))
             .unwrap();
         SELECT
-            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(3))
+            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(5))
             .unwrap();
 
         assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
@@ -313,10 +313,10 @@ mod tests {
             .write_changelog(&mut storage, DUMMY_KEY, 3, Some(100))
             .unwrap();
         EVERY
-            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(100))
+            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(101))
             .unwrap();
         SELECT
-            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(100))
+            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(102))
             .unwrap();
 
         assert_eq!(
@@ -325,11 +325,11 @@ mod tests {
         );
         assert_eq!(
             EVERY.may_load_at_height(&storage, DUMMY_KEY, 3),
-            Ok(Some(Some(100)))
+            Ok(Some(Some(101)))
         );
         assert_eq!(
             SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
-            Ok(Some(Some(100)))
+            Ok(Some(Some(102)))
         );
 
         // Write a changelog at 4, removing the value
@@ -367,11 +367,11 @@ mod tests {
         );
         assert_eq!(
             EVERY.may_load_at_height(&storage, DUMMY_KEY, 3),
-            Ok(Some(Some(100)))
+            Ok(Some(Some(101)))
         );
         assert_eq!(
             SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
-            Ok(Some(Some(100)))
+            Ok(Some(Some(102)))
         );
     }
 }
