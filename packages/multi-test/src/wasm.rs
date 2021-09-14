@@ -100,7 +100,7 @@ pub struct WasmKeeper<ExecC, QueryC> {
     /// this can only be edited on the WasmRouter, and just read in caches
     codes: HashMap<usize, Box<dyn Contract<ExecC>>>,
     /// Just markers to make type elision fork when using it as `Wasm` trait
-    _p: std::marker::PhantomData<(ExecC, QueryC)>,
+    _p: std::marker::PhantomData<QueryC>,
 }
 
 impl<ExecC, QueryC> Default for WasmKeeper<ExecC, QueryC> {
