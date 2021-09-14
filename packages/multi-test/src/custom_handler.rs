@@ -1,8 +1,9 @@
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Empty, Storage};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Storage};
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;
 use std::cell::{Ref, RefCell};
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -10,14 +11,20 @@ use crate::AppResponse;
 
 /// Custom message handler trait. Implementor of this trait is mocking environment behavior on
 /// given custom message.
-pub trait CustomHandler<ExecC = Empty, QueryC = Empty> {
+pub trait CustomHandler {
+    /// Custom exec message for this handler
+    type ExecC;
+
+    /// Custom query message for this handler
+    type QueryC;
+
     fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: ExecC,
+        msg: Self::ExecC,
     ) -> AnyResult<AppResponse>;
 
     fn query(
@@ -25,26 +32,41 @@ pub trait CustomHandler<ExecC = Empty, QueryC = Empty> {
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        msg: QueryC,
+        msg: Self::QueryC,
     ) -> AnyResult<Binary>;
 }
 
 /// Custom handler implementation panicking on each call. Assuming, that unless specific behavior
 /// is implemented, custom messages should not be send.
-pub(crate) struct PanickingCustomHandler;
+pub struct PanickingCustomHandler<ExecC, QueryC>(PhantomData<ExecC>, PhantomData<QueryC>);
 
-impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for PanickingCustomHandler
+impl<Exec, Query> PanickingCustomHandler<Exec, Query> {
+    pub fn new() -> Self {
+        PanickingCustomHandler(PhantomData, PhantomData)
+    }
+}
+
+impl<Exec, Query> Default for PanickingCustomHandler<Exec, Query> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<Exec, Query> CustomHandler for PanickingCustomHandler<Exec, Query>
 where
-    ExecC: std::fmt::Debug,
-    QueryC: std::fmt::Debug,
+    Exec: std::fmt::Debug,
+    Query: std::fmt::Debug,
 {
+    type ExecC = Exec;
+    type QueryC = Query;
+
     fn execute(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
         _block: &BlockInfo,
         sender: Addr,
-        msg: ExecC,
+        msg: Self::ExecC,
     ) -> AnyResult<AppResponse> {
         panic!("Unexpected custom exec msg {:?} from {:?}", msg, sender)
     }
@@ -54,7 +76,7 @@ where
         _api: &dyn Api,
         _storage: &dyn Storage,
         _block: &BlockInfo,
-        msg: QueryC,
+        msg: Self::QueryC,
     ) -> AnyResult<Binary> {
         panic!("Unexpected custom query {:?}", msg)
     }
@@ -99,14 +121,17 @@ impl<ExecC, QueryC> CachingCustomHandler<ExecC, QueryC> {
     }
 }
 
-impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for CachingCustomHandler<ExecC, QueryC> {
+impl<Exec, Query> CustomHandler for CachingCustomHandler<Exec, Query> {
+    type ExecC = Exec;
+    type QueryC = Query;
+
     fn execute(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
         _block: &BlockInfo,
         _sender: Addr,
-        msg: ExecC,
+        msg: Exec,
     ) -> AnyResult<AppResponse> {
         self.state.execs.borrow_mut().push(msg);
         Ok(AppResponse::default())
@@ -117,7 +142,7 @@ impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for CachingCustomHandler<ExecC,
         _api: &dyn Api,
         _storage: &dyn Storage,
         _block: &BlockInfo,
-        msg: QueryC,
+        msg: Query,
     ) -> AnyResult<Binary> {
         self.state.queries.borrow_mut().push(msg);
         Ok(Binary::default())

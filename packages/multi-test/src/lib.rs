@@ -16,7 +16,7 @@ mod test_helpers;
 mod transactions;
 mod wasm;
 
-pub use crate::app::{next_block, App, AppBuilder, Router};
+pub use crate::app::{custom_app, next_block, App, AppBuilder, BasicApp, Router};
 pub use crate::bank::{Bank, BankKeeper};
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::custom_handler::CustomHandler;
