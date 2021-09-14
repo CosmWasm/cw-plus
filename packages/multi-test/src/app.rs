@@ -492,21 +492,38 @@ impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
             _ => unimplemented!(),
         }
     }
+}
 
-    pub fn execute(
+pub trait CosmosExecutor {
+    type ExecC: Clone + fmt::Debug + PartialEq + JsonSchema;
+
+    fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         sender: Addr,
-        msg: CosmosMsg<CustomT::ExecC>,
-    ) -> AnyResult<AppResponse>
-    where
-        CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
-        CustomT: CustomHandler,
-    {
+        msg: CosmosMsg<Self::ExecC>,
+    ) -> AnyResult<AppResponse>;
+}
+
+impl<BankT, CustomT, WasmT> CosmosExecutor for Router<BankT, CustomT, WasmT>
+where
+    CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema,
+    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    BankT: Bank,
+    CustomT: CustomHandler,
+{
+    type ExecC = CustomT::ExecC;
+
+    fn execute(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: CosmosMsg<Self::ExecC>,
+    ) -> AnyResult<AppResponse> {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),

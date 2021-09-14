@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use cw_storage_plus::Map;
 
-use crate::app::{Router, RouterQuerier};
+use crate::app::{CosmosExecutor, Router, RouterQuerier};
 use crate::contracts::Contract;
 use crate::error::Error;
 use crate::executor::AppResponse;
