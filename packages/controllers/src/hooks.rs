@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use thiserror::Error;
 
 use cosmwasm_std::{
@@ -72,13 +73,16 @@ impl<'a> Hooks<'a> {
             .collect()
     }
 
-    pub fn execute_add_hook(
+    pub fn execute_add_hook<C>(
         &self,
         admin: &Admin,
         deps: DepsMut,
         info: MessageInfo,
         addr: Addr,
-    ) -> Result<Response, HookError> {
+    ) -> Result<Response<C>, HookError>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         admin.assert_admin(deps.as_ref(), &info.sender)?;
         self.add_hook(deps.storage, addr.clone())?;
 
@@ -90,13 +94,16 @@ impl<'a> Hooks<'a> {
         Ok(Response::new().add_attributes(attributes))
     }
 
-    pub fn execute_remove_hook(
+    pub fn execute_remove_hook<C>(
         &self,
         admin: &Admin,
         deps: DepsMut,
         info: MessageInfo,
         addr: Addr,
-    ) -> Result<Response, HookError> {
+    ) -> Result<Response<C>, HookError>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
         admin.assert_admin(deps.as_ref(), &info.sender)?;
         self.remove_hook(deps.storage, addr.clone())?;
 
