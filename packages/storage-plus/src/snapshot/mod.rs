@@ -182,6 +182,7 @@ mod tests {
     use cosmwasm_std::testing::MockStorage;
 
     type TestSnapshot = Snapshot<'static, &'static str, u64>;
+
     const NEVER: TestSnapshot = Snapshot::new("never__check", "never__change", Strategy::Never);
     const EVERY: TestSnapshot =
         Snapshot::new("every__check", "every__change", Strategy::EveryBlock);
@@ -192,14 +193,11 @@ mod tests {
 
     #[test]
     fn should_checkpoint() {
-        let mut storage = MockStorage::new();
+        let storage = MockStorage::new();
 
-        assert_eq!(NEVER.should_checkpoint(&mut storage, &DUMMY_KEY), Ok(false));
-        assert_eq!(EVERY.should_checkpoint(&mut storage, &DUMMY_KEY), Ok(true));
-        assert_eq!(
-            SELECT.should_checkpoint(&mut storage, &DUMMY_KEY),
-            Ok(false)
-        );
+        assert_eq!(NEVER.should_checkpoint(&storage, &DUMMY_KEY), Ok(false));
+        assert_eq!(EVERY.should_checkpoint(&storage, &DUMMY_KEY), Ok(true));
+        assert_eq!(SELECT.should_checkpoint(&storage, &DUMMY_KEY), Ok(false));
     }
 
     #[test]
@@ -207,12 +205,12 @@ mod tests {
         let mut storage = MockStorage::new();
 
         assert_eq!(
-            NEVER.assert_checkpointed(&mut storage, 1),
+            NEVER.assert_checkpointed(&storage, 1),
             Err(StdError::not_found("checkpoint"))
         );
-        assert_eq!(EVERY.assert_checkpointed(&mut storage, 1), Ok(()));
+        assert_eq!(EVERY.assert_checkpointed(&storage, 1), Ok(()));
         assert_eq!(
-            SELECT.assert_checkpointed(&mut storage, 1),
+            SELECT.assert_checkpointed(&storage, 1),
             Err(StdError::not_found("checkpoint"))
         );
 
@@ -222,11 +220,11 @@ mod tests {
         SELECT.add_checkpoint(&mut storage, 1).unwrap();
 
         assert_eq!(
-            NEVER.assert_checkpointed(&mut storage, 1),
+            NEVER.assert_checkpointed(&storage, 1),
             Err(StdError::not_found("checkpoint"))
         );
-        assert_eq!(EVERY.assert_checkpointed(&mut storage, 1), Ok(()));
-        assert_eq!(SELECT.assert_checkpointed(&mut storage, 1), Ok(()));
+        assert_eq!(EVERY.assert_checkpointed(&storage, 1), Ok(()));
+        assert_eq!(SELECT.assert_checkpointed(&storage, 1), Ok(()));
 
         // Remove checkpoint
         NEVER.remove_checkpoint(&mut storage, 1).unwrap();
@@ -234,12 +232,12 @@ mod tests {
         SELECT.remove_checkpoint(&mut storage, 1).unwrap();
 
         assert_eq!(
-            NEVER.assert_checkpointed(&mut storage, 1),
+            NEVER.assert_checkpointed(&storage, 1),
             Err(StdError::not_found("checkpoint"))
         );
-        assert_eq!(EVERY.assert_checkpointed(&mut storage, 1), Ok(()));
+        assert_eq!(EVERY.assert_checkpointed(&storage, 1), Ok(()));
         assert_eq!(
-            SELECT.assert_checkpointed(&mut storage, 1),
+            SELECT.assert_checkpointed(&storage, 1),
             Err(StdError::not_found("checkpoint"))
         );
     }
@@ -282,5 +280,98 @@ mod tests {
         assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
         assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
         assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+    }
+
+    #[test]
+    fn may_load_at_height() {
+        let mut storage = MockStorage::new();
+
+        assert_eq!(
+            NEVER.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(EVERY.may_load_at_height(&storage, DUMMY_KEY, 3), Ok(None));
+        assert_eq!(
+            SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Err(StdError::not_found("checkpoint"))
+        );
+
+        // Add a checkpoint at 3
+        NEVER.add_checkpoint(&mut storage, 3).unwrap();
+        EVERY.add_checkpoint(&mut storage, 3).unwrap();
+        SELECT.add_checkpoint(&mut storage, 3).unwrap();
+
+        assert_eq!(
+            NEVER.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(EVERY.may_load_at_height(&storage, DUMMY_KEY, 3), Ok(None));
+        assert_eq!(SELECT.may_load_at_height(&storage, DUMMY_KEY, 3), Ok(None));
+
+        // Write a changelog at 3
+        NEVER
+            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(100))
+            .unwrap();
+        EVERY
+            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(100))
+            .unwrap();
+        SELECT
+            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(100))
+            .unwrap();
+
+        assert_eq!(
+            NEVER.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(
+            EVERY.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Ok(Some(Some(100)))
+        );
+        assert_eq!(
+            SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Ok(Some(Some(100)))
+        );
+
+        // Write a changelog at 4, removing the value
+        NEVER
+            .write_changelog(&mut storage, DUMMY_KEY, 4, None)
+            .unwrap();
+        EVERY
+            .write_changelog(&mut storage, DUMMY_KEY, 4, None)
+            .unwrap();
+        SELECT
+            .write_changelog(&mut storage, DUMMY_KEY, 4, None)
+            .unwrap();
+        // And add a checkpoint at 4
+        NEVER.add_checkpoint(&mut storage, 4).unwrap();
+        EVERY.add_checkpoint(&mut storage, 4).unwrap();
+        SELECT.add_checkpoint(&mut storage, 4).unwrap();
+
+        assert_eq!(
+            NEVER.may_load_at_height(&storage, DUMMY_KEY, 4),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(
+            EVERY.may_load_at_height(&storage, DUMMY_KEY, 4),
+            Ok(Some(None))
+        );
+        assert_eq!(
+            SELECT.may_load_at_height(&storage, DUMMY_KEY, 4),
+            Ok(Some(None))
+        );
+
+        // Confirm old value at 3
+        assert_eq!(
+            NEVER.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(
+            EVERY.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Ok(Some(Some(100)))
+        );
+        assert_eq!(
+            SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
+            Ok(Some(Some(100)))
+        );
     }
 }
