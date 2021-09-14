@@ -129,10 +129,10 @@ where
     }
 
     // may_load_at_height reads historical data from given checkpoints.
-    // Only returns `Ok` if we have the data to be able to give the correct answer
-    // (Strategy::EveryBlock or Strategy::Selected and h is registered as checkpoint)
-    //
-    // If there is no checkpoint for that height, then we return StdError::NotFound
+    // Returns StdError::NotFound if we have no checkpoint, and can give no data.
+    // Returns Ok(None) if there is a checkpoint, but no cached data (no changes since the
+    // checkpoint. Caller should query current state).
+    // Return Ok(Some(x)) if there is a checkpoint and data written to changelog, returning the state at that time
     pub fn may_load_at_height(
         &self,
         store: &dyn Storage,
