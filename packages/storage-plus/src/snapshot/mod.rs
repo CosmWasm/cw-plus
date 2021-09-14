@@ -89,7 +89,7 @@ where
                 .next()
                 .transpose()?;
             if first.is_none() {
-                // there must be at least one open checkpoint and no changelog for the given address since then
+                // there must be at least one open checkpoint and no changelog for the given height since then
                 return Ok(true);
             }
         }
@@ -141,7 +141,7 @@ where
     ) -> StdResult<Option<Option<T>>> {
         self.assert_checkpointed(store, height)?;
 
-        // this will look for the first snapshot of the given address >= given height
+        // this will look for the first snapshot of height >= given height
         // If None, there is no snapshot since that time.
         let start = Bound::inclusive(U64Key::new(height));
         let first = self
@@ -174,4 +174,113 @@ pub enum Strategy {
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub(crate) struct ChangeSet<T> {
     pub old: Option<T>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::MockStorage;
+
+    type TestSnapshot = Snapshot<'static, &'static str, u64>;
+    const NEVER: TestSnapshot = Snapshot::new("never__check", "never__change", Strategy::Never);
+    const EVERY: TestSnapshot =
+        Snapshot::new("every__check", "every__change", Strategy::EveryBlock);
+    const SELECT: TestSnapshot =
+        Snapshot::new("select__check", "select__change", Strategy::Selected);
+
+    const DUMMY_KEY: &str = "dummy";
+
+    #[test]
+    fn should_checkpoint() {
+        let mut storage = MockStorage::new();
+
+        assert_eq!(NEVER.should_checkpoint(&mut storage, &DUMMY_KEY), Ok(false));
+        assert_eq!(EVERY.should_checkpoint(&mut storage, &DUMMY_KEY), Ok(true));
+        assert_eq!(
+            SELECT.should_checkpoint(&mut storage, &DUMMY_KEY),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn assert_checkpointed() {
+        let mut storage = MockStorage::new();
+
+        assert_eq!(
+            NEVER.assert_checkpointed(&mut storage, 1),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(EVERY.assert_checkpointed(&mut storage, 1), Ok(()));
+        assert_eq!(
+            SELECT.assert_checkpointed(&mut storage, 1),
+            Err(StdError::not_found("checkpoint"))
+        );
+
+        // Add a checkpoint at 1
+        NEVER.add_checkpoint(&mut storage, 1).unwrap();
+        EVERY.add_checkpoint(&mut storage, 1).unwrap();
+        SELECT.add_checkpoint(&mut storage, 1).unwrap();
+
+        assert_eq!(
+            NEVER.assert_checkpointed(&mut storage, 1),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(EVERY.assert_checkpointed(&mut storage, 1), Ok(()));
+        assert_eq!(SELECT.assert_checkpointed(&mut storage, 1), Ok(()));
+
+        // Remove checkpoint
+        NEVER.remove_checkpoint(&mut storage, 1).unwrap();
+        EVERY.remove_checkpoint(&mut storage, 1).unwrap();
+        SELECT.remove_checkpoint(&mut storage, 1).unwrap();
+
+        assert_eq!(
+            NEVER.assert_checkpointed(&mut storage, 1),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(EVERY.assert_checkpointed(&mut storage, 1), Ok(()));
+        assert_eq!(
+            SELECT.assert_checkpointed(&mut storage, 1),
+            Err(StdError::not_found("checkpoint"))
+        );
+    }
+
+    #[test]
+    fn has_changelog() {
+        let mut storage = MockStorage::new();
+
+        assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
+        assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
+        assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
+
+        assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 2), Ok(false));
+        assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 2), Ok(false));
+        assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 2), Ok(false));
+
+        assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+        assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+        assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+
+        // Write a changelog at 2
+        NEVER
+            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(3))
+            .unwrap();
+        EVERY
+            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(3))
+            .unwrap();
+        SELECT
+            .write_changelog(&mut storage, DUMMY_KEY, 2, Some(3))
+            .unwrap();
+
+        assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
+        assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
+        assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 1), Ok(false));
+
+        assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 2), Ok(true));
+        assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 2), Ok(true));
+        assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 2), Ok(true));
+
+        assert_eq!(NEVER.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+        assert_eq!(EVERY.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+        assert_eq!(SELECT.has_changelog(&mut storage, DUMMY_KEY, 3), Ok(false));
+    }
 }
