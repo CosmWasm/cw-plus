@@ -331,6 +331,20 @@ mod tests {
             SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
             Ok(Some(Some(102)))
         );
+        // Check that may_load_at_height at a previous value will return the first change after that.
+        // (Only with EVERY).
+        assert_eq!(
+            NEVER.may_load_at_height(&storage, DUMMY_KEY, 2),
+            Err(StdError::not_found("checkpoint"))
+        );
+        assert_eq!(
+            EVERY.may_load_at_height(&storage, DUMMY_KEY, 2),
+            Ok(Some(Some(101)))
+        );
+        assert_eq!(
+            SELECT.may_load_at_height(&storage, DUMMY_KEY, 2),
+            Err(StdError::not_found("checkpoint"))
+        );
 
         // Write a changelog at 4, removing the value
         NEVER
