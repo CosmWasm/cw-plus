@@ -2,13 +2,13 @@ use std::fmt::{self, Debug};
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, CustomQuery,
+    from_slice, to_vec, Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractResult, CustomQuery,
     Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
-    SystemResult,
+    SystemResult, WasmMsg,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
@@ -101,7 +101,11 @@ where
     StorageT: Storage,
     CustomT: CustomHandler,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<CustomT::ExecC>) -> AnyResult<AppResponse> {
+    fn execute(
+        &mut self,
+        sender: Addr,
+        msg: cosmwasm_std::CosmosMsg<CustomT::ExecC>,
+    ) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -385,7 +389,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<CosmosMsg<CustomT::ExecC>>,
+        msgs: Vec<cosmwasm_std::CosmosMsg<CustomT::ExecC>>,
     ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -400,7 +404,7 @@ where
 
         transactional(&mut *storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg))
+                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg.into()))
                 .collect()
         })
     }
@@ -495,7 +499,7 @@ impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
 }
 
 pub trait CosmosExecutor {
-    type ExecC: Clone + fmt::Debug + PartialEq + JsonSchema;
+    type ExecC;
 
     fn execute(
         &self,
@@ -505,6 +509,44 @@ pub trait CosmosExecutor {
         sender: Addr,
         msg: CosmosMsg<Self::ExecC>,
     ) -> AnyResult<AppResponse>;
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+// See https://github.com/serde-rs/serde/issues/1296 why we cannot add De-Serialize trait bounds to T
+pub enum CosmosMsg<T = Empty> {
+    Bank(BankMsg),
+    // by default we use RawMsg, but a contract can override that
+    // to call into more app-specific code (whatever they define)
+    Custom(T),
+    Wasm(WasmMsg),
+}
+
+impl<T> Into<cosmwasm_std::CosmosMsg<T>> for CosmosMsg<T>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn into(self) -> cosmwasm_std::CosmosMsg<T> {
+        match self {
+            CosmosMsg::Bank(b) => cosmwasm_std::CosmosMsg::Bank(b),
+            CosmosMsg::Custom(c) => cosmwasm_std::CosmosMsg::Custom(c),
+            CosmosMsg::Wasm(w) => cosmwasm_std::CosmosMsg::Wasm(w),
+        }
+    }
+}
+
+impl<T> From<cosmwasm_std::CosmosMsg<T>> for CosmosMsg<T>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    fn from(input: cosmwasm_std::CosmosMsg<T>) -> CosmosMsg<T> {
+        match input {
+            cosmwasm_std::CosmosMsg::Bank(b) => CosmosMsg::Bank(b),
+            cosmwasm_std::CosmosMsg::Custom(c) => CosmosMsg::Custom(c),
+            cosmwasm_std::CosmosMsg::Wasm(w) => CosmosMsg::Wasm(w),
+            _ => panic!("Unsupported type"),
+        }
+    }
 }
 
 impl<BankT, CustomT, WasmT> CosmosExecutor for Router<BankT, CustomT, WasmT>
@@ -525,7 +567,7 @@ where
         msg: CosmosMsg<Self::ExecC>,
     ) -> AnyResult<AppResponse> {
         match msg {
-            CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
+            CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
             CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
             _ => unimplemented!(),
