@@ -487,12 +487,12 @@ pub enum CosmosMsg<T = Empty> {
     Wasm(WasmMsg),
 }
 
-impl<T> Into<cosmwasm_std::CosmosMsg<T>> for CosmosMsg<T>
+impl<T> From<CosmosMsg<T>> for cosmwasm_std::CosmosMsg<T>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
-    fn into(self) -> cosmwasm_std::CosmosMsg<T> {
-        match self {
+    fn from(input: CosmosMsg<T>) -> Self {
+        match input {
             CosmosMsg::Bank(b) => cosmwasm_std::CosmosMsg::Bank(b),
             CosmosMsg::Custom(c) => cosmwasm_std::CosmosMsg::Custom(c),
             CosmosMsg::Wasm(w) => cosmwasm_std::CosmosMsg::Wasm(w),
@@ -687,7 +687,7 @@ mod test {
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
-        let msg: CosmosMsg = BankMsg::Send {
+        let msg: cosmwasm_std::CosmosMsg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: to_send,
         }
@@ -702,7 +702,7 @@ mod test {
         app.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
-        let msg = BankMsg::Send {
+        let msg: cosmwasm_std::CosmosMsg = BankMsg::Send {
             to_address: rcpt.into(),
             amount: coins(20, "btc"),
         }
@@ -1154,12 +1154,12 @@ mod test {
 
         // cache 1 - send some tokens
         let mut cache = StorageTransaction::new(&app.storage);
-        let msg = BankMsg::Send {
+        let msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
-        };
+        });
         app.router
-            .execute(&app.api, &mut cache, &app.block, owner.clone(), msg.into())
+            .execute(&app.api, &mut cache, &app.block, owner.clone(), msg)
             .unwrap();
 
         // shows up in cache
@@ -1170,12 +1170,12 @@ mod test {
 
         // now, second level cache
         transactional(&mut cache, |cache2, read| {
-            let msg = BankMsg::Send {
+            let msg = CosmosMsg::Bank(BankMsg::Send {
                 to_address: rcpt.clone().into(),
                 amount: coins(12, "eth"),
-            };
+            });
             app.router
-                .execute(&app.api, cache2, &app.block, owner, msg.into())
+                .execute(&app.api, cache2, &app.block, owner, msg)
                 .unwrap();
 
             // shows up in 2nd cache
