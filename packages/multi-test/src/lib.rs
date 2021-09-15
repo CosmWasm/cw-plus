@@ -19,8 +19,9 @@ mod untyped_msg;
 mod wasm;
 
 pub use crate::app::{custom_app, next_block, App, AppBuilder, BasicApp, Router};
-pub use crate::bank::{Bank, BankKeeper};
+pub use crate::bank::BankKeeper;
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::custom_handler::CustomHandler;
 pub use crate::executor::{AppResponse, Executor};
+pub use crate::module::Module;
 pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};

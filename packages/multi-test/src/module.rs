@@ -6,7 +6,10 @@ use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 use crate::app::CosmosRouter;
 use crate::AppResponse;
 
-pub trait Module<ExecT, QueryT> {
+pub trait Module {
+    type ExecT;
+    type QueryT;
+
     fn execute<ExecC, QueryC>(
         &self,
         api: &dyn Api,
@@ -14,7 +17,7 @@ pub trait Module<ExecT, QueryT> {
         router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
-        msg: ExecT,
+        msg: Self::ExecT,
     ) -> AnyResult<AppResponse>;
 
     fn query(
@@ -23,7 +26,7 @@ pub trait Module<ExecT, QueryT> {
         storage: &dyn Storage,
         querier: &dyn Querier,
         block: &BlockInfo,
-        request: QueryT,
+        request: Self::QueryT,
     ) -> AnyResult<Binary>;
 }
 
@@ -41,11 +44,14 @@ impl<Exec, Query> Default for PanickingModule<Exec, Query> {
     }
 }
 
-impl<ExecT, QueryT> Module<ExecT, QueryT> for PanickingModule<ExecT, QueryT>
+impl<Exec, Query> Module for PanickingModule<Exec, Query>
 where
-    ExecT: std::fmt::Debug,
-    QueryT: std::fmt::Debug,
+    Exec: std::fmt::Debug,
+    Query: std::fmt::Debug,
 {
+    type ExecT = Exec;
+    type QueryT = Query;
+
     fn execute<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
@@ -53,7 +59,7 @@ where
         _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
         sender: Addr,
-        msg: ExecT,
+        msg: Self::ExecT,
     ) -> AnyResult<AppResponse> {
         panic!("Unexpected exec msg {:?} from {:?}", msg, sender)
     }
@@ -64,7 +70,7 @@ where
         _storage: &dyn Storage,
         _querier: &dyn Querier,
         _block: &BlockInfo,
-        request: QueryT,
+        request: Self::QueryT,
     ) -> AnyResult<Binary> {
         panic!("Unexpected custom query {:?}", request)
     }

@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     coin, to_binary, Addr, AllBalanceResponse, Api, BalanceResponse, BankMsg, BankQuery, Binary,
-    Coin, Event, Storage,
+    BlockInfo, Coin, Event, Querier, Storage,
 };
 
 use crate::executor::AppResponse;
@@ -9,32 +9,13 @@ use cw0::NativeBalance;
 use cw_storage_plus::Map;
 use itertools::Itertools;
 
+use crate::app::CosmosRouter;
+use crate::module::Module;
 use anyhow::{bail, Result as AnyResult};
 
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
 pub const NAMESPACE_BANK: &[u8] = b"bank";
-
-/// Bank is a minimal contract-like interface that implements a bank module
-/// It is initialized outside of the trait
-pub trait Bank {
-    fn execute(
-        &self,
-        storage: &mut dyn Storage,
-        sender: Addr,
-        msg: BankMsg,
-    ) -> AnyResult<AppResponse>;
-
-    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary>;
-
-    // Admin interface
-    fn init_balance(
-        &self,
-        storage: &mut dyn Storage,
-        account: &Addr,
-        amount: Vec<Coin>,
-    ) -> AnyResult<()>;
-}
 
 #[derive(Default)]
 pub struct BankKeeper {}
@@ -42,6 +23,17 @@ pub struct BankKeeper {}
 impl BankKeeper {
     pub fn new() -> Self {
         BankKeeper {}
+    }
+
+    // this is an "admin" function to let us adjust bank accounts in genesis
+    fn init_balance(
+        &self,
+        storage: &mut dyn Storage,
+        account: &Addr,
+        amount: Vec<Coin>,
+    ) -> AnyResult<()> {
+        let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
+        self.set_balance(&mut bank_storage, account, amount)
     }
 
     fn set_balance(
@@ -104,10 +96,16 @@ fn coins_to_string(coins: &[Coin]) -> String {
         .join(",")
 }
 
-impl Bank for BankKeeper {
-    fn execute(
+impl Module for BankKeeper {
+    type ExecT = BankMsg;
+    type QueryT = BankQuery;
+
+    fn execute<ExecC, QueryC>(
         &self,
+        _api: &dyn Api,
         storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
         sender: Addr,
         msg: BankMsg,
     ) -> AnyResult<AppResponse> {
@@ -136,7 +134,14 @@ impl Bank for BankKeeper {
         }
     }
 
-    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary> {
+    fn query(
+        &self,
+        api: &dyn Api,
+        storage: &dyn Storage,
+        querier: &dyn Querier,
+        block: &BlockInfo,
+        request: BankQuery,
+    ) -> AnyResult<Binary> {
         let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
         match request {
             BankQuery::AllBalances { address } => {
@@ -157,17 +162,6 @@ impl Bank for BankKeeper {
             }
             q => bail!("Unsupported bank query: {:?}", q),
         }
-    }
-
-    // this is an "admin" function to let us adjust bank accounts
-    fn init_balance(
-        &self,
-        storage: &mut dyn Storage,
-        account: &Addr,
-        amount: Vec<Coin>,
-    ) -> AnyResult<()> {
-        let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
-        self.set_balance(&mut bank_storage, account, amount)
     }
 }
 
