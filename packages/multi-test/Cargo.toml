@@ -11,9 +11,10 @@ documentation = "https://docs.cosmwasm.com"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["iterator"]
+default = ["iterator", "staking"]
 iterator = ["cosmwasm-std/iterator"]
 stargate = ["cosmwasm-std/stargate"]
+staking = ["cosmwasm-std/staking"]
 backtrace = ["anyhow/backtrace"]
 
 [dependencies]

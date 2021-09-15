@@ -2,19 +2,19 @@ use std::fmt::{self, Debug};
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, BankMsg, Binary, BlockInfo, Coin, ContractResult, CustomQuery,
-    Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
-    SystemResult, WasmMsg,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CustomQuery, Empty,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
 use crate::custom_handler::{CustomHandler, PanickingCustomHandler};
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
+use crate::untyped_msg::CosmosMsg;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
 use crate::BankKeeper;
 
@@ -476,44 +476,6 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-// See https://github.com/serde-rs/serde/issues/1296 why we cannot add De-Serialize trait bounds to T
-pub enum CosmosMsg<T = Empty> {
-    Bank(BankMsg),
-    // by default we use RawMsg, but a contract can override that
-    // to call into more app-specific code (whatever they define)
-    Custom(T),
-    Wasm(WasmMsg),
-}
-
-impl<T> From<CosmosMsg<T>> for cosmwasm_std::CosmosMsg<T>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn from(input: CosmosMsg<T>) -> Self {
-        match input {
-            CosmosMsg::Bank(b) => cosmwasm_std::CosmosMsg::Bank(b),
-            CosmosMsg::Custom(c) => cosmwasm_std::CosmosMsg::Custom(c),
-            CosmosMsg::Wasm(w) => cosmwasm_std::CosmosMsg::Wasm(w),
-        }
-    }
-}
-
-impl<T> From<cosmwasm_std::CosmosMsg<T>> for CosmosMsg<T>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    fn from(input: cosmwasm_std::CosmosMsg<T>) -> CosmosMsg<T> {
-        match input {
-            cosmwasm_std::CosmosMsg::Bank(b) => CosmosMsg::Bank(b),
-            cosmwasm_std::CosmosMsg::Custom(c) => CosmosMsg::Custom(c),
-            cosmwasm_std::CosmosMsg::Wasm(w) => CosmosMsg::Wasm(w),
-            _ => panic!("Unsupported type"),
-        }
-    }
-}
-
 pub trait CosmosRouter {
     type ExecC;
     type QueryC: CustomQuery;
@@ -559,6 +521,7 @@ where
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
             CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
+            _ => unimplemented!(),
         }
     }
 

@@ -14,6 +14,7 @@ pub mod error;
 mod executor;
 mod test_helpers;
 mod transactions;
+mod untyped_msg;
 mod wasm;
 
 pub use crate::app::{custom_app, next_block, App, AppBuilder, BasicApp, Router};
