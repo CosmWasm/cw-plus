@@ -576,11 +576,14 @@ where
 }
 
 pub struct Router<Bank, Custom, Wasm, Staking, Distr> {
+    // this can remain crate-only as all special functions are wired up to app currently
+    // we need to figure out another format for wasm, as some like sudo need to be called after init
     pub(crate) wasm: Wasm,
+    // these must be pub so we can initialize them (super user) on build
     pub bank: Bank,
     pub custom: Custom,
-    pub(crate) staking: Staking,
-    pub(crate) distribution: Distr,
+    pub staking: Staking,
+    pub distribution: Distr,
 }
 
 impl<BankT, CustomT, WasmT, StakingT, DistrT> Router<BankT, CustomT, WasmT, StakingT, DistrT>
