@@ -468,8 +468,13 @@ mod tests {
         Box::new(contract)
     }
 
-    fn mock_app() -> App {
-        AppBuilder::new().build()
+    fn mock_app(init_funds: &[Coin]) -> App {
+        AppBuilder::new().build(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &Addr::unchecked(OWNER), init_funds.to_vec())
+                .unwrap();
+        })
     }
 
     // uploads code and returns address of group contract
@@ -560,7 +565,8 @@ mod tests {
 
         // Bonus: set some funds on the multisig contract for future proposals
         if !init_funds.is_empty() {
-            app.init_bank_balance(&flex_addr, init_funds).unwrap();
+            app.send_tokens(Addr::unchecked(OWNER), flex_addr.clone(), &init_funds)
+                .unwrap();
         }
         (flex_addr, group_addr)
     }
@@ -588,7 +594,7 @@ mod tests {
 
     #[test]
     fn test_instantiate_works() {
-        let mut app = mock_app();
+        let mut app = mock_app(&[]);
 
         // make a simple group
         let group_addr = instantiate_group(&mut app, vec![member(OWNER, 1)]);
@@ -684,17 +690,13 @@ mod tests {
 
     #[test]
     fn test_propose_works() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 4;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            false,
-        );
+        let (flex_addr, _) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, false);
 
         let proposal = pay_somebody_proposal();
         // Only voters can propose
@@ -793,17 +795,13 @@ mod tests {
 
     #[test]
     fn test_proposal_queries() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            false,
-        );
+        let (flex_addr, _) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, false);
 
         // create proposal with 1 vote power
         let proposal = pay_somebody_proposal();
@@ -889,17 +887,13 @@ mod tests {
 
     #[test]
     fn test_vote_works() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            false,
-        );
+        let (flex_addr, _) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, false);
 
         // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
@@ -1041,17 +1035,13 @@ mod tests {
 
     #[test]
     fn test_execute_works() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            true,
-        );
+        let (flex_addr, _) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, true);
 
         // ensure we have cash to cover the proposal
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
@@ -1134,17 +1124,13 @@ mod tests {
 
     #[test]
     fn test_close_works() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 3;
         let voting_period = Duration::Height(2000000);
-        let (flex_addr, _) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            true,
-        );
+        let (flex_addr, _) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, true);
 
         // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
@@ -1187,17 +1173,13 @@ mod tests {
     // uses the power from the beginning of the voting period
     #[test]
     fn execute_group_changes_from_external() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 4;
         let voting_period = Duration::Time(20000);
-        let (flex_addr, group_addr) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            false,
-        );
+        let (flex_addr, group_addr) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, false);
 
         // VOTER1 starts a proposal to send some tokens (1/4 votes)
         let proposal = pay_somebody_proposal();
@@ -1316,17 +1298,13 @@ mod tests {
     // trigger the action
     #[test]
     fn execute_group_changes_from_proposal() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         let required_weight = 4;
         let voting_period = Duration::Time(20000);
-        let (flex_addr, group_addr) = setup_test_case_fixed(
-            &mut app,
-            required_weight,
-            voting_period,
-            coins(10, "BTC"),
-            true,
-        );
+        let (flex_addr, group_addr) =
+            setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, true);
 
         // Start a proposal to remove VOTER3 from the set
         let update_msg = Cw4GroupContract::new(group_addr)
@@ -1436,7 +1414,8 @@ mod tests {
     // uses the power from the beginning of the voting period
     #[test]
     fn percentage_handles_group_changes() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         // 33% required, which is 5 of the initial 15
         let voting_period = Duration::Time(20000);
@@ -1446,7 +1425,7 @@ mod tests {
                 percentage: Decimal::percent(33),
             },
             voting_period,
-            coins(10, "BTC"),
+            init_funds,
             false,
         );
 
@@ -1516,7 +1495,8 @@ mod tests {
     // uses the power from the beginning of the voting period
     #[test]
     fn quorum_handles_group_changes() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         // 33% required for quora, which is 5 of the initial 15
         // 50% yes required to pass early (8 of the initial 15)
@@ -1528,7 +1508,7 @@ mod tests {
                 quorum: Decimal::percent(33),
             },
             voting_period,
-            coins(10, "BTC"),
+            init_funds,
             false,
         );
 
@@ -1584,7 +1564,8 @@ mod tests {
 
     #[test]
     fn quorum_enforced_even_if_absolute_threshold_met() {
-        let mut app = mock_app();
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
 
         // 33% required for quora, which is 5 of the initial 15
         // 50% yes required to pass early (8 of the initial 15)
@@ -1597,7 +1578,7 @@ mod tests {
                 quorum: Decimal::percent(80),
             },
             voting_period,
-            coins(10, "BTC"),
+            init_funds,
             false,
         );
 
