@@ -866,12 +866,21 @@ mod test {
     use crate::transactions::StorageTransaction;
 
     use super::*;
+    use crate::staking::{FailingDistribution, FailingStaking};
 
-    fn mock_router() -> Router<BankKeeper, FailingModule<Empty, Empty>, WasmKeeper<Empty, Empty>> {
+    fn mock_router() -> Router<
+        BankKeeper,
+        FailingModule<Empty, Empty>,
+        WasmKeeper<Empty, Empty>,
+        FailingStaking,
+        FailingDistribution,
+    > {
         Router {
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),
             custom: FailingModule::new(),
+            staking: FailingStaking::new(),
+            distribution: FailingDistribution::new(),
         }
     }
 

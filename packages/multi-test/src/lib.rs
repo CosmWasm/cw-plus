@@ -13,6 +13,7 @@ pub mod custom_handler;
 pub mod error;
 mod executor;
 mod module;
+mod staking;
 mod test_helpers;
 mod transactions;
 mod untyped_msg;
