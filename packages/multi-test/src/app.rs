@@ -388,6 +388,62 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
         }
     }
 
+    /// Overwrites default bank interface
+    pub fn with_staking<NewStaking: Staking>(
+        self,
+        staking: NewStaking,
+    ) -> AppBuilder<BankT, ApiT, StorageT, CustomT, WasmT, NewStaking, DistrT> {
+        let AppBuilder {
+            wasm,
+            api,
+            storage,
+            custom,
+            block,
+            bank,
+            distribution,
+            ..
+        } = self;
+
+        AppBuilder {
+            api,
+            block,
+            storage,
+            bank,
+            wasm,
+            custom,
+            staking,
+            distribution,
+        }
+    }
+
+    /// Overwrites default bank interface
+    pub fn with_distribution<NewDistribution: Distribution>(
+        self,
+        distribution: NewDistribution,
+    ) -> AppBuilder<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, NewDistribution> {
+        let AppBuilder {
+            wasm,
+            api,
+            storage,
+            custom,
+            block,
+            staking,
+            bank,
+            ..
+        } = self;
+
+        AppBuilder {
+            api,
+            block,
+            storage,
+            bank,
+            wasm,
+            custom,
+            staking,
+            distribution,
+        }
+    }
+
     /// Overwrites default initial block
     pub fn with_block(mut self, block: BlockInfo) -> Self {
         self.block = block;
