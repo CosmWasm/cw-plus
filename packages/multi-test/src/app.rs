@@ -13,8 +13,8 @@ use serde::Serialize;
 
 use crate::bank::{Bank, BankKeeper};
 use crate::contracts::Contract;
-use crate::custom_handler::{CustomHandler, PanickingCustomHandler};
 use crate::executor::{AppResponse, Executor};
+use crate::module::{FailingModule, Module};
 use crate::transactions::transactional;
 use crate::untyped_msg::CosmosMsg;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
@@ -25,13 +25,8 @@ pub fn next_block(block: &mut BlockInfo) {
 }
 
 /// Type alias for default build `App` to make its storing simpler in typical scenario
-pub type BasicApp<ExecC = Empty, QueryC = Empty> = App<
-    BankKeeper,
-    MockApi,
-    MockStorage,
-    PanickingCustomHandler<ExecC, QueryC>,
-    WasmKeeper<ExecC, QueryC>,
->;
+pub type BasicApp<ExecC = Empty, QueryC = Empty> =
+    App<BankKeeper, MockApi, MockStorage, FailingModule<ExecC, QueryC>, WasmKeeper<ExecC, QueryC>>;
 
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
@@ -40,7 +35,7 @@ pub struct App<
     Bank = BankKeeper,
     Api = MockApi,
     Storage = MockStorage,
-    Custom = PanickingCustomHandler<Empty, Empty>,
+    Custom = FailingModule<Empty, Empty>,
     Wasm = WasmKeeper<Empty, Empty>,
 > {
     router: Router<Bank, Custom, Wasm>,
@@ -67,7 +62,7 @@ impl BasicApp {
     pub fn new<F>(init_fn: F) -> Self
     where
         F: FnOnce(
-            &Router<BankKeeper, PanickingCustomHandler<Empty, Empty>, WasmKeeper<Empty, Empty>>,
+            &Router<BankKeeper, FailingModule<Empty, Empty>, WasmKeeper<Empty, Empty>>,
             &dyn Api,
             &mut dyn Storage,
         ),
@@ -83,7 +78,7 @@ where
     ExecC: Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
     QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
     F: FnOnce(
-        &Router<BankKeeper, PanickingCustomHandler<ExecC, QueryC>, WasmKeeper<ExecC, QueryC>>,
+        &Router<BankKeeper, FailingModule<ExecC, QueryC>, WasmKeeper<ExecC, QueryC>>,
         &dyn Api,
         &mut dyn Storage,
     ),
@@ -93,13 +88,13 @@ where
 
 impl<BankT, ApiT, StorageT, CustomT, WasmT> Querier for App<BankT, ApiT, StorageT, CustomT, WasmT>
 where
-    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    CustomT::ExecT: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
     ApiT: Api,
     StorageT: Storage,
-    CustomT: CustomHandler,
+    CustomT: Module,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         self.router
@@ -108,21 +103,21 @@ where
     }
 }
 
-impl<BankT, ApiT, StorageT, CustomT, WasmT> Executor<CustomT::ExecC>
+impl<BankT, ApiT, StorageT, CustomT, WasmT> Executor<CustomT::ExecT>
     for App<BankT, ApiT, StorageT, CustomT, WasmT>
 where
-    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    CustomT::ExecT: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
     ApiT: Api,
     StorageT: Storage,
-    CustomT: CustomHandler,
+    CustomT: Module,
 {
     fn execute(
         &mut self,
         sender: Addr,
-        msg: cosmwasm_std::CosmosMsg<CustomT::ExecC>,
+        msg: cosmwasm_std::CosmosMsg<CustomT::ExecT>,
     ) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
@@ -145,7 +140,7 @@ impl Default
         BankKeeper,
         MockApi,
         MockStorage,
-        PanickingCustomHandler<Empty, Empty>,
+        FailingModule<Empty, Empty>,
         WasmKeeper<Empty, Empty>,
     >
 {
@@ -159,7 +154,7 @@ impl
         BankKeeper,
         MockApi,
         MockStorage,
-        PanickingCustomHandler<Empty, Empty>,
+        FailingModule<Empty, Empty>,
         WasmKeeper<Empty, Empty>,
     >
 {
@@ -170,7 +165,7 @@ impl
             bank: BankKeeper::new(),
             api: MockApi::default(),
             storage: MockStorage::new(),
-            custom: PanickingCustomHandler::new(),
+            custom: FailingModule::new(),
             block: mock_env().block,
         }
     }
@@ -181,7 +176,7 @@ impl<ExecC, QueryC>
         BankKeeper,
         MockApi,
         MockStorage,
-        PanickingCustomHandler<ExecC, QueryC>,
+        FailingModule<ExecC, QueryC>,
         WasmKeeper<ExecC, QueryC>,
     >
 where
@@ -196,7 +191,7 @@ where
             bank: BankKeeper::new(),
             api: MockApi::default(),
             storage: MockStorage::new(),
-            custom: PanickingCustomHandler::new(),
+            custom: FailingModule::new(),
             block: mock_env().block,
         }
     }
@@ -212,7 +207,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, Cu
     /// Also it is possible to completely abandon trait bounding here which would not be bad idea,
     /// however it might make the message on build creepy in many cases, so as for properly build
     /// `App` we always want `Wasm` to be `Wasm`, some checks are done early.
-    pub fn with_wasm<B, C: CustomHandler, NewWasm: Wasm<C::ExecC, C::QueryC>>(
+    pub fn with_wasm<C: Module, NewWasm: Wasm<C::ExecT, C::QueryT>>(
         self,
         wasm: NewWasm,
     ) -> AppBuilder<BankT, ApiT, StorageT, CustomT, NewWasm> {
@@ -309,14 +304,14 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, Cu
 
     /// Overwrites default custom messages handler
     ///
-    /// At this point it is needed that new custom implements some `CustomHandler` trait, but it doesn't need
+    /// At this point it is needed that new custom implements some `Module` trait, but it doesn't need
     /// to be bound to ExecC or QueryC yet - as those may change. The cross-components validation is
     /// done on final building.
     ///
     /// Also it is possible to completely abandon trait bounding here which would not be bad idea,
     /// however it might make the message on build creepy in many cases, so as for properly build
     /// `App` we always want `Wasm` to be `Wasm`, some checks are done early.
-    pub fn with_custom<NewCustom: CustomHandler>(
+    pub fn with_custom<NewCustom: Module>(
         self,
         custom: NewCustom,
     ) -> AppBuilder<BankT, ApiT, StorageT, NewCustom, WasmT> {
@@ -353,8 +348,8 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, Cu
         BankT: Bank,
         ApiT: Api,
         StorageT: Storage,
-        CustomT: CustomHandler,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+        CustomT: Module,
+        WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
         F: FnOnce(&Router<BankT, CustomT, WasmT>, &dyn Api, &mut dyn Storage),
     {
         let router = Router {
@@ -377,13 +372,13 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, Cu
 
 impl<BankT, ApiT, StorageT, CustomT, WasmT> App<BankT, ApiT, StorageT, CustomT, WasmT>
 where
-    CustomT::ExecC: std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    CustomT::ExecT: std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
     ApiT: Api,
     StorageT: Storage,
-    CustomT: CustomHandler,
+    CustomT: Module,
 {
     pub fn set_block(&mut self, block: BlockInfo) {
         self.block = block;
@@ -411,7 +406,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<cosmwasm_std::CosmosMsg<CustomT::ExecC>>,
+        msgs: Vec<cosmwasm_std::CosmosMsg<CustomT::ExecT>>,
     ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -433,7 +428,7 @@ where
 
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecC>>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT>>) -> u64 {
         self.router.wasm.store_code(code) as u64
     }
 
@@ -470,10 +465,10 @@ pub struct Router<Bank, Custom, Wasm> {
 
 impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT>
 where
-    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    CustomT: CustomHandler,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    CustomT::ExecT: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    CustomT: Module,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
 {
     pub fn querier<'a>(
@@ -481,7 +476,7 @@ where
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a, CustomT::ExecC, CustomT::QueryC> {
+    ) -> RouterQuerier<'a, CustomT::ExecT, CustomT::QueryT> {
         RouterQuerier {
             router: self,
             api,
@@ -515,14 +510,14 @@ pub trait CosmosRouter {
 
 impl<BankT, CustomT, WasmT> CosmosRouter for Router<BankT, CustomT, WasmT>
 where
-    CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    CustomT: CustomHandler,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    CustomT::ExecT: std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+    CustomT: Module,
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
     BankT: Bank,
 {
-    type ExecC = CustomT::ExecC;
-    type QueryC = CustomT::QueryC;
+    type ExecC = CustomT::ExecT;
+    type QueryC = CustomT::QueryT;
 
     fn execute(
         &self,
@@ -671,13 +666,13 @@ mod test {
         addr: &Addr,
     ) -> Vec<Coin>
     where
-        CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-        CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+        CustomT::ExecT: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+        CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+        WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
         BankT: Bank,
         ApiT: Api,
         StorageT: Storage,
-        CustomT: CustomHandler,
+        CustomT: Module,
     {
         app.wrap().query_all_balances(addr).unwrap()
     }
@@ -1155,17 +1150,17 @@ mod test {
         rcpt: &Addr,
     ) -> Vec<Coin>
     where
-        CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
-        CustomT::QueryC: CustomQuery + DeserializeOwned,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+        CustomT::ExecT: Clone + fmt::Debug + PartialEq + JsonSchema,
+        CustomT::QueryT: CustomQuery + DeserializeOwned,
+        WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
         BankT: Bank,
-        CustomT: CustomHandler,
+        CustomT: Module,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
         let block = mock_env().block;
-        let querier: MockQuerier<CustomT::QueryC> = MockQuerier::new(&[]);
+        let querier: MockQuerier<CustomT::QueryT> = MockQuerier::new(&[]);
         let res = router
             .bank
             .query(api, storage, &querier, &block, query)
@@ -1179,14 +1174,14 @@ mod test {
         rcpt: &Addr,
     ) -> Vec<Coin>
     where
-        CustomT::ExecC:
+        CustomT::ExecT:
             std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
-        CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+        CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+        WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
         BankT: Bank,
         ApiT: Api,
         StorageT: Storage,
-        CustomT: CustomHandler,
+        CustomT: Module,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),

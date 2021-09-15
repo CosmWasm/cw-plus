@@ -856,23 +856,22 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> AnyResult<Addr> {
 
 #[cfg(test)]
 mod test {
-    use crate::custom_handler::PanickingCustomHandler;
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty, StdError};
 
     use crate::app::Router;
+    use crate::bank::BankKeeper;
+    use crate::module::FailingModule;
     use crate::test_helpers::contracts::{error, payout};
     use crate::transactions::StorageTransaction;
-    use crate::BankKeeper;
 
     use super::*;
 
-    fn mock_router(
-    ) -> Router<BankKeeper, PanickingCustomHandler<Empty, Empty>, WasmKeeper<Empty, Empty>> {
+    fn mock_router() -> Router<BankKeeper, FailingModule<Empty, Empty>, WasmKeeper<Empty, Empty>> {
         Router {
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),
-            custom: PanickingCustomHandler::new(),
+            custom: FailingModule::new(),
         }
     }
 
