@@ -665,7 +665,7 @@ mod test {
         app.execute(rcpt.clone(), msg).unwrap();
 
         // cannot send too much
-        let msg: cosmwasm_std::CosmosMsg = BankMsg::Send {
+        let msg = BankMsg::Send {
             to_address: rcpt.into(),
             amount: coins(20, "btc"),
         }
@@ -1117,12 +1117,12 @@ mod test {
 
         // cache 1 - send some tokens
         let mut cache = StorageTransaction::new(&app.storage);
-        let msg = CosmosMsg::Bank(BankMsg::Send {
+        let msg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: coins(25, "eth"),
-        });
+        };
         app.router
-            .execute(&app.api, &mut cache, &app.block, owner.clone(), msg)
+            .execute(&app.api, &mut cache, &app.block, owner.clone(), msg.into())
             .unwrap();
 
         // shows up in cache
@@ -1133,12 +1133,12 @@ mod test {
 
         // now, second level cache
         transactional(&mut cache, |cache2, read| {
-            let msg = CosmosMsg::Bank(BankMsg::Send {
+            let msg = BankMsg::Send {
                 to_address: rcpt.clone().into(),
                 amount: coins(12, "eth"),
-            });
+            };
             app.router
-                .execute(&app.api, cache2, &app.block, owner, msg)
+                .execute(&app.api, cache2, &app.block, owner, msg.into())
                 .unwrap();
 
             // shows up in 2nd cache
