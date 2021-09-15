@@ -4,9 +4,8 @@ use std::marker::PhantomData;
 use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult,
-    CustomQuery, Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
-    SystemResult,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty, Querier,
+    QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -536,7 +535,7 @@ where
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(api, storage, self, block, sender, msg),
-            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
+            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, self, block, sender, msg),
             _ => unimplemented!(),
         }
     }
@@ -555,7 +554,7 @@ where
         match request {
             QueryRequest::Wasm(req) => self.wasm.query(api, storage, &querier, block, req),
             QueryRequest::Bank(req) => self.bank.query(api, storage, &querier, block, req),
-            QueryRequest::Custom(req) => self.custom.query(api, storage, block, req),
+            QueryRequest::Custom(req) => self.custom.query(api, storage, &querier, block, req),
             _ => unimplemented!(),
         }
     }

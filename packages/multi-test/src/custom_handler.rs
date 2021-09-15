@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Storage};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;
@@ -7,6 +7,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
 
+use crate::app::CosmosRouter;
 use crate::AppResponse;
 
 /// Custom message handler trait. Implementor of this trait is mocking environment behavior on
@@ -22,6 +23,7 @@ pub trait CustomHandler {
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
+        router: &dyn CosmosRouter<ExecC = Self::ExecC, QueryC = Self::QueryC>,
         block: &BlockInfo,
         sender: Addr,
         msg: Self::ExecC,
@@ -31,6 +33,7 @@ pub trait CustomHandler {
         &self,
         api: &dyn Api,
         storage: &dyn Storage,
+        querier: &dyn Querier,
         block: &BlockInfo,
         msg: Self::QueryC,
     ) -> AnyResult<Binary>;
@@ -64,6 +67,7 @@ where
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = Self::ExecC, QueryC = Self::QueryC>,
         _block: &BlockInfo,
         sender: Addr,
         msg: Self::ExecC,
@@ -75,6 +79,7 @@ where
         &self,
         _api: &dyn Api,
         _storage: &dyn Storage,
+        _querier: &dyn Querier,
         _block: &BlockInfo,
         msg: Self::QueryC,
     ) -> AnyResult<Binary> {
@@ -129,6 +134,7 @@ impl<Exec, Query> CustomHandler for CachingCustomHandler<Exec, Query> {
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = Self::ExecC, QueryC = Self::QueryC>,
         _block: &BlockInfo,
         _sender: Addr,
         msg: Exec,
@@ -141,6 +147,7 @@ impl<Exec, Query> CustomHandler for CachingCustomHandler<Exec, Query> {
         &self,
         _api: &dyn Api,
         _storage: &dyn Storage,
+        _querier: &dyn Querier,
         _block: &BlockInfo,
         msg: Query,
     ) -> AnyResult<Binary> {
