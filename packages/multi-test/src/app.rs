@@ -2,7 +2,7 @@ use std::fmt::{self, Debug};
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, BankMsg, BankQuery, Binary, BlockInfo, Coin, ContractResult,
+    from_slice, to_vec, Addr, Api, BankMsg, BankQuery, Binary, BlockInfo, ContractResult,
     CustomQuery, Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
     SystemResult,
 };
@@ -20,6 +20,7 @@ use crate::BankKeeper;
 
 use crate::module::Module;
 use anyhow::Result as AnyResult;
+use std::marker::PhantomData;
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -562,6 +563,52 @@ where
     }
 }
 
+pub struct MockRouter<ExecC, QueryC>(PhantomData<(ExecC, QueryC)>);
+
+impl Default for MockRouter<Empty, Empty> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<ExecC, QueryC> MockRouter<ExecC, QueryC> {
+    pub fn new() -> Self
+    where
+        QueryC: CustomQuery,
+    {
+        MockRouter(PhantomData)
+    }
+}
+
+impl<ExecC, QueryC> CosmosRouter for MockRouter<ExecC, QueryC>
+where
+    QueryC: CustomQuery,
+{
+    type ExecC = ExecC;
+    type QueryC = QueryC;
+
+    fn execute(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _block: &BlockInfo,
+        _sender: Addr,
+        _msg: CosmosMsg<Self::ExecC>,
+    ) -> AnyResult<AppResponse> {
+        panic!("Cannot execute MockRouters");
+    }
+
+    fn query(
+        &self,
+        _api: &dyn Api,
+        _storage: &dyn Storage,
+        _block: &BlockInfo,
+        _request: QueryRequest<Self::QueryC>,
+    ) -> AnyResult<Binary> {
+        panic!("Cannot query MockRouters");
+    }
+}
+
 pub struct RouterQuerier<'a, ExecC, QueryC> {
     router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
     api: &'a dyn Api,
@@ -611,8 +658,8 @@ where
 #[cfg(test)]
 mod test {
     use cosmwasm_std::{
-        coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Event, Reply,
-        StdResult, SubMsg, WasmMsg,
+        coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Coin, Event,
+        Reply, StdResult, SubMsg, WasmMsg,
     };
 
     use crate::error::Error;
@@ -622,6 +669,7 @@ mod test {
     use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
 
     use super::*;
+    use cosmwasm_std::testing::MockQuerier;
 
     fn get_balance<BankT, ApiT, StorageT, CustomT, WasmT>(
         app: &App<BankT, ApiT, StorageT, CustomT, WasmT>,
@@ -631,7 +679,7 @@ mod test {
         CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
         CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
+        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
         ApiT: Api,
         StorageT: Storage,
         CustomT: CustomHandler,
@@ -641,7 +689,7 @@ mod test {
 
     #[test]
     fn update_block() {
-        let mut app = App::new();
+        let mut app = App::default();
 
         let BlockInfo { time, height, .. } = app.block;
         app.update_block(next_block);
@@ -652,16 +700,22 @@ mod test {
 
     #[test]
     fn send_tokens() {
-        let mut app = App::new();
-
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("receiver");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
         let rcpt_funds = vec![coin(5, "btc")];
 
-        // set money
-        app.init_bank_balance(&owner, init_funds).unwrap();
-        app.init_bank_balance(&rcpt, rcpt_funds).unwrap();
+        let mut app = App::new(|router, _, storage| {
+            // initialization moved to App construction
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+            router
+                .bank
+                .init_balance(storage, &rcpt, rcpt_funds)
+                .unwrap();
+        });
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
@@ -693,12 +747,16 @@ mod test {
 
     #[test]
     fn simple_contract() {
-        let mut app = App::new();
-
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         // set up contract
         let code_id = app.store_code(payout::contract());
@@ -772,12 +830,16 @@ mod test {
 
     #[test]
     fn reflect_success() {
-        let mut app = custom_app::<CustomMsg, Empty>();
-
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        let mut app = custom_app::<CustomMsg, Empty, _>(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         // set up payout contract
         let payout_id = app.store_code(payout::contract());
@@ -869,12 +931,16 @@ mod test {
 
     #[test]
     fn reflect_error() {
-        let mut app = custom_app::<CustomMsg, Empty>();
-
         // set personal balance
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        let mut app = custom_app::<CustomMsg, Empty, _>(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         // set up reflect contract
         let reflect_id = app.store_code(reflect::contract());
@@ -960,11 +1026,16 @@ mod test {
 
     #[test]
     fn sudo_works() {
-        let mut app = App::new();
-
         let owner = Addr::unchecked("owner");
         let init_funds = vec![coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
+
         let payout_id = app.store_code(payout::contract());
         let msg = payout::InstantiateMessage {
             payout: coin(5, "eth"),
@@ -994,13 +1065,17 @@ mod test {
 
     #[test]
     fn reflect_submessage_reply_works() {
-        let mut app = custom_app::<CustomMsg, Empty>();
-
         // set personal balance
         let owner = Addr::unchecked("owner");
         let random = Addr::unchecked("random");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        let mut app = custom_app::<CustomMsg, Empty, _>(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         // set up reflect contract
         let reflect_id = app.store_code(reflect::contract());
@@ -1086,14 +1161,20 @@ mod test {
     ) -> Vec<Coin>
     where
         CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
+        CustomT::QueryC: CustomQuery + DeserializeOwned,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
+        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
         CustomT: CustomHandler,
     {
         let query = BankQuery::AllBalances {
             address: rcpt.into(),
         };
-        let res = router.bank.query(api, storage, query).unwrap();
+        let block = mock_env().block;
+        let querier: MockQuerier<CustomT::QueryC> = MockQuerier::new(&[]);
+        let res = router
+            .bank
+            .query(api, storage, &querier, &block, query)
+            .unwrap();
         let val: AllBalanceResponse = from_slice(&res).unwrap();
         val.amount
     }
@@ -1107,7 +1188,7 @@ mod test {
             std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
         CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
+        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
         ApiT: Api,
         StorageT: Storage,
         CustomT: CustomHandler,
@@ -1122,13 +1203,17 @@ mod test {
 
     #[test]
     fn multi_level_bank_cache() {
-        let mut app = App::new();
-
         // set personal balance
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("recipient");
         let init_funds = vec![coin(20, "btc"), coin(100, "eth")];
-        app.init_bank_balance(&owner, init_funds).unwrap();
+
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         // cache 1 - send some tokens
         let mut cache = StorageTransaction::new(&app.storage);
@@ -1179,11 +1264,16 @@ mod test {
         // additional 20btc. Then beneficiary balance is checked - expeced value is 30btc. 10btc
         // would mean that sending tokens with message is not visible for this very message, and
         // 20btc means, that only such just send funds are visible.
-        let mut app = App::new();
-
         let owner = Addr::unchecked("owner");
         let beneficiary = Addr::unchecked("beneficiary");
-        app.init_bank_balance(&owner, coins(30, "btc")).unwrap();
+        let init_funds = coins(30, "btc");
+
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         let contract_id = app.store_code(hackatom::contract());
         let contract = app
@@ -1223,11 +1313,16 @@ mod test {
         // migrate fails if not admin
         // migrate succeeds if admin
         // check beneficiary updated
-        let mut app = App::new();
-
         let owner = Addr::unchecked("owner");
         let beneficiary = Addr::unchecked("beneficiary");
-        app.init_bank_balance(&owner, coins(30, "btc")).unwrap();
+        let init_funds = coins(30, "btc");
+
+        let mut app = App::new(|router, _, storage| {
+            router
+                .bank
+                .init_balance(storage, &owner, init_funds)
+                .unwrap();
+        });
 
         // create a hackatom contract with some funds
         let contract_id = app.store_code(hackatom::contract());
@@ -1328,7 +1423,7 @@ mod test {
 
         #[test]
         fn no_submsg() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1354,7 +1449,7 @@ mod test {
 
         #[test]
         fn single_submsg() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1381,7 +1476,7 @@ mod test {
 
         #[test]
         fn single_submsg_no_reply() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1408,7 +1503,7 @@ mod test {
 
         #[test]
         fn single_no_submsg_data() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1435,7 +1530,7 @@ mod test {
 
         #[test]
         fn single_no_top_level_data() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1461,11 +1556,16 @@ mod test {
 
         #[test]
         fn single_submsg_reply_returns_none() {
-            let mut app = custom_app::<CustomMsg, Empty>();
-
             // set personal balance
             let owner = Addr::unchecked("owner");
-            app.init_bank_balance(&owner, coins(100, "tgd")).unwrap();
+            let init_funds = coins(100, "tgd");
+
+            let mut app = custom_app::<CustomMsg, Empty, _>(|router, _, storage| {
+                router
+                    .bank
+                    .init_balance(storage, &owner, init_funds)
+                    .unwrap();
+            });
 
             // set up reflect contract
             let reflect_id = app.store_code(reflect::contract());
@@ -1517,7 +1617,7 @@ mod test {
 
         #[test]
         fn multiple_submsg() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1549,7 +1649,7 @@ mod test {
 
         #[test]
         fn multiple_submsg_no_reply() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1581,7 +1681,7 @@ mod test {
 
         #[test]
         fn multiple_submsg_mixed() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1613,7 +1713,7 @@ mod test {
 
         #[test]
         fn nested_submsg() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1659,7 +1759,7 @@ mod test {
 
         #[test]
         fn empty_attribute_key() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1689,7 +1789,7 @@ mod test {
 
         #[test]
         fn empty_attribute_value() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1719,7 +1819,7 @@ mod test {
 
         #[test]
         fn empty_event_attribute_key() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1748,7 +1848,7 @@ mod test {
 
         #[test]
         fn empty_event_attribute_value() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1777,7 +1877,7 @@ mod test {
 
         #[test]
         fn too_short_event_type() {
-            let mut app = App::new();
+            let mut app = App::default();
 
             let owner = Addr::unchecked("owner");
 
@@ -1819,7 +1919,7 @@ mod test {
             let mut app = AppBuilder::new_custom()
                 .with_api(api)
                 .with_custom(custom_handler)
-                .build();
+                .build(no_init);
 
             let contract_id = app.store_code(echo::custom_contract());
             let contract = app
