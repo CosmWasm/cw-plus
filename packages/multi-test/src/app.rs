@@ -1,8 +1,10 @@
 use std::fmt::{self, Debug};
+use std::marker::PhantomData;
 
+use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, BankMsg, BankQuery, Binary, BlockInfo, ContractResult,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult,
     CustomQuery, Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
     SystemResult,
 };
@@ -10,17 +12,13 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::bank::{Bank, BankKeeper};
 use crate::contracts::Contract;
 use crate::custom_handler::{CustomHandler, PanickingCustomHandler};
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::untyped_msg::CosmosMsg;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
-use crate::BankKeeper;
-
-use crate::module::Module;
-use anyhow::Result as AnyResult;
-use std::marker::PhantomData;
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -99,7 +97,7 @@ where
     CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+    BankT: Bank,
     ApiT: Api,
     StorageT: Storage,
     CustomT: CustomHandler,
@@ -117,7 +115,7 @@ where
     CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+    BankT: Bank,
     ApiT: Api,
     StorageT: Storage,
     CustomT: CustomHandler,
@@ -239,7 +237,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, Cu
     }
 
     /// Overwrites default bank interface
-    pub fn with_bank<NewBank: Module<ExecT = BankMsg, QueryT = BankQuery>>(
+    pub fn with_bank<NewBank: Bank>(
         self,
         bank: NewBank,
     ) -> AppBuilder<NewBank, ApiT, StorageT, CustomT, WasmT> {
@@ -353,7 +351,7 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT> AppBuilder<BankT, ApiT, StorageT, Cu
     /// are properly relating to each other.
     pub fn build<F>(self, init_fn: F) -> App<BankT, ApiT, StorageT, CustomT, WasmT>
     where
-        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+        BankT: Bank,
         ApiT: Api,
         StorageT: Storage,
         CustomT: CustomHandler,
@@ -383,7 +381,7 @@ where
     CustomT::ExecC: std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+    BankT: Bank,
     ApiT: Api,
     StorageT: Storage,
     CustomT: CustomHandler,
@@ -477,7 +475,7 @@ where
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     CustomT: CustomHandler,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+    BankT: Bank,
 {
     pub fn querier<'a>(
         &'a self,
@@ -522,7 +520,7 @@ where
     CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
     CustomT: CustomHandler,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+    BankT: Bank,
 {
     type ExecC = CustomT::ExecC;
     type QueryC = CustomT::QueryC;
@@ -657,19 +655,17 @@ where
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use cosmwasm_std::testing::MockQuerier;
     use cosmwasm_std::{
         coin, coins, to_binary, AllBalanceResponse, Attribute, BankMsg, BankQuery, Coin, Event,
-        Reply, StdResult, SubMsg, WasmMsg,
+        OverflowError, OverflowOperation, Reply, StdError, StdResult, SubMsg, WasmMsg,
     };
 
     use crate::error::Error;
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
-    use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
-
-    use super::*;
-    use cosmwasm_std::testing::MockQuerier;
 
     fn get_balance<BankT, ApiT, StorageT, CustomT, WasmT>(
         app: &App<BankT, ApiT, StorageT, CustomT, WasmT>,
@@ -679,7 +675,7 @@ mod test {
         CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
         CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+        BankT: Bank,
         ApiT: Api,
         StorageT: Storage,
         CustomT: CustomHandler,
@@ -1163,7 +1159,7 @@ mod test {
         CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema,
         CustomT::QueryC: CustomQuery + DeserializeOwned,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+        BankT: Bank,
         CustomT: CustomHandler,
     {
         let query = BankQuery::AllBalances {
@@ -1188,7 +1184,7 @@ mod test {
             std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
         CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
         WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Module<ExecT = BankMsg, QueryT = BankQuery>,
+        BankT: Bank,
         ApiT: Api,
         StorageT: Storage,
         CustomT: CustomHandler,

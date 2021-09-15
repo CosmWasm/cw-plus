@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use anyhow::Result as AnyResult;
+use anyhow::{bail, Result as AnyResult};
 use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 
 use crate::app::CosmosRouter;
@@ -30,21 +30,21 @@ pub trait Module {
     ) -> AnyResult<Binary>;
 }
 
-pub struct PanickingModule<ExecT, QueryT>(PhantomData<(ExecT, QueryT)>);
+pub struct FailingModule<ExecT, QueryT>(PhantomData<(ExecT, QueryT)>);
 
-impl<Exec, Query> PanickingModule<Exec, Query> {
+impl<Exec, Query> FailingModule<Exec, Query> {
     pub fn new() -> Self {
-        PanickingModule(PhantomData)
+        FailingModule(PhantomData)
     }
 }
 
-impl<Exec, Query> Default for PanickingModule<Exec, Query> {
+impl<Exec, Query> Default for FailingModule<Exec, Query> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<Exec, Query> Module for PanickingModule<Exec, Query>
+impl<Exec, Query> Module for FailingModule<Exec, Query>
 where
     Exec: std::fmt::Debug,
     Query: std::fmt::Debug,
@@ -61,7 +61,7 @@ where
         sender: Addr,
         msg: Self::ExecT,
     ) -> AnyResult<AppResponse> {
-        panic!("Unexpected exec msg {:?} from {:?}", msg, sender)
+        bail!("Unexpected exec msg {:?} from {:?}", msg, sender)
     }
 
     fn query(
@@ -72,6 +72,6 @@ where
         _block: &BlockInfo,
         request: Self::QueryT,
     ) -> AnyResult<Binary> {
-        panic!("Unexpected custom query {:?}", request)
+        bail!("Unexpected custom query {:?}", request)
     }
 }

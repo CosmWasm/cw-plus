@@ -17,6 +17,8 @@ const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
 pub const NAMESPACE_BANK: &[u8] = b"bank";
 
+pub trait Bank: Module<ExecT = BankMsg, QueryT = BankQuery> {}
+
 #[derive(Default)]
 pub struct BankKeeper {}
 
@@ -95,6 +97,8 @@ fn coins_to_string(coins: &[Coin]) -> String {
         .map(|c| format!("{}{}", c.amount, c.denom))
         .join(",")
 }
+
+impl Bank for BankKeeper {}
 
 impl Module for BankKeeper {
     type ExecT = BankMsg;
