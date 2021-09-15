@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use cw_storage_plus::Map;
 
-use crate::app::{CosmosExecutor, RouterQuerier};
+use crate::app::{CosmosRouter, RouterQuerier};
 use crate::contracts::Contract;
 use crate::error::Error;
 use crate::executor::AppResponse;
@@ -62,7 +62,7 @@ pub trait Wasm<ExecC, QueryC> {
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
@@ -80,7 +80,7 @@ pub trait Wasm<ExecC, QueryC> {
         api: &dyn Api,
         contract_addr: Addr,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<AppResponse>;
@@ -133,7 +133,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
@@ -160,7 +160,7 @@ where
         api: &dyn Api,
         contract: Addr,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<AppResponse> {
@@ -210,7 +210,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: T,
         recipient: String,
@@ -223,7 +223,8 @@ where
             let msg: cosmwasm_std::CosmosMsg<ExecC> = BankMsg::Send {
                 to_address: recipient,
                 amount: amount.to_vec(),
-            }.into();
+            }
+            .into();
             let res = router.execute(api, storage, block, sender.into(), msg.into())?;
             Ok(res)
         } else {
@@ -236,7 +237,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
@@ -374,7 +375,7 @@ where
     fn execute_submsg(
         &self,
         api: &dyn Api,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -429,7 +430,7 @@ where
     fn _reply(
         &self,
         api: &dyn Api,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -498,7 +499,7 @@ where
     fn process_response(
         &self,
         api: &dyn Api,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
@@ -552,7 +553,7 @@ where
         api: &dyn Api,
         storage: &mut dyn Storage,
         address: Addr,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -572,7 +573,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
@@ -592,7 +593,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         reply: Reply,
     ) -> AnyResult<Response<ExecC>> {
@@ -611,7 +612,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<ExecC>> {
@@ -630,7 +631,7 @@ where
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<ExecC>> {
@@ -685,7 +686,7 @@ where
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &dyn CosmosExecutor<ExecC = ExecC>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         address: Addr,
         action: F,

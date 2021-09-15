@@ -453,13 +453,20 @@ pub struct Router<Bank, Custom, Wasm> {
     pub(crate) custom: Custom,
 }
 
-impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
+impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT>
+where
+    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    CustomT: CustomHandler,
+    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    BankT: Bank,
+{
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a, BankT, CustomT, WasmT> {
+    ) -> RouterQuerier<'a, CustomT::ExecC, CustomT::QueryC> {
         RouterQuerier {
             router: self,
             api,
@@ -467,48 +474,6 @@ impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
             block_info,
         }
     }
-
-    /// this is used by `RouterQuerier` to actual implement the `Querier` interface.
-    /// you most likely want to use `router.querier(storage, block).wrap()` to get a
-    /// QuerierWrapper to interact with
-    pub fn query(
-        &self,
-        api: &dyn Api,
-        storage: &dyn Storage,
-        block: &BlockInfo,
-        request: QueryRequest<CustomT::QueryC>,
-    ) -> AnyResult<Binary>
-    where
-        CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-        CustomT::ExecC:
-            std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
-        CustomT: CustomHandler,
-    {
-        match request {
-            QueryRequest::Wasm(req) => {
-                self.wasm
-                    .query(api, storage, &self.querier(api, storage, block), block, req)
-            }
-            QueryRequest::Bank(req) => self.bank.query(api, storage, req),
-            QueryRequest::Custom(req) => self.custom.query(api, storage, block, req),
-            _ => unimplemented!(),
-        }
-    }
-}
-
-pub trait CosmosExecutor {
-    type ExecC;
-
-    fn execute(
-        &self,
-        api: &dyn Api,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        sender: Addr,
-        msg: CosmosMsg<Self::ExecC>,
-    ) -> AnyResult<AppResponse>;
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -549,14 +514,38 @@ where
     }
 }
 
-impl<BankT, CustomT, WasmT> CosmosExecutor for Router<BankT, CustomT, WasmT>
+pub trait CosmosRouter {
+    type ExecC;
+    type QueryC: CustomQuery;
+
+    fn execute(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: CosmosMsg<Self::ExecC>,
+    ) -> AnyResult<AppResponse>;
+
+    fn query(
+        &self,
+        api: &dyn Api,
+        storage: &dyn Storage,
+        block: &BlockInfo,
+        request: QueryRequest<Self::QueryC>,
+    ) -> AnyResult<Binary>;
+}
+
+impl<BankT, CustomT, WasmT> CosmosRouter for Router<BankT, CustomT, WasmT>
 where
-    CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema,
+    CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    CustomT: CustomHandler,
     WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
     BankT: Bank,
-    CustomT: CustomHandler,
 {
     type ExecC = CustomT::ExecC;
+    type QueryC = CustomT::QueryC;
 
     fn execute(
         &self,
@@ -570,21 +559,41 @@ where
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
             CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
+        }
+    }
+
+    /// this is used by `RouterQuerier` to actual implement the `Querier` interface.
+    /// you most likely want to use `router.querier(storage, block).wrap()` to get a
+    /// QuerierWrapper to interact with
+    fn query(
+        &self,
+        api: &dyn Api,
+        storage: &dyn Storage,
+        block: &BlockInfo,
+        request: QueryRequest<Self::QueryC>,
+    ) -> AnyResult<Binary> {
+        match request {
+            QueryRequest::Wasm(req) => {
+                self.wasm
+                    .query(api, storage, &self.querier(api, storage, block), block, req)
+            }
+            QueryRequest::Bank(req) => self.bank.query(api, storage, req),
+            QueryRequest::Custom(req) => self.custom.query(api, storage, block, req),
             _ => unimplemented!(),
         }
     }
 }
 
-pub struct RouterQuerier<'a, Bank, Custom, Wasm> {
-    router: &'a Router<Bank, Custom, Wasm>,
+pub struct RouterQuerier<'a, ExecC, QueryC> {
+    router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
     api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
 
-impl<'a, Bank, Custom, Wasm> RouterQuerier<'a, Bank, Custom, Wasm> {
+impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC> {
     pub fn new(
-        router: &'a Router<Bank, Custom, Wasm>,
+        router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
@@ -598,16 +607,13 @@ impl<'a, Bank, Custom, Wasm> RouterQuerier<'a, Bank, Custom, Wasm> {
     }
 }
 
-impl<'a, BankT, CustomT, WasmT> Querier for RouterQuerier<'a, BankT, CustomT, WasmT>
+impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
 where
-    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Bank,
-    CustomT: CustomHandler,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        let request: QueryRequest<CustomT::QueryC> = match from_slice(bin_request) {
+        let request: QueryRequest<QueryC> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
