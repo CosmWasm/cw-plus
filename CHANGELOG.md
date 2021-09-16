@@ -67,9 +67,9 @@
 - Unify multisig structs Member and VoterResponse [\#151](https://github.com/CosmWasm/cw-plus/issues/151)
 - Add exhaustive checks for errors in contracts [\#105](https://github.com/CosmWasm/cw-plus/issues/105)
 
-## [v0.8.0](https://github.com/CosmWasm/cw-plus/tree/v0.8.0) (2021-08-10)
+## [v0.8.0](https://github.com/CosmWasm/cw-plus/tree/v0.8.0) + [v0.8.0-rc3](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc3) + [v0.8.0-rc2](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc2) + [v0.8.0-rc1](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc1) (2021-08-10)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.8.0-rc3...v0.8.0)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.7.0...v0.8.0)
 
 **Closed issues:**
 
@@ -77,32 +77,7 @@
 - Upgrade rust to 1.53 [\#372](https://github.com/CosmWasm/cw-plus/issues/372)
 - Implement cw20 logo spec for cw20-base [\#371](https://github.com/CosmWasm/cw-plus/issues/371)
 - multi-test: ensure event handling matches wasmd 0.18 implementation [\#348](https://github.com/CosmWasm/cw-plus/issues/348)
-
-**Merged pull requests:**
-
-- Added some missing traits on messages of cw20-base [\#386](https://github.com/CosmWasm/cw-plus/pull/386) ([hashedone](https://github.com/hashedone))
-
-## [v0.8.0-rc3](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc3) (2021-08-10)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.8.0-rc2...v0.8.0-rc3)
-
-**Closed issues:**
-
 - multi-test: ensure event handling matches wasmd 0.18 implementation [\#348](https://github.com/CosmWasm/cw-plus/issues/348)
-
-**Merged pull requests:**
-
-- Corrected submessage data response handling in multi-test [\#385](https://github.com/CosmWasm/cw-plus/pull/385) ([hashedone](https://github.com/hashedone))
-- Document submsg data failures and fix them [\#383](https://github.com/CosmWasm/cw-plus/pull/383) ([ethanfrey](https://github.com/ethanfrey))
-- Adaptors for all contracts and entry points from Empty -\> C [\#382](https://github.com/CosmWasm/cw-plus/pull/382) ([ethanfrey](https://github.com/ethanfrey))
-- Multitest events match wasmd [\#380](https://github.com/CosmWasm/cw-plus/pull/380) ([ethanfrey](https://github.com/ethanfrey))
-
-## [v0.8.0-rc2](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc2) (2021-08-05)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.8.0-rc1...v0.8.0-rc2)
-
-**Closed issues:**
-
 - Upgrade CosmWasm to 0.16.0 [\#377](https://github.com/CosmWasm/cw-plus/issues/377)
 - Upgrade rust to 1.53 [\#372](https://github.com/CosmWasm/cw-plus/issues/372)
 - Implement cw20 logo spec for cw20-base [\#371](https://github.com/CosmWasm/cw-plus/issues/371)
@@ -111,29 +86,6 @@
 - multi-test: Add migrate support [\#351](https://github.com/CosmWasm/cw-plus/issues/351)
 - multitest: Ensure Warm sent funds visible to querier [\#347](https://github.com/CosmWasm/cw-plus/issues/347)
 - multitest: Enforce validity checks for returned items [\#341](https://github.com/CosmWasm/cw-plus/issues/341)
-
-**Merged pull requests:**
-
-- Update to Rust 1.53 [\#379](https://github.com/CosmWasm/cw-plus/pull/379) ([ethanfrey](https://github.com/ethanfrey))
-- Upgrade to cosmwasm 0.16 [\#378](https://github.com/CosmWasm/cw-plus/pull/378) ([ethanfrey](https://github.com/ethanfrey))
-- Marketing info for cw20-base contract [\#375](https://github.com/CosmWasm/cw-plus/pull/375) ([hashedone](https://github.com/hashedone))
-- cw20-merkle-airdrop: change hashing to sha256 [\#374](https://github.com/CosmWasm/cw-plus/pull/374) ([orkunkl](https://github.com/orkunkl))
-- Responses validation in multi-test [\#373](https://github.com/CosmWasm/cw-plus/pull/373) ([hashedone](https://github.com/hashedone))
-- Cw20 logo spec [\#370](https://github.com/CosmWasm/cw-plus/pull/370) ([ethanfrey](https://github.com/ethanfrey))
-- Properly handling data in submessages in multi-test [\#369](https://github.com/CosmWasm/cw-plus/pull/369) ([hashedone](https://github.com/hashedone))
-- Abstracting API out of tests internals so it is clearly owned by `App` [\#368](https://github.com/CosmWasm/cw-plus/pull/368) ([hashedone](https://github.com/hashedone))
-- Storage plus doc correction [\#367](https://github.com/CosmWasm/cw-plus/pull/367) ([hashedone](https://github.com/hashedone))
-- Multitest migrate support [\#366](https://github.com/CosmWasm/cw-plus/pull/366) ([ethanfrey](https://github.com/ethanfrey))
-- Reorganizations of contracts in `multi-test::test_utils` [\#365](https://github.com/CosmWasm/cw-plus/pull/365) ([hashedone](https://github.com/hashedone))
-- Implement cw20-merkle-airdrop [\#364](https://github.com/CosmWasm/cw-plus/pull/364) ([orkunkl](https://github.com/orkunkl))
-- Testing sent founds visibility in multi-test [\#363](https://github.com/CosmWasm/cw-plus/pull/363) ([hashedone](https://github.com/hashedone))
-
-## [v0.8.0-rc1](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc1) (2021-07-29)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.7.0...v0.8.0-rc1)
-
-**Closed issues:**
-
 - Lack of `overflow-checks=true` in contracts [\#358](https://github.com/CosmWasm/cw-plus/issues/358)
 - multi-test: Store more data in ContractData [\#350](https://github.com/CosmWasm/cw-plus/issues/350)
 - multi-test: cleaner use of transactions [\#349](https://github.com/CosmWasm/cw-plus/issues/349)
@@ -148,6 +100,24 @@
 
 **Merged pull requests:**
 
+- Added some missing traits on messages of cw20-base [\#386](https://github.com/CosmWasm/cw-plus/pull/386) ([hashedone](https://github.com/hashedone))
+- Corrected submessage data response handling in multi-test [\#385](https://github.com/CosmWasm/cw-plus/pull/385) ([hashedone](https://github.com/hashedone))
+- Document submsg data failures and fix them [\#383](https://github.com/CosmWasm/cw-plus/pull/383) ([ethanfrey](https://github.com/ethanfrey))
+- Adaptors for all contracts and entry points from Empty -\> C [\#382](https://github.com/CosmWasm/cw-plus/pull/382) ([ethanfrey](https://github.com/ethanfrey))
+- Multitest events match wasmd [\#380](https://github.com/CosmWasm/cw-plus/pull/380) ([ethanfrey](https://github.com/ethanfrey))
+- Update to Rust 1.53 [\#379](https://github.com/CosmWasm/cw-plus/pull/379) ([ethanfrey](https://github.com/ethanfrey))
+- Upgrade to cosmwasm 0.16 [\#378](https://github.com/CosmWasm/cw-plus/pull/378) ([ethanfrey](https://github.com/ethanfrey))
+- Marketing info for cw20-base contract [\#375](https://github.com/CosmWasm/cw-plus/pull/375) ([hashedone](https://github.com/hashedone))
+- cw20-merkle-airdrop: change hashing to sha256 [\#374](https://github.com/CosmWasm/cw-plus/pull/374) ([orkunkl](https://github.com/orkunkl))
+- Responses validation in multi-test [\#373](https://github.com/CosmWasm/cw-plus/pull/373) ([hashedone](https://github.com/hashedone))
+- Cw20 logo spec [\#370](https://github.com/CosmWasm/cw-plus/pull/370) ([ethanfrey](https://github.com/ethanfrey))
+- Properly handling data in submessages in multi-test [\#369](https://github.com/CosmWasm/cw-plus/pull/369) ([hashedone](https://github.com/hashedone))
+- Abstracting API out of tests internals so it is clearly owned by `App` [\#368](https://github.com/CosmWasm/cw-plus/pull/368) ([hashedone](https://github.com/hashedone))
+- Storage plus doc correction [\#367](https://github.com/CosmWasm/cw-plus/pull/367) ([hashedone](https://github.com/hashedone))
+- Multitest migrate support [\#366](https://github.com/CosmWasm/cw-plus/pull/366) ([ethanfrey](https://github.com/ethanfrey))
+- Reorganizations of contracts in `multi-test::test_utils` [\#365](https://github.com/CosmWasm/cw-plus/pull/365) ([hashedone](https://github.com/hashedone))
+- Implement cw20-merkle-airdrop [\#364](https://github.com/CosmWasm/cw-plus/pull/364) ([orkunkl](https://github.com/orkunkl))
+- Testing sent founds visibility in multi-test [\#363](https://github.com/CosmWasm/cw-plus/pull/363) ([hashedone](https://github.com/hashedone))
 - Extend `ContractData` in multi-test [\#360](https://github.com/CosmWasm/cw-plus/pull/360) ([hashedone](https://github.com/hashedone))
 - Add transactional helper [\#357](https://github.com/CosmWasm/cw-plus/pull/357) ([ethanfrey](https://github.com/ethanfrey))
 - Implemented expiration for cw1-subkeys contract [\#356](https://github.com/CosmWasm/cw-plus/pull/356) ([hashedone](https://github.com/hashedone))
