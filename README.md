@@ -202,6 +202,24 @@ analyze this package, which gives much faster turn-around:
 Note that it will produce a code coverage report for the entire project, but only the coverage in that
 package is the real value. If does give quick feedback for you if you unit test writing was successful.
 
+## Generating changelog
+
+To generate a changelog we decided to use [github-changelog-generator](https://github.com/github-changelog-generator/github-changelog-generator).
+
+To install tool you need Ruby's `gem` package manager.
+
+    $ gem install github_changelog_generator
+
+Generating changelog file first time:
+
+    $ github_changelog_generator -u CosmWasm -p cw-plus
+
+Appending next releases could be done adding `--base` flag:
+
+    $ github_changelog_generator -u CosmWasm -p cw-plus --base CHANGELOG.md
+
+If you hit GitHub's 50 requests/hour limit, please follow [this](https://github.com/github-changelog-generator/github-changelog-generator#github-token) guide to create a token key which you can pass using `--token` flag.
+
 ## Licenses
 
 This repo contains two license, [Apache 2.0](./LICENSE-APACHE) and
