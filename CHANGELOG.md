@@ -200,7 +200,7 @@
 
 - Expose contract components [\#293](https://github.com/CosmWasm/cw-plus/pull/293) ([orkunkl](https://github.com/orkunkl))
 
-## [v0.6.0] (https://github.com/CosmWasm/cw-plus/tree/v0.6.0) + [v0.6.0-beta3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta3) + [v0.6.0-beta2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta2) + [v0.6.0-beta1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta1) + [v0.6.0-alpha3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha3) + [v0.6.0-alpha2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha2) + [v0.6.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha1) (2021-05-03)
+## [v0.6.0](https://github.com/CosmWasm/cw-plus/tree/v0.6.0) + [v0.6.0-beta3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta3) + [v0.6.0-beta2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta2) + [v0.6.0-beta1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta1) + [v0.6.0-alpha3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha3) + [v0.6.0-alpha2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha2) + [v0.6.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha1) (2021-05-03)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-beta3...v0.6.0)
 
