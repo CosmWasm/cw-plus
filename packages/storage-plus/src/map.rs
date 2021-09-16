@@ -10,9 +10,9 @@ use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::prefix::{namespaced_prefix_range, PrefixBound};
-#[cfg(feature = "iterator")]
+use crate::prefix::{namespaced_prefix_range, Pair2, PrefixBound};
 use crate::prefix::{Bound, Prefix};
+use crate::Prefix2;
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -109,6 +109,22 @@ where
     }
 }
 
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a> + DeserializeOwned,
+{
+    #[cfg(feature = "iterator")]
+    pub fn sub_prefix2(&self, p: K::SubPrefix) -> Prefix2<K, T> {
+        Prefix2::new(self.namespace, &p.prefix())
+    }
+
+    #[cfg(feature = "iterator")]
+    pub fn prefix2(&self, p: K::Prefix) -> Prefix2<K, T> {
+        Prefix2::new(self.namespace, &p.prefix())
+    }
+}
+
 // short-cut for simple keys, rather than .prefix(()).range(...)
 impl<'a, K, T> Map<'a, K, T>
 where
@@ -148,7 +164,7 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a>,
+    K: PrimaryKey<'a> + DeserializeOwned,
 {
     /// while range assumes you set the prefix to one element and call range over the last one,
     /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
@@ -168,6 +184,21 @@ where
         let mapped =
             namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_kv);
         Box::new(mapped)
+    }
+
+    pub fn range2<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K, T>>> + 'c>
+    where
+        T: 'c,
+        K: 'c,
+    {
+        self.sub_prefix2(K::SubPrefix::new())
+            .range(store, min, max, order)
     }
 }
 

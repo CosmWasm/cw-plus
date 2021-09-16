@@ -6,7 +6,7 @@ use cosmwasm_std::{Order, Pair, StdResult, Storage};
 use std::ops::Deref;
 
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
-use crate::iter_helpers::{concat, deserialize_kv, trim};
+use crate::iter_helpers::{concat, deserialize_kv, deserialize_kv2, trim};
 use crate::{Endian, Prefixer};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
@@ -64,7 +64,10 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
     }
 }
 
+pub type Pair2<K = Vec<u8>, V = Vec<u8>> = (K, V);
+
 type DeserializeFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
+type DeserializeFn2<K, T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair2<K, T>>;
 
 pub fn default_deserializer<T: DeserializeOwned>(
     _: &dyn Storage,
@@ -131,6 +134,87 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<Pair<T>>> + 'a>
     where
         T: 'a,
+    {
+        let de_fn = self.de_fn;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
+            .map(move |kv| (de_fn)(store, &*pk_name, kv));
+        Box::new(mapped)
+    }
+
+    pub fn keys<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
+        let mapped =
+            range_with_prefix(store, &self.storage_prefix, min, max, order).map(|(k, _)| k);
+        Box::new(mapped)
+    }
+}
+
+#[derive(Clone)]
+pub struct Prefix2<K, T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    /// all namespaces prefixes and concatenated with the key
+    storage_prefix: Vec<u8>,
+    // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
+    data: PhantomData<T>,
+    pk_name: Vec<u8>,
+    de_fn: DeserializeFn2<K, T>,
+}
+
+impl<K, T> Deref for Prefix2<K, T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.storage_prefix
+    }
+}
+
+impl<K, T> Prefix2<K, T>
+where
+    K: DeserializeOwned,
+    T: Serialize + DeserializeOwned,
+{
+    pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
+        Prefix2::with_deserialization_function(top_name, sub_names, &[], |_, _, kv| {
+            deserialize_kv2(kv)
+        })
+    }
+
+    pub fn with_deserialization_function(
+        top_name: &[u8],
+        sub_names: &[&[u8]],
+        pk_name: &[u8],
+        de_fn: DeserializeFn2<K, T>,
+    ) -> Self {
+        let storage_prefix = nested_namespaces_with_key(&[top_name], sub_names, b"");
+        Prefix2 {
+            storage_prefix,
+            data: PhantomData,
+            pk_name: pk_name.to_vec(),
+            de_fn,
+        }
+    }
+
+    pub fn range<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K, T>>> + 'a>
+    where
+        T: 'a,
+        K: 'a,
     {
         let de_fn = self.de_fn;
         let pk_name = self.pk_name.clone();

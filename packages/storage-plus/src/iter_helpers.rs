@@ -4,11 +4,21 @@ use cosmwasm_std::Pair;
 use cosmwasm_std::{from_slice, StdResult};
 
 use crate::helpers::encode_length;
+use crate::prefix::Pair2;
 
 pub(crate) fn deserialize_kv<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (k, v) = kv;
     let t = from_slice::<T>(&v)?;
     Ok((k, t))
+}
+
+pub(crate) fn deserialize_kv2<K: DeserializeOwned, T: DeserializeOwned>(
+    kv: Pair,
+) -> StdResult<Pair2<K, T>> {
+    let (k, v) = kv;
+    let kt = from_slice::<K>(&k)?;
+    let t = from_slice::<T>(&v)?;
+    Ok((kt, t))
 }
 
 /// Calculates the raw key prefix for a given namespace as documented
