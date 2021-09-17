@@ -2,17 +2,18 @@
 
 
 ORIGINAL_OPTS=$*
-OPTS=$(getopt -l "help,since-tag:,latest-tag,token:" -o "hl" -- "$@") || exit 1
+OPTS=$(getopt -l "help,since-tag:,latest-tag,token:" -o "hlt" -- "$@") || exit 1
 
 eval set -- "$OPTS"
 while true
 do
 case $1 in
   -h|--help)
-    echo -e "Usage: $0 [-h|--help] [--since-tag <tag>] [-l|--latest-tag]
+    echo -e "Usage: $0 [-h|--help] [--since-tag <tag>] [-l|--latest-tag] [-t|--token <token>]
 -h, --help          Display help
 --since-tag <tag>   Process changes since tag <tag>
--l, --latest-tag    Process changes since latest tag"
+-l, --latest-tag    Process changes since latest tag
+--token <token>     Pass changelog github token <token>"
     exit 0
     ;;
 --since-tag)
