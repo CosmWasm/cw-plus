@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Timestamp};
 use std::marker::PhantomData;
 
 use crate::helpers::namespaces_with_key;
@@ -250,7 +250,8 @@ impl<T: Endian> From<T> for IntKey<T> {
 
 impl<T: Endian> From<Vec<u8>> for IntKey<T> {
     fn from(wrap: Vec<u8>) -> Self {
-        // TODO: assert proper length
+        assert_eq!(wrap.len(), std::mem::size_of::<T>());
+
         IntKey {
             wrapped: wrap,
             data: PhantomData,
@@ -261,6 +262,42 @@ impl<T: Endian> From<Vec<u8>> for IntKey<T> {
 impl<T: Endian> From<IntKey<T>> for Vec<u8> {
     fn from(k: IntKey<T>) -> Vec<u8> {
         k.wrapped
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TimestampKey(U64Key);
+
+impl TimestampKey {
+    pub fn new(ts: Timestamp) -> Self {
+        Self(ts.nanos().into())
+    }
+}
+
+impl<'a> PrimaryKey<'a> for TimestampKey {
+    type Prefix = ();
+    type SubPrefix = ();
+
+    fn key(&self) -> Vec<&[u8]> {
+        self.0.key()
+    }
+}
+
+impl<'a> Prefixer<'a> for TimestampKey {
+    fn prefix(&self) -> Vec<&[u8]> {
+        self.0.key()
+    }
+}
+
+impl From<Vec<u8>> for TimestampKey {
+    fn from(val: Vec<u8>) -> Self {
+        Self(val.into())
+    }
+}
+
+impl From<Timestamp> for TimestampKey {
+    fn from(val: Timestamp) -> Self {
+        Self::new(val)
     }
 }
 
