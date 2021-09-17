@@ -208,7 +208,9 @@ To generate a changelog we decided to use [github-changelog-generator](https://g
 
 To install tool you need Ruby's `gem` package manager.
 
-    $ gem install github_changelog_generator
+    $ gem --user install github_changelog_generator
+
+And put `$HOME/.gem/ruby/*/bin/` into your PATH.
 
 Generating changelog file first time:
 
@@ -218,7 +220,12 @@ Appending next releases could be done adding `--base` flag:
 
     $ github_changelog_generator -u CosmWasm -p cw-plus --base CHANGELOG.md
 
-If you hit GitHub's 50 requests/hour limit, please follow [this](https://github.com/github-changelog-generator/github-changelog-generator#github-token) guide to create a token key which you can pass using `--token` flag.
+If you hit GitHub's 50 requests/hour limit, please follow [this](https://github.com/github-changelog-generator/github-changelog-generator#github-token)
+guide to create a token key which you can pass using `--token` flag.
+
+There's also a convenience `scripts/update_changelog.sh`, which can take a
+--since-tag parameter (to avoid processing the entire history). It can also
+auto-detect the latest version tag for you, with --latest-tag.
 
 ## Licenses
 
