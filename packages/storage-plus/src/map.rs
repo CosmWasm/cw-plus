@@ -415,6 +415,72 @@ mod test {
     }
 
     #[test]
+    fn range2_simple_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.save(&mut store, b"john", &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range2(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ("jim".to_string(), data2.clone()),
+                ("john".to_string(), data.clone())
+            ]
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range2(
+                &store,
+                Some(Bound::Inclusive(b"j".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ("jim".to_string(), data2),
+                ("john".to_string(), data.clone())
+            ]
+        );
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range2(
+                &store,
+                Some(Bound::Inclusive(b"jo".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![("john".to_string(), data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+>>>>>>> Add range2 working example / test
     fn range_composite_key() {
         let mut store = MockStorage::new();
 

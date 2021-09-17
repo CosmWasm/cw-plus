@@ -15,3 +15,13 @@ impl Deserializable for String {
             .map_err(|err| StdError::generic_err(err.to_string()))
     }
 }
+
+impl Deserializable for &[u8] {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_utf8(value.to_vec())
+            // FIXME: Add and use StdError utf-8 error From helper
+            .map_err(|err| StdError::generic_err(err.to_string()))
+    }
+}
