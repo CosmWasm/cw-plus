@@ -21,7 +21,7 @@ case $1 in
     ;;
 -l|--latest-tag)
     TAG=$(git tag --sort=creatordate | egrep '^v[0-9]+\.[0-9]+\.[0-9]+' | tail -1)
-    ORIGINAL_OPTS="--since-tag $TAG"
+    ORIGINAL_OPTS=$(echo $ORIGINAL_OPTS | sed "s/\B$1\b/--since-tag $TAG/")
     ;;
 --)
     shift
