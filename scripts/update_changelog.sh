@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-ORIGINAL_OPTS=$@
+ORIGINAL_OPTS=$*
 OPTS=$(getopt -l "help,since-tag:,latest-tag,token:" -o "hl" -- "$@") || exit 1
 
 eval set -- "$OPTS"
@@ -20,8 +20,8 @@ case $1 in
     TAG="$1"
     ;;
 -l|--latest-tag)
-    TAG=$(git tag --sort=creatordate | egrep '^v[0-9]+\.[0-9]+\.[0-9]+' | tail -1)
-    ORIGINAL_OPTS=$(echo "$ORIGINAL_OPTS" | sed "s/\B$1\b/--since-tag $TAG/")
+    TAG=$(git tag --sort=creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | tail -1)
+    ORIGINAL_OPTS=$(echo "$ORIGINAL_OPTS" | sed "s/\\B$1\\b/--since-tag $TAG/")
     ;;
 --)
     shift
@@ -32,7 +32,7 @@ shift
 done
 
 cp CHANGELOG.md /tmp/CHANGELOG.md.$$
-sed -i -n "/^## \[$TAG\]/,\$p" CHANGELOG.md
+sed -i -n "/^## \\[$TAG\\]/,\$p" CHANGELOG.md
 
 github_changelog_generator -u CosmWasm -p cw-plus --base CHANGELOG.md $ORIGINAL_OPTS || cp /tmp/CHANGELOG.md.$$ CHANGELOG.md
 
