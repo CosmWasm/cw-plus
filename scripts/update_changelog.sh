@@ -9,10 +9,10 @@ while true
 do
 case $1 in
   -h|--help)
-    echo -e "Usage: $0 [--since-tag <tag>]\n
-    -h, --help          Display help\n
-    --since-tag <tag>   Process changes since tag <tag>\n
-    -l, --latest-tag    Process changes since latest tag"
+    echo -e "Usage: $0 [-h|--help] [--since-tag <tag>] [-l|--latest-tag]
+-h, --help          Display help
+--since-tag <tag>   Process changes since tag <tag>
+-l, --latest-tag    Process changes since latest tag"
     exit 0
     ;;
 --since-tag)
@@ -21,7 +21,7 @@ case $1 in
     ;;
 -l|--latest-tag)
     TAG=$(git tag --sort=creatordate | egrep '^v[0-9]+\.[0-9]+\.[0-9]+' | tail -1)
-    ORIGINAL_OPTS=$(echo $ORIGINAL_OPTS | sed "s/\B$1\b/--since-tag $TAG/")
+    ORIGINAL_OPTS=$(echo "$ORIGINAL_OPTS" | sed "s/\B$1\b/--since-tag $TAG/")
     ;;
 --)
     shift
