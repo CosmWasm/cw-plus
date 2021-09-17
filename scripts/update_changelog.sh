@@ -1,8 +1,8 @@
 #!/bin/bash
 
 
-ORIGINAL_OPTS="$@"
-OPTS=$(getopt -l "help,since-tag:,latest-tag" -o "hl" -- "$@") || exit 1
+ORIGINAL_OPTS=$@
+OPTS=$(getopt -l "help,since-tag:,latest-tag,token:" -o "hl" -- "$@") || exit 1
 
 eval set -- "$OPTS"
 while true
