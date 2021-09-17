@@ -11,7 +11,7 @@ case $1 in
   -h|--help)
     echo -e "Usage: $0 [--since-tag <tag>]\n
     -h, --help          Display help\n
-    --since-tag <tag>   Process changes since tag <tag>\r
+    --since-tag <tag>   Process changes since tag <tag>\n
     -l, --latest-tag    Process changes since latest tag"
     exit 0
     ;;
