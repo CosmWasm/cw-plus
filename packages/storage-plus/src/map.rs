@@ -223,6 +223,7 @@ mod test {
     }
 
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
+    const PEOPLE_ID: Map<U32Key, Data> = Map::new("people_id");
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
@@ -415,7 +416,7 @@ mod test {
     }
 
     #[test]
-    fn range2_simple_key() {
+    fn range2_simple_string_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -480,7 +481,61 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
->>>>>>> Add range2 working example / test
+    fn range2_simple_integer_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE_ID
+            .save(&mut store, U32Key::new(1234), &data)
+            .unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE_ID.save(&mut store, U32Key::new(56), &data2).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = PEOPLE_ID
+            .range2(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(56, data2.clone()), (1234, data.clone())]);
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = PEOPLE_ID
+            .range2(
+                &store,
+                Some(Bound::Inclusive(U32Key::new(56).into())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(56, data2), (1234, data.clone())]);
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = PEOPLE_ID
+            .range2(
+                &store,
+                Some(Bound::Inclusive(U32Key::new(57).into())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(1234, data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
     fn range_composite_key() {
         let mut store = MockStorage::new();
 
