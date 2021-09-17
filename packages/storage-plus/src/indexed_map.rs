@@ -700,4 +700,53 @@ mod test {
         assert_eq!(datas[0], marias[0].1);
         assert_eq!(datas[1], marias[1].1);
     }
+
+    mod inclusive_bound {
+        use super::*;
+        use crate::U64Key;
+
+        struct Indexes<'a> {
+            secondary: MultiIndex<'a, (U64Key, Vec<u8>), u64>,
+        }
+
+        impl<'a> IndexList<u64> for Indexes<'a> {
+            fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<u64>> + '_> {
+                let v: Vec<&dyn Index<u64>> = vec![&self.secondary];
+                Box::new(v.into_iter())
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "iterator")]
+        fn composite_key_failure() {
+            let indexes = Indexes {
+                secondary: MultiIndex::new(
+                    |secondary, k| (U64Key::new(*secondary), k),
+                    "test_map",
+                    "test_map__secondary",
+                ),
+            };
+            let map = IndexedMap::<&str, u64, Indexes>::new("test_map", indexes);
+            let mut store = MockStorage::new();
+
+            map.save(&mut store, "one", &1).unwrap();
+
+            let items: Vec<_> = map
+                .idx
+                .secondary
+                .range(
+                    &store,
+                    None,
+                    Some(Bound::inclusive((U64Key::new(1), vec![]).joined_key())),
+                    Order::Ascending,
+                )
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v).collect();
+
+            assert_eq!(items, vec![1]);
+        }
+    }
 }
