@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+use crate::de::Deserializable;
 use crate::helpers::query_raw;
 #[cfg(feature = "iterator")]
 use crate::iter_helpers::deserialize_kv;
@@ -112,7 +113,7 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + DeserializeOwned,
+    K: PrimaryKey<'a> + Deserializable,
 {
     #[cfg(feature = "iterator")]
     pub fn sub_prefix2(&self, p: K::SubPrefix) -> Prefix2<K, T> {
@@ -164,7 +165,7 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + DeserializeOwned,
+    K: PrimaryKey<'a> + Deserializable,
 {
     /// while range assumes you set the prefix to one element and call range over the last one,
     /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
@@ -192,7 +193,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K, T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K::Output, T>>> + 'c>
     where
         T: 'c,
         K: 'c,
