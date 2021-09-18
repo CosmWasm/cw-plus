@@ -8,6 +8,10 @@ use crate::Endian;
 pub trait PrimaryKey<'a>: Clone {
     type Prefix: Prefixer<'a>;
     type SubPrefix: Prefixer<'a>;
+    // FIXME: Use this after 'error[E0658]: associated type defaults are unstable' is resolved.
+    // See issue #29661 <https://github.com/rust-lang/rust/issues/29661>
+    // type NoPrefix: Prefixer<'a> = ();
+    type NoPrefix: Prefixer<'a>;
 
     /// returns a slice of key steps, which can be optionally combined
     fn key(&self) -> Vec<&[u8]>;
@@ -23,6 +27,7 @@ pub trait PrimaryKey<'a>: Clone {
 impl<'a> PrimaryKey<'a> for () {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         vec![]
@@ -32,6 +37,7 @@ impl<'a> PrimaryKey<'a> for () {
 impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
@@ -43,6 +49,7 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
 impl<'a> PrimaryKey<'a> for &'a str {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
@@ -54,6 +61,7 @@ impl<'a> PrimaryKey<'a> for &'a str {
 impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U) {
     type Prefix = T;
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         let mut keys = self.0.key();
@@ -68,6 +76,7 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: 
 {
     type Prefix = (T, U);
     type SubPrefix = T;
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         let mut keys = self.0.key();
@@ -131,6 +140,7 @@ impl EmptyPrefix for () {
 impl<'a> PrimaryKey<'a> for Vec<u8> {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         vec![&self]
@@ -146,6 +156,7 @@ impl<'a> Prefixer<'a> for Vec<u8> {
 impl<'a> PrimaryKey<'a> for String {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         vec![self.as_bytes()]
@@ -162,6 +173,7 @@ impl<'a> Prefixer<'a> for String {
 impl<'a> PrimaryKey<'a> for &'a Addr {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
@@ -179,6 +191,7 @@ impl<'a> Prefixer<'a> for &'a Addr {
 impl<'a> PrimaryKey<'a> for Addr {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         // this is simple, we don't add more prefixes
@@ -196,6 +209,7 @@ impl<'a> Prefixer<'a> for Addr {
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T> {
     type Prefix = ();
     type SubPrefix = ();
+    type NoPrefix = ();
 
     fn key(&self) -> Vec<&[u8]> {
         self.wrapped.key()
