@@ -18,8 +18,8 @@ pub(crate) fn deserialize_kv2<K: Deserializable, T: DeserializeOwned>(
 ) -> StdResult<Pair2<K::Output, T>> {
     let (k, v) = kv;
     let kt = K::from_slice(&k)?;
-    let t = from_slice::<T>(&v)?;
-    Ok((kt, t))
+    let vt = from_slice::<T>(&v)?;
+    Ok((kt, vt))
 }
 
 /// Calculates the raw key prefix for a given namespace as documented
