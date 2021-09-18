@@ -199,7 +199,7 @@ where
         K: 'c,
     {
         self.sub_prefix2(K::SubPrefix::new())
-            .range(store, min, max, order)
+            .range2(store, min, max, order)
     }
 }
 
