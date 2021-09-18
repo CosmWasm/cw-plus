@@ -748,6 +748,37 @@ mod test {
                 ((b"owner2".to_vec(), 9, "recipient".to_string()), 5000)
             ]
         );
+
+        // let's iterate over a sub_prefix_de
+        let all: StdResult<Vec<_>> = TRIPLE
+            .sub_prefix_de(b"owner")
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ((9, "recipient".to_string()), 1000),
+                ((9, "recipient2".to_string()), 3000),
+                ((10, "recipient3".to_string()), 3000),
+            ]
+        );
+
+        // let's iterate over a prefix_de
+        let all: StdResult<Vec<_>> = TRIPLE
+            .prefix_de((b"owner", U8Key::new(9)))
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ("recipient".to_string(), 1000),
+                ("recipient2".to_string(), 3000),
+            ]
+        );
     }
 
     #[test]
