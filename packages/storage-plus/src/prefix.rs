@@ -209,7 +209,7 @@ where
         }
     }
 
-    pub fn range2<'a>(
+    pub fn range_de<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound>,
