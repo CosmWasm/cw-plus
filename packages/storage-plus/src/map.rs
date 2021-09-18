@@ -564,6 +564,39 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
+    fn range2_composite_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys, one under different owner
+        ALLOWANCE
+            .save(&mut store, (b"owner", b"spender"), &1000)
+            .unwrap();
+        ALLOWANCE
+            .save(&mut store, (b"owner", b"spender2"), &3000)
+            .unwrap();
+        ALLOWANCE
+            .save(&mut store, (b"owner2", b"spender"), &5000)
+            .unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .range2(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (("owner".to_string(), "spender".to_string()), 1000),
+                (("owner".to_string(), "spender2".to_string()), 3000),
+                (("owner2".to_string(), "spender".to_string()), 5000)
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
     fn range_triple_key() {
         let mut store = MockStorage::new();
 
