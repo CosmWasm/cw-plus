@@ -33,10 +33,29 @@ macro_rules! integer_de {
             type Output = $t;
 
             fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-                Ok(<$t>::from_be_bytes(value.try_into().map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
+                Ok(<$t>::from_be_bytes(value.try_into()
+                    // FIXME: Add and use StdError try-from error From helper
+                    .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
         })*
     }
 }
 
 integer_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
+
+impl<T: Deserializable, U: Deserializable> Deserializable for (T, U) {
+    type Output = (T::Output, U::Output);
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        let t_len = u16::from_be_bytes(
+            value[..2]
+                .try_into()
+                // FIXME: Add and use StdError try-from error From helper
+                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
+        ) as usize;
+        let t = T::from_slice(&value[2..2 + t_len])?;
+        let u = U::from_slice(&value[2 + t_len..])?;
+
+        Ok((t, u))
+    }
+}
