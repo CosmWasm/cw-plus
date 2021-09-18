@@ -7,13 +7,13 @@ use crate::de::Deserializable;
 use crate::helpers::encode_length;
 use crate::prefix::Pair2;
 
-pub(crate) fn deserialize_kv<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
+pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (k, v) = kv;
     let t = from_slice::<T>(&v)?;
     Ok((k, t))
 }
 
-pub(crate) fn deserialize_kv2<K: Deserializable, T: DeserializeOwned>(
+pub(crate) fn deserialize_kv<K: Deserializable, T: DeserializeOwned>(
     kv: Pair,
 ) -> StdResult<Pair2<K::Output, T>> {
     let (k, v) = kv;
