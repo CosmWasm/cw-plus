@@ -115,8 +115,7 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    // FIXME: Use SuperSuffix
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K::Suffix, T> {
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K::SuperSuffix, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 
