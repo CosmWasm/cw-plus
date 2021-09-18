@@ -7,7 +7,7 @@ use std::ops::Deref;
 
 use crate::de::Deserializable;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
-use crate::iter_helpers::{concat, deserialize_kv, deserialize_kv2, trim};
+use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::{Endian, Prefixer};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
@@ -67,8 +67,8 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
 
 pub type Pair2<K = Vec<u8>, V = Vec<u8>> = (K, V);
 
-type DeserializeFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
-type DeserializeFn2<K, T> =
+type DeserializeVFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
+type DeserializeKvFn<K, T> =
     fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair2<<K as Deserializable>::Output, T>>;
 
 pub fn default_deserializer<T: DeserializeOwned>(
@@ -89,7 +89,7 @@ where
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
     pk_name: Vec<u8>,
-    de_fn: DeserializeFn<T>,
+    de_fn: DeserializeVFn<T>,
 }
 
 impl<T> Deref for Prefix<T>
@@ -115,7 +115,7 @@ where
         top_name: &[u8],
         sub_names: &[&[u8]],
         pk_name: &[u8],
-        de_fn: DeserializeFn<T>,
+        de_fn: DeserializeVFn<T>,
     ) -> Self {
         // FIXME: we can use a custom function here, probably make this cleaner
         let storage_prefix = nested_namespaces_with_key(&[top_name], sub_names, b"");
@@ -168,7 +168,7 @@ where
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
     pk_name: Vec<u8>,
-    de_fn: DeserializeFn2<K, T>,
+    de_fn: DeserializeKvFn<K, T>,
 }
 
 impl<K, T> Deref for Prefix2<K, T>
@@ -190,7 +190,7 @@ where
 {
     pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
         Prefix2::with_deserialization_function(top_name, sub_names, &[], |_, _, kv| {
-            deserialize_kv2::<K, T>(kv)
+            deserialize_kv::<K, T>(kv)
         })
     }
 
@@ -198,7 +198,7 @@ where
         top_name: &[u8],
         sub_names: &[&[u8]],
         pk_name: &[u8],
-        de_fn: DeserializeFn2<K, T>,
+        de_fn: DeserializeKvFn<K, T>,
     ) -> Self {
         let storage_prefix = nested_namespaces_with_key(&[top_name], sub_names, b"");
         Prefix2 {
@@ -356,7 +356,7 @@ mod test {
             storage_prefix: b"foo".to_vec(),
             data: PhantomData::<u64>,
             pk_name: vec![],
-            de_fn: |_, _, kv| deserialize_kv(kv),
+            de_fn: |_, _, kv| deserialize_v(kv),
         };
 
         // set some data, we care about "foo" prefix
