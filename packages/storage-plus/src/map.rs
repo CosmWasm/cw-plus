@@ -447,8 +447,8 @@ mod test {
         assert_eq!(
             all,
             vec![
-                ("jim".to_string(), data2.clone()),
-                ("john".to_string(), data.clone())
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone())
             ]
         );
 
@@ -465,10 +465,7 @@ mod test {
         assert_eq!(2, all.len());
         assert_eq!(
             all,
-            vec![
-                ("jim".to_string(), data2),
-                ("john".to_string(), data.clone())
-            ]
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
         );
 
         // let's try to iterate over a more restrictive range
@@ -482,7 +479,7 @@ mod test {
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
-        assert_eq!(all, vec![("john".to_string(), data)]);
+        assert_eq!(all, vec![(b"john".to_vec(), data)]);
     }
 
     #[test]
@@ -594,9 +591,9 @@ mod test {
         assert_eq!(
             all,
             vec![
-                (("owner".to_string(), "spender".to_string()), 1000),
-                (("owner".to_string(), "spender2".to_string()), 3000),
-                (("owner2".to_string(), "spender".to_string()), 5000)
+                ((b"owner".to_vec(), b"spender".to_vec()), 1000),
+                ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
+                ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
             ]
         );
     }
@@ -716,10 +713,10 @@ mod test {
         assert_eq!(
             all,
             vec![
-                (("owner".to_string(), 9, "recipient".to_string()), 1000),
-                (("owner".to_string(), 9, "recipient2".to_string()), 3000),
-                (("owner".to_string(), 10, "recipient3".to_string()), 3000),
-                (("owner2".to_string(), 9, "recipient".to_string()), 5000)
+                ((b"owner".to_vec(), 9, "recipient".to_string()), 1000),
+                ((b"owner".to_vec(), 9, "recipient2".to_string()), 3000),
+                ((b"owner".to_vec(), 10, "recipient3".to_string()), 3000),
+                ((b"owner2".to_vec(), 9, "recipient".to_string()), 5000)
             ]
         );
     }
