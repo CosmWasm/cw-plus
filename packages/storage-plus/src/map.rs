@@ -113,18 +113,16 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + Deserializable,
+    K: PrimaryKey<'a>,
 {
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K, T> {
+    // FIXME: Use SuperSuffix
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K::Suffix, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix2<K, T> {
+    #[cfg(feature = "iterator")]
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix2<K::Suffix, T> {
         Prefix2::new(self.namespace, &p.prefix())
-    }
-
-    fn no_prefix_de(&self) -> Prefix2<K, T> {
-        Prefix2::new(self.namespace, &[])
     }
 }
 
@@ -215,6 +213,10 @@ where
         K::Output: 'c,
     {
         self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix2<K, T> {
+        Prefix2::new(self.namespace, &[])
     }
 }
 
@@ -621,6 +623,18 @@ mod test {
                 ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
                 ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
             ]
+        );
+
+        // let's try to iterate over a prefix_de
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix_de(b"owner")
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000),]
         );
     }
 
