@@ -48,6 +48,11 @@ where
         Prefix::new(self.namespace, &p.prefix())
     }
 
+    #[cfg(feature = "iterator")]
+    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
+        Prefix::new(self.namespace, &p.prefix())
+    }
+
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {
         self.key(k).save(store, data)
     }
@@ -109,7 +114,7 @@ impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
-    K::SubPrefix: EmptyPrefix,
+    K::NoPrefix: EmptyPrefix,
 {
     pub fn range<'c>(
         &self,
@@ -121,7 +126,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .range(store, min, max, order)
     }
 
@@ -135,7 +140,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .keys(store, min, max, order)
     }
 }
@@ -401,6 +406,32 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
+        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
+        let all = all.unwrap();
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (
+                    (b"owner".to_vec(), U8Key::new(9), b"recipient".to_vec()).joined_key(),
+                    1000
+                ),
+                (
+                    (b"owner".to_vec(), U8Key::new(9), b"recipient2".to_vec()).joined_key(),
+                    3000
+                ),
+                (
+                    (b"owner".to_vec(), U8Key::new(10), b"recipient3".to_vec()).joined_key(),
+                    3000
+                ),
+                (
+                    (b"owner2".to_vec(), U8Key::new(9), b"recipient".to_vec()).joined_key(),
+                    5000
+                )
+            ]
+        );
+
+        // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9u8.into()))
             .range(&store, None, None, Order::Ascending)
