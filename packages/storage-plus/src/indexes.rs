@@ -138,6 +138,15 @@ where
         )
     }
 
+    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv,
+        )
+    }
+
     pub fn index_key(&self, k: K) -> Vec<u8> {
         k.joined_key()
     }
@@ -168,7 +177,7 @@ impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
-    K::SubPrefix: EmptyPrefix,
+    K::NoPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -182,7 +191,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .range(store, min, max, order)
     }
 
@@ -193,7 +202,7 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .keys(store, min, max, order)
     }
 }
@@ -279,6 +288,12 @@ where
         })
     }
 
+    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv(kv)
+        })
+    }
+
     /// returns all items that match this secondary index, always by pk Ascending
     pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Pair<T>>> {
         let data = self
@@ -294,7 +309,7 @@ impl<'a, K, T> UniqueIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
-    K::SubPrefix: EmptyPrefix,
+    K::NoPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -308,7 +323,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .range(store, min, max, order)
     }
 
@@ -319,7 +334,7 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .keys(store, min, max, order)
     }
 }
