@@ -555,6 +555,21 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ((b"owner".to_vec(), b"spender".to_vec()).joined_key(), 1000),
+                ((b"owner".to_vec(), b"spender2".to_vec()).joined_key(), 3000),
+                ((b"owner2".to_vec(), b"spender".to_vec()).joined_key(), 5000),
+            ]
+        );
+
+        // let's try to iterate over a prefix
+        let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
             .range(&store, None, None, Order::Ascending)
             .collect();
