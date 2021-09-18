@@ -116,17 +116,17 @@ where
     K: PrimaryKey<'a> + Deserializable,
 {
     #[cfg(feature = "iterator")]
-    pub fn sub_prefix2(&self, p: K::SubPrefix) -> Prefix2<K, T> {
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 
     #[cfg(feature = "iterator")]
-    pub fn prefix2(&self, p: K::Prefix) -> Prefix2<K, T> {
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 
     #[cfg(feature = "iterator")]
-    fn no_prefix2(&self, p: K::NoPrefix) -> Prefix2<K, T> {
+    fn no_prefix_de(&self, p: K::NoPrefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 }
@@ -204,7 +204,7 @@ where
         T: 'c,
         K: 'c,
     {
-        self.no_prefix2(K::NoPrefix::new())
+        self.no_prefix_de(K::NoPrefix::new())
             .range_de(store, min, max, order)
     }
 }
