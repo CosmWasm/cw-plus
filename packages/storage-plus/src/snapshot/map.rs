@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+use crate::de::Deserializable;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
@@ -61,7 +62,7 @@ where
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + Deserializable,
 {
     pub fn key(&self, k: K) -> Path<T> {
         self.primary.key(k)
@@ -166,7 +167,7 @@ where
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + Deserializable,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
