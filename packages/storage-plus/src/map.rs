@@ -124,6 +124,11 @@ where
     pub fn prefix2(&self, p: K::Prefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
+
+    #[cfg(feature = "iterator")]
+    fn no_prefix2(&self, p: K::NoPrefix) -> Prefix2<K, T> {
+        Prefix2::new(self.namespace, &p.prefix())
+    }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
@@ -166,6 +171,7 @@ impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + Deserializable,
+    K::NoPrefix: EmptyPrefix,
 {
     /// while range assumes you set the prefix to one element and call range over the last one,
     /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
@@ -198,7 +204,7 @@ where
         T: 'c,
         K: 'c,
     {
-        self.sub_prefix2(K::SubPrefix::new())
+        self.no_prefix2(K::NoPrefix::new())
             .range2(store, min, max, order)
     }
 }
