@@ -193,7 +193,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range2<'c>(
+    pub fn range_de<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -205,7 +205,7 @@ where
         K: 'c,
     {
         self.no_prefix2(K::NoPrefix::new())
-            .range2(store, min, max, order)
+            .range_de(store, min, max, order)
     }
 }
 
@@ -422,7 +422,7 @@ mod test {
     }
 
     #[test]
-    fn range2_simple_string_key() {
+    fn range_de_simple_string_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -440,7 +440,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE
-            .range2(&store, None, None, Order::Ascending)
+            .range_de(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -454,7 +454,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range2(
+            .range_de(
                 &store,
                 Some(Bound::Inclusive(b"j".to_vec())),
                 None,
@@ -470,7 +470,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range2(
+            .range_de(
                 &store,
                 Some(Bound::Inclusive(b"jo".to_vec())),
                 None,
@@ -484,7 +484,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range2_simple_integer_key() {
+    fn range_de_simple_integer_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -504,7 +504,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range2(&store, None, None, Order::Ascending)
+            .range_de(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -512,7 +512,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range2(
+            .range_de(
                 &store,
                 Some(Bound::Inclusive(U32Key::new(56).into())),
                 None,
@@ -525,7 +525,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range2(
+            .range_de(
                 &store,
                 Some(Bound::Inclusive(U32Key::new(57).into())),
                 None,
@@ -568,7 +568,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range2_composite_key() {
+    fn range_de_composite_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -584,7 +584,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .range2(&store, None, None, Order::Ascending)
+            .range_de(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -687,7 +687,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range2_triple_key() {
+    fn range_de_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -706,7 +706,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = TRIPLE
-            .range2(&store, None, None, Order::Ascending)
+            .range_de(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(4, all.len());
