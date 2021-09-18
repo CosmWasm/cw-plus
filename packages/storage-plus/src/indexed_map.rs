@@ -136,6 +136,11 @@ where
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
+
+    // use no_prefix to scan -> range
+    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
@@ -144,7 +149,7 @@ where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
-    K::SubPrefix: EmptyPrefix,
+    K::NoPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -158,7 +163,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
+        self.no_prefix(K::NoPrefix::new())
             .range(store, min, max, order)
     }
 }
