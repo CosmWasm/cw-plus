@@ -225,7 +225,6 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
-    use crate::iter_helpers::to_length_prefixed;
     #[cfg(feature = "iterator")]
     use crate::U32Key;
     use crate::U8Key;
@@ -704,22 +703,13 @@ mod test {
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
-        // FIXME: range() works, but remaining keys are still encoded
+        // Use range_de() if you want key deserialization
         assert_eq!(
             all,
             vec![
-                (
-                    [to_length_prefixed(b"\x09"), b"recipient".to_vec()].concat(),
-                    1000
-                ),
-                (
-                    [to_length_prefixed(b"\x09"), b"recipient2".to_vec()].concat(),
-                    3000
-                ),
-                (
-                    [to_length_prefixed(b"\x0a"), b"recipient3".to_vec()].concat(),
-                    3000
-                )
+                ((U8Key::new(9), b"recipient".to_vec()).joined_key(), 1000),
+                ((U8Key::new(9), b"recipient2".to_vec()).joined_key(), 3000),
+                ((U8Key::new(10), b"recipient3".to_vec()).joined_key(), 3000)
             ]
         );
     }
