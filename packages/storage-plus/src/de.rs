@@ -9,6 +9,28 @@ pub trait Deserializable {
     fn from_slice(value: &[u8]) -> StdResult<Self::Output>;
 }
 
+impl Deserializable for () {
+    type Output = ();
+
+    fn from_slice(_value: &[u8]) -> StdResult<Self::Output> {
+        Ok(())
+    }
+}
+
+macro_rules! bytes_de {
+    (for $($t:ty),+) => {
+        $(impl Deserializable for $t {
+            type Output = Vec<u8>;
+
+            fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+                Ok(value.to_vec())
+            }
+        })*
+    }
+}
+
+bytes_de!(for Vec<u8>, &Vec<u8>, [u8], &[u8]);
+
 macro_rules! string_de {
     (for $($t:ty),+) => {
         $(impl Deserializable for $t {
@@ -24,8 +46,7 @@ macro_rules! string_de {
     }
 }
 
-// TODO: Confirm / extend these
-string_de!(for String, &str, &[u8], Addr, &Addr);
+string_de!(for String, &String, str, &str, Addr, &Addr);
 
 macro_rules! integer_de {
     (for $($t:ty),+) => {
