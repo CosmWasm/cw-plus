@@ -305,6 +305,8 @@ impl TimestampKey {
 impl<'a> PrimaryKey<'a> for TimestampKey {
     type Prefix = ();
     type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
 
     fn key(&self) -> Vec<&[u8]> {
         self.0.key()

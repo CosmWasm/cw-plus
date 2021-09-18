@@ -1,4 +1,4 @@
-use crate::keys::IntKey;
+use crate::keys::{IntKey, TimestampKey};
 use cosmwasm_std::{Addr, StdError, StdResult};
 use std::array::TryFromSliceError;
 use std::convert::TryInto;
@@ -63,6 +63,19 @@ macro_rules! integer_de {
 }
 
 integer_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
+
+impl Deserializable for TimestampKey {
+    type Output = u64;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        Ok(<u64>::from_be_bytes(
+            value
+                .try_into()
+                // FIXME: Add and use StdError try-from error From helper
+                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
+        ))
+    }
+}
 
 impl<T: Deserializable, U: Deserializable> Deserializable for (T, U) {
     type Output = (T::Output, U::Output);
