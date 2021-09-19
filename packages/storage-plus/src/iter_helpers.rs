@@ -7,6 +7,7 @@ use crate::de::Deserializable;
 use crate::helpers::encode_length;
 use crate::prefix::Pair2;
 
+#[allow(dead_code)]
 pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (k, v) = kv;
     let t = from_slice::<T>(&v)?;

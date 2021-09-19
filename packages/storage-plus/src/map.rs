@@ -12,7 +12,7 @@ use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::prefix::{namespaced_prefix_range, Bound, Pair2, Prefix, Prefix2, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Bound, Pair2, Prefix, PrefixBound};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -115,12 +115,12 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K::SuperSuffix, T> {
-        Prefix2::new(self.namespace, &p.prefix())
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<T, K::SuperSuffix> {
+        Prefix::new(self.namespace, &p.prefix())
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix2<K::Suffix, T> {
-        Prefix2::new(self.namespace, &p.prefix())
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<T, K::Suffix> {
+        Prefix::new(self.namespace, &p.prefix())
     }
 }
 
@@ -213,8 +213,8 @@ where
         self.no_prefix_de().keys_de(store, min, max, order)
     }
 
-    fn no_prefix_de(&self) -> Prefix2<K, T> {
-        Prefix2::new(self.namespace, &[])
+    fn no_prefix_de(&self) -> Prefix<T, K> {
+        Prefix::new(self.namespace, &[])
     }
 }
 
