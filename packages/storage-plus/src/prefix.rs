@@ -227,15 +227,22 @@ where
         Box::new(mapped)
     }
 
-    pub fn keys<'a>(
+    pub fn keys_de<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
-        let mapped =
-            range_with_prefix(store, &self.storage_prefix, min, max, order).map(|(k, _)| k);
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
+    where
+        T: 'a,
+        K::Output: 'a,
+    {
+        let de_fn = self.de_fn;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
+            .map(move |kv| (de_fn)(store, &*pk_name, kv).map(|(k, _)| Ok(k)))
+            .flatten();
         Box::new(mapped)
     }
 }
