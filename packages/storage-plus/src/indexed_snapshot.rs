@@ -5,7 +5,7 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
+use crate::keys::{Prefixer, PrimaryKey};
 use crate::prefix::{Bound, Prefix};
 use crate::snapshot::SnapshotMap;
 use crate::{IndexList, Path, Strategy};
@@ -162,8 +162,8 @@ where
     }
 
     // use no_prefix to scan -> range
-    pub fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
+    pub fn no_prefix(&self) -> Prefix<T> {
+        Prefix::new(self.pk_namespace, &[])
     }
 }
 
@@ -173,7 +173,6 @@ where
     K: PrimaryKey<'a> + Prefixer<'a>,
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
-    K::NoPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -187,8 +186,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix(K::NoPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 }
 

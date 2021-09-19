@@ -3,9 +3,9 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::helpers::query_raw;
-use crate::keys::PrimaryKey;
 #[cfg(feature = "iterator")]
-use crate::keys::{EmptyPrefix, Prefixer};
+use crate::keys::Prefixer;
+use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
@@ -49,8 +49,8 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
-        Prefix::new(self.namespace, &p.prefix())
+    pub(crate) fn no_prefix(&self) -> Prefix<T> {
+        Prefix::new(self.namespace, &[])
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {
@@ -114,7 +114,6 @@ impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
-    K::NoPrefix: EmptyPrefix,
 {
     pub fn range<'c>(
         &self,
@@ -126,8 +125,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix(K::NoPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -140,8 +138,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix(K::NoPrefix::new())
-            .keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 }
 

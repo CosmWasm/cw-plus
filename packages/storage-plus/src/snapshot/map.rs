@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use cosmwasm_std::{StdError, StdResult, Storage};
 
-use crate::keys::{EmptyPrefix, PrimaryKey};
+use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::Prefix;
@@ -64,6 +64,10 @@ where
 
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         self.primary.sub_prefix(p)
+    }
+
+    fn no_prefix(&self) -> Prefix<T> {
+        self.primary.no_prefix()
     }
 
     /// load old value and store changelog
@@ -155,7 +159,6 @@ impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + Prefixer<'a>,
-    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -169,8 +172,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 }
 
