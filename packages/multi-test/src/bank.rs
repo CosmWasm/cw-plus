@@ -1,6 +1,6 @@
 use cosmwasm_std::{
     coin, to_binary, Addr, AllBalanceResponse, Api, BalanceResponse, BankMsg, BankQuery, Binary,
-    Coin, Event, Storage,
+    BlockInfo, Coin, Event, Querier, Storage,
 };
 
 use crate::executor::AppResponse;
@@ -9,32 +9,15 @@ use cw0::NativeBalance;
 use cw_storage_plus::Map;
 use itertools::Itertools;
 
+use crate::app::CosmosRouter;
+use crate::module::Module;
 use anyhow::{bail, Result as AnyResult};
 
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
 pub const NAMESPACE_BANK: &[u8] = b"bank";
 
-/// Bank is a minimal contract-like interface that implements a bank module
-/// It is initialized outside of the trait
-pub trait Bank {
-    fn execute(
-        &self,
-        storage: &mut dyn Storage,
-        sender: Addr,
-        msg: BankMsg,
-    ) -> AnyResult<AppResponse>;
-
-    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary>;
-
-    // Admin interface
-    fn init_balance(
-        &self,
-        storage: &mut dyn Storage,
-        account: &Addr,
-        amount: Vec<Coin>,
-    ) -> AnyResult<()>;
-}
+pub trait Bank: Module<ExecT = BankMsg, QueryT = BankQuery> {}
 
 #[derive(Default)]
 pub struct BankKeeper {}
@@ -42,6 +25,17 @@ pub struct BankKeeper {}
 impl BankKeeper {
     pub fn new() -> Self {
         BankKeeper {}
+    }
+
+    // this is an "admin" function to let us adjust bank accounts in genesis
+    pub fn init_balance(
+        &self,
+        storage: &mut dyn Storage,
+        account: &Addr,
+        amount: Vec<Coin>,
+    ) -> AnyResult<()> {
+        let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
+        self.set_balance(&mut bank_storage, account, amount)
     }
 
     fn set_balance(
@@ -104,10 +98,18 @@ fn coins_to_string(coins: &[Coin]) -> String {
         .join(",")
 }
 
-impl Bank for BankKeeper {
-    fn execute(
+impl Bank for BankKeeper {}
+
+impl Module for BankKeeper {
+    type ExecT = BankMsg;
+    type QueryT = BankQuery;
+
+    fn execute<ExecC, QueryC>(
         &self,
+        _api: &dyn Api,
         storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
         sender: Addr,
         msg: BankMsg,
     ) -> AnyResult<AppResponse> {
@@ -136,7 +138,14 @@ impl Bank for BankKeeper {
         }
     }
 
-    fn query(&self, api: &dyn Api, storage: &dyn Storage, request: BankQuery) -> AnyResult<Binary> {
+    fn query(
+        &self,
+        api: &dyn Api,
+        storage: &dyn Storage,
+        _querier: &dyn Querier,
+        _block: &BlockInfo,
+        request: BankQuery,
+    ) -> AnyResult<Binary> {
         let bank_storage = prefixed_read(storage, NAMESPACE_BANK);
         match request {
             BankQuery::AllBalances { address } => {
@@ -158,25 +167,15 @@ impl Bank for BankKeeper {
             q => bail!("Unsupported bank query: {:?}", q),
         }
     }
-
-    // this is an "admin" function to let us adjust bank accounts
-    fn init_balance(
-        &self,
-        storage: &mut dyn Storage,
-        account: &Addr,
-        amount: Vec<Coin>,
-    ) -> AnyResult<()> {
-        let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
-        self.set_balance(&mut bank_storage, account, amount)
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use cosmwasm_std::testing::{MockApi, MockStorage};
-    use cosmwasm_std::{coins, from_slice, StdError};
+    use crate::app::MockRouter;
+    use cosmwasm_std::testing::{mock_env, MockApi, MockQuerier, MockStorage};
+    use cosmwasm_std::{coins, from_slice, Empty, StdError};
 
     fn query_balance(
         bank: &BankKeeper,
@@ -187,7 +186,10 @@ mod test {
         let req = BankQuery::AllBalances {
             address: rcpt.clone().into(),
         };
-        let raw = bank.query(api, store, req).unwrap();
+        let block = mock_env().block;
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+
+        let raw = bank.query(api, store, &querier, &block, req).unwrap();
         let res: AllBalanceResponse = from_slice(&raw).unwrap();
         res.amount
     }
@@ -196,6 +198,8 @@ mod test {
     fn get_set_balance() {
         let api = MockApi::default();
         let mut store = MockStorage::new();
+        let block = mock_env().block;
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
 
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("receiver");
@@ -217,14 +221,14 @@ mod test {
         let req = BankQuery::AllBalances {
             address: owner.clone().into(),
         };
-        let raw = bank.query(&api, &store, req).unwrap();
+        let raw = bank.query(&api, &store, &querier, &block, req).unwrap();
         let res: AllBalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, norm);
 
         let req = BankQuery::AllBalances {
             address: rcpt.clone().into(),
         };
-        let raw = bank.query(&api, &store, req).unwrap();
+        let raw = bank.query(&api, &store, &querier, &block, req).unwrap();
         let res: AllBalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, vec![]);
 
@@ -232,7 +236,7 @@ mod test {
             address: owner.clone().into(),
             denom: "eth".into(),
         };
-        let raw = bank.query(&api, &store, req).unwrap();
+        let raw = bank.query(&api, &store, &querier, &block, req).unwrap();
         let res: BalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, coin(100, "eth"));
 
@@ -240,7 +244,7 @@ mod test {
             address: owner.into(),
             denom: "foobar".into(),
         };
-        let raw = bank.query(&api, &store, req).unwrap();
+        let raw = bank.query(&api, &store, &querier, &block, req).unwrap();
         let res: BalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, coin(0, "foobar"));
 
@@ -248,7 +252,7 @@ mod test {
             address: rcpt.into(),
             denom: "eth".into(),
         };
-        let raw = bank.query(&api, &store, req).unwrap();
+        let raw = bank.query(&api, &store, &querier, &block, req).unwrap();
         let res: BalanceResponse = from_slice(&raw).unwrap();
         assert_eq!(res.amount, coin(0, "eth"));
     }
@@ -257,6 +261,8 @@ mod test {
     fn send_coins() {
         let api = MockApi::default();
         let mut store = MockStorage::new();
+        let block = mock_env().block;
+        let router = MockRouter::default();
 
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("receiver");
@@ -274,22 +280,31 @@ mod test {
             to_address: rcpt.clone().into(),
             amount: to_send,
         };
-        bank.execute(&mut store, owner.clone(), msg.clone())
-            .unwrap();
+        bank.execute(
+            &api,
+            &mut store,
+            &router,
+            &block,
+            owner.clone(),
+            msg.clone(),
+        )
+        .unwrap();
         let rich = query_balance(&bank, &api, &store, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
         let poor = query_balance(&bank, &api, &store, &rcpt);
         assert_eq!(vec![coin(10, "btc"), coin(30, "eth")], poor);
 
         // can send from any account with funds
-        bank.execute(&mut store, rcpt.clone(), msg).unwrap();
+        bank.execute(&api, &mut store, &router, &block, rcpt.clone(), msg)
+            .unwrap();
 
         // cannot send too much
         let msg = BankMsg::Send {
             to_address: rcpt.into(),
             amount: coins(20, "btc"),
         };
-        bank.execute(&mut store, owner.clone(), msg).unwrap_err();
+        bank.execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap_err();
 
         let rich = query_balance(&bank, &api, &store, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
@@ -299,6 +314,8 @@ mod test {
     fn burn_coins() {
         let api = MockApi::default();
         let mut store = MockStorage::new();
+        let block = mock_env().block;
+        let router = MockRouter::default();
 
         let owner = Addr::unchecked("owner");
         let rcpt = Addr::unchecked("recipient");
@@ -311,7 +328,8 @@ mod test {
         // burn both tokens
         let to_burn = vec![coin(30, "eth"), coin(5, "btc")];
         let msg = BankMsg::Burn { amount: to_burn };
-        bank.execute(&mut store, owner.clone(), msg).unwrap();
+        bank.execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap();
         let rich = query_balance(&bank, &api, &store, &owner);
         assert_eq!(vec![coin(15, "btc"), coin(70, "eth")], rich);
 
@@ -319,7 +337,9 @@ mod test {
         let msg = BankMsg::Burn {
             amount: coins(20, "btc"),
         };
-        let err = bank.execute(&mut store, owner.clone(), msg).unwrap_err();
+        let err = bank
+            .execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap_err();
         assert!(matches!(err.downcast().unwrap(), StdError::Overflow { .. }));
 
         let rich = query_balance(&bank, &api, &store, &owner);
@@ -329,7 +349,9 @@ mod test {
         let msg = BankMsg::Burn {
             amount: coins(1, "btc"),
         };
-        let err = bank.execute(&mut store, rcpt, msg).unwrap_err();
+        let err = bank
+            .execute(&api, &mut store, &router, &block, rcpt, msg)
+            .unwrap_err();
         assert!(matches!(err.downcast().unwrap(), StdError::Overflow { .. }));
     }
 }

@@ -1,86 +1,13 @@
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Storage};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;
 use std::cell::{Ref, RefCell};
-use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use crate::AppResponse;
-
-/// Custom message handler trait. Implementor of this trait is mocking environment behavior on
-/// given custom message.
-pub trait CustomHandler {
-    /// Custom exec message for this handler
-    type ExecC;
-
-    /// Custom query message for this handler
-    type QueryC;
-
-    fn execute(
-        &self,
-        api: &dyn Api,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        sender: Addr,
-        msg: Self::ExecC,
-    ) -> AnyResult<AppResponse>;
-
-    fn query(
-        &self,
-        api: &dyn Api,
-        storage: &dyn Storage,
-        block: &BlockInfo,
-        msg: Self::QueryC,
-    ) -> AnyResult<Binary>;
-}
-
-/// Custom handler implementation panicking on each call. Assuming, that unless specific behavior
-/// is implemented, custom messages should not be send.
-pub struct PanickingCustomHandler<ExecC, QueryC>(PhantomData<ExecC>, PhantomData<QueryC>);
-
-impl<Exec, Query> PanickingCustomHandler<Exec, Query> {
-    pub fn new() -> Self {
-        PanickingCustomHandler(PhantomData, PhantomData)
-    }
-}
-
-impl<Exec, Query> Default for PanickingCustomHandler<Exec, Query> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<Exec, Query> CustomHandler for PanickingCustomHandler<Exec, Query>
-where
-    Exec: std::fmt::Debug,
-    Query: std::fmt::Debug,
-{
-    type ExecC = Exec;
-    type QueryC = Query;
-
-    fn execute(
-        &self,
-        _api: &dyn Api,
-        _storage: &mut dyn Storage,
-        _block: &BlockInfo,
-        sender: Addr,
-        msg: Self::ExecC,
-    ) -> AnyResult<AppResponse> {
-        panic!("Unexpected custom exec msg {:?} from {:?}", msg, sender)
-    }
-
-    fn query(
-        &self,
-        _api: &dyn Api,
-        _storage: &dyn Storage,
-        _block: &BlockInfo,
-        msg: Self::QueryC,
-    ) -> AnyResult<Binary> {
-        panic!("Unexpected custom query {:?}", msg)
-    }
-}
+use crate::app::CosmosRouter;
+use crate::{AppResponse, Module};
 
 /// Internal state of `CachingCustomHandler` wrapping internal mutability so it is not exposed to
 /// user. Those have to be shared internal state, as after mock is passed to app it is not
@@ -121,17 +48,20 @@ impl<ExecC, QueryC> CachingCustomHandler<ExecC, QueryC> {
     }
 }
 
-impl<Exec, Query> CustomHandler for CachingCustomHandler<Exec, Query> {
-    type ExecC = Exec;
-    type QueryC = Query;
+impl<Exec, Query> Module for CachingCustomHandler<Exec, Query> {
+    type ExecT = Exec;
+    type QueryT = Query;
 
-    fn execute(
+    // TODO: how to assert
+    // where ExecC: Exec, QueryC: Query
+    fn execute<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
         _sender: Addr,
-        msg: Exec,
+        msg: Self::ExecT,
     ) -> AnyResult<AppResponse> {
         self.state.execs.borrow_mut().push(msg);
         Ok(AppResponse::default())
@@ -141,10 +71,11 @@ impl<Exec, Query> CustomHandler for CachingCustomHandler<Exec, Query> {
         &self,
         _api: &dyn Api,
         _storage: &dyn Storage,
+        _querier: &dyn Querier,
         _block: &BlockInfo,
-        msg: Query,
+        request: Self::QueryT,
     ) -> AnyResult<Binary> {
-        self.state.queries.borrow_mut().push(msg);
+        self.state.queries.borrow_mut().push(request);
         Ok(Binary::default())
     }
 }

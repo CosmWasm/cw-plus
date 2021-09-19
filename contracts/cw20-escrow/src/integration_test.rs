@@ -2,13 +2,9 @@
 
 use cosmwasm_std::{coins, to_binary, Addr, Empty, Uint128};
 use cw20::{Cw20Coin, Cw20Contract, Cw20ExecuteMsg};
-use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
+use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
 use crate::msg::{CreateMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg};
-
-fn mock_app() -> App {
-    AppBuilder::new().build()
-}
 
 pub fn contract_escrow() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
@@ -31,12 +27,16 @@ pub fn contract_cw20() -> Box<dyn Contract<Empty>> {
 #[test]
 // receive cw20 tokens and release upon approval
 fn escrow_happy_path_cw20_tokens() {
-    let mut router = mock_app();
-
     // set personal balance
     let owner = Addr::unchecked("owner");
     let init_funds = coins(2000, "btc");
-    router.init_bank_balance(&owner, init_funds).unwrap();
+
+    let mut router = App::new(|router, _, storage| {
+        router
+            .bank
+            .init_balance(storage, &owner, init_funds)
+            .unwrap();
+    });
 
     // set up cw20 contract with some tokens
     let cw20_id = router.store_code(contract_cw20());
