@@ -2,9 +2,8 @@ use std::fmt::{self, Debug};
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, CustomQuery,
-    Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
-    SystemResult,
+    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CustomQuery, Empty,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -15,6 +14,7 @@ use crate::contracts::Contract;
 use crate::custom_handler::{CustomHandler, PanickingCustomHandler};
 use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
+use crate::untyped_msg::CosmosMsg;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
 use crate::BankKeeper;
 
@@ -101,7 +101,11 @@ where
     StorageT: Storage,
     CustomT: CustomHandler,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<CustomT::ExecC>) -> AnyResult<AppResponse> {
+    fn execute(
+        &mut self,
+        sender: Addr,
+        msg: cosmwasm_std::CosmosMsg<CustomT::ExecC>,
+    ) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -385,7 +389,7 @@ where
     pub fn execute_multi(
         &mut self,
         sender: Addr,
-        msgs: Vec<CosmosMsg<CustomT::ExecC>>,
+        msgs: Vec<cosmwasm_std::CosmosMsg<CustomT::ExecC>>,
     ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
@@ -400,7 +404,7 @@ where
 
         transactional(&mut *storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg))
+                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg.into()))
                 .collect()
         })
     }
@@ -449,13 +453,20 @@ pub struct Router<Bank, Custom, Wasm> {
     pub(crate) custom: Custom,
 }
 
-impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
+impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT>
+where
+    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    CustomT: CustomHandler,
+    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    BankT: Bank,
+{
     pub fn querier<'a>(
         &'a self,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
-    ) -> RouterQuerier<'a, BankT, CustomT, WasmT> {
+    ) -> RouterQuerier<'a, CustomT::ExecC, CustomT::QueryC> {
         RouterQuerier {
             router: self,
             api,
@@ -463,25 +474,67 @@ impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
             block_info,
         }
     }
+}
 
-    /// this is used by `RouterQuerier` to actual implement the `Querier` interface.
-    /// you most likely want to use `router.querier(storage, block).wrap()` to get a
-    /// QuerierWrapper to interact with
-    pub fn query(
+pub trait CosmosRouter {
+    type ExecC;
+    type QueryC: CustomQuery;
+
+    fn execute(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: CosmosMsg<Self::ExecC>,
+    ) -> AnyResult<AppResponse>;
+
+    fn query(
         &self,
         api: &dyn Api,
         storage: &dyn Storage,
         block: &BlockInfo,
-        request: QueryRequest<CustomT::QueryC>,
-    ) -> AnyResult<Binary>
-    where
-        CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-        CustomT::ExecC:
-            std::fmt::Debug + PartialEq + Clone + JsonSchema + DeserializeOwned + 'static,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
-        CustomT: CustomHandler,
-    {
+        request: QueryRequest<Self::QueryC>,
+    ) -> AnyResult<Binary>;
+}
+
+impl<BankT, CustomT, WasmT> CosmosRouter for Router<BankT, CustomT, WasmT>
+where
+    CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
+    CustomT: CustomHandler,
+    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
+    BankT: Bank,
+{
+    type ExecC = CustomT::ExecC;
+    type QueryC = CustomT::QueryC;
+
+    fn execute(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        sender: Addr,
+        msg: CosmosMsg<Self::ExecC>,
+    ) -> AnyResult<AppResponse> {
+        match msg {
+            CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, self, block, sender, msg),
+            CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
+            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// this is used by `RouterQuerier` to actual implement the `Querier` interface.
+    /// you most likely want to use `router.querier(storage, block).wrap()` to get a
+    /// QuerierWrapper to interact with
+    fn query(
+        &self,
+        api: &dyn Api,
+        storage: &dyn Storage,
+        block: &BlockInfo,
+        request: QueryRequest<Self::QueryC>,
+    ) -> AnyResult<Binary> {
         match request {
             QueryRequest::Wasm(req) => {
                 self.wasm
@@ -492,40 +545,18 @@ impl<BankT, CustomT, WasmT> Router<BankT, CustomT, WasmT> {
             _ => unimplemented!(),
         }
     }
-
-    pub fn execute(
-        &self,
-        api: &dyn Api,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        sender: Addr,
-        msg: CosmosMsg<CustomT::ExecC>,
-    ) -> AnyResult<AppResponse>
-    where
-        CustomT::ExecC: std::fmt::Debug + Clone + PartialEq + JsonSchema,
-        WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-        BankT: Bank,
-        CustomT: CustomHandler,
-    {
-        match msg {
-            CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
-            CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
-            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
-            _ => unimplemented!(),
-        }
-    }
 }
 
-pub struct RouterQuerier<'a, Bank, Custom, Wasm> {
-    router: &'a Router<Bank, Custom, Wasm>,
+pub struct RouterQuerier<'a, ExecC, QueryC> {
+    router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
     api: &'a dyn Api,
     storage: &'a dyn Storage,
     block_info: &'a BlockInfo,
 }
 
-impl<'a, Bank, Custom, Wasm> RouterQuerier<'a, Bank, Custom, Wasm> {
+impl<'a, ExecC, QueryC> RouterQuerier<'a, ExecC, QueryC> {
     pub fn new(
-        router: &'a Router<Bank, Custom, Wasm>,
+        router: &'a dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         api: &'a dyn Api,
         storage: &'a dyn Storage,
         block_info: &'a BlockInfo,
@@ -539,16 +570,13 @@ impl<'a, Bank, Custom, Wasm> RouterQuerier<'a, Bank, Custom, Wasm> {
     }
 }
 
-impl<'a, BankT, CustomT, WasmT> Querier for RouterQuerier<'a, BankT, CustomT, WasmT>
+impl<'a, ExecC, QueryC> Querier for RouterQuerier<'a, ExecC, QueryC>
 where
-    CustomT::ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
-    CustomT::QueryC: CustomQuery + DeserializeOwned + 'static,
-    WasmT: Wasm<CustomT::ExecC, CustomT::QueryC>,
-    BankT: Bank,
-    CustomT: CustomHandler,
+    ExecC: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    QueryC: CustomQuery + DeserializeOwned + 'static,
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
-        let request: QueryRequest<CustomT::QueryC> = match from_slice(bin_request) {
+        let request: QueryRequest<QueryC> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
@@ -622,7 +650,7 @@ mod test {
 
         // send both tokens
         let to_send = vec![coin(30, "eth"), coin(5, "btc")];
-        let msg: CosmosMsg = BankMsg::Send {
+        let msg: cosmwasm_std::CosmosMsg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: to_send,
         }

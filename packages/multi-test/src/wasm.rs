@@ -15,12 +15,11 @@ use serde::{Deserialize, Serialize};
 
 use cw_storage_plus::Map;
 
-use crate::app::{Router, RouterQuerier};
+use crate::app::{CosmosRouter, RouterQuerier};
 use crate::contracts::Contract;
 use crate::error::Error;
 use crate::executor::AppResponse;
 use crate::transactions::transactional;
-use crate::{Bank, CustomHandler};
 use cosmwasm_std::testing::mock_wasmd_attr;
 
 use anyhow::{anyhow, bail, Result as AnyResult};
@@ -59,19 +58,15 @@ pub trait Wasm<ExecC, QueryC> {
     ) -> AnyResult<Binary>;
 
     /// Handles all WasmMsg messages
-    fn execute<BankT, CustomT>(
+    fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> AnyResult<AppResponse>
-    where
-        Self: Sized,
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>;
+    ) -> AnyResult<AppResponse>;
 
     // Add a new contract. Must be done on the base object, when no contracts running
     fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> usize;
@@ -80,19 +75,15 @@ pub trait Wasm<ExecC, QueryC> {
     fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData>;
 
     /// Admin interface, cannot be called via CosmosMsg
-    fn sudo<BankT, CustomT>(
+    fn sudo(
         &self,
         api: &dyn Api,
         contract_addr: Addr,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<AppResponse>
-    where
-        Self: Sized,
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>;
+    ) -> AnyResult<AppResponse>;
 }
 
 pub struct WasmKeeper<ExecC, QueryC> {
@@ -138,19 +129,15 @@ where
         }
     }
 
-    fn execute<BankT, CustomT>(
+    fn execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         msg: WasmMsg,
-    ) -> AnyResult<AppResponse>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<AppResponse> {
         let (resender, res, custom_event) =
             self.execute_wasm(api, storage, router, block, sender, msg)?;
 
@@ -168,19 +155,15 @@ where
         self.load_contract(storage, address)
     }
 
-    fn sudo<BankT, CustomT>(
+    fn sudo(
         &self,
         api: &dyn Api,
         contract: Addr,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<AppResponse>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<AppResponse> {
         let custom_event = Event::new("sudo").add_attribute(CONTRACT_ATTR, &contract);
 
         let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
@@ -223,11 +206,11 @@ where
         data.into()
     }
 
-    fn send<T, BankT, CustomT>(
+    fn send<T>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: T,
         recipient: String,
@@ -235,14 +218,13 @@ where
     ) -> AnyResult<AppResponse>
     where
         T: Into<Addr>,
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
     {
         if !amount.is_empty() {
-            let msg = BankMsg::Send {
+            let msg: cosmwasm_std::CosmosMsg<ExecC> = BankMsg::Send {
                 to_address: recipient,
                 amount: amount.to_vec(),
-            };
+            }
+            .into();
             let res = router.execute(api, storage, block, sender.into(), msg.into())?;
             Ok(res)
         } else {
@@ -251,19 +233,15 @@ where
     }
 
     // this returns the contract address as well, so we can properly resend the data
-    fn execute_wasm<BankT, CustomT>(
+    fn execute_wasm(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
-    ) -> AnyResult<(Addr, Response<ExecC>, Event)>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<(Addr, Response<ExecC>, Event)> {
         match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -394,26 +372,22 @@ where
     ///
     /// The `data` on `AppResponse` is data returned from `reply` call, not from execution of
     /// submessage itself. In case if `reply` is not called, no `data` is set.
-    fn execute_submsg<BankT, CustomT>(
+    fn execute_submsg(
         &self,
         api: &dyn Api,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
         msg: SubMsg<ExecC>,
-    ) -> AnyResult<AppResponse>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<AppResponse> {
         let SubMsg {
             msg, id, reply_on, ..
         } = msg;
 
         // execute in cache
         let res = transactional(storage, |write_cache, _| {
-            router.execute(api, write_cache, block, contract.clone(), msg)
+            router.execute(api, write_cache, block, contract.clone(), msg.into())
         });
 
         // call reply if meaningful
@@ -453,19 +427,15 @@ where
         }
     }
 
-    fn _reply<BankT, CustomT>(
+    fn _reply(
         &self,
         api: &dyn Api,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
         reply: Reply,
-    ) -> AnyResult<AppResponse>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<AppResponse> {
         let ok_attr = if reply.result.is_ok() {
             "handle_success"
         } else {
@@ -526,20 +496,16 @@ where
         (app, messages)
     }
 
-    fn process_response<BankT, CustomT>(
+    fn process_response(
         &self,
         api: &dyn Api,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         storage: &mut dyn Storage,
         block: &BlockInfo,
         contract: Addr,
         response: AppResponse,
         messages: Vec<SubMsg<ExecC>>,
-    ) -> AnyResult<AppResponse>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<AppResponse> {
         let AppResponse { mut events, data } = response;
 
         // recurse in all messages
@@ -582,20 +548,16 @@ where
         Ok(addr)
     }
 
-    pub fn call_execute<BankT, CustomT>(
+    pub fn call_execute(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
         address: Addr,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<Response<ExecC>>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<Response<ExecC>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -606,20 +568,16 @@ where
         )?)
     }
 
-    pub fn call_instantiate<BankT, CustomT>(
+    pub fn call_instantiate(
         &self,
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<Response<ExecC>>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<Response<ExecC>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -630,19 +588,15 @@ where
         )?)
     }
 
-    pub fn call_reply<BankT, CustomT>(
+    pub fn call_reply(
         &self,
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         reply: Reply,
-    ) -> AnyResult<Response<ExecC>>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<Response<ExecC>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -653,19 +607,15 @@ where
         )?)
     }
 
-    pub fn call_sudo<BankT, CustomT>(
+    pub fn call_sudo(
         &self,
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<Response<ExecC>>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<Response<ExecC>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -676,19 +626,15 @@ where
         )?)
     }
 
-    pub fn call_migrate<BankT, CustomT>(
+    pub fn call_migrate(
         &self,
         address: Addr,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<Response<ExecC>>
-    where
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
-    {
+    ) -> AnyResult<Response<ExecC>> {
         Self::verify_response(self.with_storage(
             api,
             storage,
@@ -736,21 +682,18 @@ where
         action(handler, deps, env)
     }
 
-    fn with_storage<F, T, BankT, CustomT>(
+    fn with_storage<F, T>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        router: &Router<BankT, CustomT, Self>,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
         address: Addr,
         action: F,
     ) -> AnyResult<T>
     where
         F: FnOnce(&Box<dyn Contract<ExecC>>, DepsMut, Env) -> AnyResult<T>,
-        BankT: Bank,
-        CustomT: CustomHandler<ExecC = ExecC, QueryC = QueryC>,
         ExecC: DeserializeOwned,
-        QueryC: 'static,
     {
         let contract = self.load_contract(storage, &address)?;
         let handler = self
@@ -917,6 +860,7 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info, MockApi, MockQuerier, MockStorage};
     use cosmwasm_std::{coin, from_slice, to_vec, BankMsg, Coin, CosmosMsg, Empty, StdError};
 
+    use crate::app::Router;
     use crate::test_helpers::contracts::{error, payout};
     use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
