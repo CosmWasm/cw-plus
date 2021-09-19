@@ -463,6 +463,8 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
         StorageT: Storage,
         CustomT: Module,
         WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
+        StakingT: Staking,
+        DistrT: Distribution,
         F: FnOnce(&Router<BankT, CustomT, WasmT, StakingT, DistrT>, &dyn Api, &mut dyn Storage),
     {
         let router = Router {
@@ -473,15 +475,33 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
             distribution: self.distribution,
         };
 
-        let mut storage = self.storage;
-        init_fn(&router, &self.api, &mut storage);
-
-        App {
+        let mut app = App {
             router,
             api: self.api,
             block: self.block,
-            storage,
-        }
+            storage: self.storage,
+        };
+        app.init(init_fn);
+        app
+    }
+}
+
+impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
+    App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
+where
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
+    BankT: Bank,
+    ApiT: Api,
+    StorageT: Storage,
+    CustomT: Module,
+    StakingT: Staking,
+    DistrT: Distribution,
+{
+    fn init<F>(&mut self, init_fn: F)
+    where
+        F: FnOnce(&Router<BankT, CustomT, WasmT, StakingT, DistrT>, &dyn Api, &mut dyn Storage),
+    {
+        init_fn(&self.router, &self.api, &mut self.storage);
     }
 }
 
