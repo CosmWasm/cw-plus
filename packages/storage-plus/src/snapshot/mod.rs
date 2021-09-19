@@ -1,8 +1,8 @@
+#![cfg(feature = "iterator")]
 mod item;
 mod map;
 
 pub use item::SnapshotItem;
-#[cfg(feature = "iterator")]
 pub use map::SnapshotMap;
 
 use crate::{Bound, Map, Prefixer, PrimaryKey, U64Key};
