@@ -1,4 +1,3 @@
-#![cfg(feature = "iterator")]
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
