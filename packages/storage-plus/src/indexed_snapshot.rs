@@ -1,6 +1,3 @@
-// this module requires iterator to be useful at all
-#![cfg(feature = "iterator")]
-
 use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
