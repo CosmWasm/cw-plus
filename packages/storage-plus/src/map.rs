@@ -123,8 +123,8 @@ where
         Prefix2::new(self.namespace, &p.prefix())
     }
 
-    fn no_prefix_de(&self, p: K::NoPrefix) -> Prefix2<K, T> {
-        Prefix2::new(self.namespace, &p.prefix())
+    fn no_prefix_de(&self) -> Prefix2<K, T> {
+        Prefix2::new(self.namespace, &[])
     }
 }
 
@@ -168,7 +168,6 @@ impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + Deserializable,
-    K::NoPrefix: EmptyPrefix,
 {
     /// while range assumes you set the prefix to one element and call range over the last one,
     /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
@@ -201,8 +200,7 @@ where
         T: 'c,
         K::Output: 'c,
     {
-        self.no_prefix_de(K::NoPrefix::new())
-            .range_de(store, min, max, order)
+        self.no_prefix_de().range_de(store, min, max, order)
     }
 
     pub fn keys_de<'c>(
@@ -216,8 +214,7 @@ where
         T: 'c,
         K::Output: 'c,
     {
-        self.no_prefix_de(K::NoPrefix::new())
-            .keys_de(store, min, max, order)
+        self.no_prefix_de().keys_de(store, min, max, order)
     }
 }
 
