@@ -1001,17 +1001,17 @@ jobs:
           keys:
             - cargocache-v2-storage-plus:1.53.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
-          name: Build library for native target
-          command: cargo build --locked
+          name: Build library for native target (no iterator)
+          command: cargo build --locked --no-default-features
       - run:
-          name: Run unit tests
-          command: cargo test --locked
+          name: Run unit tests (no iterator)
+          command: cargo test --locked --no-default-features
       - run:
           name: Build library for native target (with iterator)
-          command: cargo build --locked --features iterator
+          command: cargo build --locked
       - run:
           name: Run unit tests (with iterator)
-          command: cargo test --locked --features iterator
+          command: cargo test --locked
       - save_cache:
           paths:
             - /usr/local/cargo/registry
