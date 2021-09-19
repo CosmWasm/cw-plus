@@ -68,12 +68,6 @@ pub trait Wasm<ExecC, QueryC> {
         msg: WasmMsg,
     ) -> AnyResult<AppResponse>;
 
-    // Add a new contract. Must be done on the base object, when no contracts running
-    fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> usize;
-
-    // Helper for querying for specific contract data
-    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData>;
-
     /// Admin interface, cannot be called via CosmosMsg
     fn sudo(
         &self,
@@ -145,16 +139,6 @@ where
         self.process_response(api, router, storage, block, resender, res, msgs)
     }
 
-    fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> usize {
-        let idx = self.codes.len() + 1;
-        self.codes.insert(idx, code);
-        idx
-    }
-
-    fn contract_data(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData> {
-        self.load_contract(storage, address)
-    }
-
     fn sudo(
         &self,
         api: &dyn Api,
@@ -169,6 +153,20 @@ where
         let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
         let (res, msgs) = self.build_app_response(&contract, custom_event, res);
         self.process_response(api, router, storage, block, contract, res, msgs)
+    }
+}
+
+impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC> {
+    pub fn store_code(&mut self, code: Box<dyn Contract<ExecC>>) -> usize {
+        let idx = self.codes.len() + 1;
+        self.codes.insert(idx, code);
+        idx
+    }
+
+    pub fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData> {
+        CONTRACTS
+            .load(&prefixed_read(storage, NAMESPACE_WASM), address)
+            .map_err(Into::into)
     }
 }
 
@@ -717,12 +715,6 @@ where
             };
             action(handler, deps, env)
         })
-    }
-
-    pub fn load_contract(&self, storage: &dyn Storage, address: &Addr) -> AnyResult<ContractData> {
-        CONTRACTS
-            .load(&prefixed_read(storage, NAMESPACE_WASM), address)
-            .map_err(Into::into)
     }
 
     pub fn save_contract(
