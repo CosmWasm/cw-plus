@@ -220,6 +220,21 @@ where
     {
         self.no_prefix_de().keys_de(store, min, max, order)
     }
+
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'c,
+    {
+        self.no_prefix_de(K::NoPrefix::new())
+            .keys_de(store, min, max, order)
+    }
 }
 
 #[cfg(test)]
