@@ -115,17 +115,14 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + Deserializable,
 {
-    #[cfg(feature = "iterator")]
     pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 
-    #[cfg(feature = "iterator")]
     pub fn prefix_de(&self, p: K::Prefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
 
-    #[cfg(feature = "iterator")]
     fn no_prefix_de(&self, p: K::NoPrefix) -> Prefix2<K, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
@@ -716,7 +713,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "iterator")]
     fn range_de_triple_key() {
         let mut store = MockStorage::new();
 
