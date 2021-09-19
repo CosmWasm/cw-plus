@@ -497,7 +497,7 @@ where
     StakingT: Staking,
     DistrT: Distribution,
 {
-    fn init_modules<F, T>(&mut self, init_fn: F) -> T
+    pub fn init_modules<F, T>(&mut self, init_fn: F) -> T
     where
         F: FnOnce(
             &mut Router<BankT, CustomT, WasmT, StakingT, DistrT>,
@@ -516,8 +516,8 @@ where
     }
 }
 
-// TODO: these are temporary helper functions so we can fix the Wasm trait, but not break all calling
-// contracts yet.
+// Helper functions to call some custom WasmKeeper logic.
+// They show how we can easily add such calls to other custom keepers (CustomT, StakingT, etc)
 impl<BankT, ApiT, StorageT, CustomT, StakingT, DistrT>
     App<
         BankT,
@@ -545,7 +545,6 @@ where
     }
 
     /// This allows to get `ContractData` for specific contract
-    /// TODO: deprecate
     pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
         self.read_module(|router, _, storage| router.wasm.load_contract(storage, address))
     }
