@@ -119,7 +119,6 @@ where
         Prefix2::new(self.namespace, &p.prefix())
     }
 
-    #[cfg(feature = "iterator")]
     pub fn prefix_de(&self, p: K::Prefix) -> Prefix2<K::Suffix, T> {
         Prefix2::new(self.namespace, &p.prefix())
     }
