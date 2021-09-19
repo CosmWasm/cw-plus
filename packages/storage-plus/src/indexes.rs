@@ -1,6 +1,3 @@
-// this module requires iterator to be useful at all
-#![cfg(feature = "iterator")]
-
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 

@@ -1,5 +1,3 @@
-#![cfg(feature = "iterator")]
-
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -166,7 +164,6 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-#[cfg(feature = "iterator")]
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
