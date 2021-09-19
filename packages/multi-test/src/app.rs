@@ -503,6 +503,13 @@ where
     {
         init_fn(&self.router, &self.api, &mut self.storage);
     }
+
+    pub fn read_module<F, T>(&self, query_fn: F) -> T
+    where
+        F: FnOnce(&Router<BankT, CustomT, WasmT, StakingT, DistrT>, &dyn Api, &dyn Storage) -> T,
+    {
+        query_fn(&self.router, &self.api, &self.storage)
+    }
 }
 
 impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
@@ -571,8 +578,9 @@ where
     }
 
     /// This allows to get `ContractData` for specific contract
+    /// TODO: deprecate
     pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
-        self.router.wasm.contract_data(&self.storage, address)
+        self.read_module(|router, _, storage| router.wasm.contract_data(storage, address))
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
