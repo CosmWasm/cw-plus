@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
-use crate::prefix::{Bound, Prefix};
+use crate::prefix::{Bound, PrefixT};
 use crate::snapshot::SnapshotMap;
 use crate::{IndexList, Path, Strategy};
 
@@ -32,6 +32,18 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
             primary: SnapshotMap::new(pk_namespace, checkpoints, changelog, strategy),
             idx: indexes,
         }
+    }
+}
+
+impl<'a, K, T, P, I> PrefixT<'a, P, T> for IndexedSnapshotMap<'a, K, T, I>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned + Clone,
+    I: IndexList<T>,
+    P: Prefixer<'a>,
+{
+    fn get_pk_namespace(&self) -> &[u8] {
+        self.pk_namespace
     }
 }
 
@@ -149,21 +161,6 @@ where
     /// returns an error on issues parsing
     pub fn may_load(&self, store: &dyn Storage, key: K) -> StdResult<Option<T>> {
         self.primary.may_load(store, key)
-    }
-
-    // use prefix to scan -> range
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
-    }
-
-    // use sub_prefix to scan -> range
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
-    }
-
-    // use no_prefix to scan -> range
-    pub fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
     }
 }
 

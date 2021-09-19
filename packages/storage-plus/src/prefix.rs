@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 use crate::helpers::nested_namespaces_with_key;
 use crate::iter_helpers::{concat, deserialize_kv, trim};
+use crate::keys::Prefixer;
 use crate::Endian;
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
@@ -43,6 +44,28 @@ impl Bound {
 }
 
 type DeserializeFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
+
+pub trait PrefixT<'a, P: Prefixer<'a>, T: Serialize + DeserializeOwned> {
+    fn get_pk_namespace(&self) -> &[u8];
+
+    // use no_prefix to scan -> range
+    #[cfg(feature = "iterator")]
+    fn no_prefix(&self, p: P) -> Prefix<T> {
+        Prefix::new(self.get_pk_namespace(), &p.prefix())
+    }
+
+    // use sub_prefix to scan -> range
+    #[cfg(feature = "iterator")]
+    fn sub_prefix(&self, p: P) -> Prefix<T> {
+        Prefix::new(self.get_pk_namespace(), &p.prefix())
+    }
+
+    // use prefix to scan -> range
+    #[cfg(feature = "iterator")]
+    fn prefix(&self, p: P) -> Prefix<T> {
+        Prefix::new(self.get_pk_namespace(), &p.prefix())
+    }
+}
 
 #[derive(Clone)]
 pub struct Prefix<T>

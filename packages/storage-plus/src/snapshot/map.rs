@@ -8,7 +8,7 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 use crate::keys::{EmptyPrefix, PrimaryKey};
 use crate::map::Map;
 use crate::path::Path;
-use crate::prefix::Prefix;
+use crate::prefix::{Prefix, PrefixT};
 use crate::snapshot::Snapshot;
 use crate::{Bound, Prefixer, Strategy};
 

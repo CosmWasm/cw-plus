@@ -8,7 +8,7 @@ use crate::keys::PrimaryKey;
 use crate::keys::{EmptyPrefix, Prefixer};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::prefix::{Bound, Prefix};
+use crate::prefix::{Bound, PrefixT};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -29,6 +29,17 @@ impl<'a, K, T> Map<'a, K, T> {
     }
 }
 
+impl<'a, K, T, P> PrefixT<'a, P, T> for Map<'a, K, T>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned,
+    P: Prefixer<'a>,
+{
+    fn get_pk_namespace(&self) -> &[u8] {
+        self.namespace
+    }
+}
+
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
@@ -36,21 +47,6 @@ where
 {
     pub fn key(&self, k: K) -> Path<T> {
         Path::new(self.namespace, &k.key())
-    }
-
-    #[cfg(feature = "iterator")]
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new(self.namespace, &p.prefix())
-    }
-
-    #[cfg(feature = "iterator")]
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new(self.namespace, &p.prefix())
-    }
-
-    #[cfg(feature = "iterator")]
-    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
-        Prefix::new(self.namespace, &p.prefix())
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {

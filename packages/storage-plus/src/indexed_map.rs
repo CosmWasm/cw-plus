@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::indexes::Index;
 use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::{Bound, Prefix};
+use crate::prefix::{Bound, PrefixT};
 use crate::Path;
 
 pub trait IndexList<T> {
@@ -47,6 +47,18 @@ where
 
     pub fn key(&self, k: K) -> Path<T> {
         self.primary.key(k)
+    }
+}
+
+impl<'a, K, T, P, I> PrefixT<'a, P, T> for IndexedMap<'a, K, T, I>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned + Clone,
+    I: IndexList<T>,
+    P: Prefixer<'a>,
+{
+    fn get_pk_namespace(&self) -> &[u8] {
+        self.pk_namespace
     }
 }
 
@@ -125,21 +137,6 @@ where
     /// returns an error on issues parsing
     pub fn may_load(&self, store: &dyn Storage, key: K) -> StdResult<Option<T>> {
         self.primary.may_load(store, key)
-    }
-
-    // use prefix to scan -> range
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
-    }
-
-    // use sub_prefix to scan -> range
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
-    }
-
-    // use no_prefix to scan -> range
-    fn no_prefix(&self, p: K::NoPrefix) -> Prefix<T> {
-        Prefix::new(self.pk_namespace, &p.prefix())
     }
 }
 
