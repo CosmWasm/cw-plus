@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
+#[cfg(feature = "iterator")]
 use crate::de::Deserializable;
 use crate::helpers::query_raw;
 #[cfg(feature = "iterator")]
@@ -11,9 +12,7 @@ use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
-use crate::prefix::{namespaced_prefix_range, Pair2, PrefixBound};
-use crate::prefix::{Bound, Prefix};
-use crate::Prefix2;
+use crate::prefix::{namespaced_prefix_range, Bound, Pair2, Prefix, Prefix2, PrefixBound};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -43,14 +42,17 @@ where
         Path::new(self.namespace, &k.key())
     }
 
+    #[cfg(feature = "iterator")]
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
+    #[cfg(feature = "iterator")]
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
+    #[cfg(feature = "iterator")]
     pub(crate) fn no_prefix(&self) -> Prefix<T> {
         Prefix::new(self.namespace, &[])
     }
@@ -110,6 +112,7 @@ where
     }
 }
 
+#[cfg(feature = "iterator")]
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
@@ -129,6 +132,7 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
+#[cfg(feature = "iterator")]
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
@@ -224,11 +228,13 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
+    #[cfg(feature = "iterator")]
     use crate::iter_helpers::to_length_prefixed;
     #[cfg(feature = "iterator")]
     use crate::U32Key;
     use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
+    #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -238,6 +244,7 @@ mod test {
     }
 
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
+    #[cfg(feature = "iterator")]
     const PEOPLE_ID: Map<U32Key, Data> = Map::new("people_id");
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
@@ -372,6 +379,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn range_simple_key() {
         let mut store = MockStorage::new();
 
@@ -431,6 +439,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn range_de_simple_string_key() {
         let mut store = MockStorage::new();
 
@@ -710,6 +719,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn range_de_triple_key() {
         let mut store = MockStorage::new();
 
@@ -873,6 +883,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn readme_with_range() -> StdResult<()> {
         let mut store = MockStorage::new();
 
