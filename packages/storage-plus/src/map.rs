@@ -42,14 +42,17 @@ where
         Path::new(self.namespace, &k.key())
     }
 
+    #[cfg(feature = "iterator")]
     pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
+    #[cfg(feature = "iterator")]
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
+    #[cfg(feature = "iterator")]
     pub(crate) fn no_prefix(&self) -> Prefix<T> {
         Prefix::new(self.namespace, &[])
     }
@@ -129,6 +132,7 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
+#[cfg(feature = "iterator")]
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
@@ -224,11 +228,13 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
+    #[cfg(feature = "iterator")]
     use crate::iter_helpers::to_length_prefixed;
     #[cfg(feature = "iterator")]
     use crate::U32Key;
     use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
+    #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -373,6 +379,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn range_simple_key() {
         let mut store = MockStorage::new();
 
@@ -876,6 +883,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn readme_with_range() -> StdResult<()> {
         let mut store = MockStorage::new();
 
