@@ -5,7 +5,8 @@ use std::ops::Deref;
 use cosmwasm_std::{
     Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
     CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier, QuerierWrapper, Reply,
-    ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, WasmMsg, WasmQuery,
+    ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, TransactionInfo, WasmMsg,
+    WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
@@ -651,6 +652,7 @@ where
             contract: ContractInfo {
                 address: address.into(),
             },
+            transaction: Some(TransactionInfo { index: 0 }),
         }
     }
 
