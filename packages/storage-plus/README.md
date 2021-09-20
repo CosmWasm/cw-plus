@@ -51,7 +51,7 @@ struct Config {
 }
 
 // note const constructor rather than 2 functions with Singleton
-const CONFIG: Item<Config> = Item::new(b"config");
+const CONFIG: Item<Config> = Item::new("config");
 
 fn demo() -> StdResult<()> {
     let mut store = MockStorage::new();
@@ -113,7 +113,8 @@ iteration. That's right, you can list all items in a `Map`, or only
 part of them. We can efficiently allow pagination over these items as
 well, starting at the point the last query ended, with low gas costs.
 This requires the `iterator` feature to be enabled in `cw-storage-plus`
-(which automatically enables it in `cosmwasm-std` as well).
+(which automatically enables it in `cosmwasm-std` as well, and which is
+enabled by default).
 
 If you are coming from using `Bucket`, the biggest change is that
 we no longer store `Storage` inside, meaning we don't need read and write
@@ -133,7 +134,7 @@ struct Data {
     pub age: i32,
 }
 
-const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
+const PEOPLE: Map<&str, Data> = Map::new("people");
 
 fn demo() -> StdResult<()> {
     let mut store = MockStorage::new();
@@ -143,14 +144,14 @@ fn demo() -> StdResult<()> {
     };
 
     // load and save with extra key argument
-    let empty = PEOPLE.may_load(&store, b"john")?;
+    let empty = PEOPLE.may_load(&store, "john")?;
     assert_eq!(None, empty);
-    PEOPLE.save(&mut store, b"john", &data)?;
-    let loaded = PEOPLE.load(&store, b"john")?;
+    PEOPLE.save(&mut store, "john", &data)?;
+    let loaded = PEOPLE.load(&store, "john")?;
     assert_eq!(data, loaded);
 
     // nothing on another key
-    let missing = PEOPLE.may_load(&store, b"jack")?;
+    let missing = PEOPLE.may_load(&store, "jack")?;
     assert_eq!(None, missing);
 
     // update function for new or existing keys
@@ -167,21 +168,21 @@ fn demo() -> StdResult<()> {
         }
     };
 
-    let old_john = PEOPLE.update(&mut store, b"john", birthday)?;
+    let old_john = PEOPLE.update(&mut store, "john", birthday)?;
     assert_eq!(33, old_john.age);
     assert_eq!("John", old_john.name.as_str());
 
-    let new_jack = PEOPLE.update(&mut store, b"jack", birthday)?;
+    let new_jack = PEOPLE.update(&mut store, "jack", birthday)?;
     assert_eq!(0, new_jack.age);
     assert_eq!("Newborn", new_jack.name.as_str());
 
     // update also changes the store
-    assert_eq!(old_john, PEOPLE.load(&store, b"john")?);
-    assert_eq!(new_jack, PEOPLE.load(&store, b"jack")?);
+    assert_eq!(old_john, PEOPLE.load(&store, "john")?);
+    assert_eq!(new_jack, PEOPLE.load(&store, "jack")?);
 
     // removing leaves us empty
-    PEOPLE.remove(&mut store, b"john");
-    let empty = PEOPLE.may_load(&store, b"john")?;
+    PEOPLE.remove(&mut store, "john");
+    let empty = PEOPLE.may_load(&store, "john")?;
     assert_eq!(None, empty);
 
     Ok(())
@@ -230,27 +231,27 @@ everywhere you used a byte slice above.
 ```rust
 // Note the tuple for primary key. We support one slice, or a 2 or 3-tuple
 // adding longer tuples is quite easy but unlikely to be needed.
-const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+const ALLOWANCE: Map<(&str, &str), u64> = Map::new("allow");
 
 fn demo() -> StdResult<()> {
     let mut store = MockStorage::new();
 
     // save and load on a composite key
-    let empty = ALLOWANCE.may_load(&store, (b"owner", b"spender"))?;
+    let empty = ALLOWANCE.may_load(&store, ("owner", "spender"))?;
     assert_eq!(None, empty);
-    ALLOWANCE.save(&mut store, (b"owner", b"spender"), &777)?;
-    let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+    ALLOWANCE.save(&mut store, ("owner", "spender"), &777)?;
+    let loaded = ALLOWANCE.load(&store, ("owner", "spender"))?;
     assert_eq!(777, loaded);
 
     // doesn't appear under other key (even if a concat would be the same)
-    let different = ALLOWANCE.may_load(&store, (b"owners", b"pender")).unwrap();
+    let different = ALLOWANCE.may_load(&store, ("owners", "pender")).unwrap();
     assert_eq!(None, different);
 
     // simple update
-    ALLOWANCE.update(&mut store, (b"owner", b"spender"), |v| {
+    ALLOWANCE.update(&mut store, ("owner", "spender"), |v| {
         Ok(v.unwrap_or_default() + 222)
     })?;
-    let loaded = ALLOWANCE.load(&store, (b"owner", b"spender"))?;
+    let loaded = ALLOWANCE.load(&store, ("owner", "spender"))?;
     assert_eq!(999, loaded);
 
     Ok(())
@@ -276,8 +277,8 @@ struct Data {
     pub age: i32,
 }
 
-const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
-const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+const PEOPLE: Map<&str, Data> = Map::new("people");
+const ALLOWANCE: Map<(&str, &str), u64> = Map::new("allow");
 
 fn demo() -> StdResult<()> {
     let mut store = MockStorage::new();
@@ -287,7 +288,7 @@ fn demo() -> StdResult<()> {
     };
 
     // create a Path one time to use below
-    let john = PEOPLE.key(b"john");
+    let john = PEOPLE.key("john");
 
     // Use this just like an Item above
     let empty = john.may_load(&store)?;
@@ -301,7 +302,7 @@ fn demo() -> StdResult<()> {
 
     // Same for composite keys, just use both parts in key().
     // Notice how much less verbose than the above example.
-    let allow = ALLOWANCE.key((b"owner", b"spender"));
+    let allow = ALLOWANCE.key(("owner", "spender"));
     allow.save(&mut store, &1234)?;
     let loaded = allow.load(&store)?;
     assert_eq!(1234, loaded);
@@ -327,9 +328,9 @@ over all items with `range(store, min, max, order)`. It supports `Order::Ascendi
 
 ```rust
 #[derive(Copy, Clone, Debug)]
-pub enum Bound<'a> {
-    Inclusive(&'a [u8]),
-    Exclusive(&'a [u8]),
+pub enum Bound {
+    Inclusive(Vec<u8>),
+    Exclusive(Vec<u8>),
     None,
 }
 ```
@@ -347,17 +348,17 @@ struct Data {
     pub age: i32,
 }
 
-const PEOPLE: Map<&[u8], Data> = Map::new(b"people");
-const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new(b"allow");
+const PEOPLE: Map<&str, Data> = Map::new("people");
+const ALLOWANCE: Map<(&str, &str), u64> = Map::new("allow");
 
 fn demo() -> StdResult<()> {
     let mut store = MockStorage::new();
 
     // save and load on two keys
     let data = Data { name: "John".to_string(), age: 32 };
-    PEOPLE.save(&mut store, b"john", &data)?;
+    PEOPLE.save(&mut store, "john", &data)?;
     let data2 = Data { name: "Jim".to_string(), age: 44 };
-    PEOPLE.save(&mut store, b"jim", &data2)?;
+    PEOPLE.save(&mut store, "jim", &data2)?;
 
     // iterate over them all
     let all: StdResult<Vec<_>> = PEOPLE
@@ -365,46 +366,46 @@ fn demo() -> StdResult<()> {
         .collect();
     assert_eq!(
         all?,
-        vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        vec![("jim".to_vec(), data2), ("john".to_vec(), data.clone())]
     );
 
     // or just show what is after jim
     let all: StdResult<Vec<_>> = PEOPLE
         .range(
             &store,
-            Bound::Exclusive(b"jim"),
+            Bound::Exclusive("jim"),
             Bound::None,
             Order::Ascending,
         )
         .collect();
-    assert_eq!(all?, vec![(b"john".to_vec(), data)]);
+    assert_eq!(all?, vec![("john".to_vec(), data)]);
 
     // save and load on three keys, one under different owner
-    ALLOWANCE.save(&mut store, (b"owner", b"spender"), &1000)?;
-    ALLOWANCE.save(&mut store, (b"owner", b"spender2"), &3000)?;
-    ALLOWANCE.save(&mut store, (b"owner2", b"spender"), &5000)?;
+    ALLOWANCE.save(&mut store, ("owner", "spender"), &1000)?;
+    ALLOWANCE.save(&mut store, ("owner", "spender2"), &3000)?;
+    ALLOWANCE.save(&mut store, ("owner2", "spender"), &5000)?;
 
     // get all under one key
     let all: StdResult<Vec<_>> = ALLOWANCE
-        .prefix(b"owner")
+        .prefix("owner")
         .range(&store, Bound::None, Bound::None, Order::Ascending)
         .collect();
     assert_eq!(
         all?,
-        vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        vec![("spender".to_vec(), 1000), ("spender2".to_vec(), 3000)]
     );
 
     // Or ranges between two items (even reverse)
     let all: StdResult<Vec<_>> = ALLOWANCE
-        .prefix(b"owner")
+        .prefix("owner")
         .range(
             &store,
-            Bound::Exclusive(b"spender1"),
-            Bound::Inclusive(b"spender2"),
+            Bound::Exclusive("spender1"),
+            Bound::Inclusive("spender2"),
             Order::Descending,
         )
         .collect();
-    assert_eq!(all?, vec![(b"spender2".to_vec(), 3000)]);
+    assert_eq!(all?, vec![("spender2".to_vec(), 3000)]);
 
     Ok(())
 }
