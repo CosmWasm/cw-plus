@@ -48,7 +48,7 @@ pub struct App<
 }
 
 fn no_init<BankT, CustomT, WasmT, StakingT, DistrT>(
-    _: &Router<BankT, CustomT, WasmT, StakingT, DistrT>,
+    _: &mut Router<BankT, CustomT, WasmT, StakingT, DistrT>,
     _: &dyn Api,
     _: &mut dyn Storage,
 ) {
@@ -65,7 +65,7 @@ impl BasicApp {
     pub fn new<F>(init_fn: F) -> Self
     where
         F: FnOnce(
-            &Router<
+            &mut Router<
                 BankKeeper,
                 FailingModule<Empty, Empty>,
                 WasmKeeper<Empty, Empty>,
@@ -87,7 +87,7 @@ where
     ExecC: Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
     QueryC: Debug + CustomQuery + DeserializeOwned + 'static,
     F: FnOnce(
-        &Router<
+        &mut Router<
             BankKeeper,
             FailingModule<ExecC, QueryC>,
             WasmKeeper<ExecC, QueryC>,
@@ -463,7 +463,9 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
         StorageT: Storage,
         CustomT: Module,
         WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
-        F: FnOnce(&Router<BankT, CustomT, WasmT, StakingT, DistrT>, &dyn Api, &mut dyn Storage),
+        StakingT: Staking,
+        DistrT: Distribution,
+        F: FnOnce(&mut Router<BankT, CustomT, WasmT, StakingT, DistrT>, &dyn Api, &mut dyn Storage),
     {
         let router = Router {
             wasm: self.wasm,
@@ -473,15 +475,78 @@ impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
             distribution: self.distribution,
         };
 
-        let mut storage = self.storage;
-        init_fn(&router, &self.api, &mut storage);
-
-        App {
+        let mut app = App {
             router,
             api: self.api,
             block: self.block,
-            storage,
-        }
+            storage: self.storage,
+        };
+        app.init_modules(init_fn);
+        app
+    }
+}
+
+impl<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
+    App<BankT, ApiT, StorageT, CustomT, WasmT, StakingT, DistrT>
+where
+    WasmT: Wasm<CustomT::ExecT, CustomT::QueryT>,
+    BankT: Bank,
+    ApiT: Api,
+    StorageT: Storage,
+    CustomT: Module,
+    StakingT: Staking,
+    DistrT: Distribution,
+{
+    pub fn init_modules<F, T>(&mut self, init_fn: F) -> T
+    where
+        F: FnOnce(
+            &mut Router<BankT, CustomT, WasmT, StakingT, DistrT>,
+            &dyn Api,
+            &mut dyn Storage,
+        ) -> T,
+    {
+        init_fn(&mut self.router, &self.api, &mut self.storage)
+    }
+
+    pub fn read_module<F, T>(&self, query_fn: F) -> T
+    where
+        F: FnOnce(&Router<BankT, CustomT, WasmT, StakingT, DistrT>, &dyn Api, &dyn Storage) -> T,
+    {
+        query_fn(&self.router, &self.api, &self.storage)
+    }
+}
+
+// Helper functions to call some custom WasmKeeper logic.
+// They show how we can easily add such calls to other custom keepers (CustomT, StakingT, etc)
+impl<BankT, ApiT, StorageT, CustomT, StakingT, DistrT>
+    App<
+        BankT,
+        ApiT,
+        StorageT,
+        CustomT,
+        WasmKeeper<CustomT::ExecT, CustomT::QueryT>,
+        StakingT,
+        DistrT,
+    >
+where
+    BankT: Bank,
+    ApiT: Api,
+    StorageT: Storage,
+    CustomT: Module,
+    StakingT: Staking,
+    DistrT: Distribution,
+    CustomT::ExecT: Clone + fmt::Debug + PartialEq + JsonSchema + DeserializeOwned + 'static,
+    CustomT::QueryT: CustomQuery + DeserializeOwned + 'static,
+{
+    /// This registers contract code (like uploading wasm bytecode on a chain),
+    /// so it can later be used to instantiate a contract.
+    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT>>) -> u64 {
+        self.init_modules(|router, _, _| router.wasm.store_code(code) as u64)
+    }
+
+    /// This allows to get `ContractData` for specific contract
+    pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
+        self.read_module(|router, _, storage| router.wasm.load_contract(storage, address))
     }
 }
 
@@ -542,17 +607,6 @@ where
                 .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg.into()))
                 .collect()
         })
-    }
-
-    /// This registers contract code (like uploading wasm bytecode on a chain),
-    /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT>>) -> u64 {
-        self.router.wasm.store_code(code) as u64
-    }
-
-    /// This allows to get `ContractData` for specific contract
-    pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
-        self.router.wasm.contract_data(&self.storage, address)
     }
 
     /// Runs arbitrary CosmosMsg in "sudo" mode.
