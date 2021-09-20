@@ -119,15 +119,6 @@ impl<'a> Prefixer<'a> for &'a str {
     }
 }
 
-// this is a marker for the Map.range() helper, so we can detect () in Generic bounds
-pub trait EmptyPrefix {
-    fn new() -> Self;
-}
-
-impl EmptyPrefix for () {
-    fn new() {}
-}
-
 impl<'a> PrimaryKey<'a> for Vec<u8> {
     type Prefix = ();
     type SubPrefix = ();

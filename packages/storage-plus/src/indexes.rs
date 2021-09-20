@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{from_slice, Binary, Order, Pair, StdError, StdResult, Storage};
 
 use crate::helpers::namespaces_with_key;
-use crate::keys::EmptyPrefix;
 use crate::map::Map;
 use crate::{Bound, Prefix, Prefixer, PrimaryKey, U32Key};
 
@@ -138,6 +137,15 @@ where
         )
     }
 
+    fn no_prefix(&self) -> Prefix<T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &[],
+            self.pk_namespace,
+            deserialize_multi_kv,
+        )
+    }
+
     pub fn index_key(&self, k: K) -> Vec<u8> {
         k.joined_key()
     }
@@ -168,7 +176,6 @@ impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
-    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -182,8 +189,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -193,8 +199,7 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.sub_prefix(K::SubPrefix::new())
-            .keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 }
 
@@ -279,6 +284,12 @@ where
         })
     }
 
+    fn no_prefix(&self) -> Prefix<T> {
+        Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
+            deserialize_unique_kv(kv)
+        })
+    }
+
     /// returns all items that match this secondary index, always by pk Ascending
     pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Pair<T>>> {
         let data = self
@@ -294,7 +305,6 @@ impl<'a, K, T> UniqueIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
-    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -308,8 +318,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -319,7 +328,6 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.sub_prefix(K::SubPrefix::new())
-            .keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 }

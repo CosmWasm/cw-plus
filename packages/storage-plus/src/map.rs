@@ -3,9 +3,9 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::helpers::query_raw;
-use crate::keys::PrimaryKey;
 #[cfg(feature = "iterator")]
-use crate::keys::{EmptyPrefix, Prefixer};
+use crate::keys::Prefixer;
+use crate::keys::PrimaryKey;
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
@@ -46,6 +46,11 @@ where
     #[cfg(feature = "iterator")]
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         Prefix::new(self.namespace, &p.prefix())
+    }
+
+    #[cfg(feature = "iterator")]
+    pub(crate) fn no_prefix(&self) -> Prefix<T> {
+        Prefix::new(self.namespace, &[])
     }
 
     pub fn save(&self, store: &mut dyn Storage, k: K, data: &T) -> StdResult<()> {
@@ -109,7 +114,6 @@ impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
-    K::SubPrefix: EmptyPrefix,
 {
     pub fn range<'c>(
         &self,
@@ -121,8 +125,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -135,8 +138,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
-            .keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 }
 
@@ -401,6 +403,32 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
+        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
+        let all = all.unwrap();
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (
+                    (b"owner".to_vec(), U8Key::new(9), b"recipient".to_vec()).joined_key(),
+                    1000
+                ),
+                (
+                    (b"owner".to_vec(), U8Key::new(9), b"recipient2".to_vec()).joined_key(),
+                    3000
+                ),
+                (
+                    (b"owner".to_vec(), U8Key::new(10), b"recipient3".to_vec()).joined_key(),
+                    3000
+                ),
+                (
+                    (b"owner2".to_vec(), U8Key::new(9), b"recipient".to_vec()).joined_key(),
+                    5000
+                )
+            ]
+        );
+
+        // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9u8.into()))
             .range(&store, None, None, Order::Ascending)

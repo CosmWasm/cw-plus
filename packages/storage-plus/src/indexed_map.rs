@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::indexes::Index;
-use crate::keys::{EmptyPrefix, Prefixer, PrimaryKey};
+use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{Bound, Prefix};
 use crate::Path;
@@ -136,6 +136,11 @@ where
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
+
+    // use no_prefix to scan -> range
+    fn no_prefix(&self) -> Prefix<T> {
+        Prefix::new(self.pk_namespace, &[])
+    }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
@@ -144,7 +149,6 @@ where
     K: PrimaryKey<'a>,
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
-    K::SubPrefix: EmptyPrefix,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -158,8 +162,7 @@ where
     where
         T: 'c,
     {
-        self.sub_prefix(K::SubPrefix::new())
-            .range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 }
 
