@@ -10,6 +10,9 @@ use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+/// Structure holding a map of checkpoints composited from
+/// height as U64Key and checkpoint id.
+/// Stores all changes in changelog.
 #[derive(Debug, Clone)]
 pub(crate) struct Snapshot<'a, K, T> {
     checkpoints: Map<'a, U64Key, u32>,
@@ -23,6 +26,11 @@ pub(crate) struct Snapshot<'a, K, T> {
 }
 
 impl<'a, K, T> Snapshot<'a, K, T> {
+    /// Example:
+    ///
+    /// ```rust
+    /// let snapshot = Snapshot::new("every__check", "every__change", Strategy::EveryBlock);
+    /// ```
     pub const fn new(
         checkpoints: &'a str,
         changelog: &'a str,

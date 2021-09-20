@@ -21,7 +21,11 @@ pub struct SnapshotMap<'a, K, T> {
 }
 
 impl<'a, K, T> SnapshotMap<'a, K, T> {
-    /// Usage: SnapshotMap::new(snapshot_names!("foobar"), Strategy::EveryBlock)
+    /// Example:
+    ///
+    /// ```rust
+    /// SnapshotMap::new(snapshot_names!("foobar"), Strategy::EveryBlock)
+    /// ```
     pub const fn new(
         pk: &'a str,
         checkpoints: &'a str,

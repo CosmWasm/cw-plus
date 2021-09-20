@@ -15,8 +15,8 @@ pub trait IndexList<T> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<T>> + '_>;
 }
 
+// TODO: remove traits here and make this const fn new
 /// IndexedBucket works like a bucket but has a secondary index
-/// TODO: remove traits here and make this const fn new
 pub struct IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
@@ -36,7 +36,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
 {
-    /// TODO: remove traits here and make this const fn new
+    // TODO: remove traits here and make this const fn new
     pub fn new(pk_namespace: &'a str, indexes: I) -> Self {
         IndexedMap {
             pk_namespace: pk_namespace.as_bytes(),

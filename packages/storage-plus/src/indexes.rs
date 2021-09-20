@@ -59,6 +59,21 @@ where
     T: Serialize + DeserializeOwned + Clone,
 {
     // TODO: make this a const fn
+    /// Create a new MultiIndex
+    ///
+    /// idx_fn - lambda creating index key from value (first argument) and primary key (second argument)
+    /// pk_namespace - prefix for the primary key
+    /// idx_namespace - prefix for the index value
+    ///
+    /// ## Example:
+    ///
+    /// ```rust
+    /// MultiIndex::new(
+    ///     |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
+    ///     "tokens",
+    ///     "tokens__owner",
+    /// )
+    /// ```
     pub fn new(
         idx_fn: fn(&T, Vec<u8>) -> K,
         pk_namespace: &'a str,
@@ -203,6 +218,7 @@ where
     }
 }
 
+/// UniqueRef stores Binary(Vec[u8]) representation of private key and index value
 #[derive(Deserialize, Serialize)]
 pub(crate) struct UniqueRef<T> {
     // note, we collapse the pk - combining everything under the namespace - even if it is composite
@@ -220,6 +236,16 @@ pub struct UniqueIndex<'a, K, T> {
 
 impl<'a, K, T> UniqueIndex<'a, K, T> {
     // TODO: make this a const fn
+    /// Create a new UniqueIndex
+    ///
+    /// idx_fn - lambda creating index key from index value
+    /// idx_namespace - prefix for the index value
+    ///
+    /// ## Example:
+    ///
+    /// ```rust
+    /// let age = UniqueIndex::new(|d| U32Key::new(d.age), "data__age");
+    /// ```
     pub fn new(idx_fn: fn(&T) -> K, idx_namespace: &'a str) -> Self {
         UniqueIndex {
             index: idx_fn,

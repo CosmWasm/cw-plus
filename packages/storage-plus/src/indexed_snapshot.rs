@@ -20,6 +20,17 @@ pub struct IndexedSnapshotMap<'a, K, T, I> {
 }
 
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
+    /// Examples:
+    ///
+    /// ```rust
+    /// let ism = IndexedSnapshotMap::new(
+    ///     "data",
+    ///     "checkpoints",
+    ///     "changelog",
+    ///     Strategy::EveryBlock,
+    ///     indexes,
+    /// );
+    /// ```
     pub fn new(
         pk_namespace: &'a str,
         checkpoints: &'a str,
