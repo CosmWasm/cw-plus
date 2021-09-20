@@ -250,8 +250,8 @@ impl<T: Endian> From<T> for IntKey<T> {
 
 impl<T: Endian> From<Vec<u8>> for IntKey<T> {
     fn from(wrap: Vec<u8>) -> Self {
-        assert_eq!(wrap.len(), std::mem::size_of::<T>());
-
+        // TODO: Consider properly handling case, when `wrap` has length not conforming for the
+        // wrapped integer type.
         IntKey {
             wrapped: wrap,
             data: PhantomData,
