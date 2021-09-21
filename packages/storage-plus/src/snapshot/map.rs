@@ -21,7 +21,18 @@ pub struct SnapshotMap<'a, K, T> {
 }
 
 impl<'a, K, T> SnapshotMap<'a, K, T> {
-    /// Usage: SnapshotMap::new(snapshot_names!("foobar"), Strategy::EveryBlock)
+    /// Example:
+    ///
+    /// ```rust
+    /// use cw_storage_plus::{SnapshotMap, Strategy};
+    ///
+    /// SnapshotMap::<&[u8], &str>::new(
+    ///     "never",
+    ///     "never__check",
+    ///     "never__change",
+    ///     Strategy::EveryBlock
+    /// );
+    /// ```
     pub const fn new(
         pk: &'a str,
         checkpoints: &'a str,

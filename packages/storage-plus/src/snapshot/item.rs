@@ -17,7 +17,17 @@ pub struct SnapshotItem<'a, T> {
 }
 
 impl<'a, T> SnapshotItem<'a, T> {
-    /// Usage: SnapshotItem::new(snapshot_names!("foobar"), Strategy::EveryBlock)
+    /// Example:
+    ///
+    /// ```rust
+    /// use cw_storage_plus::{SnapshotItem, Strategy};
+    ///
+    /// SnapshotItem::<'static, u64>::new(
+    ///     "every",
+    ///     "every__check",
+    ///     "every__change",
+    ///     Strategy::EveryBlock);
+    /// ```
     pub const fn new(
         storage_key: &'a str,
         checkpoints: &'a str,

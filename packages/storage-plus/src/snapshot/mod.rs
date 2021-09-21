@@ -10,6 +10,10 @@ use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+/// Structure holding a map of checkpoints composited from
+/// height (as U64Key) and counter of how many times it has
+/// been checkpointed (as u32).
+/// Stores all changes in changelog.
 #[derive(Debug, Clone)]
 pub(crate) struct Snapshot<'a, K, T> {
     checkpoints: Map<'a, U64Key, u32>,
