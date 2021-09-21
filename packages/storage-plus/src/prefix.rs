@@ -8,7 +8,7 @@ use std::ops::Deref;
 
 use crate::helpers::nested_namespaces_with_key;
 use crate::iter_helpers::{concat, deserialize_kv, trim};
-use crate::Endian;
+use crate::{Endian, Prefixer};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
 /// None means that we don't limit that side of the range at all.
@@ -42,7 +42,38 @@ impl Bound {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum PrefixBound<'a, K: Prefixer<'a>> {
+    Inclusive((K, PhantomData<&'a bool>)),
+    Exclusive((K, PhantomData<&'a bool>)),
+}
+
+impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
+    pub fn inclusive(k: K) -> Self {
+        Self::Inclusive((k, PhantomData))
+    }
+
+    pub fn exclusive(k: K) -> Self {
+        Self::Exclusive((k, PhantomData))
+    }
+
+    pub fn to_bound(&self) -> Bound {
+        match self {
+            PrefixBound::Exclusive((k, _)) => Bound::Exclusive(k.joined_prefix()),
+            PrefixBound::Inclusive((k, _)) => Bound::Inclusive(k.joined_prefix()),
+        }
+    }
+}
+
 type DeserializeFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
+
+pub fn default_deserializer<T: DeserializeOwned>(
+    _: &dyn Storage,
+    _: &[u8],
+    raw: Pair,
+) -> StdResult<Pair<T>> {
+    deserialize_kv(raw)
+}
 
 #[derive(Clone)]
 pub struct Prefix<T>
@@ -73,9 +104,7 @@ where
     T: Serialize + DeserializeOwned,
 {
     pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
-        Prefix::with_deserialization_function(top_name, sub_names, &[], |_, _, kv| {
-            deserialize_kv(kv)
-        })
+        Prefix::with_deserialization_function(top_name, sub_names, &[], default_deserializer)
     }
 
     pub fn with_deserialization_function(
@@ -148,20 +177,63 @@ fn calc_start_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
         None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
         Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Exclusive(limit)) => concat(namespace, &one_byte_higher(&limit)),
+        Some(Bound::Exclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
     }
 }
 
 fn calc_end_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
     match bound {
-        None => namespace_upper_bound(namespace),
+        None => increment_last_byte(namespace),
         // this is the natural limits of the underlying Storage
         Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Inclusive(limit)) => concat(namespace, &one_byte_higher(&limit)),
+        Some(Bound::Inclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
     }
 }
 
-fn one_byte_higher(limit: &[u8]) -> Vec<u8> {
+pub fn namespaced_prefix_range<'a, 'c, K: Prefixer<'a>>(
+    storage: &'c dyn Storage,
+    namespace: &[u8],
+    start: Option<PrefixBound<'a, K>>,
+    end: Option<PrefixBound<'a, K>>,
+    order: Order,
+) -> Box<dyn Iterator<Item = Pair> + 'c> {
+    let start = calc_prefix_start_bound(namespace, start);
+    let end = calc_prefix_end_bound(namespace, end);
+
+    // get iterator from storage
+    let base_iterator = storage.range(Some(&start), Some(&end), order);
+
+    // make a copy for the closure to handle lifetimes safely
+    let prefix = namespace.to_vec();
+    let mapped = base_iterator.map(move |(k, v)| (trim(&prefix, &k), v));
+    Box::new(mapped)
+}
+
+fn calc_prefix_start_bound<'a, K: Prefixer<'a>>(
+    namespace: &[u8],
+    bound: Option<PrefixBound<'a, K>>,
+) -> Vec<u8> {
+    match bound.map(|b| b.to_bound()) {
+        None => namespace.to_vec(),
+        // this is the natural limits of the underlying Storage
+        Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
+        Some(Bound::Exclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
+    }
+}
+
+fn calc_prefix_end_bound<'a, K: Prefixer<'a>>(
+    namespace: &[u8],
+    bound: Option<PrefixBound<'a, K>>,
+) -> Vec<u8> {
+    match bound.map(|b| b.to_bound()) {
+        None => increment_last_byte(namespace),
+        // this is the natural limits of the underlying Storage
+        Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
+        Some(Bound::Inclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
+    }
+}
+
+fn extend_one_byte(limit: &[u8]) -> Vec<u8> {
     let mut v = limit.to_vec();
     v.push(0);
     v
@@ -170,7 +242,7 @@ fn one_byte_higher(limit: &[u8]) -> Vec<u8> {
 /// Returns a new vec of same length and last byte incremented by one
 /// If last bytes are 255, we handle overflow up the chain.
 /// If all bytes are 255, this returns wrong data - but that is never possible as a namespace
-fn namespace_upper_bound(input: &[u8]) -> Vec<u8> {
+fn increment_last_byte(input: &[u8]) -> Vec<u8> {
     let mut copy = input.to_vec();
     // zero out all trailing 255, increment first that is not such
     for i in (0..input.len()).rev() {

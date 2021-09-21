@@ -3,10 +3,12 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::helpers::query_raw;
+use crate::iter_helpers::deserialize_kv;
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
+use crate::prefix::{namespaced_prefix_range, PrefixBound};
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
@@ -113,6 +115,8 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
+    // TODO: this should only be when K::Prefix == ()
+    // Other cases need to call prefix() first
     K: PrimaryKey<'a>,
 {
     pub fn range<'c>(
@@ -139,6 +143,33 @@ where
         T: 'c,
     {
         self.no_prefix().keys(store, min, max, order)
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a>,
+{
+    /// while range assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+    {
+        let mapped =
+            namespaced_prefix_range(store, &self.namespace, min, max, order).map(deserialize_kv);
+        Box::new(mapped)
     }
 }
 

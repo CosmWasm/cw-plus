@@ -81,6 +81,11 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: 
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should length-prefixed and concatenated for range searches
     fn prefix(&self) -> Vec<&[u8]>;
+
+    fn joined_prefix(&self) -> Vec<u8> {
+        let prefixes = self.prefix();
+        namespaces_with_key(&prefixes, &[])
+    }
 }
 
 impl<'a> Prefixer<'a> for () {
