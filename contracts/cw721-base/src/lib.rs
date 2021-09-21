@@ -23,4 +23,15 @@ mod entry {
         let tract = contract::Cw721Contract::default();
         tract.instantiate(deps, env, info, msg)
     }
+
+    #[cfg_attr(not(feature = "library"), entry_point)]
+    pub fn execute(
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        msg: msg::ExecuteMsg,
+    ) -> Result<Response, ContractError> {
+        let tract = contract::Cw721Contract::default();
+        tract.execute(deps, env, info, msg)
+    }
 }
