@@ -23,7 +23,17 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     /// Examples:
     ///
     /// ```rust
-    /// let ism = IndexedSnapshotMap::new(
+    /// use cw_storage_plus::{IndexedSnapshotMap, Strategy, U32Key, UniqueIndex};
+    ///
+    /// #[derive(PartialEq, Debug, Clone)]
+    /// struct Data {
+    ///     pub name: String,
+    ///     pub age: u32,
+    /// }
+    ///
+    /// let indexes = UniqueIndex::new(|d: &Data| U32Key::new(d.age), "data__age");
+    ///
+    /// IndexedSnapshotMap::new(
     ///     "data",
     ///     "checkpoints",
     ///     "changelog",

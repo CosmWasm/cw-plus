@@ -29,7 +29,9 @@ impl<'a, K, T> Snapshot<'a, K, T> {
     /// Example:
     ///
     /// ```rust
-    /// let snapshot = Snapshot::new("every__check", "every__change", Strategy::EveryBlock);
+    /// use cw_storage_plus::{Strategy};
+    ///
+    /// Snapshot::new("every__check", "every__change", Strategy::EveryBlock);
     /// ```
     pub const fn new(
         checkpoints: &'a str,

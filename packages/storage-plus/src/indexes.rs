@@ -68,11 +68,20 @@ where
     /// ## Example:
     ///
     /// ```rust
+    /// use cw_storage_plus::MultiIndex;
+    /// use serde::{Deserialize, Serialize};
+    ///
+    /// #[derive(Deserialize, Serialize, Clone)]
+    /// struct Data {
+    ///     pub name: String,
+    ///     pub age: u32,
+    /// }
+    ///
     /// MultiIndex::new(
-    ///     |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
-    ///     "tokens",
-    ///     "tokens__owner",
-    /// )
+    ///     |d: &Data, k: Vec<u8>| (d.age, k),
+    ///     "age",
+    ///     "age__owner",
+    /// );
     /// ```
     pub fn new(
         idx_fn: fn(&T, Vec<u8>) -> K,
@@ -244,7 +253,15 @@ impl<'a, K, T> UniqueIndex<'a, K, T> {
     /// ## Example:
     ///
     /// ```rust
-    /// let age = UniqueIndex::new(|d| U32Key::new(d.age), "data__age");
+    /// use cw_storage_plus::{U32Key, UniqueIndex};
+    ///
+    /// #[derive(PartialEq, Debug, Clone)]
+    /// struct Data {
+    ///     pub name: String,
+    ///     pub age: u32,
+    /// }
+    ///
+    /// UniqueIndex::new(|d: &Data| U32Key::new(d.age), "data__age");
     /// ```
     pub fn new(idx_fn: fn(&T) -> K, idx_namespace: &'a str) -> Self {
         UniqueIndex {

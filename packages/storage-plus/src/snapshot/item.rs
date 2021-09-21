@@ -20,7 +20,13 @@ impl<'a, T> SnapshotItem<'a, T> {
     /// Example:
     ///
     /// ```rust
-    /// SnapshotItem::new(snapshot_names!("foobar"), Strategy::EveryBlock)
+    /// use cw_storage_plus::{SnapshotItem, Strategy};
+    ///
+    /// let snapshot_item: SnapshotItem<'static, u64> =
+    ///     SnapshotItem::new("every",
+    ///                       "every__check",
+    ///                       "every__change",
+    ///                       Strategy::EveryBlock);
     /// ```
     pub const fn new(
         storage_key: &'a str,
