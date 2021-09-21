@@ -499,12 +499,13 @@ where
         Ok(NumTokensResponse { count })
     }
 
-    pub fn query_nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
+    pub fn query_nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse<T>> {
         let info = self.tokens.load(deps.storage, &token_id)?;
         Ok(NftInfoResponse {
             name: info.name,
             description: info.description,
             image: info.image,
+            extension: info.extension,
         })
     }
 
@@ -599,7 +600,7 @@ where
         env: Env,
         token_id: String,
         include_expired: bool,
-    ) -> StdResult<AllNftInfoResponse> {
+    ) -> StdResult<AllNftInfoResponse<T>> {
         let info = self.tokens.load(deps.storage, &token_id)?;
         Ok(AllNftInfoResponse {
             access: OwnerOfResponse {
@@ -610,6 +611,7 @@ where
                 name: info.name,
                 description: info.description,
                 image: info.image,
+                extension: info.extension,
             },
         })
     }
@@ -753,11 +755,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             info,
-            NftInfoResponse {
+            NftInfoResponse::<Extension> {
                 name,
                 description,
                 image: None,
-                // extension: None,
+                extension: None,
             }
         );
 
