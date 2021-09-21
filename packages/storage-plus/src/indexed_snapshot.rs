@@ -33,7 +33,7 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     ///
     /// let indexes = UniqueIndex::new(|d: &Data| U32Key::new(d.age), "data__age");
     ///
-    /// IndexedSnapshotMap::new(
+    /// let ism: IndexedSnapshotMap<&[u8], Data, UniqueIndex<U32Key, Data>> = IndexedSnapshotMap::new(
     ///     "data",
     ///     "checkpoints",
     ///     "changelog",

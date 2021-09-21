@@ -11,7 +11,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 /// Structure holding a map of checkpoints composited from
-/// height as U64Key and checkpoint id.
+/// height (as U64Key) and counter of how many times it has
+/// been checkpointed (as u32).
 /// Stores all changes in changelog.
 #[derive(Debug, Clone)]
 pub(crate) struct Snapshot<'a, K, T> {
@@ -26,13 +27,6 @@ pub(crate) struct Snapshot<'a, K, T> {
 }
 
 impl<'a, K, T> Snapshot<'a, K, T> {
-    /// Example:
-    ///
-    /// ```rust
-    /// use cw_storage_plus::{Strategy};
-    ///
-    /// Snapshot::new("every__check", "every__change", Strategy::EveryBlock);
-    /// ```
     pub const fn new(
         checkpoints: &'a str,
         changelog: &'a str,
