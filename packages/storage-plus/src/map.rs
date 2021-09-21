@@ -3,11 +3,13 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::helpers::query_raw;
+#[cfg(feature = "iterator")]
 use crate::iter_helpers::deserialize_kv;
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
 use crate::path::Path;
+#[cfg(feature = "iterator")]
 use crate::prefix::{namespaced_prefix_range, PrefixBound};
 #[cfg(feature = "iterator")]
 use crate::prefix::{Bound, Prefix};
@@ -181,7 +183,9 @@ mod test {
 
     #[cfg(feature = "iterator")]
     use crate::iter_helpers::to_length_prefixed;
-    use crate::{U32Key, U8Key};
+    #[cfg(feature = "iterator")]
+    use crate::U32Key;
+    use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -695,6 +699,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn prefixed_range_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
