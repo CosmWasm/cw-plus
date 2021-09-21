@@ -2,6 +2,7 @@ mod helpers;
 mod msg;
 mod query;
 mod receiver;
+mod traits;
 
 pub use cw0::Expiration;
 
@@ -12,11 +13,4 @@ pub use crate::query::{
     NftInfoResponse, NumTokensResponse, OwnerOfResponse, TokensResponse,
 };
 pub use crate::receiver::Cw721ReceiveMsg;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        // test me
-    }
-}
+pub use crate::traits::{CustomMsg, Cw721};

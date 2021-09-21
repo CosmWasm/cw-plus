@@ -1,28 +1,23 @@
-use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use cosmwasm_std::{
-    to_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Empty, Env, MessageInfo, Order, Pair,
-    Response, StdError, StdResult, Storage,
+    to_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
+    StdError, StdResult, Storage,
 };
 
 use cw0::maybe_addr;
 use cw2::set_contract_version;
 use cw721::{
-    AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, Cw721ReceiveMsg, Expiration,
-    NftInfoResponse, NumTokensResponse, OwnerOfResponse, TokensResponse,
+    AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, CustomMsg, Cw721,
+    Cw721ReceiveMsg, Expiration, NftInfoResponse, NumTokensResponse, OwnerOfResponse,
+    TokensResponse,
 };
 use cw_storage_plus::{Bound, IndexedMap, Item, Map, MultiIndex};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{token_owner_idx, Approval, TokenIndexes, TokenInfo};
-
-// TODO: move this somewhere else... ideally cosmwasm-std
-pub trait CustomMsg: Clone + std::fmt::Debug + PartialEq + JsonSchema {}
-
-impl CustomMsg for Empty {}
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
@@ -94,6 +89,30 @@ where
     }
 }
 
+impl<'a, T> Cw721<T> for Cw721Contract<'a, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
+    type Err = ContractError;
+
+    fn transfer_nft<C: CustomMsg>(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        recipient: String,
+        token_id: String,
+    ) -> Result<Response<C>, ContractError> {
+        self._transfer_nft(deps, &env, &info, &recipient, &token_id)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "transfer_nft")
+            .add_attribute("sender", info.sender)
+            .add_attribute("recipient", recipient)
+            .add_attribute("token_id", token_id))
+    }
+}
+
 impl<'a, T> Cw721Contract<'a, T>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -143,7 +162,7 @@ where
             ExecuteMsg::TransferNft {
                 recipient,
                 token_id,
-            } => self.execute_transfer_nft(deps, env, info, recipient, token_id),
+            } => self.transfer_nft(deps, env, info, recipient, token_id),
             ExecuteMsg::SendNft {
                 contract,
                 token_id,
@@ -152,6 +171,7 @@ where
         }
     }
 
+    // Note: this is not in cw721
     pub fn execute_mint<C: CustomMsg>(
         &self,
         deps: DepsMut,
@@ -186,23 +206,6 @@ where
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender)
             .add_attribute("token_id", msg.token_id))
-    }
-
-    pub fn execute_transfer_nft<C: CustomMsg>(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        recipient: String,
-        token_id: String,
-    ) -> Result<Response<C>, ContractError> {
-        self._transfer_nft(deps, &env, &info, &recipient, &token_id)?;
-
-        Ok(Response::new()
-            .add_attribute("action", "transfer_nft")
-            .add_attribute("sender", info.sender)
-            .add_attribute("recipient", recipient)
-            .add_attribute("token_id", token_id))
     }
 
     pub fn execute_send_nft<C: CustomMsg>(
