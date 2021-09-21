@@ -1,5 +1,3 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
     StdError, StdResult, Storage,
@@ -23,6 +21,9 @@ use std::marker::PhantomData;
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const DEFAULT_LIMIT: u32 = 10;
+const MAX_LIMIT: u32 = 30;
+
 pub struct Cw721Contract<'a, C> {
     pub contract_info: Item<'a, ContractInfoResponse>,
     pub minter: Item<'a, Addr>,
@@ -34,7 +35,7 @@ pub struct Cw721Contract<'a, C> {
     _custom_response: PhantomData<C>,
 }
 
-impl<T, C> Default for Cw721Contract<'static, C> {
+impl<C> Default for Cw721Contract<'static, C> {
     fn default() -> Self {
         Self::new(
             "nft_info",
@@ -47,7 +48,7 @@ impl<T, C> Default for Cw721Contract<'static, C> {
     }
 }
 
-impl<'a, T, C> Cw721Contract<'a, C> {
+impl<'a, C> Cw721Contract<'a, C> {
     fn new(
         contract_key: &'a str,
         minter_key: &'a str,
@@ -80,7 +81,7 @@ impl<'a, T, C> Cw721Contract<'a, C> {
     }
 }
 
-impl<'a, T, C> Cw721Contract<'a, C>
+impl<'a, C> Cw721Contract<'a, C>
 where
     C: Clone + std::fmt::Debug + PartialEq + JsonSchema,
 {
@@ -109,7 +110,7 @@ where
         env: Env,
         info: MessageInfo,
         msg: ExecuteMsg,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         match msg {
             ExecuteMsg::Mint(msg) => self.execute_mint(deps, env, info, msg),
             ExecuteMsg::Approve {
@@ -144,7 +145,7 @@ where
         _env: Env,
         info: MessageInfo,
         msg: MintMsg,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         let minter = self.minter.load(deps.storage)?;
 
         if info.sender != minter {
@@ -180,7 +181,7 @@ where
         info: MessageInfo,
         recipient: String,
         token_id: String,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         self._transfer_nft(deps, &env, &info, &recipient, &token_id)?;
 
         Ok(Response::new()
@@ -198,7 +199,7 @@ where
         contract: String,
         token_id: String,
         msg: Binary,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         // Transfer token
         self._transfer_nft(deps, &env, &info, &contract, &token_id)?;
 
@@ -243,7 +244,7 @@ where
         spender: String,
         token_id: String,
         expires: Option<Expiration>,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         self._update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
 
         Ok(Response::new()
@@ -260,7 +261,7 @@ where
         info: MessageInfo,
         spender: String,
         token_id: String,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         self._update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
 
         Ok(Response::new()
@@ -270,6 +271,7 @@ where
             .add_attribute("token_id", token_id))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn _update_approvals(
         &self,
         deps: DepsMut,
@@ -319,7 +321,7 @@ where
         info: MessageInfo,
         operator: String,
         expires: Option<Expiration>,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         // reject expired data as invalid
         let expires = expires.unwrap_or_default();
         if expires.is_expired(&env.block) {
@@ -343,7 +345,7 @@ where
         _env: Env,
         info: MessageInfo,
         operator: String,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<C>, ContractError> {
         let operator_addr = deps.api.addr_validate(&operator)?;
         self.operators
             .remove(deps.storage, (&info.sender, &operator_addr));
@@ -419,185 +421,191 @@ where
             None => Err(ContractError::Unauthorized {}),
         }
     }
-}
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::Minter {} => to_binary(&query_minter(deps)?),
-        QueryMsg::ContractInfo {} => to_binary(&query_contract_info(deps)?),
-        QueryMsg::NftInfo { token_id } => to_binary(&query_nft_info(deps, token_id)?),
-        QueryMsg::OwnerOf {
-            token_id,
-            include_expired,
-        } => to_binary(&query_owner_of(
-            deps,
-            env,
-            token_id,
-            include_expired.unwrap_or(false),
-        )?),
-        QueryMsg::AllNftInfo {
-            token_id,
-            include_expired,
-        } => to_binary(&query_all_nft_info(
-            deps,
-            env,
-            token_id,
-            include_expired.unwrap_or(false),
-        )?),
-        QueryMsg::ApprovedForAll {
-            owner,
-            include_expired,
-            start_after,
-            limit,
-        } => to_binary(&query_all_approvals(
-            deps,
-            env,
-            owner,
-            include_expired.unwrap_or(false),
-            start_after,
-            limit,
-        )?),
-        QueryMsg::NumTokens {} => to_binary(&query_num_tokens(deps)?),
-        QueryMsg::Tokens {
-            owner,
-            start_after,
-            limit,
-        } => to_binary(&query_tokens(deps, owner, start_after, limit)?),
-        QueryMsg::AllTokens { start_after, limit } => {
-            to_binary(&query_all_tokens(deps, start_after, limit)?)
+    pub fn query(&self, deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+        match msg {
+            QueryMsg::Minter {} => to_binary(&self.query_minter(deps)?),
+            QueryMsg::ContractInfo {} => to_binary(&self.query_contract_info(deps)?),
+            QueryMsg::NftInfo { token_id } => to_binary(&self.query_nft_info(deps, token_id)?),
+            QueryMsg::OwnerOf {
+                token_id,
+                include_expired,
+            } => to_binary(&self.query_owner_of(
+                deps,
+                env,
+                token_id,
+                include_expired.unwrap_or(false),
+            )?),
+            QueryMsg::AllNftInfo {
+                token_id,
+                include_expired,
+            } => to_binary(&self.query_all_nft_info(
+                deps,
+                env,
+                token_id,
+                include_expired.unwrap_or(false),
+            )?),
+            QueryMsg::ApprovedForAll {
+                owner,
+                include_expired,
+                start_after,
+                limit,
+            } => to_binary(&self.query_all_approvals(
+                deps,
+                env,
+                owner,
+                include_expired.unwrap_or(false),
+                start_after,
+                limit,
+            )?),
+            QueryMsg::NumTokens {} => to_binary(&self.query_num_tokens(deps)?),
+            QueryMsg::Tokens {
+                owner,
+                start_after,
+                limit,
+            } => to_binary(&self.query_tokens(deps, owner, start_after, limit)?),
+            QueryMsg::AllTokens { start_after, limit } => {
+                to_binary(&self.query_all_tokens(deps, start_after, limit)?)
+            }
         }
     }
-}
 
-pub fn query_minter(deps: Deps) -> StdResult<MinterResponse> {
-    let minter_addr = MINTER.load(deps.storage)?;
-    Ok(MinterResponse {
-        minter: minter_addr.to_string(),
-    })
-}
+    pub fn query_minter(&self, deps: Deps) -> StdResult<MinterResponse> {
+        let minter_addr = self.minter.load(deps.storage)?;
+        Ok(MinterResponse {
+            minter: minter_addr.to_string(),
+        })
+    }
 
-pub fn query_contract_info(deps: Deps) -> StdResult<ContractInfoResponse> {
-    CONTRACT_INFO.load(deps.storage)
-}
+    pub fn query_contract_info(&self, deps: Deps) -> StdResult<ContractInfoResponse> {
+        self.contract_info.load(deps.storage)
+    }
 
-pub fn query_num_tokens(deps: Deps) -> StdResult<NumTokensResponse> {
-    let count = num_tokens(deps.storage)?;
-    Ok(NumTokensResponse { count })
-}
+    pub fn query_num_tokens(&self, deps: Deps) -> StdResult<NumTokensResponse> {
+        let count = self.num_tokens(deps.storage)?;
+        Ok(NumTokensResponse { count })
+    }
 
-pub fn query_nft_info(deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
-    let info = tokens().load(deps.storage, &token_id)?;
-    Ok(NftInfoResponse {
-        name: info.name,
-        description: info.description,
-        image: info.image,
-    })
-}
+    pub fn query_nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse> {
+        let info = self.tokens.load(deps.storage, &token_id)?;
+        Ok(NftInfoResponse {
+            name: info.name,
+            description: info.description,
+            image: info.image,
+        })
+    }
 
-pub fn query_owner_of(
-    deps: Deps,
-    env: Env,
-    token_id: String,
-    include_expired: bool,
-) -> StdResult<OwnerOfResponse> {
-    let info = tokens().load(deps.storage, &token_id)?;
-    Ok(OwnerOfResponse {
-        owner: info.owner.to_string(),
-        approvals: humanize_approvals(&env.block, &info, include_expired),
-    })
-}
+    pub fn query_owner_of(
+        &self,
+        deps: Deps,
+        env: Env,
+        token_id: String,
+        include_expired: bool,
+    ) -> StdResult<OwnerOfResponse> {
+        let info = self.tokens.load(deps.storage, &token_id)?;
+        Ok(OwnerOfResponse {
+            owner: info.owner.to_string(),
+            approvals: humanize_approvals(&env.block, &info, include_expired),
+        })
+    }
 
-const DEFAULT_LIMIT: u32 = 10;
-const MAX_LIMIT: u32 = 30;
+    pub fn query_all_approvals(
+        &self,
+        deps: Deps,
+        env: Env,
+        owner: String,
+        include_expired: bool,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<ApprovedForAllResponse> {
+        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let start_addr = maybe_addr(deps.api, start_after)?;
+        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-pub fn query_all_approvals(
-    deps: Deps,
-    env: Env,
-    owner: String,
-    include_expired: bool,
-    start_after: Option<String>,
-    limit: Option<u32>,
-) -> StdResult<ApprovedForAllResponse> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_addr = maybe_addr(deps.api, start_after)?;
-    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+        let owner_addr = deps.api.addr_validate(&owner)?;
+        let res: StdResult<Vec<_>> = self
+            .operators
+            .prefix(&owner_addr)
+            .range(deps.storage, start, None, Order::Ascending)
+            .filter(|r| {
+                include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block)
+            })
+            .take(limit)
+            .map(parse_approval)
+            .collect();
+        Ok(ApprovedForAllResponse { operators: res? })
+    }
 
-    let owner_addr = deps.api.addr_validate(&owner)?;
-    let res: StdResult<Vec<_>> = OPERATORS
-        .prefix(&owner_addr)
-        .range(deps.storage, start, None, Order::Ascending)
-        .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
-        .take(limit)
-        .map(parse_approval)
-        .collect();
-    Ok(ApprovedForAllResponse { operators: res? })
+    pub fn query_tokens(
+        &self,
+        deps: Deps,
+        owner: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<TokensResponse> {
+        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let start = start_after.map(Bound::exclusive);
+
+        let owner_addr = deps.api.addr_validate(&owner)?;
+        let pks: Vec<_> = self
+            .tokens
+            .idx
+            .owner
+            .prefix(owner_addr)
+            .keys(deps.storage, start, None, Order::Ascending)
+            .take(limit)
+            .collect();
+
+        let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
+        let tokens = res.map_err(StdError::invalid_utf8)?;
+        Ok(TokensResponse { tokens })
+    }
+
+    pub fn query_all_tokens(
+        &self,
+        deps: Deps,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<TokensResponse> {
+        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let start_addr = maybe_addr(deps.api, start_after)?;
+        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+
+        let tokens: StdResult<Vec<String>> = self
+            .tokens
+            .range(deps.storage, start, None, Order::Ascending)
+            .take(limit)
+            .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
+            .collect();
+        Ok(TokensResponse { tokens: tokens? })
+    }
+
+    pub fn query_all_nft_info(
+        &self,
+        deps: Deps,
+        env: Env,
+        token_id: String,
+        include_expired: bool,
+    ) -> StdResult<AllNftInfoResponse> {
+        let info = self.tokens.load(deps.storage, &token_id)?;
+        Ok(AllNftInfoResponse {
+            access: OwnerOfResponse {
+                owner: info.owner.to_string(),
+                approvals: humanize_approvals(&env.block, &info, include_expired),
+            },
+            info: NftInfoResponse {
+                name: info.name,
+                description: info.description,
+                image: info.image,
+            },
+        })
+    }
 }
 
 fn parse_approval(item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approval> {
     item.and_then(|(k, expires)| {
         let spender = String::from_utf8(k)?;
         Ok(cw721::Approval { spender, expires })
-    })
-}
-
-pub fn query_tokens(
-    deps: Deps,
-    owner: String,
-    start_after: Option<String>,
-    limit: Option<u32>,
-) -> StdResult<TokensResponse> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(Bound::exclusive);
-
-    let owner_addr = deps.api.addr_validate(&owner)?;
-    let pks: Vec<_> = tokens()
-        .idx
-        .owner
-        .prefix(owner_addr)
-        .keys(deps.storage, start, None, Order::Ascending)
-        .take(limit)
-        .collect();
-
-    let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
-    let tokens = res.map_err(StdError::invalid_utf8)?;
-    Ok(TokensResponse { tokens })
-}
-
-pub fn query_all_tokens(
-    deps: Deps,
-    start_after: Option<String>,
-    limit: Option<u32>,
-) -> StdResult<TokensResponse> {
-    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start_addr = maybe_addr(deps.api, start_after)?;
-    let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
-
-    let tokens: StdResult<Vec<String>> = tokens()
-        .range(deps.storage, start, None, Order::Ascending)
-        .take(limit)
-        .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
-        .collect();
-    Ok(TokensResponse { tokens: tokens? })
-}
-
-pub fn query_all_nft_info(
-    deps: Deps,
-    env: Env,
-    token_id: String,
-    include_expired: bool,
-) -> StdResult<AllNftInfoResponse> {
-    let info = tokens().load(deps.storage, &token_id)?;
-    Ok(AllNftInfoResponse {
-        access: OwnerOfResponse {
-            owner: info.owner.to_string(),
-            approvals: humanize_approvals(&env.block, &info, include_expired),
-        },
-        info: NftInfoResponse {
-            name: info.name,
-            description: info.description,
-            image: info.image,
-        },
     })
 }
 

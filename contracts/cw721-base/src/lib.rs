@@ -5,12 +5,12 @@ pub mod state;
 
 pub use crate::error::ContractError;
 
-mod entry {
+pub mod entry {
     use super::*;
 
     #[cfg(not(feature = "library"))]
     use cosmwasm_std::entry_point;
-    use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdResult};
+    use cosmwasm_std::{Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult};
 
     // This makes a conscious choice on the various generics used by the contract
     #[cfg_attr(not(feature = "library"), entry_point)]
@@ -33,5 +33,11 @@ mod entry {
     ) -> Result<Response, ContractError> {
         let tract = contract::Cw721Contract::default();
         tract.execute(deps, env, info, msg)
+    }
+
+    #[cfg_attr(not(feature = "library"), entry_point)]
+    pub fn query(deps: Deps, env: Env, msg: msg::QueryMsg) -> StdResult<Binary> {
+        let tract = contract::Cw721Contract::<Empty>::default();
+        tract.query(deps, env, msg)
     }
 }
