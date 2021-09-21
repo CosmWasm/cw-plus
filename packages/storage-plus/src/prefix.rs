@@ -49,12 +49,12 @@ pub enum PrefixBound<'a, K: Prefixer<'a>> {
 }
 
 impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
-    pub fn inclusive(k: K) -> Self {
-        Self::Inclusive((k, PhantomData))
+    pub fn inclusive<T: Into<K>>(k: T) -> Self {
+        Self::Inclusive((k.into(), PhantomData))
     }
 
-    pub fn exclusive(k: K) -> Self {
-        Self::Exclusive((k, PhantomData))
+    pub fn exclusive<T: Into<K>>(k: T) -> Self {
+        Self::Exclusive((k.into(), PhantomData))
     }
 
     pub fn to_bound(&self) -> Bound {
@@ -199,6 +199,9 @@ pub fn namespaced_prefix_range<'a, 'c, K: Prefixer<'a>>(
 ) -> Box<dyn Iterator<Item = Pair> + 'c> {
     let start = calc_prefix_start_bound(namespace, start);
     let end = calc_prefix_end_bound(namespace, end);
+
+    println!("start: {:?}", start);
+    println!("end: {:?}", end);
 
     // get iterator from storage
     let base_iterator = storage.range(Some(&start), Some(&end), order);

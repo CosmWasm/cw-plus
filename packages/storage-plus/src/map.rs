@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use crate::helpers::query_raw;
+use crate::helpers::{namespaces_with_key, query_raw};
 use crate::iter_helpers::deserialize_kv;
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
@@ -167,8 +167,8 @@ where
         T: 'c,
         'a: 'c,
     {
-        let mapped =
-            namespaced_prefix_range(store, &self.namespace, min, max, order).map(deserialize_kv);
+        let prefix = namespaces_with_key(&[self.namespace], &[]);
+        let mapped = namespaced_prefix_range(store, &prefix, min, max, order).map(deserialize_kv);
         Box::new(mapped)
     }
 }
@@ -181,7 +181,7 @@ mod test {
 
     #[cfg(feature = "iterator")]
     use crate::iter_helpers::to_length_prefixed;
-    use crate::U8Key;
+    use crate::{U32Key, U8Key};
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -692,5 +692,97 @@ mod test {
         assert_eq!(all?, vec![(b"spender2".to_vec(), 3000)]);
 
         Ok(())
+    }
+
+    #[test]
+    fn prefixed_range_works() {
+        // this is designed to look as much like a secondary index as possible
+        // we want to query over a range of u32 for the first key and all subkeys
+        const AGES: Map<(U32Key, Vec<u8>), u64> = Map::new("ages");
+
+        let mut store = MockStorage::new();
+        AGES.save(&mut store, (2.into(), vec![1, 2, 3]), &123)
+            .unwrap();
+        AGES.save(&mut store, (3.into(), vec![4, 5, 6]), &456)
+            .unwrap();
+        AGES.save(&mut store, (5.into(), vec![7, 8, 9]), &789)
+            .unwrap();
+        AGES.save(&mut store, (5.into(), vec![9, 8, 7]), &987)
+            .unwrap();
+        AGES.save(&mut store, (7.into(), vec![20, 21, 22]), &2002)
+            .unwrap();
+        AGES.save(&mut store, (8.into(), vec![23, 24, 25]), &2332)
+            .unwrap();
+
+        // typical range under one prefix as a control
+        let fives = AGES
+            .prefix(5.into())
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(fives.len(), 2);
+        assert_eq!(fives, vec![(vec![7, 8, 9], 789), (vec![9, 8, 7], 987)]);
+
+        let keys: Vec<_> = AGES
+            .no_prefix()
+            .keys(&store, None, None, Order::Ascending)
+            .collect();
+        println!("keys: {:?}", keys);
+
+        // using inclusive bounds both sides
+        let include = AGES
+            .prefix_range(
+                &store,
+                Some(PrefixBound::inclusive(3)),
+                Some(PrefixBound::inclusive(7)),
+                Order::Ascending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(include.len(), 4);
+        assert_eq!(include, vec![456, 789, 987, 2002]);
+
+        // using exclusive bounds both sides
+        let exclude = AGES
+            .prefix_range(
+                &store,
+                Some(PrefixBound::exclusive(3)),
+                Some(PrefixBound::exclusive(7)),
+                Order::Ascending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(exclude.len(), 2);
+        assert_eq!(exclude, vec![789, 987]);
+
+        // using inclusive in descending
+        let include = AGES
+            .prefix_range(
+                &store,
+                Some(PrefixBound::inclusive(3)),
+                Some(PrefixBound::inclusive(5)),
+                Order::Descending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(include.len(), 3);
+        assert_eq!(include, vec![987, 789, 456]);
+
+        // using exclusive in descending
+        let include = AGES
+            .prefix_range(
+                &store,
+                Some(PrefixBound::exclusive(2)),
+                Some(PrefixBound::exclusive(5)),
+                Order::Descending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(include.len(), 1);
+        assert_eq!(include, vec![456]);
     }
 }
