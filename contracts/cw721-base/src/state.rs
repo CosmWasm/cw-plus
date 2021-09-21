@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, BlockInfo};
 use cw721::Expiration;
 use cw_storage_plus::{Index, IndexList, MultiIndex};
+use serde::de::DeserializeOwned;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct TokenInfo {
+pub struct TokenInfo<T> {
     /// The owner of the newly minted NFT
     pub owner: Addr,
     /// Approvals are stored here, as we clear them all upon transfer and cannot accumulate much
@@ -18,6 +19,9 @@ pub struct TokenInfo {
     pub description: String,
     /// A URI pointing to an image representing the asset
     pub image: Option<String>,
+
+    /// You can add any custom metadata here when you extend cw721-base
+    pub extension: T,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -34,18 +38,24 @@ impl Approval {
     }
 }
 
-pub struct TokenIndexes<'a> {
+pub struct TokenIndexes<'a, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
     // pk goes to second tuple element
-    pub owner: MultiIndex<'a, (Addr, Vec<u8>), TokenInfo>,
+    pub owner: MultiIndex<'a, (Addr, Vec<u8>), TokenInfo<T>>,
 }
 
-impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<TokenInfo>> + '_> {
-        let v: Vec<&dyn Index<TokenInfo>> = vec![&self.owner];
+impl<'a, T> IndexList<TokenInfo<T>> for TokenIndexes<'a, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<TokenInfo<T>>> + '_> {
+        let v: Vec<&dyn Index<TokenInfo<T>>> = vec![&self.owner];
         Box::new(v.into_iter())
     }
 }
 
-pub fn token_owner_idx(d: &TokenInfo, k: Vec<u8>) -> (Addr, Vec<u8>) {
+pub fn token_owner_idx<T>(d: &TokenInfo<T>, k: Vec<u8>) -> (Addr, Vec<u8>) {
     (d.owner.clone(), k)
 }

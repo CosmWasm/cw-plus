@@ -15,6 +15,8 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{token_owner_idx, Approval, TokenIndexes, TokenInfo};
 use cw_storage_plus::{Bound, IndexedMap, Item, Map, MultiIndex};
 use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::marker::PhantomData;
 
 // version info for migration info
@@ -24,18 +26,24 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 30;
 
-pub struct Cw721Contract<'a, C> {
+pub struct Cw721Contract<'a, T, C>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
     pub contract_info: Item<'a, ContractInfoResponse>,
     pub minter: Item<'a, Addr>,
     pub token_count: Item<'a, u64>,
     /// Stored as (granter, operator) giving operator full control over granter's account
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
-    pub tokens: IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>>,
+    pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
 
     _custom_response: PhantomData<C>,
 }
 
-impl<C> Default for Cw721Contract<'static, C> {
+impl<T, C> Default for Cw721Contract<'static, T, C>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
     fn default() -> Self {
         Self::new(
             "nft_info",
@@ -48,7 +56,10 @@ impl<C> Default for Cw721Contract<'static, C> {
     }
 }
 
-impl<'a, C> Cw721Contract<'a, C> {
+impl<'a, T, C> Cw721Contract<'a, T, C>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
     fn new(
         contract_key: &'a str,
         minter_key: &'a str,
@@ -81,8 +92,9 @@ impl<'a, C> Cw721Contract<'a, C> {
     }
 }
 
-impl<'a, C> Cw721Contract<'a, C>
+impl<'a, T, C> Cw721Contract<'a, T, C>
 where
+    T: Serialize + DeserializeOwned + Clone,
     C: Clone + std::fmt::Debug + PartialEq + JsonSchema,
 {
     pub fn instantiate(
@@ -109,7 +121,7 @@ where
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: ExecuteMsg,
+        msg: ExecuteMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         match msg {
             ExecuteMsg::Mint(msg) => self.execute_mint(deps, env, info, msg),
@@ -144,7 +156,7 @@ where
         deps: DepsMut,
         _env: Env,
         info: MessageInfo,
-        msg: MintMsg,
+        msg: MintMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         let minter = self.minter.load(deps.storage)?;
 
@@ -159,6 +171,7 @@ where
             name: msg.name,
             description: msg.description.unwrap_or_default(),
             image: msg.image,
+            extension: msg.extension,
         };
         self.tokens
             .update(deps.storage, &msg.token_id, |old| match old {
@@ -225,7 +238,7 @@ where
         info: &MessageInfo,
         recipient: &str,
         token_id: &str,
-    ) -> Result<TokenInfo, ContractError> {
+    ) -> Result<TokenInfo<T>, ContractError> {
         let mut token = self.tokens.load(deps.storage, &token_id)?;
         // ensure we have permissions
         self.check_can_send(deps.as_ref(), env, info, &token)?;
@@ -282,7 +295,7 @@ where
         // if add == false, remove. if add == true, remove then set with this expiration
         add: bool,
         expires: Option<Expiration>,
-    ) -> Result<TokenInfo, ContractError> {
+    ) -> Result<TokenInfo<T>, ContractError> {
         let mut token = self.tokens.load(deps.storage, &token_id)?;
         // ensure we have permissions
         self.check_can_approve(deps.as_ref(), env, info, &token)?;
@@ -362,7 +375,7 @@ where
         deps: Deps,
         env: &Env,
         info: &MessageInfo,
-        token: &TokenInfo,
+        token: &TokenInfo<T>,
     ) -> Result<(), ContractError> {
         // owner can approve
         if token.owner == info.sender {
@@ -390,7 +403,7 @@ where
         deps: Deps,
         env: &Env,
         info: &MessageInfo,
-        token: &TokenInfo,
+        token: &TokenInfo<T>,
     ) -> Result<(), ContractError> {
         // owner can send
         if token.owner == info.sender {
@@ -609,9 +622,9 @@ fn parse_approval(item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approva
     })
 }
 
-fn humanize_approvals(
+fn humanize_approvals<T>(
     block: &BlockInfo,
-    info: &TokenInfo,
+    info: &TokenInfo<T>,
     include_expired: bool,
 ) -> Vec<cw721::Approval> {
     info.approvals
@@ -634,13 +647,14 @@ mod tests {
     use cosmwasm_std::{from_binary, CosmosMsg, Empty, WasmMsg};
 
     use super::*;
+    use crate::entry::Extension;
     use cw721::ApprovedForAllResponse;
 
     const MINTER: &str = "merlin";
     const CONTRACT_NAME: &str = "Magic Power";
     const SYMBOL: &str = "MGK";
 
-    fn setup_contract(deps: DepsMut<'_>) -> Cw721Contract<'static, Empty> {
+    fn setup_contract(deps: DepsMut<'_>) -> Cw721Contract<'static, Extension, Empty> {
         let contract = Cw721Contract::default();
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
@@ -656,7 +670,7 @@ mod tests {
     #[test]
     fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
-        let contract = Cw721Contract::<Empty>::default();
+        let contract = Cw721Contract::<Extension, Empty>::default();
 
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
@@ -702,12 +716,13 @@ mod tests {
         let name = "Petrify with Gaze".to_string();
         let description = "Allows the owner to petrify anyone looking at him or her".to_string();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id.clone(),
             owner: String::from("medusa"),
             name: name.clone(),
             description: Some(description.clone()),
             image: None,
+            extension: None,
         });
 
         // random cannot mint
@@ -742,6 +757,7 @@ mod tests {
                 name,
                 description,
                 image: None,
+                // extension: None,
             }
         );
 
@@ -758,12 +774,13 @@ mod tests {
         );
 
         // Cannot mint same token_id again
-        let mint_msg2 = ExecuteMsg::Mint(MintMsg {
+        let mint_msg2 = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id.clone(),
             owner: String::from("hercules"),
             name: "copy cat".into(),
             description: None,
             image: None,
+            extension: None,
         });
 
         let allowed = mock_info(MINTER, &[]);
@@ -790,12 +807,13 @@ mod tests {
         let name = "Melting power".to_string();
         let description = "Allows the owner to melt anyone looking at him or her".to_string();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id.clone(),
             owner: String::from("venus"),
             name,
             description: Some(description),
             image: None,
+            extension: None,
         });
 
         let minter = mock_info(MINTER, &[]);
@@ -846,12 +864,13 @@ mod tests {
         let name = "Melting power".to_string();
         let description = "Allows the owner to melt anyone looking at him or her".to_string();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id.clone(),
             owner: String::from("venus"),
             name,
             description: Some(description),
             image: None,
+            extension: None,
         });
 
         let minter = mock_info(MINTER, &[]);
@@ -914,12 +933,13 @@ mod tests {
         let name = "Growing power".to_string();
         let description = "Allows the owner to grow anything".to_string();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id.clone(),
             owner: String::from("demeter"),
             name,
             description: Some(description),
             image: None,
+            extension: None,
         });
 
         let minter = mock_info(MINTER, &[]);
@@ -1023,12 +1043,13 @@ mod tests {
         let name2 = "More growing power".to_string();
         let description2 = "Allows the owner the power to grow anything even faster".to_string();
 
-        let mint_msg1 = ExecuteMsg::Mint(MintMsg {
+        let mint_msg1 = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id1.clone(),
             owner: String::from("demeter"),
             name: name1,
             description: Some(description1),
             image: None,
+            extension: None,
         });
 
         let minter = mock_info(MINTER, &[]);
@@ -1036,12 +1057,13 @@ mod tests {
             .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg1)
             .unwrap();
 
-        let mint_msg2 = ExecuteMsg::Mint(MintMsg {
+        let mint_msg2 = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id2.clone(),
             owner: String::from("demeter"),
             name: name2,
             description: Some(description2),
             image: None,
+            extension: None,
         });
 
         contract
@@ -1243,18 +1265,19 @@ mod tests {
         let ceres = String::from("Ceres");
         let token_id3 = "sing".to_string();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id1.clone(),
             owner: demeter.clone(),
             name: "Growing power".to_string(),
             description: Some("Allows the owner the power to grow anything".to_string()),
             image: None,
+            extension: None,
         });
         contract
             .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
             .unwrap();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id2.clone(),
             owner: ceres.clone(),
             name: "More growing power".to_string(),
@@ -1262,17 +1285,19 @@ mod tests {
                 "Allows the owner the power to grow anything even faster".to_string(),
             ),
             image: None,
+            extension: None,
         });
         contract
             .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
             .unwrap();
 
-        let mint_msg = ExecuteMsg::Mint(MintMsg {
+        let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
             token_id: token_id3.clone(),
             owner: demeter.clone(),
             name: "Sing a lullaby".to_string(),
             description: Some("Calm even the most excited children".to_string()),
             image: None,
+            extension: None,
         });
         contract
             .execute(deps.as_mut(), mock_env(), minter, mint_msg)
