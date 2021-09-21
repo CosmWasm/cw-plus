@@ -21,7 +21,7 @@ pub struct InstantiateMsg {
 /// use other control logic in any contract that inherits this.
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecuteMsg {
+pub enum ExecuteMsg<T> {
     /// Transfer is a base message to move a token to another account without triggering actions
     TransferNft { recipient: String, token_id: String },
     /// Send is a base message to transfer a token to a contract and trigger an action
@@ -50,11 +50,11 @@ pub enum ExecuteMsg {
     RevokeAll { operator: String },
 
     /// Mint a new NFT, can only be called by the contract minter
-    Mint(MintMsg),
+    Mint(MintMsg<T>),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct MintMsg {
+pub struct MintMsg<T> {
     /// Unique ID of the NFT
     pub token_id: String,
     /// The owner of the newly minter NFT
@@ -65,6 +65,8 @@ pub struct MintMsg {
     pub description: Option<String>,
     /// A URI pointing to an image representing the asset
     pub image: Option<String>,
+    /// Any custom extension used by this contract
+    pub extension: T,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
