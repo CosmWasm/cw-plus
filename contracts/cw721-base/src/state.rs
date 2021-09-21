@@ -34,23 +34,6 @@ impl Approval {
     }
 }
 
-pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("nft_info");
-pub const MINTER: Item<Addr> = Item::new("minter");
-pub const TOKEN_COUNT: Item<u64> = Item::new("num_tokens");
-
-// Stored as (granter, operator) giving operator full control over granter's account
-pub const OPERATORS: Map<(&Addr, &Addr), Expiration> = Map::new("operators");
-
-pub fn num_tokens(storage: &dyn Storage) -> StdResult<u64> {
-    Ok(TOKEN_COUNT.may_load(storage)?.unwrap_or_default())
-}
-
-pub fn increment_tokens(storage: &mut dyn Storage) -> StdResult<u64> {
-    let val = num_tokens(storage)? + 1;
-    TOKEN_COUNT.save(storage, &val)?;
-    Ok(val)
-}
-
 pub struct TokenIndexes<'a> {
     // pk goes to second tuple element
     pub owner: MultiIndex<'a, (Addr, Vec<u8>), TokenInfo>,
@@ -63,13 +46,6 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
     }
 }
 
-pub fn tokens<'a>() -> IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>> {
-    let indexes = TokenIndexes {
-        owner: MultiIndex::new(
-            |d: &TokenInfo, k: Vec<u8>| (d.owner.clone(), k),
-            "tokens",
-            "tokens__owner",
-        ),
-    };
-    IndexedMap::new("tokens", indexes)
+pub fn token_owner_idx(d: &TokenInfo, k: Vec<u8>) -> (Addr, Vec<u8>) {
+    (d.owner.clone(), k)
 }

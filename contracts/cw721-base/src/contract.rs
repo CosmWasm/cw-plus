@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response, StdError,
-    StdResult,
+    to_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
+    StdError, StdResult, Storage,
 };
 
 use cw0::maybe_addr;
@@ -15,13 +15,72 @@ use cw721::{
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
 use crate::state::{
-    increment_tokens, num_tokens, tokens, Approval, TokenInfo, CONTRACT_INFO, MINTER, OPERATORS,
+    increment_tokens, num_tokens, token_owner_idx, tokens, Approval, TokenIndexes, TokenInfo,
+    CONTRACT_INFO, MINTER, OPERATORS,
 };
-use cw_storage_plus::Bound;
+use cw_storage_plus::{Bound, IndexedMap, Item, Map, MultiIndex};
+use std::marker::PhantomData;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw721-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub struct Cw721Contract<'a, C> {
+    pub contract_info: Item<'a, ContractInfoResponse>,
+    pub minter: Item<'a, Addr>,
+    pub token_count: Item<'a, u64>,
+    /// Stored as (granter, operator) giving operator full control over granter's account
+    pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
+    pub tokens: IndexedMap<'a, &'a str, TokenInfo, TokenIndexes<'a>>,
+
+    _custom_response: PhantomData<C>,
+}
+
+impl<T, C> Default for Cw721Contract<'static, C> {
+    fn default() -> Self {
+        Self::new(
+            "nft_info",
+            "minter",
+            "num_tokens",
+            "operators",
+            "tokens",
+            "tokens__owner",
+        )
+    }
+}
+
+impl<'a, T, C> Cw721Contract<'a, C> {
+    fn new(
+        contract_key: &'a str,
+        minter_key: &'a str,
+        token_count_key: &'a str,
+        operator_key: &'a str,
+        tokens_key: &'a str,
+        tokens_owner_key: &'a str,
+    ) -> Self {
+        let indexes = TokenIndexes {
+            owner: MultiIndex::new(token_owner_idx, tokens_key, tokens_owner_key),
+        };
+        Self {
+            contract_info: Item::new(contract_key),
+            minter: Item::new(minter_key),
+            token_count: Item::new(token_count_key),
+            operators: Map::new(operator_key),
+            tokens: IndexedMap::new(tokens_key, indexes),
+            _custom_response: PhantomData,
+        }
+    }
+
+    pub fn num_tokens(&self, storage: &dyn Storage) -> StdResult<u64> {
+        Ok(self.token_count.may_load(storage)?.unwrap_or_default())
+    }
+
+    pub fn increment_tokens(&self, storage: &mut dyn Storage) -> StdResult<u64> {
+        let val = self.num_tokens(storage)? + 1;
+        self.token_count.save(storage, &val)?;
+        Ok(val)
+    }
+}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
