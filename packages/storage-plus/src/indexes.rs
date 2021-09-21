@@ -255,7 +255,6 @@ impl<'a, K, T> UniqueIndex<'a, K, T> {
     /// ```rust
     /// use cw_storage_plus::{U32Key, UniqueIndex};
     ///
-    /// #[derive(PartialEq, Debug, Clone)]
     /// struct Data {
     ///     pub name: String,
     ///     pub age: u32,

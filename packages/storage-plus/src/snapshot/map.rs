@@ -26,11 +26,11 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
     /// ```rust
     /// use cw_storage_plus::{SnapshotMap, Strategy};
     ///
-    /// let sm: SnapshotMap<&[u8], &str> =
-    ///     SnapshotMap::new("never",
-    ///                      "never__check",
-    ///                      "never__change",
-    ///                      Strategy::EveryBlock
+    /// SnapshotMap::<&[u8], &str>::new(
+    ///     "never",
+    ///     "never__check",
+    ///     "never__change",
+    ///     Strategy::EveryBlock
     /// );
     /// ```
     pub const fn new(

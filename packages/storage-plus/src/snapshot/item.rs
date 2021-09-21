@@ -22,11 +22,11 @@ impl<'a, T> SnapshotItem<'a, T> {
     /// ```rust
     /// use cw_storage_plus::{SnapshotItem, Strategy};
     ///
-    /// let snapshot_item: SnapshotItem<'static, u64> =
-    ///     SnapshotItem::new("every",
-    ///                       "every__check",
-    ///                       "every__change",
-    ///                       Strategy::EveryBlock);
+    /// SnapshotItem::<'static, u64>::new(
+    ///     "every",
+    ///     "every__check",
+    ///     "every__change",
+    ///     Strategy::EveryBlock);
     /// ```
     pub const fn new(
         storage_key: &'a str,
