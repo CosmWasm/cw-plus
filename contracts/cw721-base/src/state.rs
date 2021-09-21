@@ -1,9 +1,9 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, BlockInfo, StdResult, Storage};
-use cw721::{ContractInfoResponse, Expiration};
-use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
+use cosmwasm_std::{Addr, BlockInfo};
+use cw721::Expiration;
+use cw_storage_plus::{Index, IndexList, MultiIndex};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct TokenInfo {

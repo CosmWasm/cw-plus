@@ -14,11 +14,9 @@ use cw721::{
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
-use crate::state::{
-    increment_tokens, num_tokens, token_owner_idx, tokens, Approval, TokenIndexes, TokenInfo,
-    CONTRACT_INFO, MINTER, OPERATORS,
-};
+use crate::state::{token_owner_idx, Approval, TokenIndexes, TokenInfo};
 use cw_storage_plus::{Bound, IndexedMap, Item, Map, MultiIndex};
+use schemars::JsonSchema;
 use std::marker::PhantomData;
 
 // version info for migration info
@@ -82,23 +80,28 @@ impl<'a, T, C> Cw721Contract<'a, C> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn instantiate(
-    deps: DepsMut,
-    _env: Env,
-    _info: MessageInfo,
-    msg: InstantiateMsg,
-) -> StdResult<Response> {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+impl<'a, T, C> Cw721Contract<'a, C>
+where
+    C: Clone + std::fmt::Debug + PartialEq + JsonSchema,
+{
+    pub fn instantiate(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        _info: MessageInfo,
+        msg: InstantiateMsg,
+    ) -> StdResult<Response<C>> {
+        set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let info = ContractInfoResponse {
-        name: msg.name,
-        symbol: msg.symbol,
-    };
-    CONTRACT_INFO.save(deps.storage, &info)?;
-    let minter = deps.api.addr_validate(&msg.minter)?;
-    MINTER.save(deps.storage, &minter)?;
-    Ok(Response::default())
+        let info = ContractInfoResponse {
+            name: msg.name,
+            symbol: msg.symbol,
+        };
+        self.contract_info.save(deps.storage, &info)?;
+        let minter = deps.api.addr_validate(&msg.minter)?;
+        self.minter.save(deps.storage, &minter)?;
+        Ok(Response::default())
+    }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
