@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use crate::helpers::{namespaces_with_key, query_raw};
+use crate::helpers::query_raw;
 use crate::iter_helpers::deserialize_kv;
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
@@ -167,8 +167,8 @@ where
         T: 'c,
         'a: 'c,
     {
-        let prefix = namespaces_with_key(&[self.namespace], &[]);
-        let mapped = namespaced_prefix_range(store, &prefix, min, max, order).map(deserialize_kv);
+        let mapped =
+            namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_kv);
         Box::new(mapped)
     }
 }

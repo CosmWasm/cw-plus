@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use cosmwasm_std::{Order, Pair, StdResult, Storage};
 use std::ops::Deref;
 
-use crate::helpers::nested_namespaces_with_key;
+use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::iter_helpers::{concat, deserialize_kv, trim};
 use crate::{Endian, Prefixer};
 
@@ -197,17 +197,14 @@ pub fn namespaced_prefix_range<'a, 'c, K: Prefixer<'a>>(
     end: Option<PrefixBound<'a, K>>,
     order: Order,
 ) -> Box<dyn Iterator<Item = Pair> + 'c> {
-    let start = calc_prefix_start_bound(namespace, start);
-    let end = calc_prefix_end_bound(namespace, end);
-
-    println!("start: {:?}", start);
-    println!("end: {:?}", end);
+    let prefix = namespaces_with_key(&[namespace], &[]);
+    let start = calc_prefix_start_bound(&prefix, start);
+    let end = calc_prefix_end_bound(&prefix, end);
 
     // get iterator from storage
     let base_iterator = storage.range(Some(&start), Some(&end), order);
 
     // make a copy for the closure to handle lifetimes safely
-    let prefix = namespace.to_vec();
     let mapped = base_iterator.map(move |(k, v)| (trim(&prefix, &k), v));
     Box::new(mapped)
 }
