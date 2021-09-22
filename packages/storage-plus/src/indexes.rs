@@ -8,6 +8,7 @@ use cosmwasm_std::{from_slice, Binary, Order, Pair, StdError, StdResult, Storage
 
 use crate::helpers::namespaces_with_key;
 use crate::map::Map;
+use crate::prefix::{namespaced_prefix_range, PrefixBound};
 use crate::{Bound, Prefix, Prefixer, PrimaryKey, U32Key};
 
 pub fn index_string(data: &str) -> Vec<u8> {
@@ -224,6 +225,26 @@ where
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         self.no_prefix().keys(store, min, max, order)
+    }
+
+    /// while range assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range<'c>(
+        &'c self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+    {
+        let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
+            .map(move |kv| (deserialize_multi_kv)(store, self.pk_namespace, kv));
+        Box::new(mapped)
     }
 }
 

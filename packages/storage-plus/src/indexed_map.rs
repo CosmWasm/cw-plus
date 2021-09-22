@@ -6,9 +6,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::indexes::Index;
+use crate::iter_helpers::deserialize_kv;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::{Bound, Prefix};
+use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
 use crate::Path;
 
 pub trait IndexList<T> {
@@ -163,6 +164,34 @@ where
         T: 'c,
     {
         self.no_prefix().range(store, min, max, order)
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
+where
+    K: PrimaryKey<'a>,
+    T: Serialize + DeserializeOwned + Clone,
+    I: IndexList<T>,
+{
+    /// while range assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+    {
+        let mapped =
+            namespaced_prefix_range(store, self.pk_namespace, min, max, order).map(deserialize_kv);
+        Box::new(mapped)
     }
 }
 
@@ -699,5 +728,55 @@ mod test {
         // The associated data
         assert_eq!(datas[0], marias[0].1);
         assert_eq!(datas[1], marias[1].1);
+    }
+
+    mod inclusive_bound {
+        use super::*;
+        use crate::U64Key;
+
+        struct Indexes<'a> {
+            secondary: MultiIndex<'a, (U64Key, Vec<u8>), u64>,
+        }
+
+        impl<'a> IndexList<u64> for Indexes<'a> {
+            fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<u64>> + '_> {
+                let v: Vec<&dyn Index<u64>> = vec![&self.secondary];
+                Box::new(v.into_iter())
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "iterator")]
+        fn composite_key_query() {
+            let indexes = Indexes {
+                secondary: MultiIndex::new(
+                    |secondary, k| (U64Key::new(*secondary), k),
+                    "test_map",
+                    "test_map__secondary",
+                ),
+            };
+            let map = IndexedMap::<&str, u64, Indexes>::new("test_map", indexes);
+            let mut store = MockStorage::new();
+
+            map.save(&mut store, "one", &1).unwrap();
+            map.save(&mut store, "two", &2).unwrap();
+
+            let items: Vec<_> = map
+                .idx
+                .secondary
+                .prefix_range(
+                    &store,
+                    None,
+                    Some(PrefixBound::inclusive(1)),
+                    Order::Ascending,
+                )
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v).collect();
+
+            assert_eq!(items, vec![1]);
+        }
     }
 }
