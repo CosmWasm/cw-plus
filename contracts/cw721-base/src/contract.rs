@@ -118,6 +118,110 @@ where
             .add_attribute("recipient", recipient)
             .add_attribute("token_id", token_id))
     }
+
+    fn send_nft(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        contract: String,
+        token_id: String,
+        msg: Binary,
+    ) -> Result<Response<C>, ContractError> {
+        // Transfer token
+        self._transfer_nft(deps, &env, &info, &contract, &token_id)?;
+
+        let send = Cw721ReceiveMsg {
+            sender: info.sender.to_string(),
+            token_id: token_id.clone(),
+            msg,
+        };
+
+        // Send message
+        Ok(Response::new()
+            .add_message(send.into_cosmos_msg(contract.clone())?)
+            .add_attribute("action", "send_nft")
+            .add_attribute("sender", info.sender)
+            .add_attribute("recipient", contract)
+            .add_attribute("token_id", token_id))
+    }
+
+    fn approve(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        spender: String,
+        token_id: String,
+        expires: Option<Expiration>,
+    ) -> Result<Response<C>, ContractError> {
+        self._update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "approve")
+            .add_attribute("sender", info.sender)
+            .add_attribute("spender", spender)
+            .add_attribute("token_id", token_id))
+    }
+
+    fn revoke(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        spender: String,
+        token_id: String,
+    ) -> Result<Response<C>, ContractError> {
+        self._update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "revoke")
+            .add_attribute("sender", info.sender)
+            .add_attribute("spender", spender)
+            .add_attribute("token_id", token_id))
+    }
+
+    fn approve_all(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        operator: String,
+        expires: Option<Expiration>,
+    ) -> Result<Response<C>, ContractError> {
+        // reject expired data as invalid
+        let expires = expires.unwrap_or_default();
+        if expires.is_expired(&env.block) {
+            return Err(ContractError::Expired {});
+        }
+
+        // set the operator for us
+        let operator_addr = deps.api.addr_validate(&operator)?;
+        self.operators
+            .save(deps.storage, (&info.sender, &operator_addr), &expires)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "approve_all")
+            .add_attribute("sender", info.sender)
+            .add_attribute("operator", operator))
+    }
+
+    fn revoke_all(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        operator: String,
+    ) -> Result<Response<C>, ContractError> {
+        let operator_addr = deps.api.addr_validate(&operator)?;
+        self.operators
+            .remove(deps.storage, (&info.sender, &operator_addr));
+
+        Ok(Response::new()
+            .add_attribute("action", "revoke_all")
+            .add_attribute("sender", info.sender)
+            .add_attribute("operator", operator))
+    }
 }
 
 impl<'a, T, C> Cw721Contract<'a, T, C>
@@ -157,16 +261,14 @@ where
                 spender,
                 token_id,
                 expires,
-            } => self.execute_approve(deps, env, info, spender, token_id, expires),
+            } => self.approve(deps, env, info, spender, token_id, expires),
             ExecuteMsg::Revoke { spender, token_id } => {
-                self.execute_revoke(deps, env, info, spender, token_id)
+                self.revoke(deps, env, info, spender, token_id)
             }
             ExecuteMsg::ApproveAll { operator, expires } => {
-                self.execute_approve_all(deps, env, info, operator, expires)
+                self.approve_all(deps, env, info, operator, expires)
             }
-            ExecuteMsg::RevokeAll { operator } => {
-                self.execute_revoke_all(deps, env, info, operator)
-            }
+            ExecuteMsg::RevokeAll { operator } => self.revoke_all(deps, env, info, operator),
             ExecuteMsg::TransferNft {
                 recipient,
                 token_id,
@@ -175,7 +277,7 @@ where
                 contract,
                 token_id,
                 msg,
-            } => self.execute_send_nft(deps, env, info, contract, token_id, msg),
+            } => self.send_nft(deps, env, info, contract, token_id, msg),
         }
     }
 
@@ -215,50 +317,6 @@ where
             .add_attribute("token_id", msg.token_id))
     }
 
-    pub fn execute_transfer_nft(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        recipient: String,
-        token_id: String,
-    ) -> Result<Response<C>, ContractError> {
-        self._transfer_nft(deps, &env, &info, &recipient, &token_id)?;
-
-        Ok(Response::new()
-            .add_attribute("action", "transfer_nft")
-            .add_attribute("sender", info.sender)
-            .add_attribute("recipient", recipient)
-            .add_attribute("token_id", token_id))
-    }
-
-    pub fn execute_send_nft(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        contract: String,
-        token_id: String,
-        msg: Binary,
-    ) -> Result<Response<C>, ContractError> {
-        // Transfer token
-        self._transfer_nft(deps, &env, &info, &contract, &token_id)?;
-
-        let send = Cw721ReceiveMsg {
-            sender: info.sender.to_string(),
-            token_id: token_id.clone(),
-            msg,
-        };
-
-        // Send message
-        Ok(Response::new()
-            .add_message(send.into_cosmos_msg(contract.clone())?)
-            .add_attribute("action", "send_nft")
-            .add_attribute("sender", info.sender)
-            .add_attribute("recipient", contract)
-            .add_attribute("token_id", token_id))
-    }
-
     pub fn _transfer_nft(
         &self,
         deps: DepsMut,
@@ -275,41 +333,6 @@ where
         token.approvals = vec![];
         self.tokens.save(deps.storage, &token_id, &token)?;
         Ok(token)
-    }
-
-    pub fn execute_approve(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        spender: String,
-        token_id: String,
-        expires: Option<Expiration>,
-    ) -> Result<Response<C>, ContractError> {
-        self._update_approvals(deps, &env, &info, &spender, &token_id, true, expires)?;
-
-        Ok(Response::new()
-            .add_attribute("action", "approve")
-            .add_attribute("sender", info.sender)
-            .add_attribute("spender", spender)
-            .add_attribute("token_id", token_id))
-    }
-
-    pub fn execute_revoke(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        spender: String,
-        token_id: String,
-    ) -> Result<Response<C>, ContractError> {
-        self._update_approvals(deps, &env, &info, &spender, &token_id, false, None)?;
-
-        Ok(Response::new()
-            .add_attribute("action", "revoke")
-            .add_attribute("sender", info.sender)
-            .add_attribute("spender", spender)
-            .add_attribute("token_id", token_id))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -353,48 +376,6 @@ where
         self.tokens.save(deps.storage, &token_id, &token)?;
 
         Ok(token)
-    }
-
-    pub fn execute_approve_all(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        operator: String,
-        expires: Option<Expiration>,
-    ) -> Result<Response<C>, ContractError> {
-        // reject expired data as invalid
-        let expires = expires.unwrap_or_default();
-        if expires.is_expired(&env.block) {
-            return Err(ContractError::Expired {});
-        }
-
-        // set the operator for us
-        let operator_addr = deps.api.addr_validate(&operator)?;
-        self.operators
-            .save(deps.storage, (&info.sender, &operator_addr), &expires)?;
-
-        Ok(Response::new()
-            .add_attribute("action", "approve_all")
-            .add_attribute("sender", info.sender)
-            .add_attribute("operator", operator))
-    }
-
-    pub fn execute_revoke_all(
-        &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
-        operator: String,
-    ) -> Result<Response<C>, ContractError> {
-        let operator_addr = deps.api.addr_validate(&operator)?;
-        self.operators
-            .remove(deps.storage, (&info.sender, &operator_addr));
-
-        Ok(Response::new()
-            .add_attribute("action", "revoke_all")
-            .add_attribute("sender", info.sender)
-            .add_attribute("operator", operator))
     }
 
     /// returns true iff the sender can execute approve or reject on the contract
