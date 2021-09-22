@@ -9,13 +9,14 @@ pub trait CustomMsg: Clone + std::fmt::Debug + PartialEq + JsonSchema {}
 
 impl CustomMsg for Empty {}
 
-pub trait Cw721<T>
+pub trait Cw721<T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
 {
     type Err: ToString;
 
-    fn transfer_nft<C: CustomMsg>(
+    fn transfer_nft(
         &self,
         deps: DepsMut,
         env: Env,
