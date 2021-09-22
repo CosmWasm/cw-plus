@@ -747,7 +747,7 @@ mod test {
 
         #[test]
         #[cfg(feature = "iterator")]
-        fn composite_key_failure() {
+        fn composite_key_query() {
             let indexes = Indexes {
                 secondary: MultiIndex::new(
                     |secondary, k| (U64Key::new(*secondary), k),
@@ -759,6 +759,7 @@ mod test {
             let mut store = MockStorage::new();
 
             map.save(&mut store, "one", &1).unwrap();
+            map.save(&mut store, "two", &2).unwrap();
 
             let items: Vec<_> = map
                 .idx
