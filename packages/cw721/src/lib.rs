@@ -13,4 +13,4 @@ pub use crate::query::{
     NftInfoResponse, NumTokensResponse, OwnerOfResponse, TokensResponse,
 };
 pub use crate::receiver::Cw721ReceiveMsg;
-pub use crate::traits::{CustomMsg, Cw721};
+pub use crate::traits::{CustomMsg, Cw721, Cw721Execute, Cw721Query};

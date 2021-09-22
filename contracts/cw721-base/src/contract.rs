@@ -11,8 +11,8 @@ use cw0::maybe_addr;
 use cw2::set_contract_version;
 use cw721::{
     AllNftInfoResponse, ApprovedForAllResponse, ContractInfoResponse, CustomMsg, Cw721,
-    Cw721ReceiveMsg, Expiration, NftInfoResponse, NumTokensResponse, OwnerOfResponse,
-    TokensResponse,
+    Cw721Execute, Cw721Query, Cw721ReceiveMsg, Expiration, NftInfoResponse, NumTokensResponse,
+    OwnerOfResponse, TokensResponse,
 };
 use cw_storage_plus::{Bound, IndexedMap, Item, Map, MultiIndex};
 
@@ -84,18 +84,18 @@ where
         }
     }
 
-    pub fn num_tokens(&self, storage: &dyn Storage) -> StdResult<u64> {
+    pub fn token_count(&self, storage: &dyn Storage) -> StdResult<u64> {
         Ok(self.token_count.may_load(storage)?.unwrap_or_default())
     }
 
     pub fn increment_tokens(&self, storage: &mut dyn Storage) -> StdResult<u64> {
-        let val = self.num_tokens(storage)? + 1;
+        let val = self.token_count(storage)? + 1;
         self.token_count.save(storage, &val)?;
         Ok(val)
     }
 }
 
-impl<'a, T, C> Cw721<T, C> for Cw721Contract<'a, T, C>
+impl<'a, T, C> Cw721Execute<T, C> for Cw721Contract<'a, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
     C: CustomMsg,
@@ -224,6 +224,145 @@ where
     }
 }
 
+impl<'a, T, C> Cw721Query<T> for Cw721Contract<'a, T, C>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
+{
+    fn contract_info(&self, deps: Deps) -> StdResult<ContractInfoResponse> {
+        self.contract_info.load(deps.storage)
+    }
+
+    fn num_tokens(&self, deps: Deps) -> StdResult<NumTokensResponse> {
+        let count = self.token_count(deps.storage)?;
+        Ok(NumTokensResponse { count })
+    }
+
+    fn nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse<T>> {
+        let info = self.tokens.load(deps.storage, &token_id)?;
+        Ok(NftInfoResponse {
+            name: info.name,
+            description: info.description,
+            image: info.image,
+            extension: info.extension,
+        })
+    }
+
+    fn owner_of(
+        &self,
+        deps: Deps,
+        env: Env,
+        token_id: String,
+        include_expired: bool,
+    ) -> StdResult<OwnerOfResponse> {
+        let info = self.tokens.load(deps.storage, &token_id)?;
+        Ok(OwnerOfResponse {
+            owner: info.owner.to_string(),
+            approvals: humanize_approvals(&env.block, &info, include_expired),
+        })
+    }
+
+    fn all_approvals(
+        &self,
+        deps: Deps,
+        env: Env,
+        owner: String,
+        include_expired: bool,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<ApprovedForAllResponse> {
+        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let start_addr = maybe_addr(deps.api, start_after)?;
+        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+
+        let owner_addr = deps.api.addr_validate(&owner)?;
+        let res: StdResult<Vec<_>> = self
+            .operators
+            .prefix(&owner_addr)
+            .range(deps.storage, start, None, Order::Ascending)
+            .filter(|r| {
+                include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block)
+            })
+            .take(limit)
+            .map(parse_approval)
+            .collect();
+        Ok(ApprovedForAllResponse { operators: res? })
+    }
+
+    fn tokens(
+        &self,
+        deps: Deps,
+        owner: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<TokensResponse> {
+        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let start = start_after.map(Bound::exclusive);
+
+        let owner_addr = deps.api.addr_validate(&owner)?;
+        let pks: Vec<_> = self
+            .tokens
+            .idx
+            .owner
+            .prefix(owner_addr)
+            .keys(deps.storage, start, None, Order::Ascending)
+            .take(limit)
+            .collect();
+
+        let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
+        let tokens = res.map_err(StdError::invalid_utf8)?;
+        Ok(TokensResponse { tokens })
+    }
+
+    fn all_tokens(
+        &self,
+        deps: Deps,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> StdResult<TokensResponse> {
+        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let start_addr = maybe_addr(deps.api, start_after)?;
+        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+
+        let tokens: StdResult<Vec<String>> = self
+            .tokens
+            .range(deps.storage, start, None, Order::Ascending)
+            .take(limit)
+            .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
+            .collect();
+        Ok(TokensResponse { tokens: tokens? })
+    }
+
+    fn all_nft_info(
+        &self,
+        deps: Deps,
+        env: Env,
+        token_id: String,
+        include_expired: bool,
+    ) -> StdResult<AllNftInfoResponse<T>> {
+        let info = self.tokens.load(deps.storage, &token_id)?;
+        Ok(AllNftInfoResponse {
+            access: OwnerOfResponse {
+                owner: info.owner.to_string(),
+                approvals: humanize_approvals(&env.block, &info, include_expired),
+            },
+            info: NftInfoResponse {
+                name: info.name,
+                description: info.description,
+                image: info.image,
+                extension: info.extension,
+            },
+        })
+    }
+}
+
+impl<'a, T, C> Cw721<T, C> for Cw721Contract<'a, T, C>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
+{
+}
+
 impl<'a, T, C> Cw721Contract<'a, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -256,7 +395,7 @@ where
         msg: ExecuteMsg<T>,
     ) -> Result<Response<C>, ContractError> {
         match msg {
-            ExecuteMsg::Mint(msg) => self.execute_mint(deps, env, info, msg),
+            ExecuteMsg::Mint(msg) => self.mint(deps, env, info, msg),
             ExecuteMsg::Approve {
                 spender,
                 token_id,
@@ -281,7 +420,7 @@ where
         }
     }
 
-    pub fn execute_mint(
+    pub fn mint(
         &self,
         deps: DepsMut,
         _env: Env,
@@ -315,6 +454,13 @@ where
             .add_attribute("action", "mint")
             .add_attribute("minter", info.sender)
             .add_attribute("token_id", msg.token_id))
+    }
+
+    fn minter(&self, deps: Deps) -> StdResult<MinterResponse> {
+        let minter_addr = self.minter.load(deps.storage)?;
+        Ok(MinterResponse {
+            minter: minter_addr.to_string(),
+        })
     }
 
     pub fn _transfer_nft(
@@ -446,22 +592,19 @@ where
 
     pub fn query(&self, deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         match msg {
-            QueryMsg::Minter {} => to_binary(&self.query_minter(deps)?),
-            QueryMsg::ContractInfo {} => to_binary(&self.query_contract_info(deps)?),
-            QueryMsg::NftInfo { token_id } => to_binary(&self.query_nft_info(deps, token_id)?),
+            QueryMsg::Minter {} => to_binary(&self.minter(deps)?),
+            QueryMsg::ContractInfo {} => to_binary(&self.contract_info(deps)?),
+            QueryMsg::NftInfo { token_id } => to_binary(&self.nft_info(deps, token_id)?),
             QueryMsg::OwnerOf {
                 token_id,
                 include_expired,
-            } => to_binary(&self.query_owner_of(
-                deps,
-                env,
-                token_id,
-                include_expired.unwrap_or(false),
-            )?),
+            } => {
+                to_binary(&self.owner_of(deps, env, token_id, include_expired.unwrap_or(false))?)
+            }
             QueryMsg::AllNftInfo {
                 token_id,
                 include_expired,
-            } => to_binary(&self.query_all_nft_info(
+            } => to_binary(&self.all_nft_info(
                 deps,
                 env,
                 token_id,
@@ -472,7 +615,7 @@ where
                 include_expired,
                 start_after,
                 limit,
-            } => to_binary(&self.query_all_approvals(
+            } => to_binary(&self.all_approvals(
                 deps,
                 env,
                 owner,
@@ -480,149 +623,16 @@ where
                 start_after,
                 limit,
             )?),
-            QueryMsg::NumTokens {} => to_binary(&self.query_num_tokens(deps)?),
+            QueryMsg::NumTokens {} => to_binary(&self.num_tokens(deps)?),
             QueryMsg::Tokens {
                 owner,
                 start_after,
                 limit,
-            } => to_binary(&self.query_tokens(deps, owner, start_after, limit)?),
+            } => to_binary(&self.tokens(deps, owner, start_after, limit)?),
             QueryMsg::AllTokens { start_after, limit } => {
-                to_binary(&self.query_all_tokens(deps, start_after, limit)?)
+                to_binary(&self.all_tokens(deps, start_after, limit)?)
             }
         }
-    }
-
-    pub fn query_minter(&self, deps: Deps) -> StdResult<MinterResponse> {
-        let minter_addr = self.minter.load(deps.storage)?;
-        Ok(MinterResponse {
-            minter: minter_addr.to_string(),
-        })
-    }
-
-    pub fn query_contract_info(&self, deps: Deps) -> StdResult<ContractInfoResponse> {
-        self.contract_info.load(deps.storage)
-    }
-
-    pub fn query_num_tokens(&self, deps: Deps) -> StdResult<NumTokensResponse> {
-        let count = self.num_tokens(deps.storage)?;
-        Ok(NumTokensResponse { count })
-    }
-
-    pub fn query_nft_info(&self, deps: Deps, token_id: String) -> StdResult<NftInfoResponse<T>> {
-        let info = self.tokens.load(deps.storage, &token_id)?;
-        Ok(NftInfoResponse {
-            name: info.name,
-            description: info.description,
-            image: info.image,
-            extension: info.extension,
-        })
-    }
-
-    pub fn query_owner_of(
-        &self,
-        deps: Deps,
-        env: Env,
-        token_id: String,
-        include_expired: bool,
-    ) -> StdResult<OwnerOfResponse> {
-        let info = self.tokens.load(deps.storage, &token_id)?;
-        Ok(OwnerOfResponse {
-            owner: info.owner.to_string(),
-            approvals: humanize_approvals(&env.block, &info, include_expired),
-        })
-    }
-
-    pub fn query_all_approvals(
-        &self,
-        deps: Deps,
-        env: Env,
-        owner: String,
-        include_expired: bool,
-        start_after: Option<String>,
-        limit: Option<u32>,
-    ) -> StdResult<ApprovedForAllResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-        let start_addr = maybe_addr(deps.api, start_after)?;
-        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
-
-        let owner_addr = deps.api.addr_validate(&owner)?;
-        let res: StdResult<Vec<_>> = self
-            .operators
-            .prefix(&owner_addr)
-            .range(deps.storage, start, None, Order::Ascending)
-            .filter(|r| {
-                include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block)
-            })
-            .take(limit)
-            .map(parse_approval)
-            .collect();
-        Ok(ApprovedForAllResponse { operators: res? })
-    }
-
-    pub fn query_tokens(
-        &self,
-        deps: Deps,
-        owner: String,
-        start_after: Option<String>,
-        limit: Option<u32>,
-    ) -> StdResult<TokensResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-        let start = start_after.map(Bound::exclusive);
-
-        let owner_addr = deps.api.addr_validate(&owner)?;
-        let pks: Vec<_> = self
-            .tokens
-            .idx
-            .owner
-            .prefix(owner_addr)
-            .keys(deps.storage, start, None, Order::Ascending)
-            .take(limit)
-            .collect();
-
-        let res: Result<Vec<_>, _> = pks.iter().map(|v| String::from_utf8(v.to_vec())).collect();
-        let tokens = res.map_err(StdError::invalid_utf8)?;
-        Ok(TokensResponse { tokens })
-    }
-
-    pub fn query_all_tokens(
-        &self,
-        deps: Deps,
-        start_after: Option<String>,
-        limit: Option<u32>,
-    ) -> StdResult<TokensResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-        let start_addr = maybe_addr(deps.api, start_after)?;
-        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
-
-        let tokens: StdResult<Vec<String>> = self
-            .tokens
-            .range(deps.storage, start, None, Order::Ascending)
-            .take(limit)
-            .map(|item| item.map(|(k, _)| String::from_utf8_lossy(&k).to_string()))
-            .collect();
-        Ok(TokensResponse { tokens: tokens? })
-    }
-
-    pub fn query_all_nft_info(
-        &self,
-        deps: Deps,
-        env: Env,
-        token_id: String,
-        include_expired: bool,
-    ) -> StdResult<AllNftInfoResponse<T>> {
-        let info = self.tokens.load(deps.storage, &token_id)?;
-        Ok(AllNftInfoResponse {
-            access: OwnerOfResponse {
-                owner: info.owner.to_string(),
-                approvals: humanize_approvals(&env.block, &info, include_expired),
-            },
-            info: NftInfoResponse {
-                name: info.name,
-                description: info.description,
-                image: info.image,
-                extension: info.extension,
-            },
-        })
     }
 }
 
@@ -697,9 +707,9 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = contract.query_minter(deps.as_ref()).unwrap();
+        let res = contract.minter(deps.as_ref()).unwrap();
         assert_eq!(MINTER, res.minter);
-        let info = contract.query_contract_info(deps.as_ref()).unwrap();
+        let info = contract.contract_info(deps.as_ref()).unwrap();
         assert_eq!(
             info,
             ContractInfoResponse {
@@ -708,13 +718,11 @@ mod tests {
             }
         );
 
-        let count = contract.query_num_tokens(deps.as_ref()).unwrap();
+        let count = contract.num_tokens(deps.as_ref()).unwrap();
         assert_eq!(0, count.count);
 
         // list the token_ids
-        let tokens = contract
-            .query_all_tokens(deps.as_ref(), None, None)
-            .unwrap();
+        let tokens = contract.all_tokens(deps.as_ref(), None, None).unwrap();
         assert_eq!(0, tokens.tokens.len());
     }
 
@@ -750,18 +758,16 @@ mod tests {
             .unwrap();
 
         // ensure num tokens increases
-        let count = contract.query_num_tokens(deps.as_ref()).unwrap();
+        let count = contract.num_tokens(deps.as_ref()).unwrap();
         assert_eq!(1, count.count);
 
         // unknown nft returns error
         let _ = contract
-            .query_nft_info(deps.as_ref(), "unknown".to_string())
+            .nft_info(deps.as_ref(), "unknown".to_string())
             .unwrap_err();
 
         // this nft info is correct
-        let info = contract
-            .query_nft_info(deps.as_ref(), token_id.clone())
-            .unwrap();
+        let info = contract.nft_info(deps.as_ref(), token_id.clone()).unwrap();
         assert_eq!(
             info,
             NftInfoResponse::<Extension> {
@@ -774,7 +780,7 @@ mod tests {
 
         // owner info is correct
         let owner = contract
-            .query_owner_of(deps.as_ref(), mock_env(), token_id.clone(), true)
+            .owner_of(deps.as_ref(), mock_env(), token_id.clone(), true)
             .unwrap();
         assert_eq!(
             owner,
@@ -801,9 +807,7 @@ mod tests {
         assert_eq!(err, ContractError::Claimed {});
 
         // list the token_ids
-        let tokens = contract
-            .query_all_tokens(deps.as_ref(), None, None)
-            .unwrap();
+        let tokens = contract.all_tokens(deps.as_ref(), None, None).unwrap();
         assert_eq!(1, tokens.tokens.len());
         assert_eq!(vec![token_id], tokens.tokens);
     }
@@ -1082,13 +1086,11 @@ mod tests {
             .unwrap();
 
         // paginate the token_ids
-        let tokens = contract
-            .query_all_tokens(deps.as_ref(), None, Some(1))
-            .unwrap();
+        let tokens = contract.all_tokens(deps.as_ref(), None, Some(1)).unwrap();
         assert_eq!(1, tokens.tokens.len());
         assert_eq!(vec![token_id1.clone()], tokens.tokens);
         let tokens = contract
-            .query_all_tokens(deps.as_ref(), Some(token_id1.clone()), Some(3))
+            .all_tokens(deps.as_ref(), Some(token_id1.clone()), Some(3))
             .unwrap();
         assert_eq!(1, tokens.tokens.len());
         assert_eq!(vec![token_id2.clone()], tokens.tokens);
@@ -1149,7 +1151,7 @@ mod tests {
             .unwrap();
 
         let res = contract
-            .query_all_approvals(
+            .all_approvals(
                 deps.as_ref(),
                 mock_env(),
                 String::from("person"),
@@ -1181,7 +1183,7 @@ mod tests {
 
         // and paginate queries
         let res = contract
-            .query_all_approvals(
+            .all_approvals(
                 deps.as_ref(),
                 mock_env(),
                 String::from("person"),
@@ -1200,7 +1202,7 @@ mod tests {
             }
         );
         let res = contract
-            .query_all_approvals(
+            .all_approvals(
                 deps.as_ref(),
                 mock_env(),
                 String::from("person"),
@@ -1228,7 +1230,7 @@ mod tests {
 
         // Approvals are removed / cleared without affecting others
         let res = contract
-            .query_all_approvals(
+            .all_approvals(
                 deps.as_ref(),
                 mock_env(),
                 String::from("person"),
@@ -1251,7 +1253,7 @@ mod tests {
         let mut late_env = mock_env();
         late_env.block.height = 1234568; //expired
         let res = contract
-            .query_all_approvals(
+            .all_approvals(
                 deps.as_ref(),
                 late_env,
                 String::from("person"),
@@ -1316,17 +1318,13 @@ mod tests {
 
         // get all tokens in order:
         let expected = vec![token_id1.clone(), token_id2.clone(), token_id3.clone()];
-        let tokens = contract
-            .query_all_tokens(deps.as_ref(), None, None)
-            .unwrap();
+        let tokens = contract.all_tokens(deps.as_ref(), None, None).unwrap();
         assert_eq!(&expected, &tokens.tokens);
         // paginate
-        let tokens = contract
-            .query_all_tokens(deps.as_ref(), None, Some(2))
-            .unwrap();
+        let tokens = contract.all_tokens(deps.as_ref(), None, Some(2)).unwrap();
         assert_eq!(&expected[..2], &tokens.tokens[..]);
         let tokens = contract
-            .query_all_tokens(deps.as_ref(), Some(expected[1].clone()), None)
+            .all_tokens(deps.as_ref(), Some(expected[1].clone()), None)
             .unwrap();
         assert_eq!(&expected[2..], &tokens.tokens[..]);
 
@@ -1335,21 +1333,19 @@ mod tests {
         let by_demeter = vec![token_id1, token_id3];
         // all tokens by owner
         let tokens = contract
-            .query_tokens(deps.as_ref(), demeter.clone(), None, None)
+            .tokens(deps.as_ref(), demeter.clone(), None, None)
             .unwrap();
         assert_eq!(&by_demeter, &tokens.tokens);
-        let tokens = contract
-            .query_tokens(deps.as_ref(), ceres, None, None)
-            .unwrap();
+        let tokens = contract.tokens(deps.as_ref(), ceres, None, None).unwrap();
         assert_eq!(&by_ceres, &tokens.tokens);
 
         // paginate for demeter
         let tokens = contract
-            .query_tokens(deps.as_ref(), demeter.clone(), None, Some(1))
+            .tokens(deps.as_ref(), demeter.clone(), None, Some(1))
             .unwrap();
         assert_eq!(&by_demeter[..1], &tokens.tokens[..]);
         let tokens = contract
-            .query_tokens(deps.as_ref(), demeter, Some(by_demeter[0].clone()), Some(3))
+            .tokens(deps.as_ref(), demeter, Some(by_demeter[0].clone()), Some(3))
             .unwrap();
         assert_eq!(&by_demeter[1..], &tokens.tokens[..]);
     }
