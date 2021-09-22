@@ -23,7 +23,7 @@ pub mod entry {
         info: MessageInfo,
         msg: msg::InstantiateMsg,
     ) -> StdResult<Response> {
-        let tract = contract::Cw721Contract::<Extension>::default();
+        let tract = contract::Cw721Contract::<Extension, Empty>::default();
         tract.instantiate(deps, env, info, msg)
     }
 
@@ -34,13 +34,13 @@ pub mod entry {
         info: MessageInfo,
         msg: msg::ExecuteMsg<Extension>,
     ) -> Result<Response, ContractError> {
-        let tract = contract::Cw721Contract::<Extension>::default();
+        let tract = contract::Cw721Contract::<Extension, Empty>::default();
         tract.execute(deps, env, info, msg)
     }
 
     #[cfg_attr(not(feature = "library"), entry_point)]
     pub fn query(deps: Deps, env: Env, msg: msg::QueryMsg) -> StdResult<Binary> {
-        let tract = contract::Cw721Contract::<Extension>::default();
+        let tract = contract::Cw721Contract::<Extension, Empty>::default();
         tract.query(deps, env, msg)
     }
 }

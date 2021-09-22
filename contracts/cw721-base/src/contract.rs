@@ -1,5 +1,6 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::marker::PhantomData;
 
 use cosmwasm_std::{
     to_binary, Addr, Binary, BlockInfo, Deps, DepsMut, Env, MessageInfo, Order, Pair, Response,
@@ -26,7 +27,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_LIMIT: u32 = 10;
 const MAX_LIMIT: u32 = 30;
 
-pub struct Cw721Contract<'a, T>
+pub struct Cw721Contract<'a, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
@@ -36,11 +37,14 @@ where
     /// Stored as (granter, operator) giving operator full control over granter's account
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
     pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
+
+    _custom_response: PhantomData<C>,
 }
 
-impl<T> Default for Cw721Contract<'static, T>
+impl<T, C> Default for Cw721Contract<'static, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
 {
     fn default() -> Self {
         Self::new(
@@ -54,9 +58,10 @@ where
     }
 }
 
-impl<'a, T> Cw721Contract<'a, T>
+impl<'a, T, C> Cw721Contract<'a, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
 {
     fn new(
         contract_key: &'a str,
@@ -75,6 +80,7 @@ where
             token_count: Item::new(token_count_key),
             operators: Map::new(operator_key),
             tokens: IndexedMap::new(tokens_key, indexes),
+            _custom_response: PhantomData,
         }
     }
 
@@ -89,13 +95,14 @@ where
     }
 }
 
-impl<'a, T> Cw721<T> for Cw721Contract<'a, T>
+impl<'a, T, C> Cw721<T, C> for Cw721Contract<'a, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
 {
     type Err = ContractError;
 
-    fn transfer_nft<C: CustomMsg>(
+    fn transfer_nft(
         &self,
         deps: DepsMut,
         env: Env,
@@ -113,11 +120,12 @@ where
     }
 }
 
-impl<'a, T> Cw721Contract<'a, T>
+impl<'a, T, C> Cw721Contract<'a, T, C>
 where
     T: Serialize + DeserializeOwned + Clone,
+    C: CustomMsg,
 {
-    pub fn instantiate<C: CustomMsg>(
+    pub fn instantiate(
         &self,
         deps: DepsMut,
         _env: Env,
@@ -136,7 +144,7 @@ where
         Ok(Response::default())
     }
 
-    pub fn execute<C: CustomMsg>(
+    pub fn execute(
         &self,
         deps: DepsMut,
         env: Env,
@@ -171,8 +179,7 @@ where
         }
     }
 
-    // Note: this is not in cw721
-    pub fn execute_mint<C: CustomMsg>(
+    pub fn execute_mint(
         &self,
         deps: DepsMut,
         _env: Env,
@@ -208,7 +215,24 @@ where
             .add_attribute("token_id", msg.token_id))
     }
 
-    pub fn execute_send_nft<C: CustomMsg>(
+    pub fn execute_transfer_nft(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        recipient: String,
+        token_id: String,
+    ) -> Result<Response<C>, ContractError> {
+        self._transfer_nft(deps, &env, &info, &recipient, &token_id)?;
+
+        Ok(Response::new()
+            .add_attribute("action", "transfer_nft")
+            .add_attribute("sender", info.sender)
+            .add_attribute("recipient", recipient)
+            .add_attribute("token_id", token_id))
+    }
+
+    pub fn execute_send_nft(
         &self,
         deps: DepsMut,
         env: Env,
@@ -253,7 +277,7 @@ where
         Ok(token)
     }
 
-    pub fn execute_approve<C: CustomMsg>(
+    pub fn execute_approve(
         &self,
         deps: DepsMut,
         env: Env,
@@ -271,7 +295,7 @@ where
             .add_attribute("token_id", token_id))
     }
 
-    pub fn execute_revoke<C: CustomMsg>(
+    pub fn execute_revoke(
         &self,
         deps: DepsMut,
         env: Env,
@@ -331,7 +355,7 @@ where
         Ok(token)
     }
 
-    pub fn execute_approve_all<C: CustomMsg>(
+    pub fn execute_approve_all(
         &self,
         deps: DepsMut,
         env: Env,
@@ -356,7 +380,7 @@ where
             .add_attribute("operator", operator))
     }
 
-    pub fn execute_revoke_all<C: CustomMsg>(
+    pub fn execute_revoke_all(
         &self,
         deps: DepsMut,
         _env: Env,
@@ -660,7 +684,7 @@ mod tests {
     const CONTRACT_NAME: &str = "Magic Power";
     const SYMBOL: &str = "MGK";
 
-    fn setup_contract(deps: DepsMut<'_>) -> Cw721Contract<'static, Extension> {
+    fn setup_contract(deps: DepsMut<'_>) -> Cw721Contract<'static, Extension, Empty> {
         let contract = Cw721Contract::default();
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
@@ -668,7 +692,7 @@ mod tests {
             minter: String::from(MINTER),
         };
         let info = mock_info("creator", &[]);
-        let res: Response<Empty> = contract.instantiate(deps, mock_env(), info, msg).unwrap();
+        let res = contract.instantiate(deps, mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
         contract
     }
@@ -676,7 +700,7 @@ mod tests {
     #[test]
     fn proper_instantiation() {
         let mut deps = mock_dependencies(&[]);
-        let contract = Cw721Contract::<Extension>::default();
+        let contract = Cw721Contract::<Extension, Empty>::default();
 
         let msg = InstantiateMsg {
             name: CONTRACT_NAME.to_string(),
@@ -686,7 +710,7 @@ mod tests {
         let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
-        let res: Response<Empty> = contract
+        let res = contract
             .instantiate(deps.as_mut(), mock_env(), info, msg)
             .unwrap();
         assert_eq!(0, res.messages.len());
@@ -734,14 +758,14 @@ mod tests {
         // random cannot mint
         let random = mock_info("random", &[]);
         let err = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, mint_msg.clone())
+            .execute(deps.as_mut(), mock_env(), random, mint_msg.clone())
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // minter can mint
         let allowed = mock_info(MINTER, &[]);
         let _ = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), allowed, mint_msg)
+            .execute(deps.as_mut(), mock_env(), allowed, mint_msg)
             .unwrap();
 
         // ensure num tokens increases
@@ -791,7 +815,7 @@ mod tests {
 
         let allowed = mock_info(MINTER, &[]);
         let err = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), allowed, mint_msg2)
+            .execute(deps.as_mut(), mock_env(), allowed, mint_msg2)
             .unwrap_err();
         assert_eq!(err, ContractError::Claimed {});
 
@@ -824,7 +848,7 @@ mod tests {
 
         let minter = mock_info(MINTER, &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter, mint_msg)
+            .execute(deps.as_mut(), mock_env(), minter, mint_msg)
             .unwrap();
 
         // random cannot transfer
@@ -835,7 +859,7 @@ mod tests {
         };
 
         let err = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, transfer_msg)
+            .execute(deps.as_mut(), mock_env(), random, transfer_msg)
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
@@ -847,7 +871,7 @@ mod tests {
         };
 
         let res = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, transfer_msg)
+            .execute(deps.as_mut(), mock_env(), random, transfer_msg)
             .unwrap();
 
         assert_eq!(
@@ -881,7 +905,7 @@ mod tests {
 
         let minter = mock_info(MINTER, &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter, mint_msg)
+            .execute(deps.as_mut(), mock_env(), minter, mint_msg)
             .unwrap();
 
         let msg = to_binary("You now have the melting power").unwrap();
@@ -894,14 +918,14 @@ mod tests {
 
         let random = mock_info("random", &[]);
         let err = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, send_msg.clone())
+            .execute(deps.as_mut(), mock_env(), random, send_msg.clone())
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but owner can
         let random = mock_info("venus", &[]);
         let res = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, send_msg)
+            .execute(deps.as_mut(), mock_env(), random, send_msg)
             .unwrap();
 
         let payload = Cw721ReceiveMsg {
@@ -950,7 +974,7 @@ mod tests {
 
         let minter = mock_info(MINTER, &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter, mint_msg)
+            .execute(deps.as_mut(), mock_env(), minter, mint_msg)
             .unwrap();
 
         // Give random transferring power
@@ -961,7 +985,7 @@ mod tests {
         };
         let owner = mock_info("demeter", &[]);
         let res = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner, approve_msg)
+            .execute(deps.as_mut(), mock_env(), owner, approve_msg)
             .unwrap();
         assert_eq!(
             res,
@@ -979,7 +1003,7 @@ mod tests {
             token_id: token_id.clone(),
         };
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, transfer_msg)
+            .execute(deps.as_mut(), mock_env(), random, transfer_msg)
             .unwrap();
 
         // Approvals are removed / cleared
@@ -1009,7 +1033,7 @@ mod tests {
         };
         let owner = mock_info("person", &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner.clone(), approve_msg)
+            .execute(deps.as_mut(), mock_env(), owner.clone(), approve_msg)
             .unwrap();
 
         let revoke_msg = ExecuteMsg::Revoke {
@@ -1017,7 +1041,7 @@ mod tests {
             token_id,
         };
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner, revoke_msg)
+            .execute(deps.as_mut(), mock_env(), owner, revoke_msg)
             .unwrap();
 
         // Approvals are now removed / cleared
@@ -1060,7 +1084,7 @@ mod tests {
 
         let minter = mock_info(MINTER, &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter.clone(), mint_msg1)
+            .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg1)
             .unwrap();
 
         let mint_msg2 = ExecuteMsg::Mint(MintMsg::<Extension> {
@@ -1073,7 +1097,7 @@ mod tests {
         });
 
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter, mint_msg2)
+            .execute(deps.as_mut(), mock_env(), minter, mint_msg2)
             .unwrap();
 
         // paginate the token_ids
@@ -1095,7 +1119,7 @@ mod tests {
         };
         let owner = mock_info("demeter", &[]);
         let res = contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner, approve_all_msg)
+            .execute(deps.as_mut(), mock_env(), owner, approve_all_msg)
             .unwrap();
         assert_eq!(
             res,
@@ -1112,7 +1136,7 @@ mod tests {
             token_id: token_id1,
         };
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random.clone(), transfer_msg)
+            .execute(deps.as_mut(), mock_env(), random.clone(), transfer_msg)
             .unwrap();
 
         // random can now send
@@ -1129,7 +1153,7 @@ mod tests {
             msg: to_binary(&msg).unwrap(),
         };
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), random, send_msg)
+            .execute(deps.as_mut(), mock_env(), random, send_msg)
             .unwrap();
 
         // Approve_all, revoke_all, and check for empty, to test revoke_all
@@ -1140,7 +1164,7 @@ mod tests {
         // person is now the owner of the tokens
         let owner = mock_info("person", &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner, approve_all_msg)
+            .execute(deps.as_mut(), mock_env(), owner, approve_all_msg)
             .unwrap();
 
         let res = contract
@@ -1171,7 +1195,7 @@ mod tests {
         };
         let owner = mock_info("person", &[]);
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner.clone(), approve_all_msg)
+            .execute(deps.as_mut(), mock_env(), owner.clone(), approve_all_msg)
             .unwrap();
 
         // and paginate queries
@@ -1218,7 +1242,7 @@ mod tests {
             operator: String::from("operator"),
         };
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), owner, revoke_all_msg)
+            .execute(deps.as_mut(), mock_env(), owner, revoke_all_msg)
             .unwrap();
 
         // Approvals are removed / cleared without affecting others
@@ -1280,7 +1304,7 @@ mod tests {
             extension: None,
         });
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
+            .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
             .unwrap();
 
         let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
@@ -1294,7 +1318,7 @@ mod tests {
             extension: None,
         });
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
+            .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg)
             .unwrap();
 
         let mint_msg = ExecuteMsg::Mint(MintMsg::<Extension> {
@@ -1306,7 +1330,7 @@ mod tests {
             extension: None,
         });
         contract
-            .execute::<Empty>(deps.as_mut(), mock_env(), minter, mint_msg)
+            .execute(deps.as_mut(), mock_env(), minter, mint_msg)
             .unwrap();
 
         // get all tokens in order:
