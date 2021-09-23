@@ -91,7 +91,7 @@ pub struct ContractInfoResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct NftInfoResponse {
+pub struct NftInfoResponse<T> {
     /// Identifies the asset to which this NFT represents
     pub name: String,
     /// Describes the asset to which this NFT represents
@@ -101,14 +101,17 @@ pub struct NftInfoResponse {
     /// ratio between 1.91:1 and 4:5 inclusive.
     /// TODO: Use https://docs.rs/url_serde for type-safety
     pub image: Option<String>,
+
+    /// You can add any custom metadata here when you extend cw721-base
+    pub extension: T,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct AllNftInfoResponse {
+pub struct AllNftInfoResponse<T> {
     /// Who can transfer the token
     pub access: OwnerOfResponse,
     /// Data on the token itself,
-    pub info: NftInfoResponse,
+    pub info: NftInfoResponse<T>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

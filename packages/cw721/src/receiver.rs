@@ -20,7 +20,10 @@ impl Cw721ReceiveMsg {
     }
 
     /// creates a cosmos_msg sending this struct to the named contract
-    pub fn into_cosmos_msg<T: Into<String>>(self, contract_addr: T) -> StdResult<CosmosMsg> {
+    pub fn into_cosmos_msg<T: Into<String>, C>(self, contract_addr: T) -> StdResult<CosmosMsg<C>>
+    where
+        C: Clone + std::fmt::Debug + PartialEq + JsonSchema,
+    {
         let msg = self.into_binary()?;
         let execute = WasmMsg::Execute {
             contract_addr: contract_addr.into(),
