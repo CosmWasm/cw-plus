@@ -141,7 +141,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -150,7 +150,7 @@ where
         )
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -159,7 +159,7 @@ where
         )
     }
 
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &[],
@@ -332,19 +332,19 @@ where
         k.joined_key()
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }
 
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })

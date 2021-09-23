@@ -88,7 +88,7 @@ pub fn default_deserializer_kv<K: Deserializable, T: DeserializeOwned>(
 }
 
 #[derive(Clone)]
-pub struct Prefix<T, K = Vec<u8>>
+pub struct Prefix<K = Vec<u8>, T = Vec<u8>>
 where
     K: Deserializable,
     T: Serialize + DeserializeOwned,
@@ -101,7 +101,7 @@ where
     de_fn: DeserializeKvFn<K, T>,
 }
 
-impl<K, T> Deref for Prefix<T, K>
+impl<K, T> Deref for Prefix<K, T>
 where
     K: Deserializable,
     T: Serialize + DeserializeOwned,
@@ -113,7 +113,7 @@ where
     }
 }
 
-impl<K, T> Prefix<T, K>
+impl<K, T> Prefix<K, T>
 where
     K: Deserializable,
     T: Serialize + DeserializeOwned,
@@ -322,7 +322,7 @@ mod test {
     fn ensure_proper_range_bounds() {
         let mut store = MockStorage::new();
         // manually create this - not testing nested prefixes here
-        let prefix: Prefix<u64, Vec<u8>> = Prefix {
+        let prefix: Prefix<Vec<u8>, u64> = Prefix {
             storage_prefix: b"foo".to_vec(),
             data: PhantomData::<u64>,
             pk_name: vec![],

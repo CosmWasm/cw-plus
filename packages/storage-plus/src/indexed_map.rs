@@ -126,17 +126,17 @@ where
     }
 
     // use prefix to scan -> range
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // use sub_prefix to scan -> range
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // use no_prefix to scan -> range
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &[])
     }
 }
