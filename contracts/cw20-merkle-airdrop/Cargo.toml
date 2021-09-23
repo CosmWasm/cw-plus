@@ -19,11 +19,11 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.9.0" }
-cw2 = { path = "../../packages/cw2", version = "0.9.0" }
-cw20 = { path = "../../packages/cw20", version = "0.9.0" }
+cw0 = { path = "../../packages/cw0", version = "0.9.1" }
+cw2 = { path = "../../packages/cw2", version = "0.9.1" }
+cw20 = { path = "../../packages/cw20", version = "0.9.1" }
 cosmwasm-std = { version = "0.16.0" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.9.0" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.9.1" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }

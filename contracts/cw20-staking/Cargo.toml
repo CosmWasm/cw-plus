@@ -1,6 +1,6 @@
 [package]
 name = "cw20-staking"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Implement simple staking derivatives as a cw20 token"
@@ -20,13 +20,13 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.9.0" }
-cw2 = { path = "../../packages/cw2", version = "0.9.0" }
-cw20 = { path = "../../packages/cw20", version = "0.9.0" }
-cw-controllers = { path = "../../packages/controllers", version = "0.9.0" }
-cw20-base = { path = "../../contracts/cw20-base", version = "0.9.0", features = ["library"] }
+cw0 = { path = "../../packages/cw0", version = "0.9.1" }
+cw2 = { path = "../../packages/cw2", version = "0.9.1" }
+cw20 = { path = "../../packages/cw20", version = "0.9.1" }
+cw-controllers = { path = "../../packages/controllers", version = "0.9.1" }
+cw20-base = { path = "../../contracts/cw20-base", version = "0.9.1", features = ["library"] }
 cosmwasm-std = { version = "0.16.0", features = ["staking"] }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.9.0" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.9.1" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
