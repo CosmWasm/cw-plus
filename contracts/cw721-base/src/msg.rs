@@ -1,7 +1,8 @@
-use cosmwasm_std::Binary;
-use cw721::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use cosmwasm_std::Binary;
+use cw721::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
