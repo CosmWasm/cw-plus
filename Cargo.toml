@@ -45,11 +45,19 @@ incremental = false
 codegen-units = 1
 incremental = false
 
+[profile.release.package.cw20-merkle-airdrop]
+codegen-units = 1
+incremental = false
+
 [profile.release.package.cw20-staking]
 codegen-units = 1
 incremental = false
 
 [profile.release.package.cw721-base]
+codegen-units = 1
+incremental = false
+
+[profile.release.package.cw721-metadata-uri]
 codegen-units = 1
 incremental = false
 
