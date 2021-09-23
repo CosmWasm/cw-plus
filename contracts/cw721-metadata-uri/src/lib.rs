@@ -1,23 +1,23 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub use cw721_base::{
-    ContractError, ExecuteMsg, InstantiateMsg, MintMsg, MinterResponse, QueryMsg,
-};
+use cosmwasm_std::Empty;
+pub use cw721_base::{ContractError, InstantiateMsg, MintMsg, MinterResponse, QueryMsg};
+pub type ExecuteMsg = cw721_base::ExecuteMsg<Extension>;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Extension {
     pub metadata_uri: String,
 }
 
+pub type Cw721MetadataContract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
+
 #[cfg(not(feature = "library"))]
 pub mod entry {
     use super::*;
 
-    pub use cw721_base::Cw721Contract;
-
     use cosmwasm_std::entry_point;
-    use cosmwasm_std::{Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult};
+    use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
     // This is a simple type to let us handle empty extensions
 
@@ -29,8 +29,7 @@ pub mod entry {
         info: MessageInfo,
         msg: InstantiateMsg,
     ) -> StdResult<Response> {
-        let tract = Cw721Contract::<Extension, Empty>::default();
-        tract.instantiate(deps, env, info, msg)
+        Cw721MetadataContract::default().instantiate(deps, env, info, msg)
     }
 
     #[entry_point]
@@ -38,15 +37,13 @@ pub mod entry {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: ExecuteMsg<Extension>,
+        msg: ExecuteMsg,
     ) -> Result<Response, ContractError> {
-        let tract = Cw721Contract::<Extension, Empty>::default();
-        tract.execute(deps, env, info, msg)
+        Cw721MetadataContract::default().execute(deps, env, info, msg)
     }
 
     #[entry_point]
     pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-        let tract = Cw721Contract::<Extension, Empty>::default();
-        tract.query(deps, env, msg)
+        Cw721MetadataContract::default().query(deps, env, msg)
     }
 }
