@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use crate::de::Deserializable;
 use crate::helpers::query_raw;
 #[cfg(feature = "iterator")]
-use crate::iter_helpers::deserialize_kv;
+use crate::iter_helpers::deserialize_v;
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
@@ -189,7 +189,7 @@ where
         'a: 'c,
     {
         let mapped =
-            namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_kv);
+            namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_v);
         Box::new(mapped)
     }
 

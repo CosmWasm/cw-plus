@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::indexes::Index;
-use crate::iter_helpers::deserialize_kv;
+use crate::iter_helpers::deserialize_v;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
@@ -190,7 +190,7 @@ where
         'a: 'c,
     {
         let mapped =
-            namespaced_prefix_range(store, self.pk_namespace, min, max, order).map(deserialize_kv);
+            namespaced_prefix_range(store, self.pk_namespace, min, max, order).map(deserialize_v);
         Box::new(mapped)
     }
 }
