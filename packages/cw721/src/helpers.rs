@@ -91,11 +91,11 @@ impl Cw721Contract {
     }
 
     /// With metadata extension
-    pub fn nft_info<Q: Querier, T: Into<String>>(
+    pub fn nft_info<Q: Querier, T: Into<String>, U: DeserializeOwned>(
         &self,
         querier: &Q,
         token_id: T,
-    ) -> StdResult<NftInfoResponse> {
+    ) -> StdResult<NftInfoResponse<U>> {
         let req = Cw721QueryMsg::NftInfo {
             token_id: token_id.into(),
         };
@@ -103,12 +103,12 @@ impl Cw721Contract {
     }
 
     /// With metadata extension
-    pub fn all_nft_info<Q: Querier, T: Into<String>>(
+    pub fn all_nft_info<Q: Querier, T: Into<String>, U: DeserializeOwned>(
         &self,
         querier: &Q,
         token_id: T,
         include_expired: bool,
-    ) -> StdResult<AllNftInfoResponse> {
+    ) -> StdResult<AllNftInfoResponse<U>> {
         let req = Cw721QueryMsg::AllNftInfo {
             token_id: token_id.into(),
             include_expired: Some(include_expired),
