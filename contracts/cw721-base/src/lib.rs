@@ -20,7 +20,6 @@ pub mod entry {
     use cosmwasm_std::entry_point;
     use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
-
     // This makes a conscious choice on the various generics used by the contract
     #[entry_point]
     pub fn instantiate(
