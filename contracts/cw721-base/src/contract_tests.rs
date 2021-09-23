@@ -7,8 +7,9 @@ use cw721::{
     NftInfoResponse, OwnerOfResponse,
 };
 
-use crate::entry::Extension;
-use crate::{ContractError, Cw721Contract, ExecuteMsg, InstantiateMsg, MintMsg, QueryMsg};
+use crate::{
+    ContractError, Cw721Contract, ExecuteMsg, Extension, InstantiateMsg, MintMsg, QueryMsg,
+};
 
 const MINTER: &str = "merlin";
 const CONTRACT_NAME: &str = "Magic Power";
