@@ -77,7 +77,7 @@ pub fn default_deserializer<T: DeserializeOwned>(
     _: &[u8],
     raw: Pair,
 ) -> StdResult<Pair<T>> {
-    deserialize_kv(raw)
+    deserialize_v(raw)
 }
 
 #[derive(Clone)]
