@@ -657,6 +657,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw721-metadata-uri"
+version = "0.9.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus 0.9.0",
+ "cw0 0.9.0",
+ "cw2",
+ "cw721",
+ "cw721-base",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "der"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
