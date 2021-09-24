@@ -1,3 +1,5 @@
+#![cfg(feature = "iterator")]
+
 use serde::de::DeserializeOwned;
 
 use cosmwasm_std::Pair;

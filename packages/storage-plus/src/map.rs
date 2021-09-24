@@ -128,6 +128,7 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
+#[cfg(feature = "iterator")]
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
@@ -231,6 +232,7 @@ mod test {
     use crate::U32Key;
     use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
+    #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -375,6 +377,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn range_simple_key() {
         let mut store = MockStorage::new();
 
@@ -912,6 +915,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn readme_with_range() -> StdResult<()> {
         let mut store = MockStorage::new();
 
