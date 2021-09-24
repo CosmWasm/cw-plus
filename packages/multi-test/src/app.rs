@@ -5,7 +5,7 @@ use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
     from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty, Querier,
-    QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    QuerierResult, QuerierWrapper, QueryRequest, StdResult, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -665,6 +665,33 @@ where
     }
 }
 
+// TODO: extend this later to give privileged access to various modules
+// For now, we just use it to allow calling into Wasm contracts in sudo mode
+// from another module. Things like gov proposals belong here.
+pub enum SudoMsg {
+    Wasm(WasmSudo),
+}
+
+impl From<WasmSudo> for SudoMsg {
+    fn from(wasm: WasmSudo) -> Self {
+        SudoMsg::Wasm(wasm)
+    }
+}
+
+pub struct WasmSudo {
+    pub contract_addr: Addr,
+    pub msg: Vec<u8>,
+}
+
+impl WasmSudo {
+    pub fn new<T: Serialize>(contract_addr: &Addr, msg: &T) -> StdResult<WasmSudo> {
+        Ok(WasmSudo {
+            contract_addr: contract_addr.clone(),
+            msg: to_vec(msg)?,
+        })
+    }
+}
+
 pub trait CosmosRouter {
     type ExecC;
     type QueryC: CustomQuery;
@@ -685,6 +712,14 @@ pub trait CosmosRouter {
         block: &BlockInfo,
         request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary>;
+
+    fn sudo(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        msg: SudoMsg,
+    ) -> AnyResult<AppResponse>;
 }
 
 impl<BankT, CustomT, WasmT, StakingT, DistrT> CosmosRouter
@@ -739,6 +774,21 @@ where
             _ => unimplemented!(),
         }
     }
+
+    fn sudo(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        msg: SudoMsg,
+    ) -> AnyResult<AppResponse> {
+        match msg {
+            SudoMsg::Wasm(msg) => {
+                self.wasm
+                    .sudo(api, msg.contract_addr, storage, self, block, msg.msg)
+            }
+        }
+    }
 }
 
 pub struct MockRouter<ExecC, QueryC>(PhantomData<(ExecC, QueryC)>);
@@ -784,6 +834,16 @@ where
         _request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary> {
         panic!("Cannot query MockRouters");
+    }
+
+    fn sudo(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _block: &BlockInfo,
+        _msg: SudoMsg,
+    ) -> AnyResult<AppResponse> {
+        panic!("Cannot sudo MockRouters");
     }
 }
 
