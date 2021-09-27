@@ -150,6 +150,18 @@ where
     }
 }
 
+/// This is essential to create a custom app with custom handler.
+///   let mut app = BasicAppBuilder::<E, Q>::new_custom().with_custom(handler).build();
+pub type BasicAppBuilder<ExecC, QueryC> = AppBuilder<
+    BankKeeper,
+    MockApi,
+    MockStorage,
+    FailingModule<ExecC, QueryC, Empty>,
+    WasmKeeper<ExecC, QueryC>,
+    FailingStaking,
+    FailingDistribution,
+>;
+
 /// Utility to build App in stages. If particular items wont be set, defaults would be used
 pub struct AppBuilder<Bank, Api, Storage, Custom, Wasm, Staking, Distr> {
     api: Api,
@@ -1345,7 +1357,150 @@ mod test {
         assert_eq!(49, count);
     }
 
-    // TODO custom handler dispatch to bank mint
+    // this demonstrates that we can mint tokens and send from other accounts via a custom module,
+    // as an example of ability to do privileged actions
+    mod custom_handler {
+        use super::*;
+
+        use anyhow::{bail, Result as AnyResult};
+        use cw_storage_plus::Item;
+        use serde::{Deserialize, Serialize};
+
+        use crate::Executor;
+
+        const LOTTERY: Item<Coin> = Item::new("lottery");
+        const PITY: Item<Coin> = Item::new("pity");
+
+        #[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema, Serialize, Deserialize)]
+        struct CustomMsg {
+            // we mint LOTTERY tokens to this one
+            lucky_winner: String,
+            // we transfer PITY from lucky_winner to runner_up
+            runner_up: String,
+        }
+
+        struct CustomHandler {}
+
+        impl Module for CustomHandler {
+            type ExecT = CustomMsg;
+            type QueryT = Empty;
+            type SudoT = Empty;
+
+            fn execute<ExecC, QueryC>(
+                &self,
+                api: &dyn Api,
+                storage: &mut dyn Storage,
+                router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+                block: &BlockInfo,
+                _sender: Addr,
+                msg: Self::ExecT,
+            ) -> AnyResult<AppResponse>
+            where
+                ExecC:
+                    std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+                QueryC: CustomQuery + DeserializeOwned + 'static,
+            {
+                let lottery = LOTTERY.load(storage)?;
+                let pity = PITY.load(storage)?;
+
+                // mint new tokens
+                let mint = BankSudo::Mint {
+                    to_address: msg.lucky_winner.clone(),
+                    amount: vec![lottery],
+                };
+                router.sudo(api, storage, block, mint.into())?;
+
+                // send from an arbitrary account (not the module)
+                let transfer = BankMsg::Send {
+                    to_address: msg.runner_up,
+                    amount: vec![pity],
+                };
+                let rcpt = api.addr_validate(&msg.lucky_winner)?;
+                router.execute(api, storage, block, rcpt, transfer.into())?;
+
+                Ok(AppResponse::default())
+            }
+
+            fn sudo<ExecC, QueryC>(
+                &self,
+                _api: &dyn Api,
+                _storage: &mut dyn Storage,
+                _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+                _block: &BlockInfo,
+                _msg: Self::SudoT,
+            ) -> AnyResult<AppResponse>
+            where
+                ExecC:
+                    std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+                QueryC: CustomQuery + DeserializeOwned + 'static,
+            {
+                bail!("sudo not implemented for CustomHandler")
+            }
+
+            fn query(
+                &self,
+                _api: &dyn Api,
+                _storage: &dyn Storage,
+                _querier: &dyn Querier,
+                _block: &BlockInfo,
+                _request: Self::QueryT,
+            ) -> AnyResult<Binary> {
+                bail!("query not implemented for CustomHandler")
+            }
+        }
+
+        impl CustomHandler {
+            // this is a custom initialization method
+            pub fn set_payout(
+                &self,
+                storage: &mut dyn Storage,
+                lottery: Coin,
+                pity: Coin,
+            ) -> AnyResult<()> {
+                LOTTERY.save(storage, &lottery)?;
+                PITY.save(storage, &pity)?;
+                Ok(())
+            }
+        }
+
+        // let's call this custom handler
+        #[test]
+        fn dispatches_messages() {
+            let winner = "winner".to_string();
+            let second = "second".to_string();
+
+            // payments. note 54321 - 12321 = 42000
+            let denom = "tix";
+            let lottery = coin(54321, denom);
+            let bonus = coin(12321, denom);
+
+            let mut app = BasicAppBuilder::<CustomMsg, Empty>::new_custom()
+                .with_custom(CustomHandler {})
+                .build(|router, _, storage| {
+                    router
+                        .custom
+                        .set_payout(storage, lottery.clone(), bonus.clone())
+                        .unwrap();
+                });
+
+            // query that balances are empty
+            let start = app.wrap().query_balance(&winner, denom).unwrap();
+            assert_eq!(start, coin(0, denom));
+
+            // trigger the custom module
+            let msg = CosmosMsg::Custom(CustomMsg {
+                lucky_winner: winner.clone(),
+                runner_up: second.clone(),
+            });
+            app.execute(Addr::unchecked("anyone"), msg.into()).unwrap();
+
+            // see if coins were properly added
+            let big_win = app.wrap().query_balance(&winner, denom).unwrap();
+            assert_eq!(big_win, coin(42000, denom));
+            let little_win = app.wrap().query_balance(&second, denom).unwrap();
+            assert_eq!(little_win, bonus);
+        }
+    }
 
     #[test]
     fn reflect_submessage_reply_works() {
