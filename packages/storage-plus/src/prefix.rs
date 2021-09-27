@@ -66,10 +66,8 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
     }
 }
 
-pub type Pair2<K = Vec<u8>, V = Vec<u8>> = (K, V);
-
 type DeserializeKvFn<K, T> =
-    fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair2<<K as Deserializable>::Output, T>>;
+    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as Deserializable>::Output, T)>;
 
 #[allow(dead_code)]
 pub fn default_deserializer_v<T: DeserializeOwned>(
@@ -84,7 +82,7 @@ pub fn default_deserializer_kv<K: Deserializable, T: DeserializeOwned>(
     _: &dyn Storage,
     _: &[u8],
     raw: Pair,
-) -> StdResult<Pair2<K::Output, T>> {
+) -> StdResult<(K::Output, T)> {
     deserialize_kv::<K, T>(raw)
 }
 
@@ -149,7 +147,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K::Output, T>>> + 'a>
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
         T: 'a,
         K::Output: 'a,
@@ -167,7 +165,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K::Output, T>>> + 'a>
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
         T: 'a,
         K::Output: 'a,
