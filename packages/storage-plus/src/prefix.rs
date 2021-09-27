@@ -66,11 +66,9 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
     }
 }
 
-pub type Pair2<K = Vec<u8>, V = Vec<u8>> = (K, V);
-
 type DeserializeVFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
 type DeserializeKvFn<K, T> =
-    fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair2<<K as Deserializable>::Output, T>>;
+    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as Deserializable>::Output, T)>;
 
 pub fn default_deserializer<T: DeserializeOwned>(
     _: &dyn Storage,
@@ -216,7 +214,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Pair2<K::Output, T>>> + 'a>
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
         T: 'a,
         K::Output: 'a,

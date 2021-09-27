@@ -7,7 +7,6 @@ use cosmwasm_std::{from_slice, StdResult};
 
 use crate::de::Deserializable;
 use crate::helpers::encode_length;
-use crate::prefix::Pair2;
 
 pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (k, v) = kv;
@@ -17,7 +16,7 @@ pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>>
 
 pub(crate) fn deserialize_kv<K: Deserializable, T: DeserializeOwned>(
     kv: Pair,
-) -> StdResult<Pair2<K::Output, T>> {
+) -> StdResult<(K::Output, T)> {
     let (k, v) = kv;
     let kt = K::from_slice(&k)?;
     let vt = from_slice::<T>(&v)?;
