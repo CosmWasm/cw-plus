@@ -5,20 +5,20 @@ use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
     from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty, Querier,
-    QuerierResult, QuerierWrapper, QueryRequest, StdResult, Storage, SystemError, SystemResult,
+    QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::bank::{Bank, BankKeeper};
+use crate::bank::{Bank, BankKeeper, BankSudo};
 use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::module::{FailingModule, Module};
-use crate::staking::{Distribution, FailingDistribution, FailingStaking, Staking};
+use crate::staking::{Distribution, FailingDistribution, FailingStaking, Staking, StakingSudo};
 use crate::transactions::transactional;
 use crate::untyped_msg::CosmosMsg;
-use crate::wasm::{ContractData, Wasm, WasmKeeper};
+use crate::wasm::{ContractData, Wasm, WasmKeeper, WasmSudo};
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -670,10 +670,12 @@ where
     }
 }
 
-// TODO: extend this later to give privileged access to various modules
-// For now, we just use it to allow calling into Wasm contracts in sudo mode
-// from another module. Things like gov proposals belong here.
+/// We use it to allow calling into modules from another module in sudo mode.
+/// Things like gov proposals belong here.
 pub enum SudoMsg {
+    Bank(BankSudo),
+    Custom(Empty),
+    Staking(StakingSudo),
     Wasm(WasmSudo),
 }
 
@@ -683,17 +685,15 @@ impl From<WasmSudo> for SudoMsg {
     }
 }
 
-pub struct WasmSudo {
-    pub contract_addr: Addr,
-    pub msg: Vec<u8>,
+impl From<BankSudo> for SudoMsg {
+    fn from(bank: BankSudo) -> Self {
+        SudoMsg::Bank(bank)
+    }
 }
 
-impl WasmSudo {
-    pub fn new<T: Serialize>(contract_addr: &Addr, msg: &T) -> StdResult<WasmSudo> {
-        Ok(WasmSudo {
-            contract_addr: contract_addr.clone(),
-            msg: to_vec(msg)?,
-        })
+impl From<StakingSudo> for SudoMsg {
+    fn from(staking: StakingSudo) -> Self {
+        SudoMsg::Staking(staking)
     }
 }
 
@@ -792,6 +792,9 @@ where
                 self.wasm
                     .sudo(api, msg.contract_addr, storage, self, block, msg.msg)
             }
+            SudoMsg::Bank(msg) => self.bank.sudo(api, storage, self, block, msg),
+            SudoMsg::Staking(msg) => self.staking.sudo(api, storage, self, block, msg),
+            SudoMsg::Custom(_) => unimplemented!(),
         }
     }
 }

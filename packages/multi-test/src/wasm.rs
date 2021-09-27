@@ -3,10 +3,10 @@ use std::fmt;
 use std::ops::Deref;
 
 use cosmwasm_std::{
-    Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
+    to_vec, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
     CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier, QuerierWrapper, Reply,
-    ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, TransactionInfo, WasmMsg,
-    WasmQuery,
+    ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgExecutionResponse, TransactionInfo,
+    WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
@@ -30,6 +30,20 @@ const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
 const CONTRACT_ATTR: &str = "_contract_addr";
+
+pub struct WasmSudo {
+    pub contract_addr: Addr,
+    pub msg: Vec<u8>,
+}
+
+impl WasmSudo {
+    pub fn new<T: Serialize>(contract_addr: &Addr, msg: &T) -> StdResult<WasmSudo> {
+        Ok(WasmSudo {
+            contract_addr: contract_addr.clone(),
+            msg: to_vec(msg)?,
+        })
+    }
+}
 
 /// Contract Data includes information about contract, equivalent of `ContractInfo` in wasmd
 /// interface.
