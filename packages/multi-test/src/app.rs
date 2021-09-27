@@ -614,23 +614,47 @@ where
         })
     }
 
-    /// Runs arbitrary CosmosMsg in "sudo" mode.
+    /// Call a smart contract in "sudo" mode.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn sudo<T: Serialize, U: Into<Addr>>(
+    pub fn wasm_sudo<T: Serialize, U: Into<Addr>>(
         &mut self,
         contract_addr: U,
         msg: &T,
     ) -> AnyResult<AppResponse> {
         let msg = to_vec(msg)?;
-        self.router.wasm.sudo(
-            &self.api,
-            contract_addr.into(),
-            &mut self.storage,
-            &self.router,
-            &self.block,
-            msg,
-        )
+
+        let Self {
+            block,
+            router,
+            api,
+            storage,
+        } = self;
+
+        transactional(&mut *storage, |write_cache, _| {
+            router
+                .wasm
+                .sudo(&*api, contract_addr.into(), write_cache, router, block, msg)
+        })
+    }
+
+    /// Runs arbitrary SudoMsg.
+    /// This will create a cache before the execution, so no state changes are persisted if this
+    /// returns an error, but all are persisted on success.
+    pub fn sudo(&mut self, msg: SudoMsg) -> AnyResult<AppResponse> {
+        // we need to do some caching of storage here, once in the entry point:
+        // meaning, wrap current state, all writes go to a cache, only when execute
+        // returns a success do we flush it (otherwise drop it)
+        let Self {
+            block,
+            router,
+            api,
+            storage,
+        } = self;
+
+        transactional(&mut *storage, |write_cache, _| {
+            router.sudo(&*api, write_cache, block, msg)
+        })
     }
 }
 
@@ -1297,7 +1321,7 @@ mod test {
 
         // sudo
         let msg = payout::SudoMsg { set_count: 25 };
-        app.sudo(payout_addr.clone(), &msg).unwrap();
+        app.wasm_sudo(payout_addr.clone(), &msg).unwrap();
 
         // count is 25
         let payout::CountResponse { count } = app
