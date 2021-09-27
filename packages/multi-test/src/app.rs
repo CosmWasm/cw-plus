@@ -1319,7 +1319,7 @@ mod test {
             .unwrap();
         assert_eq!(1, count);
 
-        // sudo
+        // wasm_sudo call
         let msg = payout::SudoMsg { set_count: 25 };
         app.wasm_sudo(payout_addr.clone(), &msg).unwrap();
 
@@ -1329,7 +1329,23 @@ mod test {
             .query_wasm_smart(&payout_addr, &payout::QueryMsg::Count {})
             .unwrap();
         assert_eq!(25, count);
+
+        // we can do the same with sudo call
+        let msg = payout::SudoMsg { set_count: 49 };
+        let sudo_msg = WasmSudo {
+            contract_addr: payout_addr.clone(),
+            msg: to_vec(&msg).unwrap(),
+        };
+        app.sudo(sudo_msg.into()).unwrap();
+
+        let payout::CountResponse { count } = app
+            .wrap()
+            .query_wasm_smart(&payout_addr, &payout::QueryMsg::Count {})
+            .unwrap();
+        assert_eq!(49, count);
     }
+
+    // TODO custom handler dispatch to bank mint
 
     #[test]
     fn reflect_submessage_reply_works() {
