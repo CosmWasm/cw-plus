@@ -862,13 +862,16 @@ mod test {
     use super::*;
     use crate::staking::{FailingDistribution, FailingStaking};
 
-    fn mock_router() -> Router<
+    /// Type alias for default build `Router` to make its reference in typical scenario
+    type BasicRouter<ExecC = Empty, QueryC = Empty> = Router<
         BankKeeper,
-        FailingModule<Empty, Empty>,
-        WasmKeeper<Empty, Empty>,
+        FailingModule<ExecC, QueryC, Empty>,
+        WasmKeeper<ExecC, QueryC>,
         FailingStaking,
         FailingDistribution,
-    > {
+    >;
+
+    fn mock_router() -> BasicRouter {
         Router {
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),

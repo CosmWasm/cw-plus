@@ -26,8 +26,13 @@ pub fn next_block(block: &mut BlockInfo) {
 }
 
 /// Type alias for default build `App` to make its storing simpler in typical scenario
-pub type BasicApp<ExecC = Empty, QueryC = Empty> =
-    App<BankKeeper, MockApi, MockStorage, FailingModule<ExecC, QueryC>, WasmKeeper<ExecC, QueryC>>;
+pub type BasicApp<ExecC = Empty, QueryC = Empty> = App<
+    BankKeeper,
+    MockApi,
+    MockStorage,
+    FailingModule<ExecC, QueryC, Empty>,
+    WasmKeeper<ExecC, QueryC>,
+>;
 
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
@@ -36,7 +41,7 @@ pub struct App<
     Bank = BankKeeper,
     Api = MockApi,
     Storage = MockStorage,
-    Custom = FailingModule<Empty, Empty>,
+    Custom = FailingModule<Empty, Empty, Empty>,
     Wasm = WasmKeeper<Empty, Empty>,
     Staking = FailingStaking,
     Distr = FailingDistribution,
@@ -67,7 +72,7 @@ impl BasicApp {
         F: FnOnce(
             &mut Router<
                 BankKeeper,
-                FailingModule<Empty, Empty>,
+                FailingModule<Empty, Empty, Empty>,
                 WasmKeeper<Empty, Empty>,
                 FailingStaking,
                 FailingDistribution,
@@ -89,7 +94,7 @@ where
     F: FnOnce(
         &mut Router<
             BankKeeper,
-            FailingModule<ExecC, QueryC>,
+            FailingModule<ExecC, QueryC, Empty>,
             WasmKeeper<ExecC, QueryC>,
             FailingStaking,
             FailingDistribution,
@@ -162,7 +167,7 @@ impl Default
         BankKeeper,
         MockApi,
         MockStorage,
-        FailingModule<Empty, Empty>,
+        FailingModule<Empty, Empty, Empty>,
         WasmKeeper<Empty, Empty>,
         FailingStaking,
         FailingDistribution,
@@ -178,7 +183,7 @@ impl
         BankKeeper,
         MockApi,
         MockStorage,
-        FailingModule<Empty, Empty>,
+        FailingModule<Empty, Empty, Empty>,
         WasmKeeper<Empty, Empty>,
         FailingStaking,
         FailingDistribution,
@@ -204,7 +209,7 @@ impl<ExecC, QueryC>
         BankKeeper,
         MockApi,
         MockStorage,
-        FailingModule<ExecC, QueryC>,
+        FailingModule<ExecC, QueryC, Empty>,
         WasmKeeper<ExecC, QueryC>,
         FailingStaking,
         FailingDistribution,

@@ -1,23 +1,37 @@
+use anyhow::{bail, Result as AnyResult};
+use itertools::Itertools;
+use schemars::JsonSchema;
+
 use cosmwasm_std::{
     coin, to_binary, Addr, AllBalanceResponse, Api, BalanceResponse, BankMsg, BankQuery, Binary,
     BlockInfo, Coin, Event, Querier, Storage,
 };
-
-use crate::executor::AppResponse;
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw0::NativeBalance;
 use cw_storage_plus::Map;
-use itertools::Itertools;
 
 use crate::app::CosmosRouter;
+use crate::executor::AppResponse;
 use crate::module::Module;
-use anyhow::{bail, Result as AnyResult};
 
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
 pub const NAMESPACE_BANK: &[u8] = b"bank";
 
-pub trait Bank: Module<ExecT = BankMsg, QueryT = BankQuery> {}
+// WIP
+#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+pub enum BankSudo {
+    Mint {
+        to_address: String,
+        amount: Vec<Coin>,
+    },
+    Burn {
+        from_address: String,
+        amount: Vec<Coin>,
+    },
+}
+
+pub trait Bank: Module<ExecT = BankMsg, QueryT = BankQuery, SudoT = BankSudo> {}
 
 #[derive(Default)]
 pub struct BankKeeper {}
@@ -103,6 +117,7 @@ impl Bank for BankKeeper {}
 impl Module for BankKeeper {
     type ExecT = BankMsg;
     type QueryT = BankQuery;
+    type SudoT = BankSudo;
 
     fn execute<ExecC, QueryC>(
         &self,
@@ -135,6 +150,32 @@ impl Module for BankKeeper {
                 Ok(AppResponse::default())
             }
             m => bail!("Unsupported bank message: {:?}", m),
+        }
+    }
+
+    fn sudo<ExecC, QueryC>(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
+        msg: BankSudo,
+    ) -> AnyResult<AppResponse> {
+        let mut bank_storage = prefixed(storage, NAMESPACE_BANK);
+        match msg {
+            BankSudo::Mint { to_address, amount } => {
+                let to_address = api.addr_validate(&to_address)?;
+                self.mint(&mut bank_storage, to_address, amount)?;
+                Ok(AppResponse::default())
+            }
+            BankSudo::Burn {
+                from_address,
+                amount,
+            } => {
+                let from_address = api.addr_validate(&from_address)?;
+                self.burn(&mut bank_storage, from_address, amount)?;
+                Ok(AppResponse::default())
+            }
         }
     }
 
