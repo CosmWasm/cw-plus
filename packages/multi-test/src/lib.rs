@@ -21,9 +21,11 @@ mod wasm;
 
 pub use crate::app::{
     custom_app, next_block, App, AppBuilder, BasicApp, BasicAppBuilder, CosmosRouter, Router,
+    SudoMsg,
 };
-pub use crate::bank::{Bank, BankKeeper};
+pub use crate::bank::{Bank, BankKeeper, BankSudo};
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::executor::{AppResponse, Executor};
 pub use crate::module::Module;
-pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};
+pub use crate::staking::{FailingDistribution, FailingStaking, Staking, StakingSudo};
+pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper, WasmSudo};
