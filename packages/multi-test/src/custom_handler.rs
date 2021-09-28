@@ -1,10 +1,10 @@
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Querier, Storage};
-
-use anyhow::Result as AnyResult;
+use anyhow::{bail, Result as AnyResult};
 use derivative::Derivative;
 use std::cell::{Ref, RefCell};
 use std::ops::Deref;
 use std::rc::Rc;
+
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Empty, Querier, Storage};
 
 use crate::app::CosmosRouter;
 use crate::{AppResponse, Module};
@@ -51,6 +51,7 @@ impl<ExecC, QueryC> CachingCustomHandler<ExecC, QueryC> {
 impl<Exec, Query> Module for CachingCustomHandler<Exec, Query> {
     type ExecT = Exec;
     type QueryT = Query;
+    type SudoT = Empty;
 
     // TODO: how to assert
     // where ExecC: Exec, QueryC: Query
@@ -65,6 +66,17 @@ impl<Exec, Query> Module for CachingCustomHandler<Exec, Query> {
     ) -> AnyResult<AppResponse> {
         self.state.execs.borrow_mut().push(msg);
         Ok(AppResponse::default())
+    }
+
+    fn sudo<ExecC, QueryC>(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
+        msg: Self::SudoT,
+    ) -> AnyResult<AppResponse> {
+        bail!("Unexpected sudo msg {:?}", msg)
     }
 
     fn query(
