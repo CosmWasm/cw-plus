@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty, Querier,
-    QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    from_slice, to_binary, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -596,7 +596,7 @@ where
 
     /// Simple helper so we get access to all the QuerierWrapper helpers,
     /// eg. wrap().query_wasm_smart, query_all_balances, ...
-    pub fn wrap(&self) -> QuerierWrapper {
+    pub fn wrap(&self) -> QuerierWrapper<CustomT::QueryT> {
         QuerierWrapper::new(self)
     }
 
@@ -634,7 +634,7 @@ where
         contract_addr: U,
         msg: &T,
     ) -> AnyResult<AppResponse> {
-        let msg = to_vec(msg)?;
+        let msg = to_binary(msg)?;
 
         let Self {
             block,
@@ -1346,7 +1346,7 @@ mod test {
         let msg = payout::SudoMsg { set_count: 49 };
         let sudo_msg = WasmSudo {
             contract_addr: payout_addr.clone(),
-            msg: to_vec(&msg).unwrap(),
+            msg: to_binary(&msg).unwrap(),
         };
         app.sudo(sudo_msg.into()).unwrap();
 
