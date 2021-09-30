@@ -17,35 +17,87 @@ impl KeyDeserialize for () {
     }
 }
 
-macro_rules! bytes_de {
-    (for $($t:ty),+) => {
-        $(impl KeyDeserialize for $t {
-            type Output = Vec<u8>;
+impl KeyDeserialize for Vec<u8> {
+    type Output = Vec<u8>;
 
-            fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-                Ok(value.to_vec())
-            }
-        })*
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        Ok(value.to_vec())
     }
 }
 
-bytes_de!(for Vec<u8>, &Vec<u8>, [u8], &[u8]);
+impl KeyDeserialize for &Vec<u8> {
+    type Output = Vec<u8>;
 
-macro_rules! string_de {
-    (for $($t:ty),+) => {
-        $(impl KeyDeserialize for $t {
-            type Output = String;
-
-            fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-                String::from_utf8(value.to_vec())
-                    // FIXME: Add and use StdError utf-8 error From helper
-                    .map_err(|err| StdError::generic_err(err.to_string()))
-            }
-        })*
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        <Vec<u8>>::from_slice(value)
     }
 }
 
-string_de!(for String, &String, str, &str, Addr, &Addr);
+impl KeyDeserialize for [u8] {
+    type Output = Vec<u8>;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        <Vec<u8>>::from_slice(value)
+    }
+}
+
+impl KeyDeserialize for &[u8] {
+    type Output = Vec<u8>;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        <Vec<u8>>::from_slice(value)
+    }
+}
+
+impl KeyDeserialize for String {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_utf8(value.to_vec())
+            // FIXME: Add and use StdError utf-8 error From helper
+            .map_err(|err| StdError::generic_err(err.to_string()))
+    }
+}
+
+impl KeyDeserialize for &String {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_slice(value)
+    }
+}
+
+impl KeyDeserialize for str {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_slice(value)
+    }
+}
+
+impl KeyDeserialize for &str {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_slice(value)
+    }
+}
+
+impl KeyDeserialize for Addr {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_slice(value)
+    }
+}
+
+impl KeyDeserialize for &Addr {
+    type Output = String;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        String::from_slice(value)
+    }
+}
 
 macro_rules! integer_de {
     (for $($t:ty),+) => {
