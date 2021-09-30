@@ -5,7 +5,25 @@ use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::Endian;
 
-// pub trait PrimaryKey<'a>: Copy {
+/// `PrimaryKey` needs to be implemented for types that want to be a `Map` (or `Map`-like) key,
+/// or part of a key.
+///
+/// In particular, it defines a series of types that help iterating over parts of a (composite) key:
+///
+/// `Prefix`: Prefix is eager. That is, except for empty keys, it's always "one less" than the full key.
+/// `Suffix`: Suffix is the complement of prefix.
+/// `SubPrefix`: Sub-prefix is "one less" than prefix.
+/// `SuperSuffix`: Super-suffix is "one more" than suffix. The complement of sub-prefix.
+///
+/// By example, for a 2-tuple `(T, U)`:
+///
+/// `T`: Prefix.
+/// `U`: Suffix.
+/// `()`: Sub-prefix.
+/// `(T, U)`: Super-suffix.
+///
+/// `SubPrefix` and `SuperSuffix` only make real sense in the case of triples. Still, they need to be
+/// consistently defined for all types.
 pub trait PrimaryKey<'a>: Clone {
     type Prefix: Prefixer<'a>;
     type SubPrefix: Prefixer<'a>;
