@@ -132,16 +132,15 @@ impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
     type Output = (T::Output, U::Output);
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        let (len, data) = value.split_at(2);
         let t_len = u16::from_be_bytes(
-            value[..2]
-                .try_into()
+            len.try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let t = T::from_slice(&value[2..2 + t_len])?;
-        let u = U::from_slice(&value[2 + t_len..])?;
+        let (t, u) = data.split_at(t_len);
 
-        Ok((t, u))
+        Ok((T::from_slice(t)?, U::from_slice(u)?))
     }
 }
 
@@ -149,22 +148,22 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
     type Output = (T::Output, U::Output, V::Output);
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        let (len, data) = value.split_at(2);
         let t_len = u16::from_be_bytes(
-            value[..2]
-                .try_into()
+            len.try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let t = T::from_slice(&value[2..2 + t_len])?;
-        let u_len = u16::from_be_bytes(
-            value[2 + t_len..4 + t_len]
-                .try_into()
-                // FIXME: Add and use StdError try-from error From helper
-                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
-        ) as usize;
-        let u = U::from_slice(&value[4 + t_len..4 + t_len + u_len])?;
-        let v = V::from_slice(&value[4 + t_len + u_len..])?;
+        let (t, data) = data.split_at(t_len);
 
-        Ok((t, u, v))
+        let (len, data) = data.split_at(2);
+        let u_len = u16::from_be_bytes(
+            len.try_into()
+                // FIXME: Add and use StdError try-from error From helper
+                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
+        ) as usize;
+        let (u, v) = data.split_at(u_len);
+
+        Ok((T::from_slice(t)?, U::from_slice(u)?, V::from_slice(v)?))
     }
 }
