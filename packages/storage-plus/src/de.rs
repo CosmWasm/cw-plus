@@ -1,7 +1,9 @@
-use crate::keys::{IntKey, TimestampKey};
-use cosmwasm_std::{Addr, StdError, StdResult};
 use std::array::TryFromSliceError;
 use std::convert::TryInto;
+
+use cosmwasm_std::{Addr, StdError, StdResult};
+
+use crate::keys::{IntKey, TimestampKey};
 
 pub trait KeyDeserialize {
     type Output: Sized;
