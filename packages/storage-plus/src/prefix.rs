@@ -217,7 +217,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
         T: 'a,
-        K::Output: 'a,
+        K::Output: 'static,
     {
         let de_fn = self.de_fn;
         let pk_name = self.pk_name.clone();
@@ -235,7 +235,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
     where
         T: 'a,
-        K::Output: 'a,
+        K::Output: 'static,
     {
         let de_fn = self.de_fn;
         let pk_name = self.pk_name.clone();

@@ -198,7 +198,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
         T: 'c,
-        K::Output: 'c,
+        K::Output: 'static,
     {
         self.no_prefix_de().range_de(store, min, max, order)
     }
@@ -212,7 +212,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
         T: 'c,
-        K::Output: 'c,
+        K::Output: 'static,
     {
         self.no_prefix_de().keys_de(store, min, max, order)
     }
