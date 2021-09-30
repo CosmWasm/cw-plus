@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use cosmwasm_std::{Order, Pair, StdResult, Storage};
 use std::ops::Deref;
 
-use crate::de::Deserializable;
+use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::{Endian, Prefixer};
@@ -68,7 +68,7 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
 
 type DeserializeVFn<T> = fn(&dyn Storage, &[u8], Pair) -> StdResult<Pair<T>>;
 type DeserializeKvFn<K, T> =
-    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as Deserializable>::Output, T)>;
+    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as KeyDeserialize>::Output, T)>;
 
 pub fn default_deserializer<T: DeserializeOwned>(
     _: &dyn Storage,
@@ -159,7 +159,7 @@ where
 #[derive(Clone)]
 pub struct Prefix2<K, T>
 where
-    K: Deserializable,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     /// all namespaces prefixes and concatenated with the key
@@ -172,7 +172,7 @@ where
 
 impl<K, T> Deref for Prefix2<K, T>
 where
-    K: Deserializable,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     type Target = [u8];
@@ -184,7 +184,7 @@ where
 
 impl<K, T> Prefix2<K, T>
 where
-    K: Deserializable,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {

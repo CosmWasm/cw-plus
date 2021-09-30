@@ -3,13 +3,13 @@ use cosmwasm_std::{Addr, StdError, StdResult};
 use std::array::TryFromSliceError;
 use std::convert::TryInto;
 
-pub trait Deserializable {
+pub trait KeyDeserialize {
     type Output: Sized;
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output>;
 }
 
-impl Deserializable for () {
+impl KeyDeserialize for () {
     type Output = ();
 
     fn from_slice(_value: &[u8]) -> StdResult<Self::Output> {
@@ -19,7 +19,7 @@ impl Deserializable for () {
 
 macro_rules! bytes_de {
     (for $($t:ty),+) => {
-        $(impl Deserializable for $t {
+        $(impl KeyDeserialize for $t {
             type Output = Vec<u8>;
 
             fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
@@ -33,7 +33,7 @@ bytes_de!(for Vec<u8>, &Vec<u8>, [u8], &[u8]);
 
 macro_rules! string_de {
     (for $($t:ty),+) => {
-        $(impl Deserializable for $t {
+        $(impl KeyDeserialize for $t {
             type Output = String;
 
             fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
@@ -50,7 +50,7 @@ string_de!(for String, &String, str, &str, Addr, &Addr);
 
 macro_rules! integer_de {
     (for $($t:ty),+) => {
-        $(impl Deserializable for IntKey<$t> {
+        $(impl KeyDeserialize for IntKey<$t> {
             type Output = $t;
 
             fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
@@ -64,7 +64,7 @@ macro_rules! integer_de {
 
 integer_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
 
-impl Deserializable for TimestampKey {
+impl KeyDeserialize for TimestampKey {
     type Output = u64;
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
@@ -77,7 +77,7 @@ impl Deserializable for TimestampKey {
     }
 }
 
-impl<T: Deserializable, U: Deserializable> Deserializable for (T, U) {
+impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
     type Output = (T::Output, U::Output);
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
@@ -94,7 +94,7 @@ impl<T: Deserializable, U: Deserializable> Deserializable for (T, U) {
     }
 }
 
-impl<T: Deserializable, U: Deserializable, V: Deserializable> Deserializable for (T, U, V) {
+impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for (T, U, V) {
     type Output = (T::Output, U::Output, V::Output);
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {

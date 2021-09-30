@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Timestamp};
 use std::marker::PhantomData;
 
-use crate::de::Deserializable;
+use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::Endian;
 
@@ -10,8 +10,8 @@ pub trait PrimaryKey<'a>: Clone {
     type Prefix: Prefixer<'a>;
     type SubPrefix: Prefixer<'a>;
 
-    type Suffix: Deserializable;
-    type SuperSuffix: Deserializable;
+    type Suffix: KeyDeserialize;
+    type SuperSuffix: KeyDeserialize;
 
     /// returns a slice of key steps, which can be optionally combined
     fn key(&self) -> Vec<&[u8]>;
@@ -61,7 +61,7 @@ impl<'a> PrimaryKey<'a> for &'a str {
 }
 
 // use generics for combining there - so we can use &[u8], Vec<u8>, or IntKey
-impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + Deserializable, U: PrimaryKey<'a> + Deserializable>
+impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize, U: PrimaryKey<'a> + KeyDeserialize>
     PrimaryKey<'a> for (T, U)
 {
     type Prefix = T;
@@ -80,8 +80,8 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + Deserializable, U: PrimaryKey<'a> + 
 impl<
         'a,
         T: PrimaryKey<'a> + Prefixer<'a>,
-        U: PrimaryKey<'a> + Prefixer<'a> + Deserializable,
-        V: PrimaryKey<'a> + Deserializable,
+        U: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
+        V: PrimaryKey<'a> + KeyDeserialize,
     > PrimaryKey<'a> for (T, U, V)
 {
     type Prefix = (T, U);
@@ -218,7 +218,7 @@ impl<'a> Prefixer<'a> for Addr {
 // this auto-implements PrimaryKey for all the IntKey types
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>
 where
-    IntKey<T>: Deserializable,
+    IntKey<T>: KeyDeserialize,
 {
     type Prefix = ();
     type SubPrefix = ();
