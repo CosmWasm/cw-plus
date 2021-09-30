@@ -25,11 +25,11 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.10.0-soon" }
-cw2 = { path = "../../packages/cw2", version = "0.10.0-soon" }
-cw721 = { path = "../../packages/cw721", version = "0.10.0-soon" }
-cw721-base = { path = "../cw721-base", version = "0.10.0-soon", features = ["library"] }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.0-soon" }
+cw0 = { path = "../../packages/cw0", version = "0.10.0-soon3" }
+cw2 = { path = "../../packages/cw2", version = "0.10.0-soon3" }
+cw721 = { path = "../../packages/cw721", version = "0.10.0-soon3" }
+cw721-base = { path = "../cw721-base", version = "0.10.0-soon3", features = ["library"] }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.0-soon3" }
 cosmwasm-std = { version = "1.0.0-soon" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
