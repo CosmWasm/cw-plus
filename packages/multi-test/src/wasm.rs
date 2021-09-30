@@ -3,10 +3,10 @@ use std::fmt;
 use std::ops::Deref;
 
 use cosmwasm_std::{
-    Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo, ContractResult,
-    CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier, QuerierWrapper, Reply,
-    ReplyOn, Response, Storage, SubMsg, SubMsgExecutionResponse, TransactionInfo, WasmMsg,
-    WasmQuery,
+    to_binary, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo,
+    ContractResult, CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier,
+    QuerierWrapper, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgExecutionResponse,
+    TransactionInfo, WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
@@ -30,6 +30,21 @@ const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
 const CONTRACT_ATTR: &str = "_contract_addr";
+
+#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+pub struct WasmSudo {
+    pub contract_addr: Addr,
+    pub msg: Binary,
+}
+
+impl WasmSudo {
+    pub fn new<T: Serialize>(contract_addr: &Addr, msg: &T) -> StdResult<WasmSudo> {
+        Ok(WasmSudo {
+            contract_addr: contract_addr.clone(),
+            msg: to_binary(msg)?,
+        })
+    }
+}
 
 /// Contract Data includes information about contract, equivalent of `ContractInfo` in wasmd
 /// interface.
@@ -77,7 +92,7 @@ pub trait Wasm<ExecC, QueryC> {
         storage: &mut dyn Storage,
         router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
-        msg: Vec<u8>,
+        msg: Binary,
     ) -> AnyResult<AppResponse>;
 }
 
@@ -147,11 +162,11 @@ where
         storage: &mut dyn Storage,
         router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         block: &BlockInfo,
-        msg: Vec<u8>,
+        msg: Binary,
     ) -> AnyResult<AppResponse> {
         let custom_event = Event::new("sudo").add_attribute(CONTRACT_ATTR, &contract);
 
-        let res = self.call_sudo(contract.clone(), api, storage, router, block, msg)?;
+        let res = self.call_sudo(contract.clone(), api, storage, router, block, msg.to_vec())?;
         let (res, msgs) = self.build_app_response(&contract, custom_event, res);
         self.process_response(api, router, storage, block, contract, res, msgs)
     }
@@ -862,13 +877,16 @@ mod test {
     use super::*;
     use crate::staking::{FailingDistribution, FailingStaking};
 
-    fn mock_router() -> Router<
+    /// Type alias for default build `Router` to make its reference in typical scenario
+    type BasicRouter<ExecC = Empty, QueryC = Empty> = Router<
         BankKeeper,
-        FailingModule<Empty, Empty>,
-        WasmKeeper<Empty, Empty>,
+        FailingModule<ExecC, QueryC, Empty>,
+        WasmKeeper<ExecC, QueryC>,
         FailingStaking,
         FailingDistribution,
-    > {
+    >;
+
+    fn mock_router() -> BasicRouter {
         Router {
             wasm: WasmKeeper::new(),
             bank: BankKeeper::new(),

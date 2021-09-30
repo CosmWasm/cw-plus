@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 #[cfg(feature = "iterator")]
-use crate::de::Deserializable;
+use crate::de::KeyDeserialize;
 use crate::helpers::query_raw;
 #[cfg(feature = "iterator")]
 use crate::iter_helpers::deserialize_v;
@@ -167,7 +167,7 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + Deserializable,
+    K: PrimaryKey<'a> + KeyDeserialize,
 {
     /// while range assumes you set the prefix to one element and call range over the last one,
     /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
@@ -198,7 +198,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
         T: 'c,
-        K::Output: 'c,
+        K::Output: 'static,
     {
         self.no_prefix_de().range_de(store, min, max, order)
     }
@@ -212,7 +212,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
         T: 'c,
-        K::Output: 'c,
+        K::Output: 'static,
     {
         self.no_prefix_de().keys_de(store, min, max, order)
     }

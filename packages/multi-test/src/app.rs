@@ -4,21 +4,21 @@ use std::marker::PhantomData;
 use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty, Querier,
-    QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    from_slice, to_binary, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::bank::{Bank, BankKeeper};
+use crate::bank::{Bank, BankKeeper, BankSudo};
 use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::module::{FailingModule, Module};
-use crate::staking::{Distribution, FailingDistribution, FailingStaking, Staking};
+use crate::staking::{Distribution, FailingDistribution, FailingStaking, Staking, StakingSudo};
 use crate::transactions::transactional;
 use crate::untyped_msg::CosmosMsg;
-use crate::wasm::{ContractData, Wasm, WasmKeeper};
+use crate::wasm::{ContractData, Wasm, WasmKeeper, WasmSudo};
 
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
@@ -26,8 +26,13 @@ pub fn next_block(block: &mut BlockInfo) {
 }
 
 /// Type alias for default build `App` to make its storing simpler in typical scenario
-pub type BasicApp<ExecC = Empty, QueryC = Empty> =
-    App<BankKeeper, MockApi, MockStorage, FailingModule<ExecC, QueryC>, WasmKeeper<ExecC, QueryC>>;
+pub type BasicApp<ExecC = Empty, QueryC = Empty> = App<
+    BankKeeper,
+    MockApi,
+    MockStorage,
+    FailingModule<ExecC, QueryC, Empty>,
+    WasmKeeper<ExecC, QueryC>,
+>;
 
 /// Router is a persisted state. You can query this.
 /// Execution generally happens on the RouterCache, which then can be atomically committed or rolled back.
@@ -36,7 +41,7 @@ pub struct App<
     Bank = BankKeeper,
     Api = MockApi,
     Storage = MockStorage,
-    Custom = FailingModule<Empty, Empty>,
+    Custom = FailingModule<Empty, Empty, Empty>,
     Wasm = WasmKeeper<Empty, Empty>,
     Staking = FailingStaking,
     Distr = FailingDistribution,
@@ -67,7 +72,7 @@ impl BasicApp {
         F: FnOnce(
             &mut Router<
                 BankKeeper,
-                FailingModule<Empty, Empty>,
+                FailingModule<Empty, Empty, Empty>,
                 WasmKeeper<Empty, Empty>,
                 FailingStaking,
                 FailingDistribution,
@@ -89,7 +94,7 @@ where
     F: FnOnce(
         &mut Router<
             BankKeeper,
-            FailingModule<ExecC, QueryC>,
+            FailingModule<ExecC, QueryC, Empty>,
             WasmKeeper<ExecC, QueryC>,
             FailingStaking,
             FailingDistribution,
@@ -145,6 +150,18 @@ where
     }
 }
 
+/// This is essential to create a custom app with custom handler.
+///   let mut app = BasicAppBuilder::<E, Q>::new_custom().with_custom(handler).build();
+pub type BasicAppBuilder<ExecC, QueryC> = AppBuilder<
+    BankKeeper,
+    MockApi,
+    MockStorage,
+    FailingModule<ExecC, QueryC, Empty>,
+    WasmKeeper<ExecC, QueryC>,
+    FailingStaking,
+    FailingDistribution,
+>;
+
 /// Utility to build App in stages. If particular items wont be set, defaults would be used
 pub struct AppBuilder<Bank, Api, Storage, Custom, Wasm, Staking, Distr> {
     api: Api,
@@ -162,7 +179,7 @@ impl Default
         BankKeeper,
         MockApi,
         MockStorage,
-        FailingModule<Empty, Empty>,
+        FailingModule<Empty, Empty, Empty>,
         WasmKeeper<Empty, Empty>,
         FailingStaking,
         FailingDistribution,
@@ -178,7 +195,7 @@ impl
         BankKeeper,
         MockApi,
         MockStorage,
-        FailingModule<Empty, Empty>,
+        FailingModule<Empty, Empty, Empty>,
         WasmKeeper<Empty, Empty>,
         FailingStaking,
         FailingDistribution,
@@ -204,7 +221,7 @@ impl<ExecC, QueryC>
         BankKeeper,
         MockApi,
         MockStorage,
-        FailingModule<ExecC, QueryC>,
+        FailingModule<ExecC, QueryC, Empty>,
         WasmKeeper<ExecC, QueryC>,
         FailingStaking,
         FailingDistribution,
@@ -579,7 +596,7 @@ where
 
     /// Simple helper so we get access to all the QuerierWrapper helpers,
     /// eg. wrap().query_wasm_smart, query_all_balances, ...
-    pub fn wrap(&self) -> QuerierWrapper {
+    pub fn wrap(&self) -> QuerierWrapper<CustomT::QueryT> {
         QuerierWrapper::new(self)
     }
 
@@ -609,23 +626,47 @@ where
         })
     }
 
-    /// Runs arbitrary CosmosMsg in "sudo" mode.
+    /// Call a smart contract in "sudo" mode.
     /// This will create a cache before the execution, so no state changes are persisted if this
     /// returns an error, but all are persisted on success.
-    pub fn sudo<T: Serialize, U: Into<Addr>>(
+    pub fn wasm_sudo<T: Serialize, U: Into<Addr>>(
         &mut self,
         contract_addr: U,
         msg: &T,
     ) -> AnyResult<AppResponse> {
-        let msg = to_vec(msg)?;
-        self.router.wasm.sudo(
-            &self.api,
-            contract_addr.into(),
-            &mut self.storage,
-            &self.router,
-            &self.block,
-            msg,
-        )
+        let msg = to_binary(msg)?;
+
+        let Self {
+            block,
+            router,
+            api,
+            storage,
+        } = self;
+
+        transactional(&mut *storage, |write_cache, _| {
+            router
+                .wasm
+                .sudo(&*api, contract_addr.into(), write_cache, router, block, msg)
+        })
+    }
+
+    /// Runs arbitrary SudoMsg.
+    /// This will create a cache before the execution, so no state changes are persisted if this
+    /// returns an error, but all are persisted on success.
+    pub fn sudo(&mut self, msg: SudoMsg) -> AnyResult<AppResponse> {
+        // we need to do some caching of storage here, once in the entry point:
+        // meaning, wrap current state, all writes go to a cache, only when execute
+        // returns a success do we flush it (otherwise drop it)
+        let Self {
+            block,
+            router,
+            api,
+            storage,
+        } = self;
+
+        transactional(&mut *storage, |write_cache, _| {
+            router.sudo(&*api, write_cache, block, msg)
+        })
     }
 }
 
@@ -665,6 +706,33 @@ where
     }
 }
 
+/// We use it to allow calling into modules from another module in sudo mode.
+/// Things like gov proposals belong here.
+pub enum SudoMsg {
+    Bank(BankSudo),
+    Custom(Empty),
+    Staking(StakingSudo),
+    Wasm(WasmSudo),
+}
+
+impl From<WasmSudo> for SudoMsg {
+    fn from(wasm: WasmSudo) -> Self {
+        SudoMsg::Wasm(wasm)
+    }
+}
+
+impl From<BankSudo> for SudoMsg {
+    fn from(bank: BankSudo) -> Self {
+        SudoMsg::Bank(bank)
+    }
+}
+
+impl From<StakingSudo> for SudoMsg {
+    fn from(staking: StakingSudo) -> Self {
+        SudoMsg::Staking(staking)
+    }
+}
+
 pub trait CosmosRouter {
     type ExecC;
     type QueryC: CustomQuery;
@@ -685,6 +753,14 @@ pub trait CosmosRouter {
         block: &BlockInfo,
         request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary>;
+
+    fn sudo(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        msg: SudoMsg,
+    ) -> AnyResult<AppResponse>;
 }
 
 impl<BankT, CustomT, WasmT, StakingT, DistrT> CosmosRouter
@@ -739,6 +815,24 @@ where
             _ => unimplemented!(),
         }
     }
+
+    fn sudo(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        block: &BlockInfo,
+        msg: SudoMsg,
+    ) -> AnyResult<AppResponse> {
+        match msg {
+            SudoMsg::Wasm(msg) => {
+                self.wasm
+                    .sudo(api, msg.contract_addr, storage, self, block, msg.msg)
+            }
+            SudoMsg::Bank(msg) => self.bank.sudo(api, storage, self, block, msg),
+            SudoMsg::Staking(msg) => self.staking.sudo(api, storage, self, block, msg),
+            SudoMsg::Custom(_) => unimplemented!(),
+        }
+    }
 }
 
 pub struct MockRouter<ExecC, QueryC>(PhantomData<(ExecC, QueryC)>);
@@ -784,6 +878,16 @@ where
         _request: QueryRequest<Self::QueryC>,
     ) -> AnyResult<Binary> {
         panic!("Cannot query MockRouters");
+    }
+
+    fn sudo(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _block: &BlockInfo,
+        _msg: SudoMsg,
+    ) -> AnyResult<AppResponse> {
+        panic!("Cannot sudo MockRouters");
     }
 }
 
@@ -1227,9 +1331,9 @@ mod test {
             .unwrap();
         assert_eq!(1, count);
 
-        // sudo
+        // wasm_sudo call
         let msg = payout::SudoMsg { set_count: 25 };
-        app.sudo(payout_addr.clone(), &msg).unwrap();
+        app.wasm_sudo(payout_addr.clone(), &msg).unwrap();
 
         // count is 25
         let payout::CountResponse { count } = app
@@ -1237,6 +1341,165 @@ mod test {
             .query_wasm_smart(&payout_addr, &payout::QueryMsg::Count {})
             .unwrap();
         assert_eq!(25, count);
+
+        // we can do the same with sudo call
+        let msg = payout::SudoMsg { set_count: 49 };
+        let sudo_msg = WasmSudo {
+            contract_addr: payout_addr.clone(),
+            msg: to_binary(&msg).unwrap(),
+        };
+        app.sudo(sudo_msg.into()).unwrap();
+
+        let payout::CountResponse { count } = app
+            .wrap()
+            .query_wasm_smart(&payout_addr, &payout::QueryMsg::Count {})
+            .unwrap();
+        assert_eq!(49, count);
+    }
+
+    // this demonstrates that we can mint tokens and send from other accounts via a custom module,
+    // as an example of ability to do privileged actions
+    mod custom_handler {
+        use super::*;
+
+        use anyhow::{bail, Result as AnyResult};
+        use cw_storage_plus::Item;
+        use serde::{Deserialize, Serialize};
+
+        use crate::Executor;
+
+        const LOTTERY: Item<Coin> = Item::new("lottery");
+        const PITY: Item<Coin> = Item::new("pity");
+
+        #[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema, Serialize, Deserialize)]
+        struct CustomMsg {
+            // we mint LOTTERY tokens to this one
+            lucky_winner: String,
+            // we transfer PITY from lucky_winner to runner_up
+            runner_up: String,
+        }
+
+        struct CustomHandler {}
+
+        impl Module for CustomHandler {
+            type ExecT = CustomMsg;
+            type QueryT = Empty;
+            type SudoT = Empty;
+
+            fn execute<ExecC, QueryC>(
+                &self,
+                api: &dyn Api,
+                storage: &mut dyn Storage,
+                router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+                block: &BlockInfo,
+                _sender: Addr,
+                msg: Self::ExecT,
+            ) -> AnyResult<AppResponse>
+            where
+                ExecC:
+                    std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+                QueryC: CustomQuery + DeserializeOwned + 'static,
+            {
+                let lottery = LOTTERY.load(storage)?;
+                let pity = PITY.load(storage)?;
+
+                // mint new tokens
+                let mint = BankSudo::Mint {
+                    to_address: msg.lucky_winner.clone(),
+                    amount: vec![lottery],
+                };
+                router.sudo(api, storage, block, mint.into())?;
+
+                // send from an arbitrary account (not the module)
+                let transfer = BankMsg::Send {
+                    to_address: msg.runner_up,
+                    amount: vec![pity],
+                };
+                let rcpt = api.addr_validate(&msg.lucky_winner)?;
+                router.execute(api, storage, block, rcpt, transfer.into())?;
+
+                Ok(AppResponse::default())
+            }
+
+            fn sudo<ExecC, QueryC>(
+                &self,
+                _api: &dyn Api,
+                _storage: &mut dyn Storage,
+                _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+                _block: &BlockInfo,
+                _msg: Self::SudoT,
+            ) -> AnyResult<AppResponse>
+            where
+                ExecC:
+                    std::fmt::Debug + Clone + PartialEq + JsonSchema + DeserializeOwned + 'static,
+                QueryC: CustomQuery + DeserializeOwned + 'static,
+            {
+                bail!("sudo not implemented for CustomHandler")
+            }
+
+            fn query(
+                &self,
+                _api: &dyn Api,
+                _storage: &dyn Storage,
+                _querier: &dyn Querier,
+                _block: &BlockInfo,
+                _request: Self::QueryT,
+            ) -> AnyResult<Binary> {
+                bail!("query not implemented for CustomHandler")
+            }
+        }
+
+        impl CustomHandler {
+            // this is a custom initialization method
+            pub fn set_payout(
+                &self,
+                storage: &mut dyn Storage,
+                lottery: Coin,
+                pity: Coin,
+            ) -> AnyResult<()> {
+                LOTTERY.save(storage, &lottery)?;
+                PITY.save(storage, &pity)?;
+                Ok(())
+            }
+        }
+
+        // let's call this custom handler
+        #[test]
+        fn dispatches_messages() {
+            let winner = "winner".to_string();
+            let second = "second".to_string();
+
+            // payments. note 54321 - 12321 = 42000
+            let denom = "tix";
+            let lottery = coin(54321, denom);
+            let bonus = coin(12321, denom);
+
+            let mut app = BasicAppBuilder::<CustomMsg, Empty>::new_custom()
+                .with_custom(CustomHandler {})
+                .build(|router, _, storage| {
+                    router
+                        .custom
+                        .set_payout(storage, lottery.clone(), bonus.clone())
+                        .unwrap();
+                });
+
+            // query that balances are empty
+            let start = app.wrap().query_balance(&winner, denom).unwrap();
+            assert_eq!(start, coin(0, denom));
+
+            // trigger the custom module
+            let msg = CosmosMsg::Custom(CustomMsg {
+                lucky_winner: winner.clone(),
+                runner_up: second.clone(),
+            });
+            app.execute(Addr::unchecked("anyone"), msg.into()).unwrap();
+
+            // see if coins were properly added
+            let big_win = app.wrap().query_balance(&winner, denom).unwrap();
+            assert_eq!(big_win, coin(42000, denom));
+            let little_win = app.wrap().query_balance(&second, denom).unwrap();
+            assert_eq!(little_win, bonus);
+        }
     }
 
     #[test]

@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use cosmwasm_std::Pair;
 use cosmwasm_std::{from_slice, StdResult};
 
-use crate::de::Deserializable;
+use crate::de::KeyDeserialize;
 use crate::helpers::encode_length;
 
 #[allow(dead_code)]
@@ -15,7 +15,7 @@ pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>>
     Ok((k, t))
 }
 
-pub(crate) fn deserialize_kv<K: Deserializable, T: DeserializeOwned>(
+pub(crate) fn deserialize_kv<K: KeyDeserialize, T: DeserializeOwned>(
     kv: Pair,
 ) -> StdResult<(K::Output, T)> {
     let (k, v) = kv;

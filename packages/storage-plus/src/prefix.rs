@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use cosmwasm_std::{Order, Pair, StdResult, Storage};
 use std::ops::Deref;
 
-use crate::de::Deserializable;
+use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::{Endian, Prefixer};
@@ -67,7 +67,7 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
 }
 
 type DeserializeKvFn<K, T> =
-    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as Deserializable>::Output, T)>;
+    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as KeyDeserialize>::Output, T)>;
 
 #[allow(dead_code)]
 pub fn default_deserializer_v<T: DeserializeOwned>(
@@ -78,7 +78,7 @@ pub fn default_deserializer_v<T: DeserializeOwned>(
     deserialize_v(raw)
 }
 
-pub fn default_deserializer_kv<K: Deserializable, T: DeserializeOwned>(
+pub fn default_deserializer_kv<K: KeyDeserialize, T: DeserializeOwned>(
     _: &dyn Storage,
     _: &[u8],
     raw: Pair,
@@ -89,7 +89,7 @@ pub fn default_deserializer_kv<K: Deserializable, T: DeserializeOwned>(
 #[derive(Clone)]
 pub struct Prefix<K = Vec<u8>, T = Vec<u8>>
 where
-    K: Deserializable,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     /// all namespaces prefixes and concatenated with the key
@@ -102,7 +102,7 @@ where
 
 impl<K, T> Deref for Prefix<K, T>
 where
-    K: Deserializable,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     type Target = [u8];
@@ -114,7 +114,7 @@ where
 
 impl<K, T> Prefix<K, T>
 where
-    K: Deserializable,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
@@ -159,24 +159,6 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'a>(
-        &self,
-        store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
-    where
-        T: 'a,
-        K::Output: 'a,
-    {
-        let de_fn = self.de_fn;
-        let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &*pk_name, kv));
-        Box::new(mapped)
-    }
-
     pub fn keys<'a>(
         &self,
         store: &'a dyn Storage,
@@ -189,6 +171,24 @@ where
         Box::new(mapped)
     }
 
+    pub fn range_de<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
+    where
+        T: 'a,
+        K::Output: 'static,
+    {
+        let de_fn = self.de_fn;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
+            .map(move |kv| (de_fn)(store, &*pk_name, kv));
+        Box::new(mapped)
+    }
+
     pub fn keys_de<'a>(
         &self,
         store: &'a dyn Storage,
@@ -198,7 +198,7 @@ where
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
     where
         T: 'a,
-        K::Output: 'a,
+        K::Output: 'static,
     {
         let de_fn = self.de_fn;
         let pk_name = self.pk_name.clone();
