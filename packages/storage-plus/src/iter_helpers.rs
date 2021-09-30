@@ -8,6 +8,7 @@ use cosmwasm_std::{from_slice, StdResult};
 use crate::de::KeyDeserialize;
 use crate::helpers::encode_length;
 
+#[allow(dead_code)]
 pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (k, v) = kv;
     let t = from_slice::<T>(&v)?;

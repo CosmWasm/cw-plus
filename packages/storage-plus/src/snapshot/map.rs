@@ -1,5 +1,3 @@
-#![cfg(feature = "iterator")]
-
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -70,15 +68,15 @@ where
         self.primary.key(k)
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         self.primary.prefix(p)
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         self.primary.sub_prefix(p)
     }
 
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         self.primary.no_prefix()
     }
 
@@ -166,7 +164,6 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-#[cfg(feature = "iterator")]
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,

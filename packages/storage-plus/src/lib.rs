@@ -27,6 +27,6 @@ pub use keys::{Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
-pub use prefix::{range_with_prefix, Bound, Prefix, Prefix2};
+pub use prefix::{range_with_prefix, Bound, Prefix};
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
