@@ -87,7 +87,7 @@ pub fn default_deserializer_kv<K: KeyDeserialize, T: DeserializeOwned>(
 }
 
 #[derive(Clone)]
-pub struct Prefix<K = Vec<u8>, T = Vec<u8>>
+pub struct Prefix<K, T>
 where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
