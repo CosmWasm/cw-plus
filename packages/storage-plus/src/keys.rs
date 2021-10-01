@@ -25,9 +25,13 @@ use crate::Endian;
 /// `SubPrefix` and `SuperSuffix` only make real sense in the case of triples. Still, they need to be
 /// consistently defined for all types.
 pub trait PrimaryKey<'a>: Clone {
+    /// These associated types need to implement `Prefixer`, so that they can be useful arguments
+    /// for `prefix()`, `sub_prefix()`, and their key-deserializable variants.
     type Prefix: Prefixer<'a>;
     type SubPrefix: Prefixer<'a>;
 
+    /// These associated types need to implement `KeyDeserialize`, so that they can be returned from
+    /// `range_de()` and friends.
     type Suffix: KeyDeserialize;
     type SuperSuffix: KeyDeserialize;
 
