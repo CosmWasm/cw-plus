@@ -5,9 +5,8 @@ use std::marker::PhantomData;
 #[cfg(feature = "iterator")]
 use crate::de::KeyDeserialize;
 use crate::helpers::query_raw;
-use crate::iter_helpers::deserialize_kv;
 #[cfg(feature = "iterator")]
-use crate::iter_helpers::deserialize_v;
+use crate::iter_helpers::{deserialize_kv, deserialize_v};
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
 use crate::keys::PrimaryKey;
