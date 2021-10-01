@@ -35,14 +35,6 @@ impl KeyDeserialize for &Vec<u8> {
     }
 }
 
-impl KeyDeserialize for [u8] {
-    type Output = Vec<u8>;
-
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        <Vec<u8>>::from_slice(value)
-    }
-}
-
 impl KeyDeserialize for &[u8] {
     type Output = Vec<u8>;
 
@@ -62,14 +54,6 @@ impl KeyDeserialize for String {
 }
 
 impl KeyDeserialize for &String {
-    type Output = String;
-
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        String::from_slice(value)
-    }
-}
-
-impl KeyDeserialize for str {
     type Output = String;
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
