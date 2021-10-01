@@ -115,8 +115,6 @@ fn proxy_freeze_message() {
             AdminListResponse {
                 mutable,
                 ..
-            }) => {
-            assert!(!mutable)
-        }
+            }) if !mutable
     );
 }
