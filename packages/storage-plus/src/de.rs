@@ -70,18 +70,18 @@ impl KeyDeserialize for &str {
 }
 
 impl KeyDeserialize for Addr {
-    type Output = String;
+    type Output = Addr;
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        String::from_slice(value)
+        Ok(Addr::unchecked(String::from_slice(value)?))
     }
 }
 
 impl KeyDeserialize for &Addr {
-    type Output = String;
+    type Output = Addr;
 
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        String::from_slice(value)
+        Addr::from_slice(value)
     }
 }
 
