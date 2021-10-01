@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 #[cfg(feature = "iterator")]
 use crate::de::KeyDeserialize;
 use crate::helpers::query_raw;
+use crate::iter_helpers::deserialize_kv;
 #[cfg(feature = "iterator")]
 use crate::iter_helpers::deserialize_v;
 #[cfg(feature = "iterator")]
@@ -136,6 +137,26 @@ where
     // Other cases need to call prefix() first
     K: PrimaryKey<'a>,
 {
+    /// while range assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+    {
+        let mapped =
+            namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_v);
+        Box::new(mapped)
+    }
+
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
@@ -169,23 +190,25 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
-    /// while range assumes you set the prefix to one element and call range over the last one,
-    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// while range_de assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
     /// accept, and iterates over those. There are some issues that distinguish these to and blindly
     /// casting to Vec<u8> doesn't solve them.
-    pub fn prefix_range<'c>(
+    pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
         max: Option<PrefixBound<'a, K::Prefix>>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
         T: 'c,
         'a: 'c,
+        K: 'c,
+        K::Output: 'static,
     {
-        let mapped =
-            namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_v);
+        let mapped = namespaced_prefix_range(store, self.namespace, min, max, order)
+            .map(deserialize_kv::<K, T>);
         Box::new(mapped)
     }
 
@@ -1060,6 +1083,96 @@ mod test {
         // using exclusive in descending
         let include = AGES
             .prefix_range(
+                &store,
+                Some(PrefixBound::exclusive(2)),
+                Some(PrefixBound::exclusive(5)),
+                Order::Descending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(include.len(), 1);
+        assert_eq!(include, vec![456]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn prefixed_range_de_works() {
+        // this is designed to look as much like a secondary index as possible
+        // we want to query over a range of u32 for the first key and all subkeys
+        const AGES: Map<(U32Key, &str), u64> = Map::new("ages");
+
+        let mut store = MockStorage::new();
+        AGES.save(&mut store, (2.into(), "123"), &123).unwrap();
+        AGES.save(&mut store, (3.into(), "456"), &456).unwrap();
+        AGES.save(&mut store, (5.into(), "789"), &789).unwrap();
+        AGES.save(&mut store, (5.into(), "987"), &987).unwrap();
+        AGES.save(&mut store, (7.into(), "202122"), &2002).unwrap();
+        AGES.save(&mut store, (8.into(), "232425"), &2332).unwrap();
+
+        // typical range under one prefix as a control
+        let fives = AGES
+            .prefix_de(5.into())
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(fives.len(), 2);
+        assert_eq!(
+            fives,
+            vec![("789".to_string(), 789), ("987".to_string(), 987)]
+        );
+
+        let keys: Vec<_> = AGES
+            .no_prefix()
+            .keys_de(&store, None, None, Order::Ascending)
+            .collect();
+        println!("keys: {:?}", keys);
+
+        // using inclusive bounds both sides
+        let include = AGES
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive(3)),
+                Some(PrefixBound::inclusive(7)),
+                Order::Ascending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(include.len(), 4);
+        assert_eq!(include, vec![456, 789, 987, 2002]);
+
+        // using exclusive bounds both sides
+        let exclude = AGES
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::exclusive(3)),
+                Some(PrefixBound::exclusive(7)),
+                Order::Ascending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(exclude.len(), 2);
+        assert_eq!(exclude, vec![789, 987]);
+
+        // using inclusive in descending
+        let include = AGES
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive(3)),
+                Some(PrefixBound::inclusive(5)),
+                Order::Descending,
+            )
+            .map(|r| r.map(|(_, v)| v))
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(include.len(), 3);
+        assert_eq!(include, vec![987, 789, 456]);
+
+        // using exclusive in descending
+        let include = AGES
+            .prefix_range_de(
                 &store,
                 Some(PrefixBound::exclusive(2)),
                 Some(PrefixBound::exclusive(5)),
