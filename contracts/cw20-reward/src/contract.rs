@@ -13,6 +13,7 @@ use cosmwasm_std::{
 
 use basset::reward::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse};
 use terra_cosmwasm::TerraMsgWrapper;
+use crate::msg::ExecuteMsg;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(

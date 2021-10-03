@@ -1,10 +1,10 @@
 pub mod contract;
 pub mod state;
 
-mod global;
-mod math;
-mod querier;
-mod user;
+pub mod global;
+pub mod math;
+pub mod msg;
+pub mod user;
 
 #[cfg(test)]
 mod testing;
