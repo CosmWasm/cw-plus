@@ -20,6 +20,7 @@ impl KeyDeserialize for () {
         Ok(())
     }
 
+    #[inline(always)]
     fn from_vec(_value: Vec<u8>) -> StdResult<Self::Output> {
         Ok(())
     }
@@ -33,6 +34,7 @@ impl KeyDeserialize for Vec<u8> {
         Ok(value.to_vec())
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         Ok(value)
     }
@@ -46,6 +48,7 @@ impl KeyDeserialize for &Vec<u8> {
         <Vec<u8>>::from_slice(value)
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         Ok(value)
     }
@@ -59,6 +62,7 @@ impl KeyDeserialize for &[u8] {
         <Vec<u8>>::from_slice(value)
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         Ok(value)
     }
@@ -74,6 +78,7 @@ impl KeyDeserialize for String {
             .map_err(|err| StdError::generic_err(err.to_string()))
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         String::from_slice(value.as_slice())
     }
@@ -87,6 +92,7 @@ impl KeyDeserialize for &String {
         String::from_slice(value)
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         String::from_slice(value.as_slice())
     }
@@ -100,6 +106,7 @@ impl KeyDeserialize for &str {
         String::from_slice(value)
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         String::from_slice(value.as_slice())
     }
@@ -113,6 +120,7 @@ impl KeyDeserialize for Addr {
         Ok(Addr::unchecked(String::from_slice(value)?))
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         Addr::from_slice(value.as_slice())
     }
@@ -126,6 +134,7 @@ impl KeyDeserialize for &Addr {
         Addr::from_slice(value)
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         Addr::from_slice(value.as_slice())
     }
@@ -143,6 +152,7 @@ macro_rules! integer_de {
                     .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
 
+            #[inline(always)]
             fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
                 <IntKey<$t>>::from_slice(value.as_slice())
             }
@@ -160,6 +170,7 @@ impl KeyDeserialize for TimestampKey {
         <IntKey<u64>>::from_slice(value)
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         <IntKey<u64>>::from_slice(value.as_slice())
     }
@@ -181,6 +192,7 @@ impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
         Ok((T::from_slice(t)?, U::from_slice(u)?))
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         <(T, U)>::from_slice(value.as_slice())
     }
@@ -210,6 +222,7 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
         Ok((T::from_slice(t)?, U::from_slice(u)?, V::from_slice(v)?))
     }
 
+    #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         <(T, U, V)>::from_slice(value.as_slice())
     }
