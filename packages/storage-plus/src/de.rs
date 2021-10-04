@@ -153,3 +153,143 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
         Ok((T::from_slice(t)?, U::from_slice(u)?, V::from_slice(v)?))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{PrimaryKey, U32Key};
+
+    const BYTES: &[u8] = b"Hello";
+    const STRING: &str = "Hello";
+
+    #[test]
+    #[allow(clippy::unit_cmp)]
+    fn deserialize_empty_works() {
+        assert_eq!(<()>::from_slice(BYTES).unwrap(), ());
+    }
+
+    #[test]
+    fn deserialize_bytes_works() {
+        assert_eq!(<Vec<u8>>::from_slice(BYTES).unwrap(), BYTES);
+        assert_eq!(<&Vec<u8>>::from_slice(BYTES).unwrap(), BYTES);
+        assert_eq!(<&[u8]>::from_slice(BYTES).unwrap(), BYTES);
+    }
+
+    #[test]
+    fn deserialize_string_works() {
+        assert_eq!(<String>::from_slice(BYTES).unwrap(), STRING);
+        assert_eq!(<&String>::from_slice(BYTES).unwrap(), STRING);
+        assert_eq!(<&str>::from_slice(BYTES).unwrap(), STRING);
+    }
+
+    #[test]
+    fn deserialize_broken_string_errs() {
+        assert!(matches!(
+            <String>::from_slice(b"\xc3").err(),
+            Some(StdError::GenericErr { .. })
+        ));
+    }
+
+    #[test]
+    fn deserialize_addr_works() {
+        assert_eq!(<Addr>::from_slice(BYTES).unwrap(), Addr::unchecked(STRING));
+        assert_eq!(<&Addr>::from_slice(BYTES).unwrap(), Addr::unchecked(STRING));
+    }
+
+    #[test]
+    fn deserialize_broken_addr_errs() {
+        assert!(matches!(
+            <Addr>::from_slice(b"\xc3").err(),
+            Some(StdError::GenericErr { .. })
+        ));
+    }
+
+    #[test]
+    fn deserialize_integer_works() {
+        assert_eq!(<IntKey<u8>>::from_slice(&[1]).unwrap(), 1u8);
+        assert_eq!(<IntKey<i8>>::from_slice(&[128]).unwrap(), -1i8 << 7);
+        assert_eq!(<IntKey<u16>>::from_slice(&[1, 0]).unwrap(), 1u16 << 8);
+        assert_eq!(
+            <IntKey<i16>>::from_slice(&[128, 0]).unwrap(),
+            -1i16 << (8 + 7)
+        );
+        assert_eq!(
+            <IntKey<u32>>::from_slice(&[1, 0, 0, 0]).unwrap(),
+            1u32 << (3 * 8)
+        );
+        assert_eq!(
+            <IntKey<i32>>::from_slice(&[128, 0, 0, 0]).unwrap(),
+            -1i32 << (3 * 8 + 7)
+        );
+        assert_eq!(
+            <IntKey<u64>>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            1u64 << (7 * 8)
+        );
+        assert_eq!(
+            <IntKey<i64>>::from_slice(&[128, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            -1i64 << (7 * 8 + 7)
+        );
+        assert_eq!(
+            <IntKey<u128>>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            1u128 << (15 * 8)
+        );
+        assert_eq!(
+            <IntKey<i128>>::from_slice(&[
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+            ])
+            .unwrap(),
+            -1i128
+        );
+    }
+
+    #[test]
+    fn deserialize_broken_integer_errs() {
+        // One byte less fails
+        assert!(matches!(
+            <IntKey<u16>>::from_slice(&[1]).err(),
+            Some(StdError::GenericErr { .. })
+        ));
+
+        // More bytes fails too
+        assert!(matches!(
+            <IntKey<u8>>::from_slice(&[1, 2]).err(),
+            Some(StdError::GenericErr { .. })
+        ));
+    }
+
+    #[test]
+    fn deserialize_timestamp_works() {
+        assert_eq!(
+            <TimestampKey>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            1u64 << (7 * 8)
+        );
+    }
+
+    #[test]
+    fn deserialize_broken_timestamp_errs() {
+        // More bytes fails
+        assert!(matches!(
+            <TimestampKey>::from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9]).err(),
+            Some(StdError::GenericErr { .. })
+        ));
+    }
+
+    #[test]
+    fn deserialize_tuple_works() {
+        assert_eq!(
+            <(&[u8], &str)>::from_slice((BYTES, STRING).joined_key().as_slice()).unwrap(),
+            (BYTES.to_vec(), STRING.to_string())
+        );
+    }
+
+    #[test]
+    fn deserialize_triple_works() {
+        assert_eq!(
+            <(&[u8], U32Key, &str)>::from_slice(
+                (BYTES, U32Key::new(1234), STRING).joined_key().as_slice()
+            )
+            .unwrap(),
+            (BYTES.to_vec(), 1234, STRING.to_string())
+        );
+    }
+}
