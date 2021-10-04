@@ -67,7 +67,7 @@ impl KeyDeserialize for &String {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        String::from_vec(value)
+        Self::Output::from_vec(value)
     }
 }
 
@@ -76,7 +76,7 @@ impl KeyDeserialize for &str {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        String::from_vec(value)
+        Self::Output::from_vec(value)
     }
 }
 
@@ -94,7 +94,7 @@ impl KeyDeserialize for &Addr {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        Addr::from_vec(value)
+        Self::Output::from_vec(value)
     }
 }
 
@@ -120,7 +120,7 @@ impl KeyDeserialize for TimestampKey {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        <IntKey<u64>>::from_vec(value)
+        <IntKey<Self::Output>>::from_vec(value)
     }
 }
 
