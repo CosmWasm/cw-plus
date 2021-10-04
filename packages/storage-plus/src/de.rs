@@ -128,16 +128,18 @@ impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
     type Output = (T::Output, U::Output);
 
     #[inline(always)]
-    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        let (len, data) = value.split_at(2);
+    fn from_vec(mut value: Vec<u8>) -> StdResult<Self::Output> {
+        let mut tu = value.split_off(2);
         let t_len = u16::from_be_bytes(
-            len.try_into()
+            value
+                .as_slice()
+                .try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let (t, u) = data.split_at(t_len);
+        let u = tu.split_off(t_len);
 
-        Ok((T::from_slice(t)?, U::from_slice(u)?))
+        Ok((T::from_vec(tu)?, U::from_vec(u)?))
     }
 }
 
@@ -145,24 +147,28 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
     type Output = (T::Output, U::Output, V::Output);
 
     #[inline(always)]
-    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        let (len, data) = value.split_at(2);
+    fn from_vec(mut value: Vec<u8>) -> StdResult<Self::Output> {
+        let mut tuv = value.split_off(2);
         let t_len = u16::from_be_bytes(
-            len.try_into()
+            value
+                .as_slice()
+                .try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let (t, data) = data.split_at(t_len);
+        let mut len_uv = tuv.split_off(t_len);
 
-        let (len, data) = data.split_at(2);
+        let mut uv = len_uv.split_off(2);
         let u_len = u16::from_be_bytes(
-            len.try_into()
+            len_uv
+                .as_slice()
+                .try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let (u, v) = data.split_at(u_len);
+        let v = uv.split_off(u_len);
 
-        Ok((T::from_slice(t)?, U::from_slice(u)?, V::from_slice(v)?))
+        Ok((T::from_vec(tuv)?, U::from_vec(uv)?, V::from_vec(v)?))
     }
 }
 
