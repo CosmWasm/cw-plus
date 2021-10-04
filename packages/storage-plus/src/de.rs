@@ -56,9 +56,7 @@ impl KeyDeserialize for String {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        String::from_utf8(value)
-            // FIXME: Add and use StdError utf-8 error From helper
-            .map_err(|err| StdError::generic_err(err.to_string()))
+        String::from_utf8(value).map_err(StdError::invalid_utf8)
     }
 }
 
@@ -106,7 +104,6 @@ macro_rules! integer_de {
             #[inline(always)]
             fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
                 Ok(<$t>::from_be_bytes(value.as_slice().try_into()
-                    // FIXME: Add and use StdError try-from error From helper
                     .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
         })*
@@ -134,7 +131,6 @@ impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
             value
                 .as_slice()
                 .try_into()
-                // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
         let u = tu.split_off(t_len);
@@ -153,7 +149,6 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
             value
                 .as_slice()
                 .try_into()
-                // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
         let mut len_uv = tuv.split_off(t_len);
@@ -163,7 +158,6 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
             len_uv
                 .as_slice()
                 .try_into()
-                // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
         let v = uv.split_off(u_len);
@@ -204,7 +198,7 @@ mod test {
     fn deserialize_broken_string_errs() {
         assert!(matches!(
             <String>::from_slice(b"\xc3").err(),
-            Some(StdError::GenericErr { .. })
+            Some(StdError::InvalidUtf8 { .. })
         ));
     }
 
@@ -218,7 +212,7 @@ mod test {
     fn deserialize_broken_addr_errs() {
         assert!(matches!(
             <Addr>::from_slice(b"\xc3").err(),
-            Some(StdError::GenericErr { .. })
+            Some(StdError::InvalidUtf8 { .. })
         ));
     }
 
