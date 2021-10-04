@@ -14,7 +14,7 @@ pub trait KeyDeserialize {
 impl KeyDeserialize for () {
     type Output = ();
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(_value: &[u8]) -> StdResult<Self::Output> {
         Ok(())
     }
@@ -23,7 +23,7 @@ impl KeyDeserialize for () {
 impl KeyDeserialize for Vec<u8> {
     type Output = Vec<u8>;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         Ok(value.to_vec())
     }
@@ -32,7 +32,7 @@ impl KeyDeserialize for Vec<u8> {
 impl KeyDeserialize for &Vec<u8> {
     type Output = Vec<u8>;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         <Vec<u8>>::from_slice(value)
     }
@@ -41,7 +41,7 @@ impl KeyDeserialize for &Vec<u8> {
 impl KeyDeserialize for &[u8] {
     type Output = Vec<u8>;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         <Vec<u8>>::from_slice(value)
     }
@@ -50,7 +50,7 @@ impl KeyDeserialize for &[u8] {
 impl KeyDeserialize for String {
     type Output = String;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         String::from_utf8(value.to_vec())
             // FIXME: Add and use StdError utf-8 error From helper
@@ -61,7 +61,7 @@ impl KeyDeserialize for String {
 impl KeyDeserialize for &String {
     type Output = String;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         String::from_slice(value)
     }
@@ -70,7 +70,7 @@ impl KeyDeserialize for &String {
 impl KeyDeserialize for &str {
     type Output = String;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         String::from_slice(value)
     }
@@ -79,7 +79,7 @@ impl KeyDeserialize for &str {
 impl KeyDeserialize for Addr {
     type Output = Addr;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         Ok(Addr::unchecked(String::from_slice(value)?))
     }
@@ -88,7 +88,7 @@ impl KeyDeserialize for Addr {
 impl KeyDeserialize for &Addr {
     type Output = Addr;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         Addr::from_slice(value)
     }
@@ -99,7 +99,7 @@ macro_rules! integer_de {
         $(impl KeyDeserialize for IntKey<$t> {
             type Output = $t;
 
-            #[inline]
+            #[inline(always)]
             fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
                 Ok(<$t>::from_be_bytes(value.try_into()
                     // FIXME: Add and use StdError try-from error From helper
@@ -114,7 +114,7 @@ integer_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
 impl KeyDeserialize for TimestampKey {
     type Output = u64;
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         Ok(<u64>::from_be_bytes(
             value
@@ -128,7 +128,7 @@ impl KeyDeserialize for TimestampKey {
 impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
     type Output = (T::Output, U::Output);
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         let (len, data) = value.split_at(2);
         let t_len = u16::from_be_bytes(
@@ -145,7 +145,7 @@ impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
 impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for (T, U, V) {
     type Output = (T::Output, U::Output, V::Output);
 
-    #[inline]
+    #[inline(always)]
     fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
         let (len, data) = value.split_at(2);
         let t_len = u16::from_be_bytes(
