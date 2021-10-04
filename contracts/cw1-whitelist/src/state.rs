@@ -12,7 +12,8 @@ pub struct AdminList {
 
 impl AdminList {
     /// returns true if the address is a registered admin
-    pub fn is_admin(&self, addr: &str) -> bool {
+    pub fn is_admin(&self, addr: impl AsRef<str>) -> bool {
+        let addr = addr.as_ref();
         self.admins.iter().any(|a| a.as_ref() == addr)
     }
 
