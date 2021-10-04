@@ -5,6 +5,7 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::de::KeyDeserialize;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::prefix::{Bound, Prefix};
 use crate::snapshot::SnapshotMap;
@@ -59,7 +60,7 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
     I: IndexList<T>,
 {
     pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
@@ -90,7 +91,7 @@ where
 
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
 where
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
 {
@@ -173,17 +174,17 @@ where
     }
 
     // use prefix to scan -> range
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // use sub_prefix to scan -> range
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // use no_prefix to scan -> range
-    pub fn no_prefix(&self) -> Prefix<T> {
+    pub fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &[])
     }
 }
@@ -191,7 +192,7 @@ where
 // short-cut for simple keys, rather than .prefix(()).range(...)
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
 where
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
     I: IndexList<T>,
 {

@@ -5,12 +5,23 @@ use serde::de::DeserializeOwned;
 use cosmwasm_std::Pair;
 use cosmwasm_std::{from_slice, StdResult};
 
+use crate::de::KeyDeserialize;
 use crate::helpers::encode_length;
 
-pub(crate) fn deserialize_kv<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
+#[allow(dead_code)]
+pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
     let (k, v) = kv;
     let t = from_slice::<T>(&v)?;
     Ok((k, t))
+}
+
+pub(crate) fn deserialize_kv<K: KeyDeserialize, T: DeserializeOwned>(
+    kv: Pair,
+) -> StdResult<(K::Output, T)> {
+    let (k, v) = kv;
+    let kt = K::from_slice(&k)?;
+    let vt = from_slice::<T>(&v)?;
+    Ok((kt, vt))
 }
 
 /// Calculates the raw key prefix for a given namespace as documented
