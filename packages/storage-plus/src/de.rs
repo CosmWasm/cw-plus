@@ -8,13 +8,18 @@ use crate::keys::{IntKey, TimestampKey};
 pub trait KeyDeserialize {
     type Output: Sized;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output>;
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output>;
+
+    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
+        Self::from_vec(value.to_vec())
+    }
 }
 
 impl KeyDeserialize for () {
     type Output = ();
 
-    fn from_slice(_value: &[u8]) -> StdResult<Self::Output> {
+    #[inline(always)]
+    fn from_vec(_value: Vec<u8>) -> StdResult<Self::Output> {
         Ok(())
     }
 }
@@ -22,32 +27,36 @@ impl KeyDeserialize for () {
 impl KeyDeserialize for Vec<u8> {
     type Output = Vec<u8>;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        Ok(value.to_vec())
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Ok(value)
     }
 }
 
 impl KeyDeserialize for &Vec<u8> {
     type Output = Vec<u8>;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        <Vec<u8>>::from_slice(value)
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Ok(value)
     }
 }
 
 impl KeyDeserialize for &[u8] {
     type Output = Vec<u8>;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        <Vec<u8>>::from_slice(value)
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Ok(value)
     }
 }
 
 impl KeyDeserialize for String {
     type Output = String;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        String::from_utf8(value.to_vec())
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        String::from_utf8(value)
             // FIXME: Add and use StdError utf-8 error From helper
             .map_err(|err| StdError::generic_err(err.to_string()))
     }
@@ -56,32 +65,36 @@ impl KeyDeserialize for String {
 impl KeyDeserialize for &String {
     type Output = String;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        String::from_slice(value)
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Self::Output::from_vec(value)
     }
 }
 
 impl KeyDeserialize for &str {
     type Output = String;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        String::from_slice(value)
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Self::Output::from_vec(value)
     }
 }
 
 impl KeyDeserialize for Addr {
     type Output = Addr;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        Ok(Addr::unchecked(String::from_slice(value)?))
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Ok(Addr::unchecked(String::from_vec(value)?))
     }
 }
 
 impl KeyDeserialize for &Addr {
     type Output = Addr;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        Addr::from_slice(value)
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        Self::Output::from_vec(value)
     }
 }
 
@@ -90,8 +103,9 @@ macro_rules! integer_de {
         $(impl KeyDeserialize for IntKey<$t> {
             type Output = $t;
 
-            fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-                Ok(<$t>::from_be_bytes(value.try_into()
+            #[inline(always)]
+            fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+                Ok(<$t>::from_be_bytes(value.as_slice().try_into()
                     // FIXME: Add and use StdError try-from error From helper
                     .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
@@ -104,53 +118,57 @@ integer_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
 impl KeyDeserialize for TimestampKey {
     type Output = u64;
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        Ok(<u64>::from_be_bytes(
-            value
-                .try_into()
-                // FIXME: Add and use StdError try-from error From helper
-                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
-        ))
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        <IntKey<Self::Output>>::from_vec(value)
     }
 }
 
 impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
     type Output = (T::Output, U::Output);
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        let (len, data) = value.split_at(2);
+    #[inline(always)]
+    fn from_vec(mut value: Vec<u8>) -> StdResult<Self::Output> {
+        let mut tu = value.split_off(2);
         let t_len = u16::from_be_bytes(
-            len.try_into()
+            value
+                .as_slice()
+                .try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let (t, u) = data.split_at(t_len);
+        let u = tu.split_off(t_len);
 
-        Ok((T::from_slice(t)?, U::from_slice(u)?))
+        Ok((T::from_vec(tu)?, U::from_vec(u)?))
     }
 }
 
 impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for (T, U, V) {
     type Output = (T::Output, U::Output, V::Output);
 
-    fn from_slice(value: &[u8]) -> StdResult<Self::Output> {
-        let (len, data) = value.split_at(2);
+    #[inline(always)]
+    fn from_vec(mut value: Vec<u8>) -> StdResult<Self::Output> {
+        let mut tuv = value.split_off(2);
         let t_len = u16::from_be_bytes(
-            len.try_into()
+            value
+                .as_slice()
+                .try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let (t, data) = data.split_at(t_len);
+        let mut len_uv = tuv.split_off(t_len);
 
-        let (len, data) = data.split_at(2);
+        let mut uv = len_uv.split_off(2);
         let u_len = u16::from_be_bytes(
-            len.try_into()
+            len_uv
+                .as_slice()
+                .try_into()
                 // FIXME: Add and use StdError try-from error From helper
                 .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
         ) as usize;
-        let (u, v) = data.split_at(u_len);
+        let v = uv.split_off(u_len);
 
-        Ok((T::from_slice(t)?, U::from_slice(u)?, V::from_slice(v)?))
+        Ok((T::from_vec(tuv)?, U::from_vec(uv)?, V::from_vec(v)?))
     }
 }
 

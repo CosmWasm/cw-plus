@@ -19,7 +19,7 @@ pub(crate) fn deserialize_kv<K: KeyDeserialize, T: DeserializeOwned>(
     kv: Pair,
 ) -> StdResult<(K::Output, T)> {
     let (k, v) = kv;
-    let kt = K::from_slice(&k)?;
+    let kt = K::from_vec(k)?;
     let vt = from_slice::<T>(&v)?;
     Ok((kt, vt))
 }
