@@ -56,9 +56,7 @@ impl KeyDeserialize for String {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        String::from_utf8(value)
-            // FIXME: Add and use StdError utf-8 error From helper
-            .map_err(|err| StdError::generic_err(err.to_string()))
+        String::from_utf8(value).map_err(StdError::invalid_utf8)
     }
 }
 
@@ -106,7 +104,6 @@ macro_rules! integer_de {
             #[inline(always)]
             fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
                 Ok(<$t>::from_be_bytes(value.as_slice().try_into()
-                    // FIXME: Add and use StdError try-from error From helper
                     .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
         })*
@@ -124,19 +121,22 @@ impl KeyDeserialize for TimestampKey {
     }
 }
 
+fn parse_length(value: &[u8]) -> StdResult<usize> {
+    Ok(u16::from_be_bytes(
+        value
+            .try_into()
+            .map_err(|_| StdError::generic_err("Could not read 2 byte length"))?,
+    )
+    .into())
+}
+
 impl<T: KeyDeserialize, U: KeyDeserialize> KeyDeserialize for (T, U) {
     type Output = (T::Output, U::Output);
 
     #[inline(always)]
     fn from_vec(mut value: Vec<u8>) -> StdResult<Self::Output> {
         let mut tu = value.split_off(2);
-        let t_len = u16::from_be_bytes(
-            value
-                .as_slice()
-                .try_into()
-                // FIXME: Add and use StdError try-from error From helper
-                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
-        ) as usize;
+        let t_len = parse_length(&value)?;
         let u = tu.split_off(t_len);
 
         Ok((T::from_vec(tu)?, U::from_vec(u)?))
@@ -149,23 +149,11 @@ impl<T: KeyDeserialize, U: KeyDeserialize, V: KeyDeserialize> KeyDeserialize for
     #[inline(always)]
     fn from_vec(mut value: Vec<u8>) -> StdResult<Self::Output> {
         let mut tuv = value.split_off(2);
-        let t_len = u16::from_be_bytes(
-            value
-                .as_slice()
-                .try_into()
-                // FIXME: Add and use StdError try-from error From helper
-                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
-        ) as usize;
+        let t_len = parse_length(&value)?;
         let mut len_uv = tuv.split_off(t_len);
 
         let mut uv = len_uv.split_off(2);
-        let u_len = u16::from_be_bytes(
-            len_uv
-                .as_slice()
-                .try_into()
-                // FIXME: Add and use StdError try-from error From helper
-                .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?,
-        ) as usize;
+        let u_len = parse_length(&len_uv)?;
         let v = uv.split_off(u_len);
 
         Ok((T::from_vec(tuv)?, U::from_vec(uv)?, V::from_vec(v)?))
@@ -204,7 +192,7 @@ mod test {
     fn deserialize_broken_string_errs() {
         assert!(matches!(
             <String>::from_slice(b"\xc3").err(),
-            Some(StdError::GenericErr { .. })
+            Some(StdError::InvalidUtf8 { .. })
         ));
     }
 
@@ -218,7 +206,7 @@ mod test {
     fn deserialize_broken_addr_errs() {
         assert!(matches!(
             <Addr>::from_slice(b"\xc3").err(),
-            Some(StdError::GenericErr { .. })
+            Some(StdError::InvalidUtf8 { .. })
         ));
     }
 
