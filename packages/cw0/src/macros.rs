@@ -43,9 +43,7 @@ macro_rules! fail_if {
 #[macro_export]
 macro_rules! ensure_eq {
     ($a:expr, $b:expr, $e:expr) => {
-        if $a != $b {
-            return Err($e);
-        }
+        ensure!($a == $b, $e);
     };
 }
 
