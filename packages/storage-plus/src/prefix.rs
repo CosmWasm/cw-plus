@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Order, Pair, StdResult, Storage};
+use cosmwasm_std::{Order, Record, StdResult, Storage};
 use std::ops::Deref;
 
 use crate::de::KeyDeserialize;
@@ -67,21 +67,21 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
 }
 
 type DeserializeKvFn<K, T> =
-    fn(&dyn Storage, &[u8], Pair) -> StdResult<(<K as KeyDeserialize>::Output, T)>;
+    fn(&dyn Storage, &[u8], Record) -> StdResult<(<K as KeyDeserialize>::Output, T)>;
 
 #[allow(dead_code)]
 pub fn default_deserializer_v<T: DeserializeOwned>(
     _: &dyn Storage,
     _: &[u8],
-    raw: Pair,
-) -> StdResult<Pair<T>> {
+    raw: Record,
+) -> StdResult<Record<T>> {
     deserialize_v(raw)
 }
 
 pub fn default_deserializer_kv<K: KeyDeserialize, T: DeserializeOwned>(
     _: &dyn Storage,
     _: &[u8],
-    raw: Pair,
+    raw: Record,
 ) -> StdResult<(K::Output, T)> {
     deserialize_kv::<K, T>(raw)
 }
@@ -215,7 +215,7 @@ pub fn range_with_prefix<'a>(
     start: Option<Bound>,
     end: Option<Bound>,
     order: Order,
-) -> Box<dyn Iterator<Item = Pair> + 'a> {
+) -> Box<dyn Iterator<Item = Record> + 'a> {
     let start = calc_start_bound(namespace, start);
     let end = calc_end_bound(namespace, end);
 
@@ -252,7 +252,7 @@ pub fn namespaced_prefix_range<'a, 'c, K: Prefixer<'a>>(
     start: Option<PrefixBound<'a, K>>,
     end: Option<PrefixBound<'a, K>>,
     order: Order,
-) -> Box<dyn Iterator<Item = Pair> + 'c> {
+) -> Box<dyn Iterator<Item = Record> + 'c> {
     let prefix = namespaces_with_key(&[namespace], &[]);
     let start = calc_prefix_start_bound(&prefix, start);
     let end = calc_prefix_end_bound(&prefix, end);
