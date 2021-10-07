@@ -5,6 +5,7 @@ mod map;
 pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
+use crate::de::KeyDeserialize;
 use crate::{Bound, Map, Prefixer, PrimaryKey, U64Key};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
@@ -64,7 +65,7 @@ impl<'a, K, T> Snapshot<'a, K, T> {
 impl<'a, K, T> Snapshot<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
     /// should_checkpoint looks at the strategy and determines if we want to checkpoint
     pub fn should_checkpoint(&self, store: &dyn Storage, k: &K) -> StdResult<bool> {

@@ -1,10 +1,9 @@
-#![cfg(feature = "iterator")]
-
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+use crate::de::KeyDeserialize;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
@@ -63,21 +62,21 @@ where
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
     pub fn key(&self, k: K) -> Path<T> {
         self.primary.key(k)
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         self.primary.prefix(p)
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         self.primary.sub_prefix(p)
     }
 
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         self.primary.no_prefix()
     }
 
@@ -165,11 +164,10 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-#[cfg(feature = "iterator")]
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + Prefixer<'a>,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -179,7 +177,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
         T: 'c,
     {

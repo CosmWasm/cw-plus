@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, Env, Order, Pair, StdError, StdResult};
+use cosmwasm_std::{to_binary, Binary, BlockInfo, Deps, Env, Order, Record, StdError, StdResult};
 
 use cw0::maybe_addr;
 use cw721::{
@@ -206,7 +206,7 @@ where
     }
 }
 
-fn parse_approval(item: StdResult<Pair<Expiration>>) -> StdResult<cw721::Approval> {
+fn parse_approval(item: StdResult<Record<Expiration>>) -> StdResult<cw721::Approval> {
     item.and_then(|(k, expires)| {
         let spender = String::from_utf8(k)?;
         Ok(cw721::Approval { spender, expires })

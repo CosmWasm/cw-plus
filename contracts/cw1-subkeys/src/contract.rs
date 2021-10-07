@@ -8,7 +8,7 @@ use cosmwasm_std::{
     to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
     MessageInfo, Order, Response, StakingMsg, StdResult,
 };
-use cw0::Expiration;
+use cw0::{ensure, Expiration};
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{
@@ -105,9 +105,10 @@ where
                 }) => {
                     ALLOWANCES.update::<_, ContractError>(deps.storage, &info.sender, |allow| {
                         let mut allowance = allow.ok_or(ContractError::NoAllowance {})?;
-                        if allowance.expires.is_expired(&env.block) {
-                            return Err(ContractError::NoAllowance {});
-                        }
+                        ensure!(
+                            !allowance.expires.is_expired(&env.block),
+                            ContractError::NoAllowance {}
+                        );
 
                         // Decrease allowance
                         allowance.balance = allowance.balance.sub(amount.clone())?;
@@ -134,19 +135,13 @@ pub fn check_staking_permissions(
 ) -> Result<(), ContractError> {
     match staking_msg {
         StakingMsg::Delegate { .. } => {
-            if !permissions.delegate {
-                return Err(ContractError::DelegatePerm {});
-            }
+            ensure!(permissions.delegate, ContractError::DelegatePerm {});
         }
         StakingMsg::Undelegate { .. } => {
-            if !permissions.undelegate {
-                return Err(ContractError::UnDelegatePerm {});
-            }
+            ensure!(permissions.undelegate, ContractError::UnDelegatePerm {});
         }
         StakingMsg::Redelegate { .. } => {
-            if !permissions.redelegate {
-                return Err(ContractError::ReDelegatePerm {});
-            }
+            ensure!(permissions.redelegate, ContractError::ReDelegatePerm {});
         }
         _ => return Err(ContractError::UnsupportedMessage {}),
     }
@@ -159,14 +154,10 @@ pub fn check_distribution_permissions(
 ) -> Result<(), ContractError> {
     match distribution_msg {
         DistributionMsg::SetWithdrawAddress { .. } => {
-            if !permissions.withdraw {
-                return Err(ContractError::WithdrawAddrPerm {});
-            }
+            ensure!(permissions.withdraw, ContractError::WithdrawAddrPerm {});
         }
         DistributionMsg::WithdrawDelegatorReward { .. } => {
-            if !permissions.withdraw {
-                return Err(ContractError::WithdrawPerm {});
-            }
+            ensure!(permissions.withdraw, ContractError::WithdrawPerm {});
         }
         _ => return Err(ContractError::UnsupportedMessage {}),
     }
@@ -185,14 +176,13 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    if !cfg.is_admin(info.sender.as_ref()) {
-        return Err(ContractError::Unauthorized {});
-    }
+    ensure!(cfg.is_admin(&info.sender), ContractError::Unauthorized {});
 
     let spender_addr = deps.api.addr_validate(&spender)?;
-    if info.sender == spender_addr {
-        return Err(ContractError::CannotSetOwnAccount {});
-    }
+    ensure!(
+        info.sender != spender_addr,
+        ContractError::CannotSetOwnAccount {}
+    );
 
     ALLOWANCES.update::<_, ContractError>(deps.storage, &spender_addr, |allow| {
         let prev_expires = allow
@@ -239,14 +229,13 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    if !cfg.is_admin(info.sender.as_ref()) {
-        return Err(ContractError::Unauthorized {});
-    }
+    ensure!(cfg.is_admin(&info.sender), ContractError::Unauthorized {});
 
     let spender_addr = deps.api.addr_validate(&spender)?;
-    if info.sender == spender_addr {
-        return Err(ContractError::CannotSetOwnAccount {});
-    }
+    ensure!(
+        info.sender != spender_addr,
+        ContractError::CannotSetOwnAccount {}
+    );
 
     let allowance =
         ALLOWANCES.update::<_, ContractError>(deps.storage, &spender_addr, |allow| {
@@ -291,14 +280,13 @@ where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    if !cfg.is_admin(info.sender.as_ref()) {
-        return Err(ContractError::Unauthorized {});
-    }
+    ensure!(cfg.is_admin(&info.sender), ContractError::Unauthorized {});
 
     let spender_addr = deps.api.addr_validate(&spender)?;
-    if info.sender == spender_addr {
-        return Err(ContractError::CannotSetOwnAccount {});
-    }
+    ensure!(
+        info.sender != spender_addr,
+        ContractError::CannotSetOwnAccount {}
+    );
     PERMISSIONS.save(deps.storage, &spender_addr, &perm)?;
 
     let res = Response::new()

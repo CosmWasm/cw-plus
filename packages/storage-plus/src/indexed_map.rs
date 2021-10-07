@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::indexes::Index;
-use crate::iter_helpers::deserialize_kv;
+use crate::iter_helpers::deserialize_v;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
@@ -129,17 +129,17 @@ where
     }
 
     // use prefix to scan -> range
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // use sub_prefix to scan -> range
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
     // use no_prefix to scan -> range
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.pk_namespace, &[])
     }
 }
@@ -159,7 +159,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
         T: 'c,
     {
@@ -184,13 +184,13 @@ where
         min: Option<PrefixBound<'a, K::Prefix>>,
         max: Option<PrefixBound<'a, K::Prefix>>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
         T: 'c,
         'a: 'c,
     {
         let mapped =
-            namespaced_prefix_range(store, self.pk_namespace, min, max, order).map(deserialize_kv);
+            namespaced_prefix_range(store, self.pk_namespace, min, max, order).map(deserialize_v);
         Box::new(mapped)
     }
 }
