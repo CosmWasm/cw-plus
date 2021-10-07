@@ -10,7 +10,7 @@
 macro_rules! ensure {
     ($cond:expr, $e:expr) => {
         if !($cond) {
-            return Err($e);
+            return Err(std::convert::From::from($e));
         }
     };
 }
@@ -43,9 +43,7 @@ macro_rules! fail_if {
 #[macro_export]
 macro_rules! ensure_eq {
     ($a:expr, $b:expr, $e:expr) => {
-        if $a != $b {
-            return Err($e);
-        }
+        ensure!($a == $b, $e);
     };
 }
 
@@ -55,6 +53,19 @@ mod test {
 
     #[test]
     fn ensure_works() {
+        fn check(a: usize, b: usize) -> Result<(), StdError> {
+            ensure!(a == b, StdError::generic_err("foobar"));
+            Ok(())
+        }
+
+        let err = check(5, 6).unwrap_err();
+        assert!(matches!(err, StdError::GenericErr { .. }));
+
+        check(5, 5).unwrap();
+    }
+
+    #[test]
+    fn ensure_can_infer_error_type() {
         let check = |a, b| {
             ensure!(a == b, StdError::generic_err("foobar"));
             Ok(())
@@ -62,6 +73,28 @@ mod test {
 
         let err = check(5, 6).unwrap_err();
         assert!(matches!(err, StdError::GenericErr { .. }));
+
+        check(5, 5).unwrap();
+    }
+
+    #[test]
+    fn ensure_can_convert_into() {
+        #[derive(Debug)]
+        struct ContractError;
+
+        impl From<StdError> for ContractError {
+            fn from(_original: StdError) -> Self {
+                ContractError
+            }
+        }
+
+        fn check(a: usize, b: usize) -> Result<(), ContractError> {
+            ensure!(a == b, StdError::generic_err("foobar"));
+            Ok(())
+        }
+
+        let err = check(5, 6).unwrap_err();
+        assert!(matches!(err, ContractError));
 
         check(5, 5).unwrap();
     }
