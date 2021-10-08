@@ -111,7 +111,7 @@ pub fn execute_update_admins(
 
 fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
     let cfg = ADMIN_LIST.load(deps.storage)?;
-    let can = cfg.is_admin(sender.as_ref());
+    let can = cfg.is_admin(&sender);
     Ok(can)
 }
 

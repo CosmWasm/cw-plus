@@ -2,15 +2,26 @@
 
 use serde::de::DeserializeOwned;
 
-use cosmwasm_std::Pair;
+use cosmwasm_std::Record;
 use cosmwasm_std::{from_slice, StdResult};
 
+use crate::de::KeyDeserialize;
 use crate::helpers::encode_length;
 
-pub(crate) fn deserialize_kv<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
+#[allow(dead_code)]
+pub(crate) fn deserialize_v<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
     let (k, v) = kv;
     let t = from_slice::<T>(&v)?;
     Ok((k, t))
+}
+
+pub(crate) fn deserialize_kv<K: KeyDeserialize, T: DeserializeOwned>(
+    kv: Record,
+) -> StdResult<(K::Output, T)> {
+    let (k, v) = kv;
+    let kt = K::from_vec(k)?;
+    let vt = from_slice::<T>(&v)?;
+    Ok((kt, vt))
 }
 
 /// Calculates the raw key prefix for a given namespace as documented
@@ -146,7 +157,7 @@ mod namespace_test {
 
         // ensure we get proper result from prefixed_range iterator
         let iter = range_with_prefix(&storage, &prefix, None, None, Order::Descending);
-        let elements: Vec<Pair> = iter.collect();
+        let elements: Vec<Record> = iter.collect();
         assert_eq!(
             elements,
             vec![
@@ -171,14 +182,14 @@ mod namespace_test {
         set_with_prefix(&mut storage, &other_prefix, b"moon", b"buggy");
 
         // make sure start and end are applied properly
-        let res: Vec<Pair> =
+        let res: Vec<Record> =
             range_with_prefix(&storage, &prefix, Some(b"b"), Some(b"c"), Order::Ascending)
                 .collect();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0], (b"bar".to_vec(), b"none".to_vec()));
 
         // make sure start and end are applied properly
-        let res: Vec<Pair> = range_with_prefix(
+        let res: Vec<Record> = range_with_prefix(
             &storage,
             &prefix,
             Some(b"bas"),
@@ -188,7 +199,7 @@ mod namespace_test {
         .collect();
         assert_eq!(res.len(), 0);
 
-        let res: Vec<Pair> =
+        let res: Vec<Record> =
             range_with_prefix(&storage, &prefix, Some(b"ant"), None, Order::Ascending).collect();
         assert_eq!(res.len(), 2);
         assert_eq!(res[0], (b"bar".to_vec(), b"none".to_vec()));

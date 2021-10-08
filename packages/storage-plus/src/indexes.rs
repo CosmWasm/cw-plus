@@ -4,7 +4,7 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{from_slice, Binary, Order, Pair, StdError, StdResult, Storage};
+use cosmwasm_std::{from_slice, Binary, Order, Record, StdError, StdResult, Storage};
 
 use crate::helpers::namespaces_with_key;
 use crate::map::Map;
@@ -101,8 +101,8 @@ where
 fn deserialize_multi_kv<T: DeserializeOwned>(
     store: &dyn Storage,
     pk_namespace: &[u8],
-    kv: Pair,
-) -> StdResult<Pair<T>> {
+    kv: Record,
+) -> StdResult<Record<T>> {
     let (key, pk_len) = kv;
 
     // Deserialize pk_len
@@ -144,7 +144,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -153,7 +153,7 @@ where
         )
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -162,7 +162,7 @@ where
         )
     }
 
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &[],
@@ -190,7 +190,7 @@ where
     }
 
     #[cfg(test)]
-    pub fn all_items(&self, store: &dyn Storage, p: K::Prefix) -> StdResult<Vec<Pair<T>>> {
+    pub fn all_items(&self, store: &dyn Storage, p: K::Prefix) -> StdResult<Vec<Record<T>>> {
         let prefix = self.prefix(p);
         prefix.range(store, None, None, Order::Ascending).collect()
     }
@@ -210,7 +210,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'c>
     where
         T: 'c,
     {
@@ -237,7 +237,7 @@ where
         min: Option<PrefixBound<'a, K::Prefix>>,
         max: Option<PrefixBound<'a, K::Prefix>>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
         T: 'c,
         'a: 'c,
@@ -320,7 +320,7 @@ where
     }
 }
 
-fn deserialize_unique_kv<T: DeserializeOwned>(kv: Pair) -> StdResult<Pair<T>> {
+fn deserialize_unique_kv<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
     Ok((t.pk.into(), t.value))
@@ -335,26 +335,26 @@ where
         k.joined_key()
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }
 
-    fn no_prefix(&self) -> Prefix<T> {
+    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
             deserialize_unique_kv(kv)
         })
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
-    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Pair<T>>> {
+    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Record<T>>> {
         let data = self
             .idx_map
             .may_load(store, idx)?
@@ -377,7 +377,7 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Pair<T>>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'c>
     where
         T: 'c,
     {

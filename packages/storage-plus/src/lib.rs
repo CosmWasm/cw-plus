@@ -1,3 +1,4 @@
+mod de;
 mod endian;
 mod helpers;
 mod indexed_map;
