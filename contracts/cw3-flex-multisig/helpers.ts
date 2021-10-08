@@ -2,8 +2,9 @@ import axios from  "axios";
 import fs from "fs";
 import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
-import {  DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
+import {  DirectSecp256k1HdWallet, makeCosmoshubPath} from "@cosmjs/proto-signing";
 import { Slip10RawIndex } from "@cosmjs/crypto";
+import { Coin } from "@cosmjs/amino";
 import path from "path";
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
@@ -214,7 +215,7 @@ interface MemberChangedHookMsg {
   readonly diffs: MemberDiff[];
 }
 
-type CosmosMsg = SendMsg | any
+type CosmosMsg = SendMsg | DelegateMsg | UndelegateMsg | RedelegateMsg | WithdrawMsg | any
 
 interface SendMsg {
   readonly bank: {
@@ -222,6 +223,43 @@ interface SendMsg {
       readonly from_address: string,
       readonly to_address: string,
       readonly amount: readonly Coin[],
+    }
+  }
+}
+
+interface DelegateMsg {
+  readonly staking: {
+    readonly delegate: {
+      readonly validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface UndelegateMsg {
+  readonly staking: {
+    readonly undelegate: {
+      readonly validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface RedelegateMsg {
+  readonly staking: {
+    readonly redelegate: {
+      readonly src_validator: string,
+      readonly dst_validator: string,
+      readonly amount: Coin,
+    }
+  }
+}
+
+interface WithdrawMsg {
+  readonly staking: {
+    readonly withdraw: {
+      readonly validator: string,
+      readonly recipient?: string,
     }
   }
 }
