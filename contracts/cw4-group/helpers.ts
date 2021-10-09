@@ -221,17 +221,17 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): 
       return result.transactionHash;
     }
 
-    const updateMembers = async (txSigner: string, remove: string[], add: string[]): Promise<string> => {
+    const updateMembers = async (txSigner: string, remove: Member[], add: Member[]): Promise<string> => {
       const result = await client.execute(txSigner, contractAddress, {update_members: {remove, add}}, fees.exec);
       return result.transactionHash;
     }
 
-    const addHook = async (txSigner: string, addr: string): Promise<string> => {
+    const _addHook = async (txSigner: string, addr: string): Promise<string> => {
       const result = await client.execute(txSigner, contractAddress, {add_hook: {addr}}, fees.exec);
       return result.transactionHash;
     }
 
-    const removeHook = async (txSigner: string, addr: string): Promise<string> => {
+    const _removeHook = async (txSigner: string, addr: string): Promise<string> => {
       const result = await client.execute(txSigner, contractAddress, {remove_hook: {addr}}, fees.exec);
       return result.transactionHash;
     }
@@ -245,8 +245,8 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): 
       hooks,
       updateAdmin,
       updateMembers,
-      addHook,
-      removeHook
+      _addHook,
+      _removeHook
     };
   }
 
