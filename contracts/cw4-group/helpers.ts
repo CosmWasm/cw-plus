@@ -152,7 +152,12 @@ interface MemberResponse {
 }
 
 interface MemberListResponse {
-  readonly members: number;
+  readonly members: Member[];
+}
+
+interface Member {
+  readonly addr: string;
+  readonly weight: number;
 }
 
 interface TotalWeightResponse {
@@ -175,9 +180,11 @@ interface CW4GroupInstance {
 
   // actions
   updateAdmin: (txSigner: string, admin?: string) => Promise<string>
-  updateMembers: (txSigner: string, remove: string[], add: string[] ) => Promise<string>
-  addHook: (txSigner: string, addr: string) => Promise<string>
-  removeHook: (txSigner: string, addr: string) => Promise<string>
+  updateMembers: (txSigner: string, remove: Member[], add: Member[] ) => Promise<string>
+
+  // will not used by end user for testing purposes
+  _addHook: (txSigner: string, addr: string) => Promise<string>
+  _removeHook: (txSigner: string, addr: string) => Promise<string>
 }
 
 interface CW4GroupContract {
