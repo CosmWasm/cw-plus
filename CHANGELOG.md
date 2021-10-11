@@ -2,16 +2,80 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.9.0...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon4...HEAD)
+
+## [v0.10.0](https://github.com/CosmWasm/cw-plus/tree/v0.10.0) + [v0.10.0-soon4](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon4) +  [v0.10.0-soon3](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon3) +  [v0.10.0-soon2](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon2) +  [v0.10.0-soon](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon) (2021-10-11)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.9.1...v0.10.0)
 
 **Closed issues:**
 
+- Question about `MultiIndex` [\#466](https://github.com/CosmWasm/cw-plus/issues/466)
+- More multitest improvements [\#266](https://github.com/CosmWasm/cw-plus/issues/266)
+- Update to cosmwasm v1.0.0-soon2 [\#473](https://github.com/CosmWasm/cw-plus/issues/473)
+- Add ensure! macro [\#468](https://github.com/CosmWasm/cw-plus/issues/468)
+- Better return values from range/prefix [\#198](https://github.com/CosmWasm/cw-plus/issues/198)
+- Contracts for Token Sale and Vesting period [\#444](https://github.com/CosmWasm/cw-plus/issues/444)
+- small updates on storage-plus docs [\#435](https://github.com/CosmWasm/cw-plus/issues/435)
+- Unintuitive behavior of range on multi-index [\#430](https://github.com/CosmWasm/cw-plus/issues/430)
+- Upgrade to cosmwasm 1.0-soon [\#427](https://github.com/CosmWasm/cw-plus/issues/427)
+- Refactor Admin cw-controller to better represent actual functionality [\#424](https://github.com/CosmWasm/cw-plus/issues/424)
+- Add auto-changelog generator [\#421](https://github.com/CosmWasm/cw-plus/issues/421)
+- Implement `PrimaryKey` for `Timestamp` [\#419](https://github.com/CosmWasm/cw-plus/issues/419)
+- storage-plus: Improve in-code documentation of map primitives, in particular `MultiIndex` [\#407](https://github.com/CosmWasm/cw-plus/issues/407)
 - Remove use of dyn in multitest Router [\#404](https://github.com/CosmWasm/cw-plus/issues/404)
+- Define generic multitest module [\#387](https://github.com/CosmWasm/cw-plus/issues/387)
+- Cw20 state key compatibity with previous versions  [\#346](https://github.com/CosmWasm/cw-plus/issues/346)
+- Refactor cw20-base to use controller pattern [\#205](https://github.com/CosmWasm/cw-plus/issues/205)
 
 **Merged pull requests:**
 
+- Release 0.10.0 [\#483](https://github.com/CosmWasm/cw-plus/pull/483) ([ethanfrey](https://github.com/ethanfrey))
+- Upgrade CosmWasm to 1.0.0-beta [\#482](https://github.com/CosmWasm/cw-plus/pull/482) ([webmaster128](https://github.com/webmaster128))
+- Release v0.10.0-soon4 [\#477](https://github.com/CosmWasm/cw-plus/pull/477) ([ethanfrey](https://github.com/ethanfrey))
+- Update to CosmWasm 1.0.0-soon2  [\#475](https://github.com/CosmWasm/cw-plus/pull/475) ([ethanfrey](https://github.com/ethanfrey))
+- Allow error type conversions in ensure! and ensure\_eq! [\#474](https://github.com/CosmWasm/cw-plus/pull/474) ([webmaster128](https://github.com/webmaster128))
+- Improve error handling / remove FIXMEs [\#470](https://github.com/CosmWasm/cw-plus/pull/470) ([maurolacy](https://github.com/maurolacy))
+- Add ensure [\#469](https://github.com/CosmWasm/cw-plus/pull/469) ([ethanfrey](https://github.com/ethanfrey))
+- Key deserializer improvements [\#467](https://github.com/CosmWasm/cw-plus/pull/467) ([maurolacy](https://github.com/maurolacy))
+- Upgrade to cosmwasm/workspace-optimizer:0.12.3 [\#465](https://github.com/CosmWasm/cw-plus/pull/465) ([webmaster128](https://github.com/webmaster128))
+- Prefix consolidation [\#439](https://github.com/CosmWasm/cw-plus/pull/439) ([maurolacy](https://github.com/maurolacy))
+- Full deserialization for `range` [\#432](https://github.com/CosmWasm/cw-plus/pull/432) ([maurolacy](https://github.com/maurolacy))
+- Prepare release v0.10.0-soon3 [\#457](https://github.com/CosmWasm/cw-plus/pull/457) ([ethanfrey](https://github.com/ethanfrey))
+- Expose essential multitest types [\#456](https://github.com/CosmWasm/cw-plus/pull/456) ([ethanfrey](https://github.com/ethanfrey))
+- Release 0.10.0-soon2 [\#455](https://github.com/CosmWasm/cw-plus/pull/455) ([ethanfrey](https://github.com/ethanfrey))
+- Expose sudo powers on Router we give to Modules [\#453](https://github.com/CosmWasm/cw-plus/pull/453) ([ethanfrey](https://github.com/ethanfrey))
+- Forward port 440 demo metadata extension [\#452](https://github.com/CosmWasm/cw-plus/pull/452) ([ethanfrey](https://github.com/ethanfrey))
+- Forward port 440-customize-nft [\#451](https://github.com/CosmWasm/cw-plus/pull/451) ([ethanfrey](https://github.com/ethanfrey))
+- Release 0.10.0-soon [\#448](https://github.com/CosmWasm/cw-plus/pull/448) ([ethanfrey](https://github.com/ethanfrey))
+- Add proper prefix\_range helper when you want to iterate over the prefix space [\#446](https://github.com/CosmWasm/cw-plus/pull/446) ([ethanfrey](https://github.com/ethanfrey))
+- Improve in-code documentation of map primitives [\#443](https://github.com/CosmWasm/cw-plus/pull/443) ([ueco-jb](https://github.com/ueco-jb))
+- Small storage-plus docs update [\#442](https://github.com/CosmWasm/cw-plus/pull/442) ([hashedone](https://github.com/hashedone))
+- Upgrade to cosmwasm 1.0.0-soon [\#441](https://github.com/CosmWasm/cw-plus/pull/441) ([ethanfrey](https://github.com/ethanfrey))
+- Test storage-plus with iterator disabled [\#438](https://github.com/CosmWasm/cw-plus/pull/438) ([ethanfrey](https://github.com/ethanfrey))
+- Multitest module query [\#437](https://github.com/CosmWasm/cw-plus/pull/437) ([ethanfrey](https://github.com/ethanfrey))
+- Range with no prefix support [\#433](https://github.com/CosmWasm/cw-plus/pull/433) ([maurolacy](https://github.com/maurolacy))
+- Added implementation of timestamp key [\#431](https://github.com/CosmWasm/cw-plus/pull/431) ([hashedone](https://github.com/hashedone))
+- Update changelog 2 [\#428](https://github.com/CosmWasm/cw-plus/pull/428) ([maurolacy](https://github.com/maurolacy))
+- Add automatically generated changelog [\#426](https://github.com/CosmWasm/cw-plus/pull/426) ([ueco-jb](https://github.com/ueco-jb))
+- Generic module types [\#425](https://github.com/CosmWasm/cw-plus/pull/425) ([ethanfrey](https://github.com/ethanfrey))
+- Simplify router args [\#422](https://github.com/CosmWasm/cw-plus/pull/422) ([ethanfrey](https://github.com/ethanfrey))
 - Snapshot item 2 [\#418](https://github.com/CosmWasm/cw-plus/pull/418) ([maurolacy](https://github.com/maurolacy))
 - Removing dyn from Router [\#410](https://github.com/CosmWasm/cw-plus/pull/410) ([hashedone](https://github.com/hashedone))
+
+**Fixed bugs:**
+
+- Fix improper assert\_matches usage [\#459](https://github.com/CosmWasm/cw-plus/pull/459) ([ueco-jb](https://github.com/ueco-jb))
+
+
+## [v0.9.1](https://github.com/CosmWasm/cw-plus/tree/v0.9.1) (2021-09-23)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon...v0.9.1)
+
+**Closed issues:**
+
+- Allow NFTs to include custom data [\#440](https://github.com/CosmWasm/cw-plus/issues/440)
+
 
 ## [v0.9.0](https://github.com/CosmWasm/cw-plus/tree/v0.9.0) (2021-09-14)
 
@@ -67,9 +131,9 @@
 - Unify multisig structs Member and VoterResponse [\#151](https://github.com/CosmWasm/cw-plus/issues/151)
 - Add exhaustive checks for errors in contracts [\#105](https://github.com/CosmWasm/cw-plus/issues/105)
 
-## [v0.8.0](https://github.com/CosmWasm/cw-plus/tree/v0.8.0) + [v0.8.0-rc3](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc3) + [v0.8.0-rc2](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc2) + [v0.8.0-rc1](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc1) (2021-08-10)
+## [v0.8.0](https://github.com/CosmWasm/cw-plus/tree/v0.8.0) (2021-08-10)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.7.0...v0.8.0)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.8.0-rc3...v0.8.0)
 
 **Closed issues:**
 
@@ -77,7 +141,32 @@
 - Upgrade rust to 1.53 [\#372](https://github.com/CosmWasm/cw-plus/issues/372)
 - Implement cw20 logo spec for cw20-base [\#371](https://github.com/CosmWasm/cw-plus/issues/371)
 - multi-test: ensure event handling matches wasmd 0.18 implementation [\#348](https://github.com/CosmWasm/cw-plus/issues/348)
+
+**Merged pull requests:**
+
+- Added some missing traits on messages of cw20-base [\#386](https://github.com/CosmWasm/cw-plus/pull/386) ([hashedone](https://github.com/hashedone))
+
+## [v0.8.0-rc3](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc3) (2021-08-10)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.8.0-rc2...v0.8.0-rc3)
+
+**Closed issues:**
+
 - multi-test: ensure event handling matches wasmd 0.18 implementation [\#348](https://github.com/CosmWasm/cw-plus/issues/348)
+
+**Merged pull requests:**
+
+- Corrected submessage data response handling in multi-test [\#385](https://github.com/CosmWasm/cw-plus/pull/385) ([hashedone](https://github.com/hashedone))
+- Document submsg data failures and fix them [\#383](https://github.com/CosmWasm/cw-plus/pull/383) ([ethanfrey](https://github.com/ethanfrey))
+- Adaptors for all contracts and entry points from Empty -\> C [\#382](https://github.com/CosmWasm/cw-plus/pull/382) ([ethanfrey](https://github.com/ethanfrey))
+- Multitest events match wasmd [\#380](https://github.com/CosmWasm/cw-plus/pull/380) ([ethanfrey](https://github.com/ethanfrey))
+
+## [v0.8.0-rc2](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc2) (2021-08-05)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.8.0-rc1...v0.8.0-rc2)
+
+**Closed issues:**
+
 - Upgrade CosmWasm to 0.16.0 [\#377](https://github.com/CosmWasm/cw-plus/issues/377)
 - Upgrade rust to 1.53 [\#372](https://github.com/CosmWasm/cw-plus/issues/372)
 - Implement cw20 logo spec for cw20-base [\#371](https://github.com/CosmWasm/cw-plus/issues/371)
@@ -86,6 +175,29 @@
 - multi-test: Add migrate support [\#351](https://github.com/CosmWasm/cw-plus/issues/351)
 - multitest: Ensure Warm sent funds visible to querier [\#347](https://github.com/CosmWasm/cw-plus/issues/347)
 - multitest: Enforce validity checks for returned items [\#341](https://github.com/CosmWasm/cw-plus/issues/341)
+
+**Merged pull requests:**
+
+- Update to Rust 1.53 [\#379](https://github.com/CosmWasm/cw-plus/pull/379) ([ethanfrey](https://github.com/ethanfrey))
+- Upgrade to cosmwasm 0.16 [\#378](https://github.com/CosmWasm/cw-plus/pull/378) ([ethanfrey](https://github.com/ethanfrey))
+- Marketing info for cw20-base contract [\#375](https://github.com/CosmWasm/cw-plus/pull/375) ([hashedone](https://github.com/hashedone))
+- cw20-merkle-airdrop: change hashing to sha256 [\#374](https://github.com/CosmWasm/cw-plus/pull/374) ([orkunkl](https://github.com/orkunkl))
+- Responses validation in multi-test [\#373](https://github.com/CosmWasm/cw-plus/pull/373) ([hashedone](https://github.com/hashedone))
+- Cw20 logo spec [\#370](https://github.com/CosmWasm/cw-plus/pull/370) ([ethanfrey](https://github.com/ethanfrey))
+- Properly handling data in submessages in multi-test [\#369](https://github.com/CosmWasm/cw-plus/pull/369) ([hashedone](https://github.com/hashedone))
+- Abstracting API out of tests internals so it is clearly owned by `App` [\#368](https://github.com/CosmWasm/cw-plus/pull/368) ([hashedone](https://github.com/hashedone))
+- Storage plus doc correction [\#367](https://github.com/CosmWasm/cw-plus/pull/367) ([hashedone](https://github.com/hashedone))
+- Multitest migrate support [\#366](https://github.com/CosmWasm/cw-plus/pull/366) ([ethanfrey](https://github.com/ethanfrey))
+- Reorganizations of contracts in `multi-test::test_utils` [\#365](https://github.com/CosmWasm/cw-plus/pull/365) ([hashedone](https://github.com/hashedone))
+- Implement cw20-merkle-airdrop [\#364](https://github.com/CosmWasm/cw-plus/pull/364) ([orkunkl](https://github.com/orkunkl))
+- Testing sent founds visibility in multi-test [\#363](https://github.com/CosmWasm/cw-plus/pull/363) ([hashedone](https://github.com/hashedone))
+
+## [v0.8.0-rc1](https://github.com/CosmWasm/cw-plus/tree/v0.8.0-rc1) (2021-07-29)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.7.0...v0.8.0-rc1)
+
+**Closed issues:**
+
 - Lack of `overflow-checks=true` in contracts [\#358](https://github.com/CosmWasm/cw-plus/issues/358)
 - multi-test: Store more data in ContractData [\#350](https://github.com/CosmWasm/cw-plus/issues/350)
 - multi-test: cleaner use of transactions [\#349](https://github.com/CosmWasm/cw-plus/issues/349)
@@ -100,24 +212,6 @@
 
 **Merged pull requests:**
 
-- Added some missing traits on messages of cw20-base [\#386](https://github.com/CosmWasm/cw-plus/pull/386) ([hashedone](https://github.com/hashedone))
-- Corrected submessage data response handling in multi-test [\#385](https://github.com/CosmWasm/cw-plus/pull/385) ([hashedone](https://github.com/hashedone))
-- Document submsg data failures and fix them [\#383](https://github.com/CosmWasm/cw-plus/pull/383) ([ethanfrey](https://github.com/ethanfrey))
-- Adaptors for all contracts and entry points from Empty -\> C [\#382](https://github.com/CosmWasm/cw-plus/pull/382) ([ethanfrey](https://github.com/ethanfrey))
-- Multitest events match wasmd [\#380](https://github.com/CosmWasm/cw-plus/pull/380) ([ethanfrey](https://github.com/ethanfrey))
-- Update to Rust 1.53 [\#379](https://github.com/CosmWasm/cw-plus/pull/379) ([ethanfrey](https://github.com/ethanfrey))
-- Upgrade to cosmwasm 0.16 [\#378](https://github.com/CosmWasm/cw-plus/pull/378) ([ethanfrey](https://github.com/ethanfrey))
-- Marketing info for cw20-base contract [\#375](https://github.com/CosmWasm/cw-plus/pull/375) ([hashedone](https://github.com/hashedone))
-- cw20-merkle-airdrop: change hashing to sha256 [\#374](https://github.com/CosmWasm/cw-plus/pull/374) ([orkunkl](https://github.com/orkunkl))
-- Responses validation in multi-test [\#373](https://github.com/CosmWasm/cw-plus/pull/373) ([hashedone](https://github.com/hashedone))
-- Cw20 logo spec [\#370](https://github.com/CosmWasm/cw-plus/pull/370) ([ethanfrey](https://github.com/ethanfrey))
-- Properly handling data in submessages in multi-test [\#369](https://github.com/CosmWasm/cw-plus/pull/369) ([hashedone](https://github.com/hashedone))
-- Abstracting API out of tests internals so it is clearly owned by `App` [\#368](https://github.com/CosmWasm/cw-plus/pull/368) ([hashedone](https://github.com/hashedone))
-- Storage plus doc correction [\#367](https://github.com/CosmWasm/cw-plus/pull/367) ([hashedone](https://github.com/hashedone))
-- Multitest migrate support [\#366](https://github.com/CosmWasm/cw-plus/pull/366) ([ethanfrey](https://github.com/ethanfrey))
-- Reorganizations of contracts in `multi-test::test_utils` [\#365](https://github.com/CosmWasm/cw-plus/pull/365) ([hashedone](https://github.com/hashedone))
-- Implement cw20-merkle-airdrop [\#364](https://github.com/CosmWasm/cw-plus/pull/364) ([orkunkl](https://github.com/orkunkl))
-- Testing sent founds visibility in multi-test [\#363](https://github.com/CosmWasm/cw-plus/pull/363) ([hashedone](https://github.com/hashedone))
 - Extend `ContractData` in multi-test [\#360](https://github.com/CosmWasm/cw-plus/pull/360) ([hashedone](https://github.com/hashedone))
 - Add transactional helper [\#357](https://github.com/CosmWasm/cw-plus/pull/357) ([ethanfrey](https://github.com/ethanfrey))
 - Implemented expiration for cw1-subkeys contract [\#356](https://github.com/CosmWasm/cw-plus/pull/356) ([hashedone](https://github.com/hashedone))
@@ -200,13 +294,9 @@
 
 - Expose contract components [\#293](https://github.com/CosmWasm/cw-plus/pull/293) ([orkunkl](https://github.com/orkunkl))
 
-## [v0.6.0](https://github.com/CosmWasm/cw-plus/tree/v0.6.0) + [v0.6.0-beta3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta3) + [v0.6.0-beta2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta2) + [v0.6.0-beta1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta1) + [v0.6.0-alpha3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha3) + [v0.6.0-alpha2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha2) + [v0.6.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha1) (2021-05-03)
+## [v0.6.0](https://github.com/CosmWasm/cw-plus/tree/v0.6.0) (2021-05-03)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-beta3...v0.6.0)
-
-**Implemented enhancements:**
-
-- Add contract sanity checking during build / release [\#228](https://github.com/CosmWasm/cw-plus/issues/228)
 
 **Closed issues:**
 
@@ -214,6 +304,105 @@
 - CW20 example contract which 1-to-1 mapped to native token [\#276](https://github.com/CosmWasm/cw-plus/issues/276)
 - Implement `PrimaryKey` for `HumanAddr` [\#256](https://github.com/CosmWasm/cw-plus/issues/256)
 - Storage-plus: See if we can simplify PkOwned to Vec\<u8\> [\#199](https://github.com/CosmWasm/cw-plus/issues/199)
+
+**Merged pull requests:**
+
+- Clarify index\_key\(\) range\(\) vs prefix\(\) behaviour [\#291](https://github.com/CosmWasm/cw-plus/pull/291) ([maurolacy](https://github.com/maurolacy))
+- Pkowned to vec u8 [\#290](https://github.com/CosmWasm/cw-plus/pull/290) ([maurolacy](https://github.com/maurolacy))
+- Update to CosmWasm v0.14.0 [\#289](https://github.com/CosmWasm/cw-plus/pull/289) ([ethanfrey](https://github.com/ethanfrey))
+- Primary key / index key helpers [\#288](https://github.com/CosmWasm/cw-plus/pull/288) ([maurolacy](https://github.com/maurolacy))
+
+## [v0.6.0-beta3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta3) (2021-04-28)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-beta2...v0.6.0-beta3)
+
+**Closed issues:**
+
+- Make message required in Cw20ReceiveMsg [\#283](https://github.com/CosmWasm/cw-plus/issues/283)
+- `Sudo` over no `new_with_sudo` contract wrapper error message [\#278](https://github.com/CosmWasm/cw-plus/issues/278)
+- build\_and\_upload\_contract CI job fails [\#273](https://github.com/CosmWasm/cw-plus/issues/273)
+- Add cw20 support to token-weighted group [\#143](https://github.com/CosmWasm/cw-plus/issues/143)
+
+**Merged pull requests:**
+
+- Cosmwasm beta5 [\#287](https://github.com/CosmWasm/cw-plus/pull/287) ([ethanfrey](https://github.com/ethanfrey))
+- Cw20ReceiveMsg msg field [\#286](https://github.com/CosmWasm/cw-plus/pull/286) ([maurolacy](https://github.com/maurolacy))
+- Fix ci contract build [\#285](https://github.com/CosmWasm/cw-plus/pull/285) ([ethanfrey](https://github.com/ethanfrey))
+- Use Cw20 token in cw4-stake [\#282](https://github.com/CosmWasm/cw-plus/pull/282) ([ethanfrey](https://github.com/ethanfrey))
+- Avoid the need for Any type by using Empty as message type and String as error type [\#281](https://github.com/CosmWasm/cw-plus/pull/281) ([webmaster128](https://github.com/webmaster128))
+- Update to 0.14.0 beta4 [\#280](https://github.com/CosmWasm/cw-plus/pull/280) ([maurolacy](https://github.com/maurolacy))
+- Better error message with missing sudo \(no parse error\) [\#279](https://github.com/CosmWasm/cw-plus/pull/279) ([ethanfrey](https://github.com/ethanfrey))
+
+## [v0.6.0-beta2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta2) (2021-04-19)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-beta1...v0.6.0-beta2)
+
+**Closed issues:**
+
+- Add secondary index support to SnapshotMap. [\#255](https://github.com/CosmWasm/cw-plus/issues/255)
+
+**Merged pull requests:**
+
+- Indexed snapshot. Expose primary methods [\#275](https://github.com/CosmWasm/cw-plus/pull/275) ([maurolacy](https://github.com/maurolacy))
+- Indexed snapshot map [\#271](https://github.com/CosmWasm/cw-plus/pull/271) ([maurolacy](https://github.com/maurolacy))
+- Run clippy on test code [\#270](https://github.com/CosmWasm/cw-plus/pull/270) ([webmaster128](https://github.com/webmaster128))
+
+## [v0.6.0-beta1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-beta1) (2021-04-13)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-alpha3...v0.6.0-beta1)
+
+**Closed issues:**
+
+- Update to cosmwasm v0.14.0-beta3 [\#268](https://github.com/CosmWasm/cw-plus/issues/268)
+- My [\#263](https://github.com/CosmWasm/cw-plus/issues/263)
+
+**Merged pull requests:**
+
+- Bump dependency to cosmasm v0.14.0-beta3 [\#269](https://github.com/CosmWasm/cw-plus/pull/269) ([ethanfrey](https://github.com/ethanfrey))
+- Remove unused PrimaryKey::parse\_key [\#267](https://github.com/CosmWasm/cw-plus/pull/267) ([webmaster128](https://github.com/webmaster128))
+- Use workspace-optimizer:0.11.0 [\#262](https://github.com/CosmWasm/cw-plus/pull/262) ([webmaster128](https://github.com/webmaster128))
+- Update cosmwasm-std [\#260](https://github.com/CosmWasm/cw-plus/pull/260) ([yihuang](https://github.com/yihuang))
+- implement demo cw1155 contract [\#251](https://github.com/CosmWasm/cw-plus/pull/251) ([yihuang](https://github.com/yihuang))
+
+## [v0.6.0-alpha3](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha3) (2021-04-01)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-alpha2...v0.6.0-alpha3)
+
+**Merged pull requests:**
+
+- More multitest improvements [\#258](https://github.com/CosmWasm/cw-plus/pull/258) ([ethanfrey](https://github.com/ethanfrey))
+
+## [v0.6.0-alpha2](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha2) (2021-04-01)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.6.0-alpha1...v0.6.0-alpha2)
+
+**Closed issues:**
+
+- Re-enable field\_reassign\_with\_default [\#252](https://github.com/CosmWasm/cw-plus/issues/252)
+- No equivalent of ERC1155 standard [\#246](https://github.com/CosmWasm/cw-plus/issues/246)
+- Rename HandleMsg to ExecuteMsg [\#236](https://github.com/CosmWasm/cw-plus/issues/236)
+- Use \#\[entry\_point\] macro in contracts [\#230](https://github.com/CosmWasm/cw-plus/issues/230)
+- Support PartialEq on error [\#179](https://github.com/CosmWasm/cw-plus/issues/179)
+
+**Merged pull requests:**
+
+- Enhance multi test [\#257](https://github.com/CosmWasm/cw-plus/pull/257) ([ethanfrey](https://github.com/ethanfrey))
+- Update to Rust v1.51.0 [\#254](https://github.com/CosmWasm/cw-plus/pull/254) ([maurolacy](https://github.com/maurolacy))
+- PartialEq for errors [\#253](https://github.com/CosmWasm/cw-plus/pull/253) ([maurolacy](https://github.com/maurolacy))
+- Handle msg to execute msg [\#250](https://github.com/CosmWasm/cw-plus/pull/250) ([maurolacy](https://github.com/maurolacy))
+- Migrate to entry\_point macro [\#249](https://github.com/CosmWasm/cw-plus/pull/249) ([maurolacy](https://github.com/maurolacy))
+- Add cw1155 specification [\#247](https://github.com/CosmWasm/cw-plus/pull/247) ([yihuang](https://github.com/yihuang))
+
+## [v0.6.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.6.0-alpha1) (2021-03-12)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.5.0...v0.6.0-alpha1)
+
+**Implemented enhancements:**
+
+- Add contract sanity checking during build / release [\#228](https://github.com/CosmWasm/cw-plus/issues/228)
+
+**Closed issues:**
+
 - Update to CosmWasm v0.14.0-beta1 [\#242](https://github.com/CosmWasm/cw-plus/issues/242)
 - Support life-timed references in `UniqueIndex` and `MultiIndex` keys [\#233](https://github.com/CosmWasm/cw-plus/issues/233)
 - Write cw20-ics20 ibc enabled contract [\#231](https://github.com/CosmWasm/cw-plus/issues/231)
@@ -224,47 +413,9 @@
 - Use entry\_point macro for contract entry-points [\#224](https://github.com/CosmWasm/cw-plus/issues/224)
 - Upgrade Contracts to storage-plus [\#203](https://github.com/CosmWasm/cw-plus/issues/203)
 - Support composite keys on secondary indexes \(multi-index\) [\#163](https://github.com/CosmWasm/cw-plus/issues/163)
-- Re-enable field\_reassign\_with\_default [\#252](https://github.com/CosmWasm/cw-plus/issues/252)
-- No equivalent of ERC1155 standard [\#246](https://github.com/CosmWasm/cw-plus/issues/246)
-- Rename HandleMsg to ExecuteMsg [\#236](https://github.com/CosmWasm/cw-plus/issues/236)
-- Use \#\[entry\_point\] macro in contracts [\#230](https://github.com/CosmWasm/cw-plus/issues/230)
-- Support PartialEq on error [\#179](https://github.com/CosmWasm/cw-plus/issues/179)
-- Update to cosmwasm v0.14.0-beta3 [\#268](https://github.com/CosmWasm/cw-plus/issues/268)
-- My [\#263](https://github.com/CosmWasm/cw-plus/issues/263)
-- Add secondary index support to SnapshotMap. [\#255](https://github.com/CosmWasm/cw-plus/issues/255)
-- Make message required in Cw20ReceiveMsg [\#283](https://github.com/CosmWasm/cw-plus/issues/283)
-- `Sudo` over no `new_with_sudo` contract wrapper error message [\#278](https://github.com/CosmWasm/cw-plus/issues/278)
-- build\_and\_upload\_contract CI job fails [\#273](https://github.com/CosmWasm/cw-plus/issues/273)
-- Add cw20 support to token-weighted group [\#143](https://github.com/CosmWasm/cw-plus/issues/143)
 
 **Merged pull requests:**
 
-- Clarify index\_key\(\) range\(\) vs prefix\(\) behaviour [\#291](https://github.com/CosmWasm/cw-plus/pull/291) ([maurolacy](https://github.com/maurolacy))
-- Pkowned to vec u8 [\#290](https://github.com/CosmWasm/cw-plus/pull/290) ([maurolacy](https://github.com/maurolacy))
-- Update to CosmWasm v0.14.0 [\#289](https://github.com/CosmWasm/cw-plus/pull/289) ([ethanfrey](https://github.com/ethanfrey))
-- Primary key / index key helpers [\#288](https://github.com/CosmWasm/cw-plus/pull/288) ([maurolacy](https://github.com/maurolacy))
-- Enhance multi test [\#257](https://github.com/CosmWasm/cw-plus/pull/257) ([ethanfrey](https://github.com/ethanfrey))
-- Update to Rust v1.51.0 [\#254](https://github.com/CosmWasm/cw-plus/pull/254) ([maurolacy](https://github.com/maurolacy))
-- PartialEq for errors [\#253](https://github.com/CosmWasm/cw-plus/pull/253) ([maurolacy](https://github.com/maurolacy))
-- Handle msg to execute msg [\#250](https://github.com/CosmWasm/cw-plus/pull/250) ([maurolacy](https://github.com/maurolacy))
-- Migrate to entry\_point macro [\#249](https://github.com/CosmWasm/cw-plus/pull/249) ([maurolacy](https://github.com/maurolacy))
-- Add cw1155 specification [\#247](https://github.com/CosmWasm/cw-plus/pull/247) ([yihuang](https://github.com/yihuang))
-- More multitest improvements [\#258](https://github.com/CosmWasm/cw-plus/pull/258) ([ethanfrey](https://github.com/ethanfrey))
-- Cosmwasm beta5 [\#287](https://github.com/CosmWasm/cw-plus/pull/287) ([ethanfrey](https://github.com/ethanfrey))
-- Cw20ReceiveMsg msg field [\#286](https://github.com/CosmWasm/cw-plus/pull/286) ([maurolacy](https://github.com/maurolacy))
-- Fix ci contract build [\#285](https://github.com/CosmWasm/cw-plus/pull/285) ([ethanfrey](https://github.com/ethanfrey))
-- Use Cw20 token in cw4-stake [\#282](https://github.com/CosmWasm/cw-plus/pull/282) ([ethanfrey](https://github.com/ethanfrey))
-- Avoid the need for Any type by using Empty as message type and String as error type [\#281](https://github.com/CosmWasm/cw-plus/pull/281) ([webmaster128](https://github.com/webmaster128))
-- Update to 0.14.0 beta4 [\#280](https://github.com/CosmWasm/cw-plus/pull/280) ([maurolacy](https://github.com/maurolacy))
-- Better error message with missing sudo \(no parse error\) [\#279](https://github.com/CosmWasm/cw-plus/pull/279) ([ethanfrey](https://github.com/ethanfrey))
-- Bump dependency to cosmasm v0.14.0-beta3 [\#269](https://github.com/CosmWasm/cw-plus/pull/269) ([ethanfrey](https://github.com/ethanfrey))
-- Remove unused PrimaryKey::parse\_key [\#267](https://github.com/CosmWasm/cw-plus/pull/267) ([webmaster128](https://github.com/webmaster128))
-- Use workspace-optimizer:0.11.0 [\#262](https://github.com/CosmWasm/cw-plus/pull/262) ([webmaster128](https://github.com/webmaster128))
-- Update cosmwasm-std [\#260](https://github.com/CosmWasm/cw-plus/pull/260) ([yihuang](https://github.com/yihuang))
-- implement demo cw1155 contract [\#251](https://github.com/CosmWasm/cw-plus/pull/251) ([yihuang](https://github.com/yihuang))
-- Indexed snapshot. Expose primary methods [\#275](https://github.com/CosmWasm/cw-plus/pull/275) ([maurolacy](https://github.com/maurolacy))
-- Indexed snapshot map [\#271](https://github.com/CosmWasm/cw-plus/pull/271) ([maurolacy](https://github.com/maurolacy))
-- Run clippy on test code [\#270](https://github.com/CosmWasm/cw-plus/pull/270) ([webmaster128](https://github.com/webmaster128))
 - Fix ics20 denom [\#244](https://github.com/CosmWasm/cw-plus/pull/244) ([ethanfrey](https://github.com/ethanfrey))
 - Update to 0.14.0 beta1 [\#243](https://github.com/CosmWasm/cw-plus/pull/243) ([maurolacy](https://github.com/maurolacy))
 - Upgrade cw1 to storage plus [\#241](https://github.com/CosmWasm/cw-plus/pull/241) ([ethanfrey](https://github.com/ethanfrey))
