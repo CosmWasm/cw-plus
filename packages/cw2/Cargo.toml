@@ -10,7 +10,7 @@ homepage = "https://cosmwasm.com"
 documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
-cosmwasm-std = { version = "=1.0.0-soon2", default-features = false }
+cosmwasm-std = { version = "1.0.0-beta", default-features = false }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.0-soon4" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
