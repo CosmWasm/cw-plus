@@ -5,10 +5,10 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
-    MessageInfo, Order, Response, StakingMsg, StdResult,
+    ensure, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty,
+    Env, MessageInfo, Order, Response, StakingMsg, StdResult,
 };
-use cw0::{ensure, Expiration};
+use cw0::Expiration;
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{
