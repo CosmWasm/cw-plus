@@ -4,15 +4,12 @@ The ideas in here are based on the `cosmwasm-storage` crate. However,
 after much usage, we decided a complete rewrite could allow us to add
 more powerful and easy to use interfaces. Here are those interfaces.
 
-**Status: experimental**
+**Status: beta**
 
-You currently should not be using this crate outside of the `cw-plus`
-repo. This is a first draft of many types. We will update the status
-after they have been used more heavily and the interfaces stabilized.
-
-The ideas/desired functionality in here should be more or less final,
-it's just the form to express them that is not final. As we add new functionality,
-we will continue to refine the foundations, but maintain semver.
+This has been heavily used in many production-quality contracts and
+heavily refined. There is one planned API break (dealing with
+auto-deserializing keys in range queries), but the code has demonstrated
+itself to be stable and powerful. Please feel free to use in your contracts.
 
 ## Usage Overview
 
