@@ -113,8 +113,7 @@ where
         limit: Option<u32>,
     ) -> StdResult<TokensResponse> {
         let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-        let start_addr = maybe_addr(deps.api, start_after)?;
-        let start = start_addr.map(|addr| Bound::exclusive(addr.as_ref()));
+        let start = start_after.map(Bound::exclusive);
 
         let tokens: StdResult<Vec<String>> = self
             .tokens
