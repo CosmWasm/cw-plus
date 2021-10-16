@@ -1,9 +1,7 @@
-use crate::querier::query_token_contract;
 use crate::state::{
     read_config, read_holder, read_holders, read_state, store_holder, store_state, Config, Holder,
     State,
 };
-use basset::reward::{AccruedRewardsResponse, HolderResponse, HoldersResponse};
 
 use cosmwasm_std::{
     attr, BankMsg, Coin, CosmosMsg, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError,
@@ -13,9 +11,7 @@ use cosmwasm_std::{
 use crate::math::{
     decimal_multiplication_in_256, decimal_subtraction_in_256, decimal_summation_in_256,
 };
-use basset::deduct_tax;
 use std::str::FromStr;
-use terra_cosmwasm::TerraMsgWrapper;
 
 pub fn execute_claim_rewards(
     deps: DepsMut,

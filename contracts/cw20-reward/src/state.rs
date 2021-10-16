@@ -3,7 +3,6 @@ use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Deps, Order, StdResult, St
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use basset::reward::HolderResponse;
 use cw_storage_plus::{Bound, Item, Map};
 
 pub const STATE: Item<State> = Item::new("\u{0}\u{5}state");

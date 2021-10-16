@@ -1,4 +1,3 @@
-use cosmwasm_bignumber::Decimal256;
 use cosmwasm_std::Decimal;
 
 /// return a * b

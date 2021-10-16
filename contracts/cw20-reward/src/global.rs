@@ -5,7 +5,6 @@ use crate::math::decimal_summation_in_256;
 use cosmwasm_std::{
     attr, CosmosMsg, Decimal, DepsMut, Env, MessageInfo, Response, StdError, StdResult,
 };
-use terra_cosmwasm::{create_swap_msg, ExchangeRatesResponse, TerraMsgWrapper, TerraQuerier};
 /// Swap all native tokens to reward_denom
 /// Only hub_contract is allowed to execute
 #[allow(clippy::if_same_then_else)]
@@ -102,15 +101,5 @@ pub fn execute_update_global_index(
     ];
     let res = Response::new().add_attributes(attributes);
 
-    Ok(res)
-}
-
-pub fn query_exchange_rates(
-    deps: &DepsMut,
-    base_denom: String,
-    quote_denoms: Vec<String>,
-) -> StdResult<ExchangeRatesResponse> {
-    let querier = TerraQuerier::new(&deps.querier);
-    let res: ExchangeRatesResponse = querier.query_exchange_rates(base_denom, quote_denoms)?;
     Ok(res)
 }

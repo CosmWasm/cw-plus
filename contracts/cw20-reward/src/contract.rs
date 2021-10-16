@@ -11,9 +11,7 @@ use cosmwasm_std::{
     to_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
 };
 
-use basset::reward::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StateResponse};
-use terra_cosmwasm::TerraMsgWrapper;
-use crate::msg::ExecuteMsg;
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, StateResponse};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -46,7 +44,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::ClaimRewards { recipient } => execute_claim_rewards(deps, env, info, recipient),
         ExecuteMsg::SwapToRewardDenom {} => execute_swap(deps, env, info),
