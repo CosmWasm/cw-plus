@@ -1,28 +1,7 @@
-//! This integration test tries to run and call the generated wasm.
-//! It depends on a Wasm build being available, which you can create with `cargo wasm`.
-//! Then running `cargo integration-test` will validate we can properly call into that generated Wasm.
-//!
-//! You can easily convert unit tests to integration tests as follows:
-//! 1. Copy them over verbatim
-//! 2. Then change
-//!      let mut deps = mock_dependencies(20, &[]);
-//!    to
-//!      let mut deps = mock_instance(WASM, &[]);
-//! 3. If you access raw storage, where ever you see something like:
-//!      deps.storage.get(CONFIG_KEY).expect("no data stored");
-//!    replace it with:
-//!      deps.with_storage(|store| {
-//!          let data = store.get(CONFIG_KEY).expect("no data stored");
-//!          //...
-//!      });
-//! 4. Anywhere you see query(&deps, ...) you must replace it with query(&mut deps, ...)
-
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{
-        from_binary, to_binary, Addr, BankMsg, Coin, Decimal, MessageInfo, SubMsg, Uint128, WasmMsg,
-    };
+    use cosmwasm_std::{from_binary, to_binary, Addr, BankMsg, Coin, Decimal, MessageInfo, SubMsg, Uint128, WasmMsg, Empty};
 
     use crate::contract::{calculate_decimal_rewards, execute, get_decimals, instantiate, query};
     use crate::msg::{
@@ -37,6 +16,25 @@ mod tests {
     use std::borrow::BorrowMut;
     use std::ops::{Mul, Sub};
     use std::str::FromStr;
+    use cw_multi_test::{App, Contract, ContractWrapper};
+
+    fn mock_app() -> App {
+        App::default()
+    }
+
+    pub fn contract_cw20_reward() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(execute, instantiate, query);
+        Box::new(contract)
+    }
+
+    pub fn contract_cw20() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(
+            cw20_base::contract::execute,
+            cw20_base::contract::instantiate,
+            cw20_base::contract::query,
+        );
+        Box::new(contract)
+    }
 
     const MOCK_CW20_CONTRACT_ADDR: &str = "cw20";
     fn default_init() -> InstantiateMsg {

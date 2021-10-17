@@ -25,6 +25,7 @@ cw20 = { path = "../../packages/cw20", version = "0.10.0" }
 cosmwasm-std = { version = "1.0.0-beta", features = ["iterator"] }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.0", features = ["iterator"]}
 cw-controllers = { path = "../../packages/controllers", version = "0.10.0"}
+cw-multi-test = { path = "../../packages/multi-test", version = "0.10.0"}
 schemars = "0.8.3"
 serde = { version = "1.0.125", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.24" }
