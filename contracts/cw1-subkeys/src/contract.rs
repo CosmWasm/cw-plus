@@ -5,10 +5,10 @@ use std::ops::{AddAssign, Sub};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg, Empty, Env,
-    MessageInfo, Order, Response, StakingMsg, StdResult,
+    ensure, ensure_ne, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg,
+    Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
 };
-use cw0::{ensure, Expiration};
+use cw0::Expiration;
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{
@@ -179,8 +179,9 @@ where
     ensure!(cfg.is_admin(&info.sender), ContractError::Unauthorized {});
 
     let spender_addr = deps.api.addr_validate(&spender)?;
-    ensure!(
-        info.sender != spender_addr,
+    ensure_ne!(
+        info.sender,
+        spender_addr,
         ContractError::CannotSetOwnAccount {}
     );
 
@@ -232,8 +233,9 @@ where
     ensure!(cfg.is_admin(&info.sender), ContractError::Unauthorized {});
 
     let spender_addr = deps.api.addr_validate(&spender)?;
-    ensure!(
-        info.sender != spender_addr,
+    ensure_ne!(
+        info.sender,
+        spender_addr,
         ContractError::CannotSetOwnAccount {}
     );
 
@@ -283,8 +285,9 @@ where
     ensure!(cfg.is_admin(&info.sender), ContractError::Unauthorized {});
 
     let spender_addr = deps.api.addr_validate(&spender)?;
-    ensure!(
-        info.sender != spender_addr,
+    ensure_ne!(
+        info.sender,
+        spender_addr,
         ContractError::CannotSetOwnAccount {}
     );
     PERMISSIONS.save(deps.storage, &spender_addr, &perm)?;
