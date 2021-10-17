@@ -1,14 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Decimal, Uint128};
+use cosmwasm_std::{Decimal, Uint128};
 use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub cw20_token_addr: Addr,
+    pub cw20_token_addr: String,
     pub unbonding_period: u64,
-    pub native_denom: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -78,12 +77,6 @@ pub struct StateResponse {
     pub unbonding_period: u64,
     pub global_index: Decimal,
     pub total_balance: Uint128,
-    pub prev_reward_balance: Uint128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct RewardIndexResponse {
-    pub global_index: Decimal,
     pub prev_reward_balance: Uint128,
 }
 

@@ -21,31 +21,28 @@
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{
-        from_binary, to_binary, Addr, Api, BankMsg, Coin, CosmosMsg, Decimal, Empty, MessageInfo,
-        StdError, SubMsg, Uint128, WasmMsg,
+        from_binary, to_binary, Addr, BankMsg, Coin, Decimal, MessageInfo, SubMsg, Uint128, WasmMsg,
     };
 
     use crate::contract::{calculate_decimal_rewards, execute, get_decimals, instantiate, query};
     use crate::msg::{
         ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg, QueryMsg, ReceiveMsg,
-        RewardIndexResponse, StateResponse,
+        StateResponse,
     };
 
     use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
     use crate::state::{Holder, State, HOLDERS, STATE};
-    use std::borrow::{Borrow, BorrowMut};
+    use crate::ContractError;
+    use std::borrow::BorrowMut;
     use std::ops::{Mul, Sub};
     use std::str::FromStr;
 
-    const DEFAULT_REWARD_DENOM: &str = "uusd";
     const MOCK_CW20_CONTRACT_ADDR: &str = "cw20";
-    const MOCK_TOKEN_CONTRACT_ADDR: &str = "token";
     fn default_init() -> InstantiateMsg {
         InstantiateMsg {
-            cw20_token_addr: Addr::unchecked(MOCK_CW20_CONTRACT_ADDR),
+            cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.into(),
             unbonding_period: 1000,
-            native_denom: DEFAULT_REWARD_DENOM.to_string(),
         }
     }
 
@@ -78,27 +75,21 @@ mod tests {
             StateResponse {
                 cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.to_string(),
                 unbonding_period: 1000,
-                native_denom: DEFAULT_REWARD_DENOM.to_string(),
                 total_balance: Default::default(),
                 global_index: Decimal::zero(),
                 prev_reward_balance: Default::default()
             }
         );
 
-        let res = query(
-            deps.as_ref(),
-            env,
-            QueryMsg::RewardIndex {
-                cw20_addr: MOCK_CW20_CONTRACT_ADDR.to_string(),
-            },
-        )
-        .unwrap();
-        let state_response: RewardIndexResponse = from_binary(&res).unwrap();
+        let res = query(deps.as_ref(), env, QueryMsg::State {}).unwrap();
+        let state_response: StateResponse = from_binary(&res).unwrap();
         assert_eq!(
             state_response,
-            RewardIndexResponse {
+            StateResponse {
+                cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.into(),
+                unbonding_period: 0,
                 global_index: Decimal::zero(),
-                total_balance: Uint128::new(0u128),
+                total_balance: Default::default(),
                 prev_reward_balance: Uint128::zero()
             }
         );
@@ -114,21 +105,21 @@ mod tests {
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("sender", &[]);
-        instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg);
+        instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
 
         let msg = ExecuteMsg::UpdateRewardIndex {};
 
         // Failed zero staking balance
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
-            Err(StdError::GenericErr { msg, .. }) => assert_eq!(msg, "No asset is bonded by Hub"),
+            Err(ContractError::NoBond {}) => {}
             _ => panic!("DO NOT ENTER HERE"),
         }
         STATE
             .save(
                 deps.as_mut().storage,
                 &State {
-                    cw20_token_addr: MOCK_CW20_CONTRACT_ADDR,
+                    cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.into(),
                     unbonding_period: 0,
                     global_index: Decimal::zero(),
                     total_balance: Uint128::from(100u128),
@@ -141,18 +132,13 @@ mod tests {
         // global_index == 1
         //handle(&mut deps, env, msg).unwrap();
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
-        let res = query(
-            deps.as_ref(),
-            env,
-            QueryMsg::RewardIndex {
-                cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-            },
-        )
-        .unwrap();
-        let state_response: RewardIndexResponse = from_binary(&res).unwrap();
+        let res = query(deps.as_ref(), env, QueryMsg::State {}).unwrap();
+        let state_response: State = from_binary(&res).unwrap();
         assert_eq!(
             state_response,
-            RewardIndexResponse {
+            State {
+                cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.into(),
+                unbonding_period: 0,
                 global_index: Decimal::one(),
                 total_balance: Uint128::from(100u128),
                 prev_reward_balance: Uint128::from(100u128)
@@ -162,15 +148,12 @@ mod tests {
 
     #[test]
     fn increase_balance() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg);
+        instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
         let receive_msg = receive_stake_msg("addr0000", 100);
@@ -179,7 +162,8 @@ mod tests {
             env.clone(),
             info.clone(),
             receive_msg.clone(),
-        );
+        )
+        .unwrap();
 
         let res = query(
             deps.as_ref(),
@@ -204,12 +188,10 @@ mod tests {
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
         let info = mock_info("addr0000", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
-        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let info = mock_info("sender", &[]);
         execute(deps.as_mut(), env.clone(), info.clone(), receive_msg).unwrap();
         let res = query(
             deps.as_ref(),
@@ -234,17 +216,14 @@ mod tests {
 
     #[test]
     fn increase_balance_with_decimals() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100000u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg);
+        instantiate(deps.as_mut(), env.clone(), info.clone(), init_msg).unwrap();
 
-        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let info = mock_info("sender", &[]);
         let receive_msg = receive_stake_msg("addr0000", 11);
         execute(
             deps.as_mut(),
@@ -276,12 +255,10 @@ mod tests {
         // claimed_rewards = 100000 , total_balance = 11
         // global_index == 9077.727272727272727272
         let info = mock_info("addr0000", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
-        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let info = mock_info("sender", &[]);
         let receive_msg = receive_stake_msg("addr0000", 10);
         execute(
             deps.as_mut(),
@@ -319,15 +296,12 @@ mod tests {
 
     #[test]
     fn unbond_stake() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
         let msg = ExecuteMsg::UnbondStake {
             amount: Uint128::from(100u128),
@@ -337,22 +311,20 @@ mod tests {
         let info = mock_info("addr0000", &[]);
         let res = execute(deps.as_mut(), env.clone(), info.clone(), msg.clone());
         match res {
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Decrease amount cannot exceed user balance: 0")
+            Err(ContractError::DecreaseAmountExceeds(amount)) => {
+                assert_eq!(amount, Uint128::zero())
             }
             _ => panic!("DO NOT ENTER HERE"),
         };
 
-        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let info = mock_info("sender", &[]);
         let receive_msg = receive_stake_msg("addr0000", 100);
         execute(deps.as_mut(), env.clone(), info, receive_msg).unwrap();
 
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
         let info = mock_info("addr0000", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let info = mock_info("addr0000", &[]);
@@ -384,15 +356,12 @@ mod tests {
 
     #[test]
     fn claim_rewards() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let env = mock_env();
-        let info = mock_info(MOCK_TOKEN_CONTRACT_ADDR, &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        let info = mock_info("sender", &[]);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
         let receive_msg = receive_stake_msg("addr0000", 100);
@@ -419,10 +388,8 @@ mod tests {
 
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
-        let info = mock_info("sender", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::ClaimRewards { recipient: None };
@@ -444,9 +411,7 @@ mod tests {
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
         let info = mock_info("sender", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::ClaimRewards {
@@ -468,17 +433,14 @@ mod tests {
 
     #[test]
     fn withdraw_stake() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let mut env = mock_env();
-        let info = mock_info(MOCK_TOKEN_CONTRACT_ADDR, &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        let info = mock_info("sender", &[]);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
-        let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
+        let info = mock_info("sender", &[]);
         let receive_msg = receive_stake_msg("addr0000", 100);
         execute(deps.as_mut(), env.clone(), info, receive_msg.clone()).unwrap();
 
@@ -505,9 +467,7 @@ mod tests {
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
         let info = mock_info("sender", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::ClaimRewards { recipient: None };
@@ -539,9 +499,7 @@ mod tests {
         let res = execute(deps.as_mut(), env.clone(), info, msg);
 
         match res {
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Wait for the unbonding period")
-            }
+            Err(ContractError::WaitUnbonding {}) => {}
             _ => panic!("Unexpected error"),
         }
 
@@ -567,15 +525,12 @@ mod tests {
 
     #[test]
     fn withdraw_stake_cap() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let mut env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
         let receive_msg = receive_stake_msg("addr0000", 100);
@@ -604,9 +559,7 @@ mod tests {
         // claimed_rewards = 100, total_balance = 100
         // global_index == 1
         let info = mock_info("addr0000", &[]);
-        let msg = ExecuteMsg::UpdateRewardIndex {
-            cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-        };
+        let msg = ExecuteMsg::UpdateRewardIndex {};
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         let msg = ExecuteMsg::ClaimRewards { recipient: None };
@@ -639,9 +592,7 @@ mod tests {
         env.block.height = 100000;
         let res = execute(deps.as_mut(), env.clone(), info, msg);
         match res {
-            Err(StdError::GenericErr { msg, .. }) => {
-                assert_eq!(msg, "Wait for the unbonding period")
-            }
+            Err(ContractError::WaitUnbonding {}) => {}
 
             _ => panic!("Unexpected error"),
         }
@@ -669,14 +620,11 @@ mod tests {
 
     #[test]
     fn claim_rewards_with_decimals() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(99999u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
         let receive_msg = receive_stake_msg("addr0000", 11);
@@ -743,18 +691,13 @@ mod tests {
             }
         );
 
-        let res = query(
-            deps.as_ref(),
-            env,
-            QueryMsg::RewardIndex {
-                cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-            },
-        )
-        .unwrap();
-        let state_response: RewardIndexResponse = from_binary(&res).unwrap();
+        let res = query(deps.as_ref(), env, QueryMsg::State {}).unwrap();
+        let state_response: StateResponse = from_binary(&res).unwrap();
         assert_eq!(
             state_response,
-            RewardIndexResponse {
+            StateResponse {
+                cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.into(),
+                unbonding_period: 0,
                 global_index: index,
                 total_balance: Uint128::new(11u128),
                 prev_reward_balance: Uint128::new(1)
@@ -764,15 +707,12 @@ mod tests {
 
     #[test]
     fn query_holders() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
         let info = mock_info(MOCK_CW20_CONTRACT_ADDR, &[]);
         let receive_msg = receive_stake_msg(Addr::unchecked("addr0000").as_str(), 100);
@@ -884,15 +824,12 @@ mod tests {
 
     #[test]
     fn proper_prev_balance() {
-        let mut deps = mock_dependencies(&[Coin {
-            denom: DEFAULT_REWARD_DENOM.to_string(),
-            amount: Uint128::new(100u128),
-        }]);
+        let mut deps = mock_dependencies(&[]);
 
         let init_msg = default_init();
         let env = mock_env();
         let info = mock_info("addr0000", &[]);
-        instantiate(deps.as_mut(), env.clone(), info, init_msg);
+        instantiate(deps.as_mut(), env.clone(), info, init_msg).unwrap();
 
         let amount1 = Uint128::from(8899999999988889u128);
         let amount2 = Uint128::from(14487875351811111u128);
@@ -907,6 +844,8 @@ mod tests {
             .save(
                 deps.as_mut().storage,
                 &State {
+                    cw20_token_addr: MOCK_CW20_CONTRACT_ADDR.into(),
+                    unbonding_period: 0,
                     global_index,
                     total_balance: all_balance,
                     prev_reward_balance: rewards,
@@ -965,18 +904,13 @@ mod tests {
         let info = mock_info("addr0002", &[]);
         execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
-        let res = query(
-            deps.as_ref(),
-            env.clone(),
-            QueryMsg::RewardIndex {
-                cw20_addr: MOCK_CW20_CONTRACT_ADDR.into_string(),
-            },
-        )
-        .unwrap();
-        let state_response: RewardIndexResponse = from_binary(&res).unwrap();
+        let res = query(deps.as_ref(), env.clone(), QueryMsg::State {}).unwrap();
+        let state_response: StateResponse = from_binary(&res).unwrap();
         assert_eq!(
             state_response,
-            RewardIndexResponse {
+            StateResponse {
+                cw20_token_addr: "".to_string(),
+                unbonding_period: 0,
                 global_index,
                 total_balance: all_balance,
                 prev_reward_balance: Uint128::new(1)

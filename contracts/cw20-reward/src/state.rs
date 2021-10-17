@@ -1,16 +1,13 @@
 use crate::msg::HolderResponse;
-use crate::msg::QueryMsg::AccruedRewards;
-use core::num::FpCategory::Nan;
-use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Deps, Order, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Deps, Order, StdResult, Uint128};
 use cw_controllers::Claims;
 use cw_storage_plus::{Bound, Item, Map};
 use schemars::JsonSchema;
-use schemars::_serde_json::to_string;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub cw20_token_addr: Addr,
+    pub cw20_token_addr: String,
     pub unbonding_period: u64,
     pub global_index: Decimal,
     pub total_balance: Uint128,

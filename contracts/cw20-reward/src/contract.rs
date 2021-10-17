@@ -1,17 +1,17 @@
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, Addr, Binary, Decimal, Deps, DepsMut, Env,
-    MessageInfo, Order, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    attr, entry_point, from_binary, to_binary, Binary, Decimal, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
 };
 
 use crate::msg::{
     AccruedRewardsResponse, ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg,
-    MigrateMsg, QueryMsg, ReceiveMsg, RewardIndexResponse, StateResponse,
+    MigrateMsg, QueryMsg, ReceiveMsg, StateResponse,
 };
 use crate::state::{list_accrued_rewards, Holder, State, CLAIMS, HOLDERS, STATE};
 use crate::ContractError;
-use cw20::{BalanceResponse, Cw20Contract, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
+use cw20::{BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg, Cw20ReceiveMsg};
 use cw_controllers::ClaimsResponse;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -21,8 +21,9 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    deps.api.addr_validate(&msg.cw20_token_addr.as_str())?;
     let state = State {
-        cw20_token_addr: deps.api.addr_validate(&msg.cw20_token_addr.as_str())?,
+        cw20_token_addr: msg.cw20_token_addr,
         unbonding_period: msg.unbonding_period,
         global_index: Decimal::zero(),
         total_balance: Uint128::zero(),
@@ -63,7 +64,7 @@ pub fn execute_update_reward_index(deps: DepsMut, env: Env) -> Result<Response, 
         address: env.contract.address.into_string(),
     };
     let query = WasmQuery::Smart {
-        contract_addr: state.cw20_token_addr.into(),
+        contract_addr: state.cw20_token_addr.clone().into(),
         msg: to_binary(&msg)?,
     }
     .into();
@@ -109,7 +110,6 @@ pub fn execute_claim_rewards(
         calculate_decimal_rewards(state.global_index, holder.index, holder.balance)?;
 
     let all_reward_with_decimals = reward_with_decimals.add(holder.pending_rewards);
-    let decimals = get_decimals(all_reward_with_decimals)?;
 
     let rewards = all_reward_with_decimals * Uint128::new(1);
 
@@ -162,7 +162,7 @@ pub fn execute_bond(
     }
 
     let addr = deps.api.addr_validate(&holder_addr.as_str())?;
-    let state = STATE.load(deps.storage)?;
+    let mut state = STATE.load(deps.storage)?;
 
     let mut holder = HOLDERS.may_load(deps.storage, &addr)?.unwrap_or(Holder {
         balance: Uint128::zero(),
@@ -178,6 +178,9 @@ pub fn execute_bond(
     holder.balance = amount;
     // save reward and index
     HOLDERS.save(deps.storage, &addr, &holder)?;
+
+    state.total_balance += amount;
+    STATE.save(deps.storage, &state)?;
 
     let res = Response::new()
         .add_attribute("action", "bond_stake")
@@ -244,7 +247,7 @@ pub fn execute_withdraw_stake(
         amount,
     };
     let msg = WasmMsg::Execute {
-        contract_addr: state.cw20_token_addr.into_string(),
+        contract_addr: state.cw20_token_addr,
         msg: to_binary(&cw20_transfer_msg)?,
         funds: vec![],
     };
@@ -273,7 +276,7 @@ pub fn query_state(deps: Deps, _env: Env, _msg: QueryMsg) -> StdResult<StateResp
     let state = STATE.load(deps.storage)?;
 
     Ok(StateResponse {
-        cw20_token_addr: state.cw20_token_addr.into_string(),
+        cw20_token_addr: state.cw20_token_addr,
         unbonding_period: state.unbonding_period,
         global_index: state.global_index,
         total_balance: state.total_balance,
@@ -332,6 +335,7 @@ pub fn calculate_decimal_rewards(
     user_balance: Uint128,
 ) -> StdResult<Decimal> {
     let decimal_balance = Decimal::from_ratio(user_balance, Uint128::new(1));
+
     Ok(global_index.sub(user_index).mul(decimal_balance))
 }
 
