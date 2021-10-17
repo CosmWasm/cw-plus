@@ -19,24 +19,24 @@
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_env, mock_info, mock_dependencies};
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{
-        from_binary, to_binary, Addr, Api, BankMsg, Coin, CosmosMsg, Decimal, Empty,
-        MessageInfo, StdError, SubMsg, Uint128, WasmMsg,
+        from_binary, to_binary, Addr, Api, BankMsg, Coin, CosmosMsg, Decimal, Empty, MessageInfo,
+        StdError, SubMsg, Uint128, WasmMsg,
     };
 
-    use crate::contract::{execute, instantiate, query, calculate_decimal_rewards, get_decimals};
+    use crate::contract::{calculate_decimal_rewards, execute, get_decimals, instantiate, query};
     use crate::msg::{
-        StateResponse, ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg, QueryMsg,
-        ReceiveMsg, RewardIndexResponse,
+        ExecuteMsg, HolderResponse, HoldersResponse, InstantiateMsg, QueryMsg, ReceiveMsg,
+        RewardIndexResponse, StateResponse,
     };
 
     use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 
-    use std::str::FromStr;
-    use crate::state::{STATE, State, Holder, HOLDERS};
-    use std::ops::{Mul, Sub};
+    use crate::state::{Holder, State, HOLDERS, STATE};
     use std::borrow::{Borrow, BorrowMut};
+    use std::ops::{Mul, Sub};
+    use std::str::FromStr;
 
     const DEFAULT_REWARD_DENOM: &str = "uusd";
     const MOCK_CW20_CONTRACT_ADDR: &str = "cw20";
@@ -305,7 +305,7 @@ mod tests {
         let value1 = Decimal::from_ratio(Uint128::new(100000), Uint128::new(11));
         let index = value1.mul(Decimal::one());
         let pend_value1 = holder_response.index.sub(Decimal::zero());
-        let user_pend_reward =  Decimal::from_str("11").unwrap().mul(pend_value1);
+        let user_pend_reward = Decimal::from_str("11").unwrap().mul(pend_value1);
         assert_eq!(
             holder_response,
             HolderResponse {
@@ -731,7 +731,7 @@ mod tests {
         )
         .unwrap();
         let holder_response: HolderResponse = from_binary(&res).unwrap();
-        let value1= Decimal::from_ratio(Uint128::new(99999), Uint128::new(11));
+        let value1 = Decimal::from_ratio(Uint128::new(99999), Uint128::new(11));
         let index = Decimal::one().mul(value1);
         assert_eq!(
             holder_response,
@@ -914,26 +914,44 @@ mod tests {
             )
             .unwrap();
 
-        let holder = Holder{
+        let holder = Holder {
             balance: amount1,
             index: Decimal::from_str("0").unwrap(),
             pending_rewards: Decimal::from_str("0").unwrap(),
         };
-        HOLDERS.save(deps.storage.borrow_mut(), &Addr::unchecked("addr0000"), &holder).unwrap();
+        HOLDERS
+            .save(
+                deps.storage.borrow_mut(),
+                &Addr::unchecked("addr0000"),
+                &holder,
+            )
+            .unwrap();
 
-        let holder = Holder{
+        let holder = Holder {
             balance: amount2,
             index: Decimal::from_str("0").unwrap(),
             pending_rewards: Decimal::from_str("0").unwrap(),
         };
-        HOLDERS.save(deps.storage.borrow_mut(), &Addr::unchecked("addr0001"), &holder).unwrap();
+        HOLDERS
+            .save(
+                deps.storage.borrow_mut(),
+                &Addr::unchecked("addr0001"),
+                &holder,
+            )
+            .unwrap();
 
-        let holder = Holder{
+        let holder = Holder {
             balance: amount3,
             index: Decimal::from_str("0").unwrap(),
             pending_rewards: Decimal::from_str("0").unwrap(),
         };
-        HOLDERS.save(deps.storage.borrow_mut(), &Addr::unchecked("addr0002"), &holder).unwrap();
+        HOLDERS
+            .save(
+                deps.storage.borrow_mut(),
+                &Addr::unchecked("addr0002"),
+                &holder,
+            )
+            .unwrap();
 
         let msg = ExecuteMsg::ClaimRewards { recipient: None };
         let info = mock_info("addr0000", &[]);
@@ -1023,25 +1041,24 @@ mod tests {
         );
     }
 
-        #[test]
-        pub fn proper_calculate_rewards() {
-            let global_index = Decimal::from_ratio(Uint128::new(9), Uint128::new(100));
-            let user_index = Decimal::zero();
-            let user_balance = Uint128::new(1000);
-            let reward = calculate_decimal_rewards(global_index, user_index, user_balance).unwrap();
-            assert_eq!(reward.to_string(), "90");
-        }
+    #[test]
+    pub fn proper_calculate_rewards() {
+        let global_index = Decimal::from_ratio(Uint128::new(9), Uint128::new(100));
+        let user_index = Decimal::zero();
+        let user_balance = Uint128::new(1000);
+        let reward = calculate_decimal_rewards(global_index, user_index, user_balance).unwrap();
+        assert_eq!(reward.to_string(), "90");
+    }
 
-        #[test]
-        pub fn proper_get_decimals() {
-            let global_index = Decimal::from_ratio(Uint128::new(9999999), Uint128::new(100000000));
-            let user_index = Decimal::zero();
-            let user_balance = Uint128::new(10);
-            let reward = get_decimals(
-                calculate_decimal_rewards(global_index, user_index, user_balance).unwrap(),
-            )
-                .unwrap();
-            assert_eq!(reward.to_string(), "0.9999999");
-        }
-
+    #[test]
+    pub fn proper_get_decimals() {
+        let global_index = Decimal::from_ratio(Uint128::new(9999999), Uint128::new(100000000));
+        let user_index = Decimal::zero();
+        let user_balance = Uint128::new(10);
+        let reward = get_decimals(
+            calculate_decimal_rewards(global_index, user_index, user_balance).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(reward.to_string(), "0.9999999");
+    }
 }

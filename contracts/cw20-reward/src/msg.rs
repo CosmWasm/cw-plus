@@ -19,7 +19,7 @@ pub enum ExecuteMsg {
     ///////////////////
 
     /// Update the reward index
-    UpdateRewardIndex { },
+    UpdateRewardIndex {},
 
     ////////////////////
     /// Staking operations
@@ -50,7 +50,7 @@ pub enum ReceiveMsg {
     /// Withdraw rewards to pending rewards
     /// Set current reward index to global index
     BondStake {},
-    UpdateRewardIndex {}
+    UpdateRewardIndex {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -1,4 +1,4 @@
-use cosmwasm_std::{StdError, Uint128, OverflowError};
+use cosmwasm_std::{OverflowError, StdError, Uint128};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -16,18 +16,17 @@ pub enum ContractError {
     Unauthorized {},
 
     #[error("Do not send native funds")]
-    DoNotSendFunds{},
+    DoNotSendFunds {},
 
     #[error("Amount required")]
-    AmountRequired{},
+    AmountRequired {},
 
     #[error("Decrease amount exceeds user balance: {0}")]
     DecreaseAmountExceeds(Uint128),
 
     #[error("Wait for the unbonding")]
-    WaitUnbonding{},
+    WaitUnbonding {},
 
     #[error("No bond")]
-    NoBond{},
-
+    NoBond {},
 }

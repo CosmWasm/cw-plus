@@ -1,12 +1,12 @@
 use crate::msg::HolderResponse;
-use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Deps, Order, StdResult, Storage, Uint128};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use crate::msg::QueryMsg::AccruedRewards;
-use schemars::_serde_json::to_string;
 use core::num::FpCategory::Nan;
-use cw_storage_plus::{Map, Bound, Item};
+use cosmwasm_std::{Addr, Api, CanonicalAddr, Decimal, Deps, Order, StdResult, Storage, Uint128};
 use cw_controllers::Claims;
+use cw_storage_plus::{Bound, Item, Map};
+use schemars::JsonSchema;
+use schemars::_serde_json::to_string;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
