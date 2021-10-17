@@ -1,12 +1,14 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Decimal, Uint128};
+use cosmwasm_std::{Addr, Decimal, Uint128};
+use cw20::Cw20ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub hub_contract: String,
-    pub reward_denom: String,
+    pub cw20_token_addr: Addr,
+    pub unbonding_period: u64,
+    pub native_denom: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -16,37 +18,44 @@ pub enum ExecuteMsg {
     /// Owner's operations
     ///////////////////
 
-    /// Swap all of the balances to uusd.
-    SwapToRewardDenom {},
-
-    /// Update the global index
-    UpdateGlobalIndex {},
+    /// Update the reward index
+    UpdateRewardIndex { },
 
     ////////////////////
-    /// bAsset's operations
+    /// Staking operations
     ///////////////////
 
-    /// Increase user staking balance
+    /// Unbound user staking balance
     /// Withdraw rewards to pending rewards
     /// Set current reward index to global index
-    IncreaseBalance { address: String, amount: Uint128 },
-    /// Decrease user staking balance
-    /// Withdraw rewards to pending rewards
-    /// Set current reward index to global index
-    DecreaseBalance { address: String, amount: Uint128 },
+    UnbondStake { amount: Uint128 },
+
+    /// Unbound user staking balance
+    /// Withdraws released stake
+    WithdrawStake { cap: Option<Uint128> },
 
     ////////////////////
     /// User's operations
     ///////////////////
-
-    /// return the accrued reward in uusd to the user.
     ClaimRewards { recipient: Option<String> },
+
+    /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
+    Receive(Cw20ReceiveMsg),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiveMsg {
+    /// Bond stake user staking balance
+    /// Withdraw rewards to pending rewards
+    /// Set current reward index to global index
+    BondStake {},
+    UpdateRewardIndex {}
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    Config {},
     State {},
     AccruedRewards {
         address: String,
@@ -58,18 +67,23 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ConfigResponse {
-    pub hub_contract: String,
-    pub reward_denom: String,
+    Claims {
+        address: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StateResponse {
+    pub cw20_token_addr: String,
+    pub unbonding_period: u64,
     pub global_index: Decimal,
     pub total_balance: Uint128,
+    pub prev_reward_balance: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RewardIndexResponse {
+    pub global_index: Decimal,
     pub prev_reward_balance: Uint128,
 }
 
@@ -90,3 +104,6 @@ pub struct HolderResponse {
 pub struct HoldersResponse {
     pub holders: Vec<HolderResponse>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}

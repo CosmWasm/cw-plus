@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReceiveMsg",
+  "anyOf": [
+    {
+      "description": "Bond stake user staking balance Withdraw rewards to pending rewards Set current reward index to global index",
+      "type": "object",
+      "required": [
+        "bond_stake"
+      ],
+      "properties": {
+        "bond_stake": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

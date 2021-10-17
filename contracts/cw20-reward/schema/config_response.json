@@ -3,15 +3,21 @@
   "title": "ConfigResponse",
   "type": "object",
   "required": [
-    "hub_contract",
-    "reward_denom"
+    "cw20_token_addr",
+    "reward_denom",
+    "unbonding_period"
   ],
   "properties": {
-    "hub_contract": {
+    "cw20_token_addr": {
       "type": "string"
     },
     "reward_denom": {
       "type": "string"
+    },
+    "unbonding_period": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
     }
   }
 }
