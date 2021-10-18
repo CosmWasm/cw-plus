@@ -185,15 +185,48 @@ where
     }
 }
 
+#[cfg(feature = "iterator")]
+impl<'a, K, T> SnapshotMap<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a> + KeyDeserialize,
+{
+    pub fn range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().range_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix<K, T> {
+        Prefix::new(self.primary.namespace(), &[])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::MockStorage;
 
     type TestMap = SnapshotMap<'static, &'static [u8], u64>;
+    type TestMapCompositeKey = SnapshotMap<'static, (&'static [u8], &'static [u8]), u64>;
+
     const NEVER: TestMap =
         SnapshotMap::new("never", "never__check", "never__change", Strategy::Never);
     const EVERY: TestMap = SnapshotMap::new(
+        "every",
+        "every__check",
+        "every__change",
+        Strategy::EveryBlock,
+    );
+    const EVERY_COMPOSITE_KEY: TestMapCompositeKey = SnapshotMap::new(
         "every",
         "every__check",
         "every__change",
@@ -255,6 +288,31 @@ mod tests {
         (b"C", Some(13)),
         (b"D", None),
     ];
+
+    // Same as `init_data`, but we have a composite key for testing range_de.
+    fn init_data_composite_key(map: &TestMapCompositeKey, storage: &mut dyn Storage) {
+        map.save(storage, (b"A", b"B"), &5, 1).unwrap();
+        map.save(storage, (b"B", b"A"), &7, 2).unwrap();
+
+        // checkpoint 3
+        map.add_checkpoint(storage, 3).unwrap();
+
+        // also use update to set - to ensure this works
+        map.save(storage, (b"B", b"B"), &1, 3).unwrap();
+        map.update(storage, (b"A", b"B"), 3, |_| -> StdResult<u64> { Ok(8) })
+            .unwrap();
+
+        map.remove(storage, (b"B", b"A"), 4).unwrap();
+        map.save(storage, (b"B", b"B"), &13, 4).unwrap();
+
+        // checkpoint 5
+        map.add_checkpoint(storage, 5).unwrap();
+        map.remove(storage, (b"A", b"B"), 5).unwrap();
+        map.update(storage, (b"C", b"A"), 5, |_| -> StdResult<u64> { Ok(22) })
+            .unwrap();
+        // and delete it later (unknown if all data present)
+        map.remove_checkpoint(storage, 5).unwrap();
+    }
 
     fn assert_final_values(map: &TestMap, storage: &dyn Storage) {
         for (k, v) in FINAL_VALUES.iter().cloned() {
@@ -371,6 +429,72 @@ mod tests {
         assert_eq!(
             Some(16),
             EVERY.may_load_at_height(&storage, b"C", 6).unwrap()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_de_simple_string_key() {
+        use cosmwasm_std::Order;
+
+        let mut store = MockStorage::new();
+        init_data(&EVERY, &mut store);
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = EVERY
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(b"C".to_vec(), 13), (b"D".to_vec(), 22)]);
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = EVERY
+            .range_de(
+                &store,
+                Some(Bound::Inclusive(b"C".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(b"C".to_vec(), 13), (b"D".to_vec(), 22)]);
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = EVERY
+            .range_de(
+                &store,
+                Some(Bound::Inclusive(b"D".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(b"D".to_vec(), 22)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_de_composite_key() {
+        use cosmwasm_std::Order;
+
+        let mut store = MockStorage::new();
+        init_data_composite_key(&EVERY_COMPOSITE_KEY, &mut store);
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ((b"B".to_vec(), b"B".to_vec()), 13),
+                ((b"C".to_vec(), b"A".to_vec()), 22)
+            ]
         );
     }
 }
