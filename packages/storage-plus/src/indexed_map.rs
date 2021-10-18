@@ -5,8 +5,9 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::de::KeyDeserialize;
 use crate::indexes::Index;
-use crate::iter_helpers::deserialize_v;
+use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
@@ -192,6 +193,68 @@ where
         let mapped =
             namespaced_prefix_range(store, self.pk_namespace, min, max, order).map(deserialize_v);
         Box::new(mapped)
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + KeyDeserialize,
+    I: IndexList<T>,
+{
+    /// while range_de assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
+    {
+        let mapped = namespaced_prefix_range(store, self.primary.namespace(), min, max, order)
+            .map(deserialize_kv::<K, T>);
+        Box::new(mapped)
+    }
+
+    pub fn range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().range_de(store, min, max, order)
+    }
+
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix<K, T> {
+        Prefix::new(self.primary.namespace(), &[])
     }
 }
 
@@ -728,6 +791,49 @@ mod test {
         // The associated data
         assert_eq!(datas[0], marias[0].1);
         assert_eq!(datas[1], marias[1].1);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_de_simple_string_key() {
+        let mut store = MockStorage::new();
+        let map = build_map();
+
+        // save data
+        let (pks, datas) = save_data(&mut store, &map);
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = map.range_de(&store, None, None, Order::Ascending).collect();
+        let all = all.unwrap();
+        assert_eq!(
+            all,
+            pks.clone()
+                .into_iter()
+                .map(&<[u8]>::to_vec)
+                .zip(datas.clone().into_iter())
+                .collect::<Vec<_>>()
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = map
+            .range_de(
+                &store,
+                Some(Bound::Inclusive(b"3".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(
+            all,
+            pks.into_iter()
+                .map(&<[u8]>::to_vec)
+                .zip(datas.into_iter())
+                .rev()
+                .take(3)
+                .rev()
+                .collect::<Vec<_>>()
+        );
     }
 
     mod inclusive_bound {
