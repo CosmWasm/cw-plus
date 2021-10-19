@@ -921,6 +921,103 @@ mod test {
         );
     }
 
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn prefix_range_de_triple_key() {
+        let mut store = MockStorage::new();
+
+        let indexes = DataCompositeMultiIndex {
+            name_age: MultiIndex::new(
+                |d, k| index_triple(&d.name, d.age, k),
+                "data",
+                "data__name_age",
+            ),
+        };
+        let map = IndexedMap::new("data", indexes);
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk1: (&[u8], &[u8], &[u8]) = (b"1", b"1", b"5627");
+        map.save(&mut store, pk1, &data1).unwrap();
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk2: (&[u8], &[u8], &[u8]) = (b"1", b"2", b"5628");
+        map.save(&mut store, pk2, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Young".to_string(),
+            age: 24,
+        };
+        let pk3: (&[u8], &[u8], &[u8]) = (b"2", b"1", b"5629");
+        map.save(&mut store, pk3, &data3).unwrap();
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 43,
+        };
+        let pk4: (&[u8], &[u8], &[u8]) = (b"2", b"2", b"5630");
+        map.save(&mut store, pk4, &data4).unwrap();
+
+        // let's try to iterate!
+        let result: StdResult<Vec<_>> = map
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive((&b"1"[..], &b"2"[..]))),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let result = result.unwrap();
+        assert_eq!(
+            result,
+            [
+                (
+                    (b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()),
+                    data2.clone()
+                ),
+                (
+                    (b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()),
+                    data3.clone()
+                ),
+                ((b"2".to_vec(), b"2".to_vec(), b"5630".to_vec()), data4)
+            ]
+        );
+
+        // let's try to iterate over a range
+        let result: StdResult<Vec<_>> = map
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive((&b"1"[..], &b"2"[..]))),
+                Some(PrefixBound::inclusive((&b"2"[..], &b"1"[..]))),
+                Order::Ascending,
+            )
+            .collect();
+        let result = result.unwrap();
+        assert_eq!(
+            result,
+            [
+                (
+                    (b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()),
+                    data2.clone()
+                ),
+                (
+                    (b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()),
+                    data3.clone()
+                ),
+            ]
+        );
+    }
+
     mod inclusive_bound {
         use super::*;
         use crate::U64Key;
