@@ -1,2 +1,2 @@
 #[cfg(any(test, feature = "multitest"))]
-mod contract;
+pub mod contract;

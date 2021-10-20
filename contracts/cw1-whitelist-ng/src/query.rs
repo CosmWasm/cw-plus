@@ -22,6 +22,7 @@ impl<'a> Cw1WhitelistQuerier<'static> {
 }
 
 impl<'a> Cw1WhitelistQuerier<'a> {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<'q, C>(
         addr: &'a Addr,
         querier: &'q QuerierWrapper<'q, C>,
