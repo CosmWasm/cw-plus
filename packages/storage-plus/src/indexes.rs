@@ -386,7 +386,15 @@ where
 fn deserialize_unique_kv<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
-    Ok((t.pk.into(), t.value))
+    Ok((t.pk.to_vec(), t.value))
+}
+
+fn deserialize_unique_kv_de<T: DeserializeOwned, K: KeyDeserialize>(
+    kv: Record,
+) -> StdResult<(K::Output, T)> {
+    let (_, v) = kv;
+    let t = from_slice::<UniqueRef<T>>(&v)?;
+    Ok((K::from_vec(t.pk.to_vec())?, t.value))
 }
 
 impl<'a, K, T> UniqueIndex<'a, K, T>
@@ -515,6 +523,8 @@ where
     }
 
     fn no_prefix_de(&self) -> Prefix<K, T> {
-        Prefix::new(self.idx_namespace, &[])
+        Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
+            deserialize_unique_kv_de::<_, K>(kv)
+        })
     }
 }
