@@ -3,7 +3,7 @@ use crate::state::Cw1WhitelistContract;
 use crate::{msg::*, query::Cw1WhitelistQuerier};
 use anyhow::{bail, Result as AnyResult};
 use cosmwasm_std::{
-    from_slice, Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Empty, Env, MessageInfo,
+    from_slice, Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Env, MessageInfo,
     QuerierWrapper, Reply, Response,
 };
 use cw_multi_test::{AppResponse, Contract, Executor};
@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-impl<T> Contract<T> for Cw1WhitelistContract
+impl<T> Contract<T> for Cw1WhitelistContract<T>
 where
     T: Clone + std::fmt::Debug + PartialEq + JsonSchema + DeserializeOwned,
 {
@@ -139,13 +139,13 @@ impl Cw1WhitelistProxy {
         send_funds: &[Coin],
     ) -> AnyResult<AppResponse>
     where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static,
+        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static + Serialize,
         App: Executor<C>,
     {
         app.execute_contract(
             sender.clone(),
             self.0.clone(),
-            &ExecuteMsg::<Empty>::UpdateAdmins { admins },
+            &ExecuteMsg::UpdateAdmins::<C> { admins },
             send_funds,
         )
     }

@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,21 +24,19 @@ impl AdminList {
     }
 }
 
-pub struct Cw1WhitelistContract {
+pub struct Cw1WhitelistContract<T> {
     // I am pretty sure that just form this with some proper hint attributes it would be possible
     // to provide helpers for raw queries, this might be fun idea
     pub(crate) admin_list: Item<'static, AdminList>,
+    _msg: PhantomData<T>,
 }
 
-impl Cw1WhitelistContract {
+impl<T> Cw1WhitelistContract<T> {
     pub const fn new() -> Self {
         Self {
             admin_list: Item::new("admin_list"),
+            _msg: PhantomData,
         }
-    }
-
-    pub const fn admin_list(&self) -> &Item<AdminList> {
-        &self.admin_list
     }
 }
 
