@@ -283,6 +283,7 @@ version = "0.10.0"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
+ "prost",
  "schemars",
  "serde",
  "thiserror",
