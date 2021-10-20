@@ -260,8 +260,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::convert::TryInto;
-
     use super::*;
 
     use crate::indexes::{index_string_tuple, index_triple, MultiIndex, UniqueIndex};
@@ -280,7 +278,7 @@ mod test {
     struct DataIndexes<'a> {
         // Second arg is for storing pk
         pub name: MultiIndex<'a, (Vec<u8>, Vec<u8>), Data>,
-        pub age: UniqueIndex<'a, U32Key, Data>,
+        pub age: UniqueIndex<'a, U32Key, Data, Vec<u8>>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data>,
     }
 
@@ -785,11 +783,11 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(u32::from_le_bytes(pks[4].try_into().unwrap()), ages[4].0);
-        assert_eq!(u32::from_le_bytes(pks[3].try_into().unwrap()), ages[0].0);
-        assert_eq!(u32::from_le_bytes(pks[1].try_into().unwrap()), ages[1].0);
-        assert_eq!(u32::from_le_bytes(pks[2].try_into().unwrap()), ages[2].0);
-        assert_eq!(u32::from_le_bytes(pks[0].try_into().unwrap()), ages[3].0);
+        assert_eq!(pks[4], ages[4].0);
+        assert_eq!(pks[3], ages[0].0);
+        assert_eq!(pks[1], ages[1].0);
+        assert_eq!(pks[2], ages[2].0);
+        assert_eq!(pks[0], ages[3].0);
 
         // The associated data
         assert_eq!(datas[4], ages[4].1);
