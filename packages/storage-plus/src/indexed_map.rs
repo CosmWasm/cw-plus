@@ -278,8 +278,8 @@ mod test {
     struct DataIndexes<'a> {
         // Second arg is for storing pk
         pub name: MultiIndex<'a, (Vec<u8>, Vec<u8>), Data>,
-        pub age: UniqueIndex<'a, U32Key, Data, Vec<u8>>,
-        pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data>,
+        pub age: UniqueIndex<'a, U32Key, Data, String>,
+        pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -820,6 +820,35 @@ mod test {
         // The pks
         assert_eq!(pks[0], String::from_slice(&marias[0].0).unwrap());
         assert_eq!(pks[1], String::from_slice(&marias[1].0).unwrap());
+
+        // The associated data
+        assert_eq!(datas[0], marias[0].1);
+        assert_eq!(datas[1], marias[1].1);
+    }
+
+    #[test]
+    fn unique_index_composite_key_range_de() {
+        let mut store = MockStorage::new();
+        let map = build_map();
+
+        // save data
+        let (pks, datas) = save_data(&mut store, &map);
+
+        let res: StdResult<Vec<_>> = map
+            .idx
+            .name_lastname
+            .prefix(b"Maria".to_vec())
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let marias = res.unwrap();
+
+        // Only two people are called "Maria"
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // The pks
+        assert_eq!(pks[0], marias[0].0);
+        assert_eq!(pks[1], marias[1].0);
 
         // The associated data
         assert_eq!(datas[0], marias[0].1);
