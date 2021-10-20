@@ -1006,14 +1006,8 @@ mod test {
         assert_eq!(
             result,
             [
-                (
-                    (b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()),
-                    data2.clone()
-                ),
-                (
-                    (b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()),
-                    data3.clone()
-                ),
+                ((b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()), data2),
+                ((b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()), data3),
             ]
         );
     }
