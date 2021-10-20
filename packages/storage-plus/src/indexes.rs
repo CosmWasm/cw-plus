@@ -473,7 +473,7 @@ where
 #[cfg(feature = "iterator")]
 impl<'a, K, T, PK> UniqueIndex<'a, K, T, PK>
 where
-    PK: KeyDeserialize,
+    PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
@@ -484,8 +484,8 @@ where
     pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<PrefixBound<'a, K::Prefix>>,
-        max: Option<PrefixBound<'a, K::Prefix>>,
+        min: Option<PrefixBound<'a, PK::Prefix>>,
+        max: Option<PrefixBound<'a, PK::Prefix>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
