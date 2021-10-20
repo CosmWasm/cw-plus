@@ -12,18 +12,33 @@ pub struct MsgInstantiateContractResponse {
 }
 
 fn parse_protobuf_string(data: &mut Vec<u8>) -> Result<String, ParseReplyError> {
-    // FIXME: don't panic
+    if data.is_empty() {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: string field: message too short".to_owned(),
+        ));
+    }
     let mut rest_1 = data.split_off(1);
     if data[0] & 0x03 != WIRE_TYPE_LENGTH_DELIMITED {
         return Err(ParseReplyError::ParseFailure(
             "failed to decode Protobuf message: string field: invalid wire type".to_owned(),
         ));
     }
+    if rest_1.is_empty() {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: string field: message too short".to_owned(),
+        ));
+    }
     let mut rest_2 = rest_1.split_off(1);
-    let rest_3 = rest_2.split_off(rest_1[0] as usize);
+    let len = rest_1[0] as usize;
+    if rest_2.len() < len {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: string field: message too short".to_owned(),
+        ));
+    }
+    let rest_3 = rest_2.split_off(len);
 
     *data = rest_3;
-    Ok(String::from_utf8(rest_2.to_owned())?)
+    Ok(String::from_utf8(rest_2)?)
 }
 
 fn parse_protobuf_bytes(data: &mut Vec<u8>) -> Result<Option<Binary>, ParseReplyError> {
@@ -36,9 +51,19 @@ fn parse_protobuf_bytes(data: &mut Vec<u8>) -> Result<Option<Binary>, ParseReply
             "failed to decode Protobuf message: bytes field: invalid wire type".to_owned(),
         ));
     }
-    // FIXME: don't panic
+    if rest_1.is_empty() {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: bytes field: message too short".to_owned(),
+        ));
+    }
     let mut rest_2 = rest_1.split_off(1);
-    let rest_3 = rest_2.split_off(rest_1[0] as usize);
+    let len = rest_1[0] as usize;
+    if rest_2.len() < len {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: bytes field: message too short".to_owned(),
+        ));
+    }
+    let rest_3 = rest_2.split_off(len);
 
     *data = rest_3;
     Ok(Some(Binary(rest_2.to_vec())))
