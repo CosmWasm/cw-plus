@@ -305,7 +305,7 @@ mod test {
     }
 
     // Can we make it easier to define this? (less wordy generic)
-    fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
+    fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d, k| (d.name.as_bytes().to_vec(), k), "data", "data__name"),
             age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
@@ -319,8 +319,8 @@ mod test {
 
     fn save_data<'a>(
         store: &mut MockStorage,
-        map: &IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>>,
-    ) -> (Vec<&'a [u8]>, Vec<Data>) {
+        map: &IndexedMap<'a, &'a str, Data, DataIndexes<'a>>,
+    ) -> (Vec<&'a str>, Vec<Data>) {
         let mut pks = vec![];
         let mut datas = vec![];
         let data = Data {
@@ -328,7 +328,7 @@ mod test {
             last_name: "Doe".to_string(),
             age: 42,
         };
-        let pk: &[u8] = b"1";
+        let pk = "1";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -339,7 +339,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 23,
         };
-        let pk: &[u8] = b"2";
+        let pk = "2";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -350,7 +350,7 @@ mod test {
             last_name: "Wayne".to_string(),
             age: 32,
         };
-        let pk: &[u8] = b"3";
+        let pk = "3";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -360,7 +360,7 @@ mod test {
             last_name: "Rodriguez".to_string(),
             age: 12,
         };
-        let pk: &[u8] = b"4";
+        let pk = "4";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -370,7 +370,7 @@ mod test {
             last_name: "After".to_string(),
             age: 90,
         };
-        let pk: &[u8] = b"5";
+        let pk = "5";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -413,7 +413,7 @@ mod test {
             .unwrap();
         assert_eq!(2, marias.len());
         let (k, v) = &marias[0];
-        assert_eq!(pk, k.as_slice());
+        assert_eq!(pk, String::from_slice(k).unwrap());
         assert_eq!(data, v);
 
         // other index doesn't match (1 byte after)
@@ -494,7 +494,7 @@ mod test {
         // match on proper age
         let proper = U32Key::new(42);
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
-        assert_eq!(pk.to_vec(), aged.0);
+        assert_eq!(pk, String::from_vec(aged.0).unwrap());
         assert_eq!(*data, aged.1);
 
         // no match on wrong age
@@ -514,7 +514,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk: &[u8] = b"5627";
+        let pk = "5627";
         map.save(&mut store, pk, &data1).unwrap();
 
         let data2 = Data {
@@ -522,7 +522,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk: &[u8] = b"5628";
+        let pk = "5628";
         map.save(&mut store, pk, &data2).unwrap();
 
         let data3 = Data {
@@ -530,7 +530,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 24,
         };
-        let pk: &[u8] = b"5629";
+        let pk = "5629";
         map.save(&mut store, pk, &data3).unwrap();
 
         let data4 = Data {
@@ -538,7 +538,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 12,
         };
-        let pk: &[u8] = b"5630";
+        let pk = "5630";
         map.save(&mut store, pk, &data4).unwrap();
 
         let marias: Vec<_> = map
@@ -638,7 +638,7 @@ mod test {
             last_name: "Laurens".to_string(),
             age: 42,
         };
-        let pk5: &[u8] = b"4";
+        let pk5 = "4";
 
         // enforce this returns some error
         map.save(&mut store, pk5, &data5).unwrap_err();
@@ -647,14 +647,14 @@ mod test {
         // match on proper age
         let age42 = U32Key::new(42);
         let (k, v) = map.idx.age.item(&store, age42.clone()).unwrap().unwrap();
-        assert_eq!(k.as_slice(), pks[0]);
+        assert_eq!(String::from_vec(k).unwrap(), pks[0]);
         assert_eq!(v.name, datas[0].name);
         assert_eq!(v.age, datas[0].age);
 
         // match on other age
         let age23 = U32Key::new(23);
         let (k, v) = map.idx.age.item(&store, age23).unwrap().unwrap();
-        assert_eq!(k.as_slice(), pks[1]);
+        assert_eq!(String::from_vec(k).unwrap(), pks[1]);
         assert_eq!(v.name, datas[1].name);
         assert_eq!(v.age, datas[1].age);
 
@@ -663,7 +663,7 @@ mod test {
         map.save(&mut store, pk5, &data5).unwrap();
         // now 42 is the new owner
         let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
-        assert_eq!(k.as_slice(), pk5);
+        assert_eq!(String::from_vec(k).unwrap(), pk5);
         assert_eq!(v.name, data5.name);
         assert_eq!(v.age, data5.age);
     }
@@ -682,7 +682,7 @@ mod test {
             last_name: "Doe".to_string(),
             age: 24,
         };
-        let pk5: &[u8] = b"5";
+        let pk5 = "5";
         // enforce this returns some error
         map.save(&mut store, pk5, &data5).unwrap_err();
     }
@@ -692,7 +692,7 @@ mod test {
         let mut store = MockStorage::new();
         let map = build_map();
 
-        let name_count = |map: &IndexedMap<&[u8], Data, DataIndexes>,
+        let name_count = |map: &IndexedMap<&str, Data, DataIndexes>,
                           store: &MemoryStorage,
                           name: &str|
          -> usize {
@@ -750,11 +750,11 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(pks[4].to_vec(), ages[4].0);
-        assert_eq!(pks[3].to_vec(), ages[0].0);
-        assert_eq!(pks[1].to_vec(), ages[1].0);
-        assert_eq!(pks[2].to_vec(), ages[2].0);
-        assert_eq!(pks[0].to_vec(), ages[3].0);
+        assert_eq!(pks[4], String::from_slice(&ages[4].0).unwrap());
+        assert_eq!(pks[3], String::from_slice(&ages[0].0).unwrap());
+        assert_eq!(pks[1], String::from_slice(&ages[1].0).unwrap());
+        assert_eq!(pks[2], String::from_slice(&ages[2].0).unwrap());
+        assert_eq!(pks[0], String::from_slice(&ages[3].0).unwrap());
 
         // The associated data
         assert_eq!(datas[4], ages[4].1);
@@ -785,8 +785,8 @@ mod test {
         assert_eq!(2, count);
 
         // The pks
-        assert_eq!(pks[0].to_vec(), marias[0].0);
-        assert_eq!(pks[1].to_vec(), marias[1].0);
+        assert_eq!(pks[0], String::from_slice(&marias[0].0).unwrap());
+        assert_eq!(pks[1], String::from_slice(&marias[1].0).unwrap());
 
         // The associated data
         assert_eq!(datas[0], marias[0].1);
@@ -809,7 +809,7 @@ mod test {
             all,
             pks.clone()
                 .into_iter()
-                .map(&<[u8]>::to_vec)
+                .map(str::to_string)
                 .zip(datas.clone().into_iter())
                 .collect::<Vec<_>>()
         );
@@ -827,7 +827,7 @@ mod test {
         assert_eq!(
             all,
             pks.into_iter()
-                .map(&<[u8]>::to_vec)
+                .map(str::to_string)
                 .zip(datas.into_iter())
                 .rev()
                 .take(3)
