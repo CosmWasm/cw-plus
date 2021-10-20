@@ -383,13 +383,13 @@ where
     }
 }
 
-fn deserialize_unique_kv<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
+fn deserialize_unique_v<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
     Ok((t.pk.to_vec(), t.value))
 }
 
-fn deserialize_unique_kv_de<T: DeserializeOwned, K: KeyDeserialize>(
+fn deserialize_unique_kv<T: DeserializeOwned, K: KeyDeserialize>(
     kv: Record,
 ) -> StdResult<(K::Output, T)> {
     let (_, v) = kv;
@@ -408,19 +408,19 @@ where
 
     pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv(kv)
+            deserialize_unique_v(kv)
         })
     }
 
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv(kv)
+            deserialize_unique_v(kv)
         })
     }
 
     fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
-            deserialize_unique_kv(kv)
+            deserialize_unique_v(kv)
         })
     }
 
@@ -524,7 +524,7 @@ where
 
     fn no_prefix_de(&self) -> Prefix<K, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
-            deserialize_unique_kv_de::<_, K>(kv)
+            deserialize_unique_kv::<_, K>(kv)
         })
     }
 }
