@@ -5,8 +5,9 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::de::KeyDeserialize;
 use crate::indexes::Index;
-use crate::iter_helpers::deserialize_v;
+use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
@@ -195,6 +196,68 @@ where
     }
 }
 
+#[cfg(feature = "iterator")]
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + KeyDeserialize,
+    I: IndexList<T>,
+{
+    /// while range_de assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
+    {
+        let mapped = namespaced_prefix_range(store, self.primary.namespace(), min, max, order)
+            .map(deserialize_kv::<K, T>);
+        Box::new(mapped)
+    }
+
+    pub fn range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().range_de(store, min, max, order)
+    }
+
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix<K, T> {
+        Prefix::new(self.primary.namespace(), &[])
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -242,7 +305,7 @@ mod test {
     }
 
     // Can we make it easier to define this? (less wordy generic)
-    fn build_map<'a>() -> IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>> {
+    fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(|d, k| (d.name.as_bytes().to_vec(), k), "data", "data__name"),
             age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
@@ -256,8 +319,8 @@ mod test {
 
     fn save_data<'a>(
         store: &mut MockStorage,
-        map: &IndexedMap<'a, &'a [u8], Data, DataIndexes<'a>>,
-    ) -> (Vec<&'a [u8]>, Vec<Data>) {
+        map: &IndexedMap<'a, &'a str, Data, DataIndexes<'a>>,
+    ) -> (Vec<&'a str>, Vec<Data>) {
         let mut pks = vec![];
         let mut datas = vec![];
         let data = Data {
@@ -265,7 +328,7 @@ mod test {
             last_name: "Doe".to_string(),
             age: 42,
         };
-        let pk: &[u8] = b"1";
+        let pk = "1";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -276,7 +339,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 23,
         };
-        let pk: &[u8] = b"2";
+        let pk = "2";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -287,7 +350,7 @@ mod test {
             last_name: "Wayne".to_string(),
             age: 32,
         };
-        let pk: &[u8] = b"3";
+        let pk = "3";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -297,7 +360,7 @@ mod test {
             last_name: "Rodriguez".to_string(),
             age: 12,
         };
-        let pk: &[u8] = b"4";
+        let pk = "4";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -307,7 +370,7 @@ mod test {
             last_name: "After".to_string(),
             age: 90,
         };
-        let pk: &[u8] = b"5";
+        let pk = "5";
         map.save(store, pk, &data).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -350,7 +413,7 @@ mod test {
             .unwrap();
         assert_eq!(2, marias.len());
         let (k, v) = &marias[0];
-        assert_eq!(pk, k.as_slice());
+        assert_eq!(pk, String::from_slice(k).unwrap());
         assert_eq!(data, v);
 
         // other index doesn't match (1 byte after)
@@ -431,7 +494,7 @@ mod test {
         // match on proper age
         let proper = U32Key::new(42);
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
-        assert_eq!(pk.to_vec(), aged.0);
+        assert_eq!(pk, String::from_vec(aged.0).unwrap());
         assert_eq!(*data, aged.1);
 
         // no match on wrong age
@@ -451,7 +514,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk: &[u8] = b"5627";
+        let pk = "5627";
         map.save(&mut store, pk, &data1).unwrap();
 
         let data2 = Data {
@@ -459,7 +522,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk: &[u8] = b"5628";
+        let pk = "5628";
         map.save(&mut store, pk, &data2).unwrap();
 
         let data3 = Data {
@@ -467,7 +530,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 24,
         };
-        let pk: &[u8] = b"5629";
+        let pk = "5629";
         map.save(&mut store, pk, &data3).unwrap();
 
         let data4 = Data {
@@ -475,7 +538,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 12,
         };
-        let pk: &[u8] = b"5630";
+        let pk = "5630";
         map.save(&mut store, pk, &data4).unwrap();
 
         let marias: Vec<_> = map
@@ -575,7 +638,7 @@ mod test {
             last_name: "Laurens".to_string(),
             age: 42,
         };
-        let pk5: &[u8] = b"4";
+        let pk5 = "4";
 
         // enforce this returns some error
         map.save(&mut store, pk5, &data5).unwrap_err();
@@ -584,14 +647,14 @@ mod test {
         // match on proper age
         let age42 = U32Key::new(42);
         let (k, v) = map.idx.age.item(&store, age42.clone()).unwrap().unwrap();
-        assert_eq!(k.as_slice(), pks[0]);
+        assert_eq!(String::from_vec(k).unwrap(), pks[0]);
         assert_eq!(v.name, datas[0].name);
         assert_eq!(v.age, datas[0].age);
 
         // match on other age
         let age23 = U32Key::new(23);
         let (k, v) = map.idx.age.item(&store, age23).unwrap().unwrap();
-        assert_eq!(k.as_slice(), pks[1]);
+        assert_eq!(String::from_vec(k).unwrap(), pks[1]);
         assert_eq!(v.name, datas[1].name);
         assert_eq!(v.age, datas[1].age);
 
@@ -600,7 +663,7 @@ mod test {
         map.save(&mut store, pk5, &data5).unwrap();
         // now 42 is the new owner
         let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
-        assert_eq!(k.as_slice(), pk5);
+        assert_eq!(String::from_vec(k).unwrap(), pk5);
         assert_eq!(v.name, data5.name);
         assert_eq!(v.age, data5.age);
     }
@@ -619,7 +682,7 @@ mod test {
             last_name: "Doe".to_string(),
             age: 24,
         };
-        let pk5: &[u8] = b"5";
+        let pk5 = "5";
         // enforce this returns some error
         map.save(&mut store, pk5, &data5).unwrap_err();
     }
@@ -629,7 +692,7 @@ mod test {
         let mut store = MockStorage::new();
         let map = build_map();
 
-        let name_count = |map: &IndexedMap<&[u8], Data, DataIndexes>,
+        let name_count = |map: &IndexedMap<&str, Data, DataIndexes>,
                           store: &MemoryStorage,
                           name: &str|
          -> usize {
@@ -687,11 +750,11 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(pks[4].to_vec(), ages[4].0);
-        assert_eq!(pks[3].to_vec(), ages[0].0);
-        assert_eq!(pks[1].to_vec(), ages[1].0);
-        assert_eq!(pks[2].to_vec(), ages[2].0);
-        assert_eq!(pks[0].to_vec(), ages[3].0);
+        assert_eq!(pks[4], String::from_slice(&ages[4].0).unwrap());
+        assert_eq!(pks[3], String::from_slice(&ages[0].0).unwrap());
+        assert_eq!(pks[1], String::from_slice(&ages[1].0).unwrap());
+        assert_eq!(pks[2], String::from_slice(&ages[2].0).unwrap());
+        assert_eq!(pks[0], String::from_slice(&ages[3].0).unwrap());
 
         // The associated data
         assert_eq!(datas[4], ages[4].1);
@@ -722,12 +785,231 @@ mod test {
         assert_eq!(2, count);
 
         // The pks
-        assert_eq!(pks[0].to_vec(), marias[0].0);
-        assert_eq!(pks[1].to_vec(), marias[1].0);
+        assert_eq!(pks[0], String::from_slice(&marias[0].0).unwrap());
+        assert_eq!(pks[1], String::from_slice(&marias[1].0).unwrap());
 
         // The associated data
         assert_eq!(datas[0], marias[0].1);
         assert_eq!(datas[1], marias[1].1);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_de_simple_string_key() {
+        let mut store = MockStorage::new();
+        let map = build_map();
+
+        // save data
+        let (pks, datas) = save_data(&mut store, &map);
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = map.range_de(&store, None, None, Order::Ascending).collect();
+        let all = all.unwrap();
+        assert_eq!(
+            all,
+            pks.clone()
+                .into_iter()
+                .map(str::to_string)
+                .zip(datas.clone().into_iter())
+                .collect::<Vec<_>>()
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = map
+            .range_de(
+                &store,
+                Some(Bound::Inclusive(b"3".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(
+            all,
+            pks.into_iter()
+                .map(str::to_string)
+                .zip(datas.into_iter())
+                .rev()
+                .take(3)
+                .rev()
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn prefix_range_de() {
+        let mut store = MockStorage::new();
+
+        let indexes = DataCompositeMultiIndex {
+            name_age: MultiIndex::new(
+                |d, k| index_triple(&d.name, d.age, k),
+                "data",
+                "data__name_age",
+            ),
+        };
+        let map = IndexedMap::new("data", indexes);
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk1: (&[u8], &[u8]) = (b"1", b"5627");
+        map.save(&mut store, pk1, &data1).unwrap();
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk2: (&[u8], &[u8]) = (b"2", b"5628");
+        map.save(&mut store, pk2, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Young".to_string(),
+            age: 24,
+        };
+        let pk3: (&[u8], &[u8]) = (b"2", b"5629");
+        map.save(&mut store, pk3, &data3).unwrap();
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 43,
+        };
+        let pk4: (&[u8], &[u8]) = (b"3", b"5630");
+        map.save(&mut store, pk4, &data4).unwrap();
+
+        // let's try to iterate!
+        let result: StdResult<Vec<_>> = map
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive(&b"2"[..])),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let result = result.unwrap();
+        assert_eq!(
+            result,
+            [
+                ((b"2".to_vec(), b"5628".to_vec()), data2.clone()),
+                ((b"2".to_vec(), b"5629".to_vec()), data3.clone()),
+                ((b"3".to_vec(), b"5630".to_vec()), data4)
+            ]
+        );
+
+        // let's try to iterate over a range
+        let result: StdResult<Vec<_>> = map
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive(&b"2"[..])),
+                Some(PrefixBound::exclusive(&b"3"[..])),
+                Order::Ascending,
+            )
+            .collect();
+        let result = result.unwrap();
+        assert_eq!(
+            result,
+            [
+                ((b"2".to_vec(), b"5628".to_vec()), data2),
+                ((b"2".to_vec(), b"5629".to_vec()), data3),
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn prefix_range_de_triple_key() {
+        let mut store = MockStorage::new();
+
+        let indexes = DataCompositeMultiIndex {
+            name_age: MultiIndex::new(
+                |d, k| index_triple(&d.name, d.age, k),
+                "data",
+                "data__name_age",
+            ),
+        };
+        let map = IndexedMap::new("data", indexes);
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk1: (&[u8], &[u8], &[u8]) = (b"1", b"1", b"5627");
+        map.save(&mut store, pk1, &data1).unwrap();
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk2: (&[u8], &[u8], &[u8]) = (b"1", b"2", b"5628");
+        map.save(&mut store, pk2, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Young".to_string(),
+            age: 24,
+        };
+        let pk3: (&[u8], &[u8], &[u8]) = (b"2", b"1", b"5629");
+        map.save(&mut store, pk3, &data3).unwrap();
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 43,
+        };
+        let pk4: (&[u8], &[u8], &[u8]) = (b"2", b"2", b"5630");
+        map.save(&mut store, pk4, &data4).unwrap();
+
+        // let's try to iterate!
+        let result: StdResult<Vec<_>> = map
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive((&b"1"[..], &b"2"[..]))),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let result = result.unwrap();
+        assert_eq!(
+            result,
+            [
+                (
+                    (b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()),
+                    data2.clone()
+                ),
+                (
+                    (b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()),
+                    data3.clone()
+                ),
+                ((b"2".to_vec(), b"2".to_vec(), b"5630".to_vec()), data4)
+            ]
+        );
+
+        // let's try to iterate over a range
+        let result: StdResult<Vec<_>> = map
+            .prefix_range_de(
+                &store,
+                Some(PrefixBound::inclusive((&b"1"[..], &b"2"[..]))),
+                Some(PrefixBound::inclusive((&b"2"[..], &b"1"[..]))),
+                Order::Ascending,
+            )
+            .collect();
+        let result = result.unwrap();
+        assert_eq!(
+            result,
+            [
+                ((b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()), data2),
+                ((b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()), data3),
+            ]
+        );
     }
 
     mod inclusive_bound {
