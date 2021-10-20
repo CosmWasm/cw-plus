@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{from_slice, Binary, Order, Record, StdError, StdResult, Storage};
 
+use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
+use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, PrefixBound};
 use crate::{Bound, Prefix, Prefixer, PrimaryKey, U32Key};
@@ -248,6 +250,67 @@ where
     }
 }
 
+#[cfg(feature = "iterator")]
+impl<'a, K, T> MultiIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + KeyDeserialize,
+{
+    /// while range_de assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
+    {
+        let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
+            .map(deserialize_kv::<K, T>);
+        Box::new(mapped)
+    }
+
+    pub fn range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().range_de(store, min, max, order)
+    }
+
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix<K, T> {
+        Prefix::new(self.idx_namespace, &[])
+    }
+}
+
 /// UniqueRef stores Binary(Vec[u8]) representation of private key and index value
 #[derive(Deserialize, Serialize)]
 pub(crate) struct UniqueRef<T> {
@@ -392,5 +455,66 @@ where
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         self.no_prefix().keys(store, min, max, order)
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T> UniqueIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + KeyDeserialize,
+{
+    /// while range_de assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
+    {
+        let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
+            .map(deserialize_kv::<K, T>);
+        Box::new(mapped)
+    }
+
+    pub fn range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().range_de(store, min, max, order)
+    }
+
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix<K, T> {
+        Prefix::new(self.idx_namespace, &[])
     }
 }
