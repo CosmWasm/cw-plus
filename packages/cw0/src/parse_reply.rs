@@ -2,54 +2,67 @@ use thiserror::Error;
 
 use cosmwasm_std::{Binary, Reply};
 
+// Protobuf wire types (https://developers.google.com/protocol-buffers/docs/encoding)
+const WIRE_TYPE_LENGTH_DELIMITED: u8 = 2;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MsgInstantiateContractResponse {
     pub contract_address: String,
     pub data: Option<Binary>, // FIXME: Confirm if Option
 }
 
+fn parse_protobuf_string(data: &mut Vec<u8>) -> Result<String, ParseReplyError> {
+    // FIXME: don't panic
+    let mut rest_1 = data.split_off(1);
+    if data[0] & 0x03 != WIRE_TYPE_LENGTH_DELIMITED {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: string field: invalid wire type".to_owned(),
+        ));
+    }
+    let mut rest_2 = rest_1.split_off(1);
+    let rest_3 = rest_2.split_off(rest_1[0] as usize);
+
+    *data = rest_3;
+    Ok(String::from_utf8(rest_2.to_owned())?)
+}
+
+fn parse_protobuf_bytes(data: &mut Vec<u8>) -> Result<Option<Binary>, ParseReplyError> {
+    if data.is_empty() {
+        return Ok(None);
+    }
+    let mut rest_1 = data.split_off(1);
+    if data[0] & 0x03 != WIRE_TYPE_LENGTH_DELIMITED {
+        return Err(ParseReplyError::ParseFailure(
+            "failed to decode Protobuf message: bytes field: invalid wire type".to_owned(),
+        ));
+    }
+    // FIXME: don't panic
+    let mut rest_2 = rest_1.split_off(1);
+    let rest_3 = rest_2.split_off(rest_1[0] as usize);
+
+    *data = rest_3;
+    Ok(Some(Binary(rest_2.to_vec())))
+}
+
 pub fn parse_reply_instantiate_data(
     msg: Reply,
 ) -> Result<MsgInstantiateContractResponse, ParseReplyError> {
-    let id = msg.id;
     let data = msg
         .result
         .into_result()
         .map_err(ParseReplyError::SubMsgFailure)?
         .data
-        .ok_or_else(|| ParseReplyError::ParseFailure {
-            id,
-            err: "Missing reply data".to_owned(),
-        })?;
+        .ok_or_else(|| ParseReplyError::ParseFailure("Missing reply data".to_owned()))?;
     // Manual protobuf decoding
-    let data = data.0;
-    println!("reply data 0: {:#?}", data);
-    // FIXME: avoid panics
-    let (wire_type, data) = data.as_slice().split_at(1);
-    println!("reply data 1: {:#?}", data);
-    if wire_type[0] != b'\x0a' {
-        return Err(ParseReplyError::ParseFailure { id, err: "failed to decode Protobuf message: MsgInstantiateContractResponse.contract_address: invalid wire type".to_owned() });
-    }
-    let (len, data) = data.split_at(1);
-    println!("reply data 2: {:#?}", data);
-    let (contract_addr, data) = data.split_at(len[0] as usize);
-    println!("reply data 3: {:#?}", data);
-    let (wire_type, data) = data.split_at(1);
-    if wire_type[0] != b'\x12' {
-        return Err(ParseReplyError::ParseFailure { id, err: "failed to decode Protobuf message: MsgInstantiateContractResponse.data: invalid wire type".to_owned() });
-    }
-    let (len, data) = data.split_at(1);
-    println!("reply data 4: {:#?}", data);
-    let (data, _rest) = data.split_at(len[0] as usize);
-    println!("reply data 5: {:#?}", data);
-    let data = if data.is_empty() {
-        None
-    } else {
-        Some(Binary(data.to_vec()))
-    };
+    let mut data = data.0;
+    // Parse contract addr
+    let contract_addr = parse_protobuf_string(&mut data)?;
+
+    // Parse (optional) data
+    let data = parse_protobuf_bytes(&mut data)?;
 
     let res = MsgInstantiateContractResponse {
-        contract_address: String::from_utf8(contract_addr.to_vec())?,
+        contract_address: contract_addr,
         data,
     };
 
@@ -61,8 +74,8 @@ pub enum ParseReplyError {
     #[error("Failure response from sub-message: {0}")]
     SubMsgFailure(String),
 
-    #[error("Invalid reply from sub-message {id}: {err}")]
-    ParseFailure { id: u64, err: String },
+    #[error("Invalid reply from sub-message: {0}")]
+    ParseFailure(String),
 
     #[error("Error occurred while converting from UTF-8")]
     FromUtf8(#[from] std::string::FromUtf8Error),
