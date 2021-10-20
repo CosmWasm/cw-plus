@@ -58,9 +58,14 @@ where
 }
 
 // Proxy for direct execution in multitest.
+#[derive(Clone, PartialEq, Debug)]
 pub struct Cw1WhitelistProxy(Addr);
 
 impl Cw1WhitelistProxy {
+    pub fn addr(&self) -> Addr {
+        self.0.clone()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn instantiate<C, App, Admin>(
         app: &mut App,
