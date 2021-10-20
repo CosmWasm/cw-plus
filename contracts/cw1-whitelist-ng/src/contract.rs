@@ -17,14 +17,14 @@ fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
 }
 
 impl Cw1WhitelistContract {
-    pub fn instantiate(
+    pub fn instantiate<T>(
         &self,
         deps: DepsMut,
         _env: Env,
         _info: MessageInfo,
         admins: Vec<String>,
         mutable: bool,
-    ) -> Result<Response, ContractError> {
+    ) -> Result<Response<T>, ContractError> {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
         let cfg = AdminList {
             admins: validate_admins(deps.api, &admins)?,
