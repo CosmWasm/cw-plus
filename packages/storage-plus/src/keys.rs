@@ -49,8 +49,8 @@ pub trait PrimaryKey<'a>: Clone + Sized {
 }
 
 struct NamespacedKey<'a, T> {
-  namespaces: Vec<&'a [u8]>,
-  key: &'a T,
+    namespaces: Vec<&'a [u8]>,
+    key: &'a T,
 }
 
 // Empty / no primary key
@@ -84,7 +84,7 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
         // this is simple, we don't add more prefixes
         NamespacedKey {
             namespaces: vec![],
-            key: self
+            key: self,
         }
     }
 
@@ -105,7 +105,7 @@ impl<'a> PrimaryKey<'a> for &'a str {
         // this is simple, we don't add more prefixes
         NamespacedKey {
             namespaces: vec![],
-            key: &self
+            key: &self,
         }
     }
 
@@ -127,12 +127,12 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize, U: PrimaryKey<'a> + 
     fn key(&self) -> NamespacedKey<Self> {
         NamespacedKey {
             namespaces: vec![],
-            key: &(self.0, self.1)
+            key: &(self.0, self.1),
         }
     }
 
     fn raw_key(&self) -> Self::KeyType {
-        &[]
+        &[self.0.raw_key().as_ref(), self.1.raw_key().as_ref()].concat()
     }
 }
 
@@ -153,12 +153,17 @@ impl<
     fn key(&self) -> NamespacedKey<Self> {
         NamespacedKey {
             namespaces: vec![],
-            key: &(self.0, self.1, self.2)
+            key: &(self.0, self.1, self.2),
         }
     }
 
     fn raw_key(&self) -> Self::KeyType {
-        &[]
+        &[
+            self.0.raw_key().as_ref(),
+            self.1.raw_key().as_ref(),
+            self.2.raw_key().as_ref(),
+        ]
+        .concat()
     }
 }
 
