@@ -4,6 +4,8 @@ use cosmwasm_std::{Binary, Reply};
 
 // Protobuf wire types (https://developers.google.com/protocol-buffers/docs/encoding)
 const WIRE_TYPE_LENGTH_DELIMITED: u8 = 2;
+// Up to 9 bytes of varints as a practical limit (https://github.com/multiformats/unsigned-varint#practical-maximum-of-9-bytes-for-security)
+const VARINT_MAX_BYTES: usize = 9;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MsgInstantiateContractResponse {
@@ -14,6 +16,37 @@ pub struct MsgInstantiateContractResponse {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MsgExecuteContractResponse {
     pub data: Option<Binary>,
+}
+
+/// Base128 varint decoding.
+/// The remaining of the data is kept in the data parameter.
+fn parse_protobuf_varint(data: &mut Vec<u8>, field_number: u8) -> Result<usize, ParseReplyError> {
+    let data_len = data.len();
+    let mut len: u64 = 0;
+    let mut i = 0;
+    while i < VARINT_MAX_BYTES {
+        if data_len == i {
+            return Err(ParseReplyError::ParseFailure(format!(
+                "failed to decode Protobuf message: field #{}: varint data too short",
+                field_number
+            )));
+        }
+        len <<= 7;
+        len += (data[i] & 0x7f) as u64;
+        if data[i] & 0x80 == 0 {
+            break;
+        }
+        i += 1;
+    }
+    if i == VARINT_MAX_BYTES {
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: field #{}: varint data too long",
+            field_number
+        )));
+    }
+    *data = data.split_off(i + 1);
+
+    Ok(len as usize) // Gently fall back to the arch's max addressable size
 }
 
 /// Helper function to parse length-prefixed protobuf fields.
@@ -41,24 +74,17 @@ fn parse_protobuf_length_prefixed(
             field_number, wire_type
         )));
     }
-    if rest_1.is_empty() {
-        return Err(ParseReplyError::ParseFailure(format!(
-            "failed to decode Protobuf message: field #{}: message too short",
-            field_number
-        )));
-    }
-    let mut rest_2 = rest_1.split_off(1);
-    let len = rest_1[0] as usize;
-    if rest_2.len() < len {
-        return Err(ParseReplyError::ParseFailure(format!(
-            "failed to decode Protobuf message: field #{}: message too short",
-            field_number
-        )));
-    }
-    let rest_3 = rest_2.split_off(len);
 
-    *data = rest_3;
-    Ok(rest_2)
+    let len = parse_protobuf_varint(&mut rest_1, field_number)?;
+    if rest_1.len() < len {
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: field #{}: message too short",
+            field_number
+        )));
+    }
+    *data = rest_1.split_off(len);
+
+    Ok(rest_1)
 }
 
 fn parse_protobuf_string(data: &mut Vec<u8>, field_number: u8) -> Result<String, ParseReplyError> {
