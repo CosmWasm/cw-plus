@@ -186,24 +186,43 @@ mod test {
     #[test]
     fn parse_reply_instantiate_data_works() {
         let contract_addr: &str = "Contract #1";
-        for data in [
-            vec![],
-            vec![1u8, 2, 255, 7, 5],
-            vec![1u8; 127],
-            vec![2u8; 128],
-            vec![3u8; 257],
-        ] {
-            let expected = if data.is_empty() {
+        for (data, expected) in [
+            (
+                vec![],
                 super::MsgInstantiateContractResponse {
                     contract_address: contract_addr.to_string(),
                     data: None,
-                }
-            } else {
+                },
+            ),
+            (
+                vec![1u8, 2, 255, 7, 5],
                 super::MsgInstantiateContractResponse {
                     contract_address: contract_addr.to_string(),
-                    data: Some(Binary(data.clone())),
-                }
-            };
+                    data: Some(Binary(vec![1u8, 2, 255, 7, 5])),
+                },
+            ),
+            (
+                vec![1u8; 127],
+                super::MsgInstantiateContractResponse {
+                    contract_address: contract_addr.to_string(),
+                    data: Some(Binary(vec![1u8; 127])),
+                },
+            ),
+            (
+                vec![2u8; 128],
+                super::MsgInstantiateContractResponse {
+                    contract_address: contract_addr.to_string(),
+                    data: Some(Binary(vec![2u8; 128])),
+                },
+            ),
+            (
+                vec![3u8; 257],
+                super::MsgInstantiateContractResponse {
+                    contract_address: contract_addr.to_string(),
+                    data: Some(Binary(vec![3u8; 257])),
+                },
+            ),
+        ] {
             let instantiate_reply = MsgInstantiateContractResponse {
                 contract_address: contract_addr.to_string(),
                 data,
@@ -231,21 +250,33 @@ mod test {
 
     #[test]
     fn parse_reply_execute_data_works() {
-        for data in [
-            vec![],
-            vec![1u8, 2, 3, 127, 15],
-            vec![0u8; 255],
-            vec![1u8; 256],
-            vec![2u8; 32769],
-        ] {
-            let expected = if data.is_empty() {
-                super::MsgExecuteContractResponse { data: None }
-            } else {
+        for (data, expected) in [
+            (vec![], super::MsgExecuteContractResponse { data: None }),
+            (
+                vec![1u8, 2, 3, 127, 15],
                 super::MsgExecuteContractResponse {
-                    data: Some(Binary(data.clone())),
-                }
-            };
-
+                    data: Some(Binary(vec![1u8, 2, 3, 127, 15])),
+                },
+            ),
+            (
+                vec![0u8; 255],
+                super::MsgExecuteContractResponse {
+                    data: Some(Binary(vec![0u8; 255])),
+                },
+            ),
+            (
+                vec![1u8; 256],
+                super::MsgExecuteContractResponse {
+                    data: Some(Binary(vec![1u8; 256])),
+                },
+            ),
+            (
+                vec![2u8; 32769],
+                super::MsgExecuteContractResponse {
+                    data: Some(Binary(vec![2u8; 32769])),
+                },
+            ),
+        ] {
             let execute_reply = MsgExecuteContractResponse { data };
             let mut encoded_execute_reply = Vec::<u8>::with_capacity(execute_reply.encoded_len());
             // The data must encode successfully
