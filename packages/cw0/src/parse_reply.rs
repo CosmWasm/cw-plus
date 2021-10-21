@@ -31,8 +31,8 @@ fn parse_protobuf_varint(data: &mut Vec<u8>, field_number: u8) -> Result<usize, 
                 field_number
             )));
         }
-        len <<= 7;
-        len += (data[i] & 0x7f) as u64;
+        len >>= 7;
+        len += ((data[i] & 0x7f) as u64) << 57;
         if data[i] & 0x80 == 0 {
             break;
         }
@@ -44,7 +44,9 @@ fn parse_protobuf_varint(data: &mut Vec<u8>, field_number: u8) -> Result<usize, 
             field_number
         )));
     }
-    *data = data.split_off(i + 1);
+    i += 1;
+    len >>= (VARINT_MAX_BYTES - i) * 7 + 1;
+    *data = data.split_off(i);
 
     Ok(len as usize) // Gently fall back to the arch's max addressable size
 }
@@ -76,6 +78,7 @@ fn parse_protobuf_length_prefixed(
     }
 
     let len = parse_protobuf_varint(&mut rest_1, field_number)?;
+    println!("field #{}: len: {}", field_number, len);
     if rest_1.len() < len {
         return Err(ParseReplyError::ParseFailure(format!(
             "failed to decode Protobuf message: field #{}: message too short",
@@ -183,7 +186,13 @@ mod test {
     #[test]
     fn parse_reply_instantiate_data_works() {
         let contract_addr: &str = "Contract #1";
-        for data in [vec![], vec![1u8, 2, 255, 7, 5]] {
+        for data in [
+            vec![],
+            vec![1u8, 2, 255, 7, 5],
+            vec![1u8; 127],
+            vec![2u8; 128],
+            vec![3u8; 257],
+        ] {
             let expected = if data.is_empty() {
                 super::MsgInstantiateContractResponse {
                     contract_address: contract_addr.to_string(),
@@ -222,7 +231,13 @@ mod test {
 
     #[test]
     fn parse_reply_execute_data_works() {
-        for data in [vec![], vec![1u8, 2, 3, 127]] {
+        for data in [
+            vec![],
+            vec![1u8, 2, 3, 127, 15],
+            vec![0u8; 255],
+            vec![1u8; 256],
+            vec![2u8; 32769],
+        ] {
             let expected = if data.is_empty() {
                 super::MsgExecuteContractResponse { data: None }
             } else {
