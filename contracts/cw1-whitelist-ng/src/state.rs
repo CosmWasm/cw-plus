@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Empty};
 use cw_storage_plus::Item;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
@@ -29,6 +29,13 @@ pub struct Cw1WhitelistContract<T> {
     // to provide helpers for raw queries, this might be fun idea
     pub(crate) admin_list: Item<'static, AdminList>,
     _msg: PhantomData<T>,
+}
+
+impl Cw1WhitelistContract<Empty> {
+    // Native form of this contract as it is to be created in entry points
+    pub const fn native() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> Cw1WhitelistContract<T> {

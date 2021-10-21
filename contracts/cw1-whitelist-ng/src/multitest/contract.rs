@@ -1,10 +1,10 @@
-use crate::query::BoundCw1WhitelistQuerier;
+use crate::msg::*;
+use crate::query::*;
 use crate::state::Cw1WhitelistContract;
-use crate::{msg::*, query::Cw1WhitelistQuerier};
 use anyhow::{bail, Result as AnyResult};
 use cosmwasm_std::{
-    from_slice, Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Env, MessageInfo,
-    QuerierWrapper, Reply, Response,
+    Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Env, MessageInfo, QuerierWrapper, Reply,
+    Response,
 };
 use cw_multi_test::{AppResponse, Contract, Executor};
 use schemars::JsonSchema;
@@ -22,9 +22,7 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<T>> {
-        let msg: InstantiateMsg = from_slice(&msg)?;
-        let InstantiateMsg { admins, mutable } = msg;
-        self.instantiate(deps, env, info, admins, mutable)
+        self.entry_instantiate(deps, env, info, &msg)
             .map_err(Into::into)
     }
 
@@ -35,13 +33,12 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<T>> {
-        let msg: ExecuteMsg<T> = from_slice(&msg)?;
-        msg.dispatch(deps, env, info, self).map_err(Into::into)
+        self.entry_execute(deps, env, info, &msg)
+            .map_err(Into::into)
     }
 
     fn query(&self, deps: cosmwasm_std::Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
-        let msg: QueryMsg<T> = from_slice(&msg)?;
-        msg.dispatch(deps, env, self).map_err(Into::into)
+        self.entry_query(deps, env, &msg).map_err(Into::into)
     }
 
     fn sudo(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response<T>> {
@@ -57,6 +54,136 @@ where
     }
 }
 
+#[derive(PartialEq, Debug)]
+#[must_use]
+pub struct Cw1Executor<'a, App> {
+    addr: Addr,
+    app: &'a mut App,
+    sender: Addr,
+    send_funds: &'a [Coin],
+}
+
+impl<'a, App> Cw1Executor<'a, App> {
+    pub fn new(addr: Addr, app: &'a mut App, sender: Addr, send_funds: &'a [Coin]) -> Self {
+        Self {
+            addr,
+            app,
+            sender,
+            send_funds,
+        }
+    }
+
+    pub fn execute<C>(self, msgs: Vec<CosmosMsg<C>>) -> AnyResult<AppResponse>
+    where
+        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + Serialize + 'static,
+        App: Executor<C>,
+    {
+        self.app.execute_contract(
+            self.sender,
+            self.addr,
+            &Cw1ExecMsg::Execute { msgs },
+            self.send_funds,
+        )
+    }
+}
+
+#[derive(PartialEq, Debug)]
+#[must_use]
+pub struct WhitelistExecutor<'a, App> {
+    addr: Addr,
+    app: &'a mut App,
+    sender: Addr,
+    send_funds: &'a [Coin],
+}
+
+impl<'a, App> WhitelistExecutor<'a, App> {
+    pub fn new(addr: Addr, app: &'a mut App, sender: Addr, send_funds: &'a [Coin]) -> Self {
+        Self {
+            addr,
+            app,
+            sender,
+            send_funds,
+        }
+    }
+
+    pub fn freeze<C>(self) -> AnyResult<AppResponse>
+    where
+        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + Serialize + 'static,
+        App: Executor<C>,
+    {
+        self.app.execute_contract(
+            self.sender,
+            self.addr,
+            &WhitelistExecMsg::Freeze {},
+            self.send_funds,
+        )
+    }
+
+    pub fn update_admins<C>(self, admins: Vec<String>) -> AnyResult<AppResponse>
+    where
+        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static + Serialize,
+        App: Executor<C>,
+    {
+        self.app.execute_contract(
+            self.sender,
+            self.addr,
+            &WhitelistExecMsg::UpdateAdmins { admins },
+            self.send_funds,
+        )
+    }
+}
+
+#[derive(PartialEq, Debug)]
+#[must_use]
+pub struct Instantiator<'a, App> {
+    code_id: u64,
+    app: &'a mut App,
+    sender: Addr,
+    send_funds: &'a [Coin],
+    label: String,
+    admin: Option<String>,
+}
+
+impl<'a, App> Instantiator<'a, App> {
+    pub fn new(code_id: u64, app: &'a mut App, sender: Addr, send_funds: &'a [Coin]) -> Self {
+        Self {
+            code_id,
+            app,
+            sender,
+            send_funds,
+            label: "Cw1Whitelist".to_owned(),
+            admin: None,
+        }
+    }
+
+    pub fn with_label(mut self, label: &str) -> Self {
+        self.label = label.to_owned();
+        self
+    }
+
+    pub fn with_admin(mut self, admin: &str) -> Self {
+        self.admin = Some(admin.to_owned());
+        self
+    }
+
+    pub fn with<C>(self, admins: Vec<String>, mutable: bool) -> AnyResult<Cw1WhitelistProxy>
+    where
+        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static,
+        App: Executor<C>,
+    {
+        let addr = self.app.instantiate_contract(
+            self.code_id,
+            self.sender,
+            &InstantiateMsg { admins, mutable },
+            self.send_funds,
+            self.label,
+            self.admin,
+        )?;
+
+        Ok(Cw1WhitelistProxy(addr))
+    }
+}
+
 // Proxy for direct execution in multitest.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Cw1WhitelistProxy(Addr);
@@ -66,99 +193,47 @@ impl Cw1WhitelistProxy {
         self.0.clone()
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn instantiate<C, App, Admin>(
-        app: &mut App,
+    pub fn instantiate<'a, App>(
+        app: &'a mut App,
         code_id: u64,
         sender: &Addr,
-        admins: Vec<String>,
-        mutable: bool,
-        send_funds: &[Coin],
-        label: &str,
-        admin: Admin,
-    ) -> AnyResult<Self>
-    where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static,
-        App: Executor<C>,
-        Admin: Into<Option<String>>,
-    {
-        let addr = app.instantiate_contract(
-            code_id,
-            sender.clone(),
-            &InstantiateMsg { admins, mutable },
-            send_funds,
-            label,
-            admin.into(),
-        )?;
-
-        Ok(Self(addr))
+        send_funds: &'a [Coin],
+    ) -> Instantiator<'a, App> {
+        Instantiator::new(code_id, app, sender.clone(), send_funds)
     }
 
-    pub fn execute<C, App>(
+    pub fn cw1_exec<'a, App>(
         &self,
-        app: &mut App,
+        app: &'a mut App,
         sender: &Addr,
-        msgs: Vec<CosmosMsg<C>>,
-        send_funds: &[Coin],
-    ) -> AnyResult<AppResponse>
-    where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static + Serialize,
-        App: Executor<C>,
-    {
-        app.execute_contract(
-            sender.clone(),
-            self.0.clone(),
-            &ExecuteMsg::<C>::Execute { msgs },
-            send_funds,
-        )
+        send_funds: &'a [Coin],
+    ) -> Cw1Executor<'a, App> {
+        Cw1Executor::new(self.0.clone(), app, sender.clone(), send_funds)
     }
 
-    pub fn freeze<C, App>(
+    pub fn whitelist_exec<'a, App>(
         &self,
-        app: &mut App,
+        app: &'a mut App,
         sender: &Addr,
-        send_funds: &[Coin],
-    ) -> AnyResult<AppResponse>
-    where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static + Serialize,
-        App: Executor<C>,
-    {
-        app.execute_contract(
-            sender.clone(),
-            self.0.clone(),
-            &ExecuteMsg::<C>::Freeze {},
-            send_funds,
-        )
+        send_funds: &'a [Coin],
+    ) -> WhitelistExecutor<'a, App> {
+        WhitelistExecutor::new(self.0.clone(), app, sender.clone(), send_funds)
     }
 
-    pub fn update_admins<C, App>(
-        &self,
-        app: &mut App,
-        sender: &Addr,
-        admins: Vec<String>,
-        send_funds: &[Coin],
-    ) -> AnyResult<AppResponse>
-    where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static + Serialize,
-        App: Executor<C>,
-    {
-        app.execute_contract(
-            sender.clone(),
-            self.0.clone(),
-            &ExecuteMsg::UpdateAdmins::<C> { admins },
-            send_funds,
-        )
-    }
-
-    // cw1_whitelist prefixed, as there is possibility to actually have multiple interfaces
-    // implemented by single contract, every with separated querier
-    pub fn cw1_whitelist_querier<'q, C>(
-        &self,
-        querier: &'q QuerierWrapper<'q, C>,
-    ) -> BoundCw1WhitelistQuerier<'_, 'q, C>
+    pub fn cw1_querier<'a, C>(&'a self, querier: &'a QuerierWrapper<'a, C>) -> Cw1Querier<'a, C>
     where
         C: CustomQuery,
     {
-        Cw1WhitelistQuerier::new(&self.0, querier)
+        Cw1Querier::new(&self.0, querier)
+    }
+
+    pub fn whitelist_querier<'a, C>(
+        &'a self,
+        querier: &'a QuerierWrapper<'a, C>,
+    ) -> WhitelistQuerier<'a, C>
+    where
+        C: CustomQuery,
+    {
+        WhitelistQuerier::new(&self.0, querier)
     }
 }

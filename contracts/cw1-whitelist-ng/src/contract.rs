@@ -1,8 +1,14 @@
-use cosmwasm_std::{Addr, Api, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    from_slice, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult,
+};
+use serde::de::DeserializeOwned;
 
 use crate::error::ContractError;
-use crate::interfaces::Cw1Whitelist;
-use crate::msg::AdminListResponse;
+use crate::interfaces::*;
+use crate::msg::{
+    AdminListResponse, Cw1ExecMsg, Cw1QueryMsg, InstantiateMsg, WhitelistExecMsg, WhitelistQueryMsg,
+};
 use crate::state::{AdminList, Cw1WhitelistContract};
 
 use cw1::CanExecuteResponse;
@@ -12,7 +18,7 @@ use cw2::set_contract_version;
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
+pub fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
     admins.iter().map(|addr| api.addr_validate(&addr)).collect()
 }
 
@@ -35,13 +41,91 @@ impl<T> Cw1WhitelistContract<T> {
         Ok(Response::new())
     }
 
-    fn is_admin(&self, deps: Deps, addr: &str) -> Result<bool, ContractError> {
+    pub fn is_admin(&self, deps: Deps, addr: &str) -> Result<bool, ContractError> {
         let cfg = self.admin_list.load(deps.storage)?;
         Ok(cfg.is_admin(addr))
     }
+
+    // Entry points, to be called only in actual entry points and by multitest `Contract`
+    // implementation
+    pub(crate) fn entry_instantiate(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        msg: &[u8],
+    ) -> Result<Response<T>, ContractError> {
+        let msg: InstantiateMsg = from_slice(msg)?;
+        msg.dispatch(deps, env, info, self)
+    }
+
+    pub(crate) fn entry_execute(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        msg: &[u8],
+    ) -> Result<Response<T>, ContractError>
+    where
+        T: DeserializeOwned,
+    {
+        let mut errs = vec![];
+
+        match from_slice::<Cw1ExecMsg<T>>(msg) {
+            Ok(msg) => return msg.dispatch(deps, env, info, self),
+            Err(err) => errs.push(err),
+        }
+
+        match from_slice::<WhitelistExecMsg>(msg) {
+            Ok(msg) => return msg.dispatch(deps, env, info, self),
+            Err(err) => errs.push(err),
+        }
+
+        let msg: String = errs
+            .into_iter()
+            .flat_map(|err| {
+                std::iter::once(err.to_string()).chain(std::iter::once("\n".to_owned()))
+            })
+            .collect();
+
+        let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
+        Err(err.into())
+    }
+
+    pub(crate) fn entry_query(
+        &self,
+        deps: Deps,
+        env: Env,
+        msg: &[u8],
+    ) -> Result<Binary, ContractError>
+    where
+        T: DeserializeOwned,
+    {
+        let mut errs = vec![];
+
+        match from_slice::<Cw1QueryMsg<T>>(msg) {
+            Ok(msg) => return msg.dispatch(deps, env, self),
+            Err(err) => errs.push(err),
+        }
+
+        match from_slice::<WhitelistQueryMsg>(msg) {
+            Ok(msg) => return msg.dispatch(deps, env, self),
+            Err(err) => errs.push(err),
+        }
+
+        let msg: String = errs
+            .into_iter()
+            .flat_map(|err| {
+                std::iter::once(err.to_string()).chain(std::iter::once("\n".to_owned()))
+            })
+            .collect();
+
+        let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
+        Err(err.into())
+    }
 }
 
-impl<T> Cw1Whitelist<T> for Cw1WhitelistContract<T> {
+impl<T> Cw1<T> for Cw1WhitelistContract<T> {
     type Error = ContractError;
 
     fn execute(
@@ -60,6 +144,22 @@ impl<T> Cw1Whitelist<T> for Cw1WhitelistContract<T> {
             Ok(res)
         }
     }
+
+    fn can_execute(
+        &self,
+        deps: Deps,
+        _env: Env,
+        sender: String,
+        _msg: CosmosMsg<T>,
+    ) -> Result<CanExecuteResponse, Self::Error> {
+        Ok(CanExecuteResponse {
+            can_execute: self.is_admin(deps, &sender)?,
+        })
+    }
+}
+
+impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
+    type Error = ContractError;
 
     fn freeze(
         &self,
@@ -108,30 +208,18 @@ impl<T> Cw1Whitelist<T> for Cw1WhitelistContract<T> {
             mutable: cfg.mutable,
         })
     }
-
-    fn can_execute(
-        &self,
-        deps: Deps,
-        _env: Env,
-        sender: String,
-        _msg: CosmosMsg<T>,
-    ) -> Result<CanExecuteResponse, Self::Error> {
-        Ok(CanExecuteResponse {
-            can_execute: self.is_admin(deps, &sender)?,
-        })
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::msg::ExecuteMsg;
+    use crate::msg::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, to_binary, BankMsg, Empty, StakingMsg, SubMsg, WasmMsg};
+    use cosmwasm_std::{coin, coins, to_binary, BankMsg, StakingMsg, SubMsg, WasmMsg};
 
     #[test]
     fn instantiate_and_modify_config() {
-        let contract = Cw1WhitelistContract::<Empty>::new();
+        let contract = Cw1WhitelistContract::native();
 
         let mut deps = mock_dependencies(&[]);
 
@@ -211,7 +299,7 @@ mod tests {
 
     #[test]
     fn execute_messages_has_proper_permissions() {
-        let contract = Cw1WhitelistContract::<Empty>::new();
+        let contract = Cw1WhitelistContract::native();
         let mut deps = mock_dependencies(&[]);
 
         let alice = "alice";
@@ -225,7 +313,7 @@ mod tests {
             .instantiate(deps.as_mut(), mock_env(), info, admins, false)
             .unwrap();
 
-        let freeze: ExecuteMsg = ExecuteMsg::Freeze {};
+        let freeze = WhitelistExecMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
                 to_address: bob.to_string(),
@@ -260,8 +348,37 @@ mod tests {
     }
 
     #[test]
+    fn execute_custom_messages_works() {
+        let contract = Cw1WhitelistContract::<String>::new();
+        let mut deps = mock_dependencies(&[]);
+        let alice = "alice";
+
+        let admins = vec![alice.to_owned()];
+        let info = mock_info(&alice, &[]);
+        contract
+            .instantiate(deps.as_mut(), mock_env(), info, admins, false)
+            .unwrap();
+
+        let msgs = vec![CosmosMsg::Custom("msg".to_owned())];
+
+        let res = contract
+            .execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(&alice, &[]),
+                msgs.clone(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            res.messages,
+            msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn can_execute_query_works() {
-        let contract = Cw1WhitelistContract::<Empty>::new();
+        let contract = Cw1WhitelistContract::native();
         let mut deps = mock_dependencies(&[]);
 
         let alice = "alice";
