@@ -143,35 +143,42 @@ mod test {
 
     #[test]
     fn parse_reply_instantiate_data_works() {
-        let instantiate_reply_data: &str = "Contract #1";
-        let instantiate_reply = MsgInstantiateContractResponse {
-            contract_address: instantiate_reply_data.to_string(),
-            data: vec![1u8, 2, 3, 4],
-        };
-        let mut encoded_instantiate_reply =
-            Vec::<u8>::with_capacity(instantiate_reply.encoded_len());
-        // The data must encode successfully
-        instantiate_reply
-            .encode(&mut encoded_instantiate_reply)
-            .unwrap();
+        let contract_addr: &str = "Contract #1";
+        for data in [vec![], vec![1u8, 2, 255, 7, 5]] {
+            let expected = if data.is_empty() {
+                super::MsgInstantiateContractResponse {
+                    contract_address: contract_addr.to_string(),
+                    data: None,
+                }
+            } else {
+                super::MsgInstantiateContractResponse {
+                    contract_address: contract_addr.to_string(),
+                    data: Some(Binary(data.clone())),
+                }
+            };
+            let instantiate_reply = MsgInstantiateContractResponse {
+                contract_address: contract_addr.to_string(),
+                data,
+            };
+            let mut encoded_instantiate_reply =
+                Vec::<u8>::with_capacity(instantiate_reply.encoded_len());
+            // The data must encode successfully
+            instantiate_reply
+                .encode(&mut encoded_instantiate_reply)
+                .unwrap();
 
-        // Build reply message
-        let msg = Reply {
-            id: 1,
-            result: ContractResult::Ok(SubMsgExecutionResponse {
-                events: vec![],
-                data: Some(encoded_instantiate_reply.into()),
-            }),
-        };
+            // Build reply message
+            let msg = Reply {
+                id: 1,
+                result: ContractResult::Ok(SubMsgExecutionResponse {
+                    events: vec![],
+                    data: Some(encoded_instantiate_reply.into()),
+                }),
+            };
 
-        let res = parse_reply_instantiate_data(msg).unwrap();
-        assert_eq!(
-            res,
-            super::MsgInstantiateContractResponse {
-                contract_address: instantiate_reply_data.into(),
-                data: Some(Binary(vec![1u8, 2, 3, 4])),
-            }
-        );
+            let res = parse_reply_instantiate_data(msg).unwrap();
+            assert_eq!(res, expected);
+        }
     }
 
     #[test]
