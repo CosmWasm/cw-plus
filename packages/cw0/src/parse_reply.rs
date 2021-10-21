@@ -18,7 +18,10 @@ pub struct MsgExecuteContractResponse {
 
 /// Helper function to parse length-prefixed protobuf fields.
 /// The remaining of the data is kept in the data parameter.
-fn parse_protobuf_length_prefixed(data: &mut Vec<u8>) -> Result<Vec<u8>, ParseReplyError> {
+fn parse_protobuf_length_prefixed(
+    data: &mut Vec<u8>,
+    field_number: u8,
+) -> Result<Vec<u8>, ParseReplyError> {
     if data.is_empty() {
         return Ok(vec![]);
     };
@@ -26,16 +29,22 @@ fn parse_protobuf_length_prefixed(data: &mut Vec<u8>) -> Result<Vec<u8>, ParseRe
     let wire_type = data[0] & 0b11;
     let field = data[0] >> 3;
 
+    if field != field_number {
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: invalid field #{} for field #{}",
+            field, field_number
+        )));
+    }
     if wire_type != WIRE_TYPE_LENGTH_DELIMITED {
         return Err(ParseReplyError::ParseFailure(format!(
             "failed to decode Protobuf message: field #{}: invalid wire type {}",
-            field, wire_type
+            field_number, wire_type
         )));
     }
     if rest_1.is_empty() {
         return Err(ParseReplyError::ParseFailure(format!(
             "failed to decode Protobuf message: field #{}: message too short",
-            field
+            field_number
         )));
     }
     let mut rest_2 = rest_1.split_off(1);
@@ -43,7 +52,7 @@ fn parse_protobuf_length_prefixed(data: &mut Vec<u8>) -> Result<Vec<u8>, ParseRe
     if rest_2.len() < len {
         return Err(ParseReplyError::ParseFailure(format!(
             "failed to decode Protobuf message: field #{}: message too short",
-            field
+            field_number
         )));
     }
     let rest_3 = rest_2.split_off(len);
@@ -52,18 +61,22 @@ fn parse_protobuf_length_prefixed(data: &mut Vec<u8>) -> Result<Vec<u8>, ParseRe
     Ok(rest_2)
 }
 
-fn parse_protobuf_string(data: &mut Vec<u8>) -> Result<String, ParseReplyError> {
-    let str_field = parse_protobuf_length_prefixed(data)?;
+fn parse_protobuf_string(data: &mut Vec<u8>, field_number: u8) -> Result<String, ParseReplyError> {
+    let str_field = parse_protobuf_length_prefixed(data, field_number)?;
     if str_field.is_empty() {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: string field: message too short".to_owned(),
-        ));
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: string field #{}: message too short",
+            field_number
+        )));
     }
     Ok(String::from_utf8(str_field)?)
 }
 
-fn parse_protobuf_bytes(data: &mut Vec<u8>) -> Result<Option<Binary>, ParseReplyError> {
-    let bytes_field = parse_protobuf_length_prefixed(data)?;
+fn parse_protobuf_bytes(
+    data: &mut Vec<u8>,
+    field_number: u8,
+) -> Result<Option<Binary>, ParseReplyError> {
+    let bytes_field = parse_protobuf_length_prefixed(data, field_number)?;
     if bytes_field.is_empty() {
         Ok(None)
     } else {
@@ -83,10 +96,10 @@ pub fn parse_reply_instantiate_data(
     // Manual protobuf decoding
     let mut data = data.0;
     // Parse contract addr
-    let contract_addr = parse_protobuf_string(&mut data)?;
+    let contract_addr = parse_protobuf_string(&mut data, 1)?;
 
     // Parse (optional) data
-    let data = parse_protobuf_bytes(&mut data)?;
+    let data = parse_protobuf_bytes(&mut data, 2)?;
 
     Ok(MsgInstantiateContractResponse {
         contract_address: contract_addr,
@@ -104,7 +117,7 @@ pub fn parse_reply_execute_data(msg: Reply) -> Result<MsgExecuteContractResponse
     // Manual protobuf decoding
     let mut data = data.0;
     // Parse (optional) data
-    let data = parse_protobuf_bytes(&mut data)?;
+    let data = parse_protobuf_bytes(&mut data, 1)?;
 
     Ok(MsgExecuteContractResponse { data })
 }
