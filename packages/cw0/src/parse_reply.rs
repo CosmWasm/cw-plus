@@ -11,6 +11,11 @@ pub struct MsgInstantiateContractResponse {
     pub data: Option<Binary>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct MsgExecuteContractResponse {
+    pub data: Option<Binary>,
+}
+
 /// Helper function to parse length-prefixed protobuf fields.
 /// The remaining of the data is kept in the data parameter.
 fn parse_protobuf_length_prefixed(data: &mut Vec<u8>) -> Result<Vec<u8>, ParseReplyError> {
@@ -83,12 +88,25 @@ pub fn parse_reply_instantiate_data(
     // Parse (optional) data
     let data = parse_protobuf_bytes(&mut data)?;
 
-    let res = MsgInstantiateContractResponse {
+    Ok(MsgInstantiateContractResponse {
         contract_address: contract_addr,
         data,
-    };
+    })
+}
 
-    Ok(res)
+pub fn parse_reply_execute_data(msg: Reply) -> Result<MsgExecuteContractResponse, ParseReplyError> {
+    let data = msg
+        .result
+        .into_result()
+        .map_err(ParseReplyError::SubMsgFailure)?
+        .data
+        .ok_or_else(|| ParseReplyError::ParseFailure("Missing reply data".to_owned()))?;
+    // Manual protobuf decoding
+    let mut data = data.0;
+    // Parse (optional) data
+    let data = parse_protobuf_bytes(&mut data)?;
+
+    Ok(MsgExecuteContractResponse { data })
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -114,6 +132,12 @@ mod test {
         #[prost(string, tag = "1")]
         pub contract_address: ::prost::alloc::string::String,
         #[prost(bytes, tag = "2")]
+        pub data: ::prost::alloc::vec::Vec<u8>,
+    }
+
+    #[derive(Clone, PartialEq, Message)]
+    pub struct MsgExecuteContractResponse {
+        #[prost(bytes, tag = "1")]
         pub data: ::prost::alloc::vec::Vec<u8>,
     }
 
@@ -148,5 +172,36 @@ mod test {
                 data: Some(Binary(vec![1u8, 2, 3, 4])),
             }
         );
+    }
+
+    #[test]
+    fn parse_reply_execute_data_works() {
+        for data in [vec![], vec![1u8, 2, 3, 127]] {
+            let expected = if data.is_empty() {
+                super::MsgExecuteContractResponse { data: None }
+            } else {
+                super::MsgExecuteContractResponse {
+                    data: Some(Binary(data.clone())),
+                }
+            };
+
+            let execute_reply = MsgExecuteContractResponse { data };
+            let mut encoded_execute_reply = Vec::<u8>::with_capacity(execute_reply.encoded_len());
+            // The data must encode successfully
+            execute_reply.encode(&mut encoded_execute_reply).unwrap();
+
+            // Build reply message
+            let msg = Reply {
+                id: 1,
+                result: ContractResult::Ok(SubMsgExecutionResponse {
+                    events: vec![],
+                    data: Some(encoded_execute_reply.into()),
+                }),
+            };
+
+            let res = parse_reply_execute_data(msg).unwrap();
+
+            assert_eq!(res, expected);
+        }
     }
 }
