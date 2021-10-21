@@ -89,7 +89,7 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
     }
 
     fn raw_key(&self) -> Self::KeyType {
-        &[]
+        &self
     }
 }
 
@@ -218,9 +218,18 @@ impl<'a> PrimaryKey<'a> for Vec<u8> {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![&self]
+    fn key(&self) -> NamespacedKey<Self> {
+        // this is simple, we don't add more prefixes
+        NamespacedKey {
+            namespaces: vec![],
+            key: self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &self
     }
 }
 
@@ -235,9 +244,18 @@ impl<'a> PrimaryKey<'a> for String {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn key(&self) -> NamespacedKey<Self> {
+        // this is simple, we don't add more prefixes
+        NamespacedKey {
+            namespaces: vec![],
+            key: &self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        self.as_bytes()
     }
 }
 
@@ -253,10 +271,18 @@ impl<'a> PrimaryKey<'a> for &'a Addr {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> NamespacedKey<Self> {
         // this is simple, we don't add more prefixes
-        vec![self.as_ref().as_bytes()]
+        NamespacedKey {
+            namespaces: vec![],
+            key: &self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        self.as_bytes()
     }
 }
 
@@ -272,10 +298,18 @@ impl<'a> PrimaryKey<'a> for Addr {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> NamespacedKey<Self> {
         // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
+        NamespacedKey {
+            namespaces: vec![],
+            key: &self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &self.as_bytes()
     }
 }
 
@@ -294,9 +328,18 @@ where
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        self.wrapped.key()
+    fn key(&self) -> NamespacedKey<Self> {
+        // this is simple, we don't add more prefixes
+        NamespacedKey {
+            namespaces: vec![],
+            key: self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &self.wrapped
     }
 }
 
