@@ -32,7 +32,7 @@ fn parse_protobuf_varint(data: &mut Vec<u8>, field_number: u8) -> Result<usize, 
             )));
         }
         len >>= 7;
-        len += ((data[i] & 0x7f) as u64) << 57;
+        len += ((data[i] & 0x7f) as u64) << 56;
         if data[i] & 0x80 == 0 {
             break;
         }
@@ -45,7 +45,7 @@ fn parse_protobuf_varint(data: &mut Vec<u8>, field_number: u8) -> Result<usize, 
         )));
     }
     i += 1;
-    len >>= (VARINT_MAX_BYTES - i) * 7 + 1;
+    len >>= (VARINT_MAX_BYTES - i) * 7;
     *data = data.split_off(i);
 
     Ok(len as usize) // Gently fall back to the arch's max addressable size
