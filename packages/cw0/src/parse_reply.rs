@@ -8,65 +8,62 @@ const WIRE_TYPE_LENGTH_DELIMITED: u8 = 2;
 #[derive(Clone, Debug, PartialEq)]
 pub struct MsgInstantiateContractResponse {
     pub contract_address: String,
-    pub data: Option<Binary>, // FIXME: Confirm if Option
+    pub data: Option<Binary>,
+}
+
+/// Helper function to parse length-prefixed protobuf fields.
+/// The remaining of the data is kept in the data parameter.
+fn parse_protobuf_length_prefixed(data: &mut Vec<u8>) -> Result<Vec<u8>, ParseReplyError> {
+    if data.is_empty() {
+        return Ok(vec![]);
+    };
+    let mut rest_1 = data.split_off(1);
+    let wire_type = data[0] & 0b11;
+    let field = data[0] >> 3;
+
+    if wire_type != WIRE_TYPE_LENGTH_DELIMITED {
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: field #{}: invalid wire type {}",
+            field, wire_type
+        )));
+    }
+    if rest_1.is_empty() {
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: field #{}: message too short",
+            field
+        )));
+    }
+    let mut rest_2 = rest_1.split_off(1);
+    let len = rest_1[0] as usize;
+    if rest_2.len() < len {
+        return Err(ParseReplyError::ParseFailure(format!(
+            "failed to decode Protobuf message: field #{}: message too short",
+            field
+        )));
+    }
+    let rest_3 = rest_2.split_off(len);
+
+    *data = rest_3;
+    Ok(rest_2)
 }
 
 fn parse_protobuf_string(data: &mut Vec<u8>) -> Result<String, ParseReplyError> {
-    if data.is_empty() {
+    let str_field = parse_protobuf_length_prefixed(data)?;
+    if str_field.is_empty() {
         return Err(ParseReplyError::ParseFailure(
             "failed to decode Protobuf message: string field: message too short".to_owned(),
         ));
     }
-    let mut rest_1 = data.split_off(1);
-    if data[0] & 0x03 != WIRE_TYPE_LENGTH_DELIMITED {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: string field: invalid wire type".to_owned(),
-        ));
-    }
-    if rest_1.is_empty() {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: string field: message too short".to_owned(),
-        ));
-    }
-    let mut rest_2 = rest_1.split_off(1);
-    let len = rest_1[0] as usize;
-    if rest_2.len() < len {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: string field: message too short".to_owned(),
-        ));
-    }
-    let rest_3 = rest_2.split_off(len);
-
-    *data = rest_3;
-    Ok(String::from_utf8(rest_2)?)
+    Ok(String::from_utf8(str_field)?)
 }
 
 fn parse_protobuf_bytes(data: &mut Vec<u8>) -> Result<Option<Binary>, ParseReplyError> {
-    if data.is_empty() {
-        return Ok(None);
+    let bytes_field = parse_protobuf_length_prefixed(data)?;
+    if bytes_field.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(Binary(bytes_field)))
     }
-    let mut rest_1 = data.split_off(1);
-    if data[0] & 0x03 != WIRE_TYPE_LENGTH_DELIMITED {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: bytes field: invalid wire type".to_owned(),
-        ));
-    }
-    if rest_1.is_empty() {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: bytes field: message too short".to_owned(),
-        ));
-    }
-    let mut rest_2 = rest_1.split_off(1);
-    let len = rest_1[0] as usize;
-    if rest_2.len() < len {
-        return Err(ParseReplyError::ParseFailure(
-            "failed to decode Protobuf message: bytes field: message too short".to_owned(),
-        ));
-    }
-    let rest_3 = rest_2.split_off(len);
-
-    *data = rest_3;
-    Ok(Some(Binary(rest_2.to_vec())))
 }
 
 pub fn parse_reply_instantiate_data(
