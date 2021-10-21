@@ -12,7 +12,7 @@ mod binary {
     use crate::state::Cw1WhitelistContract;
     use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
 
-    const CONTRACT: Cw1WhitelistContract<Empty> = Cw1WhitelistContract::new();
+    const CONTRACT: Cw1WhitelistContract<Empty> = Cw1WhitelistContract::native();
 
     #[entry_point]
     pub fn instantiate(
