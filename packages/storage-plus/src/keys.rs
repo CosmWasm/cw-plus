@@ -24,7 +24,7 @@ use crate::Endian;
 ///
 /// `SubPrefix` and `SuperSuffix` only make real sense in the case of triples. Still, they need to be
 /// consistently defined for all types.
-pub trait PrimaryKey<'a>: Clone {
+pub trait PrimaryKey<'a>: Clone + Sized {
     /// These associated types need to implement `Prefixer`, so that they can be useful arguments
     /// for `prefix()`, `sub_prefix()`, and their key-deserializable variants.
     type Prefix: Prefixer<'a>;
@@ -35,14 +35,22 @@ pub trait PrimaryKey<'a>: Clone {
     type Suffix: KeyDeserialize;
     type SuperSuffix: KeyDeserialize;
 
+    type KeyType: AsRef<[u8]>;
+
     /// returns a slice of key steps, which can be optionally combined
-    fn key(&self) -> Vec<&[u8]>;
+    fn key(&self) -> NamespacedKey<Self>;
+
+    fn raw_key(&self) -> Self::KeyType;
 
     fn joined_key(&self) -> Vec<u8> {
         let keys = self.key();
-        let l = keys.len();
-        namespaces_with_key(&keys[0..l - 1], &keys[l - 1])
+        namespaces_with_key(&keys.namespaces, keys.key.raw_key().as_ref())
     }
+}
+
+struct NamespacedKey<'a, T> {
+  namespaces: Vec<&'a [u8]>,
+  key: &'a T,
 }
 
 // Empty / no primary key
@@ -51,9 +59,17 @@ impl<'a> PrimaryKey<'a> for () {
     type SubPrefix = Self;
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![]
+    fn key(&self) -> NamespacedKey<Self> {
+        NamespacedKey {
+            namespaces: vec![],
+            key: &self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &[]
     }
 }
 
@@ -62,10 +78,18 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> NamespacedKey<Self> {
         // this is simple, we don't add more prefixes
-        vec![self]
+        NamespacedKey {
+            namespaces: vec![],
+            key: self
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &[]
     }
 }
 
@@ -75,10 +99,18 @@ impl<'a> PrimaryKey<'a> for &'a str {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> NamespacedKey<Self> {
         // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
+        NamespacedKey {
+            namespaces: vec![],
+            key: &self
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        self.as_bytes()
     }
 }
 
@@ -90,11 +122,17 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize, U: PrimaryKey<'a> + 
     type SubPrefix = ();
     type Suffix = U;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        let mut keys = self.0.key();
-        keys.extend(&self.1.key());
-        keys
+    fn key(&self) -> NamespacedKey<Self> {
+        NamespacedKey {
+            namespaces: vec![],
+            key: &(self.0, self.1)
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &[]
     }
 }
 
@@ -110,12 +148,17 @@ impl<
     type SubPrefix = T;
     type Suffix = V;
     type SuperSuffix = (U, V);
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        let mut keys = self.0.key();
-        keys.extend(&self.1.key());
-        keys.extend(&self.2.key());
-        keys
+    fn key(&self) -> NamespacedKey<Self> {
+        NamespacedKey {
+            namespaces: vec![],
+            key: &(self.0, self.1, self.2)
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &[]
     }
 }
 
