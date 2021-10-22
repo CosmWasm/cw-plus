@@ -92,12 +92,6 @@ fn parse_protobuf_length_prefixed(
 
 fn parse_protobuf_string(data: &mut Vec<u8>, field_number: u8) -> Result<String, ParseReplyError> {
     let str_field = parse_protobuf_length_prefixed(data, field_number)?;
-    if str_field.is_empty() {
-        return Err(ParseReplyError::ParseFailure(format!(
-            "failed to decode Protobuf message: string field #{}: message too short",
-            field_number
-        )));
-    }
     Ok(String::from_utf8(str_field)?)
 }
 
@@ -181,6 +175,26 @@ mod test {
     pub struct MsgExecuteContractResponse {
         #[prost(bytes, tag = "1")]
         pub data: ::prost::alloc::vec::Vec<u8>,
+    }
+
+    #[test]
+    fn parse_protobuf_string_works() {
+        for (i, (mut data, field_number, expected, rest)) in (1..).zip([
+            (b"\x0a\x00".to_vec(), 1, "", vec![0u8; 0]),
+            (b"\x0a\x01a".to_vec(), 1, "a", vec![0u8; 0]),
+            (b"\x0a\x06testf1".to_vec(), 1, "testf1", vec![0u8; 0]),
+            (b"\x12\x09testingf2".to_vec(), 2, "testingf2", vec![0u8; 0]),
+            (
+                b"\x0a\x04test_remainder".to_vec(),
+                1,
+                "test",
+                b"_remainder".to_vec(),
+            ),
+        ]) {
+            let res = parse_protobuf_string(&mut data, field_number).unwrap();
+            assert_eq!(res, expected, "test #{}", i);
+            assert_eq!(data, rest, "test #{}", i);
+        }
     }
 
     #[test]
