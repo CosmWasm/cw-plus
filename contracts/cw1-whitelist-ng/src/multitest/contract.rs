@@ -166,7 +166,7 @@ impl<'a, App> Instantiator<'a, App> {
         self
     }
 
-    pub fn with<C>(self, admins: Vec<String>, mutable: bool) -> AnyResult<Cw1WhitelistProxy>
+    pub fn with_args<C>(self, admins: Vec<String>, mutable: bool) -> AnyResult<Cw1WhitelistProxy>
     where
         C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static,
         App: Executor<C>,

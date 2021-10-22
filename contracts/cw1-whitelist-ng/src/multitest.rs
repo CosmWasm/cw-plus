@@ -19,12 +19,12 @@ mod test {
 
         let proxy = Cw1WhitelistProxy::instantiate(&mut app, contract_id, &owner, &[])
             .with_label("Proxy")
-            .with(vec![owner.to_string()], true)
+            .with_args(vec![owner.to_string()], true)
             .unwrap();
 
         let remote = Cw1WhitelistProxy::instantiate(&mut app, contract_id, &owner, &[])
             .with_label("Remote")
-            .with(vec![proxy.addr().into()], true)
+            .with_args(vec![proxy.addr().into()], true)
             .unwrap();
 
         assert_ne!(proxy, remote);

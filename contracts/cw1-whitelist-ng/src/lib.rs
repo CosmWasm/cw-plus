@@ -3,11 +3,12 @@ pub mod error;
 pub mod interfaces;
 pub mod msg;
 pub mod multitest;
+#[cfg(feature = "querier")]
 pub mod query;
 pub mod state;
 
 #[cfg(not(feature = "library"))]
-mod binary {
+mod entry_points {
     use crate::error::ContractError;
     use crate::state::Cw1WhitelistContract;
     use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
@@ -41,4 +42,4 @@ mod binary {
 }
 
 #[cfg(not(feature = "library"))]
-pub use binary::*;
+pub use entry_points::*;
