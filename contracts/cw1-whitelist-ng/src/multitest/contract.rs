@@ -10,7 +10,6 @@ use cosmwasm_std::{
 use cw_multi_test::{AppResponse, Contract, Executor};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 impl<T> Contract<T> for Cw1WhitelistContract<T>
 where
@@ -76,7 +75,7 @@ impl<'a, App> Cw1Executor<'a, App> {
 
     pub fn execute<C>(self, msgs: Vec<CosmosMsg<C>>) -> AnyResult<AppResponse>
     where
-        C: CustomMsg,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         self.app.execute_contract(
@@ -109,7 +108,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
 
     pub fn freeze<C>(self) -> AnyResult<AppResponse>
     where
-        C: CustomMsg,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         self.app.execute_contract(
@@ -122,7 +121,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
 
     pub fn update_admins<C>(self, admins: Vec<String>) -> AnyResult<AppResponse>
     where
-        C: CustomMsg,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         self.app.execute_contract(
@@ -169,7 +168,7 @@ impl<'a, App> Instantiator<'a, App> {
 
     pub fn with_args<C>(self, admins: Vec<String>, mutable: bool) -> AnyResult<Cw1WhitelistProxy>
     where
-        C: CustomMsg,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         let addr = self.app.instantiate_contract(

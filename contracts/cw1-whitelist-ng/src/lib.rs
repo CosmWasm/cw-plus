@@ -3,7 +3,7 @@ pub mod error;
 pub mod interfaces;
 pub mod msg;
 pub mod multitest;
-#[cfg(feature = "querier")]
+#[cfg(any(test, feature = "querier"))]
 pub mod query;
 pub mod state;
 
