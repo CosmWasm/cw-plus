@@ -90,12 +90,6 @@ fn parse_protobuf_length_prefixed(
 }
 
 fn parse_protobuf_string(data: &mut Vec<u8>, field_number: u8) -> Result<String, ParseReplyError> {
-    if data.is_empty() {
-        return Err(ParseReplyError::ParseFailure(format!(
-            "failed to decode Protobuf message: string field #{}: message too short",
-            field_number
-        )));
-    }
     let str_field = parse_protobuf_length_prefixed(data, field_number)?;
     Ok(String::from_utf8(str_field)?)
 }
@@ -408,11 +402,6 @@ mod test {
         let mut data = b"\x0a\x01a".to_vec();
         let res = parse_protobuf_string(&mut data, field_number).unwrap();
         assert_eq!(res, "a".to_string());
-
-        // string message too short. Non-optional string
-        let mut data = vec![];
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
 
         // FromUtf8Error
         let field_number = 1;
