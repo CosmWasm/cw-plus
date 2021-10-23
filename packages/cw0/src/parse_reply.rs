@@ -184,6 +184,42 @@ mod test {
     }
 
     #[test]
+    fn parse_protobuf_bytes_works() {
+        for (i, (mut data, field_number, expected, rest)) in (1..).zip([
+            (vec![0u8; 0], 1, None, vec![0u8; 0]),
+            (b"\x0a\x00".to_vec(), 1, None, vec![0u8; 0]),
+            (
+                b"\x0a\x01a".to_vec(),
+                1,
+                Some(Binary(b"a".to_vec())),
+                vec![0u8; 0],
+            ),
+            (
+                b"\x0a\x06testf1".to_vec(),
+                1,
+                Some(Binary(b"testf1".to_vec())),
+                vec![0u8; 0],
+            ),
+            (
+                b"\x12\x09testingf2".to_vec(),
+                2,
+                Some(Binary(b"testingf2".to_vec())),
+                vec![0u8; 0],
+            ),
+            (
+                b"\x0a\x04test_remainder".to_vec(),
+                1,
+                Some(Binary(b"test".to_vec())),
+                b"_remainder".to_vec(),
+            ),
+        ]) {
+            let res = parse_protobuf_bytes(&mut data, field_number).unwrap();
+            assert_eq!(res, expected, "test #{}", i);
+            assert_eq!(data, rest, "test #{}", i);
+        }
+    }
+
+    #[test]
     fn parse_protobuf_string_works() {
         for (i, (mut data, field_number, expected, rest)) in (1..).zip([
             (b"\x0a\x00".to_vec(), 1, "", vec![0u8; 0]),
