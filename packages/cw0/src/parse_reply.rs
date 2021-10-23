@@ -92,8 +92,8 @@ fn parse_protobuf_length_prefixed(
 fn parse_protobuf_string(data: &mut Vec<u8>, field_number: u8) -> Result<String, ParseReplyError> {
     if data.is_empty() {
         return Err(ParseReplyError::ParseFailure(format!(
-        "failed to decode Protobuf message: string field #{}: message too short",
-        field_number
+            "failed to decode Protobuf message: string field #{}: message too short",
+            field_number
         )));
     }
     let str_field = parse_protobuf_length_prefixed(data, field_number)?;
@@ -184,9 +184,100 @@ mod test {
     }
 
     #[test]
+    fn parse_protobuf_varint_tests() {
+        let field_number = 1;
+        // Single-byte varint works
+        let mut data = b"\x0a".to_vec();
+        let len = parse_protobuf_varint(&mut data, field_number).unwrap();
+        assert_eq!(len, 10);
+
+        // Rest is returned
+        let mut data = b"\x0a\x0b".to_vec();
+        let len = parse_protobuf_varint(&mut data, field_number).unwrap();
+        assert_eq!(len, 10);
+        assert_eq!(data, b"\x0b".to_vec());
+
+        // Multi-byte varint works
+        // 300 % 128 = 44. 44 + 128 = 172 (0xac) (1st byte)
+        // 300 / 128 = 2 (x02) (2nd byte)
+        let mut data = b"\xac\x02".to_vec();
+        let len = parse_protobuf_varint(&mut data, field_number).unwrap();
+        assert_eq!(len, 300);
+
+        // Rest is returned
+        let mut data = b"\xac\x02\x0c".to_vec();
+        let len = parse_protobuf_varint(&mut data, field_number).unwrap();
+        assert_eq!(len, 300);
+        assert_eq!(data, b"\x0c".to_vec());
+
+        // varint data too short (Empty varint)
+        let mut data = vec![];
+        let err = parse_protobuf_varint(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // varint data too short (Incomplete varint)
+        let mut data = b"\x80".to_vec();
+        let err = parse_protobuf_varint(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // varint data too long
+        let mut data = b"\x80\x81\x82\x83\x84\x83\x82\x81\x80".to_vec();
+        let err = parse_protobuf_varint(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+    }
+
+    #[test]
+    fn parse_protobuf_length_prefixed_tests() {
+        let field_number = 1;
+        // Single-byte length-prefixed works
+        let mut data = b"\x0a\x03abc".to_vec();
+        let res = parse_protobuf_length_prefixed(&mut data, field_number).unwrap();
+        assert_eq!(res, b"abc".to_vec());
+        assert_eq!(data, vec![0u8; 0]);
+
+        // Rest is returned
+        let mut data = b"\x0a\x03abcd".to_vec();
+        let res = parse_protobuf_length_prefixed(&mut data, field_number).unwrap();
+        assert_eq!(res, b"abc".to_vec());
+        assert_eq!(data, b"d".to_vec());
+
+        // Multi-byte length-prefixed works
+        let mut data = [b"\x0a\xac\x02", vec![65u8; 300].as_slice()]
+            .concat()
+            .to_vec();
+        let res = parse_protobuf_length_prefixed(&mut data, field_number).unwrap();
+        assert_eq!(res, vec![65u8; 300]);
+        assert_eq!(data, vec![0u8; 0]);
+
+        // Rest is returned
+        let mut data = [b"\x0a\xac\x02", vec![65u8; 300].as_slice(), b"rest"]
+            .concat()
+            .to_vec();
+        let res = parse_protobuf_length_prefixed(&mut data, field_number).unwrap();
+        assert_eq!(res, vec![65u8; 300]);
+        assert_eq!(data, b"rest");
+
+        // message too short
+        let mut data = b"\x0a\x01".to_vec();
+        let field_number = 1;
+        let err = parse_protobuf_length_prefixed(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // invalid wire type
+        let mut data = b"\x0b\x01a".to_vec();
+        let err = parse_protobuf_length_prefixed(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // invalid field number
+        let field_number = 2;
+        let mut data = b"\x0a\x01a".to_vec();
+        let err = parse_protobuf_length_prefixed(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+    }
+
+    #[test]
     fn parse_protobuf_bytes_works() {
         for (i, (mut data, field_number, expected, rest)) in (1..).zip([
-            (vec![0u8; 0], 1, None, vec![0u8; 0]),
             (b"\x0a\x00".to_vec(), 1, None, vec![0u8; 0]),
             (
                 b"\x0a\x01a".to_vec(),
@@ -247,39 +338,8 @@ mod test {
         let res = parse_protobuf_string(&mut data, field_number).unwrap();
         assert_eq!(res, "a".to_string());
 
-        // message too short. Non-optional string
+        // string message too short. Non-optional string
         let mut data = vec![];
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
-
-        // varint data too short
-        let mut data = b"\x0a".to_vec();
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
-
-        // varint data too short
-        let mut data = b"\x0a\x80".to_vec();
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
-
-        // varint data too long
-        let mut data = b"\x0a\x80\x80\x80\x80\x80\x80\x80\x80\x80".to_vec();
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
-
-        // message too short
-        let mut data = b"\x0a\x01".to_vec();
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
-
-        // invalid wire type
-        let mut data = b"\x0b\x01a".to_vec();
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
-        assert!(matches!(err, ParseFailure(..)));
-
-        // invalid field number
-        let field_number = 2;
-        let mut data = b"\x0a\x01a".to_vec();
         let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
         assert!(matches!(err, ParseFailure(..)));
 
