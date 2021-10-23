@@ -169,8 +169,24 @@ mod test {
     use cosmwasm_std::{ContractResult, SubMsgExecutionResponse};
     use prost::Message;
 
+    fn encode_bytes(data: &Vec<u8>) -> Vec<u8> {
+        #[derive(Clone, PartialEq, Message)]
+        struct ProtobufBytes {
+            #[prost(bytes, tag = "1")]
+            pub data: Vec<u8>,
+        }
+
+        let data = ProtobufBytes {
+            data: data.to_vec(),
+        };
+        let mut encoded_data = Vec::<u8>::with_capacity(data.encoded_len());
+        data.encode(&mut encoded_data).unwrap();
+
+        encoded_data
+    }
+
     #[derive(Clone, PartialEq, Message)]
-    pub struct MsgInstantiateContractResponse {
+    struct MsgInstantiateContractResponse {
         #[prost(string, tag = "1")]
         pub contract_address: ::prost::alloc::string::String,
         #[prost(bytes, tag = "2")]
@@ -178,7 +194,7 @@ mod test {
     }
 
     #[derive(Clone, PartialEq, Message)]
-    pub struct MsgExecuteContractResponse {
+    struct MsgExecuteContractResponse {
         #[prost(bytes, tag = "1")]
         pub data: ::prost::alloc::vec::Vec<u8>,
     }
@@ -277,37 +293,48 @@ mod test {
 
     #[test]
     fn parse_protobuf_bytes_works() {
-        for (i, (mut data, field_number, expected, rest)) in (1..).zip([
-            (b"\x0a\x00".to_vec(), 1, None, vec![0u8; 0]),
-            (
-                b"\x0a\x01a".to_vec(),
-                1,
-                Some(Binary(b"a".to_vec())),
-                vec![0u8; 0],
-            ),
-            (
-                b"\x0a\x06testf1".to_vec(),
-                1,
-                Some(Binary(b"testf1".to_vec())),
-                vec![0u8; 0],
-            ),
-            (
-                b"\x12\x09testingf2".to_vec(),
-                2,
-                Some(Binary(b"testingf2".to_vec())),
-                vec![0u8; 0],
-            ),
-            (
-                b"\x0a\x04test_remainder".to_vec(),
-                1,
-                Some(Binary(b"test".to_vec())),
-                b"_remainder".to_vec(),
-            ),
-        ]) {
-            let res = parse_protobuf_bytes(&mut data, field_number).unwrap();
-            assert_eq!(res, expected, "test #{}", i);
-            assert_eq!(data, rest, "test #{}", i);
-        }
+        let field_number = 1;
+
+        // Empty works
+        let data = vec![];
+        let mut encoded_data = encode_bytes(&data);
+
+        let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, None);
+
+        // Simple works
+        let data = b"test".to_vec();
+        let mut encoded_data = encode_bytes(&data.to_vec());
+
+        let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, Some(Binary(data.to_vec())));
+
+        // Large works
+        let data = vec![0x40; 300];
+        let mut encoded_data = encode_bytes(&data.to_vec());
+
+        let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, Some(Binary(data.to_vec())));
+
+        // Field number works
+        let field_number = 5;
+        let data = b"test field2".to_vec();
+        let mut encoded_data = encode_bytes(&data.to_vec());
+        encoded_data[0] = (field_number << 3) + WIRE_TYPE_LENGTH_DELIMITED;
+
+        let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, Some(Binary(data.to_vec())));
+
+        // Remainder is kept
+        let field_number = 1;
+        let test_len: usize = 4;
+        let data = b"test_remainder".to_vec();
+        let mut encoded_data = encode_bytes(&data.to_vec());
+        encoded_data[1] = test_len as u8;
+
+        let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, Some(Binary(data[..test_len].to_owned())));
+        assert_eq!(encoded_data, data[test_len..].to_owned());
     }
 
     #[test]
