@@ -349,7 +349,7 @@ mod test {
     }
 
     #[test]
-    fn parse_protobuf_string_works() {
+    fn parse_protobuf_string_tests() {
         let field_number = 1;
 
         // Empty works
@@ -393,20 +393,14 @@ mod test {
         let res = parse_protobuf_string(&mut encoded_data, field_number).unwrap();
         assert_eq!(res, data[..test_len]);
         assert_eq!(encoded_data, data[test_len..].as_bytes());
-    }
 
-    #[test]
-    fn parse_protobuf_string_errs() {
-        // Correct for reference
+        // Broken utf-8 errs
         let field_number = 1;
-        let mut data = b"\x0a\x01a".to_vec();
-        let res = parse_protobuf_string(&mut data, field_number).unwrap();
-        assert_eq!(res, "a".to_string());
-
-        // FromUtf8Error
-        let field_number = 1;
-        let mut data = b"\x0a\x04abc\xd3".to_vec();
-        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        let data = "test_X";
+        let mut encoded_data = encode_string(data);
+        let encoded_len = encoded_data.len();
+        encoded_data[encoded_len - 1] = 0xd3;
+        let err = parse_protobuf_string(&mut encoded_data, field_number).unwrap_err();
         assert!(matches!(err, BrokenUtf8(..)));
     }
 
