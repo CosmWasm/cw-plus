@@ -78,7 +78,6 @@ fn parse_protobuf_length_prefixed(
     }
 
     let len = parse_protobuf_varint(&mut rest_1, field_number)?;
-    println!("field #{}: len: {}", field_number, len);
     if rest_1.len() < len {
         return Err(ParseReplyError::ParseFailure(format!(
             "failed to decode Protobuf message: field #{}: message too short",
@@ -91,6 +90,12 @@ fn parse_protobuf_length_prefixed(
 }
 
 fn parse_protobuf_string(data: &mut Vec<u8>, field_number: u8) -> Result<String, ParseReplyError> {
+    if data.is_empty() {
+        return Err(ParseReplyError::ParseFailure(format!(
+        "failed to decode Protobuf message: string field #{}: message too short",
+        field_number
+        )));
+    }
     let str_field = parse_protobuf_length_prefixed(data, field_number)?;
     Ok(String::from_utf8(str_field)?)
 }
@@ -154,12 +159,13 @@ pub enum ParseReplyError {
     ParseFailure(String),
 
     #[error("Error occurred while converting from UTF-8")]
-    FromUtf8(#[from] std::string::FromUtf8Error),
+    BrokenUtf8(#[from] std::string::FromUtf8Error),
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::parse_reply::ParseReplyError::{BrokenUtf8, ParseFailure};
     use cosmwasm_std::{ContractResult, SubMsgExecutionResponse};
     use prost::Message;
 
@@ -195,6 +201,57 @@ mod test {
             assert_eq!(res, expected, "test #{}", i);
             assert_eq!(data, rest, "test #{}", i);
         }
+    }
+
+    #[test]
+    fn parse_protobuf_string_errs() {
+        // Correct for reference
+        let field_number = 1;
+        let mut data = b"\x0a\x01a".to_vec();
+        let res = parse_protobuf_string(&mut data, field_number).unwrap();
+        assert_eq!(res, "a".to_string());
+
+        // message too short. Non-optional string
+        let mut data = vec![];
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // varint data too short
+        let mut data = b"\x0a".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // varint data too short
+        let mut data = b"\x0a\x80".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // varint data too long
+        let mut data = b"\x0a\x80\x80\x80\x80\x80\x80\x80\x80\x80".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // message too short
+        let mut data = b"\x0a\x01".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // invalid wire type
+        let mut data = b"\x0b\x01a".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // invalid field number
+        let field_number = 2;
+        let mut data = b"\x0a\x01a".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, ParseFailure(..)));
+
+        // FromUtf8Error
+        let field_number = 1;
+        let mut data = b"\x0a\x04abc\xd3".to_vec();
+        let err = parse_protobuf_string(&mut data, field_number).unwrap_err();
+        assert!(matches!(err, BrokenUtf8(..)));
     }
 
     #[test]
