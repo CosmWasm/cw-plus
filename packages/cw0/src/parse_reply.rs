@@ -164,7 +164,7 @@ mod test {
     use prost::Message;
     use std::str::from_utf8;
 
-    fn encode_bytes(data: &Vec<u8>) -> Vec<u8> {
+    fn encode_bytes(data: &[u8]) -> Vec<u8> {
         #[derive(Clone, PartialEq, Message)]
         struct ProtobufBytes {
             #[prost(bytes, tag = "1")]
