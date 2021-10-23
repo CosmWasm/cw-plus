@@ -168,6 +168,7 @@ mod test {
     use crate::parse_reply::ParseReplyError::{BrokenUtf8, ParseFailure};
     use cosmwasm_std::{ContractResult, SubMsgExecutionResponse};
     use prost::Message;
+    use std::str::from_utf8;
 
     fn encode_bytes(data: &Vec<u8>) -> Vec<u8> {
         #[derive(Clone, PartialEq, Message)]
@@ -178,6 +179,22 @@ mod test {
 
         let data = ProtobufBytes {
             data: data.to_vec(),
+        };
+        let mut encoded_data = Vec::<u8>::with_capacity(data.encoded_len());
+        data.encode(&mut encoded_data).unwrap();
+
+        encoded_data
+    }
+
+    fn encode_string(data: &str) -> Vec<u8> {
+        #[derive(Clone, PartialEq, Message)]
+        struct ProtobufString {
+            #[prost(string, tag = "1")]
+            pub data: String,
+        }
+
+        let data = ProtobufString {
+            data: data.to_string(),
         };
         let mut encoded_data = Vec::<u8>::with_capacity(data.encoded_len());
         data.encode(&mut encoded_data).unwrap();
@@ -318,7 +335,7 @@ mod test {
 
         // Field number works
         let field_number = 5;
-        let data = b"test field2".to_vec();
+        let data = b"test field 5".to_vec();
         let mut encoded_data = encode_bytes(&data.to_vec());
         encoded_data[0] = (field_number << 3) + WIRE_TYPE_LENGTH_DELIMITED;
 
@@ -339,22 +356,49 @@ mod test {
 
     #[test]
     fn parse_protobuf_string_works() {
-        for (i, (mut data, field_number, expected, rest)) in (1..).zip([
-            (b"\x0a\x00".to_vec(), 1, "", vec![0u8; 0]),
-            (b"\x0a\x01a".to_vec(), 1, "a", vec![0u8; 0]),
-            (b"\x0a\x06testf1".to_vec(), 1, "testf1", vec![0u8; 0]),
-            (b"\x12\x09testingf2".to_vec(), 2, "testingf2", vec![0u8; 0]),
-            (
-                b"\x0a\x04test_remainder".to_vec(),
-                1,
-                "test",
-                b"_remainder".to_vec(),
-            ),
-        ]) {
-            let res = parse_protobuf_string(&mut data, field_number).unwrap();
-            assert_eq!(res, expected, "test #{}", i);
-            assert_eq!(data, rest, "test #{}", i);
-        }
+        let field_number = 1;
+
+        // Empty works
+        let data = "";
+        let mut encoded_data = encode_string(data);
+
+        let res = parse_protobuf_string(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, data);
+
+        // Simple works
+        let data = "test";
+        let mut encoded_data = encode_string(data);
+
+        let res = parse_protobuf_string(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, data);
+
+        // Large works
+        let data = vec![0x40; 300];
+        let str_data = from_utf8(data.as_slice()).unwrap();
+        let mut encoded_data = encode_string(str_data);
+
+        let res = parse_protobuf_string(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, str_data);
+
+        // Field number works
+        let field_number = 5;
+        let data = "test field 5";
+        let mut encoded_data = encode_string(data);
+        encoded_data[0] = (field_number << 3) + WIRE_TYPE_LENGTH_DELIMITED;
+
+        let res = parse_protobuf_string(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, data);
+
+        // Remainder is kept
+        let field_number = 1;
+        let test_len: usize = 4;
+        let data = "test_remainder";
+        let mut encoded_data = encode_string(data);
+        encoded_data[1] = test_len as u8;
+
+        let res = parse_protobuf_string(&mut encoded_data, field_number).unwrap();
+        assert_eq!(res, data[..test_len]);
+        assert_eq!(encoded_data, data[test_len..].as_bytes());
     }
 
     #[test]
