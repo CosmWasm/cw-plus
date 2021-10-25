@@ -6,10 +6,10 @@ use cosmwasm_std::{
     Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128,
 };
 
-use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
 use cw4::Cw4Contract;
 use cw_storage_plus::{Item, Map};
+use utils::{Duration, Expiration};
 
 use crate::msg::Threshold;
 

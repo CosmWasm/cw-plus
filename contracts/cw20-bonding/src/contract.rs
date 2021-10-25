@@ -19,7 +19,7 @@ use crate::curves::DecimalPlaces;
 use crate::error::ContractError;
 use crate::msg::{CurveFn, CurveInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{CurveState, CURVE_STATE, CURVE_TYPE};
-use cw0::{must_pay, nonpayable};
+use utils::{must_pay, nonpayable};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-bonding";
@@ -314,7 +314,7 @@ mod tests {
     use crate::msg::CurveType;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, Decimal, OverflowError, OverflowOperation, StdError, SubMsg};
-    use cw0::PaymentError;
+    use utils::PaymentError;
 
     const DENOM: &str = "satoshi";
     const CREATOR: &str = "creator";

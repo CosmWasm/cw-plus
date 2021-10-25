@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::Uint128;
-use cw0::Expiration;
+use utils::Expiration;
 
 use crate::msg::TokenId;
 

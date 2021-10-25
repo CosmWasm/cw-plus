@@ -2,9 +2,9 @@ use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cw0::Duration;
 use cw20::{Cw20ReceiveMsg, Denom};
 pub use cw_controllers::ClaimsResponse;
+use utils::Duration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InstantiateMsg {

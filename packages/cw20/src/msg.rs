@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::logo::Logo;
 use cosmwasm_std::{Binary, Uint128};
-use cw0::Expiration;
+use utils::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]

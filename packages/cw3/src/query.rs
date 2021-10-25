@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{CosmosMsg, Decimal, Empty};
-use cw0::Expiration;
+use utils::Expiration;
 
 use crate::msg::Vote;
 

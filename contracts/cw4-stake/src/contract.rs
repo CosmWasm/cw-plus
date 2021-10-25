@@ -5,7 +5,6 @@ use cosmwasm_std::{
     Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,
 };
 
-use cw0::{maybe_addr, NativeBalance};
 use cw2::set_contract_version;
 use cw20::{Balance, Cw20CoinVerified, Cw20ExecuteMsg, Cw20ReceiveMsg, Denom};
 use cw4::{
@@ -13,6 +12,7 @@ use cw4::{
     TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
+use utils::{maybe_addr, NativeBalance};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
@@ -362,10 +362,10 @@ mod tests {
     use cosmwasm_std::{
         coin, from_slice, CosmosMsg, OverflowError, OverflowOperation, StdError, Storage,
     };
-    use cw0::Duration;
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
+    use utils::Duration;
 
     use crate::error::ContractError;
 

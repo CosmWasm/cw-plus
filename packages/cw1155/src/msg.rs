@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Uint128};
-use cw0::Expiration;
+use utils::Expiration;
 
 pub type TokenId = String;
 

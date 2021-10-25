@@ -5,13 +5,13 @@ use cosmwasm_std::{
 };
 use cw_storage_plus::Bound;
 
-use cw0::{maybe_addr, Event};
 use cw1155::{
     ApproveAllEvent, ApprovedForAllResponse, BalanceResponse, BatchBalanceResponse,
     Cw1155BatchReceiveMsg, Cw1155ExecuteMsg, Cw1155QueryMsg, Cw1155ReceiveMsg, Expiration,
     IsApprovedForAllResponse, TokenId, TokenInfoResponse, TokensResponse, TransferEvent,
 };
 use cw2::set_contract_version;
+use utils::{maybe_addr, Event};
 
 use crate::error::ContractError;
 use crate::msg::InstantiateMsg;
