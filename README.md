@@ -4,7 +4,7 @@
 
 | Specification    | Crates.io                                                                                                  | Docs                                                            |
 | ---------------- | ---------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
-| cw0              | [![cw0 on crates.io](https://img.shields.io/crates/v/cw0.svg)](https://crates.io/crates/cw0)              | [![Docs](https://docs.rs/cw0/badge.svg)](https://docs.rs/cw0)    |
+| utils            | [![utils on crates.io](https://img.shields.io/crates/v/utils.svg)](https://crates.io/crates/utils)        | [![Docs](https://docs.rs/utils/badge.svg)](https://docs.rs/utils)    |
 | cw1              | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)              | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)    |
 | cw2              | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)              | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)    |
 | cw3              | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)              | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)    |
