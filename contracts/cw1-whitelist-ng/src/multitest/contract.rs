@@ -2,6 +2,7 @@ use crate::msg::*;
 use crate::query::*;
 use crate::state::Cw1WhitelistContract;
 use anyhow::{bail, Result as AnyResult};
+use cosmwasm_std::CustomMsg;
 use cosmwasm_std::{
     Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Env, MessageInfo, QuerierWrapper, Reply,
     Response,
@@ -9,7 +10,6 @@ use cosmwasm_std::{
 use cw_multi_test::{AppResponse, Contract, Executor};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 impl<T> Contract<T> for Cw1WhitelistContract<T>
 where
@@ -75,7 +75,7 @@ impl<'a, App> Cw1Executor<'a, App> {
 
     pub fn execute<C>(self, msgs: Vec<CosmosMsg<C>>) -> AnyResult<AppResponse>
     where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + Serialize + 'static,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         self.app.execute_contract(
@@ -108,7 +108,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
 
     pub fn freeze<C>(self) -> AnyResult<AppResponse>
     where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + Serialize + 'static,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         self.app.execute_contract(
@@ -121,7 +121,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
 
     pub fn update_admins<C>(self, admins: Vec<String>) -> AnyResult<AppResponse>
     where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static + Serialize,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         self.app.execute_contract(
@@ -166,9 +166,9 @@ impl<'a, App> Instantiator<'a, App> {
         self
     }
 
-    pub fn with<C>(self, admins: Vec<String>, mutable: bool) -> AnyResult<Cw1WhitelistProxy>
+    pub fn with_args<C>(self, admins: Vec<String>, mutable: bool) -> AnyResult<Cw1WhitelistProxy>
     where
-        C: Clone + std::fmt::Debug + PartialEq + JsonSchema + 'static,
+        C: CustomMsg + 'static,
         App: Executor<C>,
     {
         let addr = self.app.instantiate_contract(
