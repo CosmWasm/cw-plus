@@ -19,7 +19,7 @@ workflows:
       - contract_cw20_merkle_airdrop
       - contract_cw1155_base
       - package_controllers
-      - package_cw0
+      - package_utils
       - package_cw1
       - package_cw2
       - package_cw3
@@ -608,10 +608,10 @@ jobs:
             - target
           key: cargocache-v2-controllers:1.53.0-{{ checksum "~/project/Cargo.lock" }}
 
-  package_cw0:
+  package_utils:
     docker:
       - image: rust:1.53.0
-    working_directory: ~/project/packages/cw0
+    working_directory: ~/project/packages/utils
     steps:
       - checkout:
           path: ~/project
@@ -620,7 +620,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version; rustup target list --installed
       - restore_cache:
           keys:
-            - cargocache-v2-cw0:1.53.0-{{ checksum "~/project/Cargo.lock" }}
+            - cargocache-v2-utils:1.53.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Build library for native target
           command: cargo build --locked
@@ -631,7 +631,7 @@ jobs:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-v2-cw0:1.53.0-{{ checksum "~/project/Cargo.lock" }}
+          key: cargocache-v2-utils:1.53.0-{{ checksum "~/project/Cargo.lock" }}
 
   package_cw1:
     docker:
