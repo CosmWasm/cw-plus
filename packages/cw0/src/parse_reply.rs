@@ -312,32 +312,32 @@ mod test {
 
         // Simple works
         let data = b"test".to_vec();
-        let mut encoded_data = encode_bytes(&data.to_vec());
+        let mut encoded_data = encode_bytes(&data);
 
         let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
-        assert_eq!(res, Some(Binary(data.to_vec())));
+        assert_eq!(res, Some(Binary(data)));
 
         // Large works
         let data = vec![0x40; 300];
-        let mut encoded_data = encode_bytes(&data.to_vec());
+        let mut encoded_data = encode_bytes(&data);
 
         let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
-        assert_eq!(res, Some(Binary(data.to_vec())));
+        assert_eq!(res, Some(Binary(data)));
 
         // Field number works
         let field_number = 5;
         let data = b"test field 5".to_vec();
-        let mut encoded_data = encode_bytes(&data.to_vec());
+        let mut encoded_data = encode_bytes(&data);
         encoded_data[0] = (field_number << 3) + WIRE_TYPE_LENGTH_DELIMITED;
 
         let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
-        assert_eq!(res, Some(Binary(data.to_vec())));
+        assert_eq!(res, Some(Binary(data)));
 
         // Remainder is kept
         let field_number = 1;
         let test_len: usize = 4;
         let data = b"test_remainder".to_vec();
-        let mut encoded_data = encode_bytes(&data.to_vec());
+        let mut encoded_data = encode_bytes(&data);
         encoded_data[1] = test_len as u8;
 
         let res = parse_protobuf_bytes(&mut encoded_data, field_number).unwrap();
