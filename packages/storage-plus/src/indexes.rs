@@ -102,7 +102,7 @@ where
     }
 }
 
-fn deserialize_multi_kv<T: DeserializeOwned>(
+fn deserialize_multi_v<T: DeserializeOwned>(
     store: &dyn Storage,
     pk_namespace: &[u8],
     kv: Record,
@@ -124,6 +124,30 @@ fn deserialize_multi_kv<T: DeserializeOwned>(
     let v = from_slice::<T>(&v)?;
 
     Ok((pk.into(), v))
+}
+
+fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
+    store: &dyn Storage,
+    pk_namespace: &[u8],
+    kv: Record,
+) -> StdResult<(K::Output, T)> {
+    let (key, pk_len) = kv;
+
+    // Deserialize pk_len
+    let pk_len = from_slice::<u32>(pk_len.as_slice())?;
+
+    // Recover pk from last part of k
+    let offset = key.len() - pk_len as usize;
+    let pk = &key[offset..];
+
+    let full_key = namespaces_with_key(&[pk_namespace], pk);
+
+    let v = store
+        .get(&full_key)
+        .ok_or_else(|| StdError::generic_err("pk not found"))?;
+    let v = from_slice::<T>(&v)?;
+
+    Ok((K::from_vec(pk.to_vec())?, v))
 }
 
 impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>
@@ -153,7 +177,7 @@ where
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
-            deserialize_multi_kv,
+            deserialize_multi_v,
         )
     }
 
@@ -162,7 +186,7 @@ where
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
-            deserialize_multi_kv,
+            deserialize_multi_v,
         )
     }
 
@@ -171,7 +195,7 @@ where
             self.idx_namespace,
             &[],
             self.pk_namespace,
-            deserialize_multi_kv,
+            deserialize_multi_v,
         )
     }
 
@@ -247,8 +271,33 @@ where
         'a: 'c,
     {
         let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
-            .map(move |kv| (deserialize_multi_kv)(store, self.pk_namespace, kv));
+            .map(move |kv| (deserialize_multi_v)(store, self.pk_namespace, kv));
         Box::new(mapped)
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T> MultiIndex<'a, K, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
+{
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv::<K::Suffix, T>,
+        )
+    }
+
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv::<K::SuperSuffix, T>,
+        )
     }
 }
 
@@ -309,7 +358,12 @@ where
     }
 
     fn no_prefix_de(&self) -> Prefix<K, T> {
-        Prefix::new(self.idx_namespace, &[])
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &[],
+            self.pk_namespace,
+            deserialize_multi_kv::<K, T>,
+        )
     }
 }
 
