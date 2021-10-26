@@ -277,7 +277,7 @@ mod test {
 
     struct DataIndexes<'a> {
         // Second arg is for storing pk
-        pub name: MultiIndex<'a, (Vec<u8>, Vec<u8>), Data>,
+        pub name: MultiIndex<'a, (Vec<u8>, String), Data>,
         pub age: UniqueIndex<'a, U32Key, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
@@ -307,7 +307,15 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(|d, k| (d.name.as_bytes().to_vec(), k), "data", "data__name"),
+            name: MultiIndex::new(
+                |d, k| {
+                    (d.name.as_bytes().to_vec(), unsafe {
+                        String::from_utf8_unchecked(k)
+                    })
+                },
+                "data",
+                "data__name",
+            ),
             age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
@@ -446,7 +454,7 @@ mod test {
         // index_key() over MultiIndex works (empty pk)
         // In a MultiIndex, an index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
-        let key = (b"Maria".to_vec(), b"".to_vec());
+        let key = (b"Maria".to_vec(), "".to_string());
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a bound over the raw key
@@ -460,7 +468,7 @@ mod test {
 
         // index_key() over MultiIndex works (non-empty pk)
         // Build key including a non-empty pk
-        let key = (b"Maria".to_vec(), b"1".to_vec());
+        let key = (b"Maria".to_vec(), "1".to_string());
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a (exclusive) bound over the raw key.
@@ -608,8 +616,8 @@ mod test {
         assert_eq!(2, count);
 
         // Sorted by (descending) pk
-        assert_eq!(marias[0].0, b"5629");
-        assert_eq!(marias[1].0, b"5627");
+        assert_eq!(marias[0].0, "5629");
+        assert_eq!(marias[1].0, "5627");
         // Data is correct
         assert_eq!(marias[0].1, data3);
         assert_eq!(marias[1].1, data1);
