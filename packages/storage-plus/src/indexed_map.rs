@@ -837,7 +837,7 @@ mod test {
         let res: StdResult<Vec<_>> = map
             .idx
             .name_lastname
-            .prefix(b"Maria".to_vec())
+            .prefix_de(b"Maria".to_vec())
             .range_de(&store, None, None, Order::Ascending)
             .collect();
         let marias = res.unwrap();
