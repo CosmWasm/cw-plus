@@ -19,3 +19,4 @@ thiserror = { version = "1.0.21" }
 
 [dev-dependencies]
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.0" }
+prost = "0.9"
