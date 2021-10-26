@@ -394,7 +394,7 @@ fn deserialize_unique_v<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>>
     Ok((t.pk.to_vec(), t.value))
 }
 
-fn deserialize_unique_kv<T: DeserializeOwned, K: KeyDeserialize>(
+fn deserialize_unique_kv<K: KeyDeserialize, T: DeserializeOwned>(
     kv: Record,
 ) -> StdResult<(K::Output, T)> {
     let (_, v) = kv;
@@ -531,19 +531,19 @@ where
 
     pub fn prefix_de(&self, p: K::Prefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv::<_, PK>(kv)
+            deserialize_unique_kv::<PK, _>(kv)
         })
     }
 
     pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv::<_, PK>(kv)
+            deserialize_unique_kv::<PK, _>(kv)
         })
     }
 
     fn no_prefix_de(&self) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
-            deserialize_unique_kv::<_, PK>(kv)
+            deserialize_unique_kv::<PK, _>(kv)
         })
     }
 }
