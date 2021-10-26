@@ -528,6 +528,18 @@ where
         self.no_prefix_de().keys_de(store, min, max, order)
     }
 
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<PK, T> {
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv::<_, PK>(kv)
+        })
+    }
+
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<PK, T> {
+        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
+            deserialize_unique_kv::<_, PK>(kv)
+        })
+    }
+
     fn no_prefix_de(&self) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
             deserialize_unique_kv::<_, PK>(kv)
