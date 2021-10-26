@@ -560,6 +560,62 @@ mod test {
     }
 
     #[test]
+    fn range_de_simple_key_by_multi_index() {
+        let mut store = MockStorage::new();
+        let map = build_map();
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk = "5627";
+        map.save(&mut store, pk, &data1).unwrap();
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk = "5628";
+        map.save(&mut store, pk, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Williams".to_string(),
+            age: 24,
+        };
+        let pk = "5629";
+        map.save(&mut store, pk, &data3).unwrap();
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 12,
+        };
+        let pk = "5630";
+        map.save(&mut store, pk, &data4).unwrap();
+
+        let marias: Vec<_> = map
+            .idx
+            .name
+            .prefix_de(b"Maria".to_vec())
+            .range_de(&store, None, None, Order::Descending)
+            .collect::<StdResult<_>>()
+            .unwrap();
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // Sorted by (descending) pk
+        assert_eq!(marias[0].0, b"5629");
+        assert_eq!(marias[1].0, b"5627");
+        // Data is correct
+        assert_eq!(marias[0].1, data3);
+        assert_eq!(marias[1].1, data1);
+    }
+
+    #[test]
     fn range_composite_key_by_multi_index() {
         let mut store = MockStorage::new();
 
