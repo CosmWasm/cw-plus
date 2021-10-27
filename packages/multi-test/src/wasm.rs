@@ -24,6 +24,7 @@ use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
 
 use anyhow::{anyhow, bail, Result as AnyResult};
+use cw0::parse_instantiate_response_data;
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -856,11 +857,11 @@ pub fn parse_contract_addr(data: &Option<Binary>) -> AnyResult<Addr> {
         .ok_or_else(|| anyhow!("No data response"))?
         .to_vec();
     // parse the protobuf struct
-    let init_data = InstantiateData::decode(bin.as_slice())?;
-    if init_data.address.is_empty() {
+    let init_data = parse_instantiate_response_data(bin.as_slice())?;
+    if init_data.contract_address.is_empty() {
         bail!("no contract address provided");
     }
-    Ok(Addr::unchecked(init_data.address))
+    Ok(Addr::unchecked(init_data.contract_address))
 }
 
 #[cfg(test)]
