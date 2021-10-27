@@ -2439,7 +2439,7 @@ mod test {
 
             // set up echo contract
             let code_id = app.store_code(echo::contract());
-            let msg = echo::InitMessage::<Empty>{
+            let msg = echo::InitMessage::<Empty> {
                 data: Some("food".into()),
                 sub_msg: None,
             };
@@ -2458,6 +2458,56 @@ mod test {
             assert!(parsed.data.is_some());
             assert_eq!(parsed.data.unwrap(), Binary::from(b"food"));
             assert!(!parsed.contract_address.is_empty());
+        }
+
+        #[test]
+        fn instantiate_with_reply_works() {
+            let owner = Addr::unchecked("owner");
+            let mut app = BasicApp::new(|_, _, _| {});
+
+            // set up echo contract
+            let code_id = app.store_code(echo::contract());
+            let msg = echo::InitMessage::<Empty> {
+                data: Some("food".into()),
+                ..Default::default()
+            };
+            let addr1 = app
+                .instantiate_contract(code_id, owner.clone(), &msg, &[], "first", None)
+                .unwrap();
+
+            // another echo contract
+            let msg = echo::Message::<Empty> {
+                data: Some("babble".into()),
+                ..Default::default()
+            };
+            let sub_msg = SubMsg::reply_on_success(
+                WasmMsg::Execute {
+                    contract_addr: addr1.to_string(),
+                    msg: to_binary(&msg).unwrap(),
+                    funds: vec![],
+                },
+                1234,
+            );
+            let init_msg = echo::InitMessage::<Empty> {
+                data: Some("remove_me".into()),
+                sub_msg: Some(vec![sub_msg]),
+            };
+            let init_msg = to_binary(&init_msg).unwrap();
+            let msg = WasmMsg::Instantiate {
+                admin: None,
+                code_id,
+                msg: init_msg,
+                funds: vec![],
+                label: "label".into(),
+            };
+            let res = app.execute(owner, msg.into()).unwrap();
+
+            // assert we have a proper instantiate result
+            let parsed = parse_instantiate_response_data(res.data.unwrap().as_slice()).unwrap();
+            assert!(parsed.data.is_some());
+            assert_eq!(parsed.data.unwrap(), Binary::from(b"remove_me"));
+            assert!(!parsed.contract_address.is_empty());
+            assert_ne!(parsed.contract_address.to_string(), addr1);
         }
 
         #[test]
