@@ -10,7 +10,7 @@ pub use pagination::{
 };
 pub use parse_reply::{
     parse_execute_response_data, parse_instantiate_response_data, parse_reply_execute_data,
-    parse_reply_instantiate_data,
+    parse_reply_instantiate_data, MsgExecuteContractResponse, MsgInstantiateContractResponse,
 };
 pub use payment::{may_pay, must_pay, nonpayable, one_coin, PaymentError};
 
