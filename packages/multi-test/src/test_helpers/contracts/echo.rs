@@ -27,17 +27,35 @@ where
     pub events: Vec<Event>,
 }
 
+// This can take some data... but happy to accept {}
+#[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
+#[derivative(Default(bound = "", new = "true"))]
+pub struct InitMessage<ExecC>
+where
+    ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
+{
+    pub data: Option<String>,
+    pub sub_msg: Option<Vec<SubMsg<ExecC>>>,
+}
+
 #[allow(clippy::unnecessary_wraps)]
 fn instantiate<ExecC>(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    _msg: EmptyMsg,
+    msg: InitMessage<ExecC>,
 ) -> Result<Response<ExecC>, StdError>
 where
     ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
 {
-    Ok(Response::default())
+    let mut res = Response::new();
+    if let Some(data) = msg.data {
+        res = res.set_data(data.into_bytes());
+    }
+    if let Some(msgs) = msg.sub_msg {
+        res = res.add_submessages(msgs);
+    }
+    Ok(res)
 }
 
 #[allow(clippy::unnecessary_wraps)]

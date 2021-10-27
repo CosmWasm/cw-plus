@@ -2433,17 +2433,37 @@ mod test {
         }
 
         #[test]
-        fn execute_wrapped_properly() {
-            // set personal balance
+        fn instantiate_with_data_works() {
             let owner = Addr::unchecked("owner");
-            let init_funds = vec![coin(20, "btc")];
+            let mut app = BasicApp::new(|_, _, _| {});
 
-            let mut app = BasicApp::new(|router, _, storage| {
-                router
-                    .bank
-                    .init_balance(storage, &owner, init_funds)
-                    .unwrap();
-            });
+            // set up echo contract
+            let code_id = app.store_code(echo::contract());
+            let msg = echo::InitMessage::<Empty>{
+                data: Some("food".into()),
+                sub_msg: None,
+            };
+            let init_msg = to_binary(&msg).unwrap();
+            let msg = WasmMsg::Instantiate {
+                admin: None,
+                code_id,
+                msg: init_msg,
+                funds: vec![],
+                label: "label".into(),
+            };
+            let res = app.execute(owner, msg.into()).unwrap();
+
+            // assert we have a proper instantiate result
+            let parsed = parse_instantiate_response_data(res.data.unwrap().as_slice()).unwrap();
+            assert!(parsed.data.is_some());
+            assert_eq!(parsed.data.unwrap(), Binary::from(b"food"));
+            assert!(!parsed.contract_address.is_empty());
+        }
+
+        #[test]
+        fn execute_wrapped_properly() {
+            let owner = Addr::unchecked("owner");
+            let mut app = BasicApp::new(|_, _, _| {});
 
             // set up reflect contract
             let code_id = app.store_code(echo::contract());
@@ -2456,9 +2476,7 @@ mod test {
                 data: Some("hello".into()),
                 ..echo::Message::default()
             };
-            let exec_res = app
-                .execute_contract(owner, echo_addr, &msg, &[])
-                .unwrap();
+            let exec_res = app.execute_contract(owner, echo_addr, &msg, &[]).unwrap();
             assert!(exec_res.data.is_some());
             let parsed = parse_execute_response_data(&exec_res.data.unwrap()).unwrap();
             assert_eq!(parsed.data, Some(Binary::from(b"hello")));
