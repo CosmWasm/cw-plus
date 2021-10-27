@@ -123,7 +123,8 @@ fn deserialize_multi_v<T: DeserializeOwned>(
         .ok_or_else(|| StdError::generic_err("pk not found"))?;
     let v = from_slice::<T>(&v)?;
 
-    Ok((pk.into(), v))
+    // FIXME: Return `key` here instead of `pk` (be consistent with `deserialize_multi_kv` and `Map` behaviour)
+    Ok((pk.to_vec(), v))
 }
 
 fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
@@ -147,7 +148,7 @@ fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
         .ok_or_else(|| StdError::generic_err("pk not found"))?;
     let v = from_slice::<T>(&v)?;
 
-    Ok((K::from_vec(pk.to_vec())?, v))
+    Ok((K::from_vec(key)?, v))
 }
 
 impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>

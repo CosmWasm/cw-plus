@@ -685,6 +685,71 @@ mod test {
     }
 
     #[test]
+    fn range_de_composite_key_by_multi_index() {
+        let mut store = MockStorage::new();
+
+        let indexes = DataCompositeMultiIndex {
+            name_age: MultiIndex::new(
+                |d, k| index_triple(&d.name, d.age, k),
+                "data",
+                "data__name_age",
+            ),
+        };
+        let map = IndexedMap::new("data", indexes);
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk1: &[u8] = b"5627";
+        map.save(&mut store, pk1, &data1).unwrap();
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk2: &[u8] = b"5628";
+        map.save(&mut store, pk2, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Young".to_string(),
+            age: 24,
+        };
+        let pk3: &[u8] = b"5629";
+        map.save(&mut store, pk3, &data3).unwrap();
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 43,
+        };
+        let pk4: &[u8] = b"5630";
+        map.save(&mut store, pk4, &data4).unwrap();
+
+        let marias: Vec<_> = map
+            .idx
+            .name_age
+            .sub_prefix_de(b"Maria".to_vec())
+            .range_de(&store, None, None, Order::Descending)
+            .collect::<StdResult<_>>()
+            .unwrap();
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // Remaining age of the index keys, plus pks (sorted by age descending)
+        assert_eq!((42, pk1.to_vec()), marias[0].0);
+        assert_eq!((24, pk3.to_vec()), marias[1].0);
+
+        // Data
+        assert_eq!(data1, marias[0].1);
+        assert_eq!(data3, marias[1].1);
+    }
+
+    #[test]
     fn unique_index_enforced() {
         let mut store = MockStorage::new();
         let map = build_map();
