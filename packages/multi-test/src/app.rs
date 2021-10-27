@@ -2393,7 +2393,7 @@ mod test {
 
     mod protobuf_wrapped_data {
         use super::*;
-        use cw0::parse_instantiate_response_data;
+        use cw0::{parse_execute_response_data, parse_instantiate_response_data};
 
         #[test]
         fn instantiate_wrapped_properly() {
@@ -2430,6 +2430,38 @@ mod test {
                 .query_wasm_smart(&parsed.contract_address, &reflect::QueryMsg::Count {})
                 .unwrap();
             assert_eq!(count.count, 0);
+        }
+
+        #[test]
+        fn execute_wrapped_properly() {
+            // set personal balance
+            let owner = Addr::unchecked("owner");
+            let init_funds = vec![coin(20, "btc")];
+
+            let mut app = BasicApp::new(|router, _, storage| {
+                router
+                    .bank
+                    .init_balance(storage, &owner, init_funds)
+                    .unwrap();
+            });
+
+            // set up reflect contract
+            let code_id = app.store_code(echo::contract());
+            let echo_addr = app
+                .instantiate_contract(code_id, owner.clone(), &EmptyMsg {}, &[], "label", None)
+                .unwrap();
+
+            // ensure the execute has the same wrapper as it should
+            let msg = echo::Message::<Empty> {
+                data: Some("hello".into()),
+                ..echo::Message::default()
+            };
+            let exec_res = app
+                .execute_contract(owner, echo_addr, &msg, &[])
+                .unwrap();
+            assert!(exec_res.data.is_some());
+            let parsed = parse_execute_response_data(&exec_res.data.unwrap()).unwrap();
+            assert_eq!(parsed.data, Some(Binary::from(b"hello")));
         }
     }
 }
