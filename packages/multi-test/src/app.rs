@@ -2508,7 +2508,7 @@ mod test {
             // from the reply, not the top level
             assert_eq!(parsed.data.unwrap(), Binary::from(b"babble"));
             assert!(!parsed.contract_address.is_empty());
-            assert_ne!(parsed.contract_address.to_string(), addr1);
+            assert_ne!(parsed.contract_address, addr1.to_string());
         }
 
         #[test]
