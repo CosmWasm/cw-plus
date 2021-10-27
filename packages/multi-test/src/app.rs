@@ -2505,7 +2505,8 @@ mod test {
             // assert we have a proper instantiate result
             let parsed = parse_instantiate_response_data(res.data.unwrap().as_slice()).unwrap();
             assert!(parsed.data.is_some());
-            assert_eq!(parsed.data.unwrap(), Binary::from(b"remove_me"));
+            // from the reply, not the top level
+            assert_eq!(parsed.data.unwrap(), Binary::from(b"babble"));
             assert!(!parsed.contract_address.is_empty());
             assert_ne!(parsed.contract_address.to_string(), addr1);
         }

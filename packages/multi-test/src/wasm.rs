@@ -149,11 +149,7 @@ where
         sender: Addr,
         msg: WasmMsg,
     ) -> AnyResult<AppResponse> {
-        let (resender, res, custom_event) =
-            self.execute_wasm(api, storage, router, block, sender, msg)?;
-
-        let (res, msgs) = self.build_app_response(&resender, custom_event, res);
-        self.process_response(api, router, storage, block, resender, res, msgs)
+        self.execute_wasm(api, storage, router, block, sender, msg)
     }
 
     fn sudo(
@@ -256,7 +252,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
-    ) -> AnyResult<(Addr, Response<ExecC>, Event)> {
+    ) -> AnyResult<AppResponse> {
         match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -289,7 +285,9 @@ where
 
                 let custom_event =
                     Event::new("execute").add_attribute(CONTRACT_ATTR, &contract_addr);
-                Ok((contract_addr, res, custom_event))
+
+                let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
+                self.process_response(api, router, storage, block, contract_addr, res, msgs)
             }
             WasmMsg::Instantiate {
                 admin,
@@ -324,7 +322,7 @@ where
 
                 // then call the contract
                 let info = MessageInfo { sender, funds };
-                let mut res = self.call_instantiate(
+                let res = self.call_instantiate(
                     contract_addr.clone(),
                     api,
                     storage,
@@ -333,12 +331,23 @@ where
                     info,
                     msg.to_vec(),
                 )?;
-                init_response(&mut res, &contract_addr);
 
                 let custom_event = Event::new("instantiate")
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", code_id.to_string());
-                Ok((contract_addr, res, custom_event))
+
+                let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
+                let mut res = self.process_response(
+                    api,
+                    router,
+                    storage,
+                    block,
+                    contract_addr.clone(),
+                    res,
+                    msgs,
+                )?;
+                init_response(&mut res, &contract_addr);
+                Ok(res)
             }
             WasmMsg::Migrate {
                 contract_addr,
@@ -372,7 +381,8 @@ where
                 let custom_event = Event::new("migrate")
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", new_code_id.to_string());
-                Ok((contract_addr, res, custom_event))
+                let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
+                self.process_response(api, router, storage, block, contract_addr, res, msgs)
             }
             msg => bail!(Error::UnsupportedWasmMsg(msg)),
         }
@@ -835,10 +845,7 @@ pub struct InstantiateData {
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
 
-fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+fn init_response(res: &mut AppResponse, contact_address: &Addr) {
     let data = res.data.clone().unwrap_or_default().to_vec();
     let init_data = InstantiateData {
         address: contact_address.into(),
