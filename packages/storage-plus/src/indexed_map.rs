@@ -277,7 +277,7 @@ mod test {
 
     struct DataIndexes<'a> {
         // Second arg is for storing pk
-        pub name: MultiIndex<'a, (Vec<u8>, String), Data>,
+        pub name: MultiIndex<'a, (String, String), Data>,
         pub age: UniqueIndex<'a, U32Key, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
@@ -308,11 +308,7 @@ mod test {
     fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
             name: MultiIndex::new(
-                |d, k| {
-                    (d.name.as_bytes().to_vec(), unsafe {
-                        String::from_utf8_unchecked(k)
-                    })
-                },
+                |d, k| (d.name.clone(), unsafe { String::from_utf8_unchecked(k) }),
                 "data",
                 "data__name",
             ),
@@ -403,7 +399,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(b"Maria".to_vec())
+            .prefix("Maria".to_string())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(2, count);
@@ -415,7 +411,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix(b"Maria".to_vec())
+            .prefix("Maria".to_string())
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -428,7 +424,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(b"Marib".to_vec())
+            .prefix("Marib".to_string())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -437,7 +433,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(b"Mari`".to_vec())
+            .prefix("Mari`".to_string())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -446,7 +442,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix(b"Maria5".to_vec())
+            .prefix("Maria5".to_string())
             .range(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -454,7 +450,7 @@ mod test {
         // index_key() over MultiIndex works (empty pk)
         // In a MultiIndex, an index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
-        let key = (b"Maria".to_vec(), "".to_string());
+        let key = ("Maria".to_string(), "".to_string());
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a bound over the raw key
@@ -468,7 +464,7 @@ mod test {
 
         // index_key() over MultiIndex works (non-empty pk)
         // Build key including a non-empty pk
-        let key = (b"Maria".to_vec(), "1".to_string());
+        let key = ("Maria".to_string(), "1".to_string());
         // Use the index_key() helper to build the (raw) index key
         let key = map.idx.name.index_key(key);
         // Iterate using a (exclusive) bound over the raw key.
@@ -552,7 +548,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix(b"Maria".to_vec())
+            .prefix("Maria".to_string())
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -608,7 +604,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix_de(b"Maria".to_vec())
+            .prefix_de("Maria".to_string())
             .range_de(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -762,7 +758,7 @@ mod test {
          -> usize {
             map.idx
                 .name
-                .prefix(name.as_bytes().to_vec())
+                .prefix(name.to_string())
                 .keys(store, None, None, Order::Ascending)
                 .count()
         };
