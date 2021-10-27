@@ -112,8 +112,24 @@ pub fn parse_reply_instantiate_data(
         .map_err(ParseReplyError::SubMsgFailure)?
         .data
         .ok_or_else(|| ParseReplyError::ParseFailure("Missing reply data".to_owned()))?;
+    parse_instantiate_response_data(&data.0)
+}
+
+pub fn parse_reply_execute_data(msg: Reply) -> Result<MsgExecuteContractResponse, ParseReplyError> {
+    let data = msg
+        .result
+        .into_result()
+        .map_err(ParseReplyError::SubMsgFailure)?
+        .data
+        .ok_or_else(|| ParseReplyError::ParseFailure("Missing reply data".to_owned()))?;
+    parse_execute_response_data(&data.0)
+}
+
+pub fn parse_instantiate_response_data(
+    data: &[u8],
+) -> Result<MsgInstantiateContractResponse, ParseReplyError> {
     // Manual protobuf decoding
-    let mut data = data.0;
+    let mut data = data.to_vec();
     // Parse contract addr
     let contract_addr = parse_protobuf_string(&mut data, 1)?;
 
@@ -126,19 +142,14 @@ pub fn parse_reply_instantiate_data(
     })
 }
 
-pub fn parse_reply_execute_data(msg: Reply) -> Result<MsgExecuteContractResponse, ParseReplyError> {
-    let data = msg
-        .result
-        .into_result()
-        .map_err(ParseReplyError::SubMsgFailure)?
-        .data
-        .ok_or_else(|| ParseReplyError::ParseFailure("Missing reply data".to_owned()))?;
+pub fn parse_execute_response_data(
+    data: &[u8],
+) -> Result<MsgExecuteContractResponse, ParseReplyError> {
     // Manual protobuf decoding
-    let mut data = data.0;
-    // Parse (optional) data
-    let data = parse_protobuf_bytes(&mut data, 1)?;
+    let mut data = data.to_vec();
+    let inner_data = parse_protobuf_bytes(&mut data, 1)?;
 
-    Ok(MsgExecuteContractResponse { data })
+    Ok(MsgExecuteContractResponse { data: inner_data })
 }
 
 #[derive(Error, Debug, PartialEq)]
