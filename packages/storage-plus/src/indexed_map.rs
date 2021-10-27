@@ -740,7 +740,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Remaining age of the index keys, plus pks (sorted by age descending)
+        // Remaining part (age) of the index keys, plus pks (bytes) (sorted by age descending)
         assert_eq!((42, pk1.to_vec()), marias[0].0);
         assert_eq!((24, pk3.to_vec()), marias[1].0);
 
