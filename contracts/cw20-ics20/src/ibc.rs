@@ -2,10 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, DepsMut, Env, IbcBasicResponse,
-    IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcEndpoint, IbcOrder,
-    IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg, IbcReceiveResponse,
-    StdResult, SubMsg, Uint128, WasmMsg,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, ContractResult, DepsMut, Env,
+    IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg,
+    IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
+    IbcReceiveResponse, Reply, Response, StdResult, SubMsg, Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
@@ -70,6 +70,23 @@ fn ack_success() -> Binary {
 fn ack_fail(err: String) -> Binary {
     let res = Ics20Ack::Error(err);
     to_binary(&res).unwrap()
+}
+
+const SEND_TOKEN_ID: u64 = 1337;
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
+    if reply.id != SEND_TOKEN_ID {
+        return Err(ContractError::UnknownReplyId { id: reply.id });
+    }
+    let res = match reply.result {
+        ContractResult::Ok(_) => Response::new(),
+        ContractResult::Err(err) => {
+            // encode an acknowledgement error
+            Response::new().set_data(ack_fail(err))
+        }
+    };
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -314,10 +331,13 @@ fn on_packet_failure(
 
 fn send_amount(amount: Amount, recipient: String) -> SubMsg {
     match amount {
-        Amount::Native(coin) => SubMsg::new(BankMsg::Send {
-            to_address: recipient,
-            amount: vec![coin],
-        }),
+        Amount::Native(coin) => SubMsg::reply_on_error(
+            BankMsg::Send {
+                to_address: recipient,
+                amount: vec![coin],
+            },
+            SEND_TOKEN_ID,
+        ),
         Amount::Cw20(coin) => {
             let msg = Cw20ExecuteMsg::Transfer {
                 recipient,
@@ -328,7 +348,7 @@ fn send_amount(amount: Amount, recipient: String) -> SubMsg {
                 msg: to_binary(&msg).unwrap(),
                 funds: vec![],
             };
-            SubMsg::new(exec)
+            SubMsg::reply_on_error(exec, SEND_TOKEN_ID)
         }
     }
 }
@@ -379,14 +399,14 @@ mod test {
             msg: to_binary(&msg).unwrap(),
             funds: vec![],
         };
-        SubMsg::new(exec)
+        SubMsg::reply_on_error(exec, SEND_TOKEN_ID)
     }
 
     fn native_payment(amount: u128, denom: &str, recipient: &str) -> SubMsg {
-        SubMsg::new(BankMsg::Send {
+        SubMsg::reply_on_error(BankMsg::Send {
             to_address: recipient.into(),
             amount: coins(amount, denom),
-        })
+        }, SEND_TOKEN_ID)
     }
 
     fn mock_sent_packet(my_channel: &str, amount: u128, denom: &str, sender: &str) -> IbcPacket {
