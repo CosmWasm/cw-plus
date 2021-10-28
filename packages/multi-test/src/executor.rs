@@ -1,10 +1,10 @@
 use std::fmt;
 
-use crate::parse_contract_addr;
 use cosmwasm_std::{
     to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, SubMsgExecutionResponse,
     WasmMsg,
 };
+use cw0::parse_instantiate_response_data;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -91,7 +91,8 @@ where
             label: label.into(),
         };
         let res = self.execute(sender, msg.into())?;
-        parse_contract_addr(&res.data)
+        let data = parse_instantiate_response_data(res.data.unwrap_or_default().as_slice())?;
+        Ok(Addr::unchecked(data.contract_address))
     }
 
     /// Execute a contract and process all returned messages.

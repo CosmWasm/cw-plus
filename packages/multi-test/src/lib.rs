@@ -28,4 +28,4 @@ pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::executor::{AppResponse, Executor};
 pub use crate::module::Module;
 pub use crate::staking::{FailingDistribution, FailingStaking, Staking, StakingSudo};
-pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper, WasmSudo};
+pub use crate::wasm::{Wasm, WasmKeeper, WasmSudo};

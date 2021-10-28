@@ -23,8 +23,7 @@ use crate::executor::AppResponse;
 use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
 
-use anyhow::{anyhow, bail, Result as AnyResult};
-use cw0::parse_instantiate_response_data;
+use anyhow::{bail, Result as AnyResult};
 
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
@@ -149,11 +148,7 @@ where
         sender: Addr,
         msg: WasmMsg,
     ) -> AnyResult<AppResponse> {
-        let (resender, res, custom_event) =
-            self.execute_wasm(api, storage, router, block, sender, msg)?;
-
-        let (res, msgs) = self.build_app_response(&resender, custom_event, res);
-        self.process_response(api, router, storage, block, resender, res, msgs)
+        self.execute_wasm(api, storage, router, block, sender, msg)
     }
 
     fn sudo(
@@ -256,7 +251,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         wasm_msg: WasmMsg,
-    ) -> AnyResult<(Addr, Response<ExecC>, Event)> {
+    ) -> AnyResult<AppResponse> {
         match wasm_msg {
             WasmMsg::Execute {
                 contract_addr,
@@ -289,7 +284,12 @@ where
 
                 let custom_event =
                     Event::new("execute").add_attribute(CONTRACT_ATTR, &contract_addr);
-                Ok((contract_addr, res, custom_event))
+
+                let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
+                let res =
+                    self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
+                // res.data = execute_response(res.data);
+                Ok(res)
             }
             WasmMsg::Instantiate {
                 admin,
@@ -324,7 +324,7 @@ where
 
                 // then call the contract
                 let info = MessageInfo { sender, funds };
-                let mut res = self.call_instantiate(
+                let res = self.call_instantiate(
                     contract_addr.clone(),
                     api,
                     storage,
@@ -333,12 +333,23 @@ where
                     info,
                     msg.to_vec(),
                 )?;
-                init_response(&mut res, &contract_addr);
 
                 let custom_event = Event::new("instantiate")
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", code_id.to_string());
-                Ok((contract_addr, res, custom_event))
+
+                let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
+                let mut res = self.process_response(
+                    api,
+                    router,
+                    storage,
+                    block,
+                    contract_addr.clone(),
+                    res,
+                    msgs,
+                )?;
+                res.data = Some(init_response(res.data, &contract_addr));
+                Ok(res)
             }
             WasmMsg::Migrate {
                 contract_addr,
@@ -372,7 +383,11 @@ where
                 let custom_event = Event::new("migrate")
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", new_code_id.to_string());
-                Ok((contract_addr, res, custom_event))
+                let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
+                let res =
+                    self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
+                // res.data = execute_response(res.data);
+                Ok(res)
             }
             msg => bail!(Error::UnsupportedWasmMsg(msg)),
         }
@@ -826,42 +841,45 @@ where
     }
 }
 
+// TODO: replace with code in cw0
+
 #[derive(Clone, PartialEq, Message)]
-pub struct InstantiateData {
+struct InstantiateResponse {
     #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
-    /// Unique ID number for this person.
     #[prost(bytes, tag = "2")]
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
 
-fn init_response<C>(res: &mut Response<C>, contact_address: &Addr)
-where
-    C: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
-    let data = res.data.clone().unwrap_or_default().to_vec();
-    let init_data = InstantiateData {
+// TODO: encode helpers in cw0
+fn init_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
+    let data = data.unwrap_or_default().to_vec();
+    let init_data = InstantiateResponse {
         address: contact_address.into(),
         data,
     };
     let mut new_data = Vec::<u8>::with_capacity(init_data.encoded_len());
     // the data must encode successfully
     init_data.encode(&mut new_data).unwrap();
-    res.data = Some(new_data.into());
+    new_data.into()
 }
 
-// this parses the result from a wasm contract init
-pub fn parse_contract_addr(data: &Option<Binary>) -> AnyResult<Addr> {
-    let bin = data
-        .as_ref()
-        .ok_or_else(|| anyhow!("No data response"))?
-        .to_vec();
-    // parse the protobuf struct
-    let init_data = parse_instantiate_response_data(bin.as_slice())?;
-    if init_data.contract_address.is_empty() {
-        bail!("no contract address provided");
-    }
-    Ok(Addr::unchecked(init_data.contract_address))
+#[derive(Clone, PartialEq, Message)]
+struct ExecuteResponse {
+    #[prost(bytes, tag = "1")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+}
+
+// empty return if no data present in original
+#[allow(dead_code)]
+fn execute_response(data: Option<Binary>) -> Option<Binary> {
+    data.map(|d| {
+        let exec_data = ExecuteResponse { data: d.to_vec() };
+        let mut new_data = Vec::<u8>::with_capacity(exec_data.encoded_len());
+        // the data must encode successfully
+        exec_data.encode(&mut new_data).unwrap();
+        new_data.into()
+    })
 }
 
 #[cfg(test)]
