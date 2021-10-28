@@ -13,7 +13,12 @@ use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 use schemars::JsonSchema;
 use std::fmt::Debug;
 
+use cw0::{parse_execute_response_data, parse_instantiate_response_data};
 use derivative::Derivative;
+
+// Choosing a reply id less than ECHO_EXECUTE_BASE_ID indicates an Instantiate message reply by convention.
+// An Execute message reply otherwise.
+pub(crate) const EXECUTE_REPLY_BASE_ID: u64 = i64::MAX as u64;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
@@ -89,17 +94,35 @@ fn reply<ExecC>(_deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<ExecC>
 where
     ExecC: Debug + PartialEq + Clone + JsonSchema + 'static,
 {
+    let res = Response::new();
     if let Reply {
+        id,
         result:
             ContractResult::Ok(SubMsgExecutionResponse {
                 data: Some(data), ..
             }),
-        ..
     } = msg
     {
-        Ok(Response::new().set_data(data))
+        // We parse out the WasmMsg::Execute wrapper...
+        // TODO: Handle all of Execute, Instantiate, and BankMsg replies differently.
+        let parsed_data;
+        if id < EXECUTE_REPLY_BASE_ID {
+            parsed_data = parse_instantiate_response_data(data.as_slice())
+                .map_err(|e| StdError::generic_err(e.to_string()))?
+                .data;
+        } else {
+            parsed_data = parse_execute_response_data(data.as_slice())
+                .map_err(|e| StdError::generic_err(e.to_string()))?
+                .data;
+        }
+
+        if let Some(data) = parsed_data {
+            Ok(res.set_data(data))
+        } else {
+            Ok(res)
+        }
     } else {
-        Ok(Response::new())
+        Ok(res)
     }
 }
 

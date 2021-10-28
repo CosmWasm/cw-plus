@@ -1824,6 +1824,8 @@ mod test {
     mod reply_data_overwrite {
         use super::*;
 
+        use echo::EXECUTE_REPLY_BASE_ID;
+
         fn make_echo_submsg(
             contract: Addr,
             data: impl Into<Option<&'static str>>,
@@ -1907,7 +1909,12 @@ mod test {
                     contract.clone(),
                     &echo::Message {
                         data: Some("First".to_owned()),
-                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
+                        sub_msg: vec![make_echo_submsg(
+                            contract,
+                            "Second",
+                            vec![],
+                            EXECUTE_REPLY_BASE_ID,
+                        )],
                         ..echo::Message::default()
                     },
                     &[],
@@ -1987,7 +1994,12 @@ mod test {
                     owner,
                     contract.clone(),
                     &echo::Message {
-                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
+                        sub_msg: vec![make_echo_submsg(
+                            contract,
+                            "Second",
+                            vec![],
+                            EXECUTE_REPLY_BASE_ID,
+                        )],
                         ..echo::Message::default()
                     },
                     &[],
@@ -2076,10 +2088,25 @@ mod test {
                     &echo::Message {
                         data: Some("Orig".to_owned()),
                         sub_msg: vec![
-                            make_echo_submsg(contract.clone(), None, vec![], 1),
-                            make_echo_submsg(contract.clone(), "First", vec![], 2),
-                            make_echo_submsg(contract.clone(), "Second", vec![], 3),
-                            make_echo_submsg(contract, None, vec![], 4),
+                            make_echo_submsg(
+                                contract.clone(),
+                                None,
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 1,
+                            ),
+                            make_echo_submsg(
+                                contract.clone(),
+                                "First",
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 2,
+                            ),
+                            make_echo_submsg(
+                                contract.clone(),
+                                "Second",
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 3,
+                            ),
+                            make_echo_submsg(contract, None, vec![], EXECUTE_REPLY_BASE_ID + 4),
                         ],
                         ..echo::Message::default()
                     },
@@ -2139,10 +2166,25 @@ mod test {
                     contract.clone(),
                     &echo::Message {
                         sub_msg: vec![
-                            make_echo_submsg(contract.clone(), None, vec![], 1),
+                            make_echo_submsg(
+                                contract.clone(),
+                                None,
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 1,
+                            ),
                             make_echo_submsg_no_reply(contract.clone(), "Hidden", vec![]),
-                            make_echo_submsg(contract.clone(), "Shown", vec![], 2),
-                            make_echo_submsg(contract.clone(), None, vec![], 3),
+                            make_echo_submsg(
+                                contract.clone(),
+                                "Shown",
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 2,
+                            ),
+                            make_echo_submsg(
+                                contract.clone(),
+                                None,
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 3,
+                            ),
                             make_echo_submsg_no_reply(contract, "Lost", vec![]),
                         ],
                         ..echo::Message::default()
@@ -2180,12 +2222,17 @@ mod test {
                                 vec![make_echo_submsg(
                                     contract.clone(),
                                     "Second",
-                                    vec![make_echo_submsg(contract, None, vec![], 4)],
-                                    3,
+                                    vec![make_echo_submsg(
+                                        contract,
+                                        None,
+                                        vec![],
+                                        EXECUTE_REPLY_BASE_ID + 4,
+                                    )],
+                                    EXECUTE_REPLY_BASE_ID + 3,
                                 )],
-                                2,
+                                EXECUTE_REPLY_BASE_ID + 2,
                             )],
-                            1,
+                            EXECUTE_REPLY_BASE_ID + 1,
                         )],
                         ..echo::Message::default()
                     },
@@ -2393,7 +2440,8 @@ mod test {
 
     mod protobuf_wrapped_data {
         use super::*;
-        use cw0::{parse_execute_response_data, parse_instantiate_response_data};
+        use crate::test_helpers::contracts::echo::EXECUTE_REPLY_BASE_ID;
+        use cw0::parse_instantiate_response_data;
 
         #[test]
         fn instantiate_wrapped_properly() {
@@ -2477,7 +2525,7 @@ mod test {
 
             // another echo contract
             let msg = echo::Message::<Empty> {
-                data: Some("babble".into()),
+                data: Some("Passed to contract instantiation, returned as reply, and then returned as response".into()),
                 ..Default::default()
             };
             let sub_msg = SubMsg::reply_on_success(
@@ -2486,10 +2534,10 @@ mod test {
                     msg: to_binary(&msg).unwrap(),
                     funds: vec![],
                 },
-                1234,
+                EXECUTE_REPLY_BASE_ID,
             );
             let init_msg = echo::InitMessage::<Empty> {
-                data: Some("remove_me".into()),
+                data: Some("Overwrite me".into()),
                 sub_msg: Some(vec![sub_msg]),
             };
             let init_msg = to_binary(&init_msg).unwrap();
@@ -2505,13 +2553,12 @@ mod test {
             // assert we have a proper instantiate result
             let parsed = parse_instantiate_response_data(res.data.unwrap().as_slice()).unwrap();
             assert!(parsed.data.is_some());
-            // from the reply, not the top level
-            assert_eq!(parsed.data.unwrap(), Binary::from(b"babble"));
+            // Result is from the reply, not the original one
+            assert_eq!(parsed.data.unwrap(), Binary::from(b"Passed to contract instantiation, returned as reply, and then returned as response"));
             assert!(!parsed.contract_address.is_empty());
             assert_ne!(parsed.contract_address, addr1.to_string());
         }
 
-        #[ignore]
         #[test]
         fn execute_wrapped_properly() {
             let owner = Addr::unchecked("owner");
@@ -2528,10 +2575,9 @@ mod test {
                 data: Some("hello".into()),
                 ..echo::Message::default()
             };
+            // execute_contract now decodes a protobuf wrapper, so we get the top-level response
             let exec_res = app.execute_contract(owner, echo_addr, &msg, &[]).unwrap();
-            assert!(exec_res.data.is_some());
-            let parsed = parse_execute_response_data(&exec_res.data.unwrap()).unwrap();
-            assert_eq!(parsed.data, Some(Binary::from(b"hello")));
+            assert_eq!(exec_res.data, Some(Binary::from(b"hello")));
         }
     }
 }

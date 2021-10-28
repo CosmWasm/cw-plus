@@ -286,9 +286,9 @@ where
                     Event::new("execute").add_attribute(CONTRACT_ATTR, &contract_addr);
 
                 let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
-                let res =
+                let mut res =
                     self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
-                // res.data = execute_response(res.data);
+                res.data = execute_response(res.data);
                 Ok(res)
             }
             WasmMsg::Instantiate {
@@ -348,7 +348,7 @@ where
                     res,
                     msgs,
                 )?;
-                res.data = Some(init_response(res.data, &contract_addr));
+                res.data = Some(instantiate_response(res.data, &contract_addr));
                 Ok(res)
             }
             WasmMsg::Migrate {
@@ -384,9 +384,9 @@ where
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", new_code_id.to_string());
                 let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
-                let res =
+                let mut res =
                     self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
-                // res.data = execute_response(res.data);
+                res.data = execute_response(res.data);
                 Ok(res)
             }
             msg => bail!(Error::UnsupportedWasmMsg(msg)),
@@ -852,7 +852,7 @@ struct InstantiateResponse {
 }
 
 // TODO: encode helpers in cw0
-fn init_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
+fn instantiate_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
     let data = data.unwrap_or_default().to_vec();
     let init_data = InstantiateResponse {
         address: contact_address.into(),
@@ -871,7 +871,6 @@ struct ExecuteResponse {
 }
 
 // empty return if no data present in original
-#[allow(dead_code)]
 fn execute_response(data: Option<Binary>) -> Option<Binary> {
     data.map(|d| {
         let exec_data = ExecuteResponse { data: d.to_vec() };

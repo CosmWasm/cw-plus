@@ -4,7 +4,7 @@ use cosmwasm_std::{
     to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, SubMsgExecutionResponse,
     WasmMsg,
 };
-use cw0::parse_instantiate_response_data;
+use cw0::{parse_execute_response_data, parse_instantiate_response_data};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -96,7 +96,8 @@ where
     }
 
     /// Execute a contract and process all returned messages.
-    /// This is just a helper around execute()
+    /// This is just a helper around execute(),
+    /// but we parse out the data field to that what is returned by the contract (not the protobuf wrapper)
     fn execute_contract<T: Serialize>(
         &mut self,
         sender: Addr,
@@ -110,7 +111,11 @@ where
             msg,
             funds: send_funds.to_vec(),
         };
-        self.execute(sender, msg.into())
+        let mut res = self.execute(sender, msg.into())?;
+        res.data = res
+            .data
+            .and_then(|d| parse_execute_response_data(d.as_slice()).unwrap().data);
+        Ok(res)
     }
 
     /// Migrate a contract. Sender must be registered admin.
