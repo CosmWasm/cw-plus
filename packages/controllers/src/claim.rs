@@ -207,7 +207,13 @@ mod test {
                 None,
             )
             .unwrap();
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+
         assert_eq!(amount, Uint128::zero());
+        assert_eq!(saved_claims.len(), 0);
     }
 
     #[test]
@@ -244,11 +250,22 @@ mod test {
                 None,
             )
             .unwrap();
+
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+
         assert_eq!(amount, Uint128::zero());
+        assert_eq!(saved_claims.len(), 2);
+        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
+        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[1].release_at, Expiration::AtHeight(100));
     }
 
     #[test]
-    fn test_claim_tokens_with_one_released_claims() {
+    fn test_claim_tokens_with_one_released_claim() {
         let mut deps = mock_dependencies(&[]);
         let claims = Claims::new("claims");
 
@@ -281,7 +298,16 @@ mod test {
                 None,
             )
             .unwrap();
+
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+
         assert_eq!(amount, TEST_AMOUNT.into());
+        assert_eq!(saved_claims.len(), 1);
+        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(100));
     }
 
     #[test]
@@ -309,7 +335,7 @@ mod test {
 
         let mut env = mock_env();
         env.block.height = 1000;
-        // the address has two claims and the first one can be released
+        // the address has two claims and both can be released
         let amount = claims
             .claim_tokens(
                 deps.as_mut().storage,
@@ -318,7 +344,14 @@ mod test {
                 None,
             )
             .unwrap();
+
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+
         assert_eq!(amount, (TEST_AMOUNT + TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims.len(), 0);
     }
 
     #[test]
@@ -346,7 +379,7 @@ mod test {
 
         let mut env = mock_env();
         env.block.height = 1000;
-        // the address has two claims and the first one can be released
+
         let amount = claims
             .claim_tokens(
                 deps.as_mut().storage,
@@ -355,7 +388,18 @@ mod test {
                 Some(Uint128::zero()),
             )
             .unwrap();
+
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+
         assert_eq!(amount, Uint128::zero());
+        assert_eq!(saved_claims.len(), 2);
+        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT).into());
+        assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
+        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[1].release_at, Expiration::AtHeight(100));
     }
 
     #[test]
@@ -383,7 +427,7 @@ mod test {
 
         let mut env = mock_env();
         env.block.height = 1000;
-        // the address has two claims and the first one can be released
+
         let amount = claims
             .claim_tokens(
                 deps.as_mut().storage,
@@ -392,7 +436,14 @@ mod test {
                 Some(Uint128::from(2100u128)),
             )
             .unwrap();
+
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+
         assert_eq!(amount, (TEST_AMOUNT + TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims.len(), 0);
     }
 
     #[test]
@@ -438,6 +489,53 @@ mod test {
         assert_eq!(saved_claims.len(), 1);
         assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
         assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
+    }
+
+    #[test]
+    fn test_claim_tokens_with_cap_too_low_no_claims_released() {
+        let mut deps = mock_dependencies(&[]);
+        let claims = Claims::new("claims");
+
+        claims
+            .create_claim(
+                deps.as_mut().storage,
+                &Addr::unchecked("addr"),
+                (TEST_AMOUNT + 100).into(),
+                Expiration::AtHeight(10),
+            )
+            .unwrap();
+
+        claims
+            .create_claim(
+                deps.as_mut().storage,
+                &Addr::unchecked("addr"),
+                TEST_AMOUNT.into(),
+                Expiration::AtHeight(5),
+            )
+            .unwrap();
+
+        let mut env = mock_env();
+        env.block.height = 1000;
+        // the address has two claims and the first one can be released
+        let amount = claims
+            .claim_tokens(
+                deps.as_mut().storage,
+                &Addr::unchecked("addr"),
+                &env.block,
+                Some((TEST_AMOUNT - 50).into()),
+            )
+            .unwrap();
+        assert_eq!(amount, Uint128::zero());
+
+        let saved_claims = claims
+            .0
+            .load(deps.as_mut().storage, &Addr::unchecked("addr"))
+            .unwrap();
+        assert_eq!(saved_claims.len(), 2);
+        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
+        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT).into());
+        assert_eq!(saved_claims[1].release_at, Expiration::AtHeight(5));
     }
 
     #[test]
