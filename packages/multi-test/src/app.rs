@@ -2511,7 +2511,6 @@ mod test {
             assert_ne!(parsed.contract_address, addr1.to_string());
         }
 
-        #[ignore]
         #[test]
         fn execute_wrapped_properly() {
             let owner = Addr::unchecked("owner");
@@ -2528,10 +2527,9 @@ mod test {
                 data: Some("hello".into()),
                 ..echo::Message::default()
             };
+            // execute_contract now decodes a protobuf wrapper, so we get the top-level response
             let exec_res = app.execute_contract(owner, echo_addr, &msg, &[]).unwrap();
-            assert!(exec_res.data.is_some());
-            let parsed = parse_execute_response_data(&exec_res.data.unwrap()).unwrap();
-            assert_eq!(parsed.data, Some(Binary::from(b"hello")));
+            assert_eq!(exec_res.data, Some(Binary::from(b"hello")));
         }
     }
 }

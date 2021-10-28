@@ -286,9 +286,9 @@ where
                     Event::new("execute").add_attribute(CONTRACT_ATTR, &contract_addr);
 
                 let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
-                let res =
+                let mut res =
                     self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
-                // res.data = execute_response(res.data);
+                res.data = execute_response(res.data);
                 Ok(res)
             }
             WasmMsg::Instantiate {
@@ -384,9 +384,9 @@ where
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", new_code_id.to_string());
                 let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
-                let res =
+                let mut res =
                     self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
-                // res.data = execute_response(res.data);
+                res.data = execute_response(res.data);
                 Ok(res)
             }
             msg => bail!(Error::UnsupportedWasmMsg(msg)),
@@ -871,7 +871,6 @@ struct ExecuteResponse {
 }
 
 // empty return if no data present in original
-#[allow(dead_code)]
 fn execute_response(data: Option<Binary>) -> Option<Binary> {
     data.map(|d| {
         let exec_data = ExecuteResponse { data: d.to_vec() };
