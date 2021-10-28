@@ -403,10 +403,13 @@ mod test {
     }
 
     fn native_payment(amount: u128, denom: &str, recipient: &str) -> SubMsg {
-        SubMsg::reply_on_error(BankMsg::Send {
-            to_address: recipient.into(),
-            amount: coins(amount, denom),
-        }, SEND_TOKEN_ID)
+        SubMsg::reply_on_error(
+            BankMsg::Send {
+                to_address: recipient.into(),
+                amount: coins(amount, denom),
+            },
+            SEND_TOKEN_ID,
+        )
     }
 
     fn mock_sent_packet(my_channel: &str, amount: u128, denom: &str, sender: &str) -> IbcPacket {
