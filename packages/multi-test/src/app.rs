@@ -2477,7 +2477,7 @@ mod test {
 
             // another echo contract
             let msg = echo::Message::<Empty> {
-                data: Some("babble".into()),
+                data: Some("Passed to contract instantiation, returned as reply, and then returned as response".into()),
                 ..Default::default()
             };
             let sub_msg = SubMsg::reply_on_success(
@@ -2489,7 +2489,7 @@ mod test {
                 1234,
             );
             let init_msg = echo::InitMessage::<Empty> {
-                data: Some("remove_me".into()),
+                data: Some("Overwrite me".into()),
                 sub_msg: Some(vec![sub_msg]),
             };
             let init_msg = to_binary(&init_msg).unwrap();
@@ -2505,8 +2505,8 @@ mod test {
             // assert we have a proper instantiate result
             let parsed = parse_instantiate_response_data(res.data.unwrap().as_slice()).unwrap();
             assert!(parsed.data.is_some());
-            // from the reply, not the top level
-            assert_eq!(parsed.data.unwrap(), Binary::from(b"babble"));
+            // Result is from the reply, not the original one
+            assert_eq!(parsed.data.unwrap(), Binary::from(b"Passed to contract instantiation, returned as reply, and then returned as response"));
             assert!(!parsed.contract_address.is_empty());
             assert_ne!(parsed.contract_address, addr1.to_string());
         }
