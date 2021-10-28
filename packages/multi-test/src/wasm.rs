@@ -348,7 +348,7 @@ where
                     res,
                     msgs,
                 )?;
-                res.data = Some(init_response(res.data, &contract_addr));
+                res.data = Some(instantiate_response(res.data, &contract_addr));
                 Ok(res)
             }
             WasmMsg::Migrate {
@@ -852,7 +852,7 @@ struct InstantiateResponse {
 }
 
 // TODO: encode helpers in cw0
-fn init_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
+fn instantiate_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
     let data = data.unwrap_or_default().to_vec();
     let init_data = InstantiateResponse {
         address: contact_address.into(),
