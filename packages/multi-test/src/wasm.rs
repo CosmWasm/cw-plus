@@ -286,7 +286,10 @@ where
                     Event::new("execute").add_attribute(CONTRACT_ATTR, &contract_addr);
 
                 let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
-                self.process_response(api, router, storage, block, contract_addr, res, msgs)
+                let res =
+                    self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
+                // res.data = execute_response(res.data);
+                Ok(res)
             }
             WasmMsg::Instantiate {
                 admin,
@@ -345,7 +348,7 @@ where
                     res,
                     msgs,
                 )?;
-                init_response(&mut res, &contract_addr);
+                res.data = Some(init_response(res.data, &contract_addr));
                 Ok(res)
             }
             WasmMsg::Migrate {
@@ -381,7 +384,10 @@ where
                     .add_attribute(CONTRACT_ATTR, &contract_addr)
                     .add_attribute("code_id", new_code_id.to_string());
                 let (res, msgs) = self.build_app_response(&contract_addr, custom_event, res);
-                self.process_response(api, router, storage, block, contract_addr, res, msgs)
+                let res =
+                    self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
+                // res.data = execute_response(res.data);
+                Ok(res)
             }
             msg => bail!(Error::UnsupportedWasmMsg(msg)),
         }
@@ -838,24 +844,42 @@ where
 // TODO: replace with code in cw0
 
 #[derive(Clone, PartialEq, Message)]
-pub struct InstantiateData {
+struct InstantiateResponse {
     #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
-    /// Unique ID number for this person.
     #[prost(bytes, tag = "2")]
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
 
-fn init_response(res: &mut AppResponse, contact_address: &Addr) {
-    let data = res.data.clone().unwrap_or_default().to_vec();
-    let init_data = InstantiateData {
+// TODO: encode helpers in cw0
+fn init_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
+    let data = data.unwrap_or_default().to_vec();
+    let init_data = InstantiateResponse {
         address: contact_address.into(),
         data,
     };
     let mut new_data = Vec::<u8>::with_capacity(init_data.encoded_len());
     // the data must encode successfully
     init_data.encode(&mut new_data).unwrap();
-    res.data = Some(new_data.into());
+    new_data.into()
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct ExecuteResponse {
+    #[prost(bytes, tag = "1")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
+}
+
+// empty return if no data present in original
+#[allow(dead_code)]
+fn execute_response(data: Option<Binary>) -> Option<Binary> {
+    data.map(|d| {
+        let exec_data = ExecuteResponse { data: d.to_vec() };
+        let mut new_data = Vec::<u8>::with_capacity(exec_data.encoded_len());
+        // the data must encode successfully
+        exec_data.encode(&mut new_data).unwrap();
+        new_data.into()
+    })
 }
 
 #[cfg(test)]

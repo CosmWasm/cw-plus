@@ -2511,6 +2511,7 @@ mod test {
             assert_ne!(parsed.contract_address, addr1.to_string());
         }
 
+        #[ignore]
         #[test]
         fn execute_wrapped_properly() {
             let owner = Addr::unchecked("owner");
