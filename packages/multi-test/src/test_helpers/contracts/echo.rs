@@ -13,6 +13,7 @@ use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 use schemars::JsonSchema;
 use std::fmt::Debug;
 
+use cw0::parse_execute_response_data;
 use derivative::Derivative;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
@@ -97,7 +98,17 @@ where
         ..
     } = msg
     {
-        Ok(Response::new().set_data(data))
+        // we parse out the WasmMsg::Execute wrapper...
+        // TODO: this is not fully correct... we need to handle execute, instantiate, and bankmsg differently
+        // that will require using the Reply id somehow to signal what type
+        let parsed = parse_execute_response_data(data.as_slice())
+            .map_err(|e| StdError::generic_err(e.to_string()))?
+            .data;
+        if let Some(d) = parsed {
+            Ok(Response::new().set_data(d))
+        } else {
+            Ok(Response::new())
+        }
     } else {
         Ok(Response::new())
     }

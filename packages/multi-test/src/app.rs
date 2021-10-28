@@ -2393,7 +2393,7 @@ mod test {
 
     mod protobuf_wrapped_data {
         use super::*;
-        use cw0::{parse_execute_response_data, parse_instantiate_response_data};
+        use cw0::parse_instantiate_response_data;
 
         #[test]
         fn instantiate_wrapped_properly() {
