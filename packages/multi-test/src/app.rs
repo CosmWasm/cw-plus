@@ -1824,6 +1824,8 @@ mod test {
     mod reply_data_overwrite {
         use super::*;
 
+        use echo::EXECUTE_REPLY_BASE_ID;
+
         fn make_echo_submsg(
             contract: Addr,
             data: impl Into<Option<&'static str>>,
@@ -1907,7 +1909,12 @@ mod test {
                     contract.clone(),
                     &echo::Message {
                         data: Some("First".to_owned()),
-                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
+                        sub_msg: vec![make_echo_submsg(
+                            contract,
+                            "Second",
+                            vec![],
+                            EXECUTE_REPLY_BASE_ID,
+                        )],
                         ..echo::Message::default()
                     },
                     &[],
@@ -1987,7 +1994,12 @@ mod test {
                     owner,
                     contract.clone(),
                     &echo::Message {
-                        sub_msg: vec![make_echo_submsg(contract, "Second", vec![], 1)],
+                        sub_msg: vec![make_echo_submsg(
+                            contract,
+                            "Second",
+                            vec![],
+                            EXECUTE_REPLY_BASE_ID,
+                        )],
                         ..echo::Message::default()
                     },
                     &[],
@@ -2076,10 +2088,25 @@ mod test {
                     &echo::Message {
                         data: Some("Orig".to_owned()),
                         sub_msg: vec![
-                            make_echo_submsg(contract.clone(), None, vec![], 1),
-                            make_echo_submsg(contract.clone(), "First", vec![], 2),
-                            make_echo_submsg(contract.clone(), "Second", vec![], 3),
-                            make_echo_submsg(contract, None, vec![], 4),
+                            make_echo_submsg(
+                                contract.clone(),
+                                None,
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 1,
+                            ),
+                            make_echo_submsg(
+                                contract.clone(),
+                                "First",
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 2,
+                            ),
+                            make_echo_submsg(
+                                contract.clone(),
+                                "Second",
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 3,
+                            ),
+                            make_echo_submsg(contract, None, vec![], EXECUTE_REPLY_BASE_ID + 4),
                         ],
                         ..echo::Message::default()
                     },
@@ -2139,10 +2166,25 @@ mod test {
                     contract.clone(),
                     &echo::Message {
                         sub_msg: vec![
-                            make_echo_submsg(contract.clone(), None, vec![], 1),
+                            make_echo_submsg(
+                                contract.clone(),
+                                None,
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 1,
+                            ),
                             make_echo_submsg_no_reply(contract.clone(), "Hidden", vec![]),
-                            make_echo_submsg(contract.clone(), "Shown", vec![], 2),
-                            make_echo_submsg(contract.clone(), None, vec![], 3),
+                            make_echo_submsg(
+                                contract.clone(),
+                                "Shown",
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 2,
+                            ),
+                            make_echo_submsg(
+                                contract.clone(),
+                                None,
+                                vec![],
+                                EXECUTE_REPLY_BASE_ID + 3,
+                            ),
                             make_echo_submsg_no_reply(contract, "Lost", vec![]),
                         ],
                         ..echo::Message::default()
@@ -2180,12 +2222,17 @@ mod test {
                                 vec![make_echo_submsg(
                                     contract.clone(),
                                     "Second",
-                                    vec![make_echo_submsg(contract, None, vec![], 4)],
-                                    3,
+                                    vec![make_echo_submsg(
+                                        contract,
+                                        None,
+                                        vec![],
+                                        EXECUTE_REPLY_BASE_ID + 4,
+                                    )],
+                                    EXECUTE_REPLY_BASE_ID + 3,
                                 )],
-                                2,
+                                EXECUTE_REPLY_BASE_ID + 2,
                             )],
-                            1,
+                            EXECUTE_REPLY_BASE_ID + 1,
                         )],
                         ..echo::Message::default()
                     },
@@ -2393,6 +2440,7 @@ mod test {
 
     mod protobuf_wrapped_data {
         use super::*;
+        use crate::test_helpers::contracts::echo::EXECUTE_REPLY_BASE_ID;
         use cw0::parse_instantiate_response_data;
 
         #[test]
@@ -2486,7 +2534,7 @@ mod test {
                     msg: to_binary(&msg).unwrap(),
                     funds: vec![],
                 },
-                1234,
+                EXECUTE_REPLY_BASE_ID,
             );
             let init_msg = echo::InitMessage::<Empty> {
                 data: Some("Overwrite me".into()),
