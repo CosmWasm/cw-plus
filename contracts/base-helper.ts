@@ -9,7 +9,7 @@ import path from "path";
 /*
  * This base-helper is here to use with different helper files in contracts
  *
- * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cosmwasm-plus/master/contracts/base-helpers.ts
+ * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts
  *
  * Create a client:
  *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
