@@ -69,24 +69,20 @@ impl<T> Cw1WhitelistContract<T> {
     where
         T: DeserializeOwned,
     {
-        let mut errs = vec![];
-
-        match from_slice::<Cw1ExecMsg<T>>(msg) {
+        let cw1_err = match from_slice::<Cw1ExecMsg<T>>(msg) {
             Ok(msg) => return msg.dispatch(deps, env, info, self),
-            Err(err) => errs.push(err),
-        }
+            Err(err) => err,
+        };
 
-        match from_slice::<WhitelistExecMsg>(msg) {
+        let whitelist_err = match from_slice::<WhitelistExecMsg>(msg) {
             Ok(msg) => return msg.dispatch(deps, env, info, self),
-            Err(err) => errs.push(err),
-        }
+            Err(err) => err,
+        };
 
-        let msg: String = errs
-            .into_iter()
-            .flat_map(|err| {
-                std::iter::once(err.to_string()).chain(std::iter::once("\n".to_owned()))
-            })
-            .collect();
+        let msg = format!(
+            "While parsing Cw1WhitelistExecMsg\n As Cw1ExecMsg: {}\n As WhitelistExecMsg: {}",
+            cw1_err, whitelist_err
+        );
 
         let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
         Err(err.into())
@@ -101,24 +97,20 @@ impl<T> Cw1WhitelistContract<T> {
     where
         T: DeserializeOwned,
     {
-        let mut errs = vec![];
-
-        match from_slice::<Cw1QueryMsg<T>>(msg) {
+        let cw1_err = match from_slice::<Cw1QueryMsg<T>>(msg) {
             Ok(msg) => return msg.dispatch(deps, env, self),
-            Err(err) => errs.push(err),
-        }
+            Err(err) => err,
+        };
 
-        match from_slice::<WhitelistQueryMsg>(msg) {
+        let whitelist_err = match from_slice::<WhitelistQueryMsg>(msg) {
             Ok(msg) => return msg.dispatch(deps, env, self),
-            Err(err) => errs.push(err),
-        }
+            Err(err) => err,
+        };
 
-        let msg: String = errs
-            .into_iter()
-            .flat_map(|err| {
-                std::iter::once(err.to_string()).chain(std::iter::once("\n".to_owned()))
-            })
-            .collect();
+        let msg = format!(
+            "While parsing Cw1WhitelistQueryMsg\n As Cw1QueryMsg: {}\n As WhitelistQueryMsg: {}",
+            cw1_err, whitelist_err
+        );
 
         let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
         Err(err.into())
