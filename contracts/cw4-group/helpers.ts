@@ -1,17 +1,9 @@
-import axios from  "axios";
-import fs from "fs";
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
-import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
-import { Slip10RawIndex } from "@cosmjs/crypto";
-import { toUtf8, toBase64 } from "@cosmjs/encoding";
-import path from "path";
-
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
- * With these you can easily use the cw20 contract without worrying about forming messages and parsing queries.
+  * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
+ * With these you can easily use the cw4 contract without worrying about forming messages and parsing queries.
  *
- * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw4-group/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw4-group/helpers.ts
  *
  * Create a client:
  *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
@@ -43,105 +35,6 @@ import path from "path";
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
 */
-
-interface Options {
-  readonly httpUrl: string
-  readonly networkId: string
-  readonly feeToken: string
-  readonly bech32prefix: string
-  readonly hdPath: readonly Slip10RawIndex[]
-  readonly faucetUrl?: string
-  readonly defaultKeyFile: string,
-  readonly fees: {
-    upload: StdFee,
-    init: StdFee,
-    exec: StdFee
-  }
-}
-
-const pebblenetGasPrice = GasPrice.fromString("0.01upebble");
-const pebblenetOptions: Options = {
-  httpUrl: 'https://rpc.pebblenet.cosmwasm.com',
-  networkId: 'pebblenet-1',
-  bech32prefix: 'wasm',
-  feeToken: 'upebble',
-  faucetUrl: 'https://faucet.pebblenet.cosmwasm.com/credit',
-  hdPath: makeCosmoshubPath(0),
-  defaultKeyFile: path.join(process.env.HOME, ".pebblenet.key"),
-  fees: {
-    upload: calculateFee(1500000, pebblenetGasPrice),
-    init: calculateFee(500000, pebblenetGasPrice),
-    exec: calculateFee(200000, pebblenetGasPrice),
-  },
-}
-
-interface Network {
-  setup: (password: string, filename?: string) => Promise<[string, SigningCosmWasmClient]>
-  recoverMnemonic: (password: string, filename?: string) => Promise<string>
-}
-
-const useOptions = (options: Options): Network => {
-
-  const loadOrCreateWallet = async (options: Options, filename: string, password: string): Promise<DirectSecp256k1HdWallet> => {
-    let encrypted: string;
-    try {
-      encrypted = fs.readFileSync(filename, 'utf8');
-    } catch (err) {
-      // generate if no file exists
-      const wallet = await DirectSecp256k1HdWallet.generate(12, {hdPaths: [options.hdPath], prefix: options.bech32prefix});
-      const encrypted = await wallet.serialize(password);
-      fs.writeFileSync(filename, encrypted, 'utf8');
-      return wallet;
-    }
-    // otherwise, decrypt the file (we cannot put deserialize inside try or it will over-write on a bad password)
-    const wallet = await DirectSecp256k1HdWallet.deserialize(encrypted, password);
-    return wallet;
-  };
-
-  const connect = async (
-    wallet: DirectSecp256k1HdWallet,
-    options: Options
-  ): Promise<SigningCosmWasmClient> => {
-    const clientOptions = {
-      prefix: options.bech32prefix
-    }
-    return await SigningCosmWasmClient.connectWithSigner(options.httpUrl, wallet, clientOptions)
-  };
-
-  const hitFaucet = async (
-    faucetUrl: string,
-    address: string,
-    denom: string
-  ): Promise<void> => {
-    await axios.post(faucetUrl, {denom, address});
-  }
-
-  const setup = async (password: string, filename?: string): Promise<[string, SigningCosmWasmClient]> => {
-    const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
-    const client = await connect(wallet, pebblenetOptions);
-
-    const [account] = await wallet.getAccounts();
-    // ensure we have some tokens
-    if (options.faucetUrl) {
-      const tokens = await client.getBalance(account.address, options.feeToken)
-      if (tokens.amount === '0') {
-        console.log(`Getting ${options.feeToken} from faucet`);
-        await hitFaucet(options.faucetUrl, account.address, options.feeToken);
-      }
-    }
-
-    return [account.address, client];
-  }
-
-  const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
-    const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
-    return wallet.mnemonic;
-  }
-
-  return {setup, recoverMnemonic};
-}
 
 interface AdminResponse {
   readonly admin?: string
