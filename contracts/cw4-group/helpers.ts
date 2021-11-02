@@ -1,6 +1,6 @@
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
-  * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
+ * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
  * With these you can easily use the cw4 contract without worrying about forming messages and parsing queries.
  *
  * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw4-group/helpers.ts
@@ -34,10 +34,10 @@
  *   const instance = await contract.instantiate(addr, codeId, initMsg, 'WORKFORCE1');
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
-*/
+ */
 
 interface AdminResponse {
-  readonly admin?: string
+  readonly admin?: string;
 }
 
 interface MemberResponse {
@@ -62,72 +62,77 @@ interface HooksResponse {
 }
 
 interface CW4GroupInstance {
-  readonly contractAddress: string
+  readonly contractAddress: string;
 
   // queries
-  admin: () => Promise<AdminResponse>
-  totalWeight: () => Promise<TotalWeightResponse>
-  member: (addr: string, atHeight?: number) => Promise<MemberResponse>
-  listMembers: (startAfter?: string, limit?: number) => Promise<MemberListResponse>
-  hooks: () => Promise<HooksResponse>
+  admin: () => Promise<AdminResponse>;
+  totalWeight: () => Promise<TotalWeightResponse>;
+  member: (addr: string, atHeight?: number) => Promise<MemberResponse>;
+  listMembers: (startAfter?: string, limit?: number) => Promise<MemberListResponse>;
+  hooks: () => Promise<HooksResponse>;
 
   // actions
-  updateAdmin: (txSigner: string, admin?: string) => Promise<string>
-  updateMembers: (txSigner: string, remove: Member[], add: Member[] ) => Promise<string>
+  updateAdmin: (txSigner: string, admin?: string) => Promise<string>;
+  updateMembers: (txSigner: string, remove: Member[], add: Member[]) => Promise<string>;
 
   // will not used by end user for testing purposes
-  _addHook: (txSigner: string, addr: string) => Promise<string>
-  _removeHook: (txSigner: string, addr: string) => Promise<string>
+  _addHook: (txSigner: string, addr: string) => Promise<string>;
+  _removeHook: (txSigner: string, addr: string) => Promise<string>;
 }
 
 interface CW4GroupContract {
-  upload: (txSigner: string) => Promise<number>
-  instantiate: (txSigner: string, codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string) => Promise<CW4GroupInstance>
-  use: (contractAddress: string) => CW4GroupInstance
+  upload: (txSigner: string) => Promise<number>;
+  instantiate: (
+    txSigner: string,
+    codeId: number,
+    initMsg: Record<string, unknown>,
+    label: string,
+    admin?: string
+  ) => Promise<CW4GroupInstance>;
+  use: (contractAddress: string) => CW4GroupInstance;
 }
 
-export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): CW4GroupContract => {
+export const CW4Group = (client: SigningCosmWasmClient, fees: Options["fees"]): CW4GroupContract => {
   const use = (contractAddress: string): CW4GroupInstance => {
-
     const admin = async (): Promise<AdminResponse> => {
-      return client.queryContractSmart(contractAddress, {admin: {}});
+      return client.queryContractSmart(contractAddress, { admin: {} });
     };
 
     const totalWeight = async (): Promise<TotalWeightResponse> => {
-      return client.queryContractSmart(contractAddress, {total_weight: {}});
+      return client.queryContractSmart(contractAddress, { total_weight: {} });
     };
 
     const member = async (addr: string, atHeight?: number): Promise<MemberResponse> => {
-      return client.queryContractSmart(contractAddress, {member: {addr, at_height: atHeight}});
+      return client.queryContractSmart(contractAddress, { member: { addr, at_height: atHeight } });
     };
 
     const listMembers = async (startAfter?: string, limit?: number): Promise<MemberListResponse> => {
-      return client.queryContractSmart(contractAddress, {list_members: {start_after: startAfter, limit}});
+      return client.queryContractSmart(contractAddress, { list_members: { start_after: startAfter, limit } });
     };
 
     const hooks = async (): Promise<HooksResponse> => {
-      return client.queryContractSmart(contractAddress, {hooks: {}});
+      return client.queryContractSmart(contractAddress, { hooks: {} });
     };
 
     const updateAdmin = async (txSigner: string, admin?: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {update_admin: {admin}}, fees.exec);
+      const result = await client.execute(txSigner, contractAddress, { update_admin: { admin } }, fees.exec);
       return result.transactionHash;
-    }
+    };
 
     const updateMembers = async (txSigner: string, remove: Member[], add: Member[]): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {update_members: {remove, add}}, fees.exec);
+      const result = await client.execute(txSigner, contractAddress, { update_members: { remove, add } }, fees.exec);
       return result.transactionHash;
-    }
+    };
 
     const _addHook = async (txSigner: string, addr: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {add_hook: {addr}}, fees.exec);
+      const result = await client.execute(txSigner, contractAddress, { add_hook: { addr } }, fees.exec);
       return result.transactionHash;
-    }
+    };
 
     const _removeHook = async (txSigner: string, addr: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {remove_hook: {addr}}, fees.exec);
+      const result = await client.execute(txSigner, contractAddress, { remove_hook: { addr } }, fees.exec);
       return result.transactionHash;
-    }
+    };
 
     return {
       contractAddress,
@@ -139,29 +144,38 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): 
       updateAdmin,
       updateMembers,
       _addHook,
-      _removeHook
+      _removeHook,
     };
-  }
+  };
 
   const downloadWasm = async (url: string): Promise<Uint8Array> => {
-    const r = await axios.get(url, { responseType: 'arraybuffer' })
+    const r = await axios.get(url, { responseType: "arraybuffer" });
     if (r.status !== 200) {
-      throw new Error(`Download error: ${r.status}`)
+      throw new Error(`Download error: ${r.status}`);
     }
-    return r.data
-  }
+    return r.data;
+  };
 
   const upload = async (senderAddress: string): Promise<number> => {
     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.9.0/cw4_group.wasm";
     const wasm = await downloadWasm(sourceUrl);
     const result = await client.upload(senderAddress, wasm, fees.upload);
     return result.codeId;
-  }
+  };
 
-  const instantiate = async (senderAddress: string, codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string): Promise<CW4GroupInstance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, { memo: `Init ${label}`, admin });
+  const instantiate = async (
+    senderAddress: string,
+    codeId: number,
+    initMsg: Record<string, unknown>,
+    label: string,
+    admin?: string
+  ): Promise<CW4GroupInstance> => {
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, {
+      memo: `Init ${label}`,
+      admin,
+    });
     return use(result.contractAddress);
-  }
+  };
 
   return { upload, instantiate, use };
-}
+};
