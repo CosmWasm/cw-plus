@@ -1,6 +1,6 @@
 [package]
 name = "cw20-atomic-swap"
-version = "0.10.1"
+version = "0.10.2"
 authors = ["Mauro Lacy <maurolacy@users.noreply.github.com>"]
 edition = "2018"
 description = "Implementation of Atomic Swaps"
@@ -15,11 +15,11 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-cw0 = { path = "../../packages/cw0", version = "0.10.1" }
-cw2 = { path = "../../packages/cw2", version = "0.10.1" }
-cw20 = { path = "../../packages/cw20", version = "0.10.1" }
+cw0 = { path = "../../packages/cw0", version = "0.10.2" }
+cw2 = { path = "../../packages/cw2", version = "0.10.2" }
+cw20 = { path = "../../packages/cw20", version = "0.10.2" }
 cosmwasm-std = { version = "1.0.0-beta" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.1" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.2" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
