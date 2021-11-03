@@ -216,8 +216,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_string_tuple, index_triple, MultiIndex, UniqueIndex};
-    use crate::{Index, U32Key};
+    use crate::indexes::{index_string_tuple, index_triple};
+    use crate::{Index, MultiIndex, U32Key, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
