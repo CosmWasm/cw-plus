@@ -613,3 +613,15 @@ Another example that is similar, but returning only the `token_id`s, using the `
         .collect();
 ```
 Now `pks` contains `token_id` values (as `Vec<u8>`s) for the given `owner`.
+
+### Index keys deserialization
+
+To deserialize keys of indexes (using the `*_de` functions), there are currently some requirements / limitations:
+
+- For `UniqueIndex`: The primary key (`PK`) type needs to be specified, in order to deserialize the primary key to it.
+This generic type comes with a default of `()`, which means that no deserialization / data will be provided
+for the primary key.
+
+- For `MultiIndex`: The last element of the index tuple must be specified with the type you want it to be deserialized.
+That is, the last tuple element serves as a marker for the deserialization type (in the same way `PK` does it in
+`UniqueIndex`).
