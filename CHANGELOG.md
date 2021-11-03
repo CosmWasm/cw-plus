@@ -2,19 +2,128 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon4...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.1...HEAD)
 
-## [v0.10.0](https://github.com/CosmWasm/cw-plus/tree/v0.10.0) + [v0.10.0-soon4](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon4) +  [v0.10.0-soon3](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon3) +  [v0.10.0-soon2](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon2) +  [v0.10.0-soon](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon) (2021-10-11)
+**Closed issues:**
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.9.1...v0.10.0)
+- Multitest has errors with reply data [\#516](https://github.com/CosmWasm/cw-plus/issues/516)
+
+**Merged pull requests:**
+
+- cw1-whitelist-ng: Slight messages parsing improvement [\#523](https://github.com/CosmWasm/cw-plus/pull/523) ([hashedone](https://github.com/hashedone))
+- ics20: Handle send errors with reply [\#520](https://github.com/CosmWasm/cw-plus/pull/520) ([ethanfrey](https://github.com/ethanfrey))
+- Proper execute responses [\#519](https://github.com/CosmWasm/cw-plus/pull/519) ([ethanfrey](https://github.com/ethanfrey))
+- Publish MsgInstantiate / Execute responses [\#518](https://github.com/CosmWasm/cw-plus/pull/518) ([maurolacy](https://github.com/maurolacy))
+- Fix instaniate reply data [\#517](https://github.com/CosmWasm/cw-plus/pull/517) ([ethanfrey](https://github.com/ethanfrey))
+- Use protobuf de helpers [\#515](https://github.com/CosmWasm/cw-plus/pull/515) ([maurolacy](https://github.com/maurolacy))
+- Add tests for the claims controller [\#514](https://github.com/CosmWasm/cw-plus/pull/514) ([sgoya](https://github.com/sgoya))
+- Implement cw3-flex-multisig helper [\#479](https://github.com/CosmWasm/cw-plus/pull/479) ([orkunkl](https://github.com/orkunkl))
+
+## [v0.10.1](https://github.com/CosmWasm/cw-plus/tree/v0.10.1) (2021-10-26)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0...v0.10.1)
+
+**Closed issues:**
+
+- Reimplement cw1-whitelist contract in terms of semantic structures [\#494](https://github.com/CosmWasm/cw-plus/issues/494)
+- Helper transfer method failed to execute message [\#492](https://github.com/CosmWasm/cw-plus/issues/492)
+- Add helpers for parsing the protobuf MsgInstantiate and MsgExecute responses [\#480](https://github.com/CosmWasm/cw-plus/issues/480)
+
+**Merged pull requests:**
+
+- Prepare 0.10.1 release [\#513](https://github.com/CosmWasm/cw-plus/pull/513) ([ethanfrey](https://github.com/ethanfrey))
+- Added cw1-whitelist-ng to CI [\#512](https://github.com/CosmWasm/cw-plus/pull/512) ([hashedone](https://github.com/hashedone))
+- cw1-subkeys-ng: Additional follow up improvements [\#506](https://github.com/CosmWasm/cw-plus/pull/506) ([hashedone](https://github.com/hashedone))
+- Parse reply helpers [\#502](https://github.com/CosmWasm/cw-plus/pull/502) ([maurolacy](https://github.com/maurolacy))
+- cw1-whitelist-ng: Contract implementation in terms of semantical structures [\#499](https://github.com/CosmWasm/cw-plus/pull/499) ([hashedone](https://github.com/hashedone))
+- range\_de for IndexMap [\#498](https://github.com/CosmWasm/cw-plus/pull/498) ([uint](https://github.com/uint))
+- Implement range\_de for SnapshotMap [\#497](https://github.com/CosmWasm/cw-plus/pull/497) ([uint](https://github.com/uint))
+- Fix publish script [\#486](https://github.com/CosmWasm/cw-plus/pull/486) ([ethanfrey](https://github.com/ethanfrey))
+- Implement cw4-group typescript helper [\#476](https://github.com/CosmWasm/cw-plus/pull/476) ([orkunkl](https://github.com/orkunkl))
+
+## [v0.10.0](https://github.com/CosmWasm/cw-plus/tree/v0.10.0) (2021-10-11)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon4...v0.10.0)
 
 **Closed issues:**
 
 - Question about `MultiIndex` [\#466](https://github.com/CosmWasm/cw-plus/issues/466)
 - More multitest improvements [\#266](https://github.com/CosmWasm/cw-plus/issues/266)
 - Update to cosmwasm v1.0.0-soon2 [\#473](https://github.com/CosmWasm/cw-plus/issues/473)
+- Allow NFTs to include custom data [\#440](https://github.com/CosmWasm/cw-plus/issues/440)
+- Refactor Admin cw-controller to better represent actual functionality [\#424](https://github.com/CosmWasm/cw-plus/issues/424)
+- Implement `PrimaryKey` for `Timestamp` [\#419](https://github.com/CosmWasm/cw-plus/issues/419)
+- storage-plus: Improve in-code documentation of map primitives, in particular `MultiIndex` [\#407](https://github.com/CosmWasm/cw-plus/issues/407)
+- Remove use of dyn in multitest Router [\#404](https://github.com/CosmWasm/cw-plus/issues/404)
+- Define generic multitest module [\#387](https://github.com/CosmWasm/cw-plus/issues/387)
+
+**Merged pull requests:**
+
+- Update CHANGELOG [\#485](https://github.com/CosmWasm/cw-plus/pull/485) ([ethanfrey](https://github.com/ethanfrey))
+- Release 0.10.0 [\#483](https://github.com/CosmWasm/cw-plus/pull/483) ([ethanfrey](https://github.com/ethanfrey))
+- Upgrade CosmWasm to 1.0.0-beta [\#482](https://github.com/CosmWasm/cw-plus/pull/482) ([webmaster128](https://github.com/webmaster128))
+- Full deserialization for `range` [\#432](https://github.com/CosmWasm/cw-plus/pull/432) ([maurolacy](https://github.com/maurolacy))
+
+## [v0.10.0-soon4](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon4) (2021-10-07)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon3...v0.10.0-soon4)
+
+**Fixed bugs:**
+
+- Fix improper assert\_matches usage [\#459](https://github.com/CosmWasm/cw-plus/pull/459) ([ueco-jb](https://github.com/ueco-jb))
+
+**Closed issues:**
+
+- Update to cosmwasm v1.0.0-soon2 [\#473](https://github.com/CosmWasm/cw-plus/issues/473)
 - Add ensure! macro [\#468](https://github.com/CosmWasm/cw-plus/issues/468)
 - Better return values from range/prefix [\#198](https://github.com/CosmWasm/cw-plus/issues/198)
+
+**Merged pull requests:**
+
+- Release v0.10.0-soon4 [\#477](https://github.com/CosmWasm/cw-plus/pull/477) ([ethanfrey](https://github.com/ethanfrey))
+- Update to CosmWasm 1.0.0-soon2  [\#475](https://github.com/CosmWasm/cw-plus/pull/475) ([ethanfrey](https://github.com/ethanfrey))
+- Allow error type conversions in ensure! and ensure\_eq! [\#474](https://github.com/CosmWasm/cw-plus/pull/474) ([webmaster128](https://github.com/webmaster128))
+- Improve error handling / remove FIXMEs [\#470](https://github.com/CosmWasm/cw-plus/pull/470) ([maurolacy](https://github.com/maurolacy))
+- Add ensure [\#469](https://github.com/CosmWasm/cw-plus/pull/469) ([ethanfrey](https://github.com/ethanfrey))
+- Key deserializer improvements [\#467](https://github.com/CosmWasm/cw-plus/pull/467) ([maurolacy](https://github.com/maurolacy))
+- Upgrade to cosmwasm/workspace-optimizer:0.12.3 [\#465](https://github.com/CosmWasm/cw-plus/pull/465) ([webmaster128](https://github.com/webmaster128))
+- Prefix consolidation [\#439](https://github.com/CosmWasm/cw-plus/pull/439) ([maurolacy](https://github.com/maurolacy))
+- Full deserialization for `range` [\#432](https://github.com/CosmWasm/cw-plus/pull/432) ([maurolacy](https://github.com/maurolacy))
+
+## [v0.10.0-soon3](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon3) (2021-09-29)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon2...v0.10.0-soon3)
+
+**Merged pull requests:**
+
+- Prepare release v0.10.0-soon3 [\#457](https://github.com/CosmWasm/cw-plus/pull/457) ([ethanfrey](https://github.com/ethanfrey))
+- Expose essential multitest types [\#456](https://github.com/CosmWasm/cw-plus/pull/456) ([ethanfrey](https://github.com/ethanfrey))
+
+## [v0.10.0-soon2](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon2) (2021-09-28)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.9.1...v0.10.0-soon2)
+
+**Merged pull requests:**
+
+- Release 0.10.0-soon2 [\#455](https://github.com/CosmWasm/cw-plus/pull/455) ([ethanfrey](https://github.com/ethanfrey))
+- Expose sudo powers on Router we give to Modules [\#453](https://github.com/CosmWasm/cw-plus/pull/453) ([ethanfrey](https://github.com/ethanfrey))
+- Forward port 440 demo metadata extension [\#452](https://github.com/CosmWasm/cw-plus/pull/452) ([ethanfrey](https://github.com/ethanfrey))
+- Forward port 440-customize-nft [\#451](https://github.com/CosmWasm/cw-plus/pull/451) ([ethanfrey](https://github.com/ethanfrey))
+
+## [v0.9.1](https://github.com/CosmWasm/cw-plus/tree/v0.9.1) (2021-09-23)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon...v0.9.1)
+
+**Closed issues:**
+
+- Allow NFTs to include custom data [\#440](https://github.com/CosmWasm/cw-plus/issues/440)
+
+## [v0.10.0-soon](https://github.com/CosmWasm/cw-plus/tree/v0.10.0-soon) (2021-09-22)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.9.0...v0.10.0-soon)
+
+**Closed issues:**
+
 - Contracts for Token Sale and Vesting period [\#444](https://github.com/CosmWasm/cw-plus/issues/444)
 - small updates on storage-plus docs [\#435](https://github.com/CosmWasm/cw-plus/issues/435)
 - Unintuitive behavior of range on multi-index [\#430](https://github.com/CosmWasm/cw-plus/issues/430)
@@ -30,23 +139,6 @@
 
 **Merged pull requests:**
 
-- Release 0.10.0 [\#483](https://github.com/CosmWasm/cw-plus/pull/483) ([ethanfrey](https://github.com/ethanfrey))
-- Upgrade CosmWasm to 1.0.0-beta [\#482](https://github.com/CosmWasm/cw-plus/pull/482) ([webmaster128](https://github.com/webmaster128))
-- Release v0.10.0-soon4 [\#477](https://github.com/CosmWasm/cw-plus/pull/477) ([ethanfrey](https://github.com/ethanfrey))
-- Update to CosmWasm 1.0.0-soon2  [\#475](https://github.com/CosmWasm/cw-plus/pull/475) ([ethanfrey](https://github.com/ethanfrey))
-- Allow error type conversions in ensure! and ensure\_eq! [\#474](https://github.com/CosmWasm/cw-plus/pull/474) ([webmaster128](https://github.com/webmaster128))
-- Improve error handling / remove FIXMEs [\#470](https://github.com/CosmWasm/cw-plus/pull/470) ([maurolacy](https://github.com/maurolacy))
-- Add ensure [\#469](https://github.com/CosmWasm/cw-plus/pull/469) ([ethanfrey](https://github.com/ethanfrey))
-- Key deserializer improvements [\#467](https://github.com/CosmWasm/cw-plus/pull/467) ([maurolacy](https://github.com/maurolacy))
-- Upgrade to cosmwasm/workspace-optimizer:0.12.3 [\#465](https://github.com/CosmWasm/cw-plus/pull/465) ([webmaster128](https://github.com/webmaster128))
-- Prefix consolidation [\#439](https://github.com/CosmWasm/cw-plus/pull/439) ([maurolacy](https://github.com/maurolacy))
-- Full deserialization for `range` [\#432](https://github.com/CosmWasm/cw-plus/pull/432) ([maurolacy](https://github.com/maurolacy))
-- Prepare release v0.10.0-soon3 [\#457](https://github.com/CosmWasm/cw-plus/pull/457) ([ethanfrey](https://github.com/ethanfrey))
-- Expose essential multitest types [\#456](https://github.com/CosmWasm/cw-plus/pull/456) ([ethanfrey](https://github.com/ethanfrey))
-- Release 0.10.0-soon2 [\#455](https://github.com/CosmWasm/cw-plus/pull/455) ([ethanfrey](https://github.com/ethanfrey))
-- Expose sudo powers on Router we give to Modules [\#453](https://github.com/CosmWasm/cw-plus/pull/453) ([ethanfrey](https://github.com/ethanfrey))
-- Forward port 440 demo metadata extension [\#452](https://github.com/CosmWasm/cw-plus/pull/452) ([ethanfrey](https://github.com/ethanfrey))
-- Forward port 440-customize-nft [\#451](https://github.com/CosmWasm/cw-plus/pull/451) ([ethanfrey](https://github.com/ethanfrey))
 - Release 0.10.0-soon [\#448](https://github.com/CosmWasm/cw-plus/pull/448) ([ethanfrey](https://github.com/ethanfrey))
 - Add proper prefix\_range helper when you want to iterate over the prefix space [\#446](https://github.com/CosmWasm/cw-plus/pull/446) ([ethanfrey](https://github.com/ethanfrey))
 - Improve in-code documentation of map primitives [\#443](https://github.com/CosmWasm/cw-plus/pull/443) ([ueco-jb](https://github.com/ueco-jb))
@@ -62,20 +154,6 @@
 - Simplify router args [\#422](https://github.com/CosmWasm/cw-plus/pull/422) ([ethanfrey](https://github.com/ethanfrey))
 - Snapshot item 2 [\#418](https://github.com/CosmWasm/cw-plus/pull/418) ([maurolacy](https://github.com/maurolacy))
 - Removing dyn from Router [\#410](https://github.com/CosmWasm/cw-plus/pull/410) ([hashedone](https://github.com/hashedone))
-
-**Fixed bugs:**
-
-- Fix improper assert\_matches usage [\#459](https://github.com/CosmWasm/cw-plus/pull/459) ([ueco-jb](https://github.com/ueco-jb))
-
-
-## [v0.9.1](https://github.com/CosmWasm/cw-plus/tree/v0.9.1) (2021-09-23)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0-soon...v0.9.1)
-
-**Closed issues:**
-
-- Allow NFTs to include custom data [\#440](https://github.com/CosmWasm/cw-plus/issues/440)
-
 
 ## [v0.9.0](https://github.com/CosmWasm/cw-plus/tree/v0.9.0) (2021-09-14)
 
