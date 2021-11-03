@@ -42,6 +42,9 @@ pub enum ContractError {
 
     #[error("Allowance already expired while setting: {0}")]
     SettingExpiredAllowance(Expiration),
+
+    #[error("Semver parsing error: {0}")]
+    SemVer(String),
 }
 
 impl From<cw1_whitelist::ContractError> for ContractError {
@@ -50,5 +53,11 @@ impl From<cw1_whitelist::ContractError> for ContractError {
             cw1_whitelist::ContractError::Std(error) => ContractError::Std(error),
             cw1_whitelist::ContractError::Unauthorized {} => ContractError::Unauthorized {},
         }
+    }
+}
+
+impl From<semver::Error> for ContractError {
+    fn from(err: semver::Error) -> Self {
+        Self::SemVer(err.to_string())
     }
 }
