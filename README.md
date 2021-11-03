@@ -20,20 +20,20 @@
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
-| cw1-subkeys             | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw1_subkeys.wasm)                        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
-| cw1-whitelist           | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw1_whitelist.wasm)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
-| cw3-fixed-multisig      | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw3_fixed_multisig.wasm)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
-| cw3-flex-multisig       | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw3_flex_multisig.wasm)          | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)    |
-| cw4-group               | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)    |
-| cw4-stake               | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)    |
-| cw20-atomic-swap        | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_atomic_swap.wasm)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
-| cw20-base               | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
-| cw20-bonding            | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_bonding.wasm)          | [![Docs](https://docs.rs/cw20-bonding/badge.svg)](https://docs.rs/cw20-bonding)    |
-| cw20-escrow             | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
-| cw20-ics20              | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_ics20.wasm)          | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)    |
-| cw20-staking            | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
-| cw20-merkle-airdrop     | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw20_merkle_airdrop.wasm)          | [![Docs](https://docs.rs/cw20-merkle-airdrop/badge.svg)](https://docs.rs/cw20-merkle-airdrop)    |
-| cw1155-base             | [Release v0.10.1](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.1/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
+| cw1-subkeys             | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw1_subkeys.wasm)                        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)    |
+| cw1-whitelist           | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw1_whitelist.wasm)          | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)    |
+| cw3-fixed-multisig      | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw3_fixed_multisig.wasm)          | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig)    |
+| cw3-flex-multisig       | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw3_flex_multisig.wasm)          | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)    |
+| cw4-group               | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)    |
+| cw4-stake               | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)    |
+| cw20-atomic-swap        | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_atomic_swap.wasm)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
+| cw20-base               | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
+| cw20-bonding            | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_bonding.wasm)          | [![Docs](https://docs.rs/cw20-bonding/badge.svg)](https://docs.rs/cw20-bonding)    |
+| cw20-escrow             | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
+| cw20-ics20              | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_ics20.wasm)          | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)    |
+| cw20-staking            | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
+| cw20-merkle-airdrop     | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw20_merkle_airdrop.wasm)          | [![Docs](https://docs.rs/cw20-merkle-airdrop/badge.svg)](https://docs.rs/cw20-merkle-airdrop)    |
+| cw1155-base             | [Release v0.10.2](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
 
 
 Note that `cw721` and `cw721-base` have moved to the new [`cw-nfts` repo](https://github.com/CosmWasm/cw-nfts)
