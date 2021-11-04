@@ -89,10 +89,12 @@ pub fn execute_propose(
     // only members of the multisig can create a proposal
     let cfg = CONFIG.load(deps.storage)?;
 
-    let vote_power = cfg
-        .group_addr
-        .is_member(&deps.querier, &info.sender)?
-        .ok_or(ContractError::Unauthorized {})?;
+    // Only members of the multisig can create a proposal
+    // Additional check if weight >= 1
+    let vote_power =
+        cfg.group_addr
+            .is_voting_member(&deps.querier, &info.sender, env.block.height)
+            .map_err(|_| ContractError::Unauthorized {})?;
 
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
@@ -153,11 +155,13 @@ pub fn execute_vote(
         return Err(ContractError::Expired {});
     }
 
+    // Only members of the multisig can create a proposal
+    // Additional check if weight >= 1
     // use a snapshot of "start of proposal"
-    let vote_power = cfg
-        .group_addr
-        .member_at_height(&deps.querier, info.sender.clone(), prop.start_height)?
-        .ok_or(ContractError::Unauthorized {})?;
+    let vote_power =
+        cfg.group_addr
+            .is_voting_member(&deps.querier, &info.sender, prop.start_height)
+            .map_err(|_| ContractError::Unauthorized {})?;
 
     // cast vote if no vote previously cast
     BALLOTS.update(

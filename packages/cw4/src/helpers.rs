@@ -2,7 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdResult, WasmMsg, WasmQuery,
+    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdError, StdResult, WasmMsg,
+    WasmQuery,
 };
 
 use crate::msg::Cw4ExecuteMsg;
@@ -77,6 +78,25 @@ impl Cw4Contract {
     /// Check if this address is a member, and if so, with which weight
     pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
         Map::new(MEMBERS_KEY).query(querier, self.addr(), addr)
+    }
+
+    /// Check if this address is a member, and if its weight is >= 1
+    pub fn is_voting_member<T: Into<String>>(
+        &self,
+        querier: &QuerierWrapper,
+        member: T,
+        height: u64,
+    ) -> StdResult<u64> {
+        self.member_at_height(querier, member, height)?.map_or(
+            Err(StdError::generic_err("Unauthorized")),
+            |member_weight| {
+                if member_weight < 1 {
+                    Err(StdError::generic_err("Unauthorized"))
+                } else {
+                    Ok(member_weight)
+                }
+            },
+        )
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
