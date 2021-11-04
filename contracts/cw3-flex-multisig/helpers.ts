@@ -173,12 +173,13 @@ interface CW3FlexInstance {
 }
 
 interface CW3FlexContract {
-  upload: (txSigner: string) => Promise<number>;
+  upload: (txSigner: string, options: Options) => Promise<number>;
   instantiate: (
     txSigner: string,
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ) => Promise<CW3FlexInstance>;
   use: (contractAddress: string) => CW3FlexInstance;
@@ -186,8 +187,7 @@ interface CW3FlexContract {
 
 export const CW3Flex = (
   client: SigningCosmWasmClient,
-  fees: Options["fees"],
-  gasPrice: Options["gasPrice"]
+  options: Options
 ): CW3FlexContract => {
   const use = (contractAddress: string): CW3FlexInstance => {
     const threshold = async (): Promise<ThresholdResponse> => {
@@ -234,35 +234,35 @@ export const CW3Flex = (
       msgs: CosmosMsg[],
       latest?: Expiration
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(txSigner, contractAddress, { propose: { description, msgs, latest } }, fee);
       return result.transactionHash;
     };
 
     const vote = async (txSigner: string, proposalId: number, vote: Vote): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(txSigner, contractAddress, { vote: { proposal_id: proposalId, vote } }, fee);
       return result.transactionHash;
     };
 
     const execute = async (txSigner: string, proposalId: number): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(txSigner, contractAddress, { execute: { proposal_id: proposalId } }, fee);
       return result.transactionHash;
     };
 
     const close = async (txSigner: string, proposalId: number): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(txSigner, contractAddress, { close: { proposal_id: proposalId } }, fee);
       return result.transactionHash;
     };
 
     const _memberChangedHook = async (txSigner: string, diffs: MemberDiff[]): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(txSigner, contractAddress, { membership_hook: { diffs: diffs } }, fee);
       return result.transactionHash;
@@ -294,10 +294,11 @@ export const CW3Flex = (
     return r.data;
   };
 
-  const upload = async (senderAddress: string): Promise<number> => {
+  const upload = async (senderAddress: string, options: Options): Promise<number> => {
     const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.9.0/cw3_flex_multisig.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(senderAddress, wasm, fees.upload);
+    const fee = calculateFee(options.fees.upload, options.gasPrice)
+    const result = await client.upload(senderAddress, wasm, fee);
     return result.codeId;
   };
 
@@ -306,9 +307,11 @@ export const CW3Flex = (
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ): Promise<CW3FlexInstance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, {
+    const fee = calculateFee(options.fees.init, options.gasPrice)
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, {
       memo: `Init ${label}`,
       admin,
     });
