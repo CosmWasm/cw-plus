@@ -15,10 +15,10 @@ import { calculateFee } from "@cosmjs/stargate";
  *   await useOptions(pebblenetOptions).recoverMnemonic(password);
  *
  * Create contract:
- *   const contract = CW20(client, pebblenetOptions.fees);
+ *   const contract = CW20(client, pebblenetOptions);
  *
  * Upload contract:
- *   const codeId = await contract.upload(addr);
+ *   const codeId = await contract.upload(addr, pebblenetOptions);
  *
  * Instantiate contract example:
  *   const initMsg = {
@@ -28,7 +28,7 @@ import { calculateFee } from "@cosmjs/stargate";
  *     initial_balances: [{ address: addr, amount: "10000" }],
  *     mint: { "minter": addr }
  *   };
- *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!');
+ *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */

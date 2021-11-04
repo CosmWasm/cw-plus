@@ -15,10 +15,10 @@ import { calculateFee } from "@cosmjs/stargate";
  *   await useOptions(pebblenetOptions).recoverMnemonic(password);
  *
  * Create contract:
- *   const contract = CW1(client, pebblenetOptions.fees);
+ *   const contract = CW1(client, pebblenetOptions);
  *
  * Upload contract:
- *   const codeId = await contract.upload(addr);
+ *   const codeId = await contract.upload(addr, pebblenetOptions);
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
