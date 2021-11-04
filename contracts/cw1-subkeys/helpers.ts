@@ -130,20 +130,21 @@ interface CW1Instance {
 }
 
 interface CW1Contract {
-  upload: (senderAddress: string) => Promise<number>;
+  upload: (senderAddress: string, options: Options) => Promise<number>;
 
   instantiate: (
     senderAddress: string,
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ) => Promise<CW1Instance>;
 
   use: (contractAddress: string) => CW1Instance;
 }
 
-const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Options["gasPrice"]): CW1Contract => {
+const CW1 = (client: SigningCosmWasmClient, options: Options): CW1Contract => {
   const use = (contractAddress: string): CW1Instance => {
     const allowance = async (address?: string): Promise<AllowanceInfo> => {
       return await client.queryContractSmart(contractAddress, { allowance: { address } });
@@ -171,7 +172,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
 
     // called by an admin to make admin set immutable
     const freeze = async (senderAddress: string): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { freeze: {} }, fee);
       return result.transactionHash;
@@ -179,7 +180,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
 
     // burns tokens, returns transactionHash
     const updateAdmins = async (senderAddress: string, admins: readonly string[]): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { update_admins: { admins } }, fee);
       return result.transactionHash;
@@ -187,7 +188,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
 
     // transfers tokens, returns transactionHash
     const execute = async (senderAddress: string, msgs: readonly CosmosMsg[]): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { execute: { msgs } }, fee);
       return result.transactionHash;
@@ -199,7 +200,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
       amount: Coin,
       expires?: Expiration
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -218,7 +219,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
       amount: Coin,
       expires?: Expiration
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -236,7 +237,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
       spender: string,
       permissions: Permissions
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -274,10 +275,11 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
     return r.data;
   };
 
-  const upload = async (senderAddress: string): Promise<number> => {
+  const upload = async (senderAddress: string, options: Options): Promise<number> => {
     const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.9.1/cw1_subkeys.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(senderAddress, wasm, fees.upload);
+    const fee = calculateFee(options.fees.upload, options.gasPrice)
+    const result = await client.upload(senderAddress, wasm, fee);
     return result.codeId;
   };
 
@@ -286,9 +288,11 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ): Promise<CW1Instance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, {
+    const fee = calculateFee(options.fees.init, options.gasPrice)
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, {
       memo: `Init ${label}`,
       admin,
     });
