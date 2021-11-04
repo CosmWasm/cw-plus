@@ -18,8 +18,9 @@ use cw1_whitelist::{
     msg::InstantiateMsg,
     state::ADMIN_LIST,
 };
-use cw2::set_contract_version;
+use cw2::{get_contract_version, set_contract_version};
 use cw_storage_plus::Bound;
+use semver::Version;
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -453,6 +454,22 @@ pub fn query_all_permissions(
         })
         .collect();
     Ok(AllPermissionsResponse { permissions: res? })
+}
+
+// Migrate contract if version is lower than current version
+#[entry_point]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
+    let version: Version = CONTRACT_VERSION.parse()?;
+    let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;
+
+    if storage_version < version {
+        set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+        // If state structure changed in any contract version in the way migration is needed, it
+        // should occur here
+    }
+
+    Ok(Response::new())
 }
 
 #[cfg(test)]
