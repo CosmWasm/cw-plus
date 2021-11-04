@@ -1,4 +1,5 @@
 import { Coin } from "@cosmjs/amino";
+import { calculateFee } from "@cosmjs/stargate";
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
  * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
@@ -183,7 +184,11 @@ interface CW3FlexContract {
   use: (contractAddress: string) => CW3FlexInstance;
 }
 
-export const CW3Flex = (client: SigningCosmWasmClient, fees: Options["fees"]): CW3FlexContract => {
+export const CW3Flex = (
+  client: SigningCosmWasmClient,
+  fees: Options["fees"],
+  gasPrice: Options["gasPrice"]
+): CW3FlexContract => {
   const use = (contractAddress: string): CW3FlexInstance => {
     const threshold = async (): Promise<ThresholdResponse> => {
       return client.queryContractSmart(contractAddress, { threshold: {} });
@@ -229,42 +234,37 @@ export const CW3Flex = (client: SigningCosmWasmClient, fees: Options["fees"]): C
       msgs: CosmosMsg[],
       latest?: Expiration
     ): Promise<string> => {
-      const result = await client.execute(
-        txSigner,
-        contractAddress,
-        { propose: { description, msgs, latest } },
-        fees.exec
-      );
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(txSigner, contractAddress, { propose: { description, msgs, latest } }, fee);
       return result.transactionHash;
     };
 
     const vote = async (txSigner: string, proposalId: number, vote: Vote): Promise<string> => {
-      const result = await client.execute(
-        txSigner,
-        contractAddress,
-        { vote: { proposal_id: proposalId, vote } },
-        fees.exec
-      );
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(txSigner, contractAddress, { vote: { proposal_id: proposalId, vote } }, fee);
       return result.transactionHash;
     };
 
     const execute = async (txSigner: string, proposalId: number): Promise<string> => {
-      const result = await client.execute(
-        txSigner,
-        contractAddress,
-        { execute: { proposal_id: proposalId } },
-        fees.exec
-      );
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(txSigner, contractAddress, { execute: { proposal_id: proposalId } }, fee);
       return result.transactionHash;
     };
 
     const close = async (txSigner: string, proposalId: number): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, { close: { proposal_id: proposalId } }, fees.exec);
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(txSigner, contractAddress, { close: { proposal_id: proposalId } }, fee);
       return result.transactionHash;
     };
 
     const _memberChangedHook = async (txSigner: string, diffs: MemberDiff[]): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, { membership_hook: { diffs: diffs } }, fees.exec);
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(txSigner, contractAddress, { membership_hook: { diffs: diffs } }, fee);
       return result.transactionHash;
     };
 

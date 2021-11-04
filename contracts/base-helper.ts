@@ -1,7 +1,7 @@
 import axios from  "axios";
 import fs from "fs";
 import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
+import { GasPrice, StdFee } from "@cosmjs/stargate";
 import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
 import { Slip10RawIndex } from "@cosmjs/crypto";
 import path from "path";
@@ -32,10 +32,10 @@ interface Options {
     upload: StdFee,
     init: StdFee,
     exec: StdFee
-  }
+  },
+  readonly gasPrice: string,
 }
 
-const pebblenetGasPrice = GasPrice.fromString("0.01upebble");
 const pebblenetOptions: Options = {
   httpUrl: 'https://rpc.pebblenet.cosmwasm.com',
   networkId: 'pebblenet-1',
@@ -45,10 +45,11 @@ const pebblenetOptions: Options = {
   hdPath: makeCosmoshubPath(0),
   defaultKeyFile: path.join(process.env.HOME, ".pebblenet.key"),
   fees: {
-    upload: calculateFee(1500000, pebblenetGasPrice),
-    init: calculateFee(500000, pebblenetGasPrice),
-    exec: calculateFee(200000, pebblenetGasPrice),
+    upload: 1500000,
+    init: 500000,
+    exec: 200000,
   },
+  gasPrice: GasPrice.fromString("0.01upebble"),
 }
 
 interface Network {
