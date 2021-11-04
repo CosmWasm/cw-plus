@@ -538,7 +538,7 @@ mod tests {
     ) -> (Addr, Addr) {
         // 1. Instantiate group contract with members (and OWNER as admin)
         let members = vec![
-            member(OWNER, 0),
+            member(OWNER, 1),
             member(VOTER1, 1),
             member(VOTER2, 2),
             member(VOTER3, 3),
@@ -883,7 +883,7 @@ mod tests {
             status: Status::Open,
             threshold: ThresholdResponse::AbsoluteCount {
                 weight: 3,
-                total_weight: 15,
+                total_weight: 16,
             },
         };
         assert_eq!(&expected, &res.proposals[0]);
@@ -899,7 +899,7 @@ mod tests {
         let (flex_addr, _) =
             setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, false);
 
-        // create proposal with 0 vote power
+        // create proposal with 1 vote power
         let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
@@ -941,7 +941,7 @@ mod tests {
         // No/Veto votes have no effect on the tally
         // Compute the current tally
         let tally = get_tally(&app, flex_addr.as_ref(), proposal_id);
-        assert_eq!(tally, 1);
+        assert_eq!(tally, 2);
 
         // Cast a No vote
         let no_vote = ExecuteMsg::Vote {
@@ -998,7 +998,7 @@ mod tests {
         assert_eq!(ContractError::NotOpen {}, err.downcast().unwrap());
 
         // query individual votes
-        // initial (with 0 weight)
+        // initial (with 1 weight)
         let voter = OWNER.into();
         let vote: VoteResponse = app
             .wrap()
@@ -1009,7 +1009,7 @@ mod tests {
             VoteInfo {
                 voter: OWNER.into(),
                 vote: Vote::Yes,
-                weight: 0
+                weight: 1
             }
         );
 
@@ -1051,7 +1051,7 @@ mod tests {
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
         assert_eq!(contract_bal, coin(10, "BTC"));
 
-        // create proposal with 0 vote power
+        // create proposal with 1 vote power
         let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
@@ -1136,7 +1136,7 @@ mod tests {
         let (flex_addr, _) =
             setup_test_case_fixed(&mut app, required_weight, voting_period, init_funds, true);
 
-        // create proposal with 0 vote power
+        // create proposal with 1 vote power
         let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
@@ -1211,7 +1211,7 @@ mod tests {
             .unwrap();
         let expected_thresh = ThresholdResponse::AbsoluteCount {
             weight: 4,
-            total_weight: 15,
+            total_weight: 16,
         };
         assert_eq!(expected_thresh, threshold);
 
@@ -1290,7 +1290,7 @@ mod tests {
             .unwrap();
         let expected_thresh = ThresholdResponse::AbsoluteCount {
             weight: 4,
-            total_weight: 19,
+            total_weight: 20,
         };
         assert_eq!(expected_thresh, threshold);
 
