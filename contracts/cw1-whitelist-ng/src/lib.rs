@@ -10,32 +10,34 @@ pub mod state;
 mod entry_points {
     use crate::error::ContractError;
     use crate::state::Cw1WhitelistContract;
-    use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
+    use cosmwasm_std::{
+        entry_point_lazy, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    };
 
     const CONTRACT: Cw1WhitelistContract<Empty> = Cw1WhitelistContract::native();
 
-    #[entry_point]
+    #[entry_point_lazy]
     pub fn instantiate(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: Binary,
+        msg: Vec<u8>,
     ) -> Result<Response, ContractError> {
         CONTRACT.entry_instantiate(deps, env, info, &msg)
     }
 
-    #[entry_point]
+    #[entry_point_lazy]
     pub fn execute(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: Binary,
+        msg: Vec<u8>,
     ) -> Result<Response, ContractError> {
         CONTRACT.entry_execute(deps, env, info, &msg)
     }
 
-    #[entry_point]
-    pub fn query(deps: Deps, env: Env, msg: Binary) -> Result<Binary, ContractError> {
+    #[entry_point_lazy]
+    pub fn query(deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, ContractError> {
         CONTRACT.entry_query(deps, env, &msg)
     }
 }
