@@ -1,4 +1,5 @@
 import { Coin } from "@cosmjs/amino";
+import { calculateFee } from "@cosmjs/stargate";
 
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
@@ -142,7 +143,7 @@ interface CW1Contract {
   use: (contractAddress: string) => CW1Instance;
 }
 
-const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW1Contract => {
+const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Options["gasPrice"]): CW1Contract => {
   const use = (contractAddress: string): CW1Instance => {
     const allowance = async (address?: string): Promise<AllowanceInfo> => {
       return await client.queryContractSmart(contractAddress, { allowance: { address } });
@@ -170,19 +171,25 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW1Contract 
 
     // called by an admin to make admin set immutable
     const freeze = async (senderAddress: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, { freeze: {} }, fees.exec);
+      const fee = calculateFee(fees.exec, gasPrice)
+
+      const result = await client.execute(senderAddress, contractAddress, { freeze: {} }, fee);
       return result.transactionHash;
     };
 
     // burns tokens, returns transactionHash
     const updateAdmins = async (senderAddress: string, admins: readonly string[]): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, { update_admins: { admins } }, fees.exec);
+      const fee = calculateFee(fees.exec, gasPrice)
+
+      const result = await client.execute(senderAddress, contractAddress, { update_admins: { admins } }, fee);
       return result.transactionHash;
     };
 
     // transfers tokens, returns transactionHash
     const execute = async (senderAddress: string, msgs: readonly CosmosMsg[]): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, { execute: { msgs } }, fees.exec);
+      const fee = calculateFee(fees.exec, gasPrice)
+
+      const result = await client.execute(senderAddress, contractAddress, { execute: { msgs } }, fee);
       return result.transactionHash;
     };
 
@@ -192,13 +199,15 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW1Contract 
       amount: Coin,
       expires?: Expiration
     ): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice)
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         {
           increase_allowance: { spender, amount, expires },
         },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
@@ -209,13 +218,15 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW1Contract 
       amount: Coin,
       expires?: Expiration
     ): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice)
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         {
           decrease_allowance: { spender, amount, expires },
         },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
@@ -225,13 +236,15 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW1Contract 
       spender: string,
       permissions: Permissions
     ): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice)
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         {
           set_permissions: { spender, permissions },
         },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
