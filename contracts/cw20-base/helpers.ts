@@ -85,7 +85,7 @@ interface CW20Instance {
 
 interface CW20Contract {
   // upload a code blob and returns a codeId
-  upload: (txSigner: string) => Promise<number>;
+  upload: (txSigner: string, options: Options) => Promise<number>;
 
   // instantiates a cw20 contract
   // codeId must come from a previous deploy
@@ -96,6 +96,7 @@ interface CW20Contract {
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ) => Promise<CW20Instance>;
 
@@ -104,8 +105,7 @@ interface CW20Contract {
 
 export const CW20 = (
   client: SigningCosmWasmClient,
-  fees: Options["fees"],
-  gasPrice: Options["gasPrice"]
+  options: Options
 ): CW20Contract => {
   const use = (contractAddress: string): CW20Instance => {
     const balance = async (address: string): Promise<string> => {
@@ -148,7 +148,7 @@ export const CW20 = (
 
     // transfers tokens, returns transactionHash
     const transfer = async (senderAddress: string, recipient: string, amount: string): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { transfer: { recipient, amount } }, fee);
       return result.transactionHash;
@@ -156,14 +156,14 @@ export const CW20 = (
 
     // burns tokens, returns transactionHash
     const burn = async (senderAddress: string, amount: string): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { burn: { amount } }, fee);
       return result.transactionHash;
     };
 
     const increaseAllowance = async (senderAddress: string, spender: string, amount: string): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -175,7 +175,7 @@ export const CW20 = (
     };
 
     const decreaseAllowance = async (senderAddress: string, spender: string, amount: string): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -192,7 +192,7 @@ export const CW20 = (
       recipient: string,
       amount: string
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -213,7 +213,7 @@ export const CW20 = (
       amount: string,
       msg: Record<string, unknown>
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -231,7 +231,7 @@ export const CW20 = (
       amount: string,
       msg: Record<string, unknown>
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice);
+      const fee = calculateFee(options.fees.exec, options.gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -269,10 +269,11 @@ export const CW20 = (
     return r.data;
   };
 
-  const upload = async (senderAddress: string): Promise<number> => {
+  const upload = async (senderAddress: string, options: Options): Promise<number> => {
     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.8.1/cw20_base.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(senderAddress, wasm, fees.upload);
+    const fee = calculateFee(options.fees.upload, options.gasPrice)
+    const result = await client.upload(senderAddress, wasm, fee);
     return result.codeId;
   };
 
@@ -281,9 +282,11 @@ export const CW20 = (
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ): Promise<CW20Instance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, {
+    const fee = calculateFee(options.fees.init, options.gasPrice)
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, {
       memo: `Init ${label}`,
       admin,
     });
