@@ -1,3 +1,5 @@
+import { calculateFee } from "@cosmjs/stargate";
+
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
  * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
@@ -81,18 +83,19 @@ interface CW4GroupInstance {
 }
 
 interface CW4GroupContract {
-  upload: (txSigner: string) => Promise<number>;
+  upload: (txSigner: string, options: Options) => Promise<number>;
   instantiate: (
     txSigner: string,
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ) => Promise<CW4GroupInstance>;
   use: (contractAddress: string) => CW4GroupInstance;
 }
 
-export const CW4Group = (client: SigningCosmWasmClient, fees: Options["fees"]): CW4GroupContract => {
+export const CW4Group = (client: SigningCosmWasmClient, options: Options): CW4GroupContract => {
   const use = (contractAddress: string): CW4GroupInstance => {
     const admin = async (): Promise<AdminResponse> => {
       return client.queryContractSmart(contractAddress, { admin: {} });
@@ -115,22 +118,30 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options["fees"]): 
     };
 
     const updateAdmin = async (txSigner: string, admin?: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, { update_admin: { admin } }, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, { update_admin: { admin } }, fee);
       return result.transactionHash;
     };
 
     const updateMembers = async (txSigner: string, remove: Member[], add: Member[]): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, { update_members: { remove, add } }, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, { update_members: { remove, add } }, fee);
       return result.transactionHash;
     };
 
     const _addHook = async (txSigner: string, addr: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, { add_hook: { addr } }, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, { add_hook: { addr } }, fee);
       return result.transactionHash;
     };
 
     const _removeHook = async (txSigner: string, addr: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, { remove_hook: { addr } }, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, { remove_hook: { addr } }, fee);
       return result.transactionHash;
     };
 
@@ -156,10 +167,11 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options["fees"]): 
     return r.data;
   };
 
-  const upload = async (senderAddress: string): Promise<number> => {
+  const upload = async (senderAddress: string, options: Options): Promise<number> => {
     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.9.0/cw4_group.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(senderAddress, wasm, fees.upload);
+    const fee = calculateFee(options.fees.upload, options.gasPrice)
+    const result = await client.upload(senderAddress, wasm, fee);
     return result.codeId;
   };
 
@@ -168,9 +180,11 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options["fees"]): 
     codeId: number,
     initMsg: Record<string, unknown>,
     label: string,
+    options: Options,
     admin?: string
   ): Promise<CW4GroupInstance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, {
+    const fee = calculateFee(options.fees.init, options.gasPrice)
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, {
       memo: `Init ${label}`,
       admin,
     });
