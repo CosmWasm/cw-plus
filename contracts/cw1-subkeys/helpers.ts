@@ -171,7 +171,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
 
     // called by an admin to make admin set immutable
     const freeze = async (senderAddress: string): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice)
+      const fee = calculateFee(fees.exec, gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { freeze: {} }, fee);
       return result.transactionHash;
@@ -179,7 +179,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
 
     // burns tokens, returns transactionHash
     const updateAdmins = async (senderAddress: string, admins: readonly string[]): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice)
+      const fee = calculateFee(fees.exec, gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { update_admins: { admins } }, fee);
       return result.transactionHash;
@@ -187,7 +187,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
 
     // transfers tokens, returns transactionHash
     const execute = async (senderAddress: string, msgs: readonly CosmosMsg[]): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice)
+      const fee = calculateFee(fees.exec, gasPrice);
 
       const result = await client.execute(senderAddress, contractAddress, { execute: { msgs } }, fee);
       return result.transactionHash;
@@ -199,7 +199,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
       amount: Coin,
       expires?: Expiration
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice)
+      const fee = calculateFee(fees.exec, gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -218,7 +218,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
       amount: Coin,
       expires?: Expiration
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice)
+      const fee = calculateFee(fees.exec, gasPrice);
 
       const result = await client.execute(
         senderAddress,
@@ -236,7 +236,7 @@ const CW1 = (client: SigningCosmWasmClient, fees: Options["fees"], gasPrice: Opt
       spender: string,
       permissions: Permissions
     ): Promise<string> => {
-      const fee = calculateFee(fees.exec, gasPrice)
+      const fee = calculateFee(fees.exec, gasPrice);
 
       const result = await client.execute(
         senderAddress,

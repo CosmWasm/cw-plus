@@ -1,4 +1,5 @@
 import { toUtf8, toBase64 } from "@cosmjs/encoding";
+import { calculateFee } from "@cosmjs/stargate";
 
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
@@ -101,7 +102,11 @@ interface CW20Contract {
   use: (contractAddress: string) => CW20Instance;
 }
 
-export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20Contract => {
+export const CW20 = (
+  client: SigningCosmWasmClient,
+  fees: Options["fees"],
+  gasPrice: Options["gasPrice"]
+): CW20Contract => {
   const use = (contractAddress: string): CW20Instance => {
     const balance = async (address: string): Promise<string> => {
       const result = await client.queryContractSmart(contractAddress, { balance: { address } });
@@ -143,37 +148,40 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
 
     // transfers tokens, returns transactionHash
     const transfer = async (senderAddress: string, recipient: string, amount: string): Promise<string> => {
-      const result = await client.execute(
-        senderAddress,
-        contractAddress,
-        { transfer: { recipient, amount } },
-        fees.exec
-      );
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(senderAddress, contractAddress, { transfer: { recipient, amount } }, fee);
       return result.transactionHash;
     };
 
     // burns tokens, returns transactionHash
     const burn = async (senderAddress: string, amount: string): Promise<string> => {
-      const result = await client.execute(senderAddress, contractAddress, { burn: { amount } }, fees.exec);
+      const fee = calculateFee(fees.exec, gasPrice);
+
+      const result = await client.execute(senderAddress, contractAddress, { burn: { amount } }, fee);
       return result.transactionHash;
     };
 
     const increaseAllowance = async (senderAddress: string, spender: string, amount: string): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice);
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         { increase_allowance: { spender, amount } },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
 
     const decreaseAllowance = async (senderAddress: string, spender: string, amount: string): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice);
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         { decrease_allowance: { spender, amount } },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
@@ -184,11 +192,13 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
       recipient: string,
       amount: string
     ): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice);
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         { transfer_from: { owner, recipient, amount } },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
@@ -203,11 +213,13 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
       amount: string,
       msg: Record<string, unknown>
     ): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice);
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         { send: { recipient, amount, msg: jsonToBinary(msg) } },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
@@ -219,11 +231,13 @@ export const CW20 = (client: SigningCosmWasmClient, fees: Options["fees"]): CW20
       amount: string,
       msg: Record<string, unknown>
     ): Promise<string> => {
+      const fee = calculateFee(fees.exec, gasPrice);
+
       const result = await client.execute(
         senderAddress,
         contractAddress,
         { send_from: { owner, recipient, amount, msg: jsonToBinary(msg) } },
-        fees.exec
+        fee
       );
       return result.transactionHash;
     };
