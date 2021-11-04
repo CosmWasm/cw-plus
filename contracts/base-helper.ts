@@ -3,7 +3,7 @@ import fs from "fs";
 import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 import { GasPrice, StdFee } from "@cosmjs/stargate";
 import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
-import { Slip10RawIndex } from "@cosmjs/crypto";
+import { HdPath } from "@cosmjs/crypto";
 import path from "path";
 
 /*
@@ -25,7 +25,7 @@ interface Options {
   readonly networkId: string
   readonly feeToken: string
   readonly bech32prefix: string
-  readonly hdPath: readonly Slip10RawIndex[]
+  readonly hdPath: readonly HdPath[]
   readonly faucetUrl?: string
   readonly defaultKeyFile: string,
   readonly fees: {
