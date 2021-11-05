@@ -628,7 +628,7 @@ mod tests {
                 None,
             )
             .unwrap_err();
-        assert_eq!(ContractError::ZeroThreshold {}, err.downcast().unwrap());
+        assert_eq!(ContractError::InvalidThreshold {}, err.downcast().unwrap());
 
         // Total weight less than required weight not allowed
         let instantiate_msg = InstantiateMsg {
@@ -646,10 +646,7 @@ mod tests {
                 None,
             )
             .unwrap_err();
-        assert_eq!(
-            ContractError::UnreachableThreshold {},
-            err.downcast().unwrap()
-        );
+        assert_eq!(ContractError::UnreachableWeight {}, err.downcast().unwrap());
 
         // All valid
         let instantiate_msg = InstantiateMsg {
@@ -1441,7 +1438,7 @@ mod tests {
 
         // 51% required, which is 12 of the initial 24
         let threshold = Threshold::ThresholdQuorum {
-            threshold: Decimal::percent(50),
+            threshold: Decimal::percent(51),
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(20000);
@@ -1523,7 +1520,7 @@ mod tests {
         let (flex_addr, group_addr) = setup_test_case(
             &mut app,
             Threshold::ThresholdQuorum {
-                threshold: Decimal::percent(50),
+                threshold: Decimal::percent(51),
                 quorum: Decimal::percent(33),
             },
             voting_period,
