@@ -4,10 +4,11 @@ use serde::Serialize;
 use cosmwasm_std::{StdError, StdResult, Storage};
 
 use crate::de::KeyDeserialize;
+use crate::iter_helpers::deserialize_kv;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
-use crate::prefix::Prefix;
+use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
 use crate::snapshot::Snapshot;
 use crate::{Bound, Prefixer, Strategy};
 
@@ -191,6 +192,28 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
+    /// while range_de assumes you set the prefix to one element and call range over the last one,
+    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
+    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
+    /// casting to Vec<u8> doesn't solve them.
+    pub fn prefix_range_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
+    {
+        let mapped = namespaced_prefix_range(store, self.primary.namespace(), min, max, order)
+            .map(deserialize_kv::<K, T>);
+        Box::new(mapped)
+    }
+
     pub fn range_de<'c>(
         &self,
         store: &'c dyn Storage,
