@@ -223,7 +223,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::MockStorage;
 
-    type TestMap = SnapshotMap<'static, &'static [u8], u64>;
+    type TestMap = SnapshotMap<'static, &'static str, u64>;
     type TestMapCompositeKey = SnapshotMap<'static, (&'static [u8], &'static [u8]), u64>;
 
     const NEVER: TestMap =
@@ -257,45 +257,37 @@ mod tests {
     // Values at beginning of 3 -> A = 5, B = 7
     // Values at beginning of 5 -> A = 8, C = 13
     fn init_data(map: &TestMap, storage: &mut dyn Storage) {
-        map.save(storage, b"A", &5, 1).unwrap();
-        map.save(storage, b"B", &7, 2).unwrap();
+        map.save(storage, "A", &5, 1).unwrap();
+        map.save(storage, "B", &7, 2).unwrap();
 
         // checkpoint 3
         map.add_checkpoint(storage, 3).unwrap();
 
         // also use update to set - to ensure this works
-        map.save(storage, b"C", &1, 3).unwrap();
-        map.update(storage, b"A", 3, |_| -> StdResult<u64> { Ok(8) })
+        map.save(storage, "C", &1, 3).unwrap();
+        map.update(storage, "A", 3, |_| -> StdResult<u64> { Ok(8) })
             .unwrap();
 
-        map.remove(storage, b"B", 4).unwrap();
-        map.save(storage, b"C", &13, 4).unwrap();
+        map.remove(storage, "B", 4).unwrap();
+        map.save(storage, "C", &13, 4).unwrap();
 
         // checkpoint 5
         map.add_checkpoint(storage, 5).unwrap();
-        map.remove(storage, b"A", 5).unwrap();
-        map.update(storage, b"D", 5, |_| -> StdResult<u64> { Ok(22) })
+        map.remove(storage, "A", 5).unwrap();
+        map.update(storage, "D", 5, |_| -> StdResult<u64> { Ok(22) })
             .unwrap();
         // and delete it later (unknown if all data present)
         map.remove_checkpoint(storage, 5).unwrap();
     }
 
-    const FINAL_VALUES: &[(&[u8], Option<u64>)] = &[
-        (b"A", None),
-        (b"B", None),
-        (b"C", Some(13)),
-        (b"D", Some(22)),
-    ];
+    const FINAL_VALUES: &[(&str, Option<u64>)] =
+        &[("A", None), ("B", None), ("C", Some(13)), ("D", Some(22))];
 
-    const VALUES_START_3: &[(&[u8], Option<u64>)] =
-        &[(b"A", Some(5)), (b"B", Some(7)), (b"C", None), (b"D", None)];
+    const VALUES_START_3: &[(&str, Option<u64>)] =
+        &[("A", Some(5)), ("B", Some(7)), ("C", None), ("D", None)];
 
-    const VALUES_START_5: &[(&[u8], Option<u64>)] = &[
-        (b"A", Some(8)),
-        (b"B", None),
-        (b"C", Some(13)),
-        (b"D", None),
-    ];
+    const VALUES_START_5: &[(&str, Option<u64>)] =
+        &[("A", Some(8)), ("B", None), ("C", Some(13)), ("D", None)];
 
     // Same as `init_data`, but we have a composite key for testing range_de.
     fn init_data_composite_key(map: &TestMapCompositeKey, storage: &mut dyn Storage) {
@@ -332,7 +324,7 @@ mod tests {
         map: &TestMap,
         storage: &dyn Storage,
         height: u64,
-        values: &[(&[u8], Option<u64>)],
+        values: &[(&str, Option<u64>)],
     ) {
         for (k, v) in values.iter().cloned() {
             assert_eq!(v, map.may_load_at_height(storage, k, height).unwrap());
@@ -340,7 +332,7 @@ mod tests {
     }
 
     fn assert_missing_checkpoint(map: &TestMap, storage: &dyn Storage, height: u64) {
-        for k in &[b"A", b"B", b"C", b"D"] {
+        for k in &["A", "B", "C", "D"] {
             assert!(map.may_load_at_height(storage, *k, height).is_err());
         }
     }
@@ -386,57 +378,39 @@ mod tests {
         let mut storage = MockStorage::new();
 
         println!("SETUP");
-        EVERY.save(&mut storage, b"A", &5, 1).unwrap();
-        EVERY.save(&mut storage, b"B", &7, 2).unwrap();
-        EVERY.save(&mut storage, b"C", &2, 2).unwrap();
+        EVERY.save(&mut storage, "A", &5, 1).unwrap();
+        EVERY.save(&mut storage, "B", &7, 2).unwrap();
+        EVERY.save(&mut storage, "C", &2, 2).unwrap();
 
         // update and save - A query at 3 => 5, at 4 => 12
         EVERY
-            .update(&mut storage, b"A", 3, |_| -> StdResult<u64> { Ok(9) })
+            .update(&mut storage, "A", 3, |_| -> StdResult<u64> { Ok(9) })
             .unwrap();
-        EVERY.save(&mut storage, b"A", &12, 3).unwrap();
-        assert_eq!(
-            Some(5),
-            EVERY.may_load_at_height(&storage, b"A", 2).unwrap()
-        );
-        assert_eq!(
-            Some(5),
-            EVERY.may_load_at_height(&storage, b"A", 3).unwrap()
-        );
+        EVERY.save(&mut storage, "A", &12, 3).unwrap();
+        assert_eq!(Some(5), EVERY.may_load_at_height(&storage, "A", 2).unwrap());
+        assert_eq!(Some(5), EVERY.may_load_at_height(&storage, "A", 3).unwrap());
         assert_eq!(
             Some(12),
-            EVERY.may_load_at_height(&storage, b"A", 4).unwrap()
+            EVERY.may_load_at_height(&storage, "A", 4).unwrap()
         );
 
         // save and remove - B query at 4 => 7, at 5 => None
-        EVERY.save(&mut storage, b"B", &17, 4).unwrap();
-        EVERY.remove(&mut storage, b"B", 4).unwrap();
-        assert_eq!(
-            Some(7),
-            EVERY.may_load_at_height(&storage, b"B", 3).unwrap()
-        );
-        assert_eq!(
-            Some(7),
-            EVERY.may_load_at_height(&storage, b"B", 4).unwrap()
-        );
-        assert_eq!(None, EVERY.may_load_at_height(&storage, b"B", 5).unwrap());
+        EVERY.save(&mut storage, "B", &17, 4).unwrap();
+        EVERY.remove(&mut storage, "B", 4).unwrap();
+        assert_eq!(Some(7), EVERY.may_load_at_height(&storage, "B", 3).unwrap());
+        assert_eq!(Some(7), EVERY.may_load_at_height(&storage, "B", 4).unwrap());
+        assert_eq!(None, EVERY.may_load_at_height(&storage, "B", 5).unwrap());
 
         // remove and update - C query at 5 => 2, at 6 => 16
-        EVERY.remove(&mut storage, b"C", 5).unwrap();
+        EVERY.remove(&mut storage, "C", 5).unwrap();
         EVERY
-            .update(&mut storage, b"C", 5, |_| -> StdResult<u64> { Ok(16) })
+            .update(&mut storage, "C", 5, |_| -> StdResult<u64> { Ok(16) })
             .unwrap();
-        assert_eq!(
-            Some(2),
-            EVERY.may_load_at_height(&storage, b"C", 4).unwrap()
-        );
-        assert_eq!(
-            Some(2),
-            EVERY.may_load_at_height(&storage, b"C", 5).unwrap()
-        );
+        assert_eq!(Some(2), EVERY.may_load_at_height(&storage, "C", 4).unwrap());
+        assert_eq!(Some(2), EVERY.may_load_at_height(&storage, "C", 5).unwrap());
         assert_eq!(
             Some(16),
-            EVERY.may_load_at_height(&storage, b"C", 6).unwrap()
+            EVERY.may_load_at_height(&storage, "C", 6).unwrap()
         );
     }
 
@@ -454,7 +428,7 @@ mod tests {
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
-        assert_eq!(all, vec![(b"C".to_vec(), 13), (b"D".to_vec(), 22)]);
+        assert_eq!(all, vec![("C".into(), 13), ("D".into(), 22)]);
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = EVERY
@@ -467,7 +441,7 @@ mod tests {
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
-        assert_eq!(all, vec![(b"C".to_vec(), 13), (b"D".to_vec(), 22)]);
+        assert_eq!(all, vec![("C".into(), 13), ("D".into(), 22)]);
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = EVERY
@@ -480,7 +454,7 @@ mod tests {
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
-        assert_eq!(all, vec![(b"D".to_vec(), 22)]);
+        assert_eq!(all, vec![("D".into(), 22)]);
     }
 
     #[test]
