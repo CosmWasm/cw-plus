@@ -205,6 +205,20 @@ where
         self.no_prefix_de().range_de(store, min, max, order)
     }
 
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
     pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
