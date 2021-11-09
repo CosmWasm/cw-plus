@@ -205,6 +205,14 @@ where
         self.no_prefix_de().range_de(store, min, max, order)
     }
 
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+        Prefix::new(self.primary.namespace(), &p.prefix())
+    }
+
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+        Prefix::new(self.primary.namespace(), &p.prefix())
+    }
+
     fn no_prefix_de(&self) -> Prefix<K, T> {
         Prefix::new(self.primary.namespace(), &[])
     }
