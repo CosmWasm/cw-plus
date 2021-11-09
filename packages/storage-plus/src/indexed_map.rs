@@ -200,6 +200,22 @@ where
 impl<'a, K, T, I> IndexedMap<'a, K, T, I>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
+    I: IndexList<T>,
+{
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
+
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T, I> IndexedMap<'a, K, T, I>
+where
+    T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + KeyDeserialize,
     I: IndexList<T>,
 {
@@ -220,7 +236,7 @@ where
         K: 'c,
         K::Output: 'static,
     {
-        let mapped = namespaced_prefix_range(store, self.primary.namespace(), min, max, order)
+        let mapped = namespaced_prefix_range(store, self.pk_namespace, min, max, order)
             .map(deserialize_kv::<K, T>);
         Box::new(mapped)
     }
@@ -254,7 +270,7 @@ where
     }
 
     fn no_prefix_de(&self) -> Prefix<K, T> {
-        Prefix::new(self.primary.namespace(), &[])
+        Prefix::new(self.pk_namespace, &[])
     }
 }
 
