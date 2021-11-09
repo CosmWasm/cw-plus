@@ -224,7 +224,7 @@ mod tests {
     use cosmwasm_std::testing::MockStorage;
 
     type TestMap = SnapshotMap<'static, &'static str, u64>;
-    type TestMapCompositeKey = SnapshotMap<'static, (&'static [u8], &'static [u8]), u64>;
+    type TestMapCompositeKey = SnapshotMap<'static, (&'static str, &'static str), u64>;
 
     const NEVER: TestMap =
         SnapshotMap::new("never", "never__check", "never__change", Strategy::Never);
@@ -291,24 +291,24 @@ mod tests {
 
     // Same as `init_data`, but we have a composite key for testing range_de.
     fn init_data_composite_key(map: &TestMapCompositeKey, storage: &mut dyn Storage) {
-        map.save(storage, (b"A", b"B"), &5, 1).unwrap();
-        map.save(storage, (b"B", b"A"), &7, 2).unwrap();
+        map.save(storage, ("A", "B"), &5, 1).unwrap();
+        map.save(storage, ("B", "A"), &7, 2).unwrap();
 
         // checkpoint 3
         map.add_checkpoint(storage, 3).unwrap();
 
         // also use update to set - to ensure this works
-        map.save(storage, (b"B", b"B"), &1, 3).unwrap();
-        map.update(storage, (b"A", b"B"), 3, |_| -> StdResult<u64> { Ok(8) })
+        map.save(storage, ("B", "B"), &1, 3).unwrap();
+        map.update(storage, ("A", "B"), 3, |_| -> StdResult<u64> { Ok(8) })
             .unwrap();
 
-        map.remove(storage, (b"B", b"A"), 4).unwrap();
-        map.save(storage, (b"B", b"B"), &13, 4).unwrap();
+        map.remove(storage, ("B", "A"), 4).unwrap();
+        map.save(storage, ("B", "B"), &13, 4).unwrap();
 
         // checkpoint 5
         map.add_checkpoint(storage, 5).unwrap();
-        map.remove(storage, (b"A", b"B"), 5).unwrap();
-        map.update(storage, (b"C", b"A"), 5, |_| -> StdResult<u64> { Ok(22) })
+        map.remove(storage, ("A", "B"), 5).unwrap();
+        map.update(storage, ("C", "A"), 5, |_| -> StdResult<u64> { Ok(22) })
             .unwrap();
         // and delete it later (unknown if all data present)
         map.remove_checkpoint(storage, 5).unwrap();
@@ -474,8 +474,8 @@ mod tests {
         assert_eq!(
             all,
             vec![
-                ((b"B".to_vec(), b"B".to_vec()), 13),
-                ((b"C".to_vec(), b"A".to_vec()), 22)
+                (("B".into(), "B".into()), 13),
+                (("C".into(), "A".into()), 22)
             ]
         );
     }
