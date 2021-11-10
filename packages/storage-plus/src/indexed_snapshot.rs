@@ -217,6 +217,22 @@ where
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
 where
     T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a>,
+    I: IndexList<T>,
+{
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
+
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+        Prefix::new(self.pk_namespace, &p.prefix())
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
+where
+    T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + KeyDeserialize,
     I: IndexList<T>,
 {
