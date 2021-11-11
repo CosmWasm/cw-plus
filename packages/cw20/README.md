@@ -18,16 +18,16 @@ Handling decimals is left to the UI and not interpreted
 ### Messages
 
 `Transfer{recipient, amount}` - Moves `amount` tokens from the
-`env.sender` account to the `recipient` account. This is designed to
+`info.sender` account to the `recipient` account. This is designed to
 send to an address controlled by a private key and *does not* trigger
 any actions on the recipient if it is a contract.
 
 `Send{contract, amount, msg}` - Moves `amount` tokens from the
-`env.sender` account to the `recipient` account. `contract` must be an
+`info.sender` account to the `recipient` account. `contract` must be an
 address of a contract that implements the `Receiver` interface. The `msg`
 will be passed to the recipient contract, along with the amount.
 
-`Burn{amount}` - Remove `amount` tokens from the balance of `env.sender`
+`Burn{amount}` - Remove `amount` tokens from the balance of `info.sender`
 and reduce `total_supply` by the same amount.
 
 ### Queries
@@ -46,7 +46,7 @@ any contract that wishes to manage CW20 tokens. This is generally *not*
 implemented by any CW20 contract.
 
 `Receive{sender, amount, msg}` - This is designed to handle `Send`
-messages. The address of the contract is stored in `env.sender`
+messages. The address of the contract is stored in `info.sender`
 so it cannot be faked. The contract should ensure the sender matches
 the token contract it expects to handle, and not allow arbitrary addresses.
 
@@ -83,17 +83,17 @@ down to 0 and not make any underflow error.
 
 `IncreaseAllowance{spender, amount, expires}` - Set or increase the allowance
 such that `spender` may access up to `amount + current_allowance` tokens
-from the `env.sender` account. This may optionally come with an `Expiration`
+from the `info.sender` account. This may optionally come with an `Expiration`
 time, which if set limits when the approval can be used (by time or height).
 
 `DecreaseAllowance{spender, amount, expires}` - Decrease or clear the allowance
 such that `spender` may access up to `current_allowance - amount` tokens
-from the `env.sender` account. This may optionally come with an `Expiration`
+from the `info.sender` account. This may optionally come with an `Expiration`
 time, which if set limits when the approval can be used (by time or height).
 If `amount >= current_allowance`, this will clear the allowance (delete it).
 
 `TransferFrom{owner, recipient, amount}` - This makes use of an allowance
-and if there was a valid, un-expired pre-approval for the `env.sender`,
+and if there was a valid, un-expired pre-approval for the `info.sender`,
 then we move `amount` tokens from `owner` to `recipient` and deduct it
 from the available allowance.
 
@@ -101,7 +101,7 @@ from the available allowance.
 `TransferFrom` is to `Transfer`. This allows a pre-approved account to
 not just transfer the tokens, but to send them to another contract
 to trigger a given action. **Note** `SendFrom` will set the `Receive{sender}`
-to be the `env.sender` (the account that triggered the transfer)
+to be the `info.sender` (the account that triggered the transfer)
 rather than the `owner` account (the account the money is coming from).
 This is an open question whether we should switch this?
 
@@ -124,7 +124,7 @@ minter address and handle updating the ACL there.
 
 ### Messages
 
-`Mint{recipient, amount}` - If the `env.sender` is the allowed minter,
+`Mint{recipient, amount}` - If the `info.sender` is the allowed minter,
 this will create `amount` new tokens (updating total supply) and
 add them to the balance of `recipient`, as long as it does not exceed the cap.
 
@@ -158,11 +158,11 @@ affect on-chain logic.
 
 ### Messages
 
-`UploadLogo{url | embedded}` - If the `env.sender` is the allowed marketing account,
+`UploadLogo{url | embedded}` - If the `info.sender` is the allowed marketing account,
 this will either set a new URL reference where the logo is served, or allow them to upload
 a small (less than 5KB) SVG or PNG logo onto the blockchain to be served.
 
-`UpdateMarketing{project, description, marketing}` - If the `env.sender` is the allowed marketing
+`UpdateMarketing{project, description, marketing}` - If the `info.sender` is the allowed marketing
 account, this will update some marketing-related metadata on the contract.
 
 ### Queries
