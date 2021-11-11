@@ -420,15 +420,23 @@ impl<'a> PrimaryKey<'a> for TimestampKey {
     type SubPrefix = ();
     type Suffix = Self;
     type SuperSuffix = Self;
+    type KeyType = &'a [u8];
 
-    fn key(&self) -> Vec<&[u8]> {
-        self.0.key()
+    fn key(&self) -> NamespacedKey<Self> {
+        NamespacedKey {
+            namespaces: vec![],
+            key: &self,
+        }
+    }
+
+    fn raw_key(&self) -> Self::KeyType {
+        &self.0.wrapped
     }
 }
 
 impl<'a> Prefixer<'a> for TimestampKey {
     fn prefix(&self) -> Vec<&[u8]> {
-        self.0.key()
+        vec![self.0.raw_key()]
     }
 }
 
