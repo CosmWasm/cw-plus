@@ -23,7 +23,7 @@ send to an address controlled by a private key and *does not* trigger
 any actions on the recipient if it is a contract.
 
 `Send{contract, amount, msg}` - Moves `amount` tokens from the
-`info.sender` account to the `recipient` account. `contract` must be an
+`info.sender` account to the `contract` account. `contract` must be an
 address of a contract that implements the `Receiver` interface. The `msg`
 will be passed to the recipient contract, along with the amount.
 
