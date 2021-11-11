@@ -87,16 +87,8 @@ impl Cw4Contract {
         member: T,
         height: u64,
     ) -> StdResult<u64> {
-        self.member_at_height(querier, member, height)?.map_or(
-            Err(StdError::generic_err("Unauthorized")),
-            |member_weight| {
-                if member_weight < 1 {
-                    Err(StdError::generic_err("Unauthorized"))
-                } else {
-                    Ok(member_weight)
-                }
-            },
-        )
+        self.member_at_height(querier, member, height)?
+            .map_or(Err(StdError::generic_err("Not a member")), Ok)
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query

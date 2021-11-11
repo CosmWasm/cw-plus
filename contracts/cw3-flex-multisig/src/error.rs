@@ -9,6 +9,12 @@ pub enum ContractError {
     #[error("Required threshold must be higher then 50% and smaller then 100%")]
     InvalidThreshold {},
 
+    #[error("Required quorum threshold cannot be zero")]
+    ZeroQuorumThreshold {},
+
+    #[error("Not possible to reach required quorum threshold")]
+    UnreachableQuorumThreshold {},
+
     #[error("Required weight cannot be zero")]
     ZeroWeight {},
 

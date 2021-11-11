@@ -541,11 +541,11 @@ mod tests {
     ) -> (Addr, Addr) {
         // 1. Instantiate group contract with members (and OWNER as admin)
         let members = vec![
-            member(OWNER, 1),
+            member(OWNER, 0),
             member(VOTER1, 1),
             member(VOTER2, 2),
             member(VOTER3, 3),
-            member(VOTER4, 13), // so that he alone can pass a 50 / 52% threshold proposal
+            member(VOTER4, 12), // so that he alone can pass a 50 / 52% threshold proposal
             member(VOTER5, 5),
         ];
         let group_addr = instantiate_group(app, members);
@@ -808,7 +808,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
         let threshold = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(80),
-            quorum: Decimal::percent(1),
+            quorum: Decimal::percent(20),
         };
         let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, false);
 
@@ -886,9 +886,10 @@ mod tests {
             msgs,
             expires: voting_period.after(&proposed_at),
             status: Status::Open,
-            threshold: ThresholdResponse::AbsoluteCount {
-                weight: 3,
-                total_weight: 24,
+            threshold: ThresholdResponse::ThresholdQuorum {
+                total_weight: 23,
+                threshold: Decimal::percent(80),
+                quorum: Decimal::percent(20),
             },
         };
         assert_eq!(&expected, &res.proposals[0]);
@@ -906,7 +907,7 @@ mod tests {
         let voting_period = Duration::Time(2000000);
         let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, false);
 
-        // create proposal with 1 vote power
+        // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
@@ -948,7 +949,7 @@ mod tests {
         // No/Veto votes have no effect on the tally
         // Compute the current tally
         let tally = get_tally(&app, flex_addr.as_ref(), proposal_id);
-        assert_eq!(tally, 2);
+        assert_eq!(tally, 1);
 
         // Cast a No vote
         let no_vote = ExecuteMsg::Vote {
@@ -1005,7 +1006,7 @@ mod tests {
         assert_eq!(ContractError::NotOpen {}, err.downcast().unwrap());
 
         // query individual votes
-        // initial (with 1 weight)
+        // initial (with 0 weight)
         let voter = OWNER.into();
         let vote: VoteResponse = app
             .wrap()
@@ -1016,7 +1017,7 @@ mod tests {
             VoteInfo {
                 voter: OWNER.into(),
                 vote: Vote::Yes,
-                weight: 1
+                weight: 0
             }
         );
 
@@ -1060,7 +1061,7 @@ mod tests {
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
         assert_eq!(contract_bal, coin(10, "BTC"));
 
-        // create proposal with 1 vote power
+        // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
@@ -1147,7 +1148,7 @@ mod tests {
         let voting_period = Duration::Height(2000000);
         let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, true);
 
-        // create proposal with 1 vote power
+        // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
         let res = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
@@ -1224,7 +1225,7 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Threshold {})
             .unwrap();
         let expected_thresh = ThresholdResponse::ThresholdQuorum {
-            total_weight: 25,
+            total_weight: 23,
             threshold: Decimal::percent(51),
             quorum: Decimal::percent(1),
         };
@@ -1303,7 +1304,7 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Threshold {})
             .unwrap();
         let expected_thresh = ThresholdResponse::ThresholdQuorum {
-            total_weight: 43,
+            total_weight: 41,
             threshold: Decimal::percent(51),
             quorum: Decimal::percent(1),
         };
@@ -1573,7 +1574,7 @@ mod tests {
         // not expired yet
         assert_eq!(prop_status(&app), Status::Open);
 
-        // wait until the vote is over, and see it was passed (met quorum, and threshold of voters)
+        // wait until the vote is over, and see it was rejected
         app.update_block(expire(voting_period));
         assert_eq!(prop_status(&app), Status::Rejected);
     }
