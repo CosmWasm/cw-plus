@@ -143,7 +143,7 @@ impl<
 
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should be length-prefixed and concatenated for range searches
-    fn prefix(&self) -> Vec<&[u8]>;
+    fn prefix(&self) -> Vec<Key>;
 
     fn joined_prefix(&self) -> Vec<u8> {
         let prefixes = self.prefix();
@@ -152,19 +152,19 @@ pub trait Prefixer<'a> {
 }
 
 impl<'a> Prefixer<'a> for () {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         vec![]
     }
 }
 
 impl<'a> Prefixer<'a> for &'a [u8] {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_ref())]
     }
 }
 
 impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         let mut res = self.0.prefix();
         res.extend(self.1.prefix().into_iter());
         res
@@ -172,7 +172,7 @@ impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
 }
 
 impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T, U, V) {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         let mut res = self.0.prefix();
         res.extend(self.1.prefix().into_iter());
         res.extend(self.2.prefix().into_iter());
@@ -182,8 +182,8 @@ impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T,
 
 // Provide a string version of this to raw encode strings
 impl<'a> Prefixer<'a> for &'a str {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -199,8 +199,8 @@ impl<'a> PrimaryKey<'a> for Vec<u8> {
 }
 
 impl<'a> Prefixer<'a> for Vec<u8> {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_ref())]
     }
 }
 
@@ -216,8 +216,8 @@ impl<'a> PrimaryKey<'a> for String {
 }
 
 impl<'a> Prefixer<'a> for String {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -235,8 +235,8 @@ impl<'a> PrimaryKey<'a> for &'a Addr {
 }
 
 impl<'a> Prefixer<'a> for &'a Addr {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self.as_ref().as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -254,8 +254,8 @@ impl<'a> PrimaryKey<'a> for Addr {
 }
 
 impl<'a> Prefixer<'a> for Addr {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self.as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -270,11 +270,11 @@ impl<'a> PrimaryKey<'a> for u32 {
     }
 }
 
-// impl<'a> Prefixer<'a> for u32 {
-//     fn prefix(&self) -> Vec<&[u8]> {
-//         vec![&self.to_be_bytes()]
-//     }
-// }
+impl<'a> Prefixer<'a> for u32 {
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Val32(self.to_be_bytes())]
+    }
+}
 
 // this auto-implements PrimaryKey for all the IntKey types
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>
@@ -293,7 +293,7 @@ where
 
 // this auto-implements Prefixer for all the IntKey types
 impl<'a, T: Endian> Prefixer<'a> for IntKey<T> {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         self.wrapped.prefix()
     }
 }
@@ -375,7 +375,7 @@ impl<'a> PrimaryKey<'a> for TimestampKey {
 }
 
 impl<'a> Prefixer<'a> for TimestampKey {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         self.0.prefix()
     }
 }
