@@ -20,6 +20,12 @@ impl<'a> AsRef<[u8]> for Key<'a> {
     }
 }
 
+impl<'a> PartialEq<&[u8]> for Key<'a> {
+    fn eq(&self, other: &&[u8]) -> bool {
+        self.as_ref() == *other
+    }
+}
+
 /// `PrimaryKey` needs to be implemented for types that want to be a `Map` (or `Map`-like) key,
 /// or part of a key.
 ///
@@ -147,7 +153,15 @@ pub trait Prefixer<'a> {
 
     fn joined_prefix(&self) -> Vec<u8> {
         let prefixes = self.prefix();
-        namespaces_with_key(&prefixes, &[])
+        let l = prefixes.len();
+        namespaces_with_key(
+            &prefixes[0..l - 1]
+                .iter()
+                .map(|e| e.as_ref())
+                .collect::<Vec<_>>()
+                .as_slice(),
+            &[],
+        )
     }
 }
 

@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::helpers::{may_deserialize, must_deserialize, nested_namespaces_with_key};
+use crate::keys::Key;
 use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 use std::ops::Deref;
 
@@ -35,7 +36,14 @@ where
     pub fn new(namespace: &[u8], keys: &[&[u8]]) -> Self {
         let l = keys.len();
         // FIXME: make this more efficient
-        let storage_key = nested_namespaces_with_key(&[namespace], &keys[0..l - 1], keys[l - 1]);
+        let storage_key = nested_namespaces_with_key(
+            &[namespace],
+            &keys[0..l - 1]
+                .iter()
+                .map(|k| Key::Ref(k))
+                .collect::<Vec<Key>>(),
+            keys[l - 1],
+        );
         Path {
             storage_key,
             data: PhantomData,

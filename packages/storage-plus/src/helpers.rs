@@ -7,6 +7,8 @@
 use serde::de::DeserializeOwned;
 use std::any::type_name;
 
+use crate::keys::Key;
+
 use cosmwasm_std::{
     from_slice, to_vec, Addr, Binary, ContractResult, Empty, QuerierWrapper, QueryRequest,
     StdError, StdResult, SystemResult, WasmQuery,
@@ -54,15 +56,15 @@ pub(crate) fn namespaces_with_key(namespaces: &[&[u8]], key: &[u8]) -> Vec<u8> {
 /// there are multiple sets we do not want to combine just to call this
 pub(crate) fn nested_namespaces_with_key(
     top_names: &[&[u8]],
-    sub_names: &[&[u8]],
+    sub_names: &[Key],
     key: &[u8],
 ) -> Vec<u8> {
     let mut size = key.len();
     for &namespace in top_names {
         size += namespace.len() + 2;
     }
-    for &namespace in sub_names {
-        size += namespace.len() + 2;
+    for namespace in sub_names {
+        size += namespace.as_ref().len() + 2;
     }
 
     let mut out = Vec::with_capacity(size);
@@ -70,9 +72,9 @@ pub(crate) fn nested_namespaces_with_key(
         out.extend_from_slice(&encode_length(namespace));
         out.extend_from_slice(namespace);
     }
-    for &namespace in sub_names {
-        out.extend_from_slice(&encode_length(namespace));
-        out.extend_from_slice(namespace);
+    for namespace in sub_names {
+        out.extend_from_slice(&encode_length(namespace.as_ref()));
+        out.extend_from_slice(namespace.as_ref());
     }
     out.extend_from_slice(key);
     out
