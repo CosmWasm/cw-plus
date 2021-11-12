@@ -6,7 +6,7 @@ import { calculateFee } from "@cosmjs/stargate"
  * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
  * With these you can easily use the cw1 contract without worrying about forming messages and parsing queries.
  *
- * Usage: npx @cosmjs/cli@^0.26 --init https://github.com/CosmWasm/cw-plus/blob/master/contracts/base-helpers.ts --init https://github.com/CosmWasm/cw-plus/blob/master/contracts/cw1-subkeys/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/main/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/main/contracts/cw1-subkeys/helpers.ts
  *
  * Create a client:
  *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
