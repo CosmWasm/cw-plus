@@ -63,11 +63,7 @@ pub trait PrimaryKey<'a>: Clone {
         let keys = self.key();
         let l = keys.len();
         namespaces_with_key(
-            keys[0..l - 1]
-                .iter()
-                .map(|e| e.as_ref())
-                .collect::<Vec<_>>()
-                .as_slice(),
+            &keys[0..l - 1].iter().map(Key::as_ref).collect::<Vec<_>>(),
             keys[l - 1].as_ref(),
         )
     }
@@ -469,7 +465,7 @@ mod test {
         let path = k.key();
         assert_eq!(2, path.len());
         assert_eq!(
-            path.iter().map(|e| e.as_ref()).collect::<Vec<_>>(),
+            path.iter().map(Key::as_ref).collect::<Vec<_>>(),
             vec![b"foo", b"bar"]
         );
     }
@@ -496,7 +492,7 @@ mod test {
         let path = k.key();
         assert_eq!(3, path.len());
         assert_eq!(
-            path.iter().map(|e| e.as_ref()).collect::<Vec<_>>(),
+            path.iter().map(Key::as_ref).collect::<Vec<_>>(),
             vec![first, b"bar", b"zoom"]
         );
 
