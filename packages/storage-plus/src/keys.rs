@@ -259,6 +259,23 @@ impl<'a> Prefixer<'a> for Addr {
     }
 }
 
+impl<'a> PrimaryKey<'a> for u32 {
+    type Prefix = ();
+    type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Val32(self.to_be_bytes())]
+    }
+}
+
+// impl<'a> Prefixer<'a> for u32 {
+//     fn prefix(&self) -> Vec<&[u8]> {
+//         vec![&self.to_be_bytes()]
+//     }
+// }
+
 // this auto-implements PrimaryKey for all the IntKey types
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>
 where
@@ -390,6 +407,14 @@ mod test {
     #[test]
     fn u32key_works() {
         let k: U32Key = 4242u32.into();
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
+    }
+
+    #[test]
+    fn u32_works() {
+        let k: u32 = 4242u32;
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
