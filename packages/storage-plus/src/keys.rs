@@ -153,15 +153,7 @@ pub trait Prefixer<'a> {
 
     fn joined_prefix(&self) -> Vec<u8> {
         let prefixes = self.prefix();
-        let l = prefixes.len();
-        namespaces_with_key(
-            &prefixes[0..l - 1]
-                .iter()
-                .map(|e| e.as_ref())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            &[],
-        )
+        namespaces_with_key(&prefixes.iter().map(Key::as_ref).collect::<Vec<_>>(), &[])
     }
 }
 
