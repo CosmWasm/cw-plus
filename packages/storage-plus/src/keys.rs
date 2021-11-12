@@ -517,7 +517,7 @@ mod test {
     #[test]
     fn proper_prefixes() {
         let simple: &str = "hello";
-        assert_eq!(simple.prefix(), vec![b"hello"]);
+        assert_eq!(simple.prefix()[0].as_ref(), b"hello");
 
         let pair: (U32Key, &[u8]) = (12345.into(), b"random");
         let one: Vec<u8> = vec![0, 0, 48, 57];
