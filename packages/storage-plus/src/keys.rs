@@ -5,6 +5,21 @@ use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::Endian;
 
+#[derive(Debug)]
+pub enum Key<'a> {
+    Ref(&'a [u8]),
+    Val32([u8; 4]),
+}
+
+impl<'a> AsRef<[u8]> for Key<'a> {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Key::Ref(r) => r,
+            Key::Val32(v) => v,
+        }
+    }
+}
+
 /// `PrimaryKey` needs to be implemented for types that want to be a `Map` (or `Map`-like) key,
 /// or part of a key.
 ///
@@ -36,12 +51,19 @@ pub trait PrimaryKey<'a>: Clone {
     type SuperSuffix: KeyDeserialize;
 
     /// returns a slice of key steps, which can be optionally combined
-    fn key(&self) -> Vec<&[u8]>;
+    fn key(&self) -> Vec<Key>;
 
     fn joined_key(&self) -> Vec<u8> {
         let keys = self.key();
         let l = keys.len();
-        namespaces_with_key(&keys[0..l - 1], &keys[l - 1])
+        namespaces_with_key(
+            keys[0..l - 1]
+                .iter()
+                .map(|e| e.as_ref())
+                .collect::<Vec<_>>()
+                .as_slice(),
+            keys[l - 1].as_ref(),
+        )
     }
 }
 
@@ -52,7 +74,7 @@ impl<'a> PrimaryKey<'a> for () {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         vec![]
     }
 }
@@ -63,9 +85,9 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self]
+        vec![Key::Ref(self)]
     }
 }
 
@@ -76,9 +98,9 @@ impl<'a> PrimaryKey<'a> for &'a str {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -91,9 +113,9 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize, U: PrimaryKey<'a> + 
     type Suffix = U;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         let mut keys = self.0.key();
-        keys.extend(&self.1.key());
+        keys.extend(self.1.key());
         keys
     }
 }
@@ -111,10 +133,10 @@ impl<
     type Suffix = V;
     type SuperSuffix = (U, V);
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         let mut keys = self.0.key();
-        keys.extend(&self.1.key());
-        keys.extend(&self.2.key());
+        keys.extend(self.1.key());
+        keys.extend(self.2.key());
         keys
     }
 }
@@ -171,8 +193,8 @@ impl<'a> PrimaryKey<'a> for Vec<u8> {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![&self]
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Ref(&self)]
     }
 }
 
@@ -188,8 +210,8 @@ impl<'a> PrimaryKey<'a> for String {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -206,9 +228,9 @@ impl<'a> PrimaryKey<'a> for &'a Addr {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self.as_ref().as_bytes()]
+        vec![Key::Ref(self.as_ref().as_bytes())]
     }
 }
 
@@ -225,9 +247,9 @@ impl<'a> PrimaryKey<'a> for Addr {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -247,7 +269,7 @@ where
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         self.wrapped.key()
     }
 }
@@ -330,14 +352,14 @@ impl<'a> PrimaryKey<'a> for TimestampKey {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         self.0.key()
     }
 }
 
 impl<'a> Prefixer<'a> for TimestampKey {
     fn prefix(&self) -> Vec<&[u8]> {
-        self.0.key()
+        self.0.prefix()
     }
 }
 
@@ -362,7 +384,7 @@ mod test {
         let k: U64Key = 134u64.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(134u64.to_be_bytes().to_vec(), path[0].to_vec());
+        assert_eq!(134u64.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
     }
 
     #[test]
@@ -370,7 +392,7 @@ mod test {
         let k: U32Key = 4242u32.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].to_vec());
+        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
     }
 
     #[test]
@@ -380,7 +402,7 @@ mod test {
         let k: K = "hello";
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!("hello".as_bytes(), path[0]);
+        assert_eq!("hello".as_bytes(), path[0].as_ref());
 
         let joined = k.joined_key();
         assert_eq!(joined, b"hello")
@@ -393,7 +415,7 @@ mod test {
         let k: K = "hello".to_string();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!("hello".as_bytes(), path[0]);
+        assert_eq!("hello".as_bytes(), path[0].as_ref());
 
         let joined = k.joined_key();
         assert_eq!(joined, b"hello")
@@ -406,8 +428,8 @@ mod test {
         let k: K = ("hello", b"world");
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!("hello".as_bytes(), path[0]);
-        assert_eq!("world".as_bytes(), path[1]);
+        assert_eq!("hello".as_bytes(), path[0].as_ref());
+        assert_eq!("world".as_bytes(), path[1].as_ref());
     }
 
     #[test]
@@ -415,7 +437,10 @@ mod test {
         let k: (&[u8], &[u8]) = (b"foo", b"bar");
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!(path, vec![b"foo", b"bar"]);
+        assert_eq!(
+            path.iter().map(|e| e.as_ref()).collect::<Vec<_>>(),
+            vec![b"foo", b"bar"]
+        );
     }
 
     #[test]
@@ -425,10 +450,10 @@ mod test {
         let k: (U32Key, U64Key) = (123.into(), 87654.into());
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!(4, path[0].len());
-        assert_eq!(8, path[1].len());
-        assert_eq!(path[0].to_vec(), 123u32.to_be_bytes().to_vec());
-        assert_eq!(path[1].to_vec(), 87654u64.to_be_bytes().to_vec());
+        assert_eq!(4, path[0].as_ref().len());
+        assert_eq!(8, path[1].as_ref().len());
+        assert_eq!(path[0].as_ref().to_vec(), 123u32.to_be_bytes().to_vec());
+        assert_eq!(path[1].as_ref().to_vec(), 87654u64.to_be_bytes().to_vec());
     }
 
     #[test]
@@ -439,7 +464,10 @@ mod test {
         let k: ((&[u8], &[u8]), &[u8]) = ((first, b"bar"), b"zoom");
         let path = k.key();
         assert_eq!(3, path.len());
-        assert_eq!(path, vec![first, b"bar", b"zoom"]);
+        assert_eq!(
+            path.iter().map(|e| e.as_ref()).collect::<Vec<_>>(),
+            vec![first, b"bar", b"zoom"]
+        );
 
         // ensure prefix also works
         let dir = k.0.prefix();
