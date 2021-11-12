@@ -98,7 +98,7 @@ impl KeyDeserialize for &Addr {
 
 macro_rules! integer_de {
     (for $($t:ty),+) => {
-        $(impl KeyDeserialize for IntKey<$t> {
+        $(impl KeyDeserialize for $t {
             type Output = $t;
 
             #[inline(always)]
@@ -111,6 +111,22 @@ macro_rules! integer_de {
 }
 
 integer_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
+
+macro_rules! intkey_de {
+    (for $($t:ty),+) => {
+        $(impl KeyDeserialize for IntKey<$t> {
+            type Output = $t;
+
+            #[inline(always)]
+            fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+                Ok(<$t>::from_be_bytes(value.as_slice().try_into()
+                    .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
+            }
+        })*
+    }
+}
+
+intkey_de!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
 
 impl KeyDeserialize for TimestampKey {
     type Output = u64;
