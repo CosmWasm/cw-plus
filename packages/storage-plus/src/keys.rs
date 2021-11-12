@@ -415,7 +415,7 @@ mod test {
     }
 
     #[test]
-    fn u32_works() {
+    fn naked_u32key_works() {
         let k: u32 = 4242u32;
         let path = k.key();
         assert_eq!(1, path.len());
@@ -484,6 +484,17 @@ mod test {
     }
 
     #[test]
+    fn naked_composite_int_key() {
+        let k: (u32, U64Key) = (123, 87654.into());
+        let path = k.key();
+        assert_eq!(2, path.len());
+        assert_eq!(4, path[0].as_ref().len());
+        assert_eq!(8, path[1].as_ref().len());
+        assert_eq!(path[0].as_ref().to_vec(), 123u32.to_be_bytes().to_vec());
+        assert_eq!(path[1].as_ref().to_vec(), 87654u64.to_be_bytes().to_vec());
+    }
+
+    #[test]
     fn nested_composite_keys() {
         // use this to ensure proper type-casts below
         let first: &[u8] = b"foo";
@@ -524,6 +535,30 @@ mod test {
         // same works with owned variants (&str -> String, &[u8] -> Vec<u8>)
         let owned_triple: (String, U32Key, Vec<u8>) =
             ("begin".to_string(), 12345.into(), b"end".to_vec());
+        assert_eq!(
+            owned_triple.prefix(),
+            vec![one.as_slice(), two.as_slice(), three.as_slice()]
+        );
+    }
+
+    #[test]
+    fn naked_proper_prefixes() {
+        let pair: (u32, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let triple: (&str, u32, &[u8]) = ("begin", 12345, b"end");
+        let one: Vec<u8> = b"begin".to_vec();
+        let two: Vec<u8> = vec![0, 0, 48, 57];
+        let three: Vec<u8> = b"end".to_vec();
+        assert_eq!(
+            triple.prefix(),
+            vec![one.as_slice(), two.as_slice(), three.as_slice()]
+        );
+
+        // same works with owned variants (&str -> String, &[u8] -> Vec<u8>)
+        let owned_triple: (String, u32, Vec<u8>) = ("begin".to_string(), 12345, b"end".to_vec());
         assert_eq!(
             owned_triple.prefix(),
             vec![one.as_slice(), two.as_slice(), three.as_slice()]
