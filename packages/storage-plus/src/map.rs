@@ -43,7 +43,14 @@ where
     }
 
     pub fn key(&self, k: K) -> Path<T> {
-        Path::new(self.namespace, &k.key())
+        Path::new(
+            self.namespace,
+            &k.key()
+                .iter()
+                .map(|e| e.as_ref())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
     }
 
     #[cfg(feature = "iterator")]
