@@ -161,7 +161,7 @@ impl<'a> Prefixer<'a> for () {
 
 impl<'a> Prefixer<'a> for &'a [u8] {
     fn prefix(&self) -> Vec<Key> {
-        vec![Key::Ref(self.as_ref())]
+        vec![Key::Ref(self)]
     }
 }
 
