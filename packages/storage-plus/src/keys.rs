@@ -403,7 +403,7 @@ mod test {
         let k: U64Key = 134u64.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(134u64.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
+        assert_eq!(134u64.to_be_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -411,7 +411,7 @@ mod test {
         let k: U32Key = 4242u32.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
+        assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -419,7 +419,7 @@ mod test {
         let k: u32 = 4242u32;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].as_ref().to_vec());
+        assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -429,7 +429,7 @@ mod test {
         let k: K = "hello";
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!("hello".as_bytes(), path[0].as_ref());
+        assert_eq!(b"hello", path[0].as_ref());
 
         let joined = k.joined_key();
         assert_eq!(joined, b"hello")
@@ -442,7 +442,7 @@ mod test {
         let k: K = "hello".to_string();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!("hello".as_bytes(), path[0].as_ref());
+        assert_eq!(b"hello", path[0].as_ref());
 
         let joined = k.joined_key();
         assert_eq!(joined, b"hello")
@@ -455,19 +455,16 @@ mod test {
         let k: K = ("hello", b"world");
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!("hello".as_bytes(), path[0].as_ref());
-        assert_eq!("world".as_bytes(), path[1].as_ref());
+        assert_eq!(b"hello", path[0].as_ref());
+        assert_eq!(b"world", path[1].as_ref());
     }
 
     #[test]
     fn composite_byte_key() {
-        let k: (&[u8], &[u8]) = (b"foo", b"bar");
+        let k: (&[u8], &[u8]) = ("foo".as_bytes(), b"bar");
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!(
-            path.iter().map(Key::as_ref).collect::<Vec<_>>(),
-            vec![b"foo", b"bar"]
-        );
+        assert_eq!(path, vec!["foo".as_bytes(), b"bar"],);
     }
 
     #[test]
@@ -479,8 +476,8 @@ mod test {
         assert_eq!(2, path.len());
         assert_eq!(4, path[0].as_ref().len());
         assert_eq!(8, path[1].as_ref().len());
-        assert_eq!(path[0].as_ref().to_vec(), 123u32.to_be_bytes().to_vec());
-        assert_eq!(path[1].as_ref().to_vec(), 87654u64.to_be_bytes().to_vec());
+        assert_eq!(path[0].as_ref(), 123u32.to_be_bytes());
+        assert_eq!(path[1].as_ref(), 87654u64.to_be_bytes());
     }
 
     #[test]
@@ -490,8 +487,8 @@ mod test {
         assert_eq!(2, path.len());
         assert_eq!(4, path[0].as_ref().len());
         assert_eq!(8, path[1].as_ref().len());
-        assert_eq!(path[0].as_ref().to_vec(), 123u32.to_be_bytes().to_vec());
-        assert_eq!(path[1].as_ref().to_vec(), 87654u64.to_be_bytes().to_vec());
+        assert_eq!(path[0].as_ref(), 123u32.to_be_bytes());
+        assert_eq!(path[1].as_ref(), 87654u64.to_be_bytes());
     }
 
     #[test]
@@ -502,10 +499,7 @@ mod test {
         let k: ((&[u8], &[u8]), &[u8]) = ((first, b"bar"), b"zoom");
         let path = k.key();
         assert_eq!(3, path.len());
-        assert_eq!(
-            path.iter().map(Key::as_ref).collect::<Vec<_>>(),
-            vec![first, b"bar", b"zoom"]
-        );
+        assert_eq!(path, vec![first, b"bar", b"zoom"]);
 
         // ensure prefix also works
         let dir = k.0.prefix();
