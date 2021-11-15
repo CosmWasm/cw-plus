@@ -7,8 +7,10 @@ use cosmwasm_std::{
 
 use crate::msg::Cw4ExecuteMsg;
 use crate::query::HooksResponse;
-use crate::{AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, TOTAL_KEY};
-use cw_storage_plus::Item;
+use crate::{
+    AdminResponse, Cw4QueryMsg, Member, MemberListResponse, MemberResponse, MEMBERS_KEY, TOTAL_KEY,
+};
+use cw_storage_plus::{Item, Map};
 
 /// Cw4Contract is a wrapper around Addr that provides a lot of helpers
 /// for working with cw4 contracts
@@ -73,24 +75,27 @@ impl Cw4Contract {
     }
 
     /// Check if this address is a member and returns its weight
-    pub fn is_member<T: Into<String>>(
+    pub fn is_member(
         &self,
         querier: &QuerierWrapper,
-        member: T,
-        height: impl Into<Option<u64>>,
+        member: &Addr,
+        height: Option<u64>,
     ) -> StdResult<Option<u64>> {
-        self.member_at_height(querier, member, height.into())
+        match height {
+            Some(height) => self.member_at_height(querier, member.to_string(), height.into()),
+            None => Map::new(MEMBERS_KEY).query(querier, self.addr(), member),
+        }
     }
 
     /// Check if this address is a member, and if its weight is >= 1
     /// Returns member's weight in positive case
-    pub fn is_voting_member<T: Into<String>>(
+    pub fn is_voting_member(
         &self,
         querier: &QuerierWrapper,
-        member: T,
+        member: &Addr,
         height: impl Into<Option<u64>>,
     ) -> StdResult<Option<u64>> {
-        if let Some(weight) = self.member_at_height(querier, member, height.into())? {
+        if let Some(weight) = self.member_at_height(querier, member.to_string(), height.into())? {
             if weight >= 1 {
                 return Ok(Some(weight));
             }
@@ -99,10 +104,10 @@ impl Cw4Contract {
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
-    pub fn member_at_height<T: Into<String>>(
+    pub fn member_at_height(
         &self,
         querier: &QuerierWrapper,
-        member: T,
+        member: impl Into<String>,
         at_height: Option<u64>,
     ) -> StdResult<Option<u64>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Member {
