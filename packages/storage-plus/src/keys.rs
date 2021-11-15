@@ -599,6 +599,45 @@ mod test {
     }
 
     #[test]
+    fn naked_8bit_prefixes() {
+        let pair: (u8, &[u8]) = (123, b"random");
+        let one: Vec<u8> = vec![123];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let pair: (i8, &[u8]) = (123, b"random");
+        let one: Vec<u8> = vec![123];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+    }
+
+    #[test]
+    fn naked_16bit_prefixes() {
+        let pair: (u16, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let pair: (i16, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+    }
+
+    #[test]
+    fn naked_64bit_prefixes() {
+        let pair: (u64, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let pair: (i64, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+    }
+
+    #[test]
     fn naked_proper_prefixes() {
         let pair: (u32, &[u8]) = (12345, b"random");
         let one: Vec<u8> = vec![0, 0, 48, 57];
