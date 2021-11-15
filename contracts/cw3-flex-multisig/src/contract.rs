@@ -90,10 +90,9 @@ pub fn execute_propose(
     let cfg = CONFIG.load(deps.storage)?;
 
     // Only members of the multisig can create a proposal
-    // Additional check if weight >= 1
     let vote_power = cfg
         .group_addr
-        .is_member(&deps.querier, &info.sender, env.block.height)?
+        .is_member(&deps.querier, &info.sender, None)?
         .ok_or(ContractError::Unauthorized {})?;
 
     // max expires also used as default
@@ -160,8 +159,8 @@ pub fn execute_vote(
     // use a snapshot of "start of proposal"
     let vote_power = cfg
         .group_addr
-        .is_voting_member(&deps.querier, &info.sender, prop.start_height)
-        .map_err(|_| ContractError::Unauthorized {})?;
+        .is_voting_member(&deps.querier, &info.sender, prop.start_height)?
+        .ok_or(ContractError::Unauthorized {})?;
 
     // cast vote if no vote previously cast
     BALLOTS.update(
@@ -403,7 +402,7 @@ fn list_votes(
 fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let voter_addr = deps.api.addr_validate(&voter)?;
-    let weight = cfg.group_addr.is_member(&deps.querier, &voter_addr)?;
+    let weight = cfg.group_addr.is_member(&deps.querier, &voter_addr, None)?;
 
     Ok(VoterResponse { weight })
 }
@@ -916,7 +915,7 @@ mod tests {
         // Get the proposal id from the logs
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
-        // Owner cannot vote (again)
+        // Owner with 0 voting power cannot vote
         let yes_vote = ExecuteMsg::Vote {
             proposal_id,
             vote: Vote::Yes,
@@ -924,7 +923,7 @@ mod tests {
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &yes_vote, &[])
             .unwrap_err();
-        assert_eq!(ContractError::AlreadyVoted {}, err.downcast().unwrap());
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         // Only voters can vote
         let err = app
@@ -945,6 +944,12 @@ mod tests {
                 ("status", "Open"),
             ],
         );
+
+        // VOTER1 cannot vote again
+        let err = app
+            .execute_contract(Addr::unchecked(VOTER1), flex_addr.clone(), &yes_vote, &[])
+            .unwrap_err();
+        assert_eq!(ContractError::AlreadyVoted {}, err.downcast().unwrap());
 
         // No/Veto votes have no effect on the tally
         // Compute the current tally
