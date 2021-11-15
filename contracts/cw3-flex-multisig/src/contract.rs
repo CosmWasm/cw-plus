@@ -154,7 +154,7 @@ pub fn execute_vote(
         return Err(ContractError::Expired {});
     }
 
-    // Only members of the multisig can create a proposal
+    // Only voting members of the multisig can vote
     // Additional check if weight >= 1
     // use a snapshot of "start of proposal"
     let vote_power = cfg
