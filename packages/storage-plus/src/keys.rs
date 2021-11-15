@@ -202,7 +202,7 @@ impl<'a> PrimaryKey<'a> for Vec<u8> {
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        vec![Key::Ref(&self)]
+        vec![Key::Ref(self)]
     }
 }
 
@@ -572,6 +572,7 @@ mod test {
     #[test]
     fn proper_prefixes() {
         let simple: &str = "hello";
+        assert_eq!(simple.prefix().len(), 1);
         assert_eq!(simple.prefix()[0].as_ref(), b"hello");
 
         let pair: (U32Key, &[u8]) = (12345.into(), b"random");

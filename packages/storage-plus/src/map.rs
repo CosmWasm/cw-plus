@@ -9,7 +9,7 @@ use crate::helpers::query_raw;
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
-use crate::keys::PrimaryKey;
+use crate::keys::{Key, PrimaryKey};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
@@ -45,11 +45,7 @@ where
     pub fn key(&self, k: K) -> Path<T> {
         Path::new(
             self.namespace,
-            &k.key()
-                .iter()
-                .map(|e| e.as_ref())
-                .collect::<Vec<_>>()
-                .as_slice(),
+            &k.key().iter().map(Key::as_ref).collect::<Vec<_>>(),
         )
     }
 
