@@ -8,14 +8,20 @@ use crate::Endian;
 #[derive(Debug)]
 pub enum Key<'a> {
     Ref(&'a [u8]),
+    Val8([u8; 1]),
+    Val16([u8; 2]),
     Val32([u8; 4]),
+    Val64([u8; 8]),
 }
 
 impl<'a> AsRef<[u8]> for Key<'a> {
     fn as_ref(&self) -> &[u8] {
         match self {
             Key::Ref(r) => r,
+            Key::Val8(v) => v,
+            Key::Val16(v) => v,
             Key::Val32(v) => v,
+            Key::Val64(v) => v,
         }
     }
 }
@@ -261,22 +267,34 @@ impl<'a> Prefixer<'a> for Addr {
     }
 }
 
-impl<'a> PrimaryKey<'a> for u32 {
-    type Prefix = ();
-    type SubPrefix = ();
-    type Suffix = Self;
-    type SuperSuffix = Self;
+macro_rules! integer_key {
+    (for $($t:ty, $v:tt),+) => {
+        $(impl<'a> PrimaryKey<'a> for $t {
+            type Prefix = ();
+            type SubPrefix = ();
+            type Suffix = Self;
+            type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<Key> {
-        vec![Key::Val32(self.to_be_bytes())]
+            fn key(&self) -> Vec<Key> {
+                vec![Key::$v(self.to_be_bytes())]
+            }
+        })*
     }
 }
 
-impl<'a> Prefixer<'a> for u32 {
-    fn prefix(&self) -> Vec<Key> {
-        vec![Key::Val32(self.to_be_bytes())]
+integer_key!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
+
+macro_rules! integer_prefix {
+    (for $($t:ty, $v:tt),+) => {
+        $(impl<'a> Prefixer<'a> for $t {
+            fn prefix(&self) -> Vec<Key> {
+                vec![Key::$v(self.to_be_bytes())]
+            }
+        })*
     }
 }
+
+integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
 
 // this auto-implements PrimaryKey for all the IntKey types
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>
