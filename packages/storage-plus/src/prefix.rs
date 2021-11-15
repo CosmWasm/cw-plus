@@ -9,6 +9,7 @@ use std::ops::Deref;
 use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
+use crate::keys::Key;
 use crate::{Endian, Prefixer};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
@@ -117,7 +118,7 @@ where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
-    pub fn new(top_name: &[u8], sub_names: &[&[u8]]) -> Self {
+    pub fn new(top_name: &[u8], sub_names: &[Key]) -> Self {
         Prefix::with_deserialization_function(
             top_name,
             sub_names,
@@ -128,7 +129,7 @@ where
 
     pub fn with_deserialization_function(
         top_name: &[u8],
-        sub_names: &[&[u8]],
+        sub_names: &[Key],
         pk_name: &[u8],
         de_fn: DeserializeKvFn<K, T>,
     ) -> Self {

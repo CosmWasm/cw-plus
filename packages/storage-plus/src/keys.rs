@@ -5,6 +5,33 @@ use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::Endian;
 
+#[derive(Debug)]
+pub enum Key<'a> {
+    Ref(&'a [u8]),
+    Val8([u8; 1]),
+    Val16([u8; 2]),
+    Val32([u8; 4]),
+    Val64([u8; 8]),
+}
+
+impl<'a> AsRef<[u8]> for Key<'a> {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Key::Ref(r) => r,
+            Key::Val8(v) => v,
+            Key::Val16(v) => v,
+            Key::Val32(v) => v,
+            Key::Val64(v) => v,
+        }
+    }
+}
+
+impl<'a> PartialEq<&[u8]> for Key<'a> {
+    fn eq(&self, other: &&[u8]) -> bool {
+        self.as_ref() == *other
+    }
+}
+
 /// `PrimaryKey` needs to be implemented for types that want to be a `Map` (or `Map`-like) key,
 /// or part of a key.
 ///
@@ -36,12 +63,15 @@ pub trait PrimaryKey<'a>: Clone {
     type SuperSuffix: KeyDeserialize;
 
     /// returns a slice of key steps, which can be optionally combined
-    fn key(&self) -> Vec<&[u8]>;
+    fn key(&self) -> Vec<Key>;
 
     fn joined_key(&self) -> Vec<u8> {
         let keys = self.key();
         let l = keys.len();
-        namespaces_with_key(&keys[0..l - 1], &keys[l - 1])
+        namespaces_with_key(
+            &keys[0..l - 1].iter().map(Key::as_ref).collect::<Vec<_>>(),
+            keys[l - 1].as_ref(),
+        )
     }
 }
 
@@ -52,7 +82,7 @@ impl<'a> PrimaryKey<'a> for () {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         vec![]
     }
 }
@@ -63,9 +93,9 @@ impl<'a> PrimaryKey<'a> for &'a [u8] {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self]
+        vec![Key::Ref(self)]
     }
 }
 
@@ -76,9 +106,9 @@ impl<'a> PrimaryKey<'a> for &'a str {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -91,9 +121,9 @@ impl<'a, T: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize, U: PrimaryKey<'a> + 
     type Suffix = U;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         let mut keys = self.0.key();
-        keys.extend(&self.1.key());
+        keys.extend(self.1.key());
         keys
     }
 }
@@ -111,38 +141,38 @@ impl<
     type Suffix = V;
     type SuperSuffix = (U, V);
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         let mut keys = self.0.key();
-        keys.extend(&self.1.key());
-        keys.extend(&self.2.key());
+        keys.extend(self.1.key());
+        keys.extend(self.2.key());
         keys
     }
 }
 
 pub trait Prefixer<'a> {
     /// returns 0 or more namespaces that should be length-prefixed and concatenated for range searches
-    fn prefix(&self) -> Vec<&[u8]>;
+    fn prefix(&self) -> Vec<Key>;
 
     fn joined_prefix(&self) -> Vec<u8> {
         let prefixes = self.prefix();
-        namespaces_with_key(&prefixes, &[])
+        namespaces_with_key(&prefixes.iter().map(Key::as_ref).collect::<Vec<_>>(), &[])
     }
 }
 
 impl<'a> Prefixer<'a> for () {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         vec![]
     }
 }
 
 impl<'a> Prefixer<'a> for &'a [u8] {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self)]
     }
 }
 
 impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         let mut res = self.0.prefix();
         res.extend(self.1.prefix().into_iter());
         res
@@ -150,7 +180,7 @@ impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Prefixer<'a> for (T, U) {
 }
 
 impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T, U, V) {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         let mut res = self.0.prefix();
         res.extend(self.1.prefix().into_iter());
         res.extend(self.2.prefix().into_iter());
@@ -160,8 +190,8 @@ impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Prefixer<'a> for (T,
 
 // Provide a string version of this to raw encode strings
 impl<'a> Prefixer<'a> for &'a str {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -171,14 +201,14 @@ impl<'a> PrimaryKey<'a> for Vec<u8> {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![&self]
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Ref(self)]
     }
 }
 
 impl<'a> Prefixer<'a> for Vec<u8> {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_ref())]
     }
 }
 
@@ -188,14 +218,14 @@ impl<'a> PrimaryKey<'a> for String {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
 impl<'a> Prefixer<'a> for String {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![self.as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -206,15 +236,15 @@ impl<'a> PrimaryKey<'a> for &'a Addr {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self.as_ref().as_bytes()]
+        vec![Key::Ref(self.as_ref().as_bytes())]
     }
 }
 
 impl<'a> Prefixer<'a> for &'a Addr {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self.as_ref().as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
@@ -225,17 +255,46 @@ impl<'a> PrimaryKey<'a> for Addr {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         // this is simple, we don't add more prefixes
-        vec![self.as_bytes()]
+        vec![Key::Ref(self.as_bytes())]
     }
 }
 
 impl<'a> Prefixer<'a> for Addr {
-    fn prefix(&self) -> Vec<&[u8]> {
-        vec![&self.as_bytes()]
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Ref(self.as_bytes())]
     }
 }
+
+macro_rules! integer_key {
+    (for $($t:ty, $v:tt),+) => {
+        $(impl<'a> PrimaryKey<'a> for $t {
+            type Prefix = ();
+            type SubPrefix = ();
+            type Suffix = Self;
+            type SuperSuffix = Self;
+
+            fn key(&self) -> Vec<Key> {
+                vec![Key::$v(self.to_be_bytes())]
+            }
+        })*
+    }
+}
+
+integer_key!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
+
+macro_rules! integer_prefix {
+    (for $($t:ty, $v:tt),+) => {
+        $(impl<'a> Prefixer<'a> for $t {
+            fn prefix(&self) -> Vec<Key> {
+                vec![Key::$v(self.to_be_bytes())]
+            }
+        })*
+    }
+}
+
+integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
 
 // this auto-implements PrimaryKey for all the IntKey types
 impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>
@@ -247,14 +306,14 @@ where
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         self.wrapped.key()
     }
 }
 
 // this auto-implements Prefixer for all the IntKey types
 impl<'a, T: Endian> Prefixer<'a> for IntKey<T> {
-    fn prefix(&self) -> Vec<&[u8]> {
+    fn prefix(&self) -> Vec<Key> {
         self.wrapped.prefix()
     }
 }
@@ -330,14 +389,14 @@ impl<'a> PrimaryKey<'a> for TimestampKey {
     type Suffix = Self;
     type SuperSuffix = Self;
 
-    fn key(&self) -> Vec<&[u8]> {
+    fn key(&self) -> Vec<Key> {
         self.0.key()
     }
 }
 
 impl<'a> Prefixer<'a> for TimestampKey {
-    fn prefix(&self) -> Vec<&[u8]> {
-        self.0.key()
+    fn prefix(&self) -> Vec<Key> {
+        self.0.prefix()
     }
 }
 
@@ -362,7 +421,7 @@ mod test {
         let k: U64Key = 134u64.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(134u64.to_be_bytes().to_vec(), path[0].to_vec());
+        assert_eq!(134u64.to_be_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -370,7 +429,59 @@ mod test {
         let k: U32Key = 4242u32.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_be_bytes().to_vec(), path[0].to_vec());
+        assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_8key_works() {
+        let k: u8 = 42u8;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(42u8.to_be_bytes(), path[0].as_ref());
+
+        let k: i8 = 42i8;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(42i8.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_16key_works() {
+        let k: u16 = 4242u16;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u16.to_be_bytes(), path[0].as_ref());
+
+        let k: i16 = 4242i16;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i16.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_32key_works() {
+        let k: u32 = 4242u32;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
+
+        let k: i32 = 4242i32;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i32.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_64key_works() {
+        let k: u64 = 4242u64;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u64.to_be_bytes(), path[0].as_ref());
+
+        let k: i64 = 4242i64;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i64.to_be_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -380,7 +491,7 @@ mod test {
         let k: K = "hello";
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!("hello".as_bytes(), path[0]);
+        assert_eq!(b"hello", path[0].as_ref());
 
         let joined = k.joined_key();
         assert_eq!(joined, b"hello")
@@ -393,7 +504,7 @@ mod test {
         let k: K = "hello".to_string();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!("hello".as_bytes(), path[0]);
+        assert_eq!(b"hello", path[0].as_ref());
 
         let joined = k.joined_key();
         assert_eq!(joined, b"hello")
@@ -406,16 +517,16 @@ mod test {
         let k: K = ("hello", b"world");
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!("hello".as_bytes(), path[0]);
-        assert_eq!("world".as_bytes(), path[1]);
+        assert_eq!(b"hello", path[0].as_ref());
+        assert_eq!(b"world", path[1].as_ref());
     }
 
     #[test]
     fn composite_byte_key() {
-        let k: (&[u8], &[u8]) = (b"foo", b"bar");
+        let k: (&[u8], &[u8]) = ("foo".as_bytes(), b"bar");
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!(path, vec![b"foo", b"bar"]);
+        assert_eq!(path, vec!["foo".as_bytes(), b"bar"],);
     }
 
     #[test]
@@ -425,10 +536,21 @@ mod test {
         let k: (U32Key, U64Key) = (123.into(), 87654.into());
         let path = k.key();
         assert_eq!(2, path.len());
-        assert_eq!(4, path[0].len());
-        assert_eq!(8, path[1].len());
-        assert_eq!(path[0].to_vec(), 123u32.to_be_bytes().to_vec());
-        assert_eq!(path[1].to_vec(), 87654u64.to_be_bytes().to_vec());
+        assert_eq!(4, path[0].as_ref().len());
+        assert_eq!(8, path[1].as_ref().len());
+        assert_eq!(path[0].as_ref(), 123u32.to_be_bytes());
+        assert_eq!(path[1].as_ref(), 87654u64.to_be_bytes());
+    }
+
+    #[test]
+    fn naked_composite_int_key() {
+        let k: (u32, U64Key) = (123, 87654.into());
+        let path = k.key();
+        assert_eq!(2, path.len());
+        assert_eq!(4, path[0].as_ref().len());
+        assert_eq!(8, path[1].as_ref().len());
+        assert_eq!(path[0].as_ref(), 123u32.to_be_bytes());
+        assert_eq!(path[1].as_ref(), 87654u64.to_be_bytes());
     }
 
     #[test]
@@ -450,7 +572,8 @@ mod test {
     #[test]
     fn proper_prefixes() {
         let simple: &str = "hello";
-        assert_eq!(simple.prefix(), vec![b"hello"]);
+        assert_eq!(simple.prefix().len(), 1);
+        assert_eq!(simple.prefix()[0].as_ref(), b"hello");
 
         let pair: (U32Key, &[u8]) = (12345.into(), b"random");
         let one: Vec<u8> = vec![0, 0, 48, 57];
@@ -469,6 +592,69 @@ mod test {
         // same works with owned variants (&str -> String, &[u8] -> Vec<u8>)
         let owned_triple: (String, U32Key, Vec<u8>) =
             ("begin".to_string(), 12345.into(), b"end".to_vec());
+        assert_eq!(
+            owned_triple.prefix(),
+            vec![one.as_slice(), two.as_slice(), three.as_slice()]
+        );
+    }
+
+    #[test]
+    fn naked_8bit_prefixes() {
+        let pair: (u8, &[u8]) = (123, b"random");
+        let one: Vec<u8> = vec![123];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let pair: (i8, &[u8]) = (123, b"random");
+        let one: Vec<u8> = vec![123];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+    }
+
+    #[test]
+    fn naked_16bit_prefixes() {
+        let pair: (u16, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let pair: (i16, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+    }
+
+    #[test]
+    fn naked_64bit_prefixes() {
+        let pair: (u64, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let pair: (i64, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+    }
+
+    #[test]
+    fn naked_proper_prefixes() {
+        let pair: (u32, &[u8]) = (12345, b"random");
+        let one: Vec<u8> = vec![0, 0, 48, 57];
+        let two: Vec<u8> = b"random".to_vec();
+        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
+
+        let triple: (&str, u32, &[u8]) = ("begin", 12345, b"end");
+        let one: Vec<u8> = b"begin".to_vec();
+        let two: Vec<u8> = vec![0, 0, 48, 57];
+        let three: Vec<u8> = b"end".to_vec();
+        assert_eq!(
+            triple.prefix(),
+            vec![one.as_slice(), two.as_slice(), three.as_slice()]
+        );
+
+        // same works with owned variants (&str -> String, &[u8] -> Vec<u8>)
+        let owned_triple: (String, u32, Vec<u8>) = ("begin".to_string(), 12345, b"end".to_vec());
         assert_eq!(
             owned_triple.prefix(),
             vec![one.as_slice(), two.as_slice(), three.as_slice()]
