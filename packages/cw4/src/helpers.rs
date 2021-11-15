@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdError, StdResult, WasmMsg,
+    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdResult, WasmMsg,
     WasmQuery,
 };
 
@@ -75,9 +75,30 @@ impl Cw4Contract {
         Item::new(TOTAL_KEY).query(querier, self.addr())
     }
 
-    /// Check if this address is a member, and if so, with which weight
-    pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
-        Map::new(MEMBERS_KEY).query(querier, self.addr(), addr)
+    /// Returns member's weight
+    pub fn member_weight(
+        &self,
+        querier: &QuerierWrapper,
+        addr: &Addr,
+        height: Option<u64>,
+    ) -> StdResult<Option<u64>> {
+        match height {
+            Some(height) => self.member_at_height(querier, addr, height.into()),
+            None => Map::new(MEMBERS_KEY).query(querier, self.addr(), addr),
+        }
+    }
+
+    /// Check if this address is a member
+    pub fn is_member<T: Into<String>>(
+        &self,
+        querier: &QuerierWrapper,
+        member: T,
+        height: impl Into<Option<u64>>,
+    ) -> StdResult<bool> {
+        match self.member_at_height(querier, member, height.into())? {
+            Some(_) => Ok(true),
+            None => Ok(false),
+        }
     }
 
     /// Check if this address is a member, and if its weight is >= 1
@@ -85,10 +106,14 @@ impl Cw4Contract {
         &self,
         querier: &QuerierWrapper,
         member: T,
-        height: u64,
-    ) -> StdResult<u64> {
-        self.member_at_height(querier, member, height)?
-            .map_or(Err(StdError::generic_err("Not a member")), Ok)
+        height: impl Into<Option<u64>>,
+    ) -> StdResult<bool> {
+        if let Some(weight) = self.member_at_height(querier, member, height.into())? {
+            if weight >= 1 {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
@@ -96,11 +121,11 @@ impl Cw4Contract {
         &self,
         querier: &QuerierWrapper,
         member: T,
-        height: u64,
+        at_height: Option<u64>,
     ) -> StdResult<Option<u64>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Member {
             addr: member.into(),
-            at_height: Some(height),
+            at_height: at_height.into(),
         })?;
         let res: MemberResponse = querier.query(&query)?;
         Ok(res.weight)

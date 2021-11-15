@@ -93,8 +93,8 @@ pub fn execute_propose(
     // Additional check if weight >= 1
     let vote_power = cfg
         .group_addr
-        .is_voting_member(&deps.querier, &info.sender, env.block.height)
-        .map_err(|_| ContractError::Unauthorized {})?;
+        .is_member(&deps.querier, &info.sender, env.block.height)?
+        .ok_or(ContractError::Unauthorized {})?;
 
     // max expires also used as default
     let max_expires = cfg.max_voting_period.after(&env.block);
