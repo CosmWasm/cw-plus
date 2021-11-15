@@ -433,11 +433,55 @@ mod test {
     }
 
     #[test]
-    fn naked_u32key_works() {
+    fn naked_8key_works() {
+        let k: u8 = 42u8;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(42u8.to_be_bytes(), path[0].as_ref());
+
+        let k: i8 = 42i8;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(42i8.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_16key_works() {
+        let k: u16 = 4242u16;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u16.to_be_bytes(), path[0].as_ref());
+
+        let k: i16 = 4242i16;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i16.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_32key_works() {
         let k: u32 = 4242u32;
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
+
+        let k: i32 = 4242i32;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i32.to_be_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_64key_works() {
+        let k: u64 = 4242u64;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u64.to_be_bytes(), path[0].as_ref());
+
+        let k: i64 = 4242i64;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i64.to_be_bytes(), path[0].as_ref());
     }
 
     #[test]
