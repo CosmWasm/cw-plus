@@ -2,11 +2,14 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.2...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.3...HEAD)
+
+## [v0.10.3](https://github.com/CosmWasm/cw-plus/tree/v0.10.3) (2021-11-16)
 
 **Implemented enhancements:**
 
 - Deprecate IntKey [\#547](https://github.com/CosmWasm/cw-plus/pull/547) ([ueco-jb](https://github.com/ueco-jb))
+- Implement WasmQuery::ContractInfo [\#554](https://github.com/CosmWasm/cw-plus/pull/554) ([ethanfrey](https://github.com/ethanfrey))
 
 **Fixed bugs:**
 
