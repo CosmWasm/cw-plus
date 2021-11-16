@@ -63,7 +63,7 @@ impl BankKeeper {
 
     // this is an "admin" function to let us adjust bank accounts
     fn get_balance(&self, bank_storage: &dyn Storage, account: &Addr) -> AnyResult<Vec<Coin>> {
-        let val = BALANCES.may_load(bank_storage, &account)?;
+        let val = BALANCES.may_load(bank_storage, account)?;
         Ok(val.unwrap_or_default().into_vec())
     }
 

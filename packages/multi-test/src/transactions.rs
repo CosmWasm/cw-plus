@@ -152,8 +152,8 @@ impl Op {
     /// applies this `Op` to the provided storage
     pub fn apply(&self, storage: &mut dyn Storage) {
         match self {
-            Op::Set { key, value } => storage.set(&key, &value),
-            Op::Delete { key } => storage.remove(&key),
+            Op::Set { key, value } => storage.set(key, value),
+            Op::Delete { key } => storage.remove(key),
         }
     }
 
