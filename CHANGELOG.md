@@ -31,6 +31,23 @@
 - Fix min threshold in cw3-flex-multisig [\#528](https://github.com/CosmWasm/cw-plus/pull/528) ([ueco-jb](https://github.com/ueco-jb))
 - cw1-subkeys: Migration example [\#525](https://github.com/CosmWasm/cw-plus/pull/525) ([hashedone](https://github.com/hashedone))
 
+## [v0.10.2](https://github.com/CosmWasm/cw-plus/tree/v0.10.2) (2021-11-03)
+
+**Closed issues:**
+
+- Multitest has errors with reply data [\#516](https://github.com/CosmWasm/cw-plus/issues/516)
+
+**Merged pull requests:**
+
+- cw1-whitelist-ng: Slight messages parsing improvement [\#523](https://github.com/CosmWasm/cw-plus/pull/523) ([hashedone](https://github.com/hashedone))
+- ics20: Handle send errors with reply [\#520](https://github.com/CosmWasm/cw-plus/pull/520) ([ethanfrey](https://github.com/ethanfrey))
+- Proper execute responses [\#519](https://github.com/CosmWasm/cw-plus/pull/519) ([ethanfrey](https://github.com/ethanfrey))
+- Publish MsgInstantiate / Execute responses [\#518](https://github.com/CosmWasm/cw-plus/pull/518) ([maurolacy](https://github.com/maurolacy))
+- Fix instaniate reply data [\#517](https://github.com/CosmWasm/cw-plus/pull/517) ([ethanfrey](https://github.com/ethanfrey))
+- Use protobuf de helpers [\#515](https://github.com/CosmWasm/cw-plus/pull/515) ([maurolacy](https://github.com/maurolacy))
+- Add tests for the claims controller [\#514](https://github.com/CosmWasm/cw-plus/pull/514) ([sgoya](https://github.com/sgoya))
+- Implement cw3-flex-multisig helper [\#479](https://github.com/CosmWasm/cw-plus/pull/479) ([orkunkl](https://github.com/orkunkl))
+
 ## [v0.10.1](https://github.com/CosmWasm/cw-plus/tree/v0.10.1) (2021-10-26)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.0...v0.10.1)
