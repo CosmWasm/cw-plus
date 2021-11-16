@@ -23,9 +23,13 @@ import { calculateFee } from "@cosmjs/stargate"
  *   const initMsg = {
  *     group_addr: addr,
  *     threshold: {
- *        absolute_count: 5
+ *        absolute_count: {
+ *          weight: 5
+ *        }
  *     },
- *     max_voting_period: 3600
+ *     max_voting_period: {
+ *        time: 3600
+ *     }
  *   };
  *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
