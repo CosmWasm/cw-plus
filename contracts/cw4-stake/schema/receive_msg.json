@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ReceiveMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Only valid cw20 message is to bond the tokens",
       "type": "object",

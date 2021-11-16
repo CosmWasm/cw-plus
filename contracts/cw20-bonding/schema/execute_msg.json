@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ExecuteMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Buy will attempt to purchase as many supply tokens as possible. You must send only reserve tokens in that message",
       "type": "object",
@@ -255,7 +255,7 @@
     },
     "Expiration": {
       "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "AtHeight will expire when `env.block.height` >= height",
           "type": "object",
