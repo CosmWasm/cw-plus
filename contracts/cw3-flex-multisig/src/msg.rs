@@ -49,22 +49,22 @@ impl Threshold {
                 weight: weight_needed,
             } => {
                 if *weight_needed == 0 {
-                    Err(ContractError::ZeroThreshold {})
+                    Err(ContractError::ZeroWeight {})
                 } else if *weight_needed > total_weight {
-                    Err(ContractError::UnreachableThreshold {})
+                    Err(ContractError::UnreachableWeight {})
                 } else {
                     Ok(())
                 }
             }
             Threshold::AbsolutePercentage {
                 percentage: percentage_needed,
-            } => valid_percentage(percentage_needed),
+            } => valid_threshold(percentage_needed),
             Threshold::ThresholdQuorum {
                 threshold,
                 quorum: quroum,
             } => {
-                valid_percentage(threshold)?;
-                valid_percentage(quroum)
+                valid_threshold(threshold)?;
+                valid_quorum(quroum)
             }
         }
     }
@@ -91,12 +91,21 @@ impl Threshold {
     }
 }
 
-/// Asserts that the 0.0 < percent <= 1.0
-fn valid_percentage(percent: &Decimal) -> Result<(), ContractError> {
+/// Asserts that the 0.5 < percent <= 1.0
+fn valid_threshold(percent: &Decimal) -> Result<(), ContractError> {
+    if *percent > Decimal::percent(100) || *percent < Decimal::percent(50) {
+        Err(ContractError::InvalidThreshold {})
+    } else {
+        Ok(())
+    }
+}
+
+/// Asserts that the 0.5 < percent <= 1.0
+fn valid_quorum(percent: &Decimal) -> Result<(), ContractError> {
     if percent.is_zero() {
-        Err(ContractError::ZeroThreshold {})
+        Err(ContractError::ZeroQuorumThreshold {})
     } else if *percent > Decimal::one() {
-        Err(ContractError::UnreachableThreshold {})
+        Err(ContractError::UnreachableQuorumThreshold {})
     } else {
         Ok(())
     }
@@ -167,33 +176,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validate_percentage() {
+    fn validate_quorum_percentage() {
         // TODO: test the error messages
 
         // 0 is never a valid percentage
-        let err = valid_percentage(&Decimal::zero()).unwrap_err();
-        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+        let err = valid_quorum(&Decimal::zero()).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            ContractError::ZeroQuorumThreshold {}.to_string()
+        );
 
         // 100% is
-        valid_percentage(&Decimal::one()).unwrap();
+        valid_quorum(&Decimal::one()).unwrap();
 
         // 101% is not
-        let err = valid_percentage(&Decimal::percent(101)).unwrap_err();
+        let err = valid_quorum(&Decimal::percent(101)).unwrap_err();
         assert_eq!(
             err.to_string(),
-            ContractError::UnreachableThreshold {}.to_string()
+            ContractError::UnreachableQuorumThreshold {}.to_string()
         );
         // not 100.1%
-        let err = valid_percentage(&Decimal::permille(1001)).unwrap_err();
+        let err = valid_quorum(&Decimal::permille(1001)).unwrap_err();
         assert_eq!(
             err.to_string(),
-            ContractError::UnreachableThreshold {}.to_string()
+            ContractError::UnreachableQuorumThreshold {}.to_string()
         );
+    }
 
-        // other values in between 0 and 1 are valid
-        valid_percentage(&Decimal::permille(1)).unwrap();
-        valid_percentage(&Decimal::percent(17)).unwrap();
-        valid_percentage(&Decimal::percent(99)).unwrap();
+    #[test]
+    fn validate_threshold_percentage() {
+        // other values in between 0.5 and 1 are valid
+        valid_threshold(&Decimal::percent(51)).unwrap();
+        valid_threshold(&Decimal::percent(67)).unwrap();
+        valid_threshold(&Decimal::percent(99)).unwrap();
+        let err = valid_threshold(&Decimal::percent(101)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            ContractError::InvalidThreshold {}.to_string()
+        );
     }
 
     #[test]
@@ -203,13 +223,13 @@ mod tests {
             .validate(5)
             .unwrap_err();
         // TODO: remove to_string() when PartialEq implemented
-        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+        assert_eq!(err.to_string(), ContractError::ZeroWeight {}.to_string());
         let err = Threshold::AbsoluteCount { weight: 6 }
             .validate(5)
             .unwrap_err();
         assert_eq!(
             err.to_string(),
-            ContractError::UnreachableThreshold {}.to_string()
+            ContractError::UnreachableWeight {}.to_string()
         );
 
         Threshold::AbsoluteCount { weight: 1 }.validate(5).unwrap();
@@ -221,7 +241,10 @@ mod tests {
         }
         .validate(5)
         .unwrap_err();
-        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+        assert_eq!(
+            err.to_string(),
+            ContractError::InvalidThreshold {}.to_string()
+        );
         Threshold::AbsolutePercentage {
             percentage: Decimal::percent(51),
         }
@@ -243,7 +266,7 @@ mod tests {
         .unwrap_err();
         assert_eq!(
             err.to_string(),
-            ContractError::UnreachableThreshold {}.to_string()
+            ContractError::InvalidThreshold {}.to_string()
         );
         let err = Threshold::ThresholdQuorum {
             threshold: Decimal::percent(51),
@@ -251,7 +274,10 @@ mod tests {
         }
         .validate(5)
         .unwrap_err();
-        assert_eq!(err.to_string(), ContractError::ZeroThreshold {}.to_string());
+        assert_eq!(
+            err.to_string(),
+            ContractError::ZeroQuorumThreshold {}.to_string()
+        );
     }
 
     #[test]
