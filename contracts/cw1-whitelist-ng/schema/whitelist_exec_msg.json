@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "WhitelistExecMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Freeze will make a mutable contract immutable, must be called by an admin",
       "type": "object",

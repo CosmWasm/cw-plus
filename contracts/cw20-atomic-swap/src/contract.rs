@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_instantiate() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // Instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn test_create() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_release() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn test_refund() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_query() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let info = mock_info("anyone", &[]);
         instantiate(deps.as_mut(), mock_env(), info, InstantiateMsg {}).unwrap();
@@ -626,7 +626,7 @@ mod tests {
 
     #[test]
     fn test_native_cw20_swap() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // Create the contract
         let info = mock_info("anyone", &[]);

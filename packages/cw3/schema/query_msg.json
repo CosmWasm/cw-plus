@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "QueryMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Returns the threshold rules that would be used for a new proposal that was opened right now. The threshold rules do not change often, but the `total_weight` in the response may easily differ from that used in previously opened proposals. Returns ThresholdResponse.",
       "type": "object",

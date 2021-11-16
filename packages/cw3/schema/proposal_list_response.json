@@ -16,7 +16,7 @@
   "definitions": {
     "BankMsg": {
       "description": "The message types of the bank module.\n\nSee https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/bank/v1beta1/tx.proto",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "Sends native tokens from the contract to the given address.\n\nThis is translated to a [MsgSend](https://github.com/cosmos/cosmos-sdk/blob/v0.40.0/proto/cosmos/bank/v1beta1/tx.proto#L19-L28). `from_address` is automatically filled with the current contract's address.",
           "type": "object",
@@ -91,7 +91,7 @@
       }
     },
     "CosmosMsg_for_Empty": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "required": [
@@ -140,7 +140,7 @@
     },
     "Expiration": {
       "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "AtHeight will expire when `env.block.height` >= height",
           "type": "object",
@@ -242,7 +242,7 @@
     },
     "ThresholdResponse": {
       "description": "This defines the different ways tallies can happen. Every contract should support a subset of these, ideally all.\n\nThe total_weight used for calculating success as well as the weights of each individual voter used in tallying should be snapshotted at the beginning of the block at which the proposal starts (this is likely the responsibility of a correct cw4 implementation).",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "Declares that a fixed weight of yes votes is needed to pass. It does not matter how many no votes are cast, or how many do not vote, as long as `weight` yes votes are cast.\n\nThis is the simplest format and usually suitable for small multisigs of trusted parties, like 3 of 5. (weight: 3, total_weight: 5)\n\nA proposal of this type can pass early as soon as the needed weight of yes votes has been cast.",
           "type": "object",
@@ -350,7 +350,7 @@
     },
     "WasmMsg": {
       "description": "The message types of the wasm module.\n\nSee https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "Dispatches a call to another contract at a known address (with known ABI).\n\nThis is translated to a [MsgExecuteContract](https://github.com/CosmWasm/wasmd/blob/v0.14.0/x/wasm/internal/types/tx.proto#L68-L78). `sender` is automatically filled with the current contract's address.",
           "type": "object",
