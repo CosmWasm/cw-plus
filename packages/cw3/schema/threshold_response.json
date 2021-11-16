@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ThresholdResponse",
   "description": "This defines the different ways tallies can happen. Every contract should support a subset of these, ideally all.\n\nThe total_weight used for calculating success as well as the weights of each individual voter used in tallying should be snapshotted at the beginning of the block at which the proposal starts (this is likely the responsibility of a correct cw4 implementation).",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Declares that a fixed weight of yes votes is needed to pass. It does not matter how many no votes are cast, or how many do not vote, as long as `weight` yes votes are cast.\n\nThis is the simplest format and usually suitable for small multisigs of trusted parties, like 3 of 5. (weight: 3, total_weight: 5)\n\nA proposal of this type can pass early as soon as the needed weight of yes votes has been cast.",
       "type": "object",
