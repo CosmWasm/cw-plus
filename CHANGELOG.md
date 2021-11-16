@@ -2,22 +2,34 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.2...HEAD)
+
+**Implemented enhancements:**
+
+- Deprecate IntKey [\#547](https://github.com/CosmWasm/cw-plus/pull/547) ([ueco-jb](https://github.com/ueco-jb))
+
+**Fixed bugs:**
+
+- Fix min threshold and vote power bugs in cw3-flex-multisig [\#527](https://github.com/CosmWasm/cw-plus/issues/527)
 
 **Closed issues:**
 
-- Multitest has errors with reply data [\#516](https://github.com/CosmWasm/cw-plus/issues/516)
+- "env.sender" in README of cw20 [\#539](https://github.com/CosmWasm/cw-plus/issues/539)
+- Migrate example [\#511](https://github.com/CosmWasm/cw-plus/issues/511)
+- Semver parsing / comparison [\#510](https://github.com/CosmWasm/cw-plus/issues/510)
+- Example of parsing SubMessage data field [\#509](https://github.com/CosmWasm/cw-plus/issues/509)
+- Deprecate `IntKey` [\#472](https://github.com/CosmWasm/cw-plus/issues/472)
 
 **Merged pull requests:**
 
-- cw1-whitelist-ng: Slight messages parsing improvement [\#523](https://github.com/CosmWasm/cw-plus/pull/523) ([hashedone](https://github.com/hashedone))
-- ics20: Handle send errors with reply [\#520](https://github.com/CosmWasm/cw-plus/pull/520) ([ethanfrey](https://github.com/ethanfrey))
-- Proper execute responses [\#519](https://github.com/CosmWasm/cw-plus/pull/519) ([ethanfrey](https://github.com/ethanfrey))
-- Publish MsgInstantiate / Execute responses [\#518](https://github.com/CosmWasm/cw-plus/pull/518) ([maurolacy](https://github.com/maurolacy))
-- Fix instaniate reply data [\#517](https://github.com/CosmWasm/cw-plus/pull/517) ([ethanfrey](https://github.com/ethanfrey))
-- Use protobuf de helpers [\#515](https://github.com/CosmWasm/cw-plus/pull/515) ([maurolacy](https://github.com/maurolacy))
-- Add tests for the claims controller [\#514](https://github.com/CosmWasm/cw-plus/pull/514) ([sgoya](https://github.com/sgoya))
-- Implement cw3-flex-multisig helper [\#479](https://github.com/CosmWasm/cw-plus/pull/479) ([orkunkl](https://github.com/orkunkl))
+- Update cw1-subkeys/helpers.ts file to work with cosmjs/cli v0.26 [\#546](https://github.com/CosmWasm/cw-plus/pull/546) ([findolor](https://github.com/findolor))
+- Fix cw20 readme [\#544](https://github.com/CosmWasm/cw-plus/pull/544) ([loloicci](https://github.com/loloicci))
+- Revert "Update helper version and refactor based on new base helper" [\#538](https://github.com/CosmWasm/cw-plus/pull/538) ([findolor](https://github.com/findolor))
+- Update cw1-subkeys/helpers.ts version and refactor based on base-helper.ts [\#537](https://github.com/CosmWasm/cw-plus/pull/537) ([findolor](https://github.com/findolor))
+- Refactor cw20-base/helpers.ts based on base-helper.ts [\#536](https://github.com/CosmWasm/cw-plus/pull/536) ([findolor](https://github.com/findolor))
+- Add base helper for contracts [\#535](https://github.com/CosmWasm/cw-plus/pull/535) ([findolor](https://github.com/findolor))
+- Fix min threshold in cw3-flex-multisig [\#528](https://github.com/CosmWasm/cw-plus/pull/528) ([ueco-jb](https://github.com/ueco-jb))
+- cw1-subkeys: Migration example [\#525](https://github.com/CosmWasm/cw-plus/pull/525) ([hashedone](https://github.com/hashedone))
 
 ## [v0.10.1](https://github.com/CosmWasm/cw-plus/tree/v0.10.1) (2021-10-26)
 
