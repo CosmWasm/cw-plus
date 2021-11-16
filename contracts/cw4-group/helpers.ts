@@ -1,17 +1,11 @@
-import axios from  "axios";
-import fs from "fs";
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { GasPrice, calculateFee, StdFee } from "@cosmjs/stargate";
-import { DirectSecp256k1HdWallet, makeCosmoshubPath } from "@cosmjs/proto-signing";
-import { Slip10RawIndex } from "@cosmjs/crypto";
-import { toUtf8, toBase64 } from "@cosmjs/encoding";
-import path from "path";
+import { calculateFee } from "@cosmjs/stargate"
 
 /*
  * This is a set of helpers meant for use with @cosmjs/cli
+ * Look at https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts on how to setup a wallet
  * With these you can easily use the cw20 contract without worrying about forming messages and parsing queries.
  *
- * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw4-group/helpers.ts
+ * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw4-group/helpers.ts
  *
  * Create a client:
  *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
@@ -20,10 +14,10 @@ import path from "path";
  *   await useOptions(pebblenetOptions).recoverMnemonic(password);
  *
  * Create contract:
- *   const contract = CW4Group(client, pebblenetOptions.fees);
+ *   const contract = CW4Group(client, pebblenetOptions);
  *
  * Upload contract:
- *   const codeId = await contract.upload(addr);
+ *   const codeId = await contract.upload(addr, pebblenetOptions);
  *
  * Instantiate contract example:
  *   const initMsg = {
@@ -39,109 +33,10 @@ import path from "path";
  *       },
  *     ]
  *   };
- *   const instance = await contract.instantiate(addr, codeId, initMsg, 'WORKFORCE1');
+ *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
 */
-
-interface Options {
-  readonly httpUrl: string
-  readonly networkId: string
-  readonly feeToken: string
-  readonly bech32prefix: string
-  readonly hdPath: readonly Slip10RawIndex[]
-  readonly faucetUrl?: string
-  readonly defaultKeyFile: string,
-  readonly fees: {
-    upload: StdFee,
-    init: StdFee,
-    exec: StdFee
-  }
-}
-
-const pebblenetGasPrice = GasPrice.fromString("0.01upebble");
-const pebblenetOptions: Options = {
-  httpUrl: 'https://rpc.pebblenet.cosmwasm.com',
-  networkId: 'pebblenet-1',
-  bech32prefix: 'wasm',
-  feeToken: 'upebble',
-  faucetUrl: 'https://faucet.pebblenet.cosmwasm.com/credit',
-  hdPath: makeCosmoshubPath(0),
-  defaultKeyFile: path.join(process.env.HOME, ".pebblenet.key"),
-  fees: {
-    upload: calculateFee(1500000, pebblenetGasPrice),
-    init: calculateFee(500000, pebblenetGasPrice),
-    exec: calculateFee(200000, pebblenetGasPrice),
-  },
-}
-
-interface Network {
-  setup: (password: string, filename?: string) => Promise<[string, SigningCosmWasmClient]>
-  recoverMnemonic: (password: string, filename?: string) => Promise<string>
-}
-
-const useOptions = (options: Options): Network => {
-
-  const loadOrCreateWallet = async (options: Options, filename: string, password: string): Promise<DirectSecp256k1HdWallet> => {
-    let encrypted: string;
-    try {
-      encrypted = fs.readFileSync(filename, 'utf8');
-    } catch (err) {
-      // generate if no file exists
-      const wallet = await DirectSecp256k1HdWallet.generate(12, {hdPaths: [options.hdPath], prefix: options.bech32prefix});
-      const encrypted = await wallet.serialize(password);
-      fs.writeFileSync(filename, encrypted, 'utf8');
-      return wallet;
-    }
-    // otherwise, decrypt the file (we cannot put deserialize inside try or it will over-write on a bad password)
-    const wallet = await DirectSecp256k1HdWallet.deserialize(encrypted, password);
-    return wallet;
-  };
-
-  const connect = async (
-    wallet: DirectSecp256k1HdWallet,
-    options: Options
-  ): Promise<SigningCosmWasmClient> => {
-    const clientOptions = {
-      prefix: options.bech32prefix
-    }
-    return await SigningCosmWasmClient.connectWithSigner(options.httpUrl, wallet, clientOptions)
-  };
-
-  const hitFaucet = async (
-    faucetUrl: string,
-    address: string,
-    denom: string
-  ): Promise<void> => {
-    await axios.post(faucetUrl, {denom, address});
-  }
-
-  const setup = async (password: string, filename?: string): Promise<[string, SigningCosmWasmClient]> => {
-    const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
-    const client = await connect(wallet, pebblenetOptions);
-
-    const [account] = await wallet.getAccounts();
-    // ensure we have some tokens
-    if (options.faucetUrl) {
-      const tokens = await client.getBalance(account.address, options.feeToken)
-      if (tokens.amount === '0') {
-        console.log(`Getting ${options.feeToken} from faucet`);
-        await hitFaucet(options.faucetUrl, account.address, options.feeToken);
-      }
-    }
-
-    return [account.address, client];
-  }
-
-  const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
-    const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
-    return wallet.mnemonic;
-  }
-
-  return {setup, recoverMnemonic};
-}
 
 interface AdminResponse {
   readonly admin?: string
@@ -188,12 +83,12 @@ interface CW4GroupInstance {
 }
 
 interface CW4GroupContract {
-  upload: (txSigner: string) => Promise<number>
-  instantiate: (txSigner: string, codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string) => Promise<CW4GroupInstance>
+  upload: (txSigner: string, options: Options) => Promise<number>
+  instantiate: (txSigner: string, codeId: number, initMsg: Record<string, unknown>, label: string, options: Options, admin?: string) => Promise<CW4GroupInstance>
   use: (contractAddress: string) => CW4GroupInstance
 }
 
-export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): CW4GroupContract => {
+export const CW4Group = (client: SigningCosmWasmClient, options: Options): CW4GroupContract => {
   const use = (contractAddress: string): CW4GroupInstance => {
 
     const admin = async (): Promise<AdminResponse> => {
@@ -217,22 +112,30 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): 
     };
 
     const updateAdmin = async (txSigner: string, admin?: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {update_admin: {admin}}, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, {update_admin: {admin}}, fee);
       return result.transactionHash;
     }
 
     const updateMembers = async (txSigner: string, remove: Member[], add: Member[]): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {update_members: {remove, add}}, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, {update_members: {remove, add}}, fee);
       return result.transactionHash;
     }
 
     const _addHook = async (txSigner: string, addr: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {add_hook: {addr}}, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, {add_hook: {addr}}, fee);
       return result.transactionHash;
     }
 
     const _removeHook = async (txSigner: string, addr: string): Promise<string> => {
-      const result = await client.execute(txSigner, contractAddress, {remove_hook: {addr}}, fees.exec);
+      const fee = calculateFee(options.fees.exec, options.gasPrice)
+
+      const result = await client.execute(txSigner, contractAddress, {remove_hook: {addr}}, fee);
       return result.transactionHash;
     }
 
@@ -258,15 +161,17 @@ export const CW4Group = (client: SigningCosmWasmClient, fees: Options['fees']): 
     return r.data
   }
 
-  const upload = async (senderAddress: string): Promise<number> => {
+  const upload = async (senderAddress: string, options: Options): Promise<number> => {
     const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.9.0/cw4_group.wasm";
     const wasm = await downloadWasm(sourceUrl);
-    const result = await client.upload(senderAddress, wasm, fees.upload);
+    const fee = calculateFee(options.fees.upload, options.gasPrice)
+    const result = await client.upload(senderAddress, wasm, fee);
     return result.codeId;
   }
 
-  const instantiate = async (senderAddress: string, codeId: number, initMsg: Record<string, unknown>, label: string, admin?: string): Promise<CW4GroupInstance> => {
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fees.init, { memo: `Init ${label}`, admin });
+  const instantiate = async (senderAddress: string, codeId: number, initMsg: Record<string, unknown>, label: string, options: Options, admin?: string): Promise<CW4GroupInstance> => {
+    const fee = calculateFee(options.fees.init, options.gasPrice)
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, { memo: `Init ${label}`, admin });
     return use(result.contractAddress);
   }
 
