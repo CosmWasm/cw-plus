@@ -25,6 +25,20 @@ use cosmwasm_std::testing::mock_wasmd_attr;
 
 use anyhow::{bail, Result as AnyResult};
 
+// TODO: we should import this from cosmwasm-std, but cannot due to non_exhaustive so copy here
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ContractInfoResponse {
+    pub code_id: u64,
+    /// address that instantiated this contract
+    pub creator: String,
+    /// admin who can run migrations (if any)
+    pub admin: Option<String>,
+    /// if set, the contract is pinned to the cache, and thus uses less gas when called
+    pub pinned: bool,
+    /// set if this contract has bound an IBC port
+    pub ibc_port: Option<String>,
+}
+
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
@@ -134,6 +148,18 @@ where
             WasmQuery::Raw { contract_addr, key } => {
                 let addr = api.addr_validate(&contract_addr)?;
                 Ok(self.query_raw(addr, storage, &key))
+            }
+            WasmQuery::ContractInfo { contract_addr } => {
+                let addr = api.addr_validate(&contract_addr)?;
+                let contract = self.load_contract(storage, &addr)?;
+                let res = ContractInfoResponse {
+                    code_id: contract.code_id as u64,
+                    creator: contract.creator.to_string(),
+                    admin: contract.admin.map(|x| x.to_string()),
+                    pinned: false,
+                    ibc_port: None,
+                };
+                to_binary(&res).map_err(Into::into)
             }
             query => bail!(Error::UnsupportedWasmQuery(query)),
         }
