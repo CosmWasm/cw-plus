@@ -2,7 +2,39 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.3...HEAD)
+
+## [v0.10.3](https://github.com/CosmWasm/cw-plus/tree/v0.10.3) (2021-11-16)
+
+**Implemented enhancements:**
+
+- Deprecate IntKey [\#547](https://github.com/CosmWasm/cw-plus/pull/547) ([ueco-jb](https://github.com/ueco-jb))
+- Implement WasmQuery::ContractInfo [\#554](https://github.com/CosmWasm/cw-plus/pull/554) ([ethanfrey](https://github.com/ethanfrey))
+
+**Fixed bugs:**
+
+- Fix min threshold and vote power bugs in cw3-flex-multisig [\#527](https://github.com/CosmWasm/cw-plus/issues/527)
+
+**Closed issues:**
+
+- "env.sender" in README of cw20 [\#539](https://github.com/CosmWasm/cw-plus/issues/539)
+- Migrate example [\#511](https://github.com/CosmWasm/cw-plus/issues/511)
+- Semver parsing / comparison [\#510](https://github.com/CosmWasm/cw-plus/issues/510)
+- Example of parsing SubMessage data field [\#509](https://github.com/CosmWasm/cw-plus/issues/509)
+- Deprecate `IntKey` [\#472](https://github.com/CosmWasm/cw-plus/issues/472)
+
+**Merged pull requests:**
+
+- Update cw1-subkeys/helpers.ts file to work with cosmjs/cli v0.26 [\#546](https://github.com/CosmWasm/cw-plus/pull/546) ([findolor](https://github.com/findolor))
+- Fix cw20 readme [\#544](https://github.com/CosmWasm/cw-plus/pull/544) ([loloicci](https://github.com/loloicci))
+- Revert "Update helper version and refactor based on new base helper" [\#538](https://github.com/CosmWasm/cw-plus/pull/538) ([findolor](https://github.com/findolor))
+- Update cw1-subkeys/helpers.ts version and refactor based on base-helper.ts [\#537](https://github.com/CosmWasm/cw-plus/pull/537) ([findolor](https://github.com/findolor))
+- Refactor cw20-base/helpers.ts based on base-helper.ts [\#536](https://github.com/CosmWasm/cw-plus/pull/536) ([findolor](https://github.com/findolor))
+- Add base helper for contracts [\#535](https://github.com/CosmWasm/cw-plus/pull/535) ([findolor](https://github.com/findolor))
+- Fix min threshold in cw3-flex-multisig [\#528](https://github.com/CosmWasm/cw-plus/pull/528) ([ueco-jb](https://github.com/ueco-jb))
+- cw1-subkeys: Migration example [\#525](https://github.com/CosmWasm/cw-plus/pull/525) ([hashedone](https://github.com/hashedone))
+
+## [v0.10.2](https://github.com/CosmWasm/cw-plus/tree/v0.10.2) (2021-11-03)
 
 **Closed issues:**
 
