@@ -2,10 +2,9 @@ use crate::msg::*;
 use crate::query::*;
 use crate::state::Cw1WhitelistContract;
 use anyhow::{bail, Result as AnyResult};
-use cosmwasm_std::CustomMsg;
 use cosmwasm_std::{
-    Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Env, MessageInfo, QuerierWrapper, Reply,
-    Response,
+    from_slice, Addr, Binary, Coin, CosmosMsg, CustomMsg, CustomQuery, DepsMut, Env, MessageInfo,
+    QuerierWrapper, Reply, Response,
 };
 use cw_multi_test::{AppResponse, Contract, Executor};
 use schemars::JsonSchema;
@@ -22,7 +21,8 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<T>> {
-        self.entry_instantiate(deps, env, info, &msg)
+        from_slice::<InstantiateMsg>(&msg)?
+            .dispatch(deps, env, info, self)
             .map_err(Into::into)
     }
 
@@ -33,12 +33,15 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<T>> {
-        self.entry_execute(deps, env, info, &msg)
+        from_slice::<ExecMsg<T>>(&msg)?
+            .dispatch(deps, env, info, self)
             .map_err(Into::into)
     }
 
     fn query(&self, deps: cosmwasm_std::Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
-        self.entry_query(deps, env, &msg).map_err(Into::into)
+        from_slice::<QueryMsg<T>>(&msg)?
+            .dispatch(deps, env, self)
+            .map_err(Into::into)
     }
 
     fn sudo(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response<T>> {

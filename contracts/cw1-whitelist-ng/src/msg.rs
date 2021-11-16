@@ -33,6 +33,43 @@ impl InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+pub enum ExecMsg<T = Empty> {
+    /// Execute requests the contract to re-dispatch all these messages with the
+    /// contract's address as sender. Every implementation has it's own logic to
+    /// determine in
+    Execute { msgs: Vec<CosmosMsg<T>> },
+    /// Freeze will make a mutable contract immutable, must be called by an admin
+    Freeze {},
+    /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,
+    /// and only works if the contract is mutable
+    UpdateAdmins { admins: Vec<String> },
+}
+
+impl<T> ExecMsg<T> {
+    pub fn dispatch(
+        self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        contract: &Cw1WhitelistContract<T>,
+    ) -> Result<Response<T>, ContractError> {
+        use ExecMsg::*;
+
+        match self {
+            // Cw1 messages dispatching
+            Execute { msgs } => Cw1ExecMsg::Execute { msgs }.dispatch(deps, env, info, contract),
+
+            // Whitelist messages dispatching
+            Freeze {} => WhitelistExecMsg::Freeze {}.dispatch(deps, env, info, contract),
+            UpdateAdmins { admins } => {
+                WhitelistExecMsg::UpdateAdmins { admins }.dispatch(deps, env, info, contract)
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Cw1ExecMsg<T = Empty> {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
@@ -85,6 +122,35 @@ impl WhitelistExecMsg {
         match self {
             Freeze {} => contract.freeze(deps, env, info),
             UpdateAdmins { admins } => contract.update_admins(deps, env, info, admins),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg<T = Empty> {
+    /// Checks permissions of the caller on this proxy.
+    /// If CanExecute returns true then a call to `Execute` with the same message,
+    /// before any further state changes, should also succeed.
+    CanExecute { sender: String, msg: CosmosMsg<T> },
+    /// Shows all admins and whether or not it is mutable
+    AdminList {},
+}
+
+impl<T> QueryMsg<T> {
+    pub fn dispatch(
+        self,
+        deps: Deps,
+        env: Env,
+        contract: &Cw1WhitelistContract<T>,
+    ) -> Result<Binary, ContractError> {
+        use QueryMsg::*;
+
+        match self {
+            CanExecute { sender, msg } => {
+                Cw1QueryMsg::CanExecute { sender, msg }.dispatch(deps, env, contract)
+            }
+            AdminList {} => WhitelistQueryMsg::AdminList {}.dispatch(deps, env, contract),
         }
     }
 }

@@ -9,36 +9,35 @@ pub mod state;
 #[cfg(not(feature = "library"))]
 mod entry_points {
     use crate::error::ContractError;
+    use crate::msg::{ExecMsg, InstantiateMsg, QueryMsg};
     use crate::state::Cw1WhitelistContract;
-    use cosmwasm_std::{
-        entry_point_lazy, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    };
+    use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
 
     const CONTRACT: Cw1WhitelistContract<Empty> = Cw1WhitelistContract::native();
 
-    #[entry_point_lazy]
+    #[entry_point]
     pub fn instantiate(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: Vec<u8>,
+        msg: InstantiateMsg,
     ) -> Result<Response, ContractError> {
-        CONTRACT.entry_instantiate(deps, env, info, &msg)
+        msg.dispatch(deps, env, info, &CONTRACT)
     }
 
-    #[entry_point_lazy]
+    #[entry_point]
     pub fn execute(
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: Vec<u8>,
+        msg: ExecMsg,
     ) -> Result<Response, ContractError> {
-        CONTRACT.entry_execute(deps, env, info, &msg)
+        msg.dispatch(deps, env, info, &CONTRACT)
     }
 
-    #[entry_point_lazy]
-    pub fn query(deps: Deps, env: Env, msg: Vec<u8>) -> Result<Binary, ContractError> {
-        CONTRACT.entry_query(deps, env, &msg)
+    #[entry_point]
+    pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
+        msg.dispatch(deps, env, &CONTRACT)
     }
 }
 

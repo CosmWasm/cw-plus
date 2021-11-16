@@ -157,21 +157,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "cosmwasm-crypto"
-version = "1.0.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm?branch=lazy-deserialized-ep#765a93382487a0a8f0cec3350196d9da1c335d9c"
-dependencies = [
- "digest 0.9.0",
- "ed25519-zebra",
- "k256",
- "rand_core 0.5.1",
- "thiserror",
-]
-
-[[package]]
 name = "cosmwasm-derive"
 version = "1.0.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm?branch=lazy-deserialized-ep#765a93382487a0a8f0cec3350196d9da1c335d9c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abad1a6ff427a2f66890a4dce6354b4563cd07cee91a942300e011c921c09ed2"
 dependencies = [
  "syn",
 ]
@@ -189,10 +178,11 @@ dependencies = [
 [[package]]
 name = "cosmwasm-std"
 version = "1.0.0-beta2"
-source = "git+https://github.com/CosmWasm/cosmwasm?branch=lazy-deserialized-ep#765a93382487a0a8f0cec3350196d9da1c335d9c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1660ee3d5734672e1eb4f0ceda403e2d83345e15143a48845f340f3252ce99a6"
 dependencies = [
  "base64",
- "cosmwasm-crypto 1.0.0-beta2 (git+https://github.com/CosmWasm/cosmwasm?branch=lazy-deserialized-ep)",
+ "cosmwasm-crypto",
  "cosmwasm-derive",
  "schemars",
  "serde",
@@ -218,7 +208,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcde663575b5b29b479a4c18eacb9f8a00a8aaca25f8f498c7637da5bb354e19"
 dependencies = [
  "clru",
- "cosmwasm-crypto 1.0.0-beta2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cosmwasm-crypto",
  "cosmwasm-std",
  "hex 0.4.3",
  "loupe",

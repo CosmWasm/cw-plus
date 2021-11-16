@@ -1,9 +1,6 @@
 [workspace]
 members = ["packages/*", "contracts/*"]
 
-[patch.crates-io]
-cosmwasm-std = { git = "https://github.com/CosmWasm/cosmwasm", branch = "lazy-deserialized-ep" }
-
 [profile.release.package.cw1-subkeys]
 codegen-units = 1
 incremental = false

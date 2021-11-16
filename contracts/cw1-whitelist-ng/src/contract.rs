@@ -1,14 +1,8 @@
-use cosmwasm_std::{
-    from_slice, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult,
-};
-use serde::de::DeserializeOwned;
+use cosmwasm_std::{Addr, Api, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use crate::error::ContractError;
 use crate::interfaces::*;
-use crate::msg::{
-    AdminListResponse, Cw1ExecMsg, Cw1QueryMsg, InstantiateMsg, WhitelistExecMsg, WhitelistQueryMsg,
-};
+use crate::msg::AdminListResponse;
 use crate::state::{AdminList, Cw1WhitelistContract};
 
 use cw1::CanExecuteResponse;
@@ -44,76 +38,6 @@ impl<T> Cw1WhitelistContract<T> {
     pub fn is_admin(&self, deps: Deps, addr: &str) -> Result<bool, ContractError> {
         let cfg = self.admin_list.load(deps.storage)?;
         Ok(cfg.is_admin(addr))
-    }
-
-    // Entry points, to be called only in actual entry points and by multitest `Contract`
-    // implementation
-    pub(crate) fn entry_instantiate(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        msg: &[u8],
-    ) -> Result<Response<T>, ContractError> {
-        let msg: InstantiateMsg = from_slice(msg)?;
-        msg.dispatch(deps, env, info, self)
-    }
-
-    pub(crate) fn entry_execute(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        msg: &[u8],
-    ) -> Result<Response<T>, ContractError>
-    where
-        T: DeserializeOwned,
-    {
-        let cw1_err = match from_slice::<Cw1ExecMsg<T>>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, info, self),
-            Err(err) => err,
-        };
-
-        let whitelist_err = match from_slice::<WhitelistExecMsg>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, info, self),
-            Err(err) => err,
-        };
-
-        let msg = format!(
-            "While parsing Cw1WhitelistExecMsg\n As Cw1ExecMsg: {}\n As WhitelistExecMsg: {}",
-            cw1_err, whitelist_err
-        );
-
-        let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
-        Err(err.into())
-    }
-
-    pub(crate) fn entry_query(
-        &self,
-        deps: Deps,
-        env: Env,
-        msg: &[u8],
-    ) -> Result<Binary, ContractError>
-    where
-        T: DeserializeOwned,
-    {
-        let cw1_err = match from_slice::<Cw1QueryMsg<T>>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, self),
-            Err(err) => err,
-        };
-
-        let whitelist_err = match from_slice::<WhitelistQueryMsg>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, self),
-            Err(err) => err,
-        };
-
-        let msg = format!(
-            "While parsing Cw1WhitelistQueryMsg\n As Cw1QueryMsg: {}\n As WhitelistQueryMsg: {}",
-            cw1_err, whitelist_err
-        );
-
-        let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
-        Err(err.into())
     }
 }
 
