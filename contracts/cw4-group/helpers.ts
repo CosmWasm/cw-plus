@@ -36,31 +36,31 @@ import { calculateFee } from "@cosmjs/stargate"
  *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
-*/
+ */
 
 interface AdminResponse {
   readonly admin?: string
 }
 
 interface MemberResponse {
-  readonly weight?: number;
+  readonly weight?: number
 }
 
 interface MemberListResponse {
-  readonly members: Member[];
+  readonly members: Member[]
 }
 
 interface Member {
-  readonly addr: string;
-  readonly weight: number;
+  readonly addr: string
+  readonly weight: number
 }
 
 interface TotalWeightResponse {
-  readonly weight: number;
+  readonly weight: number
 }
 
 interface HooksResponse {
-  readonly hooks: readonly string[];
+  readonly hooks: readonly string[]
 }
 
 interface CW4GroupInstance {
@@ -75,7 +75,7 @@ interface CW4GroupInstance {
 
   // actions
   updateAdmin: (txSigner: string, admin?: string) => Promise<string>
-  updateMembers: (txSigner: string, remove: Member[], add: Member[] ) => Promise<string>
+  updateMembers: (txSigner: string, remove: Member[], add: Member[]) => Promise<string>
 
   // will not used by end user for testing purposes
   _addHook: (txSigner: string, addr: string) => Promise<string>
@@ -84,59 +84,65 @@ interface CW4GroupInstance {
 
 interface CW4GroupContract {
   upload: (txSigner: string, options: Options) => Promise<number>
-  instantiate: (txSigner: string, codeId: number, initMsg: Record<string, unknown>, label: string, options: Options, admin?: string) => Promise<CW4GroupInstance>
+  instantiate: (
+    txSigner: string,
+    codeId: number,
+    initMsg: Record<string, unknown>,
+    label: string,
+    options: Options,
+    admin?: string,
+  ) => Promise<CW4GroupInstance>
   use: (contractAddress: string) => CW4GroupInstance
 }
 
 export const CW4Group = (client: SigningCosmWasmClient, options: Options): CW4GroupContract => {
   const use = (contractAddress: string): CW4GroupInstance => {
-
     const admin = async (): Promise<AdminResponse> => {
-      return client.queryContractSmart(contractAddress, {admin: {}});
-    };
+      return client.queryContractSmart(contractAddress, { admin: {} })
+    }
 
     const totalWeight = async (): Promise<TotalWeightResponse> => {
-      return client.queryContractSmart(contractAddress, {total_weight: {}});
-    };
+      return client.queryContractSmart(contractAddress, { total_weight: {} })
+    }
 
     const member = async (addr: string, atHeight?: number): Promise<MemberResponse> => {
-      return client.queryContractSmart(contractAddress, {member: {addr, at_height: atHeight}});
-    };
+      return client.queryContractSmart(contractAddress, { member: { addr, at_height: atHeight } })
+    }
 
     const listMembers = async (startAfter?: string, limit?: number): Promise<MemberListResponse> => {
-      return client.queryContractSmart(contractAddress, {list_members: {start_after: startAfter, limit}});
-    };
+      return client.queryContractSmart(contractAddress, { list_members: { start_after: startAfter, limit } })
+    }
 
     const hooks = async (): Promise<HooksResponse> => {
-      return client.queryContractSmart(contractAddress, {hooks: {}});
-    };
+      return client.queryContractSmart(contractAddress, { hooks: {} })
+    }
 
     const updateAdmin = async (txSigner: string, admin?: string): Promise<string> => {
       const fee = calculateFee(options.fees.exec, options.gasPrice)
 
-      const result = await client.execute(txSigner, contractAddress, {update_admin: {admin}}, fee);
-      return result.transactionHash;
+      const result = await client.execute(txSigner, contractAddress, { update_admin: { admin } }, fee)
+      return result.transactionHash
     }
 
     const updateMembers = async (txSigner: string, remove: Member[], add: Member[]): Promise<string> => {
       const fee = calculateFee(options.fees.exec, options.gasPrice)
 
-      const result = await client.execute(txSigner, contractAddress, {update_members: {remove, add}}, fee);
-      return result.transactionHash;
+      const result = await client.execute(txSigner, contractAddress, { update_members: { remove, add } }, fee)
+      return result.transactionHash
     }
 
     const _addHook = async (txSigner: string, addr: string): Promise<string> => {
       const fee = calculateFee(options.fees.exec, options.gasPrice)
 
-      const result = await client.execute(txSigner, contractAddress, {add_hook: {addr}}, fee);
-      return result.transactionHash;
+      const result = await client.execute(txSigner, contractAddress, { add_hook: { addr } }, fee)
+      return result.transactionHash
     }
 
     const _removeHook = async (txSigner: string, addr: string): Promise<string> => {
       const fee = calculateFee(options.fees.exec, options.gasPrice)
 
-      const result = await client.execute(txSigner, contractAddress, {remove_hook: {addr}}, fee);
-      return result.transactionHash;
+      const result = await client.execute(txSigner, contractAddress, { remove_hook: { addr } }, fee)
+      return result.transactionHash
     }
 
     return {
@@ -149,12 +155,12 @@ export const CW4Group = (client: SigningCosmWasmClient, options: Options): CW4Gr
       updateAdmin,
       updateMembers,
       _addHook,
-      _removeHook
-    };
+      _removeHook,
+    }
   }
 
   const downloadWasm = async (url: string): Promise<Uint8Array> => {
-    const r = await axios.get(url, { responseType: 'arraybuffer' })
+    const r = await axios.get(url, { responseType: "arraybuffer" })
     if (r.status !== 200) {
       throw new Error(`Download error: ${r.status}`)
     }
@@ -162,18 +168,28 @@ export const CW4Group = (client: SigningCosmWasmClient, options: Options): CW4Gr
   }
 
   const upload = async (senderAddress: string, options: Options): Promise<number> => {
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.9.0/cw4_group.wasm";
-    const wasm = await downloadWasm(sourceUrl);
+    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.9.0/cw4_group.wasm"
+    const wasm = await downloadWasm(sourceUrl)
     const fee = calculateFee(options.fees.upload, options.gasPrice)
-    const result = await client.upload(senderAddress, wasm, fee);
-    return result.codeId;
+    const result = await client.upload(senderAddress, wasm, fee)
+    return result.codeId
   }
 
-  const instantiate = async (senderAddress: string, codeId: number, initMsg: Record<string, unknown>, label: string, options: Options, admin?: string): Promise<CW4GroupInstance> => {
+  const instantiate = async (
+    senderAddress: string,
+    codeId: number,
+    initMsg: Record<string, unknown>,
+    label: string,
+    options: Options,
+    admin?: string,
+  ): Promise<CW4GroupInstance> => {
     const fee = calculateFee(options.fees.init, options.gasPrice)
-    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, { memo: `Init ${label}`, admin });
-    return use(result.contractAddress);
+    const result = await client.instantiate(senderAddress, codeId, initMsg, label, fee, {
+      memo: `Init ${label}`,
+      admin,
+    })
+    return use(result.contractAddress)
   }
 
-  return { upload, instantiate, use };
+  return { upload, instantiate, use }
 }
