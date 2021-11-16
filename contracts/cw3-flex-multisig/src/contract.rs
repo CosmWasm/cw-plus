@@ -90,6 +90,10 @@ pub fn execute_propose(
     let cfg = CONFIG.load(deps.storage)?;
 
     // Only members of the multisig can create a proposal
+    // Non-voting members are special - they are allowed to create a proposal and
+    // therefore "vote", but they aren't allowed to vote otherwise.
+    // Such vote is also special, because despite having 0 weight it still counts when
+    // counting threshold passing
     let vote_power = cfg
         .group_addr
         .is_member(&deps.querier, &info.sender, None)?
