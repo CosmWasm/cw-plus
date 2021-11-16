@@ -6,7 +6,7 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
-    #[error("Required threshold must be higher then 50% and smaller then 100%")]
+    #[error("Invalid voting threshold percentage, must be in the 0.5-1.0 range")]
     InvalidThreshold {},
 
     #[error("Required quorum threshold cannot be zero")]
