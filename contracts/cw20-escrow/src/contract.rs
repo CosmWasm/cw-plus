@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn happy_path_native() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn happy_path_cw20() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn top_up_mixed_tokens() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // instantiate an empty contract
         let instantiate_msg = InstantiateMsg {};

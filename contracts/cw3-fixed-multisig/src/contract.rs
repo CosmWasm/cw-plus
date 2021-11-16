@@ -519,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_instantiate_works() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let info = mock_info(OWNER, &[]);
 
         let max_voting_period = Duration::Time(1234567);
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn test_propose_works() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let required_weight = 4;
         let voting_period = Duration::Time(2000000);
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_vote_works() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
@@ -753,7 +753,7 @@ mod tests {
 
     #[test]
     fn test_execute_works() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let required_weight = 3;
         let voting_period = Duration::Time(2000000);
@@ -828,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_close_works() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let required_weight = 3;
         let voting_period = Duration::Height(2000000);

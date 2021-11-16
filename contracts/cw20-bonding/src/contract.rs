@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn proper_instantiation() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // this matches `linear_curve` test case from curves.rs
         let creator = String::from("creator");
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn buy_issues_tokens() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let curve_type = CurveType::Linear {
             slope: Uint128::new(1),
             scale: 1,
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn bonding_fails_with_wrong_denom() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let curve_type = CurveType::Linear {
             slope: Uint128::new(1),
             scale: 1,
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn burning_sends_reserve() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let curve_type = CurveType::Linear {
             slope: Uint128::new(1),
             scale: 1,
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn cw20_imports_work() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let curve_type = CurveType::Constant {
             value: Uint128::new(15),
             scale: 1,

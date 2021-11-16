@@ -59,7 +59,7 @@ pub fn query_all_accounts(
 mod tests {
     use super::*;
 
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
     use cosmwasm_std::{coins, DepsMut, Uint128};
     use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn query_all_allowances_works() {
-        let mut deps = mock_dependencies(&coins(2, "token"));
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
         let owner = String::from("owner");
         // these are in alphabetical order same than insert order
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn query_all_accounts_works() {
-        let mut deps = mock_dependencies(&coins(2, "token"));
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
         // insert order and lexicographical order are different
         let acct1 = String::from("acct01");
