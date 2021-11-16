@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn set_and_get_admin() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let control = Admin::new("foo");
 
         // initialize and check
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn admin_checks() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let control = Admin::new("foo");
         let owner = Addr::unchecked("big boss");
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_execute_query() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         // initial setup
         let control = Admin::new("foo");

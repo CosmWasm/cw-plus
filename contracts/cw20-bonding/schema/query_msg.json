@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "QueryMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Returns the reserve and supply quantities, as well as the spot price to buy 1 token",
       "type": "object",

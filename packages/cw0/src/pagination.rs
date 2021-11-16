@@ -55,7 +55,7 @@ mod test {
     #[test]
     fn calc_range_start_works_as_expected() {
         let total_elements_count = 100;
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         for i in 0..total_elements_count {
             let holder = (addr_from_i(i), i);
             HOLDERS
@@ -88,7 +88,7 @@ mod test {
     #[test]
     fn calc_range_end_works_as_expected() {
         let total_elements_count = 100;
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         for i in 0..total_elements_count {
             let holder = (addr_from_i(i), i);
             HOLDERS

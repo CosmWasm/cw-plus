@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn proper_instantiation() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         // it worked, let's query the state
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn try_member_queries() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn add_new_remove_old_member() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         // add a new one and remove existing one
@@ -353,7 +353,7 @@ mod tests {
     #[test]
     fn add_old_remove_new_member() {
         // add will over-write and remove have no effect
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         // add a new one and remove existing one
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn add_and_remove_same_member() {
         // add will over-write and remove have no effect
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         // USER1 is updated and remove in the same call, we should remove this an add member3
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn add_remove_hooks() {
         // add will over-write and remove have no effect
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
@@ -479,7 +479,7 @@ mod tests {
 
     #[test]
     fn hooks_fire() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
@@ -537,7 +537,7 @@ mod tests {
     #[test]
     fn raw_queries_work() {
         // add will over-write and remove have no effect
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut());
 
         // get total from raw key

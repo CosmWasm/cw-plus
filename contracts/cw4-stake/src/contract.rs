@@ -466,7 +466,7 @@ mod tests {
 
     #[test]
     fn proper_instantiation() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
 
         // it worked, let's query the state
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn bond_stake_adds_membership() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
         let height = mock_env().block.height;
 
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn unbond_stake_update_membership() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
         let height = mock_env().block.height;
 
@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn cw20_token_bond() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         cw20_instantiate(deps.as_mut(), Duration::Height(2000));
 
         // Assert original weights
@@ -629,7 +629,7 @@ mod tests {
         let unbonding_period: u64 = 50;
         let unbond_height: u64 = 10;
 
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let unbonding = Duration::Height(unbonding_period);
         cw20_instantiate(deps.as_mut(), unbonding);
 
@@ -686,7 +686,7 @@ mod tests {
     #[test]
     fn raw_queries_work() {
         // add will over-write and remove have no effect
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
         // Set values as (11, 6, None)
         bond(deps.as_mut(), 11_000, 6_000, 0, 1);
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn unbond_claim_workflow() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
 
         // create some data
@@ -847,7 +847,7 @@ mod tests {
     #[test]
     fn add_remove_hooks() {
         // add will over-write and remove have no effect
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
@@ -915,7 +915,7 @@ mod tests {
 
     #[test]
     fn hooks_fire() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
 
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
@@ -969,7 +969,7 @@ mod tests {
 
     #[test]
     fn only_bond_valid_coins() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         default_instantiate(deps.as_mut());
 
         // cannot bond with 0 coins
@@ -996,7 +996,7 @@ mod tests {
     #[test]
     fn ensure_bonding_edge_cases() {
         // use min_bond 0, tokens_per_weight 500
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         do_instantiate(
             deps.as_mut(),
             Uint128::new(100),

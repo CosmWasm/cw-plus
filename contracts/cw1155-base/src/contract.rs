@@ -573,7 +573,7 @@ mod tests {
         let user1 = String::from("user1");
         let user2 = String::from("user2");
 
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let msg = InstantiateMsg {
             minter: minter.clone(),
         };
@@ -897,7 +897,7 @@ mod tests {
         let token2 = "token2".to_owned();
         let dummy_msg = Binary::default();
 
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let msg = InstantiateMsg {
             minter: minter.clone(),
         };
@@ -990,7 +990,7 @@ mod tests {
         let users = (0..10).map(|i| format!("user{}", i)).collect::<Vec<_>>();
         let minter = String::from("minter");
 
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let msg = InstantiateMsg {
             minter: minter.clone(),
         };
@@ -1102,7 +1102,7 @@ mod tests {
 
     #[test]
     fn approval_expires() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let token1 = "token1".to_owned();
         let minter = String::from("minter");
         let user1 = String::from("user1");
@@ -1181,7 +1181,7 @@ mod tests {
 
     #[test]
     fn mint_overflow() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let token1 = "token1".to_owned();
         let minter = String::from("minter");
         let user1 = String::from("user1");

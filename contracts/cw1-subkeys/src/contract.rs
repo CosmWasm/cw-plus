@@ -598,7 +598,7 @@ mod tests {
 
         /// Initialized test case using provided config
         fn init_with_config(config: SuiteConfig) -> Self {
-            let mut deps = mock_dependencies(&[]);
+            let mut deps = mock_dependencies();
             let admins = std::iter::once(OWNER)
                 .chain(config.admins)
                 .map(ToOwned::to_owned)
@@ -2232,7 +2232,7 @@ mod tests {
     // tests permissions and allowances are independent features and does not affect each other
     #[test]
     fn permissions_allowances_independent() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let owner = "admin0001";
         let admins = vec![owner.to_string()];

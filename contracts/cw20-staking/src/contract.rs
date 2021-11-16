@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn instantiation_with_missing_validator() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         deps.querier
             .update_staking("ustake", &[sample_validator("john")], &[]);
 
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn proper_instantiation() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         deps.querier.update_staking(
             "ustake",
             &[
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn bonding_issues_tokens() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         set_validator(&mut deps.querier);
 
         let creator = String::from("creator");
@@ -637,7 +637,7 @@ mod tests {
 
     #[test]
     fn rebonding_changes_pricing() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         set_validator(&mut deps.querier);
 
         let creator = String::from("creator");
@@ -696,7 +696,7 @@ mod tests {
 
     #[test]
     fn bonding_fails_with_wrong_denom() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         set_validator(&mut deps.querier);
 
         let creator = String::from("creator");
@@ -724,7 +724,7 @@ mod tests {
 
     #[test]
     fn unbonding_maintains_price_ratio() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         set_validator(&mut deps.querier);
 
         let creator = String::from("creator");
@@ -818,7 +818,7 @@ mod tests {
 
     #[test]
     fn claims_paid_out_properly() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         set_validator(&mut deps.querier);
 
         // create contract
@@ -885,7 +885,7 @@ mod tests {
 
     #[test]
     fn cw20_imports_work() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         set_validator(&mut deps.querier);
 
         // set the actors... bob stakes, sends coins to carl, and gives allowance to alice

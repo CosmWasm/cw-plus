@@ -46,7 +46,7 @@
   },
   "definitions": {
     "CurveType": {
-      "anyOf": [
+      "oneOf": [
         {
           "description": "Constant always returns `value * 10^-scale` as spot price",
           "type": "object",
