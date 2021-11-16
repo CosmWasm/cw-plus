@@ -6,11 +6,20 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
-    #[error("Required threshold cannot be zero")]
-    ZeroThreshold {},
+    #[error("Invalid voting threshold percentage, must be in the 0.5-1.0 range")]
+    InvalidThreshold {},
 
-    #[error("Not possible to reach required (passing) threshold")]
-    UnreachableThreshold {},
+    #[error("Required quorum threshold cannot be zero")]
+    ZeroQuorumThreshold {},
+
+    #[error("Not possible to reach required quorum threshold")]
+    UnreachableQuorumThreshold {},
+
+    #[error("Required weight cannot be zero")]
+    ZeroWeight {},
+
+    #[error("Not possible to reach required (passing) weight")]
+    UnreachableWeight {},
 
     #[error("Group contract invalid address '{addr}'")]
     InvalidGroup { addr: String },

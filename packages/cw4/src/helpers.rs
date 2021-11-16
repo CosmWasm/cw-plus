@@ -74,21 +74,45 @@ impl Cw4Contract {
         Item::new(TOTAL_KEY).query(querier, self.addr())
     }
 
-    /// Check if this address is a member, and if so, with which weight
-    pub fn is_member(&self, querier: &QuerierWrapper, addr: &Addr) -> StdResult<Option<u64>> {
-        Map::new(MEMBERS_KEY).query(querier, self.addr(), addr)
+    /// Check if this address is a member and returns its weight
+    pub fn is_member(
+        &self,
+        querier: &QuerierWrapper,
+        member: &Addr,
+        height: Option<u64>,
+    ) -> StdResult<Option<u64>> {
+        match height {
+            Some(height) => self.member_at_height(querier, member.to_string(), height.into()),
+            None => Map::new(MEMBERS_KEY).query(querier, self.addr(), member),
+        }
+    }
+
+    /// Check if this address is a member, and if its weight is >= 1
+    /// Returns member's weight in positive case
+    pub fn is_voting_member(
+        &self,
+        querier: &QuerierWrapper,
+        member: &Addr,
+        height: impl Into<Option<u64>>,
+    ) -> StdResult<Option<u64>> {
+        if let Some(weight) = self.member_at_height(querier, member.to_string(), height.into())? {
+            if weight >= 1 {
+                return Ok(Some(weight));
+            }
+        }
+        Ok(None)
     }
 
     /// Return the member's weight at the given snapshot - requires a smart query
-    pub fn member_at_height<T: Into<String>>(
+    pub fn member_at_height(
         &self,
         querier: &QuerierWrapper,
-        member: T,
-        height: u64,
+        member: impl Into<String>,
+        at_height: Option<u64>,
     ) -> StdResult<Option<u64>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Member {
             addr: member.into(),
-            at_height: Some(height),
+            at_height,
         })?;
         let res: MemberResponse = querier.query(&query)?;
         Ok(res.weight)

@@ -11,11 +11,3 @@ pub use crate::query::{
     MemberResponse, TotalWeightResponse, MEMBERS_CHANGELOG, MEMBERS_CHECKPOINTS, MEMBERS_KEY,
     TOTAL_KEY,
 };
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        // test me
-    }
-}
