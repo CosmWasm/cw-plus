@@ -1,5 +1,5 @@
 [workspace]
-members = ["packages/*", "contracts/*"]
+members = ["packages/*", "contracts/cw*"]
 
 [profile.release.package.cw1-subkeys]
 codegen-units = 1
