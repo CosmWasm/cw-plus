@@ -52,6 +52,22 @@ const pebblenetOptions: Options = {
   gasPrice: GasPrice.fromString("0.01upebble"),
 }
 
+const uniOptions: Options = {
+  httpUrl: 'https://rpc.uni.juno.deuslabs.fi',
+  networkId: 'uni',
+  bech32prefix: 'juno',
+  feeToken: 'ujunox',
+  faucetUrl: 'https://faucet.uni.juno.deuslabs.fi/credit',
+  hdPath: makeCosmoshubPath(0),
+  defaultKeyFile: path.join(process.env.HOME, ".uni.key"),
+  fees: {
+    upload: 6000000,
+    init: 500000,
+    exec: 200000,
+  },
+  gasPrice: GasPrice.fromString("0.025ujunox"),
+}
+
 interface Network {
   setup: (password: string, filename?: string) => Promise<[string, SigningCosmWasmClient]>
   recoverMnemonic: (password: string, filename?: string) => Promise<string>
