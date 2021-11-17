@@ -278,7 +278,7 @@ const CW1 = (client: SigningCosmWasmClient, options: Options): CW1Contract => {
   }
 
   const upload = async (senderAddress: string, options: Options): Promise<number> => {
-    const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.9.1/cw1_subkeys.wasm"
+    const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw1_subkeys.wasm"
     const wasm = await downloadWasm(sourceUrl)
     const fee = calculateFee(options.fees.upload, options.gasPrice)
     const result = await client.upload(senderAddress, wasm, fee)
