@@ -95,8 +95,8 @@ const useOptions = (options: Options): Network => {
 
   const setup = async (password: string, filename?: string): Promise<[string, SigningCosmWasmClient]> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
-    const client = await connect(wallet, pebblenetOptions);
+    const wallet = await loadOrCreateWallet(options, keyfile, password);
+    const client = await connect(wallet, options);
 
     const [account] = await wallet.getAccounts();
     // ensure we have some tokens
@@ -113,7 +113,7 @@ const useOptions = (options: Options): Network => {
 
   const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
+    const wallet = await loadOrCreateWallet(options, keyfile, password);
     return wallet.mnemonic;
   }
 
