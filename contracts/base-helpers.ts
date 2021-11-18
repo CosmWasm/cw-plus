@@ -52,6 +52,22 @@ const pebblenetOptions: Options = {
   gasPrice: GasPrice.fromString("0.01upebble"),
 }
 
+const uniOptions: Options = {
+  httpUrl: 'https://rpc.uni.juno.deuslabs.fi',
+  networkId: 'uni',
+  bech32prefix: 'juno',
+  feeToken: 'ujunox',
+  faucetUrl: 'https://faucet.uni.juno.deuslabs.fi/credit',
+  hdPath: makeCosmoshubPath(0),
+  defaultKeyFile: path.join(process.env.HOME, ".uni.key"),
+  fees: {
+    upload: 6000000,
+    init: 500000,
+    exec: 200000,
+  },
+  gasPrice: GasPrice.fromString("0.025ujunox"),
+}
+
 interface Network {
   setup: (password: string, filename?: string) => Promise<[string, SigningCosmWasmClient]>
   recoverMnemonic: (password: string, filename?: string) => Promise<string>
@@ -95,8 +111,8 @@ const useOptions = (options: Options): Network => {
 
   const setup = async (password: string, filename?: string): Promise<[string, SigningCosmWasmClient]> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
-    const client = await connect(wallet, pebblenetOptions);
+    const wallet = await loadOrCreateWallet(options, keyfile, password);
+    const client = await connect(wallet, options);
 
     const [account] = await wallet.getAccounts();
     // ensure we have some tokens
@@ -113,7 +129,7 @@ const useOptions = (options: Options): Network => {
 
   const recoverMnemonic = async (password: string, filename?: string): Promise<string> => {
     const keyfile = filename || options.defaultKeyFile;
-    const wallet = await loadOrCreateWallet(pebblenetOptions, keyfile, password);
+    const wallet = await loadOrCreateWallet(options, keyfile, password);
     return wallet.mnemonic;
   }
 
