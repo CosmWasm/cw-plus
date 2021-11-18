@@ -25,6 +25,20 @@ use cosmwasm_std::testing::mock_wasmd_attr;
 
 use anyhow::{bail, Result as AnyResult};
 
+// TODO: we should import this from cosmwasm-std, but cannot due to non_exhaustive so copy here
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ContractInfoResponse {
+    pub code_id: u64,
+    /// address that instantiated this contract
+    pub creator: String,
+    /// admin who can run migrations (if any)
+    pub admin: Option<String>,
+    /// if set, the contract is pinned to the cache, and thus uses less gas when called
+    pub pinned: bool,
+    /// set if this contract has bound an IBC port
+    pub ibc_port: Option<String>,
+}
+
 // Contract state is kept in Storage, separate from the contracts themselves
 const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 
@@ -135,6 +149,18 @@ where
                 let addr = api.addr_validate(&contract_addr)?;
                 Ok(self.query_raw(addr, storage, &key))
             }
+            WasmQuery::ContractInfo { contract_addr } => {
+                let addr = api.addr_validate(&contract_addr)?;
+                let contract = self.load_contract(storage, &addr)?;
+                let res = ContractInfoResponse {
+                    code_id: contract.code_id as u64,
+                    creator: contract.creator.to_string(),
+                    admin: contract.admin.map(|x| x.to_string()),
+                    pinned: false,
+                    ibc_port: None,
+                };
+                to_binary(&res).map_err(Into::into)
+            }
             query => bail!(Error::UnsupportedWasmQuery(query)),
         }
     }
@@ -212,7 +238,7 @@ where
 
     pub fn query_raw(&self, address: Addr, storage: &dyn Storage, key: &[u8]) -> Binary {
         let storage = self.contract_storage_readonly(storage, &address);
-        let data = storage.get(&key).unwrap_or_default();
+        let data = storage.get(key).unwrap_or_default();
         data.into()
     }
 
@@ -1003,6 +1029,44 @@ mod test {
             StdError::not_found("cw_multi_test::wasm::ContractData"),
             err.downcast().unwrap()
         );
+    }
+
+    #[test]
+    fn query_contract_into() {
+        let api = MockApi::default();
+        let mut keeper = WasmKeeper::<Empty, Empty>::new();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(payout::contract());
+
+        let mut wasm_storage = MockStorage::new();
+
+        let contract_addr = keeper
+            .register_contract(
+                &mut wasm_storage,
+                code_id,
+                Addr::unchecked("foobar"),
+                Addr::unchecked("admin"),
+                "label".to_owned(),
+                1000,
+            )
+            .unwrap();
+
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        let query = WasmQuery::ContractInfo {
+            contract_addr: contract_addr.to_string(),
+        };
+        let info = keeper
+            .query(&api, &wasm_storage, &querier, &block, query)
+            .unwrap();
+
+        let expected = ContractInfoResponse {
+            code_id: code_id as u64,
+            creator: "foobar".to_owned(),
+            admin: Some("admin".to_owned()),
+            pinned: false,
+            ibc_port: None,
+        };
+        assert_eq!(expected, from_slice(&info).unwrap());
     }
 
     #[test]

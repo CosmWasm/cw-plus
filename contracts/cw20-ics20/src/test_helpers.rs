@@ -55,7 +55,7 @@ pub fn add_channel(mut deps: DepsMut, channel_id: &str) {
 }
 
 pub fn setup(channels: &[&str]) -> OwnedDeps<MockStorage, MockApi, MockQuerier> {
-    let mut deps = mock_dependencies(&[]);
+    let mut deps = mock_dependencies();
 
     // instantiate an empty contract
     let instantiate_msg = InitMsg {

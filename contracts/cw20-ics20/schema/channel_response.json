@@ -33,7 +33,7 @@
   },
   "definitions": {
     "Amount": {
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "required": [

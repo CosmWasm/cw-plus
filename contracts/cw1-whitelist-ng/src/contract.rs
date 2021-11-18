@@ -213,7 +213,7 @@ mod tests {
     fn instantiate_and_modify_config() {
         let contract = Cw1WhitelistContract::native();
 
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let alice = "alice";
         let bob = "bob";
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn execute_messages_has_proper_permissions() {
         let contract = Cw1WhitelistContract::native();
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let alice = "alice";
         let bob = "bob";
@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn execute_custom_messages_works() {
         let contract = Cw1WhitelistContract::<String>::new();
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let alice = "alice";
 
         let admins = vec![alice.to_owned()];
@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn can_execute_query_works() {
         let contract = Cw1WhitelistContract::native();
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let alice = "alice";
         let bob = "bob";

@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn proper_instantiation() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             owner: Some("owner0000".to_string()),
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn update_config() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             owner: None,
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn register_merkle_root() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             owner: Some("owner0000".to_string()),
@@ -374,7 +374,7 @@ mod tests {
     #[test]
     fn claim() {
         // Run test 1
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let test_data: Encoded = from_slice(TEST_DATA_1).unwrap();
 
         let msg = InstantiateMsg {
@@ -488,7 +488,7 @@ mod tests {
 
     #[test]
     fn owner_freeze() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
 
         let msg = InstantiateMsg {
             owner: Some("owner0000".to_string()),

@@ -112,7 +112,7 @@ mod test {
 
     #[test]
     fn can_create_claims() {
-        let deps = mock_dependencies(&[]);
+        let deps = mock_dependencies();
         let claims = Claims::new("claims");
         // Assert that claims creates a map and there are no keys in the map.
         assert_eq!(
@@ -128,7 +128,7 @@ mod test {
 
     #[test]
     fn check_create_claim_updates_map() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -196,7 +196,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_no_claims() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         let amount = claims
@@ -218,7 +218,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_no_released_claims() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -266,7 +266,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_one_released_claim() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -312,7 +312,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_all_released_claims() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -356,7 +356,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_zero_cap() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -404,7 +404,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_cap_greater_than_pending_claims() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -448,7 +448,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_cap_only_one_claim_released() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -493,7 +493,7 @@ mod test {
 
     #[test]
     fn test_claim_tokens_with_cap_too_low_no_claims_released() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -540,7 +540,7 @@ mod test {
 
     #[test]
     fn test_query_claims_returns_correct_claims() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims
@@ -564,7 +564,7 @@ mod test {
 
     #[test]
     fn test_query_claims_returns_empty_for_non_existent_user() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps = mock_dependencies();
         let claims = Claims::new("claims");
 
         claims

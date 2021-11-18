@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "WhitelistQueryMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "Shows all admins and whether or not it is mutable",
       "type": "object",

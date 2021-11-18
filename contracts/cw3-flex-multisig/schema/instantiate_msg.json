@@ -25,7 +25,7 @@
     },
     "Duration": {
       "description": "Duration is a delta of time. You can add it to a BlockInfo or Expiration to move that further in the future. Note that an height-based Duration and a time-based Expiration cannot be combined",
-      "anyOf": [
+      "oneOf": [
         {
           "type": "object",
           "required": [
@@ -59,7 +59,7 @@
     },
     "Threshold": {
       "description": "This defines the different ways tallies can happen.\n\nThe total_weight used for calculating success as well as the weights of each individual voter used in tallying should be snapshotted at the beginning of the block at which the proposal starts (this is likely the responsibility of a correct cw4 implementation). See also `ThresholdResponse` in the cw3 spec.",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "Declares that a fixed weight of Yes votes is needed to pass. See `ThresholdResponse.AbsoluteCount` in the cw3 spec for details.",
           "type": "object",
