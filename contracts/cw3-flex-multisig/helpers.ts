@@ -8,20 +8,23 @@ import { calculateFee } from "@cosmjs/stargate"
  * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw3-flex-multisig/helpers.ts
  *
  * Create a client:
- *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
+ *   const [addr, client] = await useOptions(uniOptions).setup('password');
  *
  * Get the mnemonic:
- *   await useOptions(pebblenetOptions).recoverMnemonic(password);
+ *   await useOptions(uniOptions).recoverMnemonic(password);
  *
  * Create contract:
- *   const contract = CW3Flex(client, pebblenetOptions);
+ *   const contract = CW3Flex(client, uniOptions);
  *
  * Upload contract:
- *   const codeId = await contract.upload(addr, pebblenetOptions);
+ *   const codeId = await contract.upload(addr, uniOptions);
  *
+ * In order to instantiate a cw3-flex-multisig contract;
+ * You need to instantiate a cw4-group contract and use it's contract address as the group_addr in initMsg
+ * 
  * Instantiate contract example:
  *   const initMsg = {
- *     group_addr: addr,
+ *     group_addr: "juno1guv2ra0ryj4jvnxf2efeu8g0a2mewr979gfa67x033an638nj33qy09jvu", // cw4-group contract address
  *     threshold: {
  *        absolute_count: {
  *          weight: 5
@@ -31,7 +34,8 @@ import { calculateFee } from "@cosmjs/stargate"
  *        time: 3600
  *     }
  *   };
- *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
+ * 
+ *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', uniOptions);
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
 
@@ -299,7 +303,7 @@ export const CW3Flex = (client: SigningCosmWasmClient, options: Options): CW3Fle
   }
 
   const upload = async (senderAddress: string, options: Options): Promise<number> => {
-    const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.9.0/cw3_flex_multisig.wasm"
+    const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw3_flex_multisig.wasm"
     const wasm = await downloadWasm(sourceUrl)
     const fee = calculateFee(options.fees.upload * 2, options.gasPrice)
     const result = await client.upload(senderAddress, wasm, fee)
