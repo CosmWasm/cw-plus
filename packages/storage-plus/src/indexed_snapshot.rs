@@ -557,6 +557,66 @@ mod test {
     }
 
     #[test]
+    fn range_de_simple_key_by_multi_index() {
+        let mut store = MockStorage::new();
+        let map = build_snapshot_map();
+        let mut height = 1;
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk: &str = "5627";
+        map.save(&mut store, pk, &data1, height).unwrap();
+        height += 1;
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk: &str = "5628";
+        map.save(&mut store, pk, &data2, height).unwrap();
+        height += 1;
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Williams".to_string(),
+            age: 24,
+        };
+        let pk: &str = "5629";
+        map.save(&mut store, pk, &data3, height).unwrap();
+        height += 1;
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 12,
+        };
+        let pk: &str = "5630";
+        map.save(&mut store, pk, &data4, height).unwrap();
+
+        let marias: Vec<_> = map
+            .idx
+            .name
+            .prefix_de(b"Maria".to_vec())
+            .range_de(&store, None, None, Order::Descending)
+            .collect::<StdResult<_>>()
+            .unwrap();
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // Sorted by (descending) pk
+        assert_eq!(marias[0].0, "5629");
+        assert_eq!(marias[1].0, "5627");
+        // Data is correct
+        assert_eq!(marias[0].1, data3);
+        assert_eq!(marias[1].1, data1);
+    }
+
+    #[test]
     fn range_composite_key_by_multi_index() {
         let mut store = MockStorage::new();
         let mut height = 2;
@@ -620,6 +680,76 @@ mod test {
         // Pks (sorted by age descending)
         assert_eq!(pk1.as_bytes(), marias[0].0);
         assert_eq!(pk3.as_bytes(), marias[1].0);
+
+        // Data
+        assert_eq!(data1, marias[0].1);
+        assert_eq!(data3, marias[1].1);
+    }
+
+    #[test]
+    fn range_de_composite_key_by_multi_index() {
+        let mut store = MockStorage::new();
+        let mut height = 2;
+
+        let indexes = DataCompositeMultiIndex {
+            name_age: MultiIndex::new(
+                |d, k| index_triple(&d.name, d.age, k),
+                "data",
+                "data__name_age",
+            ),
+        };
+        let map =
+            IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);
+
+        // save data
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk1: &str = "5627";
+        map.save(&mut store, pk1, &data1, height).unwrap();
+        height += 1;
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk2: &str = "5628";
+        map.save(&mut store, pk2, &data2, height).unwrap();
+        height += 1;
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Young".to_string(),
+            age: 24,
+        };
+        let pk3: &str = "5629";
+        map.save(&mut store, pk3, &data3, height).unwrap();
+        height += 1;
+
+        let data4 = Data {
+            name: "Maria Luisa".to_string(),
+            last_name: "Bemberg".to_string(),
+            age: 43,
+        };
+        let pk4: &str = "5630";
+        map.save(&mut store, pk4, &data4, height).unwrap();
+
+        let marias: Vec<_> = map
+            .idx
+            .name_age
+            .sub_prefix_de(b"Maria".to_vec())
+            .range_de(&store, None, None, Order::Descending)
+            .collect::<StdResult<_>>()
+            .unwrap();
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // Pks (sorted by age descending)
+        assert_eq!((42, pk1.as_bytes().to_owned()), marias[0].0);
+        assert_eq!((24, pk3.as_bytes().to_owned()), marias[1].0);
 
         // Data
         assert_eq!(data1, marias[0].1);
