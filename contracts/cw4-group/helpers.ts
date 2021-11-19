@@ -8,32 +8,32 @@ import { calculateFee } from "@cosmjs/stargate"
  * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/master/contracts/cw4-group/helpers.ts
  *
  * Create a client:
- *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
+ *   const [addr, client] = await useOptions(uniOptions).setup('password');
  *
  * Get the mnemonic:
- *   await useOptions(pebblenetOptions).recoverMnemonic(password);
+ *   await useOptions(uniOptions).recoverMnemonic(password);
  *
  * Create contract:
- *   const contract = CW4Group(client, pebblenetOptions);
+ *   const contract = CW4Group(client, uniOptions);
  *
  * Upload contract:
- *   const codeId = await contract.upload(addr, pebblenetOptions);
+ *   const codeId = await contract.upload(addr, uniOptions);
  *
  * Instantiate contract example:
  *   const initMsg = {
  *     admin: addr,
  *     members: [
  *       {
- *          addr: "wasm1hkxhcvw6sfyu6ztkce3dlz5nnk8kwjmcd7ettt",
+ *          addr: "juno17r7l8v2nlxpf53p4zgdlq9trw0ndw5x3jp98yh",
  *          weight: 10,
  *       },
  *       {
- *          addr: "wasm1z6ms6cejaj8jz8zwkntx9ua0klhtptvz8elaxp",
+ *          addr: "juno10h52xd7gec64zp6ct6qfu3lhhnuv4lgz7srs8g",
  *          weight: 15,
  *       },
  *     ]
  *   };
- *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
+ *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', uniOptions);
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
@@ -168,7 +168,7 @@ export const CW4Group = (client: SigningCosmWasmClient, options: Options): CW4Gr
   }
 
   const upload = async (senderAddress: string, options: Options): Promise<number> => {
-    const sourceUrl = "https://github.com/CosmWasm/cosmwasm-plus/releases/download/v0.9.0/cw4_group.wasm"
+    const sourceUrl = "https://github.com/CosmWasm/cw-plus/releases/download/v0.10.2/cw4_group.wasm"
     const wasm = await downloadWasm(sourceUrl)
     const fee = calculateFee(options.fees.upload, options.gasPrice)
     const result = await client.upload(senderAddress, wasm, fee)
