@@ -311,8 +311,10 @@ mod test {
     struct DataIndexes<'a> {
         // Second arg is for storing pk
         pub name: MultiIndex<'a, (Vec<u8>, String), Data>,
-        pub age: UniqueIndex<'a, U32Key, Data>,
-        pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data>,
+        // Last generic type arg is pk deserialization type
+        pub age: UniqueIndex<'a, U32Key, Data, String>,
+        // Last generic type arg is pk deserialization type
+        pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -901,6 +903,37 @@ mod test {
     }
 
     #[test]
+    fn range_de_simple_key_by_unique_index() {
+        let mut store = MockStorage::new();
+        let map = build_snapshot_map();
+
+        // save data
+        let (pks, datas) = save_data(&mut store, &map);
+
+        let res: StdResult<Vec<_>> = map
+            .idx
+            .age
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let ages = res.unwrap();
+
+        let count = ages.len();
+        assert_eq!(4, count);
+
+        // The pks, sorted by age ascending
+        assert_eq!(pks[3], ages[0].0);
+        assert_eq!(pks[1], ages[1].0);
+        assert_eq!(pks[2], ages[2].0);
+        assert_eq!(pks[0], ages[3].0);
+
+        // The associated data
+        assert_eq!(datas[3], ages[0].1);
+        assert_eq!(datas[1], ages[1].1);
+        assert_eq!(datas[2], ages[2].1);
+        assert_eq!(datas[0], ages[3].1);
+    }
+
+    #[test]
     fn range_composite_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
@@ -923,6 +956,35 @@ mod test {
         // The pks
         assert_eq!(pks[0].as_bytes(), marias[0].0);
         assert_eq!(pks[1].as_bytes(), marias[1].0);
+
+        // The associated data
+        assert_eq!(datas[0], marias[0].1);
+        assert_eq!(datas[1], marias[1].1);
+    }
+
+    #[test]
+    fn range_de_composite_key_by_unique_index() {
+        let mut store = MockStorage::new();
+        let map = build_snapshot_map();
+
+        // save data
+        let (pks, datas) = save_data(&mut store, &map);
+
+        let res: StdResult<Vec<_>> = map
+            .idx
+            .name_lastname
+            .prefix_de(b"Maria".to_vec())
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let marias = res.unwrap();
+
+        // Only two people are called "Maria"
+        let count = marias.len();
+        assert_eq!(2, count);
+
+        // The pks
+        assert_eq!(pks[0], marias[0].0);
+        assert_eq!(pks[1], marias[1].0);
 
         // The associated data
         assert_eq!(datas[0], marias[0].1);
