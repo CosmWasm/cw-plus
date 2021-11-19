@@ -906,7 +906,7 @@ mod test {
     }
 
     #[test]
-    fn unique_index_simple_key_range_de() {
+    fn range_de_simple_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_map();
 
@@ -968,7 +968,7 @@ mod test {
     }
 
     #[test]
-    fn unique_index_composite_key_range_de() {
+    fn range_de_composite_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_map();
 
@@ -1248,7 +1248,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_range_de() {
+    fn prefix_range_de_simple_key() {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
