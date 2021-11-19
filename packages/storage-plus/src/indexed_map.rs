@@ -1061,7 +1061,7 @@ mod test {
             pks.clone()
                 .into_iter()
                 .map(str::to_string)
-                .zip(datas.clone().into_iter())
+                .zip(datas.into_iter())
                 .collect::<Vec<_>>()
         );
     }
@@ -1121,10 +1121,7 @@ mod test {
         let result = result.unwrap();
         assert_eq!(
             result,
-            [
-                ("5628".to_string(), data2.clone()),
-                ("5629".to_string(), data3.clone()),
-            ]
+            [("5628".to_string(), data2), ("5629".to_string(), data3),]
         );
     }
 
@@ -1181,7 +1178,7 @@ mod test {
             .range_de(&store, None, None, Order::Ascending)
             .collect();
         let result = result.unwrap();
-        assert_eq!(result, [("5628".to_string(), data2.clone()),]);
+        assert_eq!(result, [("5628".to_string(), data2),]);
     }
 
     #[test]
@@ -1240,8 +1237,8 @@ mod test {
         assert_eq!(
             result,
             [
-                (("1".to_string(), "5627".to_string()), data1.clone()),
-                (("2".to_string(), "5628".to_string()), data2.clone()),
+                (("1".to_string(), "5627".to_string()), data1),
+                (("2".to_string(), "5628".to_string()), data2),
             ]
         );
     }
