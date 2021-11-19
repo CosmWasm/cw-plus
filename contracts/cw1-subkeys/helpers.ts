@@ -9,16 +9,16 @@ import { calculateFee } from "@cosmjs/stargate"
  * Usage: npx @cosmjs/cli@^0.26 --init https://raw.githubusercontent.com/CosmWasm/cw-plus/main/contracts/base-helpers.ts --init https://raw.githubusercontent.com/CosmWasm/cw-plus/main/contracts/cw1-subkeys/helpers.ts
  *
  * Create a client:
- *   const [addr, client] = await useOptions(pebblenetOptions).setup('password');
+ *   const [addr, client] = await useOptions(uniOptions).setup('password');
  *
  * Get the mnemonic:
- *   await useOptions(pebblenetOptions).recoverMnemonic(password);
+ *   await useOptions(uniOptions).recoverMnemonic(password);
  *
  * Create contract:
- *   const contract = CW1(client, pebblenetOptions);
+ *   const contract = CW1(client, uniOptions);
  *
  * Upload contract:
- *   const codeId = await contract.upload(addr, pebblenetOptions);
+ *   const codeId = await contract.upload(addr, uniOptions);
  *
  * Instantiate contract example:
  *   const initMsg = {
@@ -26,7 +26,7 @@ import { calculateFee } from "@cosmjs/stargate"
  *     mutable: false
  *   };
  *
- *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', pebblenetOptions);
+ *   const instance = await contract.instantiate(addr, codeId, initMsg, 'Potato Coin!', uniOptions);
  *
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
