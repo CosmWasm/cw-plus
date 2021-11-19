@@ -519,6 +519,28 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
+    fn prefix_range_de_composite_key() {
+        use cosmwasm_std::Order;
+
+        let mut store = MockStorage::new();
+        init_data_composite_key(&EVERY_COMPOSITE_KEY, &mut store);
+
+        // let's prefix-range and iterate
+        let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
+            .prefix_range_de(
+                &store,
+                None,
+                Some(PrefixBound::exclusive("C")),
+                Order::Descending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(("B".into(), "B".into()), 13)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
     fn prefix_de_composite_key() {
         use cosmwasm_std::Order;
 
