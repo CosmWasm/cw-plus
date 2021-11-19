@@ -870,7 +870,7 @@ mod test {
     }
 
     #[test]
-    fn unique_index_simple_key_range() {
+    fn range_simple_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -901,7 +901,7 @@ mod test {
     }
 
     #[test]
-    fn unique_index_composite_key_range() {
+    fn range_composite_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
