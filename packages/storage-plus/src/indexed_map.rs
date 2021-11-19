@@ -1266,7 +1266,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&[u8], &[u8]) = (b"1", b"5627");
+        let pk1: (&str, &str) = ("1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1274,7 +1274,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&[u8], &[u8]) = (b"2", b"5628");
+        let pk2: (&str, &str) = ("2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1282,7 +1282,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&[u8], &[u8]) = (b"2", b"5629");
+        let pk3: (&str, &str) = ("2", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1290,14 +1290,14 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&[u8], &[u8]) = (b"3", b"5630");
+        let pk4: (&str, &str) = ("3", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's try to iterate!
         let result: StdResult<Vec<_>> = map
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::inclusive(&b"2"[..])),
+                Some(PrefixBound::inclusive("2")),
                 None,
                 Order::Ascending,
             )
@@ -1306,9 +1306,9 @@ mod test {
         assert_eq!(
             result,
             [
-                ((b"2".to_vec(), b"5628".to_vec()), data2.clone()),
-                ((b"2".to_vec(), b"5629".to_vec()), data3.clone()),
-                ((b"3".to_vec(), b"5630".to_vec()), data4)
+                (("2".to_string(), "5628".to_string()), data2.clone()),
+                (("2".to_string(), "5629".to_string()), data3.clone()),
+                (("3".to_string(), "5630".to_string()), data4)
             ]
         );
 
@@ -1316,8 +1316,8 @@ mod test {
         let result: StdResult<Vec<_>> = map
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::inclusive(&b"2"[..])),
-                Some(PrefixBound::exclusive(&b"3"[..])),
+                Some(PrefixBound::inclusive("2")),
+                Some(PrefixBound::exclusive("3")),
                 Order::Ascending,
             )
             .collect();
@@ -1325,8 +1325,8 @@ mod test {
         assert_eq!(
             result,
             [
-                ((b"2".to_vec(), b"5628".to_vec()), data2),
-                ((b"2".to_vec(), b"5629".to_vec()), data3),
+                (("2".to_string(), "5628".to_string()), data2),
+                (("2".to_string(), "5629".to_string()), data3),
             ]
         );
     }
@@ -1351,7 +1351,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&[u8], &[u8], &[u8]) = (b"1", b"1", b"5627");
+        let pk1: (&str, &str, &str) = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1359,7 +1359,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&[u8], &[u8], &[u8]) = (b"1", b"2", b"5628");
+        let pk2: (&str, &str, &str) = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1367,7 +1367,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&[u8], &[u8], &[u8]) = (b"2", b"1", b"5629");
+        let pk3: (&str, &str, &str) = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1375,14 +1375,14 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&[u8], &[u8], &[u8]) = (b"2", b"2", b"5630");
+        let pk4: (&str, &str, &str) = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
-        // let's try to iterate!
+        // let's prefix-range and iterate
         let result: StdResult<Vec<_>> = map
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::inclusive((&b"1"[..], &b"2"[..]))),
+                Some(PrefixBound::inclusive(("1", "2"))),
                 None,
                 Order::Ascending,
             )
@@ -1392,23 +1392,26 @@ mod test {
             result,
             [
                 (
-                    (b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()),
+                    ("1".to_string(), "2".to_string(), "5628".to_string()),
                     data2.clone()
                 ),
                 (
-                    (b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()),
+                    ("2".to_string(), "1".to_string(), "5629".to_string()),
                     data3.clone()
                 ),
-                ((b"2".to_vec(), b"2".to_vec(), b"5630".to_vec()), data4)
+                (
+                    ("2".to_string(), "2".to_string(), "5630".to_string()),
+                    data4
+                )
             ]
         );
 
-        // let's try to iterate over a range
+        // let's prefix-range over inclusive bounds on both sides
         let result: StdResult<Vec<_>> = map
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::inclusive((&b"1"[..], &b"2"[..]))),
-                Some(PrefixBound::inclusive((&b"2"[..], &b"1"[..]))),
+                Some(PrefixBound::inclusive(("1", "2"))),
+                Some(PrefixBound::inclusive(("2", "1"))),
                 Order::Ascending,
             )
             .collect();
@@ -1416,8 +1419,14 @@ mod test {
         assert_eq!(
             result,
             [
-                ((b"1".to_vec(), b"2".to_vec(), b"5628".to_vec()), data2),
-                ((b"2".to_vec(), b"1".to_vec(), b"5629".to_vec()), data3),
+                (
+                    ("1".to_string(), "2".to_string(), "5628".to_string()),
+                    data2
+                ),
+                (
+                    ("2".to_string(), "1".to_string(), "5629".to_string()),
+                    data3
+                ),
             ]
         );
     }
