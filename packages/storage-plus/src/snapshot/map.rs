@@ -534,4 +534,30 @@ mod tests {
         assert_eq!(1, all.len());
         assert_eq!(all, vec![("A".into(), 22),]);
     }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn sub_prefix_de_composite_key() {
+        use cosmwasm_std::Order;
+
+        let mut store = MockStorage::new();
+        init_data_composite_key(&EVERY_COMPOSITE_KEY, &mut store);
+
+        // Let's sub-prefix and iterate.
+        // This is similar to calling range() directly, but added here for completeness /
+        // sub_prefix_de type checks
+        let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
+            .sub_prefix_de(())
+            .range_de(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (("B".into(), "B".into()), 13),
+                (("C".into(), "A".into()), 22)
+            ]
+        );
+    }
 }
