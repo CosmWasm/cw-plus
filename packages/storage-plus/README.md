@@ -620,8 +620,14 @@ To deserialize keys of indexes (using the `*_de` functions), there are currently
 
 - For `UniqueIndex`: The primary key (`PK`) type needs to be specified, in order to deserialize the primary key to it.
 This generic type comes with a default of `()`, which means that no deserialization / data will be provided
-for the primary key.
+for the primary key. This is for backwards compatibility with the current `UniqueIndex` impl. It can also come handy
+in cases you don't need the primary key, and are interested only in the deserialized value.
 
 - For `MultiIndex`: The last element of the index tuple must be specified with the type you want it to be deserialized.
 That is, the last tuple element serves as a marker for the deserialization type (in the same way `PK` does it in
 `UniqueIndex`).
+
+- There are currently some inconsistencies in the values that are returned for the different index keys. `MultiIndex`
+returns a tuple with the remaining part of the index key along with the primary key, whereas `UniqueIndex` returns only
+the primary key. This will be changed in the future (See https://github.com/CosmWasm/cw-plus/issues/532) for consistency
+and compatibility with the base `Map` type behaviour.
