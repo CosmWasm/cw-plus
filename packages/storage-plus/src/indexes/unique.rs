@@ -181,10 +181,12 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    /// while range_de assumes you set the prefix to one element and call range over the last one,
-    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
-    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
-    /// casting to Vec<u8> doesn't solve them.
+    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
+    /// `PrefixBound`).
+    /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
+    /// solve them.
     pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
