@@ -2,40 +2,16 @@
 #![cfg(feature = "iterator")]
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-use cosmwasm_std::{from_slice, Binary, Order, Record, StdError, StdResult, Storage};
+use cosmwasm_std::{from_slice, Order, Record, StdError, StdResult, Storage};
 
+use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
+use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, PrefixBound};
-use crate::{Bound, Prefix, Prefixer, PrimaryKey, U32Key};
-
-pub fn index_string(data: &str) -> Vec<u8> {
-    data.as_bytes().to_vec()
-}
-
-pub fn index_tuple(name: &str, age: u32) -> (Vec<u8>, U32Key) {
-    (index_string(name), U32Key::new(age))
-}
-
-pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (Vec<u8>, U32Key, Vec<u8>) {
-    (index_string(name), U32Key::new(age), pk)
-}
-
-pub fn index_string_tuple(data1: &str, data2: &str) -> (Vec<u8>, Vec<u8>) {
-    (index_string(data1), index_string(data2))
-}
-
-// Note: we cannot store traits with generic functions inside `Box<dyn Index>`,
-// so I pull S: Storage to a top-level
-pub trait Index<T>
-where
-    T: Serialize + DeserializeOwned + Clone,
-{
-    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()>;
-    fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()>;
-}
+use crate::{Bound, Index, Prefix, Prefixer, PrimaryKey};
 
 /// MultiIndex stores (namespace, index_name, idx_value, pk) -> b"pk_len".
 /// Allows many values per index, and references pk.
@@ -98,7 +74,7 @@ where
     }
 }
 
-fn deserialize_multi_kv<T: DeserializeOwned>(
+fn deserialize_multi_v<T: DeserializeOwned>(
     store: &dyn Storage,
     pk_namespace: &[u8],
     kv: Record,
@@ -119,7 +95,32 @@ fn deserialize_multi_kv<T: DeserializeOwned>(
         .ok_or_else(|| StdError::generic_err("pk not found"))?;
     let v = from_slice::<T>(&v)?;
 
-    Ok((pk.into(), v))
+    // FIXME: Return `key` here instead of `pk` (be consistent with `deserialize_multi_kv` and `Map` behaviour)
+    Ok((pk.to_vec(), v))
+}
+
+fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
+    store: &dyn Storage,
+    pk_namespace: &[u8],
+    kv: Record,
+) -> StdResult<(K::Output, T)> {
+    let (key, pk_len) = kv;
+
+    // Deserialize pk_len
+    let pk_len = from_slice::<u32>(pk_len.as_slice())?;
+
+    // Recover pk from last part of k
+    let offset = key.len() - pk_len as usize;
+    let pk = &key[offset..];
+
+    let full_key = namespaces_with_key(&[pk_namespace], pk);
+
+    let v = store
+        .get(&full_key)
+        .ok_or_else(|| StdError::generic_err("pk not found"))?;
+    let v = from_slice::<T>(&v)?;
+
+    Ok((K::from_vec(key)?, v))
 }
 
 impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>
@@ -149,7 +150,7 @@ where
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
-            deserialize_multi_kv,
+            deserialize_multi_v,
         )
     }
 
@@ -158,7 +159,7 @@ where
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
-            deserialize_multi_kv,
+            deserialize_multi_v,
         )
     }
 
@@ -167,7 +168,7 @@ where
             self.idx_namespace,
             &[],
             self.pk_namespace,
-            deserialize_multi_kv,
+            deserialize_multi_v,
         )
     }
 
@@ -227,10 +228,12 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    /// while range assumes you set the prefix to one element and call range over the last one,
-    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
-    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
-    /// casting to Vec<u8> doesn't solve them.
+    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
+    /// `PrefixBound`).
+    /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
+    /// solve them.
     pub fn prefix_range<'c>(
         &'c self,
         store: &'c dyn Storage,
@@ -243,154 +246,100 @@ where
         'a: 'c,
     {
         let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
-            .map(move |kv| (deserialize_multi_kv)(store, self.pk_namespace, kv));
+            .map(move |kv| (deserialize_multi_v)(store, self.pk_namespace, kv));
         Box::new(mapped)
     }
 }
 
-/// UniqueRef stores Binary(Vec[u8]) representation of private key and index value
-#[derive(Deserialize, Serialize)]
-pub(crate) struct UniqueRef<T> {
-    // note, we collapse the pk - combining everything under the namespace - even if it is composite
-    pk: Binary,
-    value: T,
-}
-
-/// UniqueIndex stores (namespace, index_name, idx_value) -> {key, value}
-/// Allows one value per index (i.e. unique) and copies pk and data
-pub struct UniqueIndex<'a, K, T> {
-    index: fn(&T) -> K,
-    idx_map: Map<'a, K, UniqueRef<T>>,
-    idx_namespace: &'a [u8],
-}
-
-impl<'a, K, T> UniqueIndex<'a, K, T> {
-    // TODO: make this a const fn
-    /// Create a new UniqueIndex
-    ///
-    /// idx_fn - lambda creating index key from index value
-    /// idx_namespace - prefix for the index value
-    ///
-    /// ## Example:
-    ///
-    /// ```rust
-    /// use cw_storage_plus::{U32Key, UniqueIndex};
-    ///
-    /// struct Data {
-    ///     pub name: String,
-    ///     pub age: u32,
-    /// }
-    ///
-    /// UniqueIndex::new(|d: &Data| U32Key::new(d.age), "data__age");
-    /// ```
-    pub fn new(idx_fn: fn(&T) -> K, idx_namespace: &'a str) -> Self {
-        UniqueIndex {
-            index: idx_fn,
-            idx_map: Map::new(idx_namespace),
-            idx_namespace: idx_namespace.as_bytes(),
-        }
-    }
-}
-
-impl<'a, K, T> Index<T> for UniqueIndex<'a, K, T>
+#[cfg(feature = "iterator")]
+impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data);
-        // error if this is already set
-        self.idx_map
-            .update(store, idx, |existing| -> StdResult<_> {
-                match existing {
-                    Some(_) => Err(StdError::generic_err("Violates unique constraint on index")),
-                    None => Ok(UniqueRef::<T> {
-                        pk: pk.into(),
-                        value: data.clone(),
-                    }),
-                }
-            })?;
-        Ok(())
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv::<K::Suffix, T>,
+        )
     }
 
-    fn remove(&self, store: &mut dyn Storage, _pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data);
-        self.idx_map.remove(store, idx);
-        Ok(())
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &p.prefix(),
+            self.pk_namespace,
+            deserialize_multi_kv::<K::SuperSuffix, T>,
+        )
     }
 }
 
-fn deserialize_unique_kv<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
-    let (_, v) = kv;
-    let t = from_slice::<UniqueRef<T>>(&v)?;
-    Ok((t.pk.into(), t.value))
-}
-
-impl<'a, K, T> UniqueIndex<'a, K, T>
+#[cfg(feature = "iterator")]
+impl<'a, K, T> MultiIndex<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
+    K: PrimaryKey<'a> + KeyDeserialize,
 {
-    pub fn index_key(&self, k: K) -> Vec<u8> {
-        k.joined_key()
-    }
-
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv(kv)
-        })
-    }
-
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv(kv)
-        })
-    }
-
-    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
-            deserialize_unique_kv(kv)
-        })
-    }
-
-    /// returns all items that match this secondary index, always by pk Ascending
-    pub fn item(&self, store: &dyn Storage, idx: K) -> StdResult<Option<Record<T>>> {
-        let data = self
-            .idx_map
-            .may_load(store, idx)?
-            .map(|i| (i.pk.into(), i.value));
-        Ok(data)
-    }
-}
-
-// short-cut for simple keys, rather than .prefix(()).range(...)
-impl<'a, K, T> UniqueIndex<'a, K, T>
-where
-    T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
-{
-    // I would prefer not to copy code from Prefix, but no other way
-    // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range<'c>(
+    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
+    /// `PrefixBound`).
+    /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
+    /// solve them.
+    pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'c>
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
         T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
     {
-        self.no_prefix().range(store, min, max, order)
+        let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
+            .map(deserialize_kv::<K, T>);
+        Box::new(mapped)
     }
 
-    pub fn keys<'c>(
+    pub fn range_de<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix().keys(store, min, max, order)
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().range_de(store, min, max, order)
+    }
+
+    pub fn keys_de<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix_de().keys_de(store, min, max, order)
+    }
+
+    fn no_prefix_de(&self) -> Prefix<K, T> {
+        Prefix::with_deserialization_function(
+            self.idx_namespace,
+            &[],
+            self.pk_namespace,
+            deserialize_multi_kv::<K, T>,
+        )
     }
 }
