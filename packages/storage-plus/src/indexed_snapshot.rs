@@ -25,7 +25,7 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     /// Examples:
     ///
     /// ```rust
-    /// use cw_storage_plus::{IndexedSnapshotMap, Strategy, U32Key, UniqueIndex};
+    /// use cw_storage_plus::{IndexedSnapshotMap, Strategy, UniqueIndex};
     ///
     /// #[derive(PartialEq, Debug, Clone)]
     /// struct Data {
@@ -33,9 +33,9 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     ///     pub age: u32,
     /// }
     ///
-    /// let indexes = UniqueIndex::new(|d: &Data| U32Key::new(d.age), "data__age");
+    /// let indexes = UniqueIndex::new(|d: &Data| d.age, "data__age");
     ///
-    /// IndexedSnapshotMap::<&[u8], Data, UniqueIndex<U32Key, Data>>::new(
+    /// IndexedSnapshotMap::<&[u8], Data, UniqueIndex<u32, Data>>::new(
     ///     "data",
     ///     "checkpoints",
     ///     "changelog",
