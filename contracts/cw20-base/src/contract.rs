@@ -80,8 +80,8 @@ fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
 /// Checks if passed logo is correct, and if not, returns an error
 fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
     match logo {
-        Logo::Embedded(EmbeddedLogo::Svg(logo)) => verify_xml_logo(&logo),
-        Logo::Embedded(EmbeddedLogo::Png(logo)) => verify_png_logo(&logo),
+        Logo::Embedded(EmbeddedLogo::Svg(logo)) => verify_xml_logo(logo),
+        Logo::Embedded(EmbeddedLogo::Png(logo)) => verify_png_logo(logo),
         Logo::Url(_) => Ok(()), // Any reasonable url validation would be regex based, probably not worth it
     }
 }
