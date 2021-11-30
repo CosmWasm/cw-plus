@@ -1014,18 +1014,12 @@ mod test {
         const AGES: Map<(u32, Vec<u8>), u64> = Map::new("ages");
 
         let mut store = MockStorage::new();
-        AGES.save(&mut store, (2, vec![1, 2, 3]), &123)
-            .unwrap();
-        AGES.save(&mut store, (3, vec![4, 5, 6]), &456)
-            .unwrap();
-        AGES.save(&mut store, (5, vec![7, 8, 9]), &789)
-            .unwrap();
-        AGES.save(&mut store, (5, vec![9, 8, 7]), &987)
-            .unwrap();
-        AGES.save(&mut store, (7, vec![20, 21, 22]), &2002)
-            .unwrap();
-        AGES.save(&mut store, (8, vec![23, 24, 25]), &2332)
-            .unwrap();
+        AGES.save(&mut store, (2, vec![1, 2, 3]), &123).unwrap();
+        AGES.save(&mut store, (3, vec![4, 5, 6]), &456).unwrap();
+        AGES.save(&mut store, (5, vec![7, 8, 9]), &789).unwrap();
+        AGES.save(&mut store, (5, vec![9, 8, 7]), &987).unwrap();
+        AGES.save(&mut store, (7, vec![20, 21, 22]), &2002).unwrap();
+        AGES.save(&mut store, (8, vec![23, 24, 25]), &2332).unwrap();
 
         // typical range under one prefix as a control
         let fives = AGES

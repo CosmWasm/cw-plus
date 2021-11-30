@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, Event, MessageInfo, Reply, Response, StdError, SubMsg,
 };
-use cw_storage_plus::{Map, U64Key};
+use cw_storage_plus::Map;
 
 use crate::contracts::{Contract, ContractWrapper};
 use crate::test_helpers::contracts::payout;
@@ -20,7 +20,7 @@ pub enum QueryMsg {
     Reply { id: u64 },
 }
 
-const REFLECT: Map<U64Key, Reply> = Map::new("reflect");
+const REFLECT: Map<u64, Reply> = Map::new("reflect");
 
 fn instantiate(
     deps: DepsMut,
@@ -51,14 +51,14 @@ fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, StdError> {
             to_binary(&res)
         }
         QueryMsg::Reply { id } => {
-            let reply = REFLECT.load(deps.storage, id.into())?;
+            let reply = REFLECT.load(deps.storage, id)?;
             to_binary(&reply)
         }
     }
 }
 
 fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response<CustomMsg>, StdError> {
-    REFLECT.save(deps.storage, msg.id.into(), &msg)?;
+    REFLECT.save(deps.storage, msg.id, &msg)?;
     // add custom event here to test
     let event = Event::new("custom")
         .add_attribute("from", "reply")
