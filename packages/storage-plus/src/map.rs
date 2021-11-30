@@ -298,7 +298,7 @@ mod test {
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
 
-        let path = TRIPLE.key((b"john", 8u8.into(), "pedro"));
+        let path = TRIPLE.key((b"john", 8u8, "pedro"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!(
@@ -387,21 +387,19 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on a triple composite key
-        let triple = TRIPLE.key((b"owner", 10u8.into(), "recipient"));
+        let triple = TRIPLE.key((b"owner", 10u8, "recipient"));
         assert_eq!(None, triple.may_load(&store).unwrap());
         triple.save(&mut store, &1234).unwrap();
         assert_eq!(1234, triple.load(&store).unwrap());
 
         // not under other key
         let different = TRIPLE
-            .may_load(&store, (b"owners", 10u8.into(), "ecipient"))
+            .may_load(&store, (b"owners", 10u8, "ecipient"))
             .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
-        let same = TRIPLE
-            .load(&store, (b"owner", 10u8.into(), "recipient"))
-            .unwrap();
+        let same = TRIPLE.load(&store, (b"owner", 10u8, "recipient")).unwrap();
         assert_eq!(1234, same);
     }
 

@@ -1433,10 +1433,9 @@ mod test {
 
     mod inclusive_bound {
         use super::*;
-        use crate::U64Key;
 
         struct Indexes<'a> {
-            secondary: MultiIndex<'a, (U64Key, Vec<u8>), u64>,
+            secondary: MultiIndex<'a, (u64, Vec<u8>), u64>,
         }
 
         impl<'a> IndexList<u64> for Indexes<'a> {
@@ -1451,7 +1450,7 @@ mod test {
         fn composite_key_query() {
             let indexes = Indexes {
                 secondary: MultiIndex::new(
-                    |secondary, k| (U64Key::new(*secondary), k),
+                    |secondary, k| (*secondary, k),
                     "test_map",
                     "test_map__secondary",
                 ),
@@ -1468,7 +1467,7 @@ mod test {
                 .prefix_range(
                     &store,
                     None,
-                    Some(PrefixBound::inclusive(1)),
+                    Some(PrefixBound::inclusive(1u64)),
                     Order::Ascending,
                 )
                 .collect::<Result<_, _>>()
