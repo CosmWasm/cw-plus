@@ -23,7 +23,7 @@ paths.
 
 All CW2-compliant contracts must store the following data:
 
-* key: `\x00\x0dcontract_info` (length prefixed "contract_info" using Singleton pattern)
+* key: `contract_info`
 * data: Json-serialized `ContractVersion`
 
 ```rust
