@@ -94,7 +94,7 @@ impl NativeBalance {
 impl fmt::Display for NativeBalance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for c in &self.0 {
-            write!(f, "denom: {}, amount: {}", c.denom, c.amount)?
+            write!(f, "{}{}", c.denom, c.amount)?
         }
         Ok(())
     }
