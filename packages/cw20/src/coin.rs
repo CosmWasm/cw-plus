@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Addr, Uint128};
+use std::fmt;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Cw20Coin {
@@ -15,6 +16,12 @@ impl Cw20Coin {
     }
 }
 
+impl fmt::Display for Cw20Coin {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "address: {}, amount: {}", self.address, self.amount)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Cw20CoinVerified {
     pub address: Addr,
@@ -24,5 +31,11 @@ pub struct Cw20CoinVerified {
 impl Cw20CoinVerified {
     pub fn is_empty(&self) -> bool {
         self.amount == Uint128::zero()
+    }
+}
+
+impl fmt::Display for Cw20CoinVerified {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "address: {}, amount: {}", self.address, self.amount)
     }
 }
