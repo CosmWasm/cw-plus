@@ -143,7 +143,7 @@ where
 
         // this will look for the first snapshot of height >= given height
         // If None, there is no snapshot since that time.
-        let start = Bound::inclusive(height.to_be_bytes().to_vec());
+        let start = Bound::inclusive_int(height);
         let first = self
             .changelog
             .prefix(key)

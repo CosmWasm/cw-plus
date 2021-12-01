@@ -555,7 +555,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range_de(
                 &store,
-                Some(Bound::Inclusive(56u32.to_be_bytes().to_vec())),
+                Some(Bound::inclusive_int(56u32)),
                 None,
                 Order::Ascending,
             )
@@ -568,7 +568,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range_de(
                 &store,
-                Some(Bound::Inclusive(57u32.to_be_bytes().to_vec())),
+                Some(Bound::inclusive_int(57u32)),
                 None,
                 Order::Ascending,
             )
