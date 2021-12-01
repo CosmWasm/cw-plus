@@ -6,22 +6,22 @@ pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
 use crate::de::KeyDeserialize;
-use crate::{Bound, Map, Prefixer, PrimaryKey, U64Key};
+use crate::{Bound, Map, Prefixer, PrimaryKey};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 /// Structure holding a map of checkpoints composited from
-/// height (as U64Key) and counter of how many times it has
+/// height (as u64) and counter of how many times it has
 /// been checkpointed (as u32).
 /// Stores all changes in changelog.
 #[derive(Debug, Clone)]
 pub(crate) struct Snapshot<'a, K, T> {
-    checkpoints: Map<'a, U64Key, u32>,
+    checkpoints: Map<'a, u64, u32>,
 
     // this stores all changes (key, height). Must differentiate between no data written,
     // and explicit None (just inserted)
-    pub changelog: Map<'a, (K, U64Key), ChangeSet<T>>,
+    pub changelog: Map<'a, (K, u64), ChangeSet<T>>,
 
     // How aggressive we are about checkpointing all data
     strategy: Strategy,
@@ -42,22 +42,20 @@ impl<'a, K, T> Snapshot<'a, K, T> {
 
     pub fn add_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
         self.checkpoints
-            .update::<_, StdError>(store, height.into(), |count| {
-                Ok(count.unwrap_or_default() + 1)
-            })?;
+            .update::<_, StdError>(store, height, |count| Ok(count.unwrap_or_default() + 1))?;
         Ok(())
     }
 
     pub fn remove_checkpoint(&self, store: &mut dyn Storage, height: u64) -> StdResult<()> {
         let count = self
             .checkpoints
-            .may_load(store, height.into())?
+            .may_load(store, height)?
             .unwrap_or_default();
         if count <= 1 {
-            self.checkpoints.remove(store, height.into());
+            self.checkpoints.remove(store, height);
             Ok(())
         } else {
-            self.checkpoints.save(store, height.into(), &(count - 1))
+            self.checkpoints.save(store, height, &(count - 1))
         }
     }
 }
@@ -86,7 +84,7 @@ where
             .transpose()?;
         if let Some((height, _)) = checkpoint {
             // any changelog for the given key since then?
-            let start = Bound::inclusive(U64Key::from(height));
+            let start = Bound::inclusive(height);
             let first = self
                 .changelog
                 .prefix(k.clone())
@@ -107,7 +105,7 @@ where
         let has = match self.strategy {
             Strategy::EveryBlock => true,
             Strategy::Never => false,
-            Strategy::Selected => self.checkpoints.may_load(store, height.into())?.is_some(),
+            Strategy::Selected => self.checkpoints.may_load(store, height)?.is_some(),
         };
         match has {
             true => Ok(()),
@@ -116,10 +114,7 @@ where
     }
 
     pub fn has_changelog(&self, store: &mut dyn Storage, key: K, height: u64) -> StdResult<bool> {
-        Ok(self
-            .changelog
-            .may_load(store, (key, U64Key::from(height)))?
-            .is_some())
+        Ok(self.changelog.may_load(store, (key, height))?.is_some())
     }
 
     pub fn write_changelog(
@@ -130,7 +125,7 @@ where
         old: Option<T>,
     ) -> StdResult<()> {
         self.changelog
-            .save(store, (key, U64Key::from(height)), &ChangeSet { old })
+            .save(store, (key, height), &ChangeSet { old })
     }
 
     // may_load_at_height reads historical data from given checkpoints.
@@ -148,7 +143,7 @@ where
 
         // this will look for the first snapshot of height >= given height
         // If None, there is no snapshot since that time.
-        let start = Bound::inclusive(U64Key::new(height));
+        let start = Bound::inclusive_int(height);
         let first = self
             .changelog
             .prefix(key)

@@ -6,7 +6,6 @@ use cosmwasm_std::{
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ExecuteMsg;
-use cw_storage_plus::U8Key;
 use sha2::Digest;
 use std::convert::TryInto;
 
@@ -113,7 +112,7 @@ pub fn execute_register_merkle_root(
 
     let stage = LATEST_STAGE.update(deps.storage, |stage| -> StdResult<_> { Ok(stage + 1) })?;
 
-    MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
+    MERKLE_ROOT.save(deps.storage, stage, &merkle_root)?;
     LATEST_STAGE.save(deps.storage, &stage)?;
 
     Ok(Response::new().add_attributes(vec![
@@ -132,13 +131,13 @@ pub fn execute_claim(
     proof: Vec<String>,
 ) -> Result<Response, ContractError> {
     // verify not claimed
-    let claimed = CLAIM.may_load(deps.storage, (&info.sender, U8Key::from(stage)))?;
+    let claimed = CLAIM.may_load(deps.storage, (&info.sender, stage))?;
     if claimed.is_some() {
         return Err(ContractError::Claimed {});
     }
 
     let config = CONFIG.load(deps.storage)?;
-    let merkle_root = MERKLE_ROOT.load(deps.storage, stage.into())?;
+    let merkle_root = MERKLE_ROOT.load(deps.storage, stage)?;
 
     let user_input = format!("{}{}", info.sender, amount);
     let hash = sha2::Sha256::digest(user_input.as_bytes())
@@ -164,7 +163,7 @@ pub fn execute_claim(
     }
 
     // Update claim index to the current stage
-    CLAIM.save(deps.storage, (&info.sender, stage.into()), &true)?;
+    CLAIM.save(deps.storage, (&info.sender, stage), &true)?;
 
     let res = Response::new()
         .add_message(WasmMsg::Execute {
@@ -205,7 +204,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 }
 
 pub fn query_merkle_root(deps: Deps, stage: u8) -> StdResult<MerkleRootResponse> {
-    let merkle_root = MERKLE_ROOT.load(deps.storage, U8Key::from(stage))?;
+    let merkle_root = MERKLE_ROOT.load(deps.storage, stage)?;
     let resp = MerkleRootResponse { stage, merkle_root };
 
     Ok(resp)
@@ -219,7 +218,7 @@ pub fn query_latest_stage(deps: Deps) -> StdResult<LatestStageResponse> {
 }
 
 pub fn query_is_claimed(deps: Deps, stage: u8, address: String) -> StdResult<IsClaimedResponse> {
-    let key: (&Addr, U8Key) = (&deps.api.addr_validate(&address)?, stage.into());
+    let key: (&Addr, u8) = (&deps.api.addr_validate(&address)?, stage);
     let is_claimed = CLAIM.may_load(deps.storage, key)?.unwrap_or(false);
     let resp = IsClaimedResponse { is_claimed };
 

@@ -42,14 +42,14 @@ impl<'a, K, T, PK> UniqueIndex<'a, K, T, PK> {
     /// ## Example:
     ///
     /// ```rust
-    /// use cw_storage_plus::{U32Key, UniqueIndex};
+    /// use cw_storage_plus::UniqueIndex;
     ///
     /// struct Data {
     ///     pub name: String,
     ///     pub age: u32,
     /// }
     ///
-    /// UniqueIndex::<_, _, ()>::new(|d: &Data| U32Key::new(d.age), "data__age");
+    /// UniqueIndex::<_, _, ()>::new(|d: &Data| d.age, "data__age");
     /// ```
     pub fn new(idx_fn: fn(&T) -> K, idx_namespace: &'a str) -> Self {
         UniqueIndex {
