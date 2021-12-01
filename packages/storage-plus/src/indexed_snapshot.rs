@@ -25,7 +25,7 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     /// Examples:
     ///
     /// ```rust
-    /// use cw_storage_plus::{IndexedSnapshotMap, Strategy, U32Key, UniqueIndex};
+    /// use cw_storage_plus::{IndexedSnapshotMap, Strategy, UniqueIndex};
     ///
     /// #[derive(PartialEq, Debug, Clone)]
     /// struct Data {
@@ -33,9 +33,9 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     ///     pub age: u32,
     /// }
     ///
-    /// let indexes = UniqueIndex::new(|d: &Data| U32Key::new(d.age), "data__age");
+    /// let indexes = UniqueIndex::new(|d: &Data| d.age, "data__age");
     ///
-    /// IndexedSnapshotMap::<&[u8], Data, UniqueIndex<U32Key, Data>>::new(
+    /// IndexedSnapshotMap::<&[u8], Data, UniqueIndex<u32, Data>>::new(
     ///     "data",
     ///     "checkpoints",
     ///     "changelog",
@@ -298,7 +298,7 @@ mod test {
     use super::*;
 
     use crate::indexes::{index_string_tuple, index_triple};
-    use crate::{Index, MultiIndex, U32Key, UniqueIndex};
+    use crate::{Index, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -314,7 +314,7 @@ mod test {
         // Second arg is for storing pk
         pub name: MultiIndex<'a, (Vec<u8>, String), Data>,
         // Last generic type arg is pk deserialization type
-        pub age: UniqueIndex<'a, U32Key, Data, String>,
+        pub age: UniqueIndex<'a, u32, Data, String>,
         // Last generic type arg is pk deserialization type
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
@@ -330,7 +330,7 @@ mod test {
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
         // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, U32Key, Vec<u8>), Data>,
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -353,7 +353,7 @@ mod test {
                 "data",
                 "data__name",
             ),
-            age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
+            age: UniqueIndex::new(|d| d.age, "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
                 "data__name_lastname",
@@ -489,13 +489,13 @@ mod test {
         assert_eq!(0, count);
 
         // match on proper age
-        let proper = U32Key::new(42);
+        let proper = 42u32;
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
         assert_eq!(pk.as_bytes(), aged.0);
         assert_eq!(*data, aged.1);
 
         // no match on wrong age
-        let too_old = U32Key::new(43);
+        let too_old = 43u32;
         let aged = map.idx.age.item(&store, too_old).unwrap();
         assert_eq!(None, aged);
     }
@@ -783,14 +783,14 @@ mod test {
 
         // query by unique key
         // match on proper age
-        let age42 = U32Key::new(42);
-        let (k, v) = map.idx.age.item(&store, age42.clone()).unwrap().unwrap();
+        let age42 = 42u32;
+        let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
         assert_eq!(k, pks[0].as_bytes());
         assert_eq!(v.name, datas[0].name);
         assert_eq!(v.age, datas[0].age);
 
         // match on other age
-        let age23 = U32Key::new(23);
+        let age23 = 23u32;
         let (k, v) = map.idx.age.item(&store, age23).unwrap().unwrap();
         assert_eq!(k, pks[1].as_bytes());
         assert_eq!(v.name, datas[1].name);

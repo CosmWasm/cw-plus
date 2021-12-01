@@ -282,7 +282,7 @@ mod test {
     use super::*;
 
     use crate::indexes::{index_string_tuple, index_triple};
-    use crate::{MultiIndex, U32Key, UniqueIndex};
+    use crate::{MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -297,7 +297,7 @@ mod test {
     struct DataIndexes<'a> {
         // Second arg is for storing pk
         pub name: MultiIndex<'a, (String, String), Data>,
-        pub age: UniqueIndex<'a, U32Key, Data, String>,
+        pub age: UniqueIndex<'a, u32, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
 
@@ -312,7 +312,7 @@ mod test {
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
         // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, U32Key, Vec<u8>), Data>,
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -331,7 +331,7 @@ mod test {
                 "data",
                 "data__name",
             ),
-            age: UniqueIndex::new(|d| U32Key::new(d.age), "data__age"),
+            age: UniqueIndex::new(|d| d.age, "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
                 "data__name_lastname",
@@ -497,7 +497,7 @@ mod test {
         assert_eq!(3, count);
 
         // index_key() over UniqueIndex works.
-        let age_key = U32Key::from(23);
+        let age_key = 23u32;
         // Use the index_key() helper to build the (raw) index key
         let age_key = map.idx.age.index_key(age_key);
         // Iterate using a (inclusive) bound over the raw key.
@@ -515,13 +515,13 @@ mod test {
         assert_eq!(4, count);
 
         // match on proper age
-        let proper = U32Key::new(42);
+        let proper = 42u32;
         let aged = map.idx.age.item(&store, proper).unwrap().unwrap();
         assert_eq!(pk, String::from_vec(aged.0).unwrap());
         assert_eq!(*data, aged.1);
 
         // no match on wrong age
-        let too_old = U32Key::new(43);
+        let too_old = 43u32;
         let aged = map.idx.age.item(&store, too_old).unwrap();
         assert_eq!(None, aged);
     }
@@ -789,14 +789,14 @@ mod test {
 
         // query by unique key
         // match on proper age
-        let age42 = U32Key::new(42);
-        let (k, v) = map.idx.age.item(&store, age42.clone()).unwrap().unwrap();
+        let age42 = 42u32;
+        let (k, v) = map.idx.age.item(&store, age42).unwrap().unwrap();
         assert_eq!(String::from_vec(k).unwrap(), pks[0]);
         assert_eq!(v.name, datas[0].name);
         assert_eq!(v.age, datas[0].age);
 
         // match on other age
-        let age23 = U32Key::new(23);
+        let age23 = 23u32;
         let (k, v) = map.idx.age.item(&store, age23).unwrap().unwrap();
         assert_eq!(String::from_vec(k).unwrap(), pks[1]);
         assert_eq!(v.name, datas[1].name);
@@ -1433,10 +1433,9 @@ mod test {
 
     mod inclusive_bound {
         use super::*;
-        use crate::U64Key;
 
         struct Indexes<'a> {
-            secondary: MultiIndex<'a, (U64Key, Vec<u8>), u64>,
+            secondary: MultiIndex<'a, (u64, Vec<u8>), u64>,
         }
 
         impl<'a> IndexList<u64> for Indexes<'a> {
@@ -1451,7 +1450,7 @@ mod test {
         fn composite_key_query() {
             let indexes = Indexes {
                 secondary: MultiIndex::new(
-                    |secondary, k| (U64Key::new(*secondary), k),
+                    |secondary, k| (*secondary, k),
                     "test_map",
                     "test_map__secondary",
                 ),
@@ -1468,7 +1467,7 @@ mod test {
                 .prefix_range(
                     &store,
                     None,
-                    Some(PrefixBound::inclusive(1)),
+                    Some(PrefixBound::inclusive(1u64)),
                     Order::Ascending,
                 )
                 .collect::<Result<_, _>>()

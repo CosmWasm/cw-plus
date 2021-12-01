@@ -11,18 +11,16 @@ use serde::Serialize;
 
 use cosmwasm_std::{StdResult, Storage};
 
-use crate::U32Key;
-
 pub fn index_string(data: &str) -> Vec<u8> {
     data.as_bytes().to_vec()
 }
 
-pub fn index_tuple(name: &str, age: u32) -> (Vec<u8>, U32Key) {
-    (index_string(name), U32Key::new(age))
+pub fn index_tuple(name: &str, age: u32) -> (Vec<u8>, u32) {
+    (index_string(name), age)
 }
 
-pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (Vec<u8>, U32Key, Vec<u8>) {
-    (index_string(name), U32Key::new(age), pk)
+pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (Vec<u8>, u32, Vec<u8>) {
+    (index_string(name), age, pk)
 }
 
 pub fn index_string_tuple(data1: &str, data2: &str) -> (Vec<u8>, Vec<u8>) {

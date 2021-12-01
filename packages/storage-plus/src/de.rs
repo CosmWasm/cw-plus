@@ -1,3 +1,6 @@
+// TODO: Remove along with IntKey
+#![allow(deprecated)]
+
 use std::array::TryFromSliceError;
 use std::convert::TryInto;
 
