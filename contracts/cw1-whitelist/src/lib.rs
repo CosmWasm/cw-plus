@@ -1,3 +1,4 @@
+#![feature(test)]
 pub mod contract;
 pub mod error;
 #[cfg(test)]
@@ -6,3 +7,5 @@ pub mod msg;
 pub mod state;
 
 pub use crate::error::ContractError;
+
+extern crate test;

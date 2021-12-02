@@ -309,4 +309,42 @@ mod tests {
         let res = query_can_execute(deps.as_ref(), anyone.to_string(), staking_msg).unwrap();
         assert!(!res.can_execute);
     }
+
+    // Execution test meant to be executed with perf
+    #[bench]
+    fn execute_bench_native(b: &mut test::Bencher) {
+        let mut deps = mock_dependencies();
+
+        let alice = "alice";
+        let bob = "bob";
+        let carl = "carl";
+
+        // instantiate the contract
+        let instantiate_msg = InstantiateMsg {
+            admins: vec![alice.to_string(), carl.to_string()],
+            mutable: false,
+        };
+        let info = mock_info(&bob, &[]);
+        instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
+
+        b.iter(|| {
+            let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
+            let msgs = vec![
+                BankMsg::Send {
+                    to_address: bob.to_string(),
+                    amount: coins(10000, "DAI"),
+                }
+                .into(),
+                WasmMsg::Execute {
+                    contract_addr: "some contract".into(),
+                    msg: to_binary(&freeze).unwrap(),
+                    funds: vec![],
+                }
+                .into(),
+            ];
+
+            let info = mock_info(&carl, &[]);
+            execute_execute::<Empty>(deps.as_mut(), mock_env(), info, msgs).unwrap();
+        });
+    }
 }

@@ -1,3 +1,7 @@
+#![feature(test)]
+
+extern crate test;
+
 mod contract;
 pub mod error;
 pub mod interfaces;

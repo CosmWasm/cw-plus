@@ -353,4 +353,48 @@ mod tests {
             .unwrap();
         assert!(!res.can_execute);
     }
+
+    // Execution test meant to be executed with perf
+    #[bench]
+    fn execute_bench_native(b: &mut test::Bencher) {
+        let contract = Cw1WhitelistContract::native();
+        let mut deps = mock_dependencies();
+
+        let alice = "alice";
+        let bob = "bob";
+        let carl = "carl";
+
+        // instantiate the contract
+        let info = mock_info(&bob, &[]);
+        contract
+            .instantiate(
+                deps.as_mut(),
+                mock_env(),
+                info,
+                vec![alice.to_string(), carl.to_string()],
+                false,
+            )
+            .unwrap();
+
+        b.iter(|| {
+            let msgs = vec![
+                BankMsg::Send {
+                    to_address: bob.to_string(),
+                    amount: coins(10000, "DAI"),
+                }
+                .into(),
+                WasmMsg::Execute {
+                    contract_addr: "some contract".into(),
+                    msg: to_binary(&WhitelistExecMsg::Freeze {}).unwrap(),
+                    funds: vec![],
+                }
+                .into(),
+            ];
+            let info = mock_info(&carl, &[]);
+
+            contract
+                .execute(deps.as_mut(), mock_env(), info, msgs)
+                .unwrap();
+        });
+    }
 }

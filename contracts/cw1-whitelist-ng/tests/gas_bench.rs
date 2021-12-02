@@ -1,9 +1,12 @@
+use cosmwasm_std::testing::mock_dependencies;
 use cosmwasm_std::Empty;
 use cosmwasm_std::{coins, to_binary, BankMsg, Response, WasmMsg};
 use cosmwasm_vm::testing::{
     execute, instantiate, mock_env, mock_info, mock_instance_with_gas_limit,
 };
+use cw1_whitelist_ng::interfaces::Cw1;
 use cw1_whitelist_ng::msg::{Cw1ExecMsg, InstantiateMsg, WhitelistExecMsg};
+use cw1_whitelist_ng::state::Cw1WhitelistContract;
 
 static WASM: &[u8] = include_bytes!("../../../artifacts/cw1_whitelist_ng.wasm");
 
