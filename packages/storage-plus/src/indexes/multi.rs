@@ -95,7 +95,6 @@ fn deserialize_multi_v<T: DeserializeOwned>(
         .ok_or_else(|| StdError::generic_err("pk not found"))?;
     let v = from_slice::<T>(&v)?;
 
-    // FIXME: Return `key` here instead of `pk` (be consistent with `deserialize_multi_kv` and `Map` behaviour)
     Ok((pk.to_vec(), v))
 }
 
@@ -120,6 +119,7 @@ fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
         .ok_or_else(|| StdError::generic_err("pk not found"))?;
     let v = from_slice::<T>(&v)?;
 
+    // FIXME: Return `pk` here instead of `key` for consistency
     Ok((K::from_vec(key)?, v))
 }
 

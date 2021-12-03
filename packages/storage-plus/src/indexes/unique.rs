@@ -92,8 +92,7 @@ where
 fn deserialize_unique_v<T: DeserializeOwned>(kv: Record) -> StdResult<Record<T>> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
-    // FIXME: Return `k` here instead of `t.pk` (be consistent with `Map` behaviour)
-    Ok((t.pk.to_vec(), t.value))
+    Ok((t.pk.0, t.value))
 }
 
 fn deserialize_unique_kv<K: KeyDeserialize, T: DeserializeOwned>(
@@ -101,8 +100,7 @@ fn deserialize_unique_kv<K: KeyDeserialize, T: DeserializeOwned>(
 ) -> StdResult<(K::Output, T)> {
     let (_, v) = kv;
     let t = from_slice::<UniqueRef<T>>(&v)?;
-    // FIXME: Return `k` deserialization here instead of `t.pk` (be consistent with `deserialize_multi_kv` and `Map` behaviour)
-    Ok((K::from_vec(t.pk.to_vec())?, t.value))
+    Ok((K::from_vec(t.pk.0)?, t.value))
 }
 
 impl<'a, K, T, PK> UniqueIndex<'a, K, T, PK>
