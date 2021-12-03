@@ -894,18 +894,18 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(pks[4], String::from_slice(&ages[4].0).unwrap());
-        assert_eq!(pks[3], String::from_slice(&ages[0].0).unwrap());
-        assert_eq!(pks[1], String::from_slice(&ages[1].0).unwrap());
-        assert_eq!(pks[2], String::from_slice(&ages[2].0).unwrap());
-        assert_eq!(pks[0], String::from_slice(&ages[3].0).unwrap());
+        assert_eq!(pks[3], String::from_slice(&ages[0].0).unwrap()); // 12
+        assert_eq!(pks[1], String::from_slice(&ages[1].0).unwrap()); // 23
+        assert_eq!(pks[2], String::from_slice(&ages[2].0).unwrap()); // 32
+        assert_eq!(pks[0], String::from_slice(&ages[3].0).unwrap()); // 42
+        assert_eq!(pks[4], String::from_slice(&ages[4].0).unwrap()); // 90
 
         // The associated data
-        assert_eq!(datas[4], ages[4].1);
         assert_eq!(datas[3], ages[0].1);
         assert_eq!(datas[1], ages[1].1);
         assert_eq!(datas[2], ages[2].1);
         assert_eq!(datas[0], ages[3].1);
+        assert_eq!(datas[4], ages[4].1);
     }
 
     #[test]
@@ -927,18 +927,18 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(pks[4], ages[4].0);
         assert_eq!(pks[3], ages[0].0);
         assert_eq!(pks[1], ages[1].0);
         assert_eq!(pks[2], ages[2].0);
         assert_eq!(pks[0], ages[3].0);
+        assert_eq!(pks[4], ages[4].0);
 
         // The associated data
-        assert_eq!(datas[4], ages[4].1);
         assert_eq!(datas[3], ages[0].1);
         assert_eq!(datas[1], ages[1].1);
         assert_eq!(datas[2], ages[2].1);
         assert_eq!(datas[0], ages[3].1);
+        assert_eq!(datas[4], ages[4].1);
     }
 
     #[test]
