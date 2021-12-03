@@ -188,8 +188,8 @@ where
     pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<PrefixBound<'a, PK::Prefix>>,
-        max: Option<PrefixBound<'a, PK::Prefix>>,
+        min: Option<PrefixBound<'a, K::Prefix>>,
+        max: Option<PrefixBound<'a, K::Prefix>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
