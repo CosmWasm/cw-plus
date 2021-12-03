@@ -296,7 +296,7 @@ mod test {
 
     struct DataIndexes<'a> {
         // Second arg is for storing pk
-        pub name: MultiIndex<'a, (String, String), Data>,
+        pub name: MultiIndex<'a, (String, String), Data, String>,
         pub age: UniqueIndex<'a, u32, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
@@ -312,7 +312,7 @@ mod test {
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
         // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data>,
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -722,7 +722,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: &[u8] = b"5627";
+        let pk1: &str = "5627";
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -730,7 +730,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: &[u8] = b"5628";
+        let pk2: &str = "5628";
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -738,7 +738,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: &[u8] = b"5629";
+        let pk3: &str = "5629";
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -746,7 +746,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: &[u8] = b"5630";
+        let pk4: &str = "5630";
         map.save(&mut store, pk4, &data4).unwrap();
 
         let marias: Vec<_> = map
@@ -760,8 +760,8 @@ mod test {
         assert_eq!(2, count);
 
         // Remaining part (age) of the index keys, plus pks (bytes) (sorted by age descending)
-        assert_eq!((42, pk1.to_vec()), marias[0].0);
-        assert_eq!((24, pk3.to_vec()), marias[1].0);
+        assert_eq!(pk1, marias[0].0);
+        assert_eq!(pk3, marias[1].0);
 
         // Data
         assert_eq!(data1, marias[0].1);

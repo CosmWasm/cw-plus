@@ -312,7 +312,7 @@ mod test {
 
     struct DataIndexes<'a> {
         // Second arg is for storing pk
-        pub name: MultiIndex<'a, (Vec<u8>, String), Data>,
+        pub name: MultiIndex<'a, (Vec<u8>, String), Data, String>,
         // Last generic type arg is pk deserialization type
         pub age: UniqueIndex<'a, u32, Data, String>,
         // Last generic type arg is pk deserialization type
@@ -330,7 +330,7 @@ mod test {
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
         // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data>,
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -752,8 +752,8 @@ mod test {
         assert_eq!(2, count);
 
         // Pks (sorted by age descending)
-        assert_eq!((42, pk1.as_bytes().to_owned()), marias[0].0);
-        assert_eq!((24, pk3.as_bytes().to_owned()), marias[1].0);
+        assert_eq!(pk1.to_string(), marias[0].0);
+        assert_eq!(pk3.to_string(), marias[1].0);
 
         // Data
         assert_eq!(data1, marias[0].1);

@@ -12,6 +12,7 @@ use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, PrefixBound};
 use crate::{Bound, Index, Prefix, Prefixer, PrimaryKey};
+use std::marker::PhantomData;
 
 /// MultiIndex stores (namespace, index_name, idx_value, pk) -> b"pk_len".
 /// Allows many values per index, and references pk.
@@ -24,14 +25,16 @@ use crate::{Bound, Index, Prefix, Prefixer, PrimaryKey};
 /// The MultiIndex definition must include a field for the pk. That is, the MultiIndex K value
 /// is always a n-tuple (n >= 2) and its last element must be the pk.
 /// The index function must therefore put the pk as last element, when generating the index.
-pub struct MultiIndex<'a, K, T> {
+/// The optional PK type defines the type of Primary Key deserialization.
+pub struct MultiIndex<'a, K, T, PK = ()> {
     index: fn(&T, Vec<u8>) -> K,
     idx_namespace: &'a [u8],
     idx_map: Map<'a, K, u32>,
     pk_namespace: &'a [u8],
+    _phantom: PhantomData<PK>,
 }
 
-impl<'a, K, T> MultiIndex<'a, K, T>
+impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
@@ -54,7 +57,7 @@ where
     ///     pub age: u32,
     /// }
     ///
-    /// MultiIndex::new(
+    /// let index: MultiIndex<_, _, String> = MultiIndex::new(
     ///     |d: &Data, k: Vec<u8>| (d.age, k),
     ///     "age",
     ///     "age__owner",
@@ -70,6 +73,7 @@ where
             idx_namespace: idx_namespace.as_bytes(),
             idx_map: Map::new(idx_namespace),
             pk_namespace: pk_namespace.as_bytes(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -119,11 +123,11 @@ fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
         .ok_or_else(|| StdError::generic_err("pk not found"))?;
     let v = from_slice::<T>(&v)?;
 
-    // FIXME: Return `pk` here instead of `key` for consistency
-    Ok((K::from_vec(key)?, v))
+    // We return deserialized `pk` here for consistency
+    Ok((K::from_slice(pk)?, v))
 }
 
-impl<'a, K, T> Index<T> for MultiIndex<'a, K, T>
+impl<'a, K, T, PK> Index<T> for MultiIndex<'a, K, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
@@ -140,7 +144,7 @@ where
     }
 }
 
-impl<'a, K, T> MultiIndex<'a, K, T>
+impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
@@ -198,7 +202,7 @@ where
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-impl<'a, K, T> MultiIndex<'a, K, T>
+impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
@@ -228,8 +232,8 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
@@ -252,33 +256,35 @@ where
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, K, T> MultiIndex<'a, K, T>
+impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
 where
+    PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a>,
 {
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
-            deserialize_multi_kv::<K::Suffix, T>,
+            deserialize_multi_kv::<PK, T>,
         )
     }
 
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
-            deserialize_multi_kv::<K::SuperSuffix, T>,
+            deserialize_multi_kv::<PK, T>,
         )
     }
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, K, T> MultiIndex<'a, K, T>
+impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
 where
+    PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
@@ -294,15 +300,16 @@ where
         min: Option<PrefixBound<'a, K::Prefix>>,
         max: Option<PrefixBound<'a, K::Prefix>>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
         T: 'c,
         'a: 'c,
         K: 'c,
-        K::Output: 'static,
+        PK: 'c,
+        PK::Output: 'static,
     {
         let mapped = namespaced_prefix_range(store, self.idx_namespace, min, max, order)
-            .map(deserialize_kv::<K, T>);
+            .map(deserialize_kv::<PK, T>);
         Box::new(mapped)
     }
 
@@ -312,10 +319,10 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
         T: 'c,
-        K::Output: 'static,
+        PK::Output: 'static,
     {
         self.no_prefix_de().range_de(store, min, max, order)
     }
@@ -326,20 +333,20 @@ where
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<PK::Output>> + 'c>
     where
         T: 'c,
-        K::Output: 'static,
+        PK::Output: 'static,
     {
         self.no_prefix_de().keys_de(store, min, max, order)
     }
 
-    fn no_prefix_de(&self) -> Prefix<K, T> {
+    fn no_prefix_de(&self) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &[],
             self.pk_namespace,
-            deserialize_multi_kv::<K, T>,
+            deserialize_multi_kv::<PK, T>,
         )
     }
 }
