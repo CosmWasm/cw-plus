@@ -26,8 +26,8 @@ use std::marker::PhantomData;
 pub struct MultiIndex<'a, IK, T, PK = ()> {
     index: fn(&T) -> IK,
     idx_namespace: &'a [u8],
-    // note, we collapse the elements of the (ik, pk) tuple
-    idx_map: Map<'a, (Vec<u8>, Vec<u8>), u32>,
+    // note, we collapse the ik - combining everything under the namespace - and concatenating the pk
+    idx_map: Map<'a, Vec<u8>, u32>,
     pk_namespace: &'a [u8],
     phantom: PhantomData<PK>,
 }
@@ -56,7 +56,7 @@ where
     /// }
     ///
     /// let index: MultiIndex<_, _, String> = MultiIndex::new(
-    ///     |d: &Data, k: Vec<u8>| (d.age, k),
+    ///     |d: &Data| d.age,
     ///     "age",
     ///     "age__owner",
     /// );
@@ -127,12 +127,12 @@ where
     IK: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = ((self.index)(data).joined_key(), pk.to_vec());
+        let idx = (self.index)(data).joined_extra_key(pk);
         self.idx_map.save(store, idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = ((self.index)(old_data).joined_key(), pk.to_vec());
+        let idx = (self.index)(old_data).joined_extra_key(pk);
         self.idx_map.remove(store, idx);
         Ok(())
     }
@@ -171,7 +171,7 @@ where
     }
 
     pub fn index_key(&self, k: IK) -> Vec<u8> {
-        k.joined_key()
+        k.joined_extra_key(b"")
     }
 
     #[cfg(test)]

@@ -76,6 +76,11 @@ pub trait PrimaryKey<'a>: Clone {
             keys[l - 1].as_ref(),
         )
     }
+
+    fn joined_extra_key(&self, key: &[u8]) -> Vec<u8> {
+        let keys = self.key();
+        namespaces_with_key(&keys.iter().map(Key::as_ref).collect::<Vec<_>>(), key)
+    }
 }
 
 // Empty / no primary key
