@@ -22,14 +22,12 @@ use std::marker::PhantomData;
 /// The stored pk_len is used to recover the pk from the index namespace, and perform
 /// the secondary load of the associated value from the main map.
 ///
-/// The MultiIndex definition must include a field for the pk. That is, the MultiIndex K value
-/// is always a n-tuple (n >= 2) and its last element must be the pk.
-/// The index function must therefore put the pk as last element, when generating the index.
-/// The optional PK type defines the type of Primary Key deserialization.
+/// The (optional) PK type defines the type of Primary Key deserialization.
 pub struct MultiIndex<'a, IK, T, PK = ()> {
-    index: fn(&T, Vec<u8>) -> IK,
+    index: fn(&T) -> IK,
     idx_namespace: &'a [u8],
-    idx_map: Map<'a, IK, u32>,
+    // note, we collapse the elements of the (ik, pk) tuple
+    idx_map: Map<'a, (Vec<u8>, Vec<u8>), u32>,
     pk_namespace: &'a [u8],
     phantom: PhantomData<PK>,
 }
@@ -63,11 +61,7 @@ where
     ///     "age__owner",
     /// );
     /// ```
-    pub fn new(
-        idx_fn: fn(&T, Vec<u8>) -> IK,
-        pk_namespace: &'a str,
-        idx_namespace: &'a str,
-    ) -> Self {
+    pub fn new(idx_fn: fn(&T) -> IK, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
         MultiIndex {
             index: idx_fn,
             idx_namespace: idx_namespace.as_bytes(),
@@ -133,12 +127,12 @@ where
     IK: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data, pk.to_vec());
+        let idx = ((self.index)(data).joined_key(), pk.to_vec());
         self.idx_map.save(store, idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data, pk.to_vec());
+        let idx = ((self.index)(old_data).joined_key(), pk.to_vec());
         self.idx_map.remove(store, idx);
         Ok(())
     }
