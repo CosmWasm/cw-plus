@@ -281,8 +281,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_string_tuple, index_triple};
-    use crate::{MultiIndex, UniqueIndex};
+    use crate::indexes::index_string_tuple;
+    use crate::{index_tuple, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -295,8 +295,8 @@ mod test {
     }
 
     struct DataIndexes<'a> {
-        // Second arg is for storing pk
-        pub name: MultiIndex<'a, (String, String), Data, String>,
+        // Last args are for signaling pk deserialization
+        pub name: MultiIndex<'a, String, Data, String>,
         pub age: UniqueIndex<'a, u32, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
@@ -311,8 +311,8 @@ mod test {
 
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
-        // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data, String>,
+        // Last arg is for signaling pk deserialization
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -326,11 +326,7 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(
-                |d, k| (d.name.clone(), unsafe { String::from_utf8_unchecked(k) }),
-                "data",
-                "data__name",
-            ),
+            name: MultiIndex::new(|d| d.name.clone(), "data", "data__name"),
             age: UniqueIndex::new(|d| d.age, "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
@@ -423,10 +419,7 @@ mod test {
             .count();
         assert_eq!(2, count);
 
-        // TODO: we load by wrong keys - get full storage key!
-
-        // load it by secondary index (we must know how to compute this)
-        // let marias: Vec<_>> = map
+        // load it by secondary index
         let marias: Vec<_> = map
             .idx
             .name
@@ -469,8 +462,8 @@ mod test {
         // index_key() over MultiIndex works (empty pk)
         // In a MultiIndex, an index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
-        let key = ("Maria".to_string(), "".to_string());
-        // Use the index_key() helper to build the (raw) index key
+        let key = "Maria".to_string();
+        // Use the index_key() helper to build the (raw) index key with an empty pk
         let key = map.idx.name.index_key(key);
         // Iterate using a bound over the raw key
         let count = map
@@ -484,8 +477,8 @@ mod test {
         // index_key() over MultiIndex works (non-empty pk)
         // Build key including a non-empty pk
         let key = ("Maria".to_string(), "1".to_string());
-        // Use the index_key() helper to build the (raw) index key
-        let key = map.idx.name.index_key(key);
+        // Use the joined_key() helper to build the (raw) index key
+        let key = key.joined_key();
         // Iterate using a (exclusive) bound over the raw key.
         // (Useful for pagination / continuation contexts).
         let count = map
@@ -643,11 +636,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -708,11 +697,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1075,11 +1060,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1134,11 +1115,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1190,11 +1167,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1252,11 +1225,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1337,11 +1306,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1435,7 +1400,7 @@ mod test {
         use super::*;
 
         struct Indexes<'a> {
-            secondary: MultiIndex<'a, (u64, Vec<u8>), u64>,
+            secondary: MultiIndex<'a, u64, u64>,
         }
 
         impl<'a> IndexList<u64> for Indexes<'a> {
@@ -1450,7 +1415,7 @@ mod test {
         fn composite_key_query() {
             let indexes = Indexes {
                 secondary: MultiIndex::new(
-                    |secondary, k| (*secondary, k),
+                    |secondary| *secondary,
                     "test_map",
                     "test_map__secondary",
                 ),
