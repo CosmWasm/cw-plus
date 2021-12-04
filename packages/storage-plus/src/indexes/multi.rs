@@ -141,9 +141,9 @@ where
 impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
-    IK: PrimaryKey<'a>,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
+    pub fn prefix(&self, p: IK) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -152,7 +152,7 @@ where
         )
     }
 
-    pub fn sub_prefix(&self, p: IK::SubPrefix) -> Prefix<Vec<u8>, T> {
+    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -175,13 +175,13 @@ where
     }
 
     #[cfg(test)]
-    pub fn count(&self, store: &dyn Storage, p: IK::Prefix) -> usize {
+    pub fn count(&self, store: &dyn Storage, p: IK) -> usize {
         let prefix = self.prefix(p);
         prefix.keys(store, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
-    pub fn all_pks(&self, store: &dyn Storage, p: IK::Prefix) -> Vec<Vec<u8>> {
+    pub fn all_pks(&self, store: &dyn Storage, p: IK) -> Vec<Vec<u8>> {
         let prefix = self.prefix(p);
         prefix
             .keys(store, None, None, Order::Ascending)
@@ -189,7 +189,7 @@ where
     }
 
     #[cfg(test)]
-    pub fn all_items(&self, store: &dyn Storage, p: IK::Prefix) -> StdResult<Vec<Record<T>>> {
+    pub fn all_items(&self, store: &dyn Storage, p: IK) -> StdResult<Vec<Record<T>>> {
         let prefix = self.prefix(p);
         prefix.range(store, None, None, Order::Ascending).collect()
     }
@@ -199,7 +199,7 @@ where
 impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
-    IK: PrimaryKey<'a>,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -235,8 +235,8 @@ where
     pub fn prefix_range<'c>(
         &'c self,
         store: &'c dyn Storage,
-        min: Option<PrefixBound<'a, IK::Prefix>>,
-        max: Option<PrefixBound<'a, IK::Prefix>>,
+        min: Option<PrefixBound<'a, IK>>,
+        max: Option<PrefixBound<'a, IK>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -254,9 +254,9 @@ impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
-    IK: PrimaryKey<'a>,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
+    pub fn prefix_de(&self, p: IK) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -265,7 +265,7 @@ where
         )
     }
 
-    pub fn sub_prefix_de(&self, p: IK::SubPrefix) -> Prefix<PK, T> {
+    pub fn sub_prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -280,7 +280,7 @@ impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
-    IK: PrimaryKey<'a> + KeyDeserialize,
+    IK: PrimaryKey<'a> + KeyDeserialize + Prefixer<'a>,
 {
     /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
     /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
@@ -291,8 +291,8 @@ where
     pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<PrefixBound<'a, IK::Prefix>>,
-        max: Option<PrefixBound<'a, IK::Prefix>>,
+        min: Option<PrefixBound<'a, IK>>,
+        max: Option<PrefixBound<'a, IK>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
