@@ -22,3 +22,4 @@ convert_case = "0.4"
 serde = { version = "1", features = ["derive"] }
 cosmwasm-std = "0.16"
 schemars = "0.8"
+
