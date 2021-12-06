@@ -29,7 +29,7 @@ pub struct UniqueIndex<'a, K, T, PK = ()> {
     index: fn(&T) -> K,
     idx_map: Map<'a, K, UniqueRef<T>>,
     idx_namespace: &'a [u8],
-    _phantom: PhantomData<PK>,
+    phantom: PhantomData<PK>,
 }
 
 impl<'a, K, T, PK> UniqueIndex<'a, K, T, PK> {
@@ -56,7 +56,7 @@ impl<'a, K, T, PK> UniqueIndex<'a, K, T, PK> {
             index: idx_fn,
             idx_map: Map::new(idx_namespace),
             idx_namespace: idx_namespace.as_bytes(),
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

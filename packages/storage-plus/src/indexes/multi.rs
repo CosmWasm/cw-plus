@@ -31,7 +31,7 @@ pub struct MultiIndex<'a, K, T, PK = ()> {
     idx_namespace: &'a [u8],
     idx_map: Map<'a, K, u32>,
     pk_namespace: &'a [u8],
-    _phantom: PhantomData<PK>,
+    phantom: PhantomData<PK>,
 }
 
 impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
@@ -73,7 +73,7 @@ where
             idx_namespace: idx_namespace.as_bytes(),
             idx_map: Map::new(idx_namespace),
             pk_namespace: pk_namespace.as_bytes(),
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 }
