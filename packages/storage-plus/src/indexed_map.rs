@@ -18,7 +18,7 @@ pub trait IndexList<T> {
 }
 
 // TODO: remove traits here and make this const fn new
-/// IndexedBucket works like a bucket but has a secondary index
+/// `IndexedMap` works like a `Map` but has a secondary index
 pub struct IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
@@ -574,7 +574,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Sorted by (descending) pk
+        // Pks, sorted by (descending) pk
         assert_eq!(marias[0].0, b"5629");
         assert_eq!(marias[1].0, b"5627");
         // Data is correct
@@ -630,7 +630,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Sorted by (descending) pk
+        // Pks, sorted by (descending) pk
         assert_eq!(marias[0].0, "5629");
         assert_eq!(marias[1].0, "5627");
         // Data is correct
@@ -694,7 +694,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Pks (sorted by age descending)
+        // Pks, sorted by (descending) age
         assert_eq!(pk1, marias[0].0);
         assert_eq!(pk3, marias[1].0);
 
@@ -759,7 +759,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Remaining part (age) of the index keys, plus pks (bytes) (sorted by age descending)
+        // Pks, sorted by (descending) age
         assert_eq!(pk1, marias[0].0);
         assert_eq!(pk3, marias[1].0);
 

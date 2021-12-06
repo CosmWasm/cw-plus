@@ -12,7 +12,7 @@ use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
 use crate::snapshot::SnapshotMap;
 use crate::{IndexList, Path, Strategy};
 
-/// IndexedSnapshotMap works like a SnapshotMap but has a secondary index
+/// `IndexedSnapshotMap` works like a `SnapshotMap` but has a secondary index
 pub struct IndexedSnapshotMap<'a, K, T, I> {
     pk_namespace: &'a [u8],
     primary: SnapshotMap<'a, K, T>,
