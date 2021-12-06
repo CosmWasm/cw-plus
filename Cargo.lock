@@ -154,6 +154,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d6f2aa4d0537bcc1c74df8755072bd31c1ef1a3a1b85a68e8404a8c353b7b8b"
 
 [[package]]
+name = "convert_case"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+
+[[package]]
 name = "cosmwasm-crypto"
 version = "1.0.0-beta8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -374,6 +380,16 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "cw-derive"
+version = "0.10.3"
+dependencies = [
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
