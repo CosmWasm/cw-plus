@@ -59,7 +59,7 @@ impl Parse for Mapping {
 }
 
 /// `#[msg(...)]` attribute for `interface` macro
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq)]
 pub enum InterfaceMsgAttr {
     Exec,
     Query,
@@ -67,10 +67,10 @@ pub enum InterfaceMsgAttr {
 
 impl Parse for InterfaceMsgAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let content;
+        let _content;
 
-        parenthesized!(content in input);
-        let item: Ident = content.parse()?;
+        parenthesized!(_content in input);
+        let item: Ident = input.parse()?;
 
         if !input.is_empty() {
             return Err(Error::new(input.span(), "Unexpected token"));

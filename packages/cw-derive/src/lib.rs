@@ -2,27 +2,21 @@ use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::fold::Fold;
 use syn::parse::{Parse, Parser};
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, Error, FnArg, Ident, ItemTrait, Pat, TraitItem, TraitItemMethod};
 
 mod parser;
-mod strip_input;
-
-use strip_input::StripInput;
 
 /// Macro generating messages from contract trait.
 ///
 /// ## Example usage
-/// ```ignore
-/// # use cosmwasm_std::Response;
+/// ```
+/// ! use cosmwasm_std::Response;
 ///
-/// # struct Ctx;
-/// # struct Error;
+/// ! struct Error;
 ///
-/// # #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-/// # struct Member;
+/// ! struct Member;
 ///
 /// #[cw_derive::interface(module=msg, exec=Execute, query=Query)]
 /// trait Cw4 {
@@ -33,24 +27,21 @@ use strip_input::StripInput;
 ///     fn update_members(&self, ctx: Ctx, remove: Vec<String>, add: Vec<Member>)
 ///         -> Result<Response, Error>;
 ///
-///     #[msg(query)]
-///     fn admin(&self, ctx: Ctx) -> Result<Response, Error>;
+///     #[msg(exec)]
+///     fn add_hook(&self, ctx: Ctx, addr: String) -> Result<Response, Error>;
 ///
-///     #[msg(query)]
-///     fn member(&self, ctx: Ctx, addr: String, at_height: Option<u64>) -> Result<Response, Error>;
+///     #[msg(exec)]
+///     fn remove_hook(&self, ctx: Ctx, addr: String) -> Result<Response, Error>;
 /// }
 /// ```
 ///
 /// This would generate output like:
 ///
-/// ```ignore
-/// mod msg {
-///     # #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-///     # struct Member;
-///
+/// ```
+/// pub mod msg {
 ///     #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
 ///     #[serde(rename_all = "snake_case")]
-///     enum Execute {
+///     pub enum Execute {
 ///         UpdateAdmin { admin: Option<String> },
 ///         UpdateMembers {
 ///             remove: Vec<String>,
@@ -78,20 +69,19 @@ use strip_input::StripInput;
 /// * `msg(msg_type)` - Hints, that this function is a message variant of specific type. Methods
 /// which are not marked with this attribute are ignored by generator. `msg_type` is one of:
 ///   * `exec` - this is execute message variant
+///   * `query` - this is query message variang
 #[proc_macro_attribute]
 pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = item.clone();
     let attrs = parse_macro_input!(attr as parser::InterfaceArgs);
     let input = parse_macro_input!(item as ItemTrait);
 
     let exec = build_msg(&attrs.exec, &input, parser::InterfaceMsgAttr::Exec);
     let query = build_msg(&attrs.query, &input, parser::InterfaceMsgAttr::Query);
 
-    let input = StripInput.fold_item_trait(input);
-
     let expanded = if let Some(module) = attrs.module {
         quote! {
             pub mod #module {
-                use super::*;
                 #exec
 
                 #query
@@ -133,7 +123,7 @@ fn build_msg(name: &Ident, source: &ItemTrait, ty: parser::InterfaceMsgAttr) -> 
 
     quote! {
         #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-        #[serde(rename_all="snake_case")]
+        #[serde(rename_all = "snake_case")]
         pub enum #name {
             #(#variants,)*
         }
@@ -155,64 +145,37 @@ fn msg_variant_err(method: &TraitItemMethod, err: Error) -> TokenStream2 {
 /// Builds single message variant from method definition
 fn msg_variant(method: &TraitItemMethod) -> TokenStream2 {
     let name = &method.sig.ident;
-    let name = Ident::new(&name.to_string().to_case(Case::UpperCamel), name.span());
+    let name = Ident::new(&name.to_string().to_case(Case::Camel), name.span());
 
-    let fields = method
-        .sig
-        .inputs
-        .iter()
-        .skip(2)
-        .enumerate()
-        .map(|(idx, arg)| {
-            match arg {
-                FnArg::Receiver(item) => {
-                    let err =
-                        Error::new(item.span(), "Unexpected `self` argument").into_compile_error();
-                    quote! {
-                        _self: #err
-                    }
-                }
-                FnArg::Typed(item) => {
-                    let name = match &*item.pat {
-                        Pat::Ident(p) => &p.ident,
-                        pat => {
-                            // TODO: Support pattern arguments, when decorated with argument with item
-                            // name
-                            //
-                            // Eg.
-                            //
-                            // ```
-                            // fn exec_foo(&self, ctx: Ctx, #[msg(name=metadata)] SomeData { addr, sender }: SomeData);
-                            // ```
-                            //
-                            // should expand to enum variant:
-                            //
-                            // ```
-                            // ExecFoo {
-                            //   metadata: SomeDaa
-                            // }
-                            // ```
-                            let err =
-                                Error::new(pat.span(), "Expected argument name, pattern occurred")
-                                    .into_compile_error();
-                            let name = format!("_invalid_{}", idx);
-                            return quote! {
-                                #name: #err
-                            };
-                        }
-                    };
-
-                    let name = Ident::new(&name.to_string().to_case(Case::Snake), name.span());
-                    let ty = &item.ty;
-
-                    quote! {
-                        #name: #ty
-                    }
-                }
+    let fields = method.sig.inputs.iter().skip(2).map(|arg| match arg {
+        FnArg::Receiver(item) => {
+            let err = Error::new(item.span(), "Unexpected `self` argument").into_compile_error();
+            quote! {
+                _self: #err
             }
-        });
+        }
+        FnArg::Typed(item) => {
+            let name = match &*item.pat {
+                Pat::Path(p) if p.path.get_ident().is_some() => p.path.get_ident().unwrap(),
+                pat => {
+                    // TODO: Support pattern arguments, when decorated with argument with item
+                    // name
+                    let err = Error::new(pat.span(), "Expected argument name, pattern occurred")
+                        .into_compile_error();
+                    return quote! {
+                        _invalid: #err
+                    };
+                }
+            };
 
-    let fields: Vec<_> = fields.collect();
+            let name = Ident::new(&name.to_string().to_case(Case::Camel), name.span());
+            let ty = &item.ty;
+
+            quote! {
+                #name: #ty
+            }
+        }
+    });
 
     quote! {
         #name {
