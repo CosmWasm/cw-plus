@@ -380,7 +380,7 @@ mod test {
             last_name: "Doe".to_string(),
             age: 42,
         };
-        let pk: &str = "1";
+        let pk = "1";
         map.save(store, pk, &data, height).unwrap();
         height += 1;
         pks.push(pk);
@@ -392,7 +392,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 23,
         };
-        let pk: &str = "2";
+        let pk = "2";
         map.save(store, pk, &data, height).unwrap();
         height += 1;
         pks.push(pk);
@@ -404,7 +404,7 @@ mod test {
             last_name: "Wayne".to_string(),
             age: 32,
         };
-        let pk: &str = "3";
+        let pk = "3";
         map.save(store, pk, &data, height).unwrap();
         height += 1;
         pks.push(pk);
@@ -415,7 +415,7 @@ mod test {
             last_name: "Rodriguez".to_string(),
             age: 12,
         };
-        let pk: &str = "4";
+        let pk = "4";
         map.save(store, pk, &data, height).unwrap();
         pks.push(pk);
         datas.push(data);
@@ -512,7 +512,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk: &str = "5627";
+        let pk = "5627";
         map.save(&mut store, pk, &data1, height).unwrap();
         height += 1;
 
@@ -521,7 +521,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk: &str = "5628";
+        let pk = "5628";
         map.save(&mut store, pk, &data2, height).unwrap();
         height += 1;
 
@@ -530,7 +530,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 24,
         };
-        let pk: &str = "5629";
+        let pk = "5629";
         map.save(&mut store, pk, &data3, height).unwrap();
         height += 1;
 
@@ -539,7 +539,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 12,
         };
-        let pk: &str = "5630";
+        let pk = "5630";
         map.save(&mut store, pk, &data4, height).unwrap();
 
         let marias: Vec<_> = map
@@ -572,7 +572,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk: &str = "5627";
+        let pk = "5627";
         map.save(&mut store, pk, &data1, height).unwrap();
         height += 1;
 
@@ -581,7 +581,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk: &str = "5628";
+        let pk = "5628";
         map.save(&mut store, pk, &data2, height).unwrap();
         height += 1;
 
@@ -590,7 +590,7 @@ mod test {
             last_name: "Williams".to_string(),
             age: 24,
         };
-        let pk: &str = "5629";
+        let pk = "5629";
         map.save(&mut store, pk, &data3, height).unwrap();
         height += 1;
 
@@ -599,7 +599,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 12,
         };
-        let pk: &str = "5630";
+        let pk = "5630";
         map.save(&mut store, pk, &data4, height).unwrap();
 
         let marias: Vec<_> = map
@@ -641,7 +641,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: &str = "5627";
+        let pk1 = "5627";
         map.save(&mut store, pk1, &data1, height).unwrap();
         height += 1;
 
@@ -650,7 +650,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: &str = "5628";
+        let pk2 = "5628";
         map.save(&mut store, pk2, &data2, height).unwrap();
         height += 1;
 
@@ -659,7 +659,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: &str = "5629";
+        let pk3 = "5629";
         map.save(&mut store, pk3, &data3, height).unwrap();
         height += 1;
 
@@ -668,7 +668,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: &str = "5630";
+        let pk4 = "5630";
         map.save(&mut store, pk4, &data4, height).unwrap();
 
         let marias: Vec<_> = map
@@ -711,7 +711,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: &str = "5627";
+        let pk1 = "5627";
         map.save(&mut store, pk1, &data1, height).unwrap();
         height += 1;
 
@@ -720,7 +720,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: &str = "5628";
+        let pk2 = "5628";
         map.save(&mut store, pk2, &data2, height).unwrap();
         height += 1;
 
@@ -729,7 +729,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: &str = "5629";
+        let pk3 = "5629";
         map.save(&mut store, pk3, &data3, height).unwrap();
         height += 1;
 
@@ -738,7 +738,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: &str = "5630";
+        let pk4 = "5630";
         map.save(&mut store, pk4, &data4, height).unwrap();
 
         let marias: Vec<_> = map
@@ -775,7 +775,7 @@ mod test {
             last_name: "Laurens".to_string(),
             age: 42,
         };
-        let pk5: &str = "4";
+        let pk5 = "4";
 
         // enforce this returns some error
         map.save(&mut store, pk5, &data5, height).unwrap_err();
@@ -822,7 +822,7 @@ mod test {
             last_name: "Doe".to_string(),
             age: 24,
         };
-        let pk5: &str = "5";
+        let pk5 = "5";
         // enforce this returns some error
         map.save(&mut store, pk5, &data5, height).unwrap_err();
     }

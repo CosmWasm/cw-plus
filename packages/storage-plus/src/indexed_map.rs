@@ -722,7 +722,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: &str = "5627";
+        let pk1 = "5627";
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -730,7 +730,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: &str = "5628";
+        let pk2 = "5628";
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -738,7 +738,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: &str = "5629";
+        let pk3 = "5629";
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -746,7 +746,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: &str = "5630";
+        let pk4 = "5630";
         map.save(&mut store, pk4, &data4).unwrap();
 
         let marias: Vec<_> = map
@@ -1089,7 +1089,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str) = ("1", "5627");
+        let pk1 = ("1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1097,7 +1097,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str) = ("2", "5628");
+        let pk2 = ("2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1105,7 +1105,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str) = ("2", "5629");
+        let pk3 = ("2", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1113,7 +1113,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str) = ("3", "5630");
+        let pk4 = ("3", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's prefix and iterate
@@ -1148,7 +1148,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str, &str) = ("1", "1", "5627");
+        let pk1 = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1156,7 +1156,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str, &str) = ("1", "2", "5628");
+        let pk2 = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1164,7 +1164,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str, &str) = ("2", "1", "5629");
+        let pk3 = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1172,7 +1172,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str, &str) = ("2", "2", "5630");
+        let pk4 = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's prefix and iterate
@@ -1204,7 +1204,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str, &str) = ("1", "1", "5627");
+        let pk1 = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1212,7 +1212,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str, &str) = ("1", "2", "5628");
+        let pk2 = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1220,7 +1220,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str, &str) = ("2", "1", "5629");
+        let pk3 = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1228,7 +1228,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str, &str) = ("2", "2", "5630");
+        let pk4 = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's sub-prefix and iterate
@@ -1266,7 +1266,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str) = ("1", "5627");
+        let pk1 = ("1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1274,7 +1274,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str) = ("2", "5628");
+        let pk2 = ("2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1282,7 +1282,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str) = ("2", "5629");
+        let pk3 = ("2", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1290,7 +1290,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str) = ("3", "5630");
+        let pk4 = ("3", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's try to iterate!
@@ -1351,7 +1351,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str, &str) = ("1", "1", "5627");
+        let pk1 = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1359,7 +1359,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str, &str) = ("1", "2", "5628");
+        let pk2 = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1367,7 +1367,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str, &str) = ("2", "1", "5629");
+        let pk3 = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1375,7 +1375,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str, &str) = ("2", "2", "5630");
+        let pk4 = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's prefix-range and iterate
