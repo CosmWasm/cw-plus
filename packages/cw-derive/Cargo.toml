@@ -1,0 +1,19 @@
+[package]
+name = "cw-derive"
+version = "0.10.3"
+authors = ["Bartłomiej Kuras <bart.k@confio.gmbh>"]
+edition = "2018"
+description = "Utilities for generating trait based contracts"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cw-plus"
+homepage = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "1", features = ["parsing", "derive", "full"] }
+quote = "1"
+proc-macro2 = "1"
+convert_case = "0.4"
