@@ -18,7 +18,7 @@ pub trait IndexList<T> {
 }
 
 // TODO: remove traits here and make this const fn new
-/// IndexedBucket works like a bucket but has a secondary index
+/// `IndexedMap` works like a `Map` but has a secondary index
 pub struct IndexedMap<'a, K, T, I>
 where
     K: PrimaryKey<'a>,
@@ -296,7 +296,7 @@ mod test {
 
     struct DataIndexes<'a> {
         // Second arg is for storing pk
-        pub name: MultiIndex<'a, (String, String), Data>,
+        pub name: MultiIndex<'a, (String, String), Data, String>,
         pub age: UniqueIndex<'a, u32, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
@@ -312,7 +312,7 @@ mod test {
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
         // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data>,
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -574,7 +574,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Sorted by (descending) pk
+        // Pks, sorted by (descending) pk
         assert_eq!(marias[0].0, b"5629");
         assert_eq!(marias[1].0, b"5627");
         // Data is correct
@@ -630,7 +630,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Sorted by (descending) pk
+        // Pks, sorted by (descending) pk
         assert_eq!(marias[0].0, "5629");
         assert_eq!(marias[1].0, "5627");
         // Data is correct
@@ -694,7 +694,7 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Pks (sorted by age descending)
+        // Pks, sorted by (descending) age
         assert_eq!(pk1, marias[0].0);
         assert_eq!(pk3, marias[1].0);
 
@@ -722,7 +722,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: &[u8] = b"5627";
+        let pk1 = "5627";
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -730,7 +730,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: &[u8] = b"5628";
+        let pk2 = "5628";
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -738,7 +738,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: &[u8] = b"5629";
+        let pk3 = "5629";
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -746,7 +746,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: &[u8] = b"5630";
+        let pk4 = "5630";
         map.save(&mut store, pk4, &data4).unwrap();
 
         let marias: Vec<_> = map
@@ -759,9 +759,9 @@ mod test {
         let count = marias.len();
         assert_eq!(2, count);
 
-        // Remaining part (age) of the index keys, plus pks (bytes) (sorted by age descending)
-        assert_eq!((42, pk1.to_vec()), marias[0].0);
-        assert_eq!((24, pk3.to_vec()), marias[1].0);
+        // Pks, sorted by (descending) age
+        assert_eq!(pk1, marias[0].0);
+        assert_eq!(pk3, marias[1].0);
 
         // Data
         assert_eq!(data1, marias[0].1);
@@ -894,18 +894,18 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(pks[4], String::from_slice(&ages[4].0).unwrap());
-        assert_eq!(pks[3], String::from_slice(&ages[0].0).unwrap());
-        assert_eq!(pks[1], String::from_slice(&ages[1].0).unwrap());
-        assert_eq!(pks[2], String::from_slice(&ages[2].0).unwrap());
-        assert_eq!(pks[0], String::from_slice(&ages[3].0).unwrap());
+        assert_eq!(pks[3], String::from_slice(&ages[0].0).unwrap()); // 12
+        assert_eq!(pks[1], String::from_slice(&ages[1].0).unwrap()); // 23
+        assert_eq!(pks[2], String::from_slice(&ages[2].0).unwrap()); // 32
+        assert_eq!(pks[0], String::from_slice(&ages[3].0).unwrap()); // 42
+        assert_eq!(pks[4], String::from_slice(&ages[4].0).unwrap()); // 90
 
         // The associated data
-        assert_eq!(datas[4], ages[4].1);
         assert_eq!(datas[3], ages[0].1);
         assert_eq!(datas[1], ages[1].1);
         assert_eq!(datas[2], ages[2].1);
         assert_eq!(datas[0], ages[3].1);
+        assert_eq!(datas[4], ages[4].1);
     }
 
     #[test]
@@ -927,18 +927,18 @@ mod test {
         assert_eq!(5, count);
 
         // The pks, sorted by age ascending
-        assert_eq!(pks[4], ages[4].0);
         assert_eq!(pks[3], ages[0].0);
         assert_eq!(pks[1], ages[1].0);
         assert_eq!(pks[2], ages[2].0);
         assert_eq!(pks[0], ages[3].0);
+        assert_eq!(pks[4], ages[4].0);
 
         // The associated data
-        assert_eq!(datas[4], ages[4].1);
         assert_eq!(datas[3], ages[0].1);
         assert_eq!(datas[1], ages[1].1);
         assert_eq!(datas[2], ages[2].1);
         assert_eq!(datas[0], ages[3].1);
+        assert_eq!(datas[4], ages[4].1);
     }
 
     #[test]
@@ -1089,7 +1089,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str) = ("1", "5627");
+        let pk1 = ("1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1097,7 +1097,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str) = ("2", "5628");
+        let pk2 = ("2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1105,7 +1105,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str) = ("2", "5629");
+        let pk3 = ("2", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1113,7 +1113,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str) = ("3", "5630");
+        let pk4 = ("3", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's prefix and iterate
@@ -1148,7 +1148,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str, &str) = ("1", "1", "5627");
+        let pk1 = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1156,7 +1156,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str, &str) = ("1", "2", "5628");
+        let pk2 = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1164,7 +1164,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str, &str) = ("2", "1", "5629");
+        let pk3 = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1172,7 +1172,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str, &str) = ("2", "2", "5630");
+        let pk4 = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's prefix and iterate
@@ -1204,7 +1204,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str, &str) = ("1", "1", "5627");
+        let pk1 = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1212,7 +1212,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str, &str) = ("1", "2", "5628");
+        let pk2 = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1220,7 +1220,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str, &str) = ("2", "1", "5629");
+        let pk3 = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1228,7 +1228,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str, &str) = ("2", "2", "5630");
+        let pk4 = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's sub-prefix and iterate
@@ -1266,7 +1266,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str) = ("1", "5627");
+        let pk1 = ("1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1274,7 +1274,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str) = ("2", "5628");
+        let pk2 = ("2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1282,7 +1282,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str) = ("2", "5629");
+        let pk3 = ("2", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1290,7 +1290,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str) = ("3", "5630");
+        let pk4 = ("3", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's try to iterate!
@@ -1351,7 +1351,7 @@ mod test {
             last_name: "".to_string(),
             age: 42,
         };
-        let pk1: (&str, &str, &str) = ("1", "1", "5627");
+        let pk1 = ("1", "1", "5627");
         map.save(&mut store, pk1, &data1).unwrap();
 
         let data2 = Data {
@@ -1359,7 +1359,7 @@ mod test {
             last_name: "Perez".to_string(),
             age: 13,
         };
-        let pk2: (&str, &str, &str) = ("1", "2", "5628");
+        let pk2 = ("1", "2", "5628");
         map.save(&mut store, pk2, &data2).unwrap();
 
         let data3 = Data {
@@ -1367,7 +1367,7 @@ mod test {
             last_name: "Young".to_string(),
             age: 24,
         };
-        let pk3: (&str, &str, &str) = ("2", "1", "5629");
+        let pk3 = ("2", "1", "5629");
         map.save(&mut store, pk3, &data3).unwrap();
 
         let data4 = Data {
@@ -1375,7 +1375,7 @@ mod test {
             last_name: "Bemberg".to_string(),
             age: 43,
         };
-        let pk4: (&str, &str, &str) = ("2", "2", "5630");
+        let pk4 = ("2", "2", "5630");
         map.save(&mut store, pk4, &data4).unwrap();
 
         // let's prefix-range and iterate
