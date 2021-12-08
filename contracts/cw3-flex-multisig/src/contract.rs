@@ -7,7 +7,6 @@ use cosmwasm_std::{
     Response, StdResult,
 };
 
-use cw0::{maybe_addr, Expiration};
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
@@ -15,6 +14,7 @@ use cw3::{
 };
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
+use utils::{maybe_addr, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -429,11 +429,11 @@ fn list_voters(
 mod tests {
     use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal, Timestamp};
 
-    use cw0::Duration;
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
     use cw_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
+    use utils::Duration;
 
     use super::*;
     use crate::msg::Threshold;

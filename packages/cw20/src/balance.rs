@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use cw0::NativeBalance;
+use utils::NativeBalance;
 
 use crate::Cw20CoinVerified;
 

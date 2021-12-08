@@ -4,9 +4,9 @@ use std::convert::TryInto;
 
 use cosmwasm_std::{Addr, BlockInfo, CosmosMsg, Empty, StdError, StdResult, Storage};
 
-use cw0::{Duration, Expiration};
 use cw3::{Status, Vote};
 use cw_storage_plus::{Item, Map};
+use utils::{Duration, Expiration};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {

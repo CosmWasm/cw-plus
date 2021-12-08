@@ -1,4 +1,4 @@
-pub use cw0::Expiration;
+pub use utils::Expiration;
 
 pub use crate::balance::Balance;
 pub use crate::coin::{Cw20Coin, Cw20CoinVerified};

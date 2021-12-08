@@ -867,7 +867,7 @@ where
     }
 }
 
-// TODO: replace with code in cw0
+// TODO: replace with code in utils
 
 #[derive(Clone, PartialEq, Message)]
 struct InstantiateResponse {
@@ -877,7 +877,7 @@ struct InstantiateResponse {
     pub data: ::prost::alloc::vec::Vec<u8>,
 }
 
-// TODO: encode helpers in cw0
+// TODO: encode helpers in utils
 fn instantiate_response(data: Option<Binary>, contact_address: &Addr) -> Binary {
     let data = data.unwrap_or_default().to_vec();
     let init_data = InstantiateResponse {

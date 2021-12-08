@@ -7,13 +7,13 @@ use cosmwasm_std::{
     Response, StdResult,
 };
 
-use cw0::Expiration;
 use cw2::set_contract_version;
 use cw3::{
     ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
     VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
 use cw_storage_plus::Bound;
+use utils::Expiration;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -436,8 +436,8 @@ mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, from_binary, BankMsg};
 
-    use cw0::Duration;
     use cw2::{get_contract_version, ContractVersion};
+    use utils::Duration;
 
     use crate::msg::Voter;
 

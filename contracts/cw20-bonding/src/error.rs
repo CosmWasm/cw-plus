@@ -1,6 +1,6 @@
 use cosmwasm_std::StdError;
-use cw0::PaymentError;
 use thiserror::Error;
+use utils::PaymentError;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {

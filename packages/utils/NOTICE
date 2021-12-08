@@ -1,4 +1,4 @@
-CW0: Common types and helpers for CosmWasm specs
+Utils: Common types and helpers for CosmWasm specs
 Copyright (C) 2020 Confio OÜ
 
 Licensed under the Apache License, Version 2.0 (the "License");

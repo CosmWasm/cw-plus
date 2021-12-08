@@ -6,7 +6,7 @@ use thiserror::Error;
 use cosmwasm_std::{attr, Addr, Deps, DepsMut, MessageInfo, Response, StdError, StdResult};
 use cw_storage_plus::Item;
 
-// TODO: should the return values end up in cw0, so eg. cw4 can import them as well as this module?
+// TODO: should the return values end up in utils, so eg. cw4 can import them as well as this module?
 /// Returned from Admin.query_admin()
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminResponse {

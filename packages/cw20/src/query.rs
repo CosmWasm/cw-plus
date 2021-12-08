@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, Binary, Uint128};
 
 use crate::logo::LogoInfo;
-use cw0::Expiration;
+use utils::Expiration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]

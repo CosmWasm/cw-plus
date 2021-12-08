@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::Addr;
-use cw0::{Expiration, NativeBalance};
 use cw_storage_plus::Map;
+use utils::{Expiration, NativeBalance};
 
 // Permissions struct defines users message execution permissions.
 // Could have implemented permissions for each cosmos module(StakingPermissions, GovPermissions etc...)
@@ -46,7 +46,7 @@ impl Allowance {
     /// Example:
     ///
     /// ```
-    /// # use cw0::{Expiration, NativeBalance};
+    /// # use utils::{Expiration, NativeBalance};
     /// # use cw1_subkeys::state::Allowance;
     /// # use cosmwasm_std::coin;
     ///
