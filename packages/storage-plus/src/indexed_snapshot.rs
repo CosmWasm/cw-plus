@@ -297,8 +297,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::{index_string_tuple, index_triple};
-    use crate::{Index, MultiIndex, UniqueIndex};
+    use crate::indexes::index_string_tuple;
+    use crate::{index_tuple, Index, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -311,11 +311,9 @@ mod test {
     }
 
     struct DataIndexes<'a> {
-        // Second arg is for storing pk
-        pub name: MultiIndex<'a, (Vec<u8>, String), Data, String>,
-        // Last generic type arg is pk deserialization type
+        // Last type parameters are for signaling pk deserialization
+        pub name: MultiIndex<'a, Vec<u8>, Data, String>,
         pub age: UniqueIndex<'a, u32, Data, String>,
-        // Last generic type arg is pk deserialization type
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
     }
 
@@ -329,8 +327,8 @@ mod test {
 
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
-        // Third arg needed for storing pk
-        pub name_age: MultiIndex<'a, (Vec<u8>, u32, Vec<u8>), Data, String>,
+        // Last type parameter is for signaling pk deserialization
+        pub name_age: MultiIndex<'a, (Vec<u8>, u32), Data, String>,
     }
 
     // Future Note: this can likely be macro-derived
@@ -344,15 +342,7 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_snapshot_map<'a>() -> IndexedSnapshotMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(
-                |d, k| {
-                    (d.name.as_bytes().to_vec(), unsafe {
-                        String::from_utf8_unchecked(k)
-                    })
-                },
-                "data",
-                "data__name",
-            ),
+            name: MultiIndex::new(|d| d.name.as_bytes().to_vec(), "data", "data__name"),
             age: UniqueIndex::new(|d| d.age, "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
@@ -445,10 +435,7 @@ mod test {
             .count();
         assert_eq!(2, count);
 
-        // TODO: we load by wrong keys - get full storage key!
-
-        // load it by secondary index (we must know how to compute this)
-        // let marias: Vec<_>> = map
+        // load it by secondary index
         let marias: Vec<_> = map
             .idx
             .name
@@ -626,11 +613,7 @@ mod test {
         let mut height = 2;
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map =
             IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);
@@ -696,11 +679,7 @@ mod test {
         let mut height = 2;
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map =
             IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);
@@ -1096,11 +1075,7 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(
-                |d, k| index_triple(&d.name, d.age, k),
-                "data",
-                "data__name_age",
-            ),
+            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
         };
         let map =
             IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);

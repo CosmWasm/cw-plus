@@ -22,26 +22,24 @@ use std::marker::PhantomData;
 /// The stored pk_len is used to recover the pk from the index namespace, and perform
 /// the secondary load of the associated value from the main map.
 ///
-/// The MultiIndex definition must include a field for the pk. That is, the MultiIndex K value
-/// is always a n-tuple (n >= 2) and its last element must be the pk.
-/// The index function must therefore put the pk as last element, when generating the index.
-/// The optional PK type defines the type of Primary Key deserialization.
-pub struct MultiIndex<'a, K, T, PK = ()> {
-    index: fn(&T, Vec<u8>) -> K,
+/// The (optional) PK type defines the type of Primary Key deserialization.
+pub struct MultiIndex<'a, IK, T, PK = ()> {
+    index: fn(&T) -> IK,
     idx_namespace: &'a [u8],
-    idx_map: Map<'a, K, u32>,
+    // note, we collapse the ik - combining everything under the namespace - and concatenating the pk
+    idx_map: Map<'a, Vec<u8>, u32>,
     pk_namespace: &'a [u8],
     phantom: PhantomData<PK>,
 }
 
-impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
     // TODO: make this a const fn
     /// Create a new MultiIndex
     ///
-    /// idx_fn - lambda creating index key from value (first argument) and primary key (second argument)
+    /// idx_fn - lambda creating index key from value
     /// pk_namespace - prefix for the primary key
     /// idx_namespace - prefix for the index value
     ///
@@ -58,16 +56,12 @@ where
     /// }
     ///
     /// let index: MultiIndex<_, _, String> = MultiIndex::new(
-    ///     |d: &Data, k: Vec<u8>| (d.age, k),
+    ///     |d: &Data| d.age,
     ///     "age",
     ///     "age__owner",
     /// );
     /// ```
-    pub fn new(
-        idx_fn: fn(&T, Vec<u8>) -> K,
-        pk_namespace: &'a str,
-        idx_namespace: &'a str,
-    ) -> Self {
+    pub fn new(idx_fn: fn(&T) -> IK, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
         MultiIndex {
             index: idx_fn,
             idx_namespace: idx_namespace.as_bytes(),
@@ -127,29 +121,29 @@ fn deserialize_multi_kv<K: KeyDeserialize, T: DeserializeOwned>(
     Ok((K::from_slice(pk)?, v))
 }
 
-impl<'a, K, T, PK> Index<T> for MultiIndex<'a, K, T, PK>
+impl<'a, IK, T, PK> Index<T> for MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
+    IK: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data, pk.to_vec());
+        let idx = (self.index)(data).joined_extra_key(pk);
         self.idx_map.save(store, idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data, pk.to_vec());
+        let idx = (self.index)(old_data).joined_extra_key(pk);
         self.idx_map.remove(store, idx);
         Ok(())
     }
 }
 
-impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
+    pub fn prefix(&self, p: IK) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -158,7 +152,7 @@ where
         )
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
+    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -176,18 +170,18 @@ where
         )
     }
 
-    pub fn index_key(&self, k: K) -> Vec<u8> {
-        k.joined_key()
+    pub fn index_key(&self, k: IK) -> Vec<u8> {
+        k.joined_extra_key(b"")
     }
 
     #[cfg(test)]
-    pub fn count(&self, store: &dyn Storage, p: K::Prefix) -> usize {
+    pub fn count(&self, store: &dyn Storage, p: IK) -> usize {
         let prefix = self.prefix(p);
         prefix.keys(store, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
-    pub fn all_pks(&self, store: &dyn Storage, p: K::Prefix) -> Vec<Vec<u8>> {
+    pub fn all_pks(&self, store: &dyn Storage, p: IK) -> Vec<Vec<u8>> {
         let prefix = self.prefix(p);
         prefix
             .keys(store, None, None, Order::Ascending)
@@ -195,17 +189,17 @@ where
     }
 
     #[cfg(test)]
-    pub fn all_items(&self, store: &dyn Storage, p: K::Prefix) -> StdResult<Vec<Record<T>>> {
+    pub fn all_items(&self, store: &dyn Storage, p: IK) -> StdResult<Vec<Record<T>>> {
         let prefix = self.prefix(p);
         prefix.range(store, None, None, Order::Ascending).collect()
     }
 }
 
 // short-cut for simple keys, rather than .prefix(()).range(...)
-impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
@@ -241,8 +235,8 @@ where
     pub fn prefix_range<'c>(
         &'c self,
         store: &'c dyn Storage,
-        min: Option<PrefixBound<'a, K::Prefix>>,
-        max: Option<PrefixBound<'a, K::Prefix>>,
+        min: Option<PrefixBound<'a, IK>>,
+        max: Option<PrefixBound<'a, IK>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -256,13 +250,13 @@ where
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a>,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<PK, T> {
+    pub fn prefix_de(&self, p: IK) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -271,7 +265,7 @@ where
         )
     }
 
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<PK, T> {
+    pub fn sub_prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_function(
             self.idx_namespace,
             &p.prefix(),
@@ -282,11 +276,11 @@ where
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, K, T, PK> MultiIndex<'a, K, T, PK>
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     PK: PrimaryKey<'a> + KeyDeserialize,
     T: Serialize + DeserializeOwned + Clone,
-    K: PrimaryKey<'a> + KeyDeserialize,
+    IK: PrimaryKey<'a> + KeyDeserialize + Prefixer<'a>,
 {
     /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
     /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
@@ -297,14 +291,14 @@ where
     pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<PrefixBound<'a, K::Prefix>>,
-        max: Option<PrefixBound<'a, K::Prefix>>,
+        min: Option<PrefixBound<'a, IK>>,
+        max: Option<PrefixBound<'a, IK>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
         T: 'c,
         'a: 'c,
-        K: 'c,
+        IK: 'c,
         PK: 'c,
         PK::Output: 'static,
     {
