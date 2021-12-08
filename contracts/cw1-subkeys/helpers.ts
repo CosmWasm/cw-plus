@@ -34,7 +34,7 @@ import { calculateFee } from "@cosmjs/stargate"
 type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {} }
 
 interface CanExecuteResponse {
-  readonly canExecute: boolean
+  readonly can_execute: boolean
 }
 
 interface Permissions {
