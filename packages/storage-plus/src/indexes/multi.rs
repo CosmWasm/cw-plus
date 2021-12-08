@@ -39,7 +39,7 @@ where
     // TODO: make this a const fn
     /// Create a new MultiIndex
     ///
-    /// idx_fn - lambda creating index key from value (first argument) and primary key (second argument)
+    /// idx_fn - lambda creating index key from value
     /// pk_namespace - prefix for the primary key
     /// idx_namespace - prefix for the index value
     ///
