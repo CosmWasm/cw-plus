@@ -295,7 +295,7 @@ mod test {
     }
 
     struct DataIndexes<'a> {
-        // Last args are for signaling pk deserialization
+        // Last type parameters are for signaling pk deserialization
         pub name: MultiIndex<'a, String, Data, String>,
         pub age: UniqueIndex<'a, u32, Data, String>,
         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
@@ -311,7 +311,7 @@ mod test {
 
     // For composite multi index tests
     struct DataCompositeMultiIndex<'a> {
-        // Last arg is for signaling pk deserialization
+        // Last type parameter is for signaling pk deserialization
         pub name_age: MultiIndex<'a, (Vec<u8>, u32), Data, String>,
     }
 
