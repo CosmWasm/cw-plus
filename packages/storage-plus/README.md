@@ -205,7 +205,7 @@ That means that byte and string slices, byte vectors, and strings, can be conven
 Moreover, some other types can be used as well, like addresses and address references, pairs and triples, and
 integer types.
 
-If the key represents and address, we suggest using `&Addr` for keys in storage, instead of `String` or string slices.
+If the key represents an address, we suggest using `&Addr` for keys in storage, instead of `String` or string slices.
 This implies doing address validation through `addr_validate` on any address passed in via a message, to ensure it's a
 legitimate address, and not random text which will fail later.
 `pub fn addr_validate(&self, &str) -> Addr` in `deps.api` can be used for address validation, and the returned `Addr`
