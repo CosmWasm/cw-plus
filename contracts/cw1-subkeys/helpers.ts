@@ -31,7 +31,7 @@ import { calculateFee } from "@cosmjs/stargate"
  * If you want to use this code inside an app, you will need several imports from https://github.com/CosmWasm/cosmjs
  */
 
-type Expiration = { at_height: { height: number } } | { at_time: { time: number } } | { never: {} }
+type Expiration = { at_height: number } | { at_time: number } | { never: {} }
 
 interface CanExecuteResponse {
   readonly can_execute: boolean
