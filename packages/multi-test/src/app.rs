@@ -2441,7 +2441,7 @@ mod test {
     mod protobuf_wrapped_data {
         use super::*;
         use crate::test_helpers::contracts::echo::EXECUTE_REPLY_BASE_ID;
-        use cw0::parse_instantiate_response_data;
+        use utils::parse_instantiate_response_data;
 
         #[test]
         fn instantiate_wrapped_properly() {

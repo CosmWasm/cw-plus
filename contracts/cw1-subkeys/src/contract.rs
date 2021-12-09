@@ -8,7 +8,6 @@ use cosmwasm_std::{
     ensure, ensure_ne, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg,
     Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
 };
-use cw0::Expiration;
 use cw1::CanExecuteResponse;
 use cw1_whitelist::{
     contract::{
@@ -21,6 +20,7 @@ use cw1_whitelist::{
 use cw2::{get_contract_version, set_contract_version};
 use cw_storage_plus::Bound;
 use semver::Version;
+use utils::Expiration;
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -479,9 +479,9 @@ mod tests {
     };
     use cosmwasm_std::{coin, coins, OwnedDeps, StakingMsg, SubMsg, Timestamp};
 
-    use cw0::NativeBalance;
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
+    use utils::NativeBalance;
 
     use crate::state::Permissions;
 

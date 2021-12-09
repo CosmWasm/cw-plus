@@ -16,7 +16,7 @@ use crate::msg::{
     TransferMsg,
 };
 use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
-use cw0::{nonpayable, one_coin};
+use utils::{nonpayable, one_coin};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
@@ -193,7 +193,7 @@ mod test {
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{coin, coins, CosmosMsg, IbcMsg, StdError, Uint128};
 
-    use cw0::PaymentError;
+    use utils::PaymentError;
 
     #[test]
     fn setup_and_query() {

@@ -143,10 +143,11 @@ where
     // Other cases need to call prefix() first
     K: PrimaryKey<'a>,
 {
-    /// while range assumes you set the prefix to one element and call range over the last one,
-    /// prefix_range accepts bounds for the lowest and highest elements of the Prefix we wish to
-    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
-    /// casting to Vec<u8> doesn't solve them.
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the `Prefix`
+    /// itself, and iterates over those (inclusively or exclusively, depending on `PrefixBound`).
+    /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
+    /// solve them.
     pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
@@ -196,10 +197,12 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
-    /// while range_de assumes you set the prefix to one element and call range over the last one,
-    /// prefix_range_de accepts bounds for the lowest and highest elements of the Prefix we wish to
-    /// accept, and iterates over those. There are some issues that distinguish these to and blindly
-    /// casting to Vec<u8> doesn't solve them.
+    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
+    /// `PrefixBound`).
+    /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
+    /// solve them.
     pub fn prefix_range_de<'c>(
         &self,
         store: &'c dyn Storage,
@@ -257,9 +260,6 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::ops::Deref;
 
-    #[cfg(feature = "iterator")]
-    use crate::U32Key;
-    use crate::U8Key;
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
@@ -272,11 +272,11 @@ mod test {
 
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
     #[cfg(feature = "iterator")]
-    const PEOPLE_ID: Map<U32Key, Data> = Map::new("people_id");
+    const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
-    const TRIPLE: Map<(&[u8], U8Key, &str), u64> = Map::new("triple");
+    const TRIPLE: Map<(&[u8], u8, &str), u64> = Map::new("triple");
 
     #[test]
     fn create_path() {
@@ -298,7 +298,7 @@ mod test {
         assert_eq!(b"john".to_vec().as_slice(), &key[9..13]);
         assert_eq!(b"maria".to_vec().as_slice(), &key[13..]);
 
-        let path = TRIPLE.key((b"john", 8u8.into(), "pedro"));
+        let path = TRIPLE.key((b"john", 8u8, "pedro"));
         let key = path.deref();
         // this should be prefixed(allow) || prefixed(john) || maria
         assert_eq!(
@@ -387,21 +387,19 @@ mod test {
         let mut store = MockStorage::new();
 
         // save and load on a triple composite key
-        let triple = TRIPLE.key((b"owner", 10u8.into(), "recipient"));
+        let triple = TRIPLE.key((b"owner", 10u8, "recipient"));
         assert_eq!(None, triple.may_load(&store).unwrap());
         triple.save(&mut store, &1234).unwrap();
         assert_eq!(1234, triple.load(&store).unwrap());
 
         // not under other key
         let different = TRIPLE
-            .may_load(&store, (b"owners", 10u8.into(), "ecipient"))
+            .may_load(&store, (b"owners", 10u8, "ecipient"))
             .unwrap();
         assert_eq!(None, different);
 
         // matches under a proper copy
-        let same = TRIPLE
-            .load(&store, (b"owner", 10u8.into(), "recipient"))
-            .unwrap();
+        let same = TRIPLE.load(&store, (b"owner", 10u8, "recipient")).unwrap();
         assert_eq!(1234, same);
     }
 
@@ -537,15 +535,13 @@ mod test {
             name: "John".to_string(),
             age: 32,
         };
-        PEOPLE_ID
-            .save(&mut store, U32Key::new(1234), &data)
-            .unwrap();
+        PEOPLE_ID.save(&mut store, 1234, &data).unwrap();
 
         let data2 = Data {
             name: "Jim".to_string(),
             age: 44,
         };
-        PEOPLE_ID.save(&mut store, U32Key::new(56), &data2).unwrap();
+        PEOPLE_ID.save(&mut store, 56, &data2).unwrap();
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE_ID
@@ -559,7 +555,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range_de(
                 &store,
-                Some(Bound::Inclusive(U32Key::new(56).into())),
+                Some(Bound::inclusive_int(56u32)),
                 None,
                 Order::Ascending,
             )
@@ -572,7 +568,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range_de(
                 &store,
-                Some(Bound::Inclusive(U32Key::new(57).into())),
+                Some(Bound::inclusive_int(57u32)),
                 None,
                 Order::Ascending,
             )
@@ -677,16 +673,16 @@ mod test {
 
         // save and load on three keys, one under different owner
         TRIPLE
-            .save(&mut store, (b"owner", 9u8.into(), "recipient"), &1000)
+            .save(&mut store, (b"owner", 9, "recipient"), &1000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", 9u8.into(), "recipient2"), &3000)
+            .save(&mut store, (b"owner", 9, "recipient2"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", 10u8.into(), "recipient3"), &3000)
+            .save(&mut store, (b"owner", 10, "recipient3"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner2", 9u8.into(), "recipient"), &5000)
+            .save(&mut store, (b"owner2", 9, "recipient"), &5000)
             .unwrap();
 
         // let's try to iterate!
@@ -697,19 +693,19 @@ mod test {
             all,
             vec![
                 (
-                    (b"owner".to_vec(), U8Key::new(9), b"recipient".to_vec()).joined_key(),
+                    (b"owner".to_vec(), 9u8, b"recipient".to_vec()).joined_key(),
                     1000
                 ),
                 (
-                    (b"owner".to_vec(), U8Key::new(9), b"recipient2".to_vec()).joined_key(),
+                    (b"owner".to_vec(), 9u8, b"recipient2".to_vec()).joined_key(),
                     3000
                 ),
                 (
-                    (b"owner".to_vec(), U8Key::new(10), b"recipient3".to_vec()).joined_key(),
+                    (b"owner".to_vec(), 10u8, b"recipient3".to_vec()).joined_key(),
                     3000
                 ),
                 (
-                    (b"owner2".to_vec(), U8Key::new(9), b"recipient".to_vec()).joined_key(),
+                    (b"owner2".to_vec(), 9u8, b"recipient".to_vec()).joined_key(),
                     5000
                 )
             ]
@@ -717,7 +713,7 @@ mod test {
 
         // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix((b"owner", 9u8.into()))
+            .prefix((b"owner", 9))
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -741,9 +737,9 @@ mod test {
         assert_eq!(
             all,
             vec![
-                ((U8Key::new(9), b"recipient".to_vec()).joined_key(), 1000),
-                ((U8Key::new(9), b"recipient2".to_vec()).joined_key(), 3000),
-                ((U8Key::new(10), b"recipient3".to_vec()).joined_key(), 3000)
+                ((9u8, b"recipient".to_vec()).joined_key(), 1000),
+                ((9u8, b"recipient2".to_vec()).joined_key(), 3000),
+                ((10u8, b"recipient3".to_vec()).joined_key(), 3000)
             ]
         );
     }
@@ -755,16 +751,16 @@ mod test {
 
         // save and load on three keys, one under different owner
         TRIPLE
-            .save(&mut store, (b"owner", 9u8.into(), "recipient"), &1000)
+            .save(&mut store, (b"owner", 9u8, "recipient"), &1000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", 9u8.into(), "recipient2"), &3000)
+            .save(&mut store, (b"owner", 9u8, "recipient2"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner", 10u8.into(), "recipient3"), &3000)
+            .save(&mut store, (b"owner", 10u8, "recipient3"), &3000)
             .unwrap();
         TRIPLE
-            .save(&mut store, (b"owner2", 9u8.into(), "recipient"), &5000)
+            .save(&mut store, (b"owner2", 9u8, "recipient"), &5000)
             .unwrap();
 
         // let's try to iterate!
@@ -801,7 +797,7 @@ mod test {
 
         // let's iterate over a prefix_de
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix_de((b"owner", U8Key::new(9)))
+            .prefix_de((b"owner", 9))
             .range_de(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -1013,25 +1009,19 @@ mod test {
     fn prefixed_range_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
-        const AGES: Map<(U32Key, Vec<u8>), u64> = Map::new("ages");
+        const AGES: Map<(u32, Vec<u8>), u64> = Map::new("ages");
 
         let mut store = MockStorage::new();
-        AGES.save(&mut store, (2.into(), vec![1, 2, 3]), &123)
-            .unwrap();
-        AGES.save(&mut store, (3.into(), vec![4, 5, 6]), &456)
-            .unwrap();
-        AGES.save(&mut store, (5.into(), vec![7, 8, 9]), &789)
-            .unwrap();
-        AGES.save(&mut store, (5.into(), vec![9, 8, 7]), &987)
-            .unwrap();
-        AGES.save(&mut store, (7.into(), vec![20, 21, 22]), &2002)
-            .unwrap();
-        AGES.save(&mut store, (8.into(), vec![23, 24, 25]), &2332)
-            .unwrap();
+        AGES.save(&mut store, (2, vec![1, 2, 3]), &123).unwrap();
+        AGES.save(&mut store, (3, vec![4, 5, 6]), &456).unwrap();
+        AGES.save(&mut store, (5, vec![7, 8, 9]), &789).unwrap();
+        AGES.save(&mut store, (5, vec![9, 8, 7]), &987).unwrap();
+        AGES.save(&mut store, (7, vec![20, 21, 22]), &2002).unwrap();
+        AGES.save(&mut store, (8, vec![23, 24, 25]), &2332).unwrap();
 
         // typical range under one prefix as a control
         let fives = AGES
-            .prefix(5.into())
+            .prefix(5)
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
@@ -1048,8 +1038,8 @@ mod test {
         let include = AGES
             .prefix_range(
                 &store,
-                Some(PrefixBound::inclusive(3)),
-                Some(PrefixBound::inclusive(7)),
+                Some(PrefixBound::inclusive(3u32)),
+                Some(PrefixBound::inclusive(7u32)),
                 Order::Ascending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1062,8 +1052,8 @@ mod test {
         let exclude = AGES
             .prefix_range(
                 &store,
-                Some(PrefixBound::exclusive(3)),
-                Some(PrefixBound::exclusive(7)),
+                Some(PrefixBound::exclusive(3u32)),
+                Some(PrefixBound::exclusive(7u32)),
                 Order::Ascending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1076,8 +1066,8 @@ mod test {
         let include = AGES
             .prefix_range(
                 &store,
-                Some(PrefixBound::inclusive(3)),
-                Some(PrefixBound::inclusive(5)),
+                Some(PrefixBound::inclusive(3u32)),
+                Some(PrefixBound::inclusive(5u32)),
                 Order::Descending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1090,8 +1080,8 @@ mod test {
         let include = AGES
             .prefix_range(
                 &store,
-                Some(PrefixBound::exclusive(2)),
-                Some(PrefixBound::exclusive(5)),
+                Some(PrefixBound::exclusive(2u32)),
+                Some(PrefixBound::exclusive(5u32)),
                 Order::Descending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1106,19 +1096,19 @@ mod test {
     fn prefixed_range_de_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
-        const AGES: Map<(U32Key, &str), u64> = Map::new("ages");
+        const AGES: Map<(u32, &str), u64> = Map::new("ages");
 
         let mut store = MockStorage::new();
-        AGES.save(&mut store, (2.into(), "123"), &123).unwrap();
-        AGES.save(&mut store, (3.into(), "456"), &456).unwrap();
-        AGES.save(&mut store, (5.into(), "789"), &789).unwrap();
-        AGES.save(&mut store, (5.into(), "987"), &987).unwrap();
-        AGES.save(&mut store, (7.into(), "202122"), &2002).unwrap();
-        AGES.save(&mut store, (8.into(), "232425"), &2332).unwrap();
+        AGES.save(&mut store, (2, "123"), &123).unwrap();
+        AGES.save(&mut store, (3, "456"), &456).unwrap();
+        AGES.save(&mut store, (5, "789"), &789).unwrap();
+        AGES.save(&mut store, (5, "987"), &987).unwrap();
+        AGES.save(&mut store, (7, "202122"), &2002).unwrap();
+        AGES.save(&mut store, (8, "232425"), &2332).unwrap();
 
         // typical range under one prefix as a control
         let fives = AGES
-            .prefix_de(5.into())
+            .prefix_de(5)
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
@@ -1138,8 +1128,8 @@ mod test {
         let include = AGES
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::inclusive(3)),
-                Some(PrefixBound::inclusive(7)),
+                Some(PrefixBound::inclusive(3u32)),
+                Some(PrefixBound::inclusive(7u32)),
                 Order::Ascending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1152,8 +1142,8 @@ mod test {
         let exclude = AGES
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::exclusive(3)),
-                Some(PrefixBound::exclusive(7)),
+                Some(PrefixBound::exclusive(3u32)),
+                Some(PrefixBound::exclusive(7u32)),
                 Order::Ascending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1166,8 +1156,8 @@ mod test {
         let include = AGES
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::inclusive(3)),
-                Some(PrefixBound::inclusive(5)),
+                Some(PrefixBound::inclusive(3u32)),
+                Some(PrefixBound::inclusive(5u32)),
                 Order::Descending,
             )
             .map(|r| r.map(|(_, v)| v))
@@ -1180,8 +1170,8 @@ mod test {
         let include = AGES
             .prefix_range_de(
                 &store,
-                Some(PrefixBound::exclusive(2)),
-                Some(PrefixBound::exclusive(5)),
+                Some(PrefixBound::exclusive(2u32)),
+                Some(PrefixBound::exclusive(5u32)),
                 Order::Descending,
             )
             .map(|r| r.map(|(_, v)| v))

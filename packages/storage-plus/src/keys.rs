@@ -1,3 +1,6 @@
+// TODO: Remove along with IntKey
+#![allow(deprecated)]
+
 use cosmwasm_std::{Addr, Timestamp};
 use std::marker::PhantomData;
 
@@ -72,6 +75,11 @@ pub trait PrimaryKey<'a>: Clone {
             &keys[0..l - 1].iter().map(Key::as_ref).collect::<Vec<_>>(),
             keys[l - 1].as_ref(),
         )
+    }
+
+    fn joined_extra_key(&self, key: &[u8]) -> Vec<u8> {
+        let keys = self.key();
+        namespaces_with_key(&keys.iter().map(Key::as_ref).collect::<Vec<_>>(), key)
     }
 }
 
@@ -336,6 +344,7 @@ pub type I128Key = IntKey<i128>;
 ///   let k = U64Key::new(12345);
 ///   let k = U32Key::from(12345);
 ///   let k: U16Key = 12345.into();
+#[deprecated(note = "It is suggested to use naked int types instead of IntKey wrapper")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IntKey<T: Endian> {
     pub wrapped: Vec<u8>,

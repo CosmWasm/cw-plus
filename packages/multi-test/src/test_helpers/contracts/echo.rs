@@ -13,8 +13,8 @@ use crate::{test_helpers::EmptyMsg, Contract, ContractWrapper};
 use schemars::JsonSchema;
 use std::fmt::Debug;
 
-use cw0::{parse_execute_response_data, parse_instantiate_response_data};
 use derivative::Derivative;
+use utils::{parse_execute_response_data, parse_instantiate_response_data};
 
 // Choosing a reply id less than ECHO_EXECUTE_BASE_ID indicates an Instantiate message reply by convention.
 // An Execute message reply otherwise.

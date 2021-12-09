@@ -11,7 +11,7 @@ use cw_storage_plus::Item;
 use crate::admin::{Admin, AdminError};
 
 // this is copied from cw4
-// TODO: pull into cw0 as common dep
+// TODO: pull into utils as common dep
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct HooksResponse {
     pub hooks: Vec<String>,

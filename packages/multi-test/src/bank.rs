@@ -7,8 +7,8 @@ use cosmwasm_std::{
     BlockInfo, Coin, Event, Querier, Storage,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
-use cw0::NativeBalance;
 use cw_storage_plus::Map;
+use utils::NativeBalance;
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;
