@@ -828,7 +828,7 @@ mod test {
             map.idx
                 .name
                 .prefix(name.to_string())
-                .keys(store, None, None, Order::Ascending)
+                .keys_raw(store, None, None, Order::Ascending)
                 .count()
         };
 

@@ -95,7 +95,7 @@ pub const ESCROWS: Map<&str, Escrow> = Map::new("escrow");
 /// This returns the list of ids for all registered escrows
 pub fn all_escrow_ids(storage: &dyn Storage) -> StdResult<Vec<String>> {
     ESCROWS
-        .keys(storage, None, None, Order::Ascending)
+        .keys_raw(storage, None, None, Order::Ascending)
         .map(|k| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("parsing escrow key")))
         .collect()
 }

@@ -167,7 +167,7 @@ where
         self.no_prefix().range_raw(store, min, max, order)
     }
 
-    pub fn keys<'c>(
+    pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -177,7 +177,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().keys(store, min, max, order)
+        self.no_prefix().keys_raw(store, min, max, order)
     }
 }
 
@@ -1019,8 +1019,7 @@ mod test {
         assert_eq!(fives, vec![(vec![7, 8, 9], 789), (vec![9, 8, 7], 987)]);
 
         let keys: Vec<_> = AGES
-            .no_prefix()
-            .keys(&store, None, None, Order::Ascending)
+            .keys_raw(&store, None, None, Order::Ascending)
             .collect();
         println!("keys: {:?}", keys);
 

@@ -182,7 +182,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn keys<'a>(
+    pub fn keys_raw<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound>,

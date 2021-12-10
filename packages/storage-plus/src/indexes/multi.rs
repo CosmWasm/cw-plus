@@ -180,14 +180,14 @@ where
     #[cfg(test)]
     pub fn count(&self, store: &dyn Storage, p: IK) -> usize {
         let prefix = self.prefix(p);
-        prefix.keys(store, None, None, Order::Ascending).count()
+        prefix.keys_raw(store, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
     pub fn all_pks(&self, store: &dyn Storage, p: IK) -> Vec<Vec<u8>> {
         let prefix = self.prefix(p);
         prefix
-            .keys(store, None, None, Order::Ascending)
+            .keys_raw(store, None, None, Order::Ascending)
             .collect::<Vec<Vec<u8>>>()
     }
 
@@ -226,7 +226,7 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix().keys(store, min, max, order)
+        self.no_prefix().keys_raw(store, min, max, order)
     }
 
     /// While `range` over a `prefix` fixes the prefix to one element and iterates over the

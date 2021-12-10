@@ -180,7 +180,7 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix().keys(store, min, max, order)
+        self.no_prefix().keys_raw(store, min, max, order)
     }
 }
 

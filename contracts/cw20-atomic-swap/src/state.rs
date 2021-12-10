@@ -32,7 +32,7 @@ pub fn all_swap_ids(
     limit: usize,
 ) -> StdResult<Vec<String>> {
     SWAPS
-        .keys(storage, start, None, Order::Ascending)
+        .keys_raw(storage, start, None, Order::Ascending)
         .take(limit)
         .map(|k| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("Parsing swap id")))
         .collect()

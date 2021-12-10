@@ -819,7 +819,7 @@ mod test {
             map.idx
                 .name
                 .prefix(name.as_bytes().to_vec())
-                .keys(store, None, None, Order::Ascending)
+                .keys_raw(store, None, None, Order::Ascending)
                 .count()
         };
 
