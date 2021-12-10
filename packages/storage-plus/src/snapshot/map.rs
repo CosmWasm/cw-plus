@@ -174,7 +174,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range(store, min, max, order)
+        self.no_prefix().range_raw(store, min, max, order)
     }
 }
 
