@@ -165,8 +165,8 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     let info = CHANNEL_INFO.load(deps.storage, &id)?;
     // this returns Vec<(outstanding, total)>
     let state: StdResult<Vec<_>> = CHANNEL_STATE
-        .prefix(&id)
-        .range(deps.storage, None, None, Order::Ascending)
+        .prefix_de(&id)
+        .range_raw(deps.storage, None, None, Order::Ascending)
         .map(|r| {
             let (k, v) = r?;
             let denom = String::from_utf8(k)?;

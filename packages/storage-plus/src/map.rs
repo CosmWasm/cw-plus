@@ -50,11 +50,6 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::new(self.namespace, &p.prefix())
-    }
-
-    #[cfg(feature = "iterator")]
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.namespace, &p.prefix())
     }
@@ -611,8 +606,8 @@ mod test {
 
         // let's try to iterate over a prefix
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de(b"owner")
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -713,8 +708,8 @@ mod test {
 
         // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix((b"owner", 9))
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de((b"owner", 9))
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -981,8 +976,8 @@ mod test {
 
         // get all under one key
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de(b"owner")
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         assert_eq!(
             all?,
@@ -991,8 +986,8 @@ mod test {
 
         // Or ranges between two items (even reverse)
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix(b"owner")
-            .range(
+            .prefix_de(b"owner")
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"spender1".to_vec())),
                 Some(Bound::Inclusive(b"spender2".to_vec())),
@@ -1021,8 +1016,8 @@ mod test {
 
         // typical range under one prefix as a control
         let fives = AGES
-            .prefix(5)
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de(5)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
         assert_eq!(fives.len(), 2);
@@ -1119,7 +1114,7 @@ mod test {
         );
 
         let keys: Vec<_> = AGES
-            .no_prefix()
+            .no_prefix_de()
             .keys_de(&store, None, None, Order::Ascending)
             .collect();
         println!("keys: {:?}", keys);

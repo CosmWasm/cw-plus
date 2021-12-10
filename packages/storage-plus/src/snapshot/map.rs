@@ -69,10 +69,6 @@ where
         self.primary.key(k)
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
-        self.primary.prefix(p)
-    }
-
     pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
         self.primary.sub_prefix(p)
     }

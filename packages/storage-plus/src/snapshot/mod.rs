@@ -87,8 +87,8 @@ where
             let start = Bound::inclusive(height);
             let first = self
                 .changelog
-                .prefix(k.clone())
-                .range(store, Some(start), None, Order::Ascending)
+                .prefix_de(k.clone())
+                .range_raw(store, Some(start), None, Order::Ascending)
                 .next()
                 .transpose()?;
             if first.is_none() {
@@ -146,8 +146,8 @@ where
         let start = Bound::inclusive_int(height);
         let first = self
             .changelog
-            .prefix(key)
-            .range(store, Some(start), None, Order::Ascending)
+            .prefix_de(key)
+            .range_raw(store, Some(start), None, Order::Ascending)
             .next();
 
         if let Some(r) = first {
