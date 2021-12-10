@@ -67,10 +67,11 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
     }
 }
 
+type DeserializeVFn<T> = fn(&dyn Storage, &[u8], Record) -> StdResult<Record<T>>;
+
 type DeserializeKvFn<K, T> =
     fn(&dyn Storage, &[u8], Record) -> StdResult<(<K as KeyDeserialize>::Output, T)>;
 
-#[allow(dead_code)]
 pub fn default_deserializer_v<T: DeserializeOwned>(
     _: &dyn Storage,
     _: &[u8],
@@ -98,7 +99,8 @@ where
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     data: PhantomData<T>,
     pk_name: Vec<u8>,
-    de_fn: DeserializeKvFn<K, T>,
+    de_fn_kv: DeserializeKvFn<K, T>,
+    de_fn_v: DeserializeVFn<T>,
 }
 
 impl<K, T> Deref for Prefix<K, T>
@@ -119,27 +121,47 @@ where
     T: Serialize + DeserializeOwned,
 {
     pub fn new(top_name: &[u8], sub_names: &[Key]) -> Self {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             top_name,
             sub_names,
             &[],
             default_deserializer_kv::<K, T>,
+            default_deserializer_v,
         )
     }
 
-    pub fn with_deserialization_function(
+    pub fn with_deserialization_functions(
         top_name: &[u8],
         sub_names: &[Key],
         pk_name: &[u8],
-        de_fn: DeserializeKvFn<K, T>,
+        de_fn_kv: DeserializeKvFn<K, T>,
+        de_fn_v: DeserializeVFn<T>,
     ) -> Self {
         let storage_prefix = nested_namespaces_with_key(&[top_name], sub_names, b"");
         Prefix {
             storage_prefix,
             data: PhantomData,
             pk_name: pk_name.to_vec(),
-            de_fn,
+            de_fn_kv,
+            de_fn_v,
         }
+    }
+
+    pub fn range_raw<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'a>
+    where
+        T: 'a,
+    {
+        let de_fn = self.de_fn_v;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
+            .map(move |kv| (de_fn)(store, &*pk_name, kv));
+        Box::new(mapped)
     }
 
     pub fn range<'a>(
@@ -153,7 +175,7 @@ where
         T: 'a,
         K::Output: 'a,
     {
-        let de_fn = self.de_fn;
+        let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
             .map(move |kv| (de_fn)(store, &*pk_name, kv));
@@ -183,7 +205,7 @@ where
         T: 'a,
         K::Output: 'static,
     {
-        let de_fn = self.de_fn;
+        let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
             .map(move |kv| (de_fn)(store, &*pk_name, kv));
@@ -201,7 +223,7 @@ where
         T: 'a,
         K::Output: 'static,
     {
-        let de_fn = self.de_fn;
+        let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
             .map(move |kv| (de_fn)(store, &*pk_name, kv).map(|(k, _)| Ok(k)))
@@ -326,7 +348,8 @@ mod test {
             storage_prefix: b"foo".to_vec(),
             data: PhantomData::<u64>,
             pk_name: vec![],
-            de_fn: |_, _, kv| deserialize_kv::<Vec<u8>, u64>(kv),
+            de_fn_kv: |_, _, kv| deserialize_kv::<Vec<u8>, u64>(kv),
+            de_fn_v: |_, _, kv| deserialize_v(kv),
         };
 
         // set some data, we care about "foo" prefix

@@ -144,28 +144,31 @@ where
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
     pub fn prefix(&self, p: IK) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
+            deserialize_multi_v,
             deserialize_multi_v,
         )
     }
 
     pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
+            deserialize_multi_v,
             deserialize_multi_v,
         )
     }
 
     fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
             self.pk_namespace,
+            deserialize_multi_v,
             deserialize_multi_v,
         )
     }
@@ -257,20 +260,22 @@ where
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
     pub fn prefix_de(&self, p: IK) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
             deserialize_multi_kv::<PK, T>,
+            deserialize_multi_v,
         )
     }
 
     pub fn sub_prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
             deserialize_multi_kv::<PK, T>,
+            deserialize_multi_v,
         )
     }
 }
@@ -336,11 +341,12 @@ where
     }
 
     fn no_prefix_de(&self) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
             self.pk_namespace,
             deserialize_multi_kv::<PK, T>,
+            deserialize_multi_v,
         )
     }
 }

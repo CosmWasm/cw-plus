@@ -113,21 +113,33 @@ where
     }
 
     pub fn prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_v(kv)
-        })
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &p.prefix(),
+            &[],
+            |_, _, kv| deserialize_unique_v(kv),
+            |_, _, kv| deserialize_unique_v(kv),
+        )
     }
 
     pub fn sub_prefix(&self, p: IK::SubPrefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_v(kv)
-        })
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &p.prefix(),
+            &[],
+            |_, _, kv| deserialize_unique_v(kv),
+            |_, _, kv| deserialize_unique_v(kv),
+        )
     }
 
     fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
-            deserialize_unique_v(kv)
-        })
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &[],
+            &[],
+            |_, _, kv| deserialize_unique_v(kv),
+            |_, _, kv| deserialize_unique_v(kv),
+        )
     }
 
     /// returns all items that match this secondary index, always by pk Ascending
@@ -233,20 +245,32 @@ where
     }
 
     pub fn prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv::<PK, _>(kv)
-        })
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &p.prefix(),
+            &[],
+            |_, _, kv| deserialize_unique_kv::<PK, _>(kv),
+            |_, _, kv| deserialize_unique_v(kv),
+        )
     }
 
     pub fn sub_prefix_de(&self, p: IK::SubPrefix) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &p.prefix(), &[], |_, _, kv| {
-            deserialize_unique_kv::<PK, _>(kv)
-        })
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &p.prefix(),
+            &[],
+            |_, _, kv| deserialize_unique_kv::<PK, _>(kv),
+            |_, _, kv| deserialize_unique_v(kv),
+        )
     }
 
     fn no_prefix_de(&self) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(self.idx_namespace, &[], &[], |_, _, kv| {
-            deserialize_unique_kv::<PK, _>(kv)
-        })
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &[],
+            &[],
+            |_, _, kv| deserialize_unique_kv::<PK, _>(kv),
+            |_, _, kv| deserialize_unique_v(kv),
+        )
     }
 }
