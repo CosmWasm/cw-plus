@@ -50,11 +50,6 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
-        Prefix::new(self.namespace, &p.prefix())
-    }
-
-    #[cfg(feature = "iterator")]
     pub(crate) fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.namespace, &[])
     }
@@ -723,8 +718,8 @@ mod test {
 
         // let's iterate over a sub prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .sub_prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .sub_prefix_de(b"owner")
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
