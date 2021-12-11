@@ -517,9 +517,8 @@ fn query_tokens(
 
     let tokens = BALANCES
         .prefix(&owner)
-        .range_raw(deps.storage, start, None, Order::Ascending)
+        .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))
         .collect::<StdResult<_>>()?;
     Ok(TokensResponse { tokens })
 }
@@ -532,9 +531,8 @@ fn query_all_tokens(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
     let tokens = TOKENS
-        .range_raw(deps.storage, start, None, Order::Ascending)
+        .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))
         .collect::<StdResult<_>>()?;
     Ok(TokensResponse { tokens })
 }
