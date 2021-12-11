@@ -160,7 +160,7 @@ where
         let de_fn = self.de_fn_v;
         let pk_name = self.pk_name.clone();
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &*pk_name, kv));
+            .map(move |kv| (de_fn)(store, &pk_name, kv));
         Box::new(mapped)
     }
 
@@ -190,7 +190,7 @@ where
         let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &*pk_name, kv));
+            .map(move |kv| (de_fn)(store, &pk_name, kv));
         Box::new(mapped)
     }
 
@@ -208,7 +208,7 @@ where
         let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &*pk_name, kv).map(|(k, _)| Ok(k)))
+            .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)))
             .flatten();
         Box::new(mapped)
     }
