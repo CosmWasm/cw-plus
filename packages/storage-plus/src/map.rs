@@ -1104,7 +1104,7 @@ mod test {
         // typical range under one prefix as a control
         let fives = AGES
             .prefix_de(5)
-            .range(&store, None, None, Order::Ascending)
+            .range_de(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
         assert_eq!(fives.len(), 2);

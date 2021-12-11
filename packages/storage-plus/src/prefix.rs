@@ -164,24 +164,6 @@ where
         Box::new(mapped)
     }
 
-    pub fn range<'a>(
-        &self,
-        store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
-    where
-        T: 'a,
-        K::Output: 'a,
-    {
-        let de_fn = self.de_fn_kv;
-        let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &*pk_name, kv));
-        Box::new(mapped)
-    }
-
     pub fn keys_raw<'a>(
         &self,
         store: &'a dyn Storage,
@@ -368,16 +350,18 @@ mod test {
         let expected_reversed: Vec<(Vec<u8>, u64)> = expected.iter().rev().cloned().collect();
 
         // let's do the basic sanity check
-        let res: StdResult<Vec<_>> = prefix.range(&store, None, None, Order::Ascending).collect();
+        let res: StdResult<Vec<_>> = prefix
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
         assert_eq!(&expected, &res.unwrap());
         let res: StdResult<Vec<_>> = prefix
-            .range(&store, None, None, Order::Descending)
+            .range_raw(&store, None, None, Order::Descending)
             .collect();
         assert_eq!(&expected_reversed, &res.unwrap());
 
         // now let's check some ascending ranges
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Inclusive(b"ra".to_vec())),
                 None,
@@ -387,7 +371,7 @@ mod test {
         assert_eq!(&expected[1..], res.unwrap().as_slice());
         // skip excluded
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"ra".to_vec())),
                 None,
@@ -397,7 +381,7 @@ mod test {
         assert_eq!(&expected[2..], res.unwrap().as_slice());
         // if we exclude something a little lower, we get matched
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"r".to_vec())),
                 None,
@@ -408,7 +392,7 @@ mod test {
 
         // now let's check some descending ranges
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 None,
                 Some(Bound::Inclusive(b"ra".to_vec())),
@@ -418,7 +402,7 @@ mod test {
         assert_eq!(&expected_reversed[1..], res.unwrap().as_slice());
         // skip excluded
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 None,
                 Some(Bound::Exclusive(b"ra".to_vec())),
@@ -428,7 +412,7 @@ mod test {
         assert_eq!(&expected_reversed[2..], res.unwrap().as_slice());
         // if we exclude something a little higher, we get matched
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 None,
                 Some(Bound::Exclusive(b"rb".to_vec())),
@@ -439,7 +423,7 @@ mod test {
 
         // now test when both sides are set
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Inclusive(b"ra".to_vec())),
                 Some(Bound::Exclusive(b"zi".to_vec())),
@@ -449,7 +433,7 @@ mod test {
         assert_eq!(&expected[1..2], res.unwrap().as_slice());
         // and descending
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Inclusive(b"ra".to_vec())),
                 Some(Bound::Exclusive(b"zi".to_vec())),
@@ -459,7 +443,7 @@ mod test {
         assert_eq!(&expected[1..2], res.unwrap().as_slice());
         // Include both sides
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Inclusive(b"ra".to_vec())),
                 Some(Bound::Inclusive(b"zi".to_vec())),
@@ -469,7 +453,7 @@ mod test {
         assert_eq!(&expected_reversed[..2], res.unwrap().as_slice());
         // Exclude both sides
         let res: StdResult<Vec<_>> = prefix
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"ra".to_vec())),
                 Some(Bound::Exclusive(b"zi".to_vec())),
