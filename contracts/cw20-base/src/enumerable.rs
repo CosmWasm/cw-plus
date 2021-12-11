@@ -41,15 +41,13 @@ pub fn query_all_accounts(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let accounts: Result<Vec<_>, _> = BALANCES
-        .keys_raw(deps.storage, start, None, Order::Ascending)
-        .map(String::from_utf8)
+    let accounts = BALANCES
+        .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .collect();
+        .map(|item| item.map(Into::into))
+        .collect::<StdResult<_>>()?;
 
-    Ok(AllAccountsResponse {
-        accounts: accounts?,
-    })
+    Ok(AllAccountsResponse { accounts })
 }
 
 #[cfg(test)]
