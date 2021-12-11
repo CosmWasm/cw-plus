@@ -414,8 +414,8 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix("Maria".to_string())
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de("Maria".to_string())
+            .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(2, count);
 
@@ -423,8 +423,8 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix("Maria".to_string())
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de("Maria".to_string())
+            .range_raw(&store, None, None, Order::Ascending)
             .collect::<StdResult<_>>()
             .unwrap();
         assert_eq!(2, marias.len());
@@ -436,8 +436,8 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix("Marib".to_string())
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de("Marib".to_string())
+            .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
 
@@ -445,8 +445,8 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix("Mari`".to_string())
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de("Mari`".to_string())
+            .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
 
@@ -454,8 +454,8 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix("Maria5".to_string())
-            .range(&store, None, None, Order::Ascending)
+            .prefix_de("Maria5".to_string())
+            .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
 
@@ -560,8 +560,8 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix("Maria".to_string())
-            .range(&store, None, None, Order::Descending)
+            .prefix_de("Maria".to_string())
+            .range_raw(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
         let count = marias.len();
@@ -827,7 +827,7 @@ mod test {
          -> usize {
             map.idx
                 .name
-                .prefix(name.to_string())
+                .prefix_de(name.to_string())
                 .keys_raw(store, None, None, Order::Ascending)
                 .count()
         };

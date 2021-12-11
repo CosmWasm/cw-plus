@@ -143,30 +143,27 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix(&self, p: IK) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_functions(
-            self.idx_namespace,
-            &p.prefix(),
-            self.pk_namespace,
-            deserialize_multi_v,
-            deserialize_multi_v,
-        )
-    }
-
-    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_functions(
-            self.idx_namespace,
-            &p.prefix(),
-            self.pk_namespace,
-            deserialize_multi_v,
-            deserialize_multi_v,
-        )
-    }
-
     fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
+            self.pk_namespace,
+            deserialize_multi_v,
+            deserialize_multi_v,
+        )
+    }
+}
+
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
+where
+    PK: PrimaryKey<'a> + KeyDeserialize,
+    T: Serialize + DeserializeOwned + Clone,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
+{
+    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
+        Prefix::with_deserialization_functions(
+            self.idx_namespace,
+            &p.prefix(),
             self.pk_namespace,
             deserialize_multi_v,
             deserialize_multi_v,
@@ -179,13 +176,13 @@ where
 
     #[cfg(test)]
     pub fn count(&self, store: &dyn Storage, p: IK) -> usize {
-        let prefix = self.prefix(p);
+        let prefix = self.prefix_de(p);
         prefix.keys_raw(store, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
     pub fn all_pks(&self, store: &dyn Storage, p: IK) -> Vec<Vec<u8>> {
-        let prefix = self.prefix(p);
+        let prefix = self.prefix_de(p);
         prefix
             .keys_raw(store, None, None, Order::Ascending)
             .collect::<Vec<Vec<u8>>>()
@@ -193,8 +190,10 @@ where
 
     #[cfg(test)]
     pub fn all_items(&self, store: &dyn Storage, p: IK) -> StdResult<Vec<Record<T>>> {
-        let prefix = self.prefix(p);
-        prefix.range(store, None, None, Order::Ascending).collect()
+        let prefix = self.prefix_de(p);
+        prefix
+            .range_raw(store, None, None, Order::Ascending)
+            .collect()
     }
 }
 
