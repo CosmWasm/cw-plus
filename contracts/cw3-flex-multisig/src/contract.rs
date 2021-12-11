@@ -18,9 +18,7 @@ use utils::{maybe_addr, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{
-    next_id, parse_id, Ballot, Config, Proposal, Votes, BALLOTS, CONFIG, PROPOSALS,
-};
+use crate::state::{next_id, Ballot, Config, Proposal, Votes, BALLOTS, CONFIG, PROPOSALS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -317,13 +315,13 @@ fn list_proposals(
 ) -> StdResult<ProposalListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive_int);
-    let props: StdResult<Vec<_>> = PROPOSALS
-        .range_raw(deps.storage, start, None, Order::Ascending)
+    let proposals = PROPOSALS
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
-        .collect();
+        .collect::<StdResult<_>>()?;
 
-    Ok(ProposalListResponse { proposals: props? })
+    Ok(ProposalListResponse { proposals })
 }
 
 fn reverse_proposals(
@@ -335,7 +333,7 @@ fn reverse_proposals(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let end = start_before.map(Bound::exclusive_int);
     let props: StdResult<Vec<_>> = PROPOSALS
-        .range_raw(deps.storage, None, end, Order::Descending)
+        .range(deps.storage, None, end, Order::Descending)
         .take(limit)
         .map(|p| map_proposal(&env.block, p))
         .collect();
@@ -345,19 +343,20 @@ fn reverse_proposals(
 
 fn map_proposal(
     block: &BlockInfo,
-    item: StdResult<(Vec<u8>, Proposal)>,
+    item: StdResult<(u64, Proposal)>,
 ) -> StdResult<ProposalResponse> {
-    let (key, prop) = item?;
-    let status = prop.current_status(block);
-    let threshold = prop.threshold.to_response(prop.total_weight);
-    Ok(ProposalResponse {
-        id: parse_id(&key)?,
-        title: prop.title,
-        description: prop.description,
-        msgs: prop.msgs,
-        status,
-        expires: prop.expires,
-        threshold,
+    item.map(|(id, prop)| {
+        let status = prop.current_status(block);
+        let threshold = prop.threshold.to_response(prop.total_weight);
+        ProposalResponse {
+            id,
+            title: prop.title,
+            description: prop.description,
+            msgs: prop.msgs,
+            status,
+            expires: prop.expires,
+            threshold,
+        }
     })
 }
 
@@ -382,21 +381,20 @@ fn list_votes(
     let addr = maybe_addr(deps.api, start_after)?;
     let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
-    let votes: StdResult<Vec<_>> = BALLOTS
+    let votes = BALLOTS
         .prefix(proposal_id)
-        .range_raw(deps.storage, start, None, Order::Ascending)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
-            let (voter, ballot) = item?;
-            Ok(VoteInfo {
-                voter: String::from_utf8(voter)?,
+            item.map(|(addr, ballot)| VoteInfo {
+                voter: addr.into(),
                 vote: ballot.vote,
                 weight: ballot.weight,
             })
         })
-        .collect();
+        .collect::<StdResult<_>>()?;
 
-    Ok(VoteListResponse { votes: votes? })
+    Ok(VoteListResponse { votes })
 }
 
 fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
