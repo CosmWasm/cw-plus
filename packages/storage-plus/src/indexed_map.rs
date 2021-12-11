@@ -204,11 +204,11 @@ where
     K: PrimaryKey<'a>,
     I: IndexList<T>,
 {
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 }
@@ -220,13 +220,13 @@ where
     K: PrimaryKey<'a> + KeyDeserialize,
     I: IndexList<T>,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -244,7 +244,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -258,7 +258,7 @@ where
         self.no_prefix_de().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -994,7 +994,7 @@ mod test {
         let (pks, datas) = save_data(&mut store, &map);
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = map.range_de(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = map.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(
             all,
@@ -1007,7 +1007,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = map
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"3".to_vec())),
                 None,
@@ -1040,7 +1040,7 @@ mod test {
         // This is similar to calling range() directly, but added here for completeness / prefix_de
         // type checks
         let all: StdResult<Vec<_>> = map
-            .prefix_de(())
+            .prefix(())
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -1099,7 +1099,7 @@ mod test {
 
         // let's prefix and iterate
         let result: StdResult<Vec<_>> = map
-            .prefix_de("2")
+            .prefix("2")
             .range(&store, None, None, Order::Ascending)
             .collect();
         let result = result.unwrap();
@@ -1154,7 +1154,7 @@ mod test {
 
         // let's prefix and iterate
         let result: StdResult<Vec<_>> = map
-            .prefix_de(("1", "2"))
+            .prefix(("1", "2"))
             .range(&store, None, None, Order::Ascending)
             .collect();
         let result = result.unwrap();
@@ -1206,7 +1206,7 @@ mod test {
 
         // let's sub-prefix and iterate
         let result: StdResult<Vec<_>> = map
-            .sub_prefix_de("1")
+            .sub_prefix("1")
             .range(&store, None, None, Order::Ascending)
             .collect();
         let result = result.unwrap();
@@ -1264,7 +1264,7 @@ mod test {
 
         // let's try to iterate!
         let result: StdResult<Vec<_>> = map
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive("2")),
                 None,
@@ -1283,7 +1283,7 @@ mod test {
 
         // let's try to iterate over a range
         let result: StdResult<Vec<_>> = map
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive("2")),
                 Some(PrefixBound::exclusive("3")),
@@ -1345,7 +1345,7 @@ mod test {
 
         // let's prefix-range and iterate
         let result: StdResult<Vec<_>> = map
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive(("1", "2"))),
                 None,
@@ -1373,7 +1373,7 @@ mod test {
 
         // let's prefix-range over inclusive bounds on both sides
         let result: StdResult<Vec<_>> = map
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive(("1", "2"))),
                 Some(PrefixBound::inclusive(("2", "1"))),
