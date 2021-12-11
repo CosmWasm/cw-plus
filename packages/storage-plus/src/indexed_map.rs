@@ -180,7 +180,7 @@ where
     /// itself, and iterates over those (inclusively or exclusively, depending on `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range<'c>(
+    pub fn prefix_range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -1429,7 +1429,7 @@ mod test {
             let items: Vec<_> = map
                 .idx
                 .secondary
-                .prefix_range(
+                .prefix_range_raw(
                     &store,
                     None,
                     Some(PrefixBound::inclusive(1u64)),
