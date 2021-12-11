@@ -312,7 +312,7 @@ where
         T: 'c,
         PK::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix_de().range(store, min, max, order)
     }
 
     pub fn keys_de<'c>(
@@ -326,7 +326,7 @@ where
         T: 'c,
         PK::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix_de().keys(store, min, max, order)
     }
 
     fn no_prefix_de(&self) -> Prefix<PK, T> {

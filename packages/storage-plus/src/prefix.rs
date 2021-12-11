@@ -176,7 +176,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'a>(
+    pub fn range<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound>,
@@ -194,7 +194,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn keys_de<'a>(
+    pub fn keys<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound>,

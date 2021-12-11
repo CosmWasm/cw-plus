@@ -271,7 +271,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix_de().range(store, min, max, order)
     }
 
     pub fn keys_de<'c>(
@@ -285,7 +285,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix_de().keys(store, min, max, order)
     }
 
     fn no_prefix_de(&self) -> Prefix<K, T> {
@@ -593,7 +593,7 @@ mod test {
             .idx
             .name
             .prefix_de(b"Maria".to_vec())
-            .range_de(&store, None, None, Order::Descending)
+            .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
         let count = marias.len();
@@ -724,7 +724,7 @@ mod test {
             .idx
             .name_age
             .sub_prefix_de(b"Maria".to_vec())
-            .range_de(&store, None, None, Order::Descending)
+            .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
         let count = marias.len();
@@ -955,7 +955,7 @@ mod test {
             .idx
             .name_lastname
             .prefix_de(b"Maria".to_vec())
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let marias = res.unwrap();
 
@@ -1029,7 +1029,7 @@ mod test {
         // type checks
         let all: StdResult<Vec<_>> = map
             .prefix_de(())
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(
@@ -1056,7 +1056,7 @@ mod test {
         // type checks
         let all: StdResult<Vec<_>> = map
             .sub_prefix_de(())
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(

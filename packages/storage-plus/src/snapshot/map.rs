@@ -232,7 +232,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix_de().range(store, min, max, order)
     }
 
     pub fn keys_de<'c>(
@@ -246,7 +246,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix_de().keys(store, min, max, order)
     }
 
     pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
@@ -557,7 +557,7 @@ mod tests {
         // let's prefix and iterate
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
             .prefix_de("C")
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -577,7 +577,7 @@ mod tests {
         // sub_prefix_de type checks
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
             .sub_prefix_de(())
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());

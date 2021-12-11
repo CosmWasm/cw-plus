@@ -222,7 +222,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix_de().range(store, min, max, order)
     }
 
     pub fn keys_de<'c>(
@@ -236,7 +236,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix_de().keys(store, min, max, order)
     }
 
     fn no_prefix_de(&self) -> Prefix<K, T> {
@@ -648,7 +648,7 @@ mod test {
         // let's try to iterate over a prefix_de
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix_de(b"owner")
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -776,7 +776,7 @@ mod test {
         // let's iterate over a sub_prefix_de
         let all: StdResult<Vec<_>> = TRIPLE
             .sub_prefix_de(b"owner")
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -792,7 +792,7 @@ mod test {
         // let's iterate over a prefix_de
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix_de((b"owner", 9))
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -1104,7 +1104,7 @@ mod test {
         // typical range under one prefix as a control
         let fives = AGES
             .prefix_de(5)
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
         assert_eq!(fives.len(), 2);
@@ -1115,7 +1115,7 @@ mod test {
 
         let keys: Vec<_> = AGES
             .no_prefix_de()
-            .keys_de(&store, None, None, Order::Ascending)
+            .keys(&store, None, None, Order::Ascending)
             .collect();
         println!("keys: {:?}", keys);
 
