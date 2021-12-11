@@ -386,7 +386,7 @@ fn list_votes(
     let start = start_after.map(Bound::exclusive);
 
     let votes: StdResult<Vec<_>> = BALLOTS
-        .prefix_de(proposal_id)
+        .prefix(proposal_id)
         .range_raw(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {

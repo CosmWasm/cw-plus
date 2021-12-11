@@ -115,11 +115,11 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 }
@@ -187,13 +187,13 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -211,7 +211,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -225,7 +225,7 @@ where
         self.no_prefix_de().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -474,9 +474,7 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
@@ -489,7 +487,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"j".to_vec())),
                 None,
@@ -505,7 +503,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"jo".to_vec())),
                 None,
@@ -537,7 +535,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -545,7 +543,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::inclusive_int(56u32)),
                 None,
@@ -558,7 +556,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::inclusive_int(57u32)),
                 None,
@@ -603,7 +601,7 @@ mod test {
 
         // let's try to iterate over a prefix
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix_de(b"owner")
+            .prefix(b"owner")
             .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -632,7 +630,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -647,7 +645,7 @@ mod test {
 
         // let's try to iterate over a prefix_de
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix_de(b"owner")
+            .prefix(b"owner")
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -707,7 +705,7 @@ mod test {
 
         // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix_de((b"owner", 9))
+            .prefix((b"owner", 9))
             .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -722,7 +720,7 @@ mod test {
 
         // let's iterate over a sub prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .sub_prefix_de(b"owner")
+            .sub_prefix(b"owner")
             .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -758,9 +756,7 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = TRIPLE
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(4, all.len());
         assert_eq!(
@@ -775,7 +771,7 @@ mod test {
 
         // let's iterate over a sub_prefix_de
         let all: StdResult<Vec<_>> = TRIPLE
-            .sub_prefix_de(b"owner")
+            .sub_prefix(b"owner")
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -791,7 +787,7 @@ mod test {
 
         // let's iterate over a prefix_de
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix_de((b"owner", 9))
+            .prefix((b"owner", 9))
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -977,7 +973,7 @@ mod test {
 
         // get all under one key
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix_de(b"owner")
+            .prefix(b"owner")
             .range_raw(&store, None, None, Order::Ascending)
             .collect();
         assert_eq!(
@@ -987,7 +983,7 @@ mod test {
 
         // Or ranges between two items (even reverse)
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix_de(b"owner")
+            .prefix(b"owner")
             .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"spender1".to_vec())),
@@ -1017,7 +1013,7 @@ mod test {
 
         // typical range under one prefix as a control
         let fives = AGES
-            .prefix_de(5)
+            .prefix(5)
             .range_raw(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
@@ -1103,7 +1099,7 @@ mod test {
 
         // typical range under one prefix as a control
         let fives = AGES
-            .prefix_de(5)
+            .prefix(5)
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
@@ -1113,15 +1109,12 @@ mod test {
             vec![("789".to_string(), 789), ("987".to_string(), 987)]
         );
 
-        let keys: Vec<_> = AGES
-            .no_prefix_de()
-            .keys(&store, None, None, Order::Ascending)
-            .collect();
+        let keys: Vec<_> = AGES.keys(&store, None, None, Order::Ascending).collect();
         println!("keys: {:?}", keys);
 
         // using inclusive bounds both sides
         let include = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(7u32)),
@@ -1135,7 +1128,7 @@ mod test {
 
         // using exclusive bounds both sides
         let exclude = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::exclusive(3u32)),
                 Some(PrefixBound::exclusive(7u32)),
@@ -1149,7 +1142,7 @@ mod test {
 
         // using inclusive in descending
         let include = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(5u32)),
@@ -1163,7 +1156,7 @@ mod test {
 
         // using exclusive in descending
         let include = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::exclusive(2u32)),
                 Some(PrefixBound::exclusive(5u32)),

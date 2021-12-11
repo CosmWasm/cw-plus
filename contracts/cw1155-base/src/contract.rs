@@ -497,7 +497,7 @@ fn query_all_approvals(
     let start = start_after.map(|addr| Bound::exclusive(addr.as_ref()));
 
     let operators = APPROVES
-        .prefix_de(&owner)
+        .prefix(&owner)
         .range_raw(deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
@@ -516,7 +516,7 @@ fn query_tokens(
     let start = start_after.map(Bound::exclusive);
 
     let tokens = BALANCES
-        .prefix_de(&owner)
+        .prefix(&owner)
         .range_raw(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))

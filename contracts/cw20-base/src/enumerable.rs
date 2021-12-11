@@ -19,7 +19,7 @@ pub fn query_all_allowances(
     let start = start_after.map(Bound::exclusive);
 
     let allowances: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
-        .prefix_de(&owner_addr)
+        .prefix(&owner_addr)
         .range_raw(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {

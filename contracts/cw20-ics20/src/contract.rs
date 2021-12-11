@@ -165,7 +165,7 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     let info = CHANNEL_INFO.load(deps.storage, &id)?;
     // this returns Vec<(outstanding, total)>
     let state: StdResult<Vec<_>> = CHANNEL_STATE
-        .prefix_de(&id)
+        .prefix(&id)
         .range_raw(deps.storage, None, None, Order::Ascending)
         .map(|r| {
             let (k, v) = r?;
