@@ -70,7 +70,7 @@ where
     }
 
     fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
-        self.primary.no_prefix()
+        self.primary.no_prefix_raw()
     }
 
     /// load old value and store changelog

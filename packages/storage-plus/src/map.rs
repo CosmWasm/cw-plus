@@ -50,7 +50,7 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    pub(crate) fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
+    pub(crate) fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.namespace, &[])
     }
 
@@ -164,7 +164,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range_raw(store, min, max, order)
+        self.no_prefix_raw().range_raw(store, min, max, order)
     }
 
     pub fn keys_raw<'c>(
@@ -177,7 +177,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().keys_raw(store, min, max, order)
+        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 }
 
@@ -222,7 +222,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -236,10 +236,10 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix_de(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T> {
         Prefix::new(self.namespace, &[])
     }
 }
