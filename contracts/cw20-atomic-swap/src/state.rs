@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Binary, BlockInfo, Order, StdError, StdResult, Storage};
+use cosmwasm_std::{Addr, Binary, BlockInfo, Order, StdResult, Storage};
 use cw_storage_plus::{Bound, Map};
 
 use cw20::{Balance, Expiration};
@@ -32,9 +32,8 @@ pub fn all_swap_ids(
     limit: usize,
 ) -> StdResult<Vec<String>> {
     SWAPS
-        .keys_raw(storage, start, None, Order::Ascending)
+        .keys(storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|k| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("Parsing swap id")))
         .collect()
 }
 
