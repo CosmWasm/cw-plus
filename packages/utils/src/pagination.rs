@@ -73,7 +73,7 @@ mod test {
             let start = calc_range_start(start_after).map(Bound::exclusive);
 
             let holders: Vec<(String, usize)> = HOLDERS
-                .range(&deps.storage, start, None, Order::Ascending)
+                .range_raw(&deps.storage, start, None, Order::Ascending)
                 .map(deser_holder_kv)
                 .take(LIMIT)
                 .collect();
@@ -102,7 +102,7 @@ mod test {
             let end = calc_range_end(end_before).map(Bound::exclusive);
 
             let holders: Vec<(String, usize)> = HOLDERS
-                .range(&deps.storage, None, end, Order::Descending)
+                .range_raw(&deps.storage, None, end, Order::Descending)
                 .map(deser_holder_kv)
                 .take(LIMIT)
                 .collect();

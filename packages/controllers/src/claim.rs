@@ -118,7 +118,7 @@ mod test {
         assert_eq!(
             claims
                 .0
-                .range(&deps.storage, None, None, Order::Ascending)
+                .range_raw(&deps.storage, None, None, Order::Ascending)
                 .collect::<StdResult<Vec<_>>>()
                 .unwrap()
                 .len(),

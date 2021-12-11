@@ -79,7 +79,7 @@ where
         // most recent checkpoint
         let checkpoint = self
             .checkpoints
-            .range(store, None, None, Order::Descending)
+            .range_raw(store, None, None, Order::Descending)
             .next()
             .transpose()?;
         if let Some((height, _)) = checkpoint {

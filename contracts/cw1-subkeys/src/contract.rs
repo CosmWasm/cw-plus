@@ -410,7 +410,7 @@ pub fn query_all_allowances(
     let start = start_after.map(Bound::exclusive);
 
     let res: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
-        .range(deps.storage, start, None, Order::Ascending)
+        .range_raw(deps.storage, start, None, Order::Ascending)
         .filter(|item| {
             if let Ok((_, allow)) = item {
                 !allow.expires.is_expired(&env.block)
@@ -442,7 +442,7 @@ pub fn query_all_permissions(
     let start = start_after.map(Bound::exclusive);
 
     let res: StdResult<Vec<PermissionsInfo>> = PERMISSIONS
-        .range(deps.storage, start, None, Order::Ascending)
+        .range_raw(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             item.and_then(|(k, perm)| {

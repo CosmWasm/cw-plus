@@ -154,7 +154,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range<'c>(
+    pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -412,7 +412,9 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(
@@ -425,7 +427,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Inclusive(b"j".to_vec())),
                 None,
@@ -441,7 +443,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Inclusive(b"jo".to_vec())),
                 None,
@@ -586,7 +588,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -676,7 +678,9 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = TRIPLE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
         let all = all.unwrap();
         assert_eq!(4, all.len());
         assert_eq!(
@@ -947,7 +951,9 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2)?;
 
         // iterate over them all
-        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
         assert_eq!(
             all?,
             vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
@@ -955,7 +961,7 @@ mod test {
 
         // or just show what is after jim
         let all: StdResult<Vec<_>> = PEOPLE
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"jim".to_vec())),
                 None,

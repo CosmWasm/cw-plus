@@ -152,7 +152,7 @@ fn query_port(deps: Deps) -> StdResult<PortResponse> {
 
 fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
     let channels: StdResult<Vec<_>> = CHANNEL_INFO
-        .range(deps.storage, None, None, Order::Ascending)
+        .range_raw(deps.storage, None, None, Order::Ascending)
         .map(|r| r.map(|(_, v)| v))
         .collect();
     Ok(ListChannelsResponse {
