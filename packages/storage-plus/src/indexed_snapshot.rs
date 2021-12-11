@@ -430,7 +430,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix_de(b"Maria".to_vec())
+            .prefix(b"Maria".to_vec())
             .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(2, count);
@@ -439,7 +439,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix_de(b"Maria".to_vec())
+            .prefix(b"Maria".to_vec())
             .range_raw(&store, None, None, Order::Ascending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -452,7 +452,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix_de(b"Marib".to_vec())
+            .prefix(b"Marib".to_vec())
             .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -461,7 +461,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix_de(b"Mari`".to_vec())
+            .prefix(b"Mari`".to_vec())
             .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -470,7 +470,7 @@ mod test {
         let count = map
             .idx
             .name
-            .prefix_de(b"Maria5".to_vec())
+            .prefix(b"Maria5".to_vec())
             .range_raw(&store, None, None, Order::Ascending)
             .count();
         assert_eq!(0, count);
@@ -532,7 +532,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix_de(b"Maria".to_vec())
+            .prefix(b"Maria".to_vec())
             .range_raw(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -592,7 +592,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name
-            .prefix_de(b"Maria".to_vec())
+            .prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -657,7 +657,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name_age
-            .sub_prefix_de(b"Maria".to_vec())
+            .sub_prefix(b"Maria".to_vec())
             .range_raw(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -723,7 +723,7 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name_age
-            .sub_prefix_de(b"Maria".to_vec())
+            .sub_prefix(b"Maria".to_vec())
             .range(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
@@ -818,7 +818,7 @@ mod test {
          -> usize {
             map.idx
                 .name
-                .prefix_de(name.as_bytes().to_vec())
+                .prefix(name.as_bytes().to_vec())
                 .keys_raw(store, None, None, Order::Ascending)
                 .count()
         };
