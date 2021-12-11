@@ -171,13 +171,13 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a>,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, IK::Prefix>>,
@@ -196,7 +196,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -210,7 +210,7 @@ where
         self.no_prefix_de().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -224,7 +224,7 @@ where
         self.no_prefix_de().keys(store, min, max, order)
     }
 
-    pub fn prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
+    pub fn prefix(&self, p: IK::Prefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
@@ -234,7 +234,7 @@ where
         )
     }
 
-    pub fn sub_prefix_de(&self, p: IK::SubPrefix) -> Prefix<PK, T> {
+    pub fn sub_prefix(&self, p: IK::SubPrefix) -> Prefix<PK, T> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
