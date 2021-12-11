@@ -409,8 +409,8 @@ pub fn query_all_allowances(
     // we use raw addresses here....
     let start = start_after.map(Bound::exclusive);
 
-    let res: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
-        .range_raw(deps.storage, start, None, Order::Ascending)
+    let allowances = ALLOWANCES
+        .range(deps.storage, start, None, Order::Ascending)
         .filter(|item| {
             if let Ok((_, allow)) = item {
                 !allow.expires.is_expired(&env.block)
@@ -420,16 +420,14 @@ pub fn query_all_allowances(
         })
         .take(limit)
         .map(|item| {
-            item.and_then(|(k, allow)| {
-                Ok(AllowanceInfo {
-                    spender: String::from_utf8(k)?,
-                    balance: allow.balance,
-                    expires: allow.expires,
-                })
+            item.map(|(addr, allow)| AllowanceInfo {
+                spender: addr.into(),
+                balance: allow.balance,
+                expires: allow.expires,
             })
         })
-        .collect();
-    Ok(AllAllowancesResponse { allowances: res? })
+        .collect::<StdResult<Vec<_>>>()?;
+    Ok(AllAllowancesResponse { allowances })
 }
 
 // return a list of all permissions here
@@ -441,19 +439,17 @@ pub fn query_all_permissions(
     let limit = calc_limit(limit);
     let start = start_after.map(Bound::exclusive);
 
-    let res: StdResult<Vec<PermissionsInfo>> = PERMISSIONS
-        .range_raw(deps.storage, start, None, Order::Ascending)
+    let permissions = PERMISSIONS
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
-            item.and_then(|(k, perm)| {
-                Ok(PermissionsInfo {
-                    spender: String::from_utf8(k)?,
-                    permissions: perm,
-                })
+            item.map(|(addr, perm)| PermissionsInfo {
+                spender: addr.into(),
+                permissions: perm,
             })
         })
-        .collect();
-    Ok(AllPermissionsResponse { permissions: res? })
+        .collect::<StdResult<Vec<_>>>()?;
+    Ok(AllPermissionsResponse { permissions })
 }
 
 // Migrate contract if version is lower than current version
