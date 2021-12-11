@@ -143,7 +143,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
@@ -205,7 +205,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range_raw(store, min, max, order)
+        self.no_prefix_raw().range_raw(store, min, max, order)
     }
 
     pub fn keys_raw<'c>(
@@ -215,7 +215,7 @@ where
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix().keys_raw(store, min, max, order)
+        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 
     /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
@@ -312,7 +312,7 @@ where
         T: 'c,
         PK::Output: 'static,
     {
-        self.no_prefix_de().range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -326,10 +326,10 @@ where
         T: 'c,
         PK::Output: 'static,
     {
-        self.no_prefix_de().keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix_de(&self) -> Prefix<PK, T> {
+    fn no_prefix(&self) -> Prefix<PK, T> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
