@@ -342,7 +342,7 @@ fn list_members(
     let start = addr.map(|addr| Bound::exclusive(addr.as_ref()));
 
     let members: StdResult<Vec<_>> = MEMBERS
-        .range(deps.storage, start, None, Order::Ascending)
+        .range_raw(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
             let (key, weight) = item?;
