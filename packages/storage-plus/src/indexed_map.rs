@@ -676,8 +676,8 @@ mod test {
         let marias: Vec<_> = map
             .idx
             .name_age
-            .sub_prefix(b"Maria".to_vec())
-            .range(&store, None, None, Order::Descending)
+            .sub_prefix_de(b"Maria".to_vec())
+            .range_raw(&store, None, None, Order::Descending)
             .collect::<StdResult<_>>()
             .unwrap();
         let count = marias.len();

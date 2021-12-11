@@ -160,16 +160,6 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_functions(
-            self.idx_namespace,
-            &p.prefix(),
-            self.pk_namespace,
-            deserialize_multi_v,
-            deserialize_multi_v,
-        )
-    }
-
     pub fn index_key(&self, k: IK) -> Vec<u8> {
         k.joined_extra_key(b"")
     }
