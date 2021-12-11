@@ -469,7 +469,7 @@ mod test {
         let count = map
             .idx
             .name
-            .range(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
+            .range_raw(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
             .count();
         // gets from the first "Maria" until the end
         assert_eq!(4, count);
@@ -484,7 +484,7 @@ mod test {
         let count = map
             .idx
             .name
-            .range(&store, Some(Bound::exclusive(key)), None, Order::Ascending)
+            .range_raw(&store, Some(Bound::exclusive(key)), None, Order::Ascending)
             .count();
         // gets from the 2nd "Maria" until the end
         assert_eq!(3, count);
@@ -497,7 +497,7 @@ mod test {
         let count = map
             .idx
             .age
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::inclusive(age_key)),
                 None,
@@ -871,7 +871,7 @@ mod test {
         let res: StdResult<Vec<_>> = map
             .idx
             .age
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let ages = res.unwrap();
 

@@ -863,7 +863,7 @@ mod test {
         let res: StdResult<Vec<_>> = map
             .idx
             .age
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let ages = res.unwrap();
 

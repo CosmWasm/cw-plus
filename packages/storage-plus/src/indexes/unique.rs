@@ -140,7 +140,7 @@ where
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range<'c>(
+    pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -153,7 +153,7 @@ where
         self.no_prefix().range_raw(store, min, max, order)
     }
 
-    pub fn keys<'c>(
+    pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
