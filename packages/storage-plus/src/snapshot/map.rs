@@ -197,13 +197,13 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -221,7 +221,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -235,7 +235,7 @@ where
         self.no_prefix_de().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -249,11 +249,11 @@ where
         self.no_prefix_de().keys(store, min, max, order)
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
@@ -467,16 +467,14 @@ mod tests {
         init_data(&EVERY, &mut store);
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = EVERY
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = EVERY.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(all, vec![("C".into(), 13), ("D".into(), 22)]);
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = EVERY
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"C".to_vec())),
                 None,
@@ -489,7 +487,7 @@ mod tests {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = EVERY
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"D".to_vec())),
                 None,
@@ -511,7 +509,7 @@ mod tests {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -534,7 +532,7 @@ mod tests {
 
         // let's prefix-range and iterate
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 None,
                 Some(PrefixBound::exclusive("C")),
@@ -556,7 +554,7 @@ mod tests {
 
         // let's prefix and iterate
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .prefix_de("C")
+            .prefix("C")
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
@@ -576,7 +574,7 @@ mod tests {
         // This is similar to calling range() directly, but added here for completeness /
         // sub_prefix_de type checks
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .sub_prefix_de(())
+            .sub_prefix(())
             .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
