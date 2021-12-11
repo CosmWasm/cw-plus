@@ -69,7 +69,7 @@ where
         self.primary.key(k)
     }
 
-    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
         self.primary.no_prefix_raw()
     }
 
@@ -174,7 +174,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range_raw(store, min, max, order)
+        self.no_prefix_raw().range_raw(store, min, max, order)
     }
 
     pub fn keys_raw<'c>(
@@ -187,7 +187,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().keys_raw(store, min, max, order)
+        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 }
 
@@ -232,7 +232,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
     pub fn keys<'c>(
@@ -246,7 +246,7 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 
     pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
@@ -257,7 +257,7 @@ where
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    fn no_prefix_de(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T> {
         Prefix::new(self.primary.namespace(), &[])
     }
 }
