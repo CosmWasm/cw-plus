@@ -18,22 +18,19 @@ pub fn query_all_allowances(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let allowances: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
+    let allowances = ALLOWANCES
         .prefix(&owner_addr)
-        .range_raw(deps.storage, start, None, Order::Ascending)
+        .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
-            let (k, v) = item?;
-            Ok(AllowanceInfo {
-                spender: String::from_utf8(k)?,
-                allowance: v.allowance,
-                expires: v.expires,
+            item.map(|(addr, allow)| AllowanceInfo {
+                spender: addr.into(),
+                allowance: allow.allowance,
+                expires: allow.expires,
             })
         })
-        .collect();
-    Ok(AllAllowancesResponse {
-        allowances: allowances?,
-    })
+        .collect::<StdResult<_>>()?;
+    Ok(AllAllowancesResponse { allowances })
 }
 
 pub fn query_all_accounts(
