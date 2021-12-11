@@ -138,7 +138,7 @@ where
     /// itself, and iterates over those (inclusively or exclusively, depending on `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range<'c>(
+    pub fn prefix_range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -1031,7 +1031,7 @@ mod test {
 
         // using inclusive bounds both sides
         let include = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(7u32)),
@@ -1045,7 +1045,7 @@ mod test {
 
         // using exclusive bounds both sides
         let exclude = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::exclusive(3u32)),
                 Some(PrefixBound::exclusive(7u32)),
@@ -1059,7 +1059,7 @@ mod test {
 
         // using inclusive in descending
         let include = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(5u32)),
@@ -1073,7 +1073,7 @@ mod test {
 
         // using exclusive in descending
         let include = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::exclusive(2u32)),
                 Some(PrefixBound::exclusive(5u32)),
