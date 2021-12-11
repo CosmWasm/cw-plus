@@ -112,16 +112,6 @@ where
         k.joined_key()
     }
 
-    pub fn prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_functions(
-            self.idx_namespace,
-            &p.prefix(),
-            &[],
-            |_, _, kv| deserialize_unique_v(kv),
-            |_, _, kv| deserialize_unique_v(kv),
-        )
-    }
-
     pub fn sub_prefix(&self, p: IK::SubPrefix) -> Prefix<Vec<u8>, T> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
