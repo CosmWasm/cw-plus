@@ -180,7 +180,7 @@ where
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I>
 where
     K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
@@ -488,7 +488,7 @@ mod test {
     }
 
     #[test]
-    fn range_simple_key_by_multi_index() {
+    fn range_raw_simple_key_by_multi_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
         let mut height = 1;
@@ -548,7 +548,7 @@ mod test {
     }
 
     #[test]
-    fn range_de_simple_key_by_multi_index() {
+    fn range_simple_key_by_multi_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
         let mut height = 1;
@@ -608,7 +608,7 @@ mod test {
     }
 
     #[test]
-    fn range_composite_key_by_multi_index() {
+    fn range_raw_composite_key_by_multi_index() {
         let mut store = MockStorage::new();
         let mut height = 2;
 
@@ -674,7 +674,7 @@ mod test {
     }
 
     #[test]
-    fn range_de_composite_key_by_multi_index() {
+    fn range_composite_key_by_multi_index() {
         let mut store = MockStorage::new();
         let mut height = 2;
 
@@ -853,7 +853,7 @@ mod test {
     }
 
     #[test]
-    fn range_simple_key_by_unique_index() {
+    fn range_raw_simple_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -884,7 +884,7 @@ mod test {
     }
 
     #[test]
-    fn range_de_simple_key_by_unique_index() {
+    fn range_simple_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -915,7 +915,7 @@ mod test {
     }
 
     #[test]
-    fn range_composite_key_by_unique_index() {
+    fn range_raw_composite_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -944,7 +944,7 @@ mod test {
     }
 
     #[test]
-    fn range_de_composite_key_by_unique_index() {
+    fn range_composite_key_by_unique_index() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -974,7 +974,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_simple_string_key() {
+    fn range_simple_string_key() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -1017,7 +1017,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_de_simple_string_key() {
+    fn prefix_simple_string_key() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
@@ -1025,7 +1025,7 @@ mod test {
         let (pks, datas) = save_data(&mut store, &map);
 
         // Let's prefix and iterate.
-        // This is similar to calling range() directly, but added here for completeness / prefix_de
+        // This is similar to calling range() directly, but added here for completeness / prefix
         // type checks
         let all: StdResult<Vec<_>> = map
             .prefix(())
@@ -1044,15 +1044,15 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn sub_prefix_de_simple_string_key() {
+    fn sub_prefix_simple_string_key() {
         let mut store = MockStorage::new();
         let map = build_snapshot_map();
 
         // save data
         let (pks, datas) = save_data(&mut store, &map);
 
-        // Let's prefix and iterate.
-        // This is similar to calling range() directly, but added here for completeness / sub_prefix_de
+        // Let's sub-prefix and iterate.
+        // This is similar to calling range() directly, but added here for completeness / sub_prefix
         // type checks
         let all: StdResult<Vec<_>> = map
             .sub_prefix(())
@@ -1071,7 +1071,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_range_de_simple_key() {
+    fn prefix_range_simple_key() {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
@@ -1113,7 +1113,7 @@ mod test {
         let pk4: (&str, &str) = ("3", "5630");
         map.save(&mut store, pk4, &data4, 1).unwrap();
 
-        // let's try to iterate!
+        // let's prefix-range and iterate
         let result: StdResult<Vec<_>> = map
             .prefix_range(
                 &store,
@@ -1132,7 +1132,7 @@ mod test {
             ]
         );
 
-        // let's try to iterate over a range
+        // let's try to iterate over a more restrictive prefix-range!
         let result: StdResult<Vec<_>> = map
             .prefix_range(
                 &store,
