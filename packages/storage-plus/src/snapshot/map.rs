@@ -156,7 +156,7 @@ where
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -333,7 +333,7 @@ mod tests {
     const VALUES_START_5: &[(&str, Option<u64>)] =
         &[("A", Some(8)), ("B", None), ("C", Some(13)), ("D", None)];
 
-    // Same as `init_data`, but we have a composite key for testing range_de.
+    // Same as `init_data`, but we have a composite key for testing range.
     fn init_data_composite_key(map: &TestMapCompositeKey, storage: &mut dyn Storage) {
         map.save(storage, ("A", "B"), &5, 1).unwrap();
         map.save(storage, ("B", "A"), &7, 2).unwrap();
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_simple_string_key() {
+    fn range_simple_string_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_composite_key() {
+    fn range_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_range_de_composite_key() {
+    fn prefix_range_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_de_composite_key() {
+    fn prefix_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -564,7 +564,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn sub_prefix_de_composite_key() {
+    fn sub_prefix_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -572,7 +572,7 @@ mod tests {
 
         // Let's sub-prefix and iterate.
         // This is similar to calling range() directly, but added here for completeness /
-        // sub_prefix_de type checks
+        // sub_prefix type checks
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
             .sub_prefix(())
             .range(&store, None, None, Order::Ascending)
