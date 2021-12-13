@@ -187,7 +187,7 @@ where
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -218,8 +218,8 @@ where
         self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 
-    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
+    /// While `range_raw` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_raw` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't

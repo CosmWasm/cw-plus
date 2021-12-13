@@ -132,7 +132,7 @@ where
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 impl<'a, IK, T, PK> UniqueIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
