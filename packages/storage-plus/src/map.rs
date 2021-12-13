@@ -124,7 +124,7 @@ where
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 #[cfg(feature = "iterator")]
 impl<'a, K, T> Map<'a, K, T>
 where
@@ -133,8 +133,8 @@ where
     // Other cases need to call prefix() first
     K: PrimaryKey<'a>,
 {
-    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the `Prefix`
+    /// While `range_raw` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_raw` accepts bounds for the lowest and highest elements of the `Prefix`
     /// itself, and iterates over those (inclusively or exclusively, depending on `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
@@ -395,7 +395,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_simple_key() {
+    fn range_raw_simple_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -457,7 +457,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_simple_string_key() {
+    fn range_simple_string_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -517,7 +517,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_simple_integer_key() {
+    fn range_simple_integer_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -570,7 +570,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_composite_key() {
+    fn range_raw_composite_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -614,7 +614,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_composite_key() {
+    fn range_composite_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -643,7 +643,7 @@ mod test {
             ]
         );
 
-        // let's try to iterate over a prefix_de
+        // let's try to iterate over a prefix
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
             .range(&store, None, None, Order::Ascending)
@@ -658,7 +658,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_triple_key() {
+    fn range_raw_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -725,7 +725,7 @@ mod test {
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
-        // Use range_de() if you want key deserialization
+        // Use range() if you want key deserialization
         assert_eq!(
             all,
             vec![
@@ -738,7 +738,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_triple_key() {
+    fn range_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -769,7 +769,7 @@ mod test {
             ]
         );
 
-        // let's iterate over a sub_prefix_de
+        // let's iterate over a sub_prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .sub_prefix(b"owner")
             .range(&store, None, None, Order::Ascending)
@@ -785,7 +785,7 @@ mod test {
             ]
         );
 
-        // let's iterate over a prefix_de
+        // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9))
             .range(&store, None, None, Order::Ascending)
@@ -931,7 +931,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn readme_with_range() -> StdResult<()> {
+    fn readme_with_range_raw() -> StdResult<()> {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -998,7 +998,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefixed_range_works() {
+    fn prefixed_range_raw_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
         const AGES: Map<(u32, Vec<u8>), u64> = Map::new("ages");
@@ -1084,7 +1084,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefixed_range_de_works() {
+    fn prefixed_range_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
         const AGES: Map<(u32, &str), u64> = Map::new("ages");
