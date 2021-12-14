@@ -326,16 +326,26 @@ impl<'a, T: Endian> Prefixer<'a> for IntKey<T> {
     }
 }
 
+#[deprecated(note = "It is suggested to use `u8` as key type instead of the `U8Key` wrapper")]
 pub type U8Key = IntKey<u8>;
+#[deprecated(note = "It is suggested to use `u16` as key type instead of the `U16Key` wrapper")]
 pub type U16Key = IntKey<u16>;
+#[deprecated(note = "It is suggested to use `u32` as key type instead of the `U32Key` wrapper")]
 pub type U32Key = IntKey<u32>;
+#[deprecated(note = "It is suggested to use `u64` as key type instead of the `U64Key` wrapper")]
 pub type U64Key = IntKey<u64>;
+#[deprecated(note = "Consider using 64-bit keys instead of the `U128Key` wrapper")]
 pub type U128Key = IntKey<u128>;
 
+#[deprecated(note = "It is suggested to use `i8` as key type instead of the `I8Key` wrapper")]
 pub type I8Key = IntKey<i8>;
+#[deprecated(note = "It is suggested to use `i16` as key type instead of the `I16Key` wrapper")]
 pub type I16Key = IntKey<i16>;
+#[deprecated(note = "It is suggested to use `i32` as key type instead of the `I32Key` wrapper")]
 pub type I32Key = IntKey<i32>;
+#[deprecated(note = "It is suggested to use `i64` as key type instead of the `I64Key` wrapper")]
 pub type I64Key = IntKey<i64>;
+#[deprecated(note = "Consider using 64-bit keys instead of the `I128Key` wrapper")]
 pub type I128Key = IntKey<i128>;
 
 /// It will cast one-particular int type into a Key via Vec<u8>, ensuring you don't mix up u32 and u64
