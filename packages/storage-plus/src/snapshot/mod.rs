@@ -79,7 +79,7 @@ where
         // most recent checkpoint
         let checkpoint = self
             .checkpoints
-            .range(store, None, None, Order::Descending)
+            .range_raw(store, None, None, Order::Descending)
             .next()
             .transpose()?;
         if let Some((height, _)) = checkpoint {
@@ -88,7 +88,7 @@ where
             let first = self
                 .changelog
                 .prefix(k.clone())
-                .range(store, Some(start), None, Order::Ascending)
+                .range_raw(store, Some(start), None, Order::Ascending)
                 .next()
                 .transpose()?;
             if first.is_none() {
@@ -147,7 +147,7 @@ where
         let first = self
             .changelog
             .prefix(key)
-            .range(store, Some(start), None, Order::Ascending)
+            .range_raw(store, Some(start), None, Order::Ascending)
             .next();
 
         if let Some(r) = first {

@@ -791,7 +791,7 @@ where
     fn next_address(&self, storage: &dyn Storage) -> Addr {
         // FIXME: quite inefficient if we actually had 100s of contracts
         let count = CONTRACTS
-            .range(storage, None, None, Order::Ascending)
+            .range_raw(storage, None, None, Order::Ascending)
             .count();
         // we make this longer so it is not rejected by tests
         Addr::unchecked(format!("Contract #{}", count.to_string()))

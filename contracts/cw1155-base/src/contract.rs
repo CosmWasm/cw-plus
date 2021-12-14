@@ -1,7 +1,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Record, Response, StdResult,
-    SubMsg, Uint128,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, SubMsg,
+    Uint128,
 };
 use cw_storage_plus::Bound;
 
@@ -478,10 +478,10 @@ pub fn query(deps: Deps, env: Env, msg: Cw1155QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn parse_approval(item: StdResult<Record<Expiration>>) -> StdResult<cw1155::Approval> {
-    item.and_then(|(k, expires)| {
-        let spender = String::from_utf8(k)?;
-        Ok(cw1155::Approval { spender, expires })
+fn build_approval(item: StdResult<(Addr, Expiration)>) -> StdResult<cw1155::Approval> {
+    item.map(|(addr, expires)| cw1155::Approval {
+        spender: addr.into(),
+        expires,
     })
 }
 
@@ -501,7 +501,7 @@ fn query_all_approvals(
         .range(deps.storage, start, None, Order::Ascending)
         .filter(|r| include_expired || r.is_err() || !r.as_ref().unwrap().1.is_expired(&env.block))
         .take(limit)
-        .map(parse_approval)
+        .map(build_approval)
         .collect::<StdResult<_>>()?;
     Ok(ApprovedForAllResponse { operators })
 }
@@ -517,9 +517,8 @@ fn query_tokens(
 
     let tokens = BALANCES
         .prefix(&owner)
-        .range(deps.storage, start, None, Order::Ascending)
+        .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))
         .collect::<StdResult<_>>()?;
     Ok(TokensResponse { tokens })
 }
@@ -532,9 +531,8 @@ fn query_all_tokens(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
     let tokens = TOKENS
-        .range(deps.storage, start, None, Order::Ascending)
+        .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|item| item.map(|(k, _)| String::from_utf8(k).unwrap()))
         .collect::<StdResult<_>>()?;
     Ok(TokensResponse { tokens })
 }

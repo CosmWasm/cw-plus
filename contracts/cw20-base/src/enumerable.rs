@@ -18,22 +18,19 @@ pub fn query_all_allowances(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let allowances: StdResult<Vec<AllowanceInfo>> = ALLOWANCES
+    let allowances = ALLOWANCES
         .prefix(&owner_addr)
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
-            let (k, v) = item?;
-            Ok(AllowanceInfo {
-                spender: String::from_utf8(k)?,
-                allowance: v.allowance,
-                expires: v.expires,
+            item.map(|(addr, allow)| AllowanceInfo {
+                spender: addr.into(),
+                allowance: allow.allowance,
+                expires: allow.expires,
             })
         })
-        .collect();
-    Ok(AllAllowancesResponse {
-        allowances: allowances?,
-    })
+        .collect::<StdResult<_>>()?;
+    Ok(AllAllowancesResponse { allowances })
 }
 
 pub fn query_all_accounts(
@@ -44,15 +41,13 @@ pub fn query_all_accounts(
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive);
 
-    let accounts: Result<Vec<_>, _> = BALANCES
+    let accounts = BALANCES
         .keys(deps.storage, start, None, Order::Ascending)
-        .map(String::from_utf8)
         .take(limit)
-        .collect();
+        .map(|item| item.map(Into::into))
+        .collect::<StdResult<_>>()?;
 
-    Ok(AllAccountsResponse {
-        accounts: accounts?,
-    })
+    Ok(AllAccountsResponse { accounts })
 }
 
 #[cfg(test)]

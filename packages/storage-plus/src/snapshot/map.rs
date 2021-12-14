@@ -69,16 +69,8 @@ where
         self.primary.key(k)
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
-        self.primary.prefix(p)
-    }
-
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
-        self.primary.sub_prefix(p)
-    }
-
-    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
-        self.primary.no_prefix()
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+        self.primary.no_prefix_raw()
     }
 
     /// load old value and store changelog
@@ -164,7 +156,7 @@ where
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 impl<'a, K, T> SnapshotMap<'a, K, T>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -172,7 +164,7 @@ where
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range<'c>(
+    pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -182,7 +174,20 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range(store, min, max, order)
+        self.no_prefix_raw().range_raw(store, min, max, order)
+    }
+
+    pub fn keys_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
+    where
+        T: 'c,
+    {
+        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 }
 
@@ -192,13 +197,13 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -216,7 +221,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -227,10 +232,10 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -241,18 +246,18 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    fn no_prefix_de(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T> {
         Prefix::new(self.primary.namespace(), &[])
     }
 }
@@ -328,7 +333,7 @@ mod tests {
     const VALUES_START_5: &[(&str, Option<u64>)] =
         &[("A", Some(8)), ("B", None), ("C", Some(13)), ("D", None)];
 
-    // Same as `init_data`, but we have a composite key for testing range_de.
+    // Same as `init_data`, but we have a composite key for testing range.
     fn init_data_composite_key(map: &TestMapCompositeKey, storage: &mut dyn Storage) {
         map.save(storage, ("A", "B"), &5, 1).unwrap();
         map.save(storage, ("B", "A"), &7, 2).unwrap();
@@ -455,23 +460,21 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_simple_string_key() {
+    fn range_simple_string_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
         init_data(&EVERY, &mut store);
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = EVERY
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = EVERY.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
         assert_eq!(all, vec![("C".into(), 13), ("D".into(), 22)]);
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = EVERY
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"C".to_vec())),
                 None,
@@ -484,7 +487,7 @@ mod tests {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = EVERY
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::Inclusive(b"D".to_vec())),
                 None,
@@ -498,7 +501,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_composite_key() {
+    fn range_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -506,7 +509,7 @@ mod tests {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -521,7 +524,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_range_de_composite_key() {
+    fn prefix_range_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -529,7 +532,7 @@ mod tests {
 
         // let's prefix-range and iterate
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 None,
                 Some(PrefixBound::exclusive("C")),
@@ -543,7 +546,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefix_de_composite_key() {
+    fn prefix_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -551,8 +554,8 @@ mod tests {
 
         // let's prefix and iterate
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .prefix_de("C")
-            .range_de(&store, None, None, Order::Ascending)
+            .prefix("C")
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -561,7 +564,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn sub_prefix_de_composite_key() {
+    fn sub_prefix_composite_key() {
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -569,10 +572,10 @@ mod tests {
 
         // Let's sub-prefix and iterate.
         // This is similar to calling range() directly, but added here for completeness /
-        // sub_prefix_de type checks
+        // sub_prefix type checks
         let all: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
-            .sub_prefix_de(())
-            .range_de(&store, None, None, Order::Ascending)
+            .sub_prefix(())
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());

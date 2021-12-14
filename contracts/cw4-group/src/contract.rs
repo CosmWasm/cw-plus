@@ -192,19 +192,18 @@ fn list_members(
     let addr = maybe_addr(deps.api, start_after)?;
     let start = addr.map(|addr| Bound::exclusive(addr.to_string()));
 
-    let members: StdResult<Vec<_>> = MEMBERS
+    let members = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {
-            let (key, weight) = item?;
-            Ok(Member {
-                addr: String::from_utf8(key)?,
+            item.map(|(addr, weight)| Member {
+                addr: addr.into(),
                 weight,
             })
         })
-        .collect();
+        .collect::<StdResult<_>>()?;
 
-    Ok(MemberListResponse { members: members? })
+    Ok(MemberListResponse { members })
 }
 
 #[cfg(test)]

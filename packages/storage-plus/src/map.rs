@@ -50,17 +50,7 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::new(self.namespace, &p.prefix())
-    }
-
-    #[cfg(feature = "iterator")]
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<Vec<u8>, T> {
-        Prefix::new(self.namespace, &p.prefix())
-    }
-
-    #[cfg(feature = "iterator")]
-    pub(crate) fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
+    pub(crate) fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
         Prefix::new(self.namespace, &[])
     }
 
@@ -125,16 +115,16 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn sub_prefix_de(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
-    pub fn prefix_de(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
         Prefix::new(self.namespace, &p.prefix())
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 #[cfg(feature = "iterator")]
 impl<'a, K, T> Map<'a, K, T>
 where
@@ -143,12 +133,12 @@ where
     // Other cases need to call prefix() first
     K: PrimaryKey<'a>,
 {
-    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the `Prefix`
+    /// While `range_raw` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_raw` accepts bounds for the lowest and highest elements of the `Prefix`
     /// itself, and iterates over those (inclusively or exclusively, depending on `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range<'c>(
+    pub fn prefix_range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -164,7 +154,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range<'c>(
+    pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -174,10 +164,10 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range(store, min, max, order)
+        self.no_prefix_raw().range_raw(store, min, max, order)
     }
 
-    pub fn keys<'c>(
+    pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -187,7 +177,7 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().keys(store, min, max, order)
+        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 }
 
@@ -197,13 +187,13 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, K::Prefix>>,
@@ -221,7 +211,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -232,10 +222,10 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -246,10 +236,10 @@ where
         T: 'c,
         K::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix_de(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T> {
         Prefix::new(self.namespace, &[])
     }
 }
@@ -405,7 +395,69 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_simple_key() {
+    fn range_raw_simple_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.save(&mut store, b"john", &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone())
+            ]
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range_raw(
+                &store,
+                Some(Bound::Inclusive(b"j".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        );
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range_raw(
+                &store,
+                Some(Bound::Inclusive(b"jo".to_vec())),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(b"john".to_vec(), data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_simple_string_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -465,69 +517,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_simple_string_key() {
-        let mut store = MockStorage::new();
-
-        // save and load on two keys
-        let data = Data {
-            name: "John".to_string(),
-            age: 32,
-        };
-        PEOPLE.save(&mut store, b"john", &data).unwrap();
-
-        let data2 = Data {
-            name: "Jim".to_string(),
-            age: 44,
-        };
-        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
-
-        // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
-            vec![
-                (b"jim".to_vec(), data2.clone()),
-                (b"john".to_vec(), data.clone())
-            ]
-        );
-
-        // let's try to iterate over a range
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range_de(
-                &store,
-                Some(Bound::Inclusive(b"j".to_vec())),
-                None,
-                Order::Ascending,
-            )
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
-            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
-        );
-
-        // let's try to iterate over a more restrictive range
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range_de(
-                &store,
-                Some(Bound::Inclusive(b"jo".to_vec())),
-                None,
-                Order::Ascending,
-            )
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(1, all.len());
-        assert_eq!(all, vec![(b"john".to_vec(), data)]);
-    }
-
-    #[test]
-    #[cfg(feature = "iterator")]
-    fn range_de_simple_integer_key() {
+    fn range_simple_integer_key() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -545,7 +535,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range_de(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -553,7 +543,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::inclusive_int(56u32)),
                 None,
@@ -566,7 +556,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range_de(
+            .range(
                 &store,
                 Some(Bound::inclusive_int(57u32)),
                 None,
@@ -576,6 +566,50 @@ mod test {
         let all = all.unwrap();
         assert_eq!(1, all.len());
         assert_eq!(all, vec![(1234, data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_raw_composite_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys, one under different owner
+        ALLOWANCE
+            .save(&mut store, (b"owner", b"spender"), &1000)
+            .unwrap();
+        ALLOWANCE
+            .save(&mut store, (b"owner", b"spender2"), &3000)
+            .unwrap();
+        ALLOWANCE
+            .save(&mut store, (b"owner2", b"spender"), &5000)
+            .unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ((b"owner".to_vec(), b"spender".to_vec()).joined_key(), 1000),
+                ((b"owner".to_vec(), b"spender2".to_vec()).joined_key(), 3000),
+                ((b"owner2".to_vec(), b"spender".to_vec()).joined_key(), 5000),
+            ]
+        );
+
+        // let's try to iterate over a prefix
+        let all: StdResult<Vec<_>> = ALLOWANCE
+            .prefix(b"owner")
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
+        );
     }
 
     #[test]
@@ -603,9 +637,9 @@ mod test {
         assert_eq!(
             all,
             vec![
-                ((b"owner".to_vec(), b"spender".to_vec()).joined_key(), 1000),
-                ((b"owner".to_vec(), b"spender2".to_vec()).joined_key(), 3000),
-                ((b"owner2".to_vec(), b"spender".to_vec()).joined_key(), 5000),
+                ((b"owner".to_vec(), b"spender".to_vec()), 1000),
+                ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
+                ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
             ]
         );
 
@@ -618,57 +652,13 @@ mod test {
         assert_eq!(2, all.len());
         assert_eq!(
             all,
-            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000)]
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "iterator")]
-    fn range_de_composite_key() {
-        let mut store = MockStorage::new();
-
-        // save and load on three keys, one under different owner
-        ALLOWANCE
-            .save(&mut store, (b"owner", b"spender"), &1000)
-            .unwrap();
-        ALLOWANCE
-            .save(&mut store, (b"owner", b"spender2"), &3000)
-            .unwrap();
-        ALLOWANCE
-            .save(&mut store, (b"owner2", b"spender"), &5000)
-            .unwrap();
-
-        // let's try to iterate!
-        let all: StdResult<Vec<_>> = ALLOWANCE
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(3, all.len());
-        assert_eq!(
-            all,
-            vec![
-                ((b"owner".to_vec(), b"spender".to_vec()), 1000),
-                ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
-                ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
-            ]
-        );
-
-        // let's try to iterate over a prefix_de
-        let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix_de(b"owner")
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
             vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000),]
         );
     }
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_triple_key() {
+    fn range_raw_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -686,7 +676,9 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = TRIPLE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
         let all = all.unwrap();
         assert_eq!(4, all.len());
         assert_eq!(
@@ -714,7 +706,7 @@ mod test {
         // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9))
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -729,11 +721,11 @@ mod test {
         // let's iterate over a sub prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .sub_prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
-        // Use range_de() if you want key deserialization
+        // Use range() if you want key deserialization
         assert_eq!(
             all,
             vec![
@@ -746,7 +738,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range_de_triple_key() {
+    fn range_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
@@ -764,9 +756,7 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = TRIPLE
-            .range_de(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(4, all.len());
         assert_eq!(
@@ -779,10 +769,10 @@ mod test {
             ]
         );
 
-        // let's iterate over a sub_prefix_de
+        // let's iterate over a sub_prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .sub_prefix_de(b"owner")
-            .range_de(&store, None, None, Order::Ascending)
+            .sub_prefix(b"owner")
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -795,10 +785,10 @@ mod test {
             ]
         );
 
-        // let's iterate over a prefix_de
+        // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
-            .prefix_de((b"owner", 9))
-            .range_de(&store, None, None, Order::Ascending)
+            .prefix((b"owner", 9))
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -941,7 +931,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn readme_with_range() -> StdResult<()> {
+    fn readme_with_range_raw() -> StdResult<()> {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -957,7 +947,9 @@ mod test {
         PEOPLE.save(&mut store, b"jim", &data2)?;
 
         // iterate over them all
-        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
         assert_eq!(
             all?,
             vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
@@ -965,7 +957,7 @@ mod test {
 
         // or just show what is after jim
         let all: StdResult<Vec<_>> = PEOPLE
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"jim".to_vec())),
                 None,
@@ -982,7 +974,7 @@ mod test {
         // get all under one key
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect();
         assert_eq!(
             all?,
@@ -992,7 +984,7 @@ mod test {
         // Or ranges between two items (even reverse)
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range(
+            .range_raw(
                 &store,
                 Some(Bound::Exclusive(b"spender1".to_vec())),
                 Some(Bound::Inclusive(b"spender2".to_vec())),
@@ -1006,7 +998,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefixed_range_works() {
+    fn prefixed_range_raw_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
         const AGES: Map<(u32, Vec<u8>), u64> = Map::new("ages");
@@ -1022,21 +1014,20 @@ mod test {
         // typical range under one prefix as a control
         let fives = AGES
             .prefix(5)
-            .range(&store, None, None, Order::Ascending)
+            .range_raw(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
         assert_eq!(fives.len(), 2);
         assert_eq!(fives, vec![(vec![7, 8, 9], 789), (vec![9, 8, 7], 987)]);
 
         let keys: Vec<_> = AGES
-            .no_prefix()
-            .keys(&store, None, None, Order::Ascending)
+            .keys_raw(&store, None, None, Order::Ascending)
             .collect();
         println!("keys: {:?}", keys);
 
         // using inclusive bounds both sides
         let include = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(7u32)),
@@ -1050,7 +1041,7 @@ mod test {
 
         // using exclusive bounds both sides
         let exclude = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::exclusive(3u32)),
                 Some(PrefixBound::exclusive(7u32)),
@@ -1064,7 +1055,7 @@ mod test {
 
         // using inclusive in descending
         let include = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(5u32)),
@@ -1078,7 +1069,7 @@ mod test {
 
         // using exclusive in descending
         let include = AGES
-            .prefix_range(
+            .prefix_range_raw(
                 &store,
                 Some(PrefixBound::exclusive(2u32)),
                 Some(PrefixBound::exclusive(5u32)),
@@ -1093,7 +1084,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn prefixed_range_de_works() {
+    fn prefixed_range_works() {
         // this is designed to look as much like a secondary index as possible
         // we want to query over a range of u32 for the first key and all subkeys
         const AGES: Map<(u32, &str), u64> = Map::new("ages");
@@ -1108,7 +1099,7 @@ mod test {
 
         // typical range under one prefix as a control
         let fives = AGES
-            .prefix_de(5)
+            .prefix(5)
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<Vec<_>>>()
             .unwrap();
@@ -1118,15 +1109,12 @@ mod test {
             vec![("789".to_string(), 789), ("987".to_string(), 987)]
         );
 
-        let keys: Vec<_> = AGES
-            .no_prefix()
-            .keys_de(&store, None, None, Order::Ascending)
-            .collect();
+        let keys: Vec<_> = AGES.keys(&store, None, None, Order::Ascending).collect();
         println!("keys: {:?}", keys);
 
         // using inclusive bounds both sides
         let include = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(7u32)),
@@ -1140,7 +1128,7 @@ mod test {
 
         // using exclusive bounds both sides
         let exclude = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::exclusive(3u32)),
                 Some(PrefixBound::exclusive(7u32)),
@@ -1154,7 +1142,7 @@ mod test {
 
         // using inclusive in descending
         let include = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::inclusive(3u32)),
                 Some(PrefixBound::inclusive(5u32)),
@@ -1168,7 +1156,7 @@ mod test {
 
         // using exclusive in descending
         let include = AGES
-            .prefix_range_de(
+            .prefix_range(
                 &store,
                 Some(PrefixBound::exclusive(2u32)),
                 Some(PrefixBound::exclusive(5u32)),

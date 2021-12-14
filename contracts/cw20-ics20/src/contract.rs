@@ -151,32 +151,30 @@ fn query_port(deps: Deps) -> StdResult<PortResponse> {
 }
 
 fn query_list(deps: Deps) -> StdResult<ListChannelsResponse> {
-    let channels: StdResult<Vec<_>> = CHANNEL_INFO
-        .range(deps.storage, None, None, Order::Ascending)
+    let channels = CHANNEL_INFO
+        .range_raw(deps.storage, None, None, Order::Ascending)
         .map(|r| r.map(|(_, v)| v))
-        .collect();
-    Ok(ListChannelsResponse {
-        channels: channels?,
-    })
+        .collect::<StdResult<_>>()?;
+    Ok(ListChannelsResponse { channels })
 }
 
 // make public for ibc tests
 pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     let info = CHANNEL_INFO.load(deps.storage, &id)?;
     // this returns Vec<(outstanding, total)>
-    let state: StdResult<Vec<_>> = CHANNEL_STATE
+    let state = CHANNEL_STATE
         .prefix(&id)
         .range(deps.storage, None, None, Order::Ascending)
         .map(|r| {
-            let (k, v) = r?;
-            let denom = String::from_utf8(k)?;
-            let outstanding = Amount::from_parts(denom.clone(), v.outstanding);
-            let total = Amount::from_parts(denom, v.total_sent);
-            Ok((outstanding, total))
+            r.map(|(denom, v)| {
+                let outstanding = Amount::from_parts(denom.clone(), v.outstanding);
+                let total = Amount::from_parts(denom, v.total_sent);
+                (outstanding, total)
+            })
         })
-        .collect();
+        .collect::<StdResult<Vec<_>>>()?;
     // we want (Vec<outstanding>, Vec<total>)
-    let (balances, total_sent) = state?.into_iter().unzip();
+    let (balances, total_sent) = state.into_iter().unzip();
 
     Ok(ChannelResponse {
         info,

@@ -36,7 +36,7 @@ pub fn calc_range_start_string(start_after: Option<String>) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use cosmwasm_std::{testing::mock_dependencies, Order, StdError};
+    use cosmwasm_std::{testing::mock_dependencies, Order};
     use cw_storage_plus::{Bound, Map};
 
     pub const HOLDERS: Map<&Addr, usize> = Map::new("some_data");
@@ -44,12 +44,6 @@ mod test {
 
     fn addr_from_i(i: usize) -> Addr {
         Addr::unchecked(format!("addr{:0>8}", i))
-    }
-
-    fn deser_holder_kv(holder_kv: Result<(Vec<u8>, usize), StdError>) -> (String, usize) {
-        let (k_bytes, v) = holder_kv.unwrap();
-        let key = std::str::from_utf8(&k_bytes).unwrap().to_string();
-        (key, v)
     }
 
     #[test]
@@ -72,15 +66,15 @@ mod test {
 
             let start = calc_range_start(start_after).map(Bound::exclusive);
 
-            let holders: Vec<(String, usize)> = HOLDERS
-                .range(&deps.storage, start, None, Order::Ascending)
-                .map(deser_holder_kv)
+            let holders = HOLDERS
+                .keys(&deps.storage, start, None, Order::Ascending)
                 .take(LIMIT)
-                .collect();
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
 
             for (i, holder) in holders.into_iter().enumerate() {
                 let global_index = j * LIMIT + i;
-                assert_eq!(holder.0, addr_from_i(global_index));
+                assert_eq!(holder, addr_from_i(global_index));
             }
         }
     }
@@ -101,15 +95,15 @@ mod test {
 
             let end = calc_range_end(end_before).map(Bound::exclusive);
 
-            let holders: Vec<(String, usize)> = HOLDERS
-                .range(&deps.storage, None, end, Order::Descending)
-                .map(deser_holder_kv)
+            let holders = HOLDERS
+                .keys(&deps.storage, None, end, Order::Descending)
                 .take(LIMIT)
-                .collect();
+                .collect::<StdResult<Vec<_>>>()
+                .unwrap();
 
             for (i, holder) in holders.into_iter().enumerate() {
                 let global_index = total_elements_count - i - j * LIMIT - 1;
-                assert_eq!(holder.0, addr_from_i(global_index));
+                assert_eq!(holder, addr_from_i(global_index));
             }
         }
     }

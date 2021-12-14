@@ -143,33 +143,23 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix(&self, p: IK) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(
-            self.idx_namespace,
-            &p.prefix(),
-            self.pk_namespace,
-            deserialize_multi_v,
-        )
-    }
-
-    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(
-            self.idx_namespace,
-            &p.prefix(),
-            self.pk_namespace,
-            deserialize_multi_v,
-        )
-    }
-
-    fn no_prefix(&self) -> Prefix<Vec<u8>, T> {
-        Prefix::with_deserialization_function(
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
             self.pk_namespace,
             deserialize_multi_v,
+            deserialize_multi_v,
         )
     }
+}
 
+impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
+where
+    PK: PrimaryKey<'a> + KeyDeserialize,
+    T: Serialize + DeserializeOwned + Clone,
+    IK: PrimaryKey<'a> + Prefixer<'a>,
+{
     pub fn index_key(&self, k: IK) -> Vec<u8> {
         k.joined_extra_key(b"")
     }
@@ -177,25 +167,27 @@ where
     #[cfg(test)]
     pub fn count(&self, store: &dyn Storage, p: IK) -> usize {
         let prefix = self.prefix(p);
-        prefix.keys(store, None, None, Order::Ascending).count()
+        prefix.keys_raw(store, None, None, Order::Ascending).count()
     }
 
     #[cfg(test)]
     pub fn all_pks(&self, store: &dyn Storage, p: IK) -> Vec<Vec<u8>> {
         let prefix = self.prefix(p);
         prefix
-            .keys(store, None, None, Order::Ascending)
+            .keys_raw(store, None, None, Order::Ascending)
             .collect::<Vec<Vec<u8>>>()
     }
 
     #[cfg(test)]
     pub fn all_items(&self, store: &dyn Storage, p: IK) -> StdResult<Vec<Record<T>>> {
         let prefix = self.prefix(p);
-        prefix.range(store, None, None, Order::Ascending).collect()
+        prefix
+            .range_raw(store, None, None, Order::Ascending)
+            .collect()
     }
 }
 
-// short-cut for simple keys, rather than .prefix(()).range(...)
+// short-cut for simple keys, rather than .prefix(()).range_raw(...)
 impl<'a, IK, T, PK> MultiIndex<'a, IK, T, PK>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -203,7 +195,7 @@ where
 {
     // I would prefer not to copy code from Prefix, but no other way
     // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range<'c>(
+    pub fn range_raw<'c>(
         &'c self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -213,26 +205,26 @@ where
     where
         T: 'c,
     {
-        self.no_prefix().range(store, min, max, order)
+        self.no_prefix_raw().range_raw(store, min, max, order)
     }
 
-    pub fn keys<'c>(
+    pub fn keys_raw<'c>(
         &'c self,
         store: &'c dyn Storage,
         min: Option<Bound>,
         max: Option<Bound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix().keys(store, min, max, order)
+        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 
-    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
+    /// While `range_raw` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range_raw` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range<'c>(
+    pub fn prefix_range_raw<'c>(
         &'c self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, IK>>,
@@ -256,21 +248,23 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix_de(&self, p: IK) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(
+    pub fn prefix(&self, p: IK) -> Prefix<PK, T> {
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
             deserialize_multi_kv::<PK, T>,
+            deserialize_multi_v,
         )
     }
 
-    pub fn sub_prefix_de(&self, p: IK::Prefix) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(
+    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<PK, T> {
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
             self.pk_namespace,
             deserialize_multi_kv::<PK, T>,
+            deserialize_multi_v,
         )
     }
 }
@@ -282,13 +276,13 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + KeyDeserialize + Prefixer<'a>,
 {
-    /// While `range_de` over a `prefix_de` fixes the prefix to one element and iterates over the
-    /// remaining, `prefix_range_de` accepts bounds for the lowest and highest elements of the
+    /// While `range` over a `prefix` fixes the prefix to one element and iterates over the
+    /// remaining, `prefix_range` accepts bounds for the lowest and highest elements of the
     /// `Prefix` itself, and iterates over those (inclusively or exclusively, depending on
     /// `PrefixBound`).
     /// There are some issues that distinguish these two, and blindly casting to `Vec<u8>` doesn't
     /// solve them.
-    pub fn prefix_range_de<'c>(
+    pub fn prefix_range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<PrefixBound<'a, IK>>,
@@ -307,7 +301,7 @@ where
         Box::new(mapped)
     }
 
-    pub fn range_de<'c>(
+    pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -318,10 +312,10 @@ where
         T: 'c,
         PK::Output: 'static,
     {
-        self.no_prefix_de().range_de(store, min, max, order)
+        self.no_prefix().range(store, min, max, order)
     }
 
-    pub fn keys_de<'c>(
+    pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
         min: Option<Bound>,
@@ -332,15 +326,16 @@ where
         T: 'c,
         PK::Output: 'static,
     {
-        self.no_prefix_de().keys_de(store, min, max, order)
+        self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix_de(&self) -> Prefix<PK, T> {
-        Prefix::with_deserialization_function(
+    fn no_prefix(&self) -> Prefix<PK, T> {
+        Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
             self.pk_namespace,
             deserialize_multi_kv::<PK, T>,
+            deserialize_multi_v,
         )
     }
 }

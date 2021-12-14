@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Coin, Env, Order, StdError, StdResult, Storage, Timestamp};
+use cosmwasm_std::{Addr, Coin, Env, Order, StdResult, Storage, Timestamp};
 use cw_storage_plus::Map;
 
 use cw20::{Balance, Cw20CoinVerified};
@@ -96,7 +96,6 @@ pub const ESCROWS: Map<&str, Escrow> = Map::new("escrow");
 pub fn all_escrow_ids(storage: &dyn Storage) -> StdResult<Vec<String>> {
     ESCROWS
         .keys(storage, None, None, Order::Ascending)
-        .map(|k| String::from_utf8(k).map_err(|_| StdError::invalid_utf8("parsing escrow key")))
         .collect()
 }
 
