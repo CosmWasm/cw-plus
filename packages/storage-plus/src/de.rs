@@ -6,6 +6,7 @@ use std::convert::TryInto;
 
 use cosmwasm_std::{Addr, StdError, StdResult};
 
+use crate::int_key::CwIntKey;
 use crate::keys::{IntKey, TimestampKey};
 
 pub trait KeyDeserialize {
@@ -106,7 +107,7 @@ macro_rules! integer_de {
 
             #[inline(always)]
             fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-                Ok(<$t>::from_be_bytes(value.as_slice().try_into()
+                Ok(<$t>::from_cw_bytes(value.as_slice().try_into()
                     .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
         })*
@@ -122,7 +123,7 @@ macro_rules! intkey_de {
 
             #[inline(always)]
             fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-                Ok(<$t>::from_be_bytes(value.as_slice().try_into()
+                Ok(<$t>::from_cw_bytes(value.as_slice().try_into()
                     .map_err(|err: TryFromSliceError| StdError::generic_err(err.to_string()))?))
             }
         })*
@@ -232,11 +233,14 @@ mod test {
     #[test]
     fn deserialize_integer_works() {
         assert_eq!(<IntKey<u8>>::from_slice(&[1]).unwrap(), 1u8);
-        assert_eq!(<IntKey<i8>>::from_slice(&[128]).unwrap(), -1i8 << 7);
+        assert_eq!(
+            <IntKey<i8>>::from_slice(&[128]).unwrap(),
+            ((-1i8 << 7) as u8 ^ 0x80) as i8
+        );
         assert_eq!(<IntKey<u16>>::from_slice(&[1, 0]).unwrap(), 1u16 << 8);
         assert_eq!(
             <IntKey<i16>>::from_slice(&[128, 0]).unwrap(),
-            -1i16 << (8 + 7)
+            ((-1i16 << (8 + 7)) as u16 ^ 0x8000) as i16
         );
         assert_eq!(
             <IntKey<u32>>::from_slice(&[1, 0, 0, 0]).unwrap(),
@@ -244,7 +248,7 @@ mod test {
         );
         assert_eq!(
             <IntKey<i32>>::from_slice(&[128, 0, 0, 0]).unwrap(),
-            -1i32 << (3 * 8 + 7)
+            ((-1i32 << (3 * 8 + 7)) as u32 ^ 0x80000000) as i32
         );
         assert_eq!(
             <IntKey<u64>>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
@@ -252,7 +256,7 @@ mod test {
         );
         assert_eq!(
             <IntKey<i64>>::from_slice(&[128, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
-            -1i64 << (7 * 8 + 7)
+            ((-1i64 << (7 * 8 + 7)) as u64 ^ 0x8000000000000000) as i64
         );
         assert_eq!(
             <IntKey<u128>>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
@@ -263,7 +267,7 @@ mod test {
                 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
             ])
             .unwrap(),
-            -1i128
+            (-1i128 as u128 ^ 0x80000000000000000000000000000000u128) as i128
         );
     }
 
