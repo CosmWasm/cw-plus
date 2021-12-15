@@ -254,6 +254,8 @@ mod test {
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
+    use crate::int_key::CwIntKey;
+
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
         pub name: String,
@@ -297,7 +299,7 @@ mod test {
         );
         assert_eq!(b"triple".to_vec().as_slice(), &key[2..8]);
         assert_eq!(b"john".to_vec().as_slice(), &key[10..14]);
-        assert_eq!(8u8.to_be_bytes(), &key[16..17]);
+        assert_eq!(8u8.to_cw_bytes(), &key[16..17]);
         assert_eq!(b"pedro".to_vec().as_slice(), &key[17..]);
     }
 
