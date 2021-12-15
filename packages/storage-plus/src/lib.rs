@@ -4,6 +4,7 @@ mod helpers;
 mod indexed_map;
 mod indexed_snapshot;
 mod indexes;
+mod int_key;
 mod item;
 mod iter_helpers;
 mod keys;
