@@ -1,9 +1,10 @@
 use std::mem;
 
-/// Our int keys are simply the Big-endian representation bytes for unsigned ints,
-/// but "sign-flipped" (xored msb) Big-endian bytes for signed ints.
-/// So that the representation of signed integers is correctly ordered lexicographically.
-// TODO: Rename to `IntKey` when deprecating actual `IntKey`
+/// Our int keys are simply the big-endian representation bytes for unsigned ints,
+/// but "sign-flipped" (xored msb) big-endian bytes for signed ints.
+///
+/// So that the representation of signed integers is in the right lexicographical order.
+// TODO: Rename to `IntKey` when deprecating current `IntKey`
 pub trait CwIntKey: Sized + Copy {
     type Buf: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> + Default;
 
