@@ -30,19 +30,19 @@ macro_rules! cw_uint_keys {
 cw_uint_keys!(for u8, u16, u32, u64, u128);
 
 macro_rules! cw_int_keys {
-    (for $($t:ty),+) => {
+    (for $($t:ty, $ut:ty),+) => {
         $(impl CwIntKey for $t {
             type Buf = [u8; mem::size_of::<$t>()];
 
             fn to_cw_bytes(&self) -> Self::Buf {
-                ((*self as u128 ^ <$t>::MIN as u128) as $t).to_be_bytes()
+                (*self as $ut ^ <$t>::MIN as $ut).to_be_bytes()
             }
 
             fn from_cw_bytes(bytes: Self::Buf) -> Self {
-                (Self::from_be_bytes(bytes) as u128 ^ <$t>::MIN as u128) as _
+                (Self::from_be_bytes(bytes) as $ut ^ <$t>::MIN as $ut) as _
             }
         })*
     }
 }
 
-cw_int_keys!(for i8, i16, i32, i64, i128);
+cw_int_keys!(for i8, u8, i16, u16, i32, u32, i64, u64, i128, u128);
