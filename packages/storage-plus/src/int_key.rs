@@ -3,6 +3,7 @@ use std::mem;
 /// Our int keys are simply the Big-endian representation bytes for unsigned ints,
 /// but "sign-flipped" (xored msb) Big-endian bytes for signed ints.
 /// So that the representation of signed integers is correctly ordered lexicographically.
+// TODO: Rename to `IntKey` when deprecating actual `IntKey`
 pub trait CwIntKey: Sized + Copy {
     type Buf: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> + Default;
 
@@ -34,15 +35,11 @@ macro_rules! cw_int_keys {
             type Buf = [u8; mem::size_of::<$t>()];
 
             fn to_cw_bytes(&self) -> Self::Buf {
-                let mut bytes = self.to_be_bytes();
-                bytes[0] ^= 0x80;
-                bytes
+                ((*self as u128 ^ <$t>::MIN as u128) as $t).to_be_bytes()
             }
 
             fn from_cw_bytes(bytes: Self::Buf) -> Self {
-                let mut bytes = bytes;
-                bytes[0] ^= 0x80;
-                Self::from_be_bytes(bytes)
+                (Self::from_be_bytes(bytes) as u128 ^ <$t>::MIN as u128) as _
             }
         })*
     }
