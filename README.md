@@ -181,6 +181,8 @@ After that, fuzzing it (ideally with an intelligent fuzzer that understands the 
 can be valuable. And beyond that formal verification can provide even more assurance
 (but is very time consuming and expensive).
 
+For critical security issues & disclosure, see [SECURITY.md](SECURITY.md).
+
 ### Code Coverage
 
 I recommend the use of [tarpaulin](https://github.com/xd009642/tarpaulin): `cargo install cargo-tarpaulin`
