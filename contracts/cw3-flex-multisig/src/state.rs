@@ -1,10 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
 
-use cosmwasm_std::{
-    Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdError, StdResult, Storage, Uint128,
-};
+use cosmwasm_std::{Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdResult, Storage, Uint128};
 
 use cw3::{Status, Vote};
 use cw4::Cw4Contract;
@@ -160,15 +157,6 @@ pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
     let id: u64 = PROPOSAL_COUNT.may_load(store)?.unwrap_or_default() + 1;
     PROPOSAL_COUNT.save(store, &id)?;
     Ok(id)
-}
-
-pub fn parse_id(data: &[u8]) -> StdResult<u64> {
-    match data[0..8].try_into() {
-        Ok(bytes) => Ok(u64::from_be_bytes(bytes)),
-        Err(_) => Err(StdError::generic_err(
-            "Corrupted data found. 8 byte expected.",
-        )),
-    }
 }
 
 #[cfg(test)]
