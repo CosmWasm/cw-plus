@@ -214,7 +214,7 @@ version = "1.0.0-beta8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c4be9fd8c9d3ae7d0c32a925ecbc20707007ce0cba1f7538c0d78b7a2d3729b"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "serde",
 ]
 
@@ -375,7 +375,7 @@ dependencies = [
 name = "cw-controllers"
 version = "0.13.2"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "cw-utils",
  "schemars",
@@ -402,7 +402,7 @@ name = "cw-multi-test"
 version = "0.13.2"
 dependencies = [
  "anyhow",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cosmwasm-storage",
  "cw-storage-plus",
  "cw-utils",
@@ -429,7 +429,7 @@ dependencies = [
 name = "cw-utils"
 version = "0.13.2"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "prost",
  "schemars",
@@ -442,7 +442,7 @@ name = "cw1"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "schemars",
  "serde",
 ]
@@ -452,7 +452,7 @@ name = "cw1-subkeys"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -471,7 +471,7 @@ dependencies = [
  "anyhow",
  "assert_matches",
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
@@ -490,7 +490,7 @@ dependencies = [
  "anyhow",
  "assert_matches",
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
@@ -507,7 +507,7 @@ name = "cw1155"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-utils",
  "schemars",
  "serde",
@@ -518,7 +518,7 @@ name = "cw1155-base"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "cw-utils",
  "cw1155",
@@ -532,7 +532,7 @@ dependencies = [
 name = "cw2"
 version = "0.13.2"
 dependencies = [
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "schemars",
  "serde",
@@ -543,7 +543,7 @@ name = "cw20"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-utils",
  "schemars",
  "serde",
@@ -554,7 +554,7 @@ name = "cw20-base"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "cw-utils",
  "cw2",
@@ -586,7 +586,7 @@ name = "cw3"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-utils",
  "schemars",
  "serde",
@@ -597,7 +597,7 @@ name = "cw3-fixed-multisig"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
@@ -615,7 +615,7 @@ name = "cw3-flex-multisig"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
@@ -634,7 +634,7 @@ name = "cw4"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-storage-plus",
  "schemars",
  "serde",
@@ -645,7 +645,7 @@ name = "cw4-group"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
@@ -661,7 +661,7 @@ name = "cw4-stake"
 version = "0.13.2"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std",
+ "cosmwasm-std 1.0.0-beta4",
  "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
