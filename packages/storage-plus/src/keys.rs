@@ -626,7 +626,8 @@ mod test {
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
 
         let pair: (i8, &[u8]) = (123, b"random");
-        let one: Vec<u8> = vec![123 + 128];
+        // Signed int keys are "sign-flipped"
+        let one: Vec<u8> = vec![123 ^ 0x80];
         let two: Vec<u8> = b"random".to_vec();
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
     }
@@ -639,7 +640,8 @@ mod test {
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
 
         let pair: (i16, &[u8]) = (12345, b"random");
-        let one: Vec<u8> = vec![48 + 128, 57];
+        // Signed int keys are "sign-flipped"
+        let one: Vec<u8> = vec![48 ^ 0x80, 57];
         let two: Vec<u8> = b"random".to_vec();
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
     }
@@ -652,7 +654,9 @@ mod test {
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
 
         let pair: (i64, &[u8]) = (12345, b"random");
-        let one: Vec<u8> = vec![128, 0, 0, 0, 0, 0, 48, 57];
+        // Signed int keys are "sign-flipped"
+        #[allow(clippy::identity_op)]
+        let one: Vec<u8> = vec![0 ^ 0x80, 0, 0, 0, 0, 0, 48, 57];
         let two: Vec<u8> = b"random".to_vec();
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
     }
