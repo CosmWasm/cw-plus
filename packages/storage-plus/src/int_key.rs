@@ -17,10 +17,12 @@ macro_rules! cw_uint_keys {
         $(impl CwIntKey for $t {
             type Buf = [u8; mem::size_of::<$t>()];
 
+            #[inline]
             fn to_cw_bytes(&self) -> Self::Buf {
                 self.to_be_bytes()
             }
 
+            #[inline]
             fn from_cw_bytes(bytes: Self::Buf) -> Self {
                 Self::from_be_bytes(bytes)
             }
@@ -35,10 +37,12 @@ macro_rules! cw_int_keys {
         $(impl CwIntKey for $t {
             type Buf = [u8; mem::size_of::<$t>()];
 
+            #[inline]
             fn to_cw_bytes(&self) -> Self::Buf {
                 (*self as $ut ^ <$t>::MIN as $ut).to_be_bytes()
             }
 
+            #[inline]
             fn from_cw_bytes(bytes: Self::Buf) -> Self {
                 (Self::from_be_bytes(bytes) as $ut ^ <$t>::MIN as $ut) as _
             }
