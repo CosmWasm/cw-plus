@@ -43,7 +43,7 @@ use strip_input::StripInput;
 ///
 /// This would generate output like:
 ///
-/// ```
+/// ```ignore
 /// mod msg {
 ///     # #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
 ///     # struct Member;
