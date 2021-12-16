@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use cosmwasm_std::Response;
 
 pub struct Ctx;
