@@ -13,7 +13,12 @@ documentation = "https://docs.cosmwasm.com"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1", features = ["parsing", "derive", "full"] }
+syn = { version = "1", features = ["parsing", "derive", "full", "fold"] }
 quote = "1"
 proc-macro2 = "1"
 convert_case = "0.4"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+cosmwasm-std = "0.16"
+schemars = "0.8"
