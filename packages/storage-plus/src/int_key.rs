@@ -4,7 +4,7 @@ use std::mem;
 /// but "sign-flipped" (xored msb) big-endian bytes for signed ints.
 ///
 /// So that the representation of signed integers is in the right lexicographical order.
-// TODO: Rename to `IntKey` when deprecating current `IntKey`
+// TODO: Rename to `IntKey` after deprecating current `IntKey` (https://github.com/CosmWasm/cw-plus/issues/570)
 pub trait CwIntKey: Sized + Copy {
     type Buf: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> + Default;
 
