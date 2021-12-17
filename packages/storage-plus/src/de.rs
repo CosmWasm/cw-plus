@@ -233,57 +233,58 @@ mod test {
     #[test]
     fn deserialize_integer_works() {
         assert_eq!(<IntKey<u8>>::from_slice(&[1]).unwrap(), 1u8);
-        assert_eq!(
-            <IntKey<i8>>::from_slice(&[128]).unwrap(),
-            ((-1i8 << 7) as u8 ^ 0x80) as i8
-        );
-        assert_eq!(
-            <IntKey<i8>>::from_slice(&[127]).unwrap(),
-            (127 ^ 0x80) as i8
-        );
-        assert_eq!(<IntKey<u16>>::from_slice(&[1, 0]).unwrap(), 1u16 << 8);
-        assert_eq!(
-            <IntKey<i16>>::from_slice(&[128, 0]).unwrap(),
-            ((-1i16 << 15) as u16 ^ 0x8000) as i16
-        );
-        assert_eq!(
-            <IntKey<i16>>::from_slice(&[127, 255]).unwrap(),
-            (((1u16 << 15) - 1) ^ 0x8000) as i16
-        );
+        assert_eq!(<IntKey<i8>>::from_slice(&[127]).unwrap(), -1i8);
+        assert_eq!(<IntKey<i8>>::from_slice(&[128]).unwrap(), 0i8);
+
+        assert_eq!(<IntKey<u16>>::from_slice(&[1, 0]).unwrap(), 256u16);
+        assert_eq!(<IntKey<i16>>::from_slice(&[128, 0]).unwrap(), 0i16);
+        assert_eq!(<IntKey<i16>>::from_slice(&[127, 255]).unwrap(), -1i16);
+
         assert_eq!(
             <IntKey<u32>>::from_slice(&[1, 0, 0, 0]).unwrap(),
-            1u32 << (3 * 8)
+            16777216u32
         );
-        assert_eq!(
-            <IntKey<i32>>::from_slice(&[128, 0, 0, 0]).unwrap(),
-            ((-1i32 << 31) as u32 ^ 0x80000000) as i32
-        );
+        assert_eq!(<IntKey<i32>>::from_slice(&[128, 0, 0, 0]).unwrap(), 0i32);
         assert_eq!(
             <IntKey<i32>>::from_slice(&[127, 255, 255, 255]).unwrap(),
-            (((1u32 << 31) - 1) ^ 0x80000000) as i32
+            -1i32
         );
+
         assert_eq!(
             <IntKey<u64>>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
-            1u64 << (7 * 8)
+            72057594037927936u64
         );
         assert_eq!(
             <IntKey<i64>>::from_slice(&[128, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
-            ((-1i64 << 63) as u64 ^ 0x8000000000000000) as i64
+            0i64
         );
         assert_eq!(
             <IntKey<i64>>::from_slice(&[127, 255, 255, 255, 255, 255, 255, 255]).unwrap(),
-            (((1u64 << 63) - 1) ^ 0x8000000000000000) as i64
+            -1i64
         );
+
         assert_eq!(
             <IntKey<u128>>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
-            1u128 << (15 * 8)
+            1329227995784915872903807060280344576u128
+        );
+        assert_eq!(
+            <IntKey<i128>>::from_slice(&[128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                .unwrap(),
+            0i128
+        );
+        assert_eq!(
+            <IntKey<i128>>::from_slice(&[
+                127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+            ])
+            .unwrap(),
+            -1i128
         );
         assert_eq!(
             <IntKey<i128>>::from_slice(&[
                 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
             ])
             .unwrap(),
-            (-1i128 as u128 ^ 0x80000000000000000000000000000000) as i128
+            170141183460469231731687303715884105727i128,
         );
     }
 
@@ -306,7 +307,7 @@ mod test {
     fn deserialize_timestamp_works() {
         assert_eq!(
             <TimestampKey>::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
-            1u64 << (7 * 8)
+            72057594037927936
         );
     }
 
