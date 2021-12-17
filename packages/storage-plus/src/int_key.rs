@@ -58,73 +58,63 @@ mod test {
 
     #[test]
     fn x8_int_key_works() {
-        let k: u8 = 42u8;
-        assert_eq!(k.to_cw_bytes(), k.to_be_bytes());
-
-        let k: i8 = 42i8;
-        assert_eq!(k.to_cw_bytes(), (k as u8 ^ 0x80).to_be_bytes());
-
-        let k: i8 = -42i8;
-        assert_eq!(k.to_cw_bytes(), (k as u8 ^ 0x80).to_be_bytes());
+        assert_eq!(0x42u8.to_cw_bytes(), [0x42]);
+        assert_eq!(0x42i8.to_cw_bytes(), [0xc2]);
+        assert_eq!((-0x3ei8).to_cw_bytes(), [0x42]);
     }
 
     #[test]
     fn x16_int_key_works() {
-        let k: u16 = 4243u16;
-        assert_eq!(k.to_cw_bytes(), k.to_be_bytes());
-
-        let k: i16 = 4445i16;
-        assert_eq!(k.to_cw_bytes(), (k as u16 ^ 0x8000).to_be_bytes());
-
-        let k: i16 = -4748i16;
-        assert_eq!(k.to_cw_bytes(), (k as u16 ^ 0x8000).to_be_bytes());
+        assert_eq!(0x4243u16.to_cw_bytes(), [0x42, 0x43]);
+        assert_eq!(0x4243i16.to_cw_bytes(), [0xc2, 0x43]);
+        assert_eq!((-0x3dbdi16).to_cw_bytes(), [0x42, 0x43]);
     }
 
     #[test]
     fn x32_int_key_works() {
-        let k: u32 = 424344u32;
-        assert_eq!(k.to_cw_bytes(), k.to_be_bytes());
-
-        let k: i32 = 454647i32;
-        assert_eq!(k.to_cw_bytes(), (k as u32 ^ 0x80000000).to_be_bytes());
-
-        let k: i32 = -484950i32;
-        assert_eq!(k.to_cw_bytes(), (k as u32 ^ 0x80000000).to_be_bytes());
+        assert_eq!(0x424344u32.to_cw_bytes(), [0x00, 0x42, 0x43, 0x44]);
+        assert_eq!(0x424344i32.to_cw_bytes(), [0x80, 0x42, 0x43, 0x44]);
+        assert_eq!((-0x7fbdbcbci32).to_cw_bytes(), [0x00, 0x42, 0x43, 0x44]);
     }
 
     #[test]
     fn x64_int_key_works() {
-        let k: u64 = 42434445u64;
-        assert_eq!(k.to_cw_bytes(), k.to_be_bytes());
-
-        let k: i64 = 46474849i64;
         assert_eq!(
-            k.to_cw_bytes(),
-            (k as u64 ^ 0x8000000000000000).to_be_bytes()
+            0x42434445u64.to_cw_bytes(),
+            [0x00, 0x00, 0x00, 0x00, 0x42, 0x43, 0x44, 0x45]
         );
-
-        let k: i64 = -50515253i64;
         assert_eq!(
-            k.to_cw_bytes(),
-            (k as u64 ^ 0x8000000000000000).to_be_bytes()
+            0x42434445i64.to_cw_bytes(),
+            [0x80, 0x00, 0x00, 0x00, 0x42, 0x43, 0x44, 0x45]
+        );
+        assert_eq!(
+            (-0x7fffffffbdbcbbbbi64).to_cw_bytes(),
+            [0x00, 0x00, 0x00, 0x00, 0x42, 0x43, 0x44, 0x45]
         );
     }
 
     #[test]
     fn x128_int_key_works() {
-        let k: u128 = 4243444546u128;
-        assert_eq!(k.to_cw_bytes(), k.to_be_bytes());
-
-        let k: i128 = 4748495051i128;
         assert_eq!(
-            k.to_cw_bytes(),
-            (k as u128 ^ 0x80000000000000000000000000000000).to_be_bytes()
+            0x4243444546u128.to_cw_bytes(),
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x43, 0x44,
+                0x45, 0x46
+            ]
         );
-
-        let k: i128 = -5253545556i128;
         assert_eq!(
-            k.to_cw_bytes(),
-            (k as u128 ^ 0x80000000000000000000000000000000).to_be_bytes()
+            0x4243444546i128.to_cw_bytes(),
+            [
+                0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x43, 0x44,
+                0x45, 0x46
+            ]
+        );
+        assert_eq!(
+            (-0x7fffffffffffffffffffffbdbcbbbabai128).to_cw_bytes(),
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x43, 0x44,
+                0x45, 0x46
+            ]
         );
     }
 }
