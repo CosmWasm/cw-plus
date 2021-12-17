@@ -80,7 +80,6 @@ use strip_input::StripInput;
 ///   * `exec` - this is execute message variant
 #[proc_macro_attribute]
 pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = item.clone();
     let attrs = parse_macro_input!(attr as parser::InterfaceArgs);
     let input = parse_macro_input!(item as ItemTrait);
 
