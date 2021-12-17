@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 
 use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
+use crate::int_key::CwIntKey;
 use crate::Endian;
 
 #[derive(Debug)]
@@ -284,7 +285,7 @@ macro_rules! integer_key {
             type SuperSuffix = Self;
 
             fn key(&self) -> Vec<Key> {
-                vec![Key::$v(self.to_be_bytes())]
+                vec![Key::$v(self.to_cw_bytes())]
             }
         })*
     }
@@ -296,7 +297,7 @@ macro_rules! integer_prefix {
     (for $($t:ty, $v:tt),+) => {
         $(impl<'a> Prefixer<'a> for $t {
             fn prefix(&self) -> Vec<Key> {
-                vec![Key::$v(self.to_be_bytes())]
+                vec![Key::$v(self.to_cw_bytes())]
             }
         })*
     }
@@ -326,16 +327,26 @@ impl<'a, T: Endian> Prefixer<'a> for IntKey<T> {
     }
 }
 
+#[deprecated(note = "It is suggested to use `u8` as key type instead of the `U8Key` wrapper")]
 pub type U8Key = IntKey<u8>;
+#[deprecated(note = "It is suggested to use `u16` as key type instead of the `U16Key` wrapper")]
 pub type U16Key = IntKey<u16>;
+#[deprecated(note = "It is suggested to use `u32` as key type instead of the `U32Key` wrapper")]
 pub type U32Key = IntKey<u32>;
+#[deprecated(note = "It is suggested to use `u64` as key type instead of the `U64Key` wrapper")]
 pub type U64Key = IntKey<u64>;
+#[deprecated(note = "Consider using 64-bit keys instead of the `U128Key` wrapper")]
 pub type U128Key = IntKey<u128>;
 
+#[deprecated(note = "It is suggested to use `i8` as key type instead of the `I8Key` wrapper")]
 pub type I8Key = IntKey<i8>;
+#[deprecated(note = "It is suggested to use `i16` as key type instead of the `I16Key` wrapper")]
 pub type I16Key = IntKey<i16>;
+#[deprecated(note = "It is suggested to use `i32` as key type instead of the `I32Key` wrapper")]
 pub type I32Key = IntKey<i32>;
+#[deprecated(note = "It is suggested to use `i64` as key type instead of the `I64Key` wrapper")]
 pub type I64Key = IntKey<i64>;
+#[deprecated(note = "Consider using 64-bit keys instead of the `I128Key` wrapper")]
 pub type I128Key = IntKey<i128>;
 
 /// It will cast one-particular int type into a Key via Vec<u8>, ensuring you don't mix up u32 and u64
@@ -351,16 +362,16 @@ pub struct IntKey<T: Endian> {
     pub data: PhantomData<T>,
 }
 
-impl<T: Endian> IntKey<T> {
+impl<T: CwIntKey + Endian> IntKey<T> {
     pub fn new(val: T) -> Self {
         IntKey {
-            wrapped: val.to_be_bytes().into(),
+            wrapped: val.to_cw_bytes().into(),
             data: PhantomData,
         }
     }
 }
 
-impl<T: Endian> From<T> for IntKey<T> {
+impl<T: CwIntKey + Endian> From<T> for IntKey<T> {
     fn from(val: T) -> Self {
         IntKey::new(val)
     }
@@ -430,7 +441,7 @@ mod test {
         let k: U64Key = 134u64.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(134u64.to_be_bytes(), path[0].as_ref());
+        assert_eq!(134u64.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -438,7 +449,7 @@ mod test {
         let k: U32Key = 4242u32.into();
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242u32.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -446,12 +457,12 @@ mod test {
         let k: u8 = 42u8;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(42u8.to_be_bytes(), path[0].as_ref());
+        assert_eq!(42u8.to_cw_bytes(), path[0].as_ref());
 
         let k: i8 = 42i8;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(42i8.to_be_bytes(), path[0].as_ref());
+        assert_eq!(42i8.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -459,12 +470,12 @@ mod test {
         let k: u16 = 4242u16;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u16.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242u16.to_cw_bytes(), path[0].as_ref());
 
         let k: i16 = 4242i16;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242i16.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242i16.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -472,12 +483,12 @@ mod test {
         let k: u32 = 4242u32;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242u32.to_cw_bytes(), path[0].as_ref());
 
         let k: i32 = 4242i32;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242i32.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242i32.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -485,12 +496,12 @@ mod test {
         let k: u64 = 4242u64;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242u64.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242u64.to_cw_bytes(), path[0].as_ref());
 
         let k: i64 = 4242i64;
         let path = k.key();
         assert_eq!(1, path.len());
-        assert_eq!(4242i64.to_be_bytes(), path[0].as_ref());
+        assert_eq!(4242i64.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
@@ -547,8 +558,8 @@ mod test {
         assert_eq!(2, path.len());
         assert_eq!(4, path[0].as_ref().len());
         assert_eq!(8, path[1].as_ref().len());
-        assert_eq!(path[0].as_ref(), 123u32.to_be_bytes());
-        assert_eq!(path[1].as_ref(), 87654u64.to_be_bytes());
+        assert_eq!(path[0].as_ref(), 123u32.to_cw_bytes());
+        assert_eq!(path[1].as_ref(), 87654u64.to_cw_bytes());
     }
 
     #[test]
@@ -558,8 +569,8 @@ mod test {
         assert_eq!(2, path.len());
         assert_eq!(4, path[0].as_ref().len());
         assert_eq!(8, path[1].as_ref().len());
-        assert_eq!(path[0].as_ref(), 123u32.to_be_bytes());
-        assert_eq!(path[1].as_ref(), 87654u64.to_be_bytes());
+        assert_eq!(path[0].as_ref(), 123u32.to_cw_bytes());
+        assert_eq!(path[1].as_ref(), 87654u64.to_cw_bytes());
     }
 
     #[test]
@@ -615,7 +626,8 @@ mod test {
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
 
         let pair: (i8, &[u8]) = (123, b"random");
-        let one: Vec<u8> = vec![123];
+        // Signed int keys are "sign-flipped"
+        let one: Vec<u8> = vec![123 ^ 0x80];
         let two: Vec<u8> = b"random".to_vec();
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
     }
@@ -628,7 +640,8 @@ mod test {
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
 
         let pair: (i16, &[u8]) = (12345, b"random");
-        let one: Vec<u8> = vec![48, 57];
+        // Signed int keys are "sign-flipped"
+        let one: Vec<u8> = vec![48 ^ 0x80, 57];
         let two: Vec<u8> = b"random".to_vec();
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
     }
@@ -641,7 +654,9 @@ mod test {
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
 
         let pair: (i64, &[u8]) = (12345, b"random");
-        let one: Vec<u8> = vec![0, 0, 0, 0, 0, 0, 48, 57];
+        // Signed int keys are "sign-flipped"
+        #[allow(clippy::identity_op)]
+        let one: Vec<u8> = vec![0 ^ 0x80, 0, 0, 0, 0, 0, 48, 57];
         let two: Vec<u8> = b"random".to_vec();
         assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
     }

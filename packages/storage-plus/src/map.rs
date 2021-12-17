@@ -254,6 +254,8 @@ mod test {
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
+    use crate::int_key::CwIntKey;
+
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
         pub name: String,
@@ -263,6 +265,8 @@ mod test {
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
     #[cfg(feature = "iterator")]
     const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
+    #[cfg(feature = "iterator")]
+    const SIGNED_ID: Map<i32, Data> = Map::new("signed_id");
 
     const ALLOWANCE: Map<(&[u8], &[u8]), u64> = Map::new("allow");
 
@@ -297,7 +301,7 @@ mod test {
         );
         assert_eq!(b"triple".to_vec().as_slice(), &key[2..8]);
         assert_eq!(b"john".to_vec().as_slice(), &key[10..14]);
-        assert_eq!(8u8.to_be_bytes(), &key[16..17]);
+        assert_eq!(8u8.to_cw_bytes(), &key[16..17]);
         assert_eq!(b"pedro".to_vec().as_slice(), &key[17..]);
     }
 
@@ -566,6 +570,69 @@ mod test {
         let all = all.unwrap();
         assert_eq!(1, all.len());
         assert_eq!(all, vec![(1234, data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_simple_signed_integer_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        SIGNED_ID.save(&mut store, -1234, &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        SIGNED_ID.save(&mut store, -56, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Jules".to_string(),
+            age: 55,
+        };
+        SIGNED_ID.save(&mut store, 50, &data3).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = SIGNED_ID
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        // order is correct
+        assert_eq!(
+            all,
+            vec![(-1234, data), (-56, data2.clone()), (50, data3.clone())]
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = SIGNED_ID
+            .range(
+                &store,
+                Some(Bound::inclusive_int(-56i32)),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(-56, data2), (50, data3.clone())]);
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = SIGNED_ID
+            .range(
+                &store,
+                Some(Bound::inclusive_int(-55i32)),
+                Some(Bound::inclusive_int(50i32)),
+                Order::Descending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(50, data3)]);
     }
 
     #[test]

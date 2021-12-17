@@ -4,6 +4,7 @@ mod helpers;
 mod indexed_map;
 mod indexed_snapshot;
 mod indexes;
+mod int_key;
 mod item;
 mod iter_helpers;
 mod keys;
@@ -24,7 +25,12 @@ pub use indexes::UniqueIndex;
 #[cfg(feature = "iterator")]
 pub use indexes::{index_string, index_string_tuple, index_triple, index_tuple, Index};
 pub use item::Item;
+// TODO: Remove along with `IntKey`
+#[allow(deprecated)]
 pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
+// TODO: Remove along with `IntKey`
+pub use int_key::CwIntKey;
+#[allow(deprecated)]
 pub use keys::{Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
 pub use map::Map;
 pub use path::Path;
