@@ -117,4 +117,15 @@ mod test {
             ]
         );
     }
+
+    #[test]
+    fn unsigned_int_key_order() {
+        assert!(0u32.to_cw_bytes() < 652u32.to_cw_bytes());
+    }
+
+    #[test]
+    fn signed_int_key_order() {
+        assert!((-321i32).to_cw_bytes() < 0i32.to_cw_bytes());
+        assert!(0i32.to_cw_bytes() < 652i32.to_cw_bytes());
+    }
 }
