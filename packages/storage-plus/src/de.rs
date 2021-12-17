@@ -231,6 +231,54 @@ mod test {
     }
 
     #[test]
+    fn deserialize_naked_integer_works() {
+        assert_eq!(u8::from_slice(&[1]).unwrap(), 1u8);
+        assert_eq!(i8::from_slice(&[127]).unwrap(), -1i8);
+        assert_eq!(i8::from_slice(&[128]).unwrap(), 0i8);
+
+        assert_eq!(u16::from_slice(&[1, 0]).unwrap(), 256u16);
+        assert_eq!(i16::from_slice(&[128, 0]).unwrap(), 0i16);
+        assert_eq!(i16::from_slice(&[127, 255]).unwrap(), -1i16);
+
+        assert_eq!(u32::from_slice(&[1, 0, 0, 0]).unwrap(), 16777216u32);
+        assert_eq!(i32::from_slice(&[128, 0, 0, 0]).unwrap(), 0i32);
+        assert_eq!(i32::from_slice(&[127, 255, 255, 255]).unwrap(), -1i32);
+
+        assert_eq!(
+            u64::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            72057594037927936u64
+        );
+        assert_eq!(i64::from_slice(&[128, 0, 0, 0, 0, 0, 0, 0]).unwrap(), 0i64);
+        assert_eq!(
+            i64::from_slice(&[127, 255, 255, 255, 255, 255, 255, 255]).unwrap(),
+            -1i64
+        );
+
+        assert_eq!(
+            u128::from_slice(&[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            1329227995784915872903807060280344576u128
+        );
+        assert_eq!(
+            i128::from_slice(&[128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+            0i128
+        );
+        assert_eq!(
+            i128::from_slice(&[
+                127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+            ])
+            .unwrap(),
+            -1i128
+        );
+        assert_eq!(
+            i128::from_slice(&[
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+            ])
+            .unwrap(),
+            170141183460469231731687303715884105727i128,
+        );
+    }
+
+    #[test]
     fn deserialize_integer_works() {
         assert_eq!(<IntKey<u8>>::from_slice(&[1]).unwrap(), 1u8);
         assert_eq!(<IntKey<i8>>::from_slice(&[127]).unwrap(), -1i8);
