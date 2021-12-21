@@ -13,7 +13,7 @@ documentation = "https://docs.cosmwasm.com"
 proc-macro = true
 
 [dependencies]
-syn = { version = "1", features = ["parsing", "derive", "full", "fold"] }
+syn = { version = "1", features = ["parsing", "derive", "fold", "visit"] }
 quote = "1"
 proc-macro2 = "1"
 convert_case = "0.4"
