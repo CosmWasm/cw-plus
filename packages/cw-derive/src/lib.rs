@@ -5,11 +5,17 @@ use quote::quote;
 use syn::fold::Fold;
 use syn::parse::{Parse, Parser};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Error, FnArg, Ident, ItemTrait, Pat, TraitItem, TraitItemMethod};
+use syn::visit::Visit;
+use syn::{
+    parse_macro_input, Error, FnArg, GenericParam, Ident, ItemTrait, Pat, PatType, TraitItem,
+    TraitItemMethod,
+};
 
+mod check_generics;
 mod parser;
 mod strip_input;
 
+use check_generics::CheckGenerics;
 use strip_input::StripInput;
 
 /// Macro generating messages from contract trait.
@@ -78,15 +84,27 @@ use strip_input::StripInput;
 /// * `msg(msg_type)` - Hints, that this function is a message variant of specific type. Methods
 /// which are not marked with this attribute are ignored by generator. `msg_type` is one of:
 ///   * `exec` - this is execute message variant
-///   * `query` - this is query message variang
+///   * `query` - this is query message variant
 #[proc_macro_attribute]
 pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = item.clone();
     let attrs = parse_macro_input!(attr as parser::InterfaceArgs);
     let input = parse_macro_input!(item as ItemTrait);
 
-    let exec = build_msg(&attrs.exec, &input, parser::InterfaceMsgAttr::Exec);
-    let query = build_msg(&attrs.query, &input, parser::InterfaceMsgAttr::Query);
+    let generics = trait_generics(&input);
+
+    let exec = build_msg(
+        &attrs.exec,
+        &input,
+        parser::InterfaceMsgAttr::Exec,
+        &generics,
+    );
+    let query = build_msg(
+        &attrs.query,
+        &input,
+        parser::InterfaceMsgAttr::Query,
+        &generics,
+    );
 
     let input = StripInput.fold_item_trait(input);
 
@@ -114,29 +132,54 @@ pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+fn trait_generics(source: &ItemTrait) -> Vec<Ident> {
+    source
+        .generics
+        .params
+        .iter()
+        .filter_map(|gp| match gp {
+            GenericParam::Type(tp) => Some(tp.ident.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Builds message basing on input trait
-fn build_msg(name: &Ident, source: &ItemTrait, ty: parser::InterfaceMsgAttr) -> TokenStream2 {
-    let variants = source.items.iter().filter_map(|item| match item {
-        TraitItem::Method(method) => {
-            let msg_attr = method.attrs.iter().find(|attr| attr.path.is_ident("msg"))?;
-            let attr = match parser::InterfaceMsgAttr::parse.parse2(msg_attr.tokens.clone()) {
-                Ok(attr) => attr,
-                Err(err) => return Some(msg_variant_err(&method, err)),
-            };
+fn build_msg(
+    name: &Ident,
+    source: &ItemTrait,
+    ty: parser::InterfaceMsgAttr,
+    generics: &[Ident],
+) -> TokenStream2 {
+    let mut generics_checker = CheckGenerics::new(generics);
 
-            if attr == ty {
-                Some(msg_variant(&method))
-            } else {
-                None
+    let variants: Vec<_> = source
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            TraitItem::Method(method) => {
+                let msg_attr = method.attrs.iter().find(|attr| attr.path.is_ident("msg"))?;
+                let attr = match parser::InterfaceMsgAttr::parse.parse2(msg_attr.tokens.clone()) {
+                    Ok(attr) => attr,
+                    Err(err) => return Some(msg_variant_err(&method, err)),
+                };
+
+                if attr == ty {
+                    let variant = msg_variant(&method, &mut generics_checker);
+                    Some(variant)
+                } else {
+                    None
+                }
             }
-        }
-        _ => None,
-    });
+            _ => None,
+        })
+        .collect();
 
+    let generics = generics_checker.used();
     quote! {
         #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-        #[serde(rename_all = "snake_case")]
-        pub enum #name {
+        #[serde(rename_all="snake_case")]
+        pub enum #name <#(#generics,)*> where #(#generics: Clone + std::fmt::Debug + PartialEq + schemars::JsonSchema,)*{
             #(#variants,)*
         }
     }
@@ -155,7 +198,7 @@ fn msg_variant_err(method: &TraitItemMethod, err: Error) -> TokenStream2 {
 }
 
 /// Builds single message variant from method definition
-fn msg_variant(method: &TraitItemMethod) -> TokenStream2 {
+fn msg_variant(method: &TraitItemMethod, generics_checker: &mut CheckGenerics) -> TokenStream2 {
     let name = &method.sig.ident;
     let name = Ident::new(&name.to_string().to_case(Case::UpperCamel), name.span());
 
@@ -165,60 +208,65 @@ fn msg_variant(method: &TraitItemMethod) -> TokenStream2 {
         .iter()
         .skip(2)
         .enumerate()
-        .map(|(idx, arg)| {
-            match arg {
-                FnArg::Receiver(item) => {
-                    let err =
-                        Error::new(item.span(), "Unexpected `self` argument").into_compile_error();
-                    quote! {
-                        _self: #err
-                    }
-                }
-                FnArg::Typed(item) => {
-                    let name = match &*item.pat {
-                        Pat::Ident(p) => &p.ident,
-                        pat => {
-                            // TODO: Support pattern arguments, when decorated with argument with item
-                            // name
-                            //
-                            // Eg.
-                            //
-                            // ```
-                            // fn exec_foo(&self, ctx: Ctx, #[msg(name=metadata)] SomeData { addr, sender }: SomeData);
-                            // ```
-                            //
-                            // should expand to enum variant:
-                            //
-                            // ```
-                            // ExecFoo {
-                            //   metadata: SomeDaa
-                            // }
-                            // ```
-                            let err =
-                                Error::new(pat.span(), "Expected argument name, pattern occurred")
-                                    .into_compile_error();
-                            let name = format!("_invalid_{}", idx);
-                            return quote! {
-                                #name: #err
-                            };
-                        }
-                    };
+        .map(|(idx, arg)| match arg {
+            FnArg::Receiver(item) => {
+                let err =
+                    Error::new(item.span(), "Unexpected `self` argument").into_compile_error();
 
-                    let name = Ident::new(&name.to_string().to_case(Case::Snake), name.span());
-                    let ty = &item.ty;
-
-                    quote! {
-                        #name: #ty
-                    }
+                quote! {
+                    _self: #err
                 }
             }
+
+            FnArg::Typed(item) => msg_field(item, idx, generics_checker),
         });
 
     let fields: Vec<_> = fields.collect();
 
-    quote! {
+    let variant = quote! {
         #name {
             #(#fields,)*
         }
+    };
+
+    variant
+}
+
+fn msg_field<'g>(item: &PatType, idx: usize, generics_checker: &mut CheckGenerics) -> TokenStream2 {
+    let name = match &*item.pat {
+        Pat::Ident(p) => &p.ident,
+        pat => {
+            // TODO: Support pattern arguments, when decorated with argument with item
+            // name
+            //
+            // Eg.
+            //
+            // ```
+            // fn exec_foo(&self, ctx: Ctx, #[msg(name=metadata)] SomeData { addr, sender }: SomeData);
+            // ```
+            //
+            // should expand to enum variant:
+            //
+            // ```
+            // ExecFoo {
+            //   metadata: SomeDaa
+            // }
+            // ```
+            let err = Error::new(pat.span(), "Expected argument name, pattern occurred")
+                .into_compile_error();
+            let name = format!("_invalid_{}", idx);
+            return quote! {
+                #name: #err
+            };
+        }
+    };
+
+    let name = Ident::new(&name.to_string().to_case(Case::Snake), name.span());
+    let ty = &item.ty;
+
+    generics_checker.visit_type(ty);
+
+    quote! {
+        #name: #ty
     }
 }
