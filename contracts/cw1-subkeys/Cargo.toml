@@ -23,7 +23,7 @@ utils = { path = "../../packages/utils", version = "0.10.3" }
 cw1 = { path = "../../packages/cw1", version = "0.10.3" }
 cw2 = { path = "../../packages/cw2", version = "0.10.3" }
 cw1-whitelist = { path = "../cw1-whitelist", version = "0.10.3", features = ["library"] }
-cosmwasm-std = { version = "1.0.0-beta", features = ["staking"] }
+cosmwasm-std = { version = "1.0.0-beta3", features = ["staking"] }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.3" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
@@ -31,5 +31,5 @@ thiserror = "1.0.23"
 semver = "1"
 
 [dev-dependencies]
-cosmwasm-schema = { version = "1.0.0-beta" }
+cosmwasm-schema = { version = "1.0.0-beta3" }
 cw1-whitelist = { path = "../cw1-whitelist", version = "0.10.3", features = ["library", "test-utils"] }
