@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, BlockInfo, Deps, StdResult, Storage, Uint128};
-use cw_storage_plus::Map;
+use cosmwasm_std::{Addr, BlockInfo, Deps, Order, StdResult, Storage, Uint128};
+use cw_storage_plus::{Bound, Map};
 use utils::Expiration;
 
 // TODO: pull into utils?
@@ -89,6 +89,28 @@ impl<'a> Claims<'a> {
     pub fn query_claims(&self, deps: Deps, address: &Addr) -> StdResult<ClaimsResponse> {
         let claims = self.0.may_load(deps.storage, address)?.unwrap_or_default();
         Ok(ClaimsResponse { claims })
+    }
+
+    pub fn range_claims(
+        &self,
+        deps: Deps,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: Order,
+        limit: Option<u32>,
+    ) -> StdResult<Vec<(Addr, Vec<Claim>)>> {
+        if let Some(limit) = limit {
+            return self
+                .0
+                .range(deps.storage, min, max, order)
+                .take(limit as usize)
+                .collect::<StdResult<Vec<(Addr, Vec<Claim>)>>>();
+        } else {
+            return self
+                .0
+                .range(deps.storage, min, max, order)
+                .collect::<StdResult<Vec<(Addr, Vec<Claim>)>>>();
+        }
     }
 }
 
@@ -581,5 +603,51 @@ mod test {
             .unwrap();
 
         assert_eq!(queried_claims.claims.len(), 0);
+    }
+
+    #[test]
+    fn test_range_query() {
+        let mut deps = mock_dependencies();
+        let claims = Claims::new("claims");
+
+        claims
+            .create_claim(
+                deps.as_mut().storage,
+                &Addr::unchecked("addr"),
+                TEST_AMOUNT.into(),
+                TEST_EXPIRATION,
+            )
+            .unwrap();
+        claims
+            .create_claim(
+                deps.as_mut().storage,
+                &Addr::unchecked("addr2"),
+                (TEST_AMOUNT + 100).into(),
+                TEST_EXPIRATION,
+            )
+            .unwrap();
+
+        let cls = claims
+            .range_claims(deps.as_ref(), None, None, Order::Ascending, None)
+            .unwrap();
+        let expected = vec![
+            (
+                Addr::unchecked("addr"),
+                vec![Claim {
+                    amount: TEST_AMOUNT.into(),
+                    release_at: TEST_EXPIRATION,
+                }],
+            ),
+            (
+                Addr::unchecked("addr2"),
+                vec![Claim {
+                    amount: (TEST_AMOUNT + 100).into(),
+                    release_at: TEST_EXPIRATION,
+                }],
+            ),
+        ];
+        assert_eq!(cls, expected)
+
+        // no need test intensively, storage range works
     }
 }
