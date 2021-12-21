@@ -1,13 +1,15 @@
 #![cfg(test)]
 
-use crate::contract::{execute, instantiate, query};
-use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
 use cosmwasm_std::{to_binary, Addr, Empty, Uint128, WasmMsg};
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
+use cw3_flex_multisig::msg::Threshold;
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 use utils::Duration;
+
+use crate::contract::{execute, instantiate, query};
+use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};
 
 fn mock_app() -> App {
     App::default()
@@ -53,7 +55,7 @@ fn cw3_controls_cw20() {
                 weight: 1,
             },
         ],
-        required_weight: 2,
+        threshold: Threshold::AbsoluteCount { weight: 2 },
         max_voting_period: Duration::Height(3),
     };
 

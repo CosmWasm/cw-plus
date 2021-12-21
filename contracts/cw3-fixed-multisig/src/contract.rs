@@ -402,9 +402,10 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, from_binary, BankMsg};
+    use cosmwasm_std::{coin, from_binary, BankMsg, Decimal};
 
     use cw2::{get_contract_version, ContractVersion};
+    use cw3_flex_multisig::msg::Threshold;
     use utils::Duration;
 
     use crate::msg::Voter;
@@ -444,7 +445,7 @@ mod tests {
     fn setup_test_case(
         deps: DepsMut,
         info: MessageInfo,
-        required_weight: u64,
+        threshold: Threshold,
         max_voting_period: Duration,
     ) -> Result<Response<Empty>, ContractError> {
         // Instantiate a contract with voters
@@ -460,7 +461,7 @@ mod tests {
 
         let instantiate_msg = InstantiateMsg {
             voters,
-            required_weight,
+            threshold,
             max_voting_period,
         };
         instantiate(deps, mock_env(), info, instantiate_msg)
@@ -494,37 +495,41 @@ mod tests {
         // No voters fails
         let instantiate_msg = InstantiateMsg {
             voters: vec![],
-            required_weight: 1,
+            threshold: Threshold::ThresholdQuorum {
+                threshold: Decimal::zero(),
+                quorum: Decimal::percent(1),
+            },
             max_voting_period,
         };
-        let err =
-            instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap_err();
+        let err = instantiate(
+            deps.as_mut(),
+            mock_env(),
+            info.clone(),
+            instantiate_msg.clone(),
+        )
+        .unwrap_err();
         assert_eq!(err, ContractError::NoVoters {});
 
         // Zero required weight fails
         let instantiate_msg = InstantiateMsg {
             voters: vec![voter(OWNER, 1)],
-            required_weight: 0,
-            max_voting_period,
+            ..instantiate_msg
         };
         let err =
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap_err();
-        assert_eq!(err, ContractError::ZeroWeight {});
+
+        use cw3_flex_multisig::ContractError::{InvalidThreshold, UnreachableWeight};
+        assert_eq!(err, ContractError::FlexMultisig(InvalidThreshold {}));
 
         // Total weight less than required weight not allowed
-        let required_weight = 100;
-        let err = setup_test_case(
-            deps.as_mut(),
-            info.clone(),
-            required_weight,
-            max_voting_period,
-        )
-        .unwrap_err();
-        assert_eq!(err, ContractError::UnreachableWeight {});
+        let threshold = Threshold::AbsoluteCount { weight: 100 };
+        let err =
+            setup_test_case(deps.as_mut(), info.clone(), threshold, max_voting_period).unwrap_err();
+        assert_eq!(err, ContractError::FlexMultisig(UnreachableWeight {}));
 
         // All valid
-        let required_weight = 1;
-        setup_test_case(deps.as_mut(), info, required_weight, max_voting_period).unwrap();
+        let threshold = Threshold::AbsoluteCount { weight: 1 };
+        setup_test_case(deps.as_mut(), info, threshold, max_voting_period).unwrap();
 
         // Verify
         assert_eq!(
@@ -539,14 +544,14 @@ mod tests {
     // TODO: query() tests
 
     #[test]
-    fn zero_weight_member_cant_propose_and_vote() {
+    fn zero_weight_member_cant_vote() {
         let mut deps = mock_dependencies();
 
-        let required_weight = 4;
+        let threshold = Threshold::AbsoluteCount { weight: 4 };
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info, required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info, threshold, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
             to_address: SOMEBODY.into(),
@@ -554,7 +559,7 @@ mod tests {
         };
         let msgs = vec![CosmosMsg::Bank(bank_msg)];
 
-        // Only voters with weight can propose
+        // Voter without voting power still can create proposal
         let info = mock_info(NOWEIGHT_VOTER, &[]);
         let proposal = ExecuteMsg::Propose {
             title: "Rewarding somebody".to_string(),
@@ -562,11 +567,6 @@ mod tests {
             msgs,
             latest: None,
         };
-        let err = execute(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap_err();
-        assert_eq!(err, ContractError::Unauthorized {});
-
-        // Propose proposal
-        let info = mock_info(OWNER, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
 
         // Get the proposal id from the logs
@@ -579,7 +579,7 @@ mod tests {
         };
         // Only voters with weight can vote
         let info = mock_info(NOWEIGHT_VOTER, &[]);
-        execute(deps.as_mut(), mock_env(), info, no_vote).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info, no_vote).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
     }
 
@@ -587,11 +587,11 @@ mod tests {
     fn test_propose_works() {
         let mut deps = mock_dependencies();
 
-        let required_weight = 4;
+        let threshold = Threshold::AbsoluteCount { weight: 4 };
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info, required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info, threshold, voting_period).unwrap();
 
         let bank_msg = BankMsg::Send {
             to_address: SOMEBODY.into(),
@@ -654,11 +654,11 @@ mod tests {
     fn test_vote_works() {
         let mut deps = mock_dependencies();
 
-        let required_weight = 3;
+        let threshold = Threshold::AbsoluteCount { weight: 3 };
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), threshold, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -767,11 +767,11 @@ mod tests {
     fn test_execute_works() {
         let mut deps = mock_dependencies();
 
-        let required_weight = 3;
+        let threshold = Threshold::AbsoluteCount { weight: 3 };
         let voting_period = Duration::Time(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), threshold, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
@@ -842,11 +842,11 @@ mod tests {
     fn test_close_works() {
         let mut deps = mock_dependencies();
 
-        let required_weight = 3;
+        let threshold = Threshold::AbsoluteCount { weight: 3 };
         let voting_period = Duration::Height(2000000);
 
         let info = mock_info(OWNER, &[]);
-        setup_test_case(deps.as_mut(), info.clone(), required_weight, voting_period).unwrap();
+        setup_test_case(deps.as_mut(), info.clone(), threshold, voting_period).unwrap();
 
         // Propose
         let bank_msg = BankMsg::Send {
