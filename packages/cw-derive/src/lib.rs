@@ -175,11 +175,31 @@ fn build_msg(
         })
         .collect();
 
-    let generics = generics_checker.used();
+    let used_generics = generics_checker.used();
+
+    let where_clause = source.generics.where_clause.as_ref().map(|clause| {
+        let preds: Vec<_> = clause
+            .predicates
+            .iter()
+            .filter(|pred| {
+                let mut generics_checker = CheckGenerics::new(generics);
+                generics_checker.visit_where_predicate(pred);
+                generics_checker
+                    .used()
+                    .into_iter()
+                    .all(|gen| used_generics.contains(&gen))
+            })
+            .collect();
+
+        quote! {
+            where #(#preds,)*
+        }
+    });
+
     quote! {
         #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
         #[serde(rename_all="snake_case")]
-        pub enum #name <#(#generics,)*> where #(#generics: Clone + std::fmt::Debug + PartialEq + schemars::JsonSchema,)*{
+        pub enum #name <#(#used_generics,)*> #where_clause {
             #(#variants,)*
         }
     }
