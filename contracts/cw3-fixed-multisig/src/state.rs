@@ -1,54 +1,16 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, BlockInfo, CosmosMsg, Empty, StdResult, Storage};
-
-use cw3::{Status, Vote};
+use cosmwasm_std::Addr;
+use cw3_flex_multisig::msg::Threshold;
 use cw_storage_plus::{Item, Map};
-use utils::{Duration, Expiration};
+use utils::Duration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
-    pub required_weight: u64,
+    pub threshold: Threshold,
     pub total_weight: u64,
     pub max_voting_period: Duration,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct Proposal {
-    pub title: String,
-    pub description: String,
-    pub expires: Expiration,
-    pub msgs: Vec<CosmosMsg<Empty>>,
-    pub status: Status,
-    /// how many votes have already said yes
-    pub yes_weight: u64,
-    /// how many votes needed to pass
-    pub required_weight: u64,
-}
-
-impl Proposal {
-    pub fn current_status(&self, block: &BlockInfo) -> Status {
-        let mut status = self.status;
-
-        // if open, check if voting is passed or timed out
-        if status == Status::Open && self.yes_weight >= self.required_weight {
-            status = Status::Passed;
-        }
-        if status == Status::Open && self.expires.is_expired(block) {
-            status = Status::Rejected;
-        }
-
-        status
-    }
-}
-
-// we cast a ballot with our chosen vote and a given weight
-// stored under the key that voted
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct Ballot {
-    pub weight: u64,
-    pub vote: Vote,
 }
 
 // unique items
@@ -57,11 +19,3 @@ pub const PROPOSAL_COUNT: Item<u64> = Item::new("proposal_count");
 
 // multiple-item maps
 pub const VOTERS: Map<&Addr, u64> = Map::new("voters");
-pub const PROPOSALS: Map<u64, Proposal> = Map::new("proposals");
-pub const BALLOTS: Map<(u64, &Addr), Ballot> = Map::new("ballots");
-
-pub fn next_id(store: &mut dyn Storage) -> StdResult<u64> {
-    let id: u64 = PROPOSAL_COUNT.may_load(store)?.unwrap_or_default() + 1;
-    PROPOSAL_COUNT.save(store, &id)?;
-    Ok(id)
-}

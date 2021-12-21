@@ -12,12 +12,14 @@ use cw3::{
     ProposalListResponse, ProposalResponse, Status, Vote, VoteInfo, VoteListResponse, VoteResponse,
     VoterDetail, VoterListResponse, VoterResponse,
 };
+use cw3_flex_multisig::state::{next_id, Ballot, Proposal, Votes, BALLOTS, PROPOSALS};
+
 use cw_storage_plus::Bound;
 use utils::{Expiration, ThresholdResponse};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{next_id, Ballot, Config, Proposal, BALLOTS, CONFIG, PROPOSALS, VOTERS};
+use crate::state::{Config, CONFIG, VOTERS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -30,22 +32,17 @@ pub fn instantiate(
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    if msg.required_weight == 0 {
-        return Err(ContractError::ZeroWeight {});
-    }
     if msg.voters.is_empty() {
         return Err(ContractError::NoVoters {});
     }
     let total_weight = msg.voters.iter().map(|v| v.weight).sum();
 
-    if total_weight < msg.required_weight {
-        return Err(ContractError::UnreachableWeight {});
-    }
+    msg.threshold.validate(total_weight)?;
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let cfg = Config {
-        required_weight: msg.required_weight,
+        threshold: msg.threshold,
         total_weight,
         max_voting_period: msg.max_voting_period,
     };
@@ -89,12 +86,10 @@ pub fn execute_propose(
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
-    // only members of the multisig with weight >= 1 can create a proposal
-    let voter_power = VOTERS.may_load(deps.storage, &info.sender)?;
-    let vote_power = match voter_power {
-        Some(power) if power >= 1 => power,
-        _ => return Err(ContractError::Unauthorized {}),
-    };
+    // only members of the multisig can create a proposal
+    let vote_power = VOTERS
+        .may_load(deps.storage, &info.sender)?
+        .ok_or(ContractError::Unauthorized {})?;
 
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -108,22 +103,19 @@ pub fn execute_propose(
         return Err(ContractError::WrongExpiration {});
     }
 
-    let status = if vote_power < cfg.required_weight {
-        Status::Open
-    } else {
-        Status::Passed
-    };
-
     // create a proposal
-    let prop = Proposal {
+    let mut prop = Proposal {
         title,
         description,
+        start_height: env.block.height,
         expires,
         msgs,
-        status,
-        yes_weight: vote_power,
-        required_weight: cfg.required_weight,
+        status: Status::Open,
+        votes: Votes::yes(vote_power),
+        threshold: cfg.threshold,
+        total_weight: cfg.total_weight,
     };
+    prop.update_status(&env.block);
     let id = next_id(deps.storage)?;
     PROPOSALS.save(deps.storage, id, &prop)?;
 
@@ -173,15 +165,10 @@ pub fn execute_vote(
         }),
     })?;
 
-    // if yes vote, update tally
-    if vote == Vote::Yes {
-        prop.yes_weight += vote_power;
-        // update status when the passing vote comes in
-        if prop.yes_weight >= prop.required_weight {
-            prop.status = Status::Passed;
-        }
-        PROPOSALS.save(deps.storage, proposal_id, &prop)?;
-    }
+    // update vote tally
+    prop.votes.add_vote(vote, vote_power);
+    prop.update_status(&env.block);
+    PROPOSALS.save(deps.storage, proposal_id, &prop)?;
 
     Ok(Response::new()
         .add_attribute("action", "vote")
@@ -273,21 +260,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
-    Ok(ThresholdResponse::AbsoluteCount {
-        weight: cfg.required_weight,
-        total_weight: cfg.total_weight,
-    })
+    Ok(cfg.threshold.to_response(cfg.total_weight))
 }
 
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
     let prop = PROPOSALS.load(deps.storage, id)?;
     let status = prop.current_status(&env.block);
-
-    let cfg = CONFIG.load(deps.storage)?;
-    let threshold = ThresholdResponse::AbsoluteCount {
-        weight: cfg.required_weight,
-        total_weight: cfg.total_weight,
-    };
+    let threshold = prop.threshold.to_response(prop.total_weight);
     Ok(ProposalResponse {
         id,
         title: prop.title,
@@ -309,18 +288,12 @@ fn list_proposals(
     start_after: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
-    let cfg = CONFIG.load(deps.storage)?;
-    let threshold = ThresholdResponse::AbsoluteCount {
-        weight: cfg.required_weight,
-        total_weight: cfg.total_weight,
-    };
-
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let start = start_after.map(Bound::exclusive_int);
     let proposals = PROPOSALS
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
-        .map(|p| map_proposal(&env.block, &threshold, p))
+        .map(|p| map_proposal(&env.block, p))
         .collect::<StdResult<_>>()?;
 
     Ok(ProposalListResponse { proposals })
@@ -332,30 +305,24 @@ fn reverse_proposals(
     start_before: Option<u64>,
     limit: Option<u32>,
 ) -> StdResult<ProposalListResponse> {
-    let cfg = CONFIG.load(deps.storage)?;
-    let threshold = ThresholdResponse::AbsoluteCount {
-        weight: cfg.required_weight,
-        total_weight: cfg.total_weight,
-    };
-
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let end = start_before.map(Bound::exclusive_int);
-    let proposals = PROPOSALS
+    let props: StdResult<Vec<_>> = PROPOSALS
         .range(deps.storage, None, end, Order::Descending)
         .take(limit)
-        .map(|p| map_proposal(&env.block, &threshold, p))
-        .collect::<StdResult<_>>()?;
+        .map(|p| map_proposal(&env.block, p))
+        .collect();
 
-    Ok(ProposalListResponse { proposals })
+    Ok(ProposalListResponse { proposals: props? })
 }
 
 fn map_proposal(
     block: &BlockInfo,
-    threshold: &ThresholdResponse,
     item: StdResult<(u64, Proposal)>,
 ) -> StdResult<ProposalResponse> {
     item.map(|(id, prop)| {
         let status = prop.current_status(block);
+        let threshold = prop.threshold.to_response(prop.total_weight);
         ProposalResponse {
             id,
             title: prop.title,
@@ -363,7 +330,7 @@ fn map_proposal(
             msgs: prop.msgs,
             status,
             expires: prop.expires,
-            threshold: threshold.clone(),
+            threshold,
         }
     })
 }

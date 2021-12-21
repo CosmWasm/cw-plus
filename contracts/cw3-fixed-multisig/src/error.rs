@@ -1,10 +1,14 @@
 use cosmwasm_std::StdError;
+use cw3_flex_multisig::error::ContractError as Cw3FlexMultisigError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
+
+    #[error("{0}")]
+    FlexMultisig(#[from] Cw3FlexMultisigError),
 
     #[error("Required weight cannot be zero")]
     ZeroWeight {},

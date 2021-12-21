@@ -530,6 +530,7 @@ dependencies = [
  "cw20",
  "cw20-base",
  "cw3",
+ "cw3-flex-multisig",
  "schemars",
  "serde",
  "thiserror",
