@@ -89,10 +89,12 @@ pub fn execute_propose(
     // we ignore earliest
     latest: Option<Expiration>,
 ) -> Result<Response<Empty>, ContractError> {
-    // only members of the multisig can create a proposal
-    let vote_power = VOTERS
-        .may_load(deps.storage, &info.sender)?
-        .ok_or(ContractError::Unauthorized {})?;
+    // only members of the multisig with weight >= 1 can create a proposal
+    let voter_power = VOTERS.may_load(deps.storage, &info.sender)?;
+    let vote_power = match voter_power {
+        Some(power) if power >= 1 => power,
+        _ => return Err(ContractError::Unauthorized {}),
+    };
 
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -146,10 +148,12 @@ pub fn execute_vote(
     proposal_id: u64,
     vote: Vote,
 ) -> Result<Response<Empty>, ContractError> {
-    // only members of the multisig can vote
-    let vote_power = VOTERS
-        .may_load(deps.storage, &info.sender)?
-        .ok_or(ContractError::Unauthorized {})?;
+    // only members of the multisig with weight >= 1 can vote
+    let voter_power = VOTERS.may_load(deps.storage, &info.sender)?;
+    let vote_power = match voter_power {
+        Some(power) if power >= 1 => power,
+        _ => return Err(ContractError::Unauthorized {}),
+    };
 
     // ensure proposal exists and can be voted on
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
@@ -458,6 +462,7 @@ mod tests {
     const VOTER3: &str = "voter0003";
     const VOTER4: &str = "voter0004";
     const VOTER5: &str = "voter0005";
+    const NOWEIGHT_VOTER: &str = "voterxxxx";
     const SOMEBODY: &str = "somebody";
 
     fn voter<T: Into<String>>(addr: T, weight: u64) -> Voter {
@@ -468,6 +473,7 @@ mod tests {
     }
 
     // this will set up the instantiation for other tests
+    #[track_caller]
     fn setup_test_case(
         deps: DepsMut,
         info: MessageInfo,
@@ -476,12 +482,13 @@ mod tests {
     ) -> Result<Response<Empty>, ContractError> {
         // Instantiate a contract with voters
         let voters = vec![
-            voter(&info.sender, 0),
+            voter(&info.sender, 1),
             voter(VOTER1, 1),
             voter(VOTER2, 2),
             voter(VOTER3, 3),
             voter(VOTER4, 4),
             voter(VOTER5, 5),
+            voter(NOWEIGHT_VOTER, 0),
         ];
 
         let instantiate_msg = InstantiateMsg {
@@ -563,6 +570,51 @@ mod tests {
     }
 
     // TODO: query() tests
+
+    #[test]
+    fn zero_weight_member_cant_propose_and_vote() {
+        let mut deps = mock_dependencies();
+
+        let required_weight = 4;
+        let voting_period = Duration::Time(2000000);
+
+        let info = mock_info(OWNER, &[]);
+        setup_test_case(deps.as_mut(), info, required_weight, voting_period).unwrap();
+
+        let bank_msg = BankMsg::Send {
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+
+        // Only voters with weight can propose
+        let info = mock_info(NOWEIGHT_VOTER, &[]);
+        let proposal = ExecuteMsg::Propose {
+            title: "Rewarding somebody".to_string(),
+            description: "Do we reward her?".to_string(),
+            msgs,
+            latest: None,
+        };
+        let err = execute(deps.as_mut(), mock_env(), info, proposal.clone()).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
+
+        // Propose proposal
+        let info = mock_info(OWNER, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // Cast a No vote
+        let no_vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        // Only voters with weight can vote
+        let info = mock_info(NOWEIGHT_VOTER, &[]);
+        execute(deps.as_mut(), mock_env(), info, no_vote).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
+    }
 
     #[test]
     fn test_propose_works() {
