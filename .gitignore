@@ -23,3 +23,6 @@ artifacts/
 
 # code coverage
 tarpaulin-report.*
+
+packages/*/schema
+contracts/*/schema
