@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use cosmwasm_std::{CosmosMsg, Response};
 
-struct Ctx;
-struct Error;
+pub struct Ctx;
+pub struct Error;
 
 #[cw_derive::interface(module=msg, exec=Cw1Exec, query=Cw1Query)]
-trait Cw1<Msg>
+pub trait Cw1<Msg>
 where
     Msg: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
 {
