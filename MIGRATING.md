@@ -41,14 +41,7 @@ index 48a60083..2f2ef70d 100644
 --- a/contracts/cw3-fixed-multisig/src/contract.rs
 +++ b/contracts/cw3-fixed-multisig/src/contract.rs
 @@ -385,21 +384,20 @@ fn list_votes(
-     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-     let start = start_after.map(Bound::exclusive);
-
--    let votes: StdResult<Vec<_>> = BALLOTS
-+    let votes = BALLOTS
-         .prefix(proposal_id)
--        .range_raw(deps.storage, start, None, Order::Ascending)
-+        .range(deps.storage, start, None, Order::Ascending)
+         .range(deps.storage, start, None, Order::Ascending)
          .take(limit)
          .map(|item| {
 -            let (key, ballot) = item?;
@@ -59,15 +52,6 @@ index 48a60083..2f2ef70d 100644
                  vote: ballot.vote,
                  weight: ballot.weight,
              })
-         })
--        .collect();
-+        .collect::<StdResult<_>>()?;
-
--    Ok(VoteListResponse { votes: votes? })
-+    Ok(VoteListResponse { votes })
- }
-
- fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
 ```
 
 If you don't need key deserialization, just can just rename `range` to `range_raw` and you are good to go.
