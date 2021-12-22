@@ -70,9 +70,9 @@ index 48a60083..2f2ef70d 100644
  fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
 ```
 
-If / when you don't need key deserialization, just can just rename `range` to `range_raw` and you are good to go.
+If you don't need key deserialization, just can just rename `range` to `range_raw` and you are good to go.
 
-If you need / want key deserialization for **indexes**, you need to specify the primary key type as a last (optional)
+If you want key deserialization for **indexes**, you need to specify the primary key type as a last (optional)
 argument in the index key specification. If not specified, it defaults to `()`, which means that primary keys will
 not only not be deserialized, but also not provided. This is for backwards-compatibility with current indexes
 specifications, and may change in the future once these features are stabilized.
