@@ -208,6 +208,36 @@ As part of this, a couple helpers for handling int keys serialization and deseri
 
 You shouldn't need these, except when manually handling raw integer keys serialization / deserialization.
 
+Migration code example:
+```rust
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    let version = get_contract_version(deps.storage)?;
+    if version.contract != CONTRACT_NAME {
+        return Err(ContractError::CannotMigrate {
+            previous_contract: version.contract,
+        });
+    }
+    // Original map
+    signed_int_map: Map<i8, String> = Map::new("signed_int_map");
+    // New map
+    signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
+
+    signed_int_map
+        .range_raw(deps.storage, None, None, Order::Ascending)
+        .map(|(k, v)| {
+            let signed = i8::from_be_bytes(k);
+            signed_int_map_new.save(deps.storage, signed, v);
+        })
+        .collect()?;
+
+    // Code to remove the old map keys
+    ...
+
+    Ok(Response::default())
+}
+```
+
 ### Non-breaking Issues / PRs
 
 - Deprecate `IntKey` [\#472](https://github.com/CosmWasm/cw-plus/issues/472) /
