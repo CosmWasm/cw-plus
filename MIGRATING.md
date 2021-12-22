@@ -15,15 +15,8 @@ diff --git a/contracts/cw1-subkeys/Cargo.toml b/contracts/cw1-subkeys/Cargo.toml
 index 1924b655..37af477d 100644
 --- a/contracts/cw1-subkeys/Cargo.toml
 +++ b/contracts/cw1-subkeys/Cargo.toml
-@@ -19,7 +19,7 @@ library = []
- test-utils = []
-
- [dependencies]
 -cw0 = { path = "../../packages/cw0", version = "0.10.3" }
 +utils = { path = "../../packages/utils", version = "0.10.3" }
- cw1 = { path = "../../packages/cw1", version = "0.10.3" }
- cw2 = { path = "../../packages/cw2", version = "0.10.3" }
- cw1-whitelist = { path = "../cw1-whitelist", version = "0.10.3", features = ["library"] }
 ```
 
 ```diff
@@ -31,22 +24,8 @@ diff --git a/contracts/cw1-subkeys/src/contract.rs b/contracts/cw1-subkeys/src/c
 index b4852225..f20a65ec 100644
 --- a/contracts/cw1-subkeys/src/contract.rs
 +++ b/contracts/cw1-subkeys/src/contract.rs
-@@ -8,7 +8,6 @@ use cosmwasm_std::{
-     ensure, ensure_ne, to_binary, BankMsg, Binary, Coin, CosmosMsg, Deps, DepsMut, DistributionMsg,
-     Empty, Env, MessageInfo, Order, Response, StakingMsg, StdResult,
- };
 -use cw0::Expiration;
- use cw1::CanExecuteResponse;
- use cw1_whitelist::{
-     contract::{
-@@ -21,6 +20,7 @@ use cw1_whitelist::{
- use cw2::{get_contract_version, set_contract_version};
- use cw_storage_plus::Bound;
- use semver::Version;
 +use utils::Expiration;
-
- use crate::error::ContractError;
- use crate::msg::{
 ```
 
 - Deprecate `range` to `range_raw` [\#460](https://github.com/CosmWasm/cw-plus/issues/460) /
@@ -55,9 +34,40 @@ index b4852225..f20a65ec 100644
 `range` was renamed to `range_raw` (no key deserialization), and `range_de` to `range`. This means you can now count
 on the key to be deserialized for you, which results in cleaner / simpler code.
 
-There are many examples in the contracts code base, by example:
+There are some examples in the contracts code base, by example:
 ```diff
+diff --git a/contracts/cw3-fixed-multisig/src/contract.rs b/contracts/cw3-fixed-multisig/src/contract.rs
+index 48a60083..2f2ef70d 100644
+--- a/contracts/cw3-fixed-multisig/src/contract.rs
++++ b/contracts/cw3-fixed-multisig/src/contract.rs
+@@ -385,21 +384,20 @@ fn list_votes(
+     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+     let start = start_after.map(Bound::exclusive);
 
+-    let votes: StdResult<Vec<_>> = BALLOTS
++    let votes = BALLOTS
+         .prefix(proposal_id)
+-        .range_raw(deps.storage, start, None, Order::Ascending)
++        .range(deps.storage, start, None, Order::Ascending)
+         .take(limit)
+         .map(|item| {
+-            let (key, ballot) = item?;
+-            Ok(VoteInfo {
+-                voter: String::from_utf8(key)?,
++            item.map(|(addr, ballot)| VoteInfo {
++                voter: addr.into(),
+                 vote: ballot.vote,
+                 weight: ballot.weight,
+             })
+         })
+-        .collect();
++        .collect::<StdResult<_>>()?;
+
+-    Ok(VoteListResponse { votes: votes? })
++    Ok(VoteListResponse { votes })
+ }
+
+ fn query_voter(deps: Deps, voter: String) -> StdResult<VoterResponse> {
 ```
 
 If / when you don't need key deserialization, just can just rename `range` to `range_raw` and you are good to go.
@@ -66,6 +76,7 @@ If you need / want key deserialization for **indexes**, you need to specify the 
 argument in the index key specification. If not specified, it defaults to `()`, which means that primary keys will
 not only not be deserialized, but also not provided. This is for backwards-compatibility with current indexes
 specifications, and may change in the future once these features are stabilized.
+See `packages/storage-plus/src/indexed_map.rs` tests for reference.
 
 Also, as part of this issue, `keys` was renamed to `keys_raw`, and `keys_de` to `keys`. `prefix_range` was also renamed,
 to `prefix_range_raw`, and its key deserialization counterpart (`prefix_range_de`) to `prefix_range` in turn.
@@ -79,8 +90,59 @@ For both `UniqueIndex` and `MultiIndex`, returned keys (deserialized or not) are
 the data. This is a breaking change for `MultiIndex`, as the previous version returned a composite of the index key and
 the primary key.
 
-Required changes are:
+Examples of required changes are:
 ```diff
+diff --git a/packages/storage-plus/src/indexed_map.rs b/packages/storage-plus/src/indexed_map.rs
+index 9f7178af..d11d501e 100644
+--- a/packages/storage-plus/src/indexed_map.rs
++++ b/packages/storage-plus/src/indexed_map.rs
+@@ -722,7 +722,7 @@ mod test {
+             last_name: "".to_string(),
+             age: 42,
+         };
+-        let pk1: &[u8] = b"5627";
++        let pk1: &str = "5627";
+         map.save(&mut store, pk1, &data1).unwrap();
+
+         let data2 = Data {
+@@ -730,7 +730,7 @@ mod test {
+             last_name: "Perez".to_string(),
+             age: 13,
+         };
+-        let pk2: &[u8] = b"5628";
++        let pk2: &str = "5628";
+         map.save(&mut store, pk2, &data2).unwrap();
+
+         let data3 = Data {
+@@ -738,7 +738,7 @@ mod test {
+             last_name: "Young".to_string(),
+             age: 24,
+         };
+-        let pk3: &[u8] = b"5629";
++        let pk3: &str = "5629";
+         map.save(&mut store, pk3, &data3).unwrap();
+
+         let data4 = Data {
+@@ -746,7 +746,7 @@ mod test {
+             last_name: "Bemberg".to_string(),
+             age: 43,
+         };
+-        let pk4: &[u8] = b"5630";
++        let pk4: &str = "5630";
+         map.save(&mut store, pk4, &data4).unwrap();
+
+         let marias: Vec<_> = map
+@@ -760,8 +760,8 @@ mod test {
+         assert_eq!(2, count);
+
+         // Remaining part (age) of the index keys, plus pks (bytes) (sorted by age descending)
+-        assert_eq!((42, pk1.to_vec()), marias[0].0);
+-        assert_eq!((24, pk3.to_vec()), marias[1].0);
++        assert_eq!(pk1, marias[0].0);
++        assert_eq!(pk3, marias[1].0);
+
+         // Data
+         assert_eq!(data1, marias[0].1);
 ```
 
 - Remove the primary key from the `MultiIndex` key specification [\#533](https://github.com/CosmWasm/cw-plus/issues/533) /
@@ -91,6 +153,45 @@ and usage.
 
 Required changes are along the lines of:
 ```diff
+diff --git a/packages/storage-plus/src/indexed_map.rs b/packages/storage-plus/src/indexed_map.rs
+index 022a4504..c7a3bb9d 100644
+--- a/packages/storage-plus/src/indexed_map.rs
++++ b/packages/storage-plus/src/indexed_map.rs
+@@ -295,8 +295,8 @@ mod test {
+     }
+
+     struct DataIndexes<'a> {
+-        // Second arg is for storing pk
+-        pub name: MultiIndex<'a, (String, String), Data, String>,
++        // Last args are for signaling pk deserialization
++        pub name: MultiIndex<'a, String, Data, String>,
+         pub age: UniqueIndex<'a, u32, Data, String>,
+         pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
+     }
+@@ -326,11 +326,7 @@ mod test {
+     // Can we make it easier to define this? (less wordy generic)
+     fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
+         let indexes = DataIndexes {
+-            name: MultiIndex::new(
+-                |d, k| (d.name.clone(), unsafe { String::from_utf8_unchecked(k) }),
+-                "data",
+-                "data__name",
+-            ),
++            name: MultiIndex::new(|d| d.name.clone(), "data", "data__name"),
+             age: UniqueIndex::new(|d| d.age, "data__age"),
+             name_lastname: UniqueIndex::new(
+                 |d| index_string_tuple(&d.name, &d.last_name),
+@@ -469,8 +462,8 @@ mod test {
+         // index_key() over MultiIndex works (empty pk)
+         // In a MultiIndex, an index key is composed by the index and the primary key.
+         // Primary key may be empty (so that to iterate over all elements that match just the index)
+-        let key = ("Maria".to_string(), "".to_string());
+-        // Use the index_key() helper to build the (raw) index key
++        let key = "Maria".to_string();
++        // Use the index_key() helper to build the (raw) index key with an empty pk
+         let key = map.idx.name.index_key(key);
+         // Iterate using a bound over the raw key
+         let count = map
 ```
 
 - Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
