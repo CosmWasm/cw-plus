@@ -21,6 +21,7 @@ library = []
 utils = { path = "../../packages/utils", version = "0.10.3" }
 cw2 = { path = "../../packages/cw2", version = "0.10.3" }
 cw3 = { path = "../../packages/cw3", version = "0.10.3" }
+cw3-fixed-multisig = { path = "../cw3-fixed-multisig", version = "0.10.3", features = ["library"] }
 cw4 = { path = "../../packages/cw4", version = "0.10.3" }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.3" }
 cosmwasm-std = { version = "1.0.0-beta3" }

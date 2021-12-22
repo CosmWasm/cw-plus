@@ -28,6 +28,8 @@ index b4852225..f20a65ec 100644
 +use utils::Expiration;
 ```
 
+---
+
 - Deprecate `range` to `range_raw` [\#460](https://github.com/CosmWasm/cw-plus/issues/460) /
 `range` to `range raw` [\#576](https://github.com/CosmWasm/cw-plus/pull/576).
 
@@ -62,6 +64,8 @@ not only not be deserialized, but also not provided. This is for backwards-compa
 specifications, and may change in the future once these features are stabilized.
 See `packages/storage-plus/src/indexed_map.rs` tests for reference.
 
+---
+
 Renamed methods:
 - `range` -> `range_raw`
 - `keys` -> `keys_raw`
@@ -71,6 +75,8 @@ Renamed methods:
 - `prefix_range_de` -> `prefix_range`
 
 Finally, this applies to all the `Map`-like types, including indexed maps.
+
+---
 
 - `UniqueIndex` / `MultiIndex` key consistency [\#532](https://github.com/CosmWasm/cw-plus/issues/532) /
 Index keys consistency [\#568](https://github.com/CosmWasm/cw-plus/pull/568)
@@ -134,6 +140,8 @@ index 9f7178af..d11d501e 100644
          assert_eq!(data1, marias[0].1);
 ```
 
+---
+
 - Remove the primary key from the `MultiIndex` key specification [\#533](https://github.com/CosmWasm/cw-plus/issues/533) /
 `MultiIndex` primary key spec removal [\#569](https://github.com/CosmWasm/cw-plus/pull/569)
 
@@ -183,6 +191,8 @@ index 022a4504..c7a3bb9d 100644
          let count = map
 ```
 
+---
+
 - Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
 Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
 
@@ -224,6 +234,23 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     ...
 
     Ok(Response::default())
+}
+```
+
+---
+
+- `cw3-fixed-multisig` requires threshold during instantiation instead of `required_weight` parameter
+
+`Threshold` type was moved to `packages/utils` along with surrounding implementations like `ThresholdResponse` etc.
+
+```diff
+use utils::Threshold;
+
+pub struct InstantiateMsg {
+    pub voters: Vec<Voter>,
+-   pub required_weight: u64,
++   pub threshold: Threshold,
+    pub max_voting_period: Duration,
 }
 ```
 
