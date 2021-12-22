@@ -213,4 +213,30 @@ You shouldn't need these, except when manually handling raw integer keys seriali
 - Deprecate `IntKey` [\#472](https://github.com/CosmWasm/cw-plus/issues/472) /
 Deprecate IntKey [\#547](https://github.com/CosmWasm/cw-plus/pull/547)
 
-See [CHANGELOG.md](CHANGELOG.md) for the full list.
+The `IntKey` wrapper and its type aliases are marked as deprecated, and will be removed in the next major version.
+The migration is straightforward, just remove the wrappers:
+```diff
+diff --git a/contracts/cw20-merkle-airdrop/src/contract.rs b/contracts/cw20-merkle-airdrop/src/contract.rs
+index e8d5ea57..bdf555e8 100644
+--- a/contracts/cw20-merkle-airdrop/src/contract.rs
++++ b/contracts/cw20-merkle-airdrop/src/contract.rs
+@@ -6,7 +6,6 @@ use cosmwasm_std::{
+ };
+ use cw2::{get_contract_version, set_contract_version};
+ use cw20::Cw20ExecuteMsg;
+-use cw_storage_plus::U8Key;
+ use sha2::Digest;
+ use std::convert::TryInto;
+
+@@ -113,7 +112,7 @@ pub fn execute_register_merkle_root(
+
+     let stage = LATEST_STAGE.update(deps.storage, |stage| -> StdResult<_> { Ok(stage + 1) })?;
+
+-    MERKLE_ROOT.save(deps.storage, U8Key::from(stage), &merkle_root)?;
++    MERKLE_ROOT.save(deps.storage, stage, &merkle_root)?;
+     LATEST_STAGE.save(deps.storage, &stage)?;
+
+     Ok(Response::new().add_attributes(vec![
+```
+
+- See [CHANGELOG.md](CHANGELOG.md) for the full list of non-breaking changes.
