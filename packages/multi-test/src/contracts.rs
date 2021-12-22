@@ -6,7 +6,7 @@ use cosmwasm_std::{
     from_slice, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply, Response, SubMsg,
 };
 
-use anyhow::{anyhow, bail, Result as AnyResult};
+use anyhow::{anyhow, bail, Context, Result as AnyResult};
 
 /// Interface to call into a Contract
 pub trait Contract<T>
@@ -65,7 +65,7 @@ pub struct ContractWrapper<
     T6 = Empty,
     E6 = anyhow::Error,
 > where
-    T1: DeserializeOwned,
+    T1: DeserializeOwned + Debug,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
@@ -88,7 +88,7 @@ pub struct ContractWrapper<
 
 impl<T1, T2, T3, E1, E2, E3, C> ContractWrapper<T1, T2, T3, E1, E2, E3, C>
 where
-    T1: DeserializeOwned + 'static,
+    T1: DeserializeOwned + Debug + 'static,
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
     E1: Display + Debug + Send + Sync + 'static,
@@ -132,7 +132,7 @@ where
 impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
     ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
 where
-    T1: DeserializeOwned + 'static,
+    T1: DeserializeOwned + Debug + 'static,
     T2: DeserializeOwned + 'static,
     T3: DeserializeOwned + 'static,
     T4: DeserializeOwned + 'static,
@@ -317,7 +317,7 @@ where
 impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6> Contract<C>
     for ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
 where
-    T1: DeserializeOwned,
+    T1: DeserializeOwned + Debug + Clone,
     T2: DeserializeOwned,
     T3: DeserializeOwned,
     T4: DeserializeOwned,
@@ -337,8 +337,20 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<C>> {
-        let msg = from_slice(&msg)?;
-        (self.execute_fn)(deps, env, info, msg).map_err(|err| anyhow!(err))
+        let msg: T1 = from_slice(&msg)?;
+        let address = env.contract.address.clone();
+        (self.execute_fn)(deps, env, info.clone(), msg.clone())
+            .map_err(|err| anyhow!("{}", err))
+            .context(format!(
+                r#"Contract returned an error on execute
+Contract address: {}
+Message sender: {}
+Funds: {:?}
+Message dump:
+{:?}
+"#,
+                address, info.sender, info.funds, msg,
+            ))
     }
 
     fn instantiate(
