@@ -133,7 +133,7 @@ fn check_can_approve(deps: Deps, env: &Env, owner: &Addr, operator: &Addr) -> St
         return Ok(true);
     }
     // operator can approve
-    let op = APPROVES.may_load(deps.storage, (&owner, &operator))?;
+    let op = APPROVES.may_load(deps.storage, (owner, operator))?;
     Ok(match op {
         Some(ex) => !ex.is_expired(&env.block),
         None => false,
@@ -325,13 +325,13 @@ pub fn execute_batch_mint(
     let mut rsp = Response::default();
 
     for (token_id, amount) in batch.iter() {
-        let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), &token_id, *amount)?;
+        let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), token_id, *amount)?;
         event.add_attributes(&mut rsp);
 
         // insert if not exist
-        if !TOKENS.has(deps.storage, &token_id) {
+        if !TOKENS.has(deps.storage, token_id) {
             // we must save some valid data here
-            TOKENS.save(deps.storage, &token_id, &String::new())?;
+            TOKENS.save(deps.storage, token_id, &String::new())?;
         }
     }
 

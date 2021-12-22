@@ -19,7 +19,7 @@ pub struct AtomicSwap {
 
 impl AtomicSwap {
     pub fn is_expired(&self, block: &BlockInfo) -> bool {
-        self.expires.is_expired(&block)
+        self.expires.is_expired(block)
     }
 }
 
