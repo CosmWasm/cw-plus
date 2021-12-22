@@ -546,7 +546,6 @@ dependencies = [
  "cw-storage-plus",
  "cw2",
  "cw3",
- "cw3-fixed-multisig",
  "cw4",
  "cw4-group",
  "schemars",
