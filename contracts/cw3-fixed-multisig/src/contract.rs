@@ -405,8 +405,7 @@ mod tests {
     use cosmwasm_std::{coin, from_binary, BankMsg, Decimal};
 
     use cw2::{get_contract_version, ContractVersion};
-    use cw3_flex_multisig::msg::Threshold;
-    use utils::Duration;
+    use utils::{Duration, Threshold};
 
     use crate::msg::Voter;
 
@@ -517,15 +516,19 @@ mod tests {
         };
         let err =
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap_err();
-
-        use cw3_flex_multisig::ContractError::{InvalidThreshold, UnreachableWeight};
-        assert_eq!(err, ContractError::FlexMultisig(InvalidThreshold {}));
+        assert_eq!(
+            err,
+            ContractError::Threshold(utils::ThresholdError::InvalidThreshold {})
+        );
 
         // Total weight less than required weight not allowed
         let threshold = Threshold::AbsoluteCount { weight: 100 };
         let err =
             setup_test_case(deps.as_mut(), info.clone(), threshold, max_voting_period).unwrap_err();
-        assert_eq!(err, ContractError::FlexMultisig(UnreachableWeight {}));
+        assert_eq!(
+            err,
+            ContractError::Threshold(utils::ThresholdError::UnreachableWeight {})
+        );
 
         // All valid
         let threshold = Threshold::AbsoluteCount { weight: 1 };

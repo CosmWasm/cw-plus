@@ -4,9 +4,8 @@ use cosmwasm_std::{to_binary, Addr, Empty, Uint128, WasmMsg};
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
-use cw3_flex_multisig::msg::Threshold;
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
-use utils::Duration;
+use utils::{Duration, Threshold};
 
 use crate::contract::{execute, instantiate, query};
 use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};

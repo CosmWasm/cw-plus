@@ -2,9 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::Addr;
-use cw3_flex_multisig::msg::Threshold;
 use cw_storage_plus::{Item, Map};
-use utils::Duration;
+use utils::{Duration, Threshold};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
