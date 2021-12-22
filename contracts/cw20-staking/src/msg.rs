@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Binary, Coin, Decimal, Uint128};
 use cw20::Expiration;
 pub use cw_controllers::ClaimsResponse;
-use utils::Duration;
+use cw_utils::Duration;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {

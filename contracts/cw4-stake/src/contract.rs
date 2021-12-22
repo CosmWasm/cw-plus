@@ -12,7 +12,7 @@ use cw4::{
     TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
-use utils::{maybe_addr, NativeBalance};
+use cw_utils::{maybe_addr, NativeBalance};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
@@ -364,7 +364,7 @@ mod tests {
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
-    use utils::Duration;
+    use cw_utils::Duration;
 
     use crate::error::ContractError;
 

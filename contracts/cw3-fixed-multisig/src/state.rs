@@ -5,7 +5,7 @@ use cosmwasm_std::{Addr, BlockInfo, CosmosMsg, Decimal, Empty, StdResult, Storag
 
 use cw3::{Status, Vote};
 use cw_storage_plus::{Item, Map};
-use utils::{Duration, Expiration, Threshold};
+use cw_utils::{Duration, Expiration, Threshold};
 
 // we multiply by this when calculating needed_votes in order to round up properly
 // Note: `10u128.pow(9)` fails as "u128::pow` is not yet stable as a const fn"

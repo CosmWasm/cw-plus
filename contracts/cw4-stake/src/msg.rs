@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use cw20::{Cw20ReceiveMsg, Denom};
 pub use cw_controllers::ClaimsResponse;
-use utils::Duration;
+use cw_utils::Duration;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InstantiateMsg {

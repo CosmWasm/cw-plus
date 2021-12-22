@@ -13,7 +13,7 @@ use cw3::{
     VoterDetail, VoterListResponse, VoterResponse,
 };
 use cw_storage_plus::Bound;
-use utils::{Expiration, ThresholdResponse};
+use cw_utils::{Expiration, ThresholdResponse};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -403,7 +403,7 @@ mod tests {
     use cosmwasm_std::{coin, from_binary, BankMsg, Decimal};
 
     use cw2::{get_contract_version, ContractVersion};
-    use utils::{Duration, Threshold};
+    use cw_utils::{Duration, Threshold};
 
     use crate::msg::Voter;
 
@@ -516,7 +516,7 @@ mod tests {
             instantiate(deps.as_mut(), mock_env(), info.clone(), instantiate_msg).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Threshold(utils::ThresholdError::InvalidThreshold {})
+            ContractError::Threshold(cw_utils::ThresholdError::InvalidThreshold {})
         );
 
         // Total weight less than required weight not allowed
@@ -525,7 +525,7 @@ mod tests {
             setup_test_case(deps.as_mut(), info.clone(), threshold, max_voting_period).unwrap_err();
         assert_eq!(
             err,
-            ContractError::Threshold(utils::ThresholdError::UnreachableWeight {})
+            ContractError::Threshold(cw_utils::ThresholdError::UnreachableWeight {})
         );
 
         // All valid

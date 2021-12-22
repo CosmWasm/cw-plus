@@ -16,7 +16,7 @@ index 1924b655..37af477d 100644
 --- a/contracts/cw1-subkeys/Cargo.toml
 +++ b/contracts/cw1-subkeys/Cargo.toml
 -cw0 = { path = "../../packages/cw0", version = "0.10.3" }
-+utils = { path = "../../packages/utils", version = "0.10.3" }
++cw-utils = { path = "../../packages/utils", version = "0.10.3" }
 ```
 
 ```diff
@@ -25,7 +25,7 @@ index b4852225..f20a65ec 100644
 --- a/contracts/cw1-subkeys/src/contract.rs
 +++ b/contracts/cw1-subkeys/src/contract.rs
 -use cw0::Expiration;
-+use utils::Expiration;
++use cw_utils::Expiration;
 ```
 
 ---
@@ -244,7 +244,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 `Threshold` type was moved to `packages/utils` along with surrounding implementations like `ThresholdResponse` etc.
 
 ```diff
-use utils::Threshold;
+use cw_utils::Threshold;
 
 pub struct InstantiateMsg {
     pub voters: Vec<Voter>,

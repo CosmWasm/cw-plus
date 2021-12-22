@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, Decimal, Uint128};
 use cw_controllers::Claims;
 use cw_storage_plus::Item;
-use utils::Duration;
+use cw_utils::Duration;
 
 pub const CLAIMS: Claims = Claims::new("claims");
 
