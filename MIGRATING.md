@@ -152,7 +152,7 @@ index 022a4504..c7a3bb9d 100644
      struct DataIndexes<'a> {
 -        // Second arg is for storing pk
 -        pub name: MultiIndex<'a, (String, String), Data, String>,
-+        // Last args are for signaling pk deserialization
++        // Last type parameters are for signaling pk deserialization
 +        pub name: MultiIndex<'a, String, Data, String>,
          pub age: UniqueIndex<'a, u32, Data, String>,
          pub name_lastname: UniqueIndex<'a, (Vec<u8>, Vec<u8>), Data, String>,
