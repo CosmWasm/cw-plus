@@ -1,6 +1,6 @@
 [package]
 name = "cw-controllers"
-version = "0.10.3"
+version = "0.11.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Common controllers we can reuse in many contracts"
@@ -13,8 +13,8 @@ documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
 cosmwasm-std = { version = "1.0.0-beta3" }
-utils = { path = "../utils", version = "0.10.3" }
-cw-storage-plus = { path = "../storage-plus", version = "0.10.3" }
+utils = { path = "../utils", version = "0.11.0" }
+cw-storage-plus = { path = "../storage-plus", version = "0.11.0" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
