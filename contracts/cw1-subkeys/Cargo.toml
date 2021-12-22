@@ -19,7 +19,7 @@ library = []
 test-utils = []
 
 [dependencies]
-utils = { path = "../../packages/utils", version = "0.11.0" }
+cw-utils = { path = "../../packages/utils", version = "0.11.0" }
 cw1 = { path = "../../packages/cw1", version = "0.11.0" }
 cw2 = { path = "../../packages/cw2", version = "0.11.0" }
 cw1-whitelist = { path = "../cw1-whitelist", version = "0.11.0", features = ["library"] }

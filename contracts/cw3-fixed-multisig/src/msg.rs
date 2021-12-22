@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{CosmosMsg, Empty};
 use cw3::Vote;
-use utils::{Duration, Expiration, Threshold};
+use cw_utils::{Duration, Expiration, Threshold};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InstantiateMsg {

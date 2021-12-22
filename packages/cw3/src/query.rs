@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{CosmosMsg, Empty};
-use utils::{Expiration, ThresholdResponse};
+use cw_utils::{Expiration, ThresholdResponse};
 
 use crate::msg::Vote;
 

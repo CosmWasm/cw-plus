@@ -11,7 +11,7 @@ use cw1155::{
     IsApprovedForAllResponse, TokenId, TokenInfoResponse, TokensResponse, TransferEvent,
 };
 use cw2::set_contract_version;
-use utils::{maybe_addr, Event};
+use cw_utils::{maybe_addr, Event};
 
 use crate::error::ContractError;
 use crate::msg::InstantiateMsg;

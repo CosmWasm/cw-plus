@@ -15,7 +15,7 @@ use cw3::{
 use cw3_fixed_multisig::state::{next_id, Ballot, Proposal, Votes, BALLOTS, PROPOSALS};
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
-use utils::{maybe_addr, Expiration, ThresholdResponse};
+use cw_utils::{maybe_addr, Expiration, ThresholdResponse};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
@@ -432,7 +432,7 @@ mod tests {
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
     use cw_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
-    use utils::{Duration, Threshold};
+    use cw_utils::{Duration, Threshold};
 
     use super::*;
 
@@ -626,7 +626,7 @@ mod tests {
             )
             .unwrap_err();
         assert_eq!(
-            ContractError::Threshold(utils::ThresholdError::InvalidThreshold {}),
+            ContractError::Threshold(cw_utils::ThresholdError::InvalidThreshold {}),
             err.downcast().unwrap()
         );
 
@@ -647,7 +647,7 @@ mod tests {
             )
             .unwrap_err();
         assert_eq!(
-            ContractError::Threshold(utils::ThresholdError::UnreachableWeight {}),
+            ContractError::Threshold(cw_utils::ThresholdError::UnreachableWeight {}),
             err.downcast().unwrap()
         );
 

@@ -19,8 +19,8 @@ use cw1_whitelist::{
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw_storage_plus::Bound;
+use cw_utils::Expiration;
 use semver::Version;
-use utils::Expiration;
 
 use crate::error::ContractError;
 use crate::msg::{
@@ -477,7 +477,7 @@ mod tests {
 
     use cw1_whitelist::msg::AdminListResponse;
     use cw2::{get_contract_version, ContractVersion};
-    use utils::NativeBalance;
+    use cw_utils::NativeBalance;
 
     use crate::state::Permissions;
 
