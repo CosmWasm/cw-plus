@@ -5,7 +5,7 @@ use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
-use utils::{Duration, Threshold};
+use cw_utils::{Duration, Threshold};
 
 use crate::contract::{execute, instantiate, query};
 use crate::msg::{ExecuteMsg, InstantiateMsg, Voter};

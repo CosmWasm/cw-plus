@@ -8,7 +8,7 @@ use cosmwasm_std::{
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::Map;
-use utils::NativeBalance;
+use cw_utils::NativeBalance;
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;

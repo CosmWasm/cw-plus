@@ -1,6 +1,6 @@
 use cosmwasm_std::StdError;
+use cw_utils::Expiration;
 use thiserror::Error;
-use utils::Expiration;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {

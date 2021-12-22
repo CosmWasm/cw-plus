@@ -439,7 +439,7 @@ mod tests {
         Validator,
     };
     use cw_controllers::Claim;
-    use utils::{Duration, DAY, HOUR, WEEK};
+    use cw_utils::{Duration, DAY, HOUR, WEEK};
 
     fn sample_validator(addr: &str) -> Validator {
         Validator {

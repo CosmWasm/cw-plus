@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use cw4::Cw4Contract;
 use cw_storage_plus::Item;
-use utils::{Duration, Threshold};
+use cw_utils::{Duration, Threshold};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
