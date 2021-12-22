@@ -17,7 +17,7 @@ use crate::{Bound, Prefixer, Strategy};
 /// What data is snapshotted depends on the Strategy.
 pub struct SnapshotMap<'a, K, T> {
     primary: Map<'a, K, T>,
-    snapshots: Snapshot<'a, K, T>,
+    pub snapshots: Snapshot<'a, K, T>,
 }
 
 impl<'a, K, T> SnapshotMap<'a, K, T> {
