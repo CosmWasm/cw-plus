@@ -62,8 +62,13 @@ not only not be deserialized, but also not provided. This is for backwards-compa
 specifications, and may change in the future once these features are stabilized.
 See `packages/storage-plus/src/indexed_map.rs` tests for reference.
 
-Also, as part of this issue, `keys` was renamed to `keys_raw`, and `keys_de` to `keys`. `prefix_range` was also renamed,
-to `prefix_range_raw`, and its key deserialization counterpart (`prefix_range_de`) to `prefix_range` in turn.
+Renamed methods:
+- `range` -> `range_raw`
+- `keys` -> `keys_raw`
+- `prefix_range` -> `prefix_range_raw`
+- `range_de` -> `range`
+- `keys_de` -> `keys`
+- `prefix_range_de` -> `prefix_range`
 
 Finally, this applies to all the `Map`-like types, including indexed maps.
 
