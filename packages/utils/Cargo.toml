@@ -1,6 +1,6 @@
 [package]
 name = "utils"
-version = "0.10.3"
+version = "0.11.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Common helpers for other cw specs"
@@ -18,5 +18,5 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
 
 [dev-dependencies]
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.3" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.11.0" }
 prost = "0.9"

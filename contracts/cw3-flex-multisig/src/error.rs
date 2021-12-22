@@ -1,4 +1,6 @@
 use cosmwasm_std::StdError;
+use utils::ThresholdError;
+
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -6,20 +8,8 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
-    #[error("Invalid voting threshold percentage, must be in the 0.5-1.0 range")]
-    InvalidThreshold {},
-
-    #[error("Required quorum threshold cannot be zero")]
-    ZeroQuorumThreshold {},
-
-    #[error("Not possible to reach required quorum threshold")]
-    UnreachableQuorumThreshold {},
-
-    #[error("Required weight cannot be zero")]
-    ZeroWeight {},
-
-    #[error("Not possible to reach required (passing) weight")]
-    UnreachableWeight {},
+    #[error("{0}")]
+    Threshold(#[from] ThresholdError),
 
     #[error("Group contract invalid address '{addr}'")]
     InvalidGroup { addr: String },
