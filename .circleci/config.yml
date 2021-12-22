@@ -848,7 +848,7 @@ jobs:
               -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
               -c "$CIRCLE_SHA1" \
               -n "$TITLE" -b "$BODY" \
-              -delete \
+              -replace \
               "$TAG" ./artifacts/
 
   build_and_upload_schemas:
