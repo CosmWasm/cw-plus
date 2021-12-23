@@ -1,4 +1,5 @@
 mod de;
+mod de_old;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -8,6 +9,7 @@ mod int_key;
 mod item;
 mod iter_helpers;
 mod keys;
+mod keys_old;
 mod map;
 mod path;
 mod prefix;
