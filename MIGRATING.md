@@ -6,6 +6,52 @@ This guide lists API changes between *cw-plus* major releases.
 
 ### Breaking Issues / PRs
 
+- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
+  Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
+
+As part of range iterators revamping, we fixed the order of signed integer keys. You shouldn't change anything in your
+code base for this, but if you were using signed keys and relying on their ordering, that has now changed for the better.
+Take into account also that **the internal representation of signed integer keys has changed**. So, if you
+have data stored under signed integer keys you would need to **migrate it**, or recreate it under the new representation.
+
+As part of this, a couple helpers for handling int keys serialization and deserialization were introduced:
+- `from_cw_bytes` Integer (signed and unsigned) values deserialization.
+- `to_cw_bytes` - Integer (signed and unsigned) values serialization.
+
+You shouldn't need these, except when manually handling raw integer keys serialization / deserialization.
+
+Migration code example:
+```rust
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    let version = get_contract_version(deps.storage)?;
+    if version.contract != CONTRACT_NAME {
+        return Err(ContractError::CannotMigrate {
+            previous_contract: version.contract,
+        });
+    }
+    // Original map
+    signed_int_map: Map<i8, String> = Map::new("signed_int_map");
+    // New map
+    signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
+
+    signed_int_map
+        .range_raw(deps.storage, None, None, Order::Ascending)
+        .map(|(k, v)| {
+            let signed = i8::from_be_bytes(k);
+            signed_int_map_new.save(deps.storage, signed, v);
+        })
+        .collect()?;
+
+    // Code to remove the old map keys
+    ...
+
+    Ok(Response::default())
+}
+```
+
+---
+
 - Rename cw0 to utils [\#471](https://github.com/CosmWasm/cw-plus/issues/471) / Cw0 rename [\#508](https://github.com/CosmWasm/cw-plus/pull/508)
 
 The `cw0` package was renamed to `cw-utils`. The required changes are straightforward:
@@ -189,52 +235,6 @@ index 022a4504..c7a3bb9d 100644
          let key = map.idx.name.index_key(key);
          // Iterate using a bound over the raw key
          let count = map
-```
-
----
-
-- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
-Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
-
-As part of range iterators revamping, we fixed the order of signed integer keys. You shouldn't change anything in your
-code base for this, but if you were using signed keys and relying on their ordering, that has now changed for the better.
-Take into account also that **the internal representation of signed integer keys has changed**. So, if you
-have data stored under signed integer keys you would need to **migrate it**, or recreate it under the new representation.
-
-As part of this, a couple helpers for handling int keys serialization and deserialization were introduced:
- - `from_cw_bytes` Integer (signed and unsigned) values deserialization.
- - `to_cw_bytes` - Integer (signed and unsigned) values serialization.
-
-You shouldn't need these, except when manually handling raw integer keys serialization / deserialization.
-
-Migration code example:
-```rust
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let version = get_contract_version(deps.storage)?;
-    if version.contract != CONTRACT_NAME {
-        return Err(ContractError::CannotMigrate {
-            previous_contract: version.contract,
-        });
-    }
-    // Original map
-    signed_int_map: Map<i8, String> = Map::new("signed_int_map");
-    // New map
-    signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
-
-    signed_int_map
-        .range_raw(deps.storage, None, None, Order::Ascending)
-        .map(|(k, v)| {
-            let signed = i8::from_be_bytes(k);
-            signed_int_map_new.save(deps.storage, signed, v);
-        })
-        .collect()?;
-
-    // Code to remove the old map keys
-    ...
-
-    Ok(Response::default())
-}
 ```
 
 ---
