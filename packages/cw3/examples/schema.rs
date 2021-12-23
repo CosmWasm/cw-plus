@@ -4,9 +4,10 @@ use std::fs::create_dir_all;
 use cosmwasm_schema::{export_schema, export_schema_with_title, remove_schemas, schema_for};
 
 use cw3::{
-    Cw3ExecuteMsg, Cw3QueryMsg, ProposalListResponse, ProposalResponse, ThresholdResponse,
-    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
+    Cw3ExecuteMsg, Cw3QueryMsg, ProposalListResponse, ProposalResponse, VoteListResponse,
+    VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
+use cw_utils::ThresholdResponse;
 
 fn main() {
     let mut out_dir = current_dir().unwrap();

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use cosmwasm_std::{Coin, CosmosMsg, Empty};
-use utils::{Expiration, NativeBalance};
+use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
 
@@ -112,7 +112,7 @@ impl AllowanceInfo {
     /// Example:
     ///
     /// ```
-    /// # use utils::{Expiration, NativeBalance};
+    /// # use cw_utils::{Expiration, NativeBalance};
     /// # use cw1_subkeys::msg::AllowanceInfo;
     /// # use cosmwasm_std::coin;
     ///

@@ -2,7 +2,68 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.3...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.0...HEAD)
+
+## [v0.11.0](https://github.com/CosmWasm/cw-plus/tree/v0.11.0) (2021-11-22)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.3...v0.11.0)
+
+**Breaking changes:**
+
+- Remove the primary key from the `MultiIndex` key specification [\#533](https://github.com/CosmWasm/cw-plus/issues/533)
+- `UniqueIndex` / `MultiIndex` key consistency [\#532](https://github.com/CosmWasm/cw-plus/issues/532)
+- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489)
+- Deprecate `range` to `range_raw` [\#460](https://github.com/CosmWasm/cw-plus/issues/460)
+
+**Implemented enhancements:**
+
+- Add `MIGRATING.md` [\#583](https://github.com/CosmWasm/cw-plus/issues/583)
+- Remove schemas, and publish them with artifacts on release tags [\#529](https://github.com/CosmWasm/cw-plus/issues/529)
+
+**Closed issues:**
+
+- Check \(and possibly fix\) threshold and voting power implementation in `cw3-fixed-multisig` [\#551](https://github.com/CosmWasm/cw-plus/issues/551)
+- Update to cosmwasm 1.0.0-beta3 [\#579](https://github.com/CosmWasm/cw-plus/issues/579)
+- Cannot import non "library" features in dev-dependencies  [\#577](https://github.com/CosmWasm/cw-plus/issues/577)
+- `base-helpers.ts` doesn't belong to `contracts` [\#566](https://github.com/CosmWasm/cw-plus/issues/566)
+- handle function [\#563](https://github.com/CosmWasm/cw-plus/issues/563)
+- Migrate from `IntKey` to new naked int key [\#549](https://github.com/CosmWasm/cw-plus/issues/549)
+- Refactor `UniqueIndex` and `MultiIndex` into their own files [\#530](https://github.com/CosmWasm/cw-plus/issues/530)
+- Iterate over historical data in SnapshotMap [\#487](https://github.com/CosmWasm/cw-plus/issues/487)
+- Rename cw0 to utils [\#471](https://github.com/CosmWasm/cw-plus/issues/471)
+- Various `range_de` / `prefix_de` improvements [\#464](https://github.com/CosmWasm/cw-plus/issues/464)
+- Add `range_de` to `Map`-like structs [\#461](https://github.com/CosmWasm/cw-plus/issues/461)
+- Add url as input when mint cw1155 [\#449](https://github.com/CosmWasm/cw-plus/issues/449)
+- Allow cw20 token as reserve token for bonding curve [\#191](https://github.com/CosmWasm/cw-plus/issues/191)
+- Benchmark bonding curve functionality [\#190](https://github.com/CosmWasm/cw-plus/issues/190)
+- Support Partial Indexes [\#177](https://github.com/CosmWasm/cw-plus/issues/177)
+- Improve cw20-staking contract [\#59](https://github.com/CosmWasm/cw-plus/issues/59)
+
+**Merged pull requests:**
+
+- Add `MIGRATING.md` [\#591](https://github.com/CosmWasm/cw-plus/pull/591) ([maurolacy](https://github.com/maurolacy))
+- Move Threshold and coexisting implementations into packages/utils [\#590](https://github.com/CosmWasm/cw-plus/pull/590) ([ueco-jb](https://github.com/ueco-jb))
+- Build and upload schemas in CI [\#589](https://github.com/CosmWasm/cw-plus/pull/589) ([maurolacy](https://github.com/maurolacy))
+- Fix min threshold and vote power bugs in cw3-fixed-multisig [\#588](https://github.com/CosmWasm/cw-plus/pull/588) ([ueco-jb](https://github.com/ueco-jb))
+- Update to cosmwasm 1.0.0-beta3 [\#587](https://github.com/CosmWasm/cw-plus/pull/587) ([ueco-jb](https://github.com/ueco-jb))
+- Make `update_changelog.sh` use the latest version tag by default [\#585](https://github.com/CosmWasm/cw-plus/pull/585) ([maurolacy](https://github.com/maurolacy))
+- Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582) ([maurolacy](https://github.com/maurolacy))
+- `range` to `range raw` [\#576](https://github.com/CosmWasm/cw-plus/pull/576) ([maurolacy](https://github.com/maurolacy))
+- Remove helper.ts files for contracts [\#574](https://github.com/CosmWasm/cw-plus/pull/574) ([findolor](https://github.com/findolor))
+- Fix expiration type properties on cw1-subkeys helpers.ts [\#571](https://github.com/CosmWasm/cw-plus/pull/571) ([findolor](https://github.com/findolor))
+- `MultiIndex` primary key spec removal [\#569](https://github.com/CosmWasm/cw-plus/pull/569) ([maurolacy](https://github.com/maurolacy))
+- Index keys consistency [\#568](https://github.com/CosmWasm/cw-plus/pull/568) ([maurolacy](https://github.com/maurolacy))
+- Implement display for Balance and Coin [\#565](https://github.com/CosmWasm/cw-plus/pull/565) ([orkunkl](https://github.com/orkunkl))
+- Migrate from `IntKey` to new naked int key [\#564](https://github.com/CosmWasm/cw-plus/pull/564) ([ueco-jb](https://github.com/ueco-jb))
+- Add ParseReplyError to cw0 lib [\#562](https://github.com/CosmWasm/cw-plus/pull/562) ([shanev](https://github.com/shanev))
+- Update cw2 readme - contract\_info key [\#561](https://github.com/CosmWasm/cw-plus/pull/561) ([korzewski](https://github.com/korzewski))
+- Change pebblenet to uni and update wasm binary to 0.10.2 [\#560](https://github.com/CosmWasm/cw-plus/pull/560) ([findolor](https://github.com/findolor))
+- Update cw1-subkeys/helpers.ts wasm binary version to 0.10.2 from 0.9.1 [\#558](https://github.com/CosmWasm/cw-plus/pull/558) ([findolor](https://github.com/findolor))
+- Update base-helpers.ts options [\#557](https://github.com/CosmWasm/cw-plus/pull/557) ([findolor](https://github.com/findolor))
+- Update cw4-group/helpers.ts to work with base-helpers.ts [\#552](https://github.com/CosmWasm/cw-plus/pull/552) ([findolor](https://github.com/findolor))
+- Update cw3-flex-multisig/helpers.ts to work with cosmjs/cli v0.26 and base-helpers.ts [\#550](https://github.com/CosmWasm/cw-plus/pull/550) ([findolor](https://github.com/findolor))
+- Cw0 rename [\#508](https://github.com/CosmWasm/cw-plus/pull/508) ([maurolacy](https://github.com/maurolacy))
+- UniqueIndex range\_de [\#500](https://github.com/CosmWasm/cw-plus/pull/500) ([uint](https://github.com/uint))
 
 ## [v0.10.3](https://github.com/CosmWasm/cw-plus/tree/v0.10.3) (2021-11-16)
 

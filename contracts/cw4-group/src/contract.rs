@@ -10,7 +10,7 @@ use cw4::{
     TotalWeightResponse,
 };
 use cw_storage_plus::Bound;
-use utils::maybe_addr;
+use cw_utils::maybe_addr;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};

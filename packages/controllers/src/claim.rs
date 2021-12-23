@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, BlockInfo, Deps, Order, StdResult, Storage, Uint128};
 use cw_storage_plus::{Bound, Map};
 use utils::Expiration;
+use cw_utils::Expiration;
 
 // TODO: pull into utils?
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
