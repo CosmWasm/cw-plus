@@ -34,6 +34,7 @@ pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
 pub use int_key::CwIntKey;
 #[allow(deprecated)]
 pub use keys::{Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
+pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
