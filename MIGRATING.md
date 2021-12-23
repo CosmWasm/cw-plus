@@ -8,7 +8,7 @@ This guide lists API changes between *cw-plus* major releases.
 
 - Rename cw0 to utils [\#471](https://github.com/CosmWasm/cw-plus/issues/471) / Cw0 rename [\#508](https://github.com/CosmWasm/cw-plus/pull/508)
 
-The `cw0` package was renamed to `utils`. The required changes are straightforward:
+The `cw0` package was renamed to `cw-utils`. The required changes are straightforward:
 
 ```diff
 diff --git a/contracts/cw1-subkeys/Cargo.toml b/contracts/cw1-subkeys/Cargo.toml
