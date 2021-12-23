@@ -80,9 +80,9 @@ mod test {
         assert_eq!(1, path.len());
         assert_eq!(4242i32.to_be_bytes(), path[0].as_ref());
 
-        // let k: IntKeyOld<i32> = -4242i32.into();
-        // let path = k.key();
-        // assert_eq!(1, path.len());
-        // assert_eq!((-4242i32).to_be_bytes(), path[0].as_ref());
+        let k: IntKeyOld<i32> = IntKeyOld::<i32>::from(-4242i32);
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!((-4242i32).to_be_bytes(), path[0].as_ref());
     }
 }
