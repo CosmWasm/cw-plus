@@ -23,30 +23,65 @@ You shouldn't need these, except when manually handling raw integer keys seriali
 Migration code example:
 ```rust
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let version = get_contract_version(deps.storage)?;
-    if version.contract != CONTRACT_NAME {
-        return Err(ContractError::CannotMigrate {
-            previous_contract: version.contract,
-        });
-    }
+pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
+  let version: Version = CONTRACT_VERSION.parse()?;
+  let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;
+
+  if storage_version < version {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    // Do the migration
     // Original map
-    signed_int_map: Map<i8, String> = Map::new("signed_int_map");
-    // New map
-    signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
+    let signed_int_map: Map<IntKeyOld<i8>, String> = Map::new("signed_int_map");
 
-    signed_int_map
-        .range_raw(deps.storage, None, None, Order::Ascending)
-        .map(|(k, v)| {
-            let signed = i8::from_be_bytes(k);
-            signed_int_map_new.save(deps.storage, signed, v);
-        })
-        .collect()?;
+    // New map (using a different namespace for safety. It could be the same with enough care)
+    let signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
 
-    // Code to remove the old map keys
-    ...
+    // Obtain all current keys (this will need to be paginated if there are many entries,
+    // i.e. i32 or i64 instead of i8).
+    // This may be gas intensive
+    let current = signed_int_map
+            .range(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
 
-    Ok(Response::default())
+    // Store length for quality control (adjust if paginated)
+    let current_count = current.len();
+
+    // Remove the old map keys
+    for (k, _) in current.iter() {
+      signed_int_map.remove(deps.storage, IntKeyOld::<i8>::from(*k));
+    }
+
+    // Save in new format
+    for (k, v) in current.iter() {
+      signed_int_map_new.save(deps.storage, *k, v)?;
+    }
+
+    // Confirm old map is empty
+    if signed_int_map
+            .keys_raw(deps.storage, None, None, Order::Ascending)
+            .next()
+            .is_some()
+    {
+      return Err(StdError::generic_err("Original still not empty!").into());
+    }
+
+    // Obtain new keys, and confirm their amount.
+    // May be gas intensive.
+    let new_count = signed_int_map_new
+            .keys_raw(deps.storage, None, None, Order::Ascending)
+            .count();
+
+    if current_count != new_count {
+      return Err(StdError::generic_err(format!(
+        "Current ({}) and new ({}) counts differ!",
+        current_count, new_count
+      ))
+              .into());
+    }
+  }
+
+  Ok(Response::new())
 }
 ```
 
