@@ -49,12 +49,12 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, Contra
 
     // Remove the old map keys
     for (k, _) in current.iter() {
-      signed_int_map.remove(deps.storage, IntKeyOld::<i8>::from(*k));
+      signed_int_map.remove(deps.storage, (*k).into());
     }
 
     // Save in new format
-    for (k, v) in current.iter() {
-      signed_int_map_new.save(deps.storage, *k, v)?;
+    for (k, v) in current.into_iter() {
+      signed_int_map_new.save(deps.storage, k, &v)?;
     }
 
     // Confirm old map is empty

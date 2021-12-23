@@ -685,19 +685,18 @@ mod test {
 
         // remove old entries
         for (k, _) in current.iter() {
-            SIGNED_ID_OLD.remove(&mut store, IntKeyOld::<i32>::from(*k));
+            SIGNED_ID_OLD.remove(&mut store, (*k).into());
         }
 
         // confirm map is empty
         assert!(SIGNED_ID_OLD
             .range(&store, None, None, Order::Ascending)
-            .collect::<StdResult<Vec<_>>>()
-            .unwrap()
-            .is_empty());
+            .next()
+            .is_none());
 
         // save in new format
-        for (k, v) in current.iter() {
-            SIGNED_ID.save(&mut store, *k, v).unwrap();
+        for (k, v) in current.into_iter() {
+            SIGNED_ID.save(&mut store, k, &v).unwrap();
         }
 
         // obtain new keys
