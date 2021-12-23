@@ -6,7 +6,7 @@ use cw20::Denom;
 use cw4::TOTAL_KEY;
 use cw_controllers::{Admin, Claims, Hooks};
 use cw_storage_plus::{Item, Map, SnapshotMap, Strategy};
-use utils::Duration;
+use cw_utils::Duration;
 
 pub const CLAIMS: Claims = Claims::new("claims");
 

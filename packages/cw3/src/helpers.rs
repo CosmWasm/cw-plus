@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 
 use crate::msg::{Cw3ExecuteMsg, Vote};
-use utils::Expiration;
+use cw_utils::Expiration;
 
 /// Cw3Contract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.

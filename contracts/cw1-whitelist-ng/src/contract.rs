@@ -19,7 +19,7 @@ const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
-    admins.iter().map(|addr| api.addr_validate(&addr)).collect()
+    admins.iter().map(|addr| api.addr_validate(addr)).collect()
 }
 
 impl<T> Cw1WhitelistContract<T> {
