@@ -255,6 +255,7 @@ mod test {
     use cosmwasm_std::{Order, StdResult};
 
     use crate::int_key::CwIntKey;
+    use crate::keys_old::IntKeyOld;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
@@ -265,6 +266,8 @@ mod test {
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
     #[cfg(feature = "iterator")]
     const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
+    #[cfg(feature = "iterator")]
+    const SIGNED_ID_OLD: Map<IntKeyOld<i32>, Data> = Map::new("signed_id");
     #[cfg(feature = "iterator")]
     const SIGNED_ID: Map<i32, Data> = Map::new("signed_id");
 
@@ -633,6 +636,77 @@ mod test {
         let all = all.unwrap();
         assert_eq!(1, all.len());
         assert_eq!(all, vec![(50, data3)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_signed_integer_key_migration() {
+        let mut store = MockStorage::new();
+
+        // save and load three keys with the old format
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        SIGNED_ID_OLD
+            .save(&mut store, IntKeyOld::<i32>::from(-1234), &data)
+            .unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        SIGNED_ID_OLD
+            .save(&mut store, IntKeyOld::<i32>::from(-56), &data2)
+            .unwrap();
+
+        let data3 = Data {
+            name: "Jules".to_string(),
+            age: 55,
+        };
+        SIGNED_ID_OLD
+            .save(&mut store, IntKeyOld::<i32>::from(50), &data3)
+            .unwrap();
+
+        // obtain all current keys
+        let current = SIGNED_ID_OLD
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        // confirm wrong current order
+        assert_eq!(
+            current,
+            vec![
+                (50, data3.clone()),
+                (-1234, data.clone()),
+                (-56, data2.clone())
+            ]
+        );
+
+        // remove old entries
+        for (k, _) in current.iter() {
+            SIGNED_ID_OLD.remove(&mut store, IntKeyOld::<i32>::from(*k));
+        }
+
+        // confirm map is empty
+        assert!(SIGNED_ID_OLD
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap()
+            .is_empty());
+
+        // save in new format
+        for (k, v) in current.iter() {
+            SIGNED_ID.save(&mut store, *k, v).unwrap();
+        }
+
+        // obtain new keys
+        let new = SIGNED_ID
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        // confirm new order is right
+        assert_eq!(new, vec![(-1234, data), (-56, data2), (50, data3)]);
     }
 
     #[test]
