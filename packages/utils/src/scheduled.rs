@@ -29,6 +29,7 @@ impl fmt::Display for Scheduled {
 }
 
 impl Scheduled {
+    #[allow(dead_code)]
     pub fn is_triggered(&self, block: &BlockInfo) -> bool {
         match self {
             Scheduled::AtHeight(height) => block.height >= *height,
