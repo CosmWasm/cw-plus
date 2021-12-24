@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 use cw2::{get_contract_version, set_contract_version};
 use cw20::Cw20ExecuteMsg;
-use cw_utils::Expiration;
+use cw_utils::{Expiration, Scheduled};
 use sha2::Digest;
 use std::convert::TryInto;
 
@@ -103,7 +103,7 @@ pub fn execute_register_merkle_root(
     info: MessageInfo,
     merkle_root: String,
     expiration: Option<Expiration>,
-    start: Option<Expiration>,
+    start: Option<Scheduled>,
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -149,7 +149,7 @@ pub fn execute_claim(
     // airdrop begun
     let start = STAGE_START.may_load(deps.storage, stage)?;
     if let Some(start) = start {
-        if !start.is_expired(&env.block) {
+        if !start.is_triggered(&env.block) {
             return Err(ContractError::StageNotBegun { stage, start });
         }
     }
@@ -587,7 +587,7 @@ mod tests {
             merkle_root: "5d4f48f147cb6cb742b376dce5626b2a036f69faec10cd73631c791780e150fc"
                 .to_string(),
             expiration: None,
-            start: Some(Expiration::AtHeight(200_000)),
+            start: Some(Scheduled::AtHeight(200_000)),
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -603,7 +603,7 @@ mod tests {
             res,
             ContractError::StageNotBegun {
                 stage: 1,
-                start: Expiration::AtHeight(200_000)
+                start: Scheduled::AtHeight(200_000)
             }
         )
     }

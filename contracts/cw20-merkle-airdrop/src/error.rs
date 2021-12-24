@@ -1,5 +1,5 @@
 use cosmwasm_std::StdError;
-use cw_utils::Expiration;
+use cw_utils::{Expiration, Scheduled};
 use hex::FromHexError;
 use thiserror::Error;
 
@@ -33,5 +33,5 @@ pub enum ContractError {
     StageExpired { stage: u8, expiration: Expiration },
 
     #[error("Airdrop stage {stage} begins at {start}")]
-    StageNotBegun { stage: u8, start: Expiration },
+    StageNotBegun { stage: u8, start: Scheduled},
 }
