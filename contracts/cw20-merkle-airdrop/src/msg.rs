@@ -23,6 +23,7 @@ pub enum ExecuteMsg {
         /// MerkleRoot is hex-encoded merkle root.
         merkle_root: String,
         expiration: Option<Expiration>,
+        start: Option<Expiration>,
     },
     /// Claim does not check if contract has enough funds, owner must ensure it.
     Claim {
@@ -55,6 +56,7 @@ pub struct MerkleRootResponse {
     /// MerkleRoot is hex-encoded merkle root.
     pub merkle_root: String,
     pub expiration: Expiration,
+    pub start: Option<Expiration>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
