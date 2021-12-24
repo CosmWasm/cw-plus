@@ -6,7 +6,7 @@ use thiserror::Error;
 use cosmwasm_std::{
     attr, Addr, Deps, DepsMut, MessageInfo, Response, StdError, StdResult, Storage, SubMsg,
 };
-use cw_storage_plus::Item;
+use cw_storage_plus::{Item, Map, PrimaryKey};
 
 use crate::admin::{Admin, AdminError};
 
@@ -32,7 +32,7 @@ pub enum HookError {
     HookNotRegistered {},
 }
 
-// store all hook addresses in one item. We cannot have many of them before the contract becomes unusable anyway.
+/// Hooks stores all hook addresses in one item. We cannot have many of them before the contract becomes unusable anyway.
 pub struct Hooks<'a>(Item<'a, Vec<Addr>>);
 
 impl<'a> Hooks<'a> {
@@ -123,3 +123,102 @@ impl<'a> Hooks<'a> {
 }
 
 // TODO: add test coverage
+
+/// HookMap stores all hook addresses with given primary key. Enables hook multiplexing based on key.
+pub struct HookMap<'a, T: PrimaryKey<'a>>(Map<'a, T, Vec<Addr>>);
+
+#[allow(dead_code)]
+impl<'a, T: PrimaryKey<'a>> HookMap<'a, T> {
+    pub fn new(storage_key: &'a str) -> Self {
+        HookMap(Map::new(storage_key))
+    }
+
+    pub fn add_hook(&self, storage: &mut dyn Storage, key: T, addr: Addr) -> Result<(), HookError> {
+        let mut hooks = self.0.may_load(storage, key.clone())?.unwrap_or_default();
+        if !hooks.iter().any(|h| h == &addr) {
+            hooks.push(addr);
+        } else {
+            return Err(HookError::HookAlreadyRegistered {});
+        }
+        Ok(self.0.save(storage, key, &hooks)?)
+    }
+
+    pub fn remove_hook(
+        &self,
+        storage: &mut dyn Storage,
+        key: T,
+        addr: Addr,
+    ) -> Result<(), HookError> {
+        let mut hooks = self.0.load(storage, key.clone())?;
+        if let Some(p) = hooks.iter().position(|x| x == &addr) {
+            hooks.remove(p);
+        } else {
+            return Err(HookError::HookNotRegistered {});
+        }
+        Ok(self.0.save(storage, key, &hooks)?)
+    }
+
+    pub fn prepare_hooks<F: Fn(Addr) -> StdResult<SubMsg>>(
+        &self,
+        storage: &dyn Storage,
+        key: T,
+        prep: F,
+    ) -> StdResult<Vec<SubMsg>> {
+        self.0
+            .may_load(storage, key)?
+            .unwrap_or_default()
+            .into_iter()
+            .map(prep)
+            .collect()
+    }
+
+    pub fn execute_add_hook<C>(
+        &self,
+        admin: &Admin,
+        deps: DepsMut,
+        info: MessageInfo,
+        key: T,
+        addr: Addr,
+    ) -> Result<Response<C>, HookError>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        admin.assert_admin(deps.as_ref(), &info.sender)?;
+        self.add_hook(deps.storage, key, addr.clone())?;
+
+        let attributes = vec![
+            attr("action", "add_hook"),
+            attr("hook", addr),
+            attr("sender", info.sender),
+        ];
+        Ok(Response::new().add_attributes(attributes))
+    }
+
+    pub fn execute_remove_hook<C>(
+        &self,
+        admin: &Admin,
+        deps: DepsMut,
+        info: MessageInfo,
+        key: T,
+        addr: Addr,
+    ) -> Result<Response<C>, HookError>
+    where
+        C: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        admin.assert_admin(deps.as_ref(), &info.sender)?;
+        self.remove_hook(deps.storage, key, addr.clone())?;
+
+        let attributes = vec![
+            attr("action", "remove_hook"),
+            attr("hook", addr),
+            attr("sender", info.sender),
+        ];
+        Ok(Response::new().add_attributes(attributes))
+    }
+
+    pub fn query_hooks(&self, deps: Deps, key: T) -> StdResult<HooksResponse> {
+        let hooks = self.0.may_load(deps.storage, key)?.unwrap_or_default();
+        let hooks = hooks.into_iter().map(String::from).collect();
+        Ok(HooksResponse { hooks })
+    }
+}
