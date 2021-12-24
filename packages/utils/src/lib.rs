@@ -4,6 +4,7 @@ mod expiration;
 mod pagination;
 mod parse_reply;
 mod payment;
+mod scheduled;
 mod threshold;
 
 pub use pagination::{
