@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::Uint128;
+use cw_utils::Expiration;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
@@ -21,6 +22,7 @@ pub enum ExecuteMsg {
     RegisterMerkleRoot {
         /// MerkleRoot is hex-encoded merkle root.
         merkle_root: String,
+        expiration: Option<Expiration>,
     },
     /// Claim does not check if contract has enough funds, owner must ensure it.
     Claim {
@@ -52,6 +54,7 @@ pub struct MerkleRootResponse {
     pub stage: u8,
     /// MerkleRoot is hex-encoded merkle root.
     pub merkle_root: String,
+    pub expiration: Expiration,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
