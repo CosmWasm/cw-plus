@@ -15,7 +15,9 @@ use crate::msg::{
     ConfigResponse, ExecuteMsg, InstantiateMsg, IsClaimedResponse, LatestStageResponse,
     MerkleRootResponse, MigrateMsg, QueryMsg,
 };
-use crate::state::{Config, CLAIM, CONFIG, LATEST_STAGE, MERKLE_ROOT, STAGE_EXPIRATION};
+use crate::state::{
+    Config, CLAIM, CONFIG, LATEST_STAGE, MERKLE_ROOT, STAGE_EXPIRATION, STAGE_START,
+};
 
 // Version info, for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-merkle-airdrop";
@@ -58,7 +60,8 @@ pub fn execute(
         ExecuteMsg::RegisterMerkleRoot {
             merkle_root,
             expiration,
-        } => execute_register_merkle_root(deps, env, info, merkle_root, expiration),
+            start,
+        } => execute_register_merkle_root(deps, env, info, merkle_root, expiration, start),
         ExecuteMsg::Claim {
             stage,
             amount,
@@ -100,6 +103,7 @@ pub fn execute_register_merkle_root(
     info: MessageInfo,
     merkle_root: String,
     expiration: Option<Expiration>,
+    start: Option<Expiration>,
 ) -> Result<Response, ContractError> {
     let cfg = CONFIG.load(deps.storage)?;
 
@@ -122,6 +126,11 @@ pub fn execute_register_merkle_root(
     let exp = expiration.unwrap_or(Expiration::Never {});
     STAGE_EXPIRATION.save(deps.storage, stage, &exp)?;
 
+    // save start
+    if let Some(start) = start {
+        STAGE_START.save(deps.storage, stage, &start)?;
+    }
+
     Ok(Response::new().add_attributes(vec![
         attr("action", "register_merkle_root"),
         attr("stage", stage.to_string()),
@@ -137,6 +146,13 @@ pub fn execute_claim(
     amount: Uint128,
     proof: Vec<String>,
 ) -> Result<Response, ContractError> {
+    // airdrop begun
+    let start = STAGE_START.may_load(deps.storage, stage)?;
+    if let Some(start) = start {
+        if !start.is_expired(&env.block) {
+            return Err(ContractError::StageNotBegun { stage, start });
+        }
+    }
     // not expired
     let expiration = STAGE_EXPIRATION.load(deps.storage, stage)?;
     if expiration.is_expired(&env.block) {
@@ -219,10 +235,12 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
 pub fn query_merkle_root(deps: Deps, stage: u8) -> StdResult<MerkleRootResponse> {
     let merkle_root = MERKLE_ROOT.load(deps.storage, stage)?;
     let expiration = STAGE_EXPIRATION.load(deps.storage, stage)?;
+    let start = STAGE_START.may_load(deps.storage, stage)?;
     let resp = MerkleRootResponse {
         stage,
         merkle_root,
         expiration,
+        start,
     };
 
     Ok(resp)
@@ -344,6 +362,7 @@ mod tests {
             merkle_root: "634de21cde1044f41d90373733b0f0fb1c1c71f9652b905cdf159e73c4cf0d37"
                 .to_string(),
             expiration: None,
+            start: None,
         };
 
         let res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
@@ -409,6 +428,7 @@ mod tests {
         let msg = ExecuteMsg::RegisterMerkleRoot {
             merkle_root: test_data.root,
             expiration: None,
+            start: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -470,6 +490,7 @@ mod tests {
         let msg = ExecuteMsg::RegisterMerkleRoot {
             merkle_root: test_data.root,
             expiration: None,
+            start: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -525,6 +546,7 @@ mod tests {
             merkle_root: "5d4f48f147cb6cb742b376dce5626b2a036f69faec10cd73631c791780e150fc"
                 .to_string(),
             expiration: Some(Expiration::AtHeight(100)),
+            start: None,
         };
         execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
@@ -541,6 +563,47 @@ mod tests {
             ContractError::StageExpired {
                 stage: 1,
                 expiration: Expiration::AtHeight(100)
+            }
+        )
+    }
+
+    #[test]
+    fn stage_starts() {
+        let mut deps = mock_dependencies();
+
+        let msg = InstantiateMsg {
+            owner: Some("owner0000".to_string()),
+            cw20_token_address: "token0000".to_string(),
+        };
+
+        let env = mock_env();
+        let info = mock_info("addr0000", &[]);
+        let _res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+
+        // can register merkle root
+        let env = mock_env();
+        let info = mock_info("owner0000", &[]);
+        let msg = ExecuteMsg::RegisterMerkleRoot {
+            merkle_root: "5d4f48f147cb6cb742b376dce5626b2a036f69faec10cd73631c791780e150fc"
+                .to_string(),
+            expiration: None,
+            start: Some(Expiration::AtHeight(200_000)),
+        };
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // can't claim expired
+        let msg = ExecuteMsg::Claim {
+            amount: Uint128::new(5),
+            stage: 1u8,
+            proof: vec![],
+        };
+
+        let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(
+            res,
+            ContractError::StageNotBegun {
+                stage: 1,
+                start: Expiration::AtHeight(200_000)
             }
         )
     }
@@ -565,6 +628,7 @@ mod tests {
             merkle_root: "5d4f48f147cb6cb742b376dce5626b2a036f69faec10cd73631c791780e150fc"
                 .to_string(),
             expiration: None,
+            start: None,
         };
         let _res = execute(deps.as_mut(), env, info, msg).unwrap();
 
@@ -593,6 +657,7 @@ mod tests {
             merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
                 .to_string(),
             expiration: None,
+            start: None,
         };
         let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(res, ContractError::Unauthorized {});
@@ -604,6 +669,7 @@ mod tests {
             merkle_root: "ebaa83c7eaf7467c378d2f37b5e46752d904d2d17acd380b24b02e3b398b3e5a"
                 .to_string(),
             expiration: None,
+            start: None,
         };
         let res = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(res, ContractError::Unauthorized {});
