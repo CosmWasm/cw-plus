@@ -13,7 +13,18 @@ documentation = "https://docs.cosmwasm.com"
 default = ["iterator"]
 iterator = ["cosmwasm-std/iterator"]
 
+[lib]
+# See https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
+bench = false
+
 [dependencies]
 cosmwasm-std = { version = "1.0.0-beta3", default-features = false }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+criterion = { version = "0.3", features = [ "html_reports" ] }
+
+[[bench]]
+name = "main"
+harness = false
