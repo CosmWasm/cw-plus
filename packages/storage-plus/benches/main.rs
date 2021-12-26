@@ -1,12 +1,23 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+use rand::Rng;
 use std::mem;
 use std::time::Duration;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
 use cw_storage_plus::CwIntKey;
 
 fn bench_signed_int_key(c: &mut Criterion) {
     let mut group = c.benchmark_group("Signed int keys");
 
-    let k: i32 = 0x42434445;
+    fn k() -> i32 {
+        // let k: i32 = 0x42434445;
+        // k
+        let r = rand::thread_rng().gen_range(i32::MIN..i32::MAX);
+        r
+    }
+    // For the asserts
+    let k_check = k();
+
     type Buf = [u8; mem::size_of::<i32>()];
 
     group.bench_function("i32 to_cw_bytes: xored (u32) + to_be_bytes", |b| {
@@ -16,11 +27,12 @@ fn bench_signed_int_key(c: &mut Criterion) {
         }
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
-        assert_eq!(to_cw_bytes(&k), i32::to_cw_bytes(&k));
-        assert_eq!(to_cw_bytes(&-k), i32::to_cw_bytes(&-k));
+        assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
+        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
 
         b.iter(|| {
-            black_box(to_cw_bytes(&k));
+            black_box(to_cw_bytes(&k()));
+            black_box(to_cw_bytes(&-k()));
         });
     });
 
@@ -31,11 +43,12 @@ fn bench_signed_int_key(c: &mut Criterion) {
         }
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
-        assert_eq!(to_cw_bytes(&k), i32::to_cw_bytes(&k));
-        assert_eq!(to_cw_bytes(&-k), i32::to_cw_bytes(&-k));
+        assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
+        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
 
         b.iter(|| {
-            black_box(to_cw_bytes(&k));
+            black_box(to_cw_bytes(&k()));
+            black_box(to_cw_bytes(&-k()));
         });
     });
 
@@ -48,11 +61,12 @@ fn bench_signed_int_key(c: &mut Criterion) {
         }
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
-        assert_eq!(to_cw_bytes(&k), i32::to_cw_bytes(&k));
-        assert_eq!(to_cw_bytes(&-k), i32::to_cw_bytes(&-k));
+        assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
+        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
 
         b.iter(|| {
-            black_box(to_cw_bytes(&k));
+            black_box(to_cw_bytes(&k()));
+            black_box(to_cw_bytes(&-k()));
         });
     });
 
@@ -67,11 +81,12 @@ fn bench_signed_int_key(c: &mut Criterion) {
         }
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
-        assert_eq!(to_cw_bytes(&k), i32::to_cw_bytes(&k));
-        assert_eq!(to_cw_bytes(&-k), i32::to_cw_bytes(&-k));
+        assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
+        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
 
         b.iter(|| {
-            black_box(to_cw_bytes(&k));
+            black_box(to_cw_bytes(&k()));
+            black_box(to_cw_bytes(&-k()));
         });
     });
 
@@ -81,8 +96,8 @@ fn bench_signed_int_key(c: &mut Criterion) {
 fn make_config() -> Criterion {
     Criterion::default()
         .without_plots()
-        .measurement_time(Duration::new(10, 0))
-        .sample_size(12)
+        .measurement_time(Duration::new(5, 0))
+        .sample_size(10)
         .configure_from_args()
 }
 

@@ -24,6 +24,7 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = [ "html_reports" ] }
+rand = "0.8"
 
 [[bench]]
 name = "main"
