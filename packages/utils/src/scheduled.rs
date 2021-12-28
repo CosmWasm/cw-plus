@@ -62,3 +62,59 @@ impl PartialOrd for Scheduled {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn compare_schedules() {
+        // matching pairs
+        assert!(Scheduled::AtHeight(5) < Scheduled::AtHeight(10));
+        assert!(Scheduled::AtHeight(8) > Scheduled::AtHeight(7));
+        assert!(
+            Scheduled::AtTime(Timestamp::from_seconds(555))
+                < Scheduled::AtTime(Timestamp::from_seconds(777))
+        );
+        assert!(
+            Scheduled::AtTime(Timestamp::from_seconds(86))
+                < Scheduled::AtTime(Timestamp::from_seconds(100))
+        );
+
+        // what happens for the uncomparables?? all compares are false
+        assert_eq!(
+            None,
+            Scheduled::AtTime(Timestamp::from_seconds(1000))
+                .partial_cmp(&Scheduled::AtHeight(230))
+        );
+        assert_eq!(
+            Scheduled::AtTime(Timestamp::from_seconds(1000))
+                .partial_cmp(&Scheduled::AtHeight(230)),
+            None
+        );
+        assert_eq!(
+            Scheduled::AtTime(Timestamp::from_seconds(1000))
+                .partial_cmp(&Scheduled::AtHeight(230)),
+            None
+        );
+        assert!(!(Scheduled::AtTime(Timestamp::from_seconds(1000)) == Scheduled::AtHeight(230)));
+    }
+
+    #[test]
+    fn schedule_addition() {
+        // height
+        let end = Scheduled::AtHeight(12345) + Duration::Height(400);
+        assert_eq!(end.unwrap(), Scheduled::AtHeight(12745));
+
+        // time
+        let end = Scheduled::AtTime(Timestamp::from_seconds(55544433)) + Duration::Time(40300);
+        assert_eq!(
+            end.unwrap(),
+            Scheduled::AtTime(Timestamp::from_seconds(55584733))
+        );
+
+        // mismatched
+        let end = Scheduled::AtHeight(12345) + Duration::Time(1500);
+        end.unwrap_err();
+    }
+}
