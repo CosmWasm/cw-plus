@@ -84,6 +84,7 @@ impl BankKeeper {
         to_address: Addr,
         amount: Vec<Coin>,
     ) -> AnyResult<()> {
+        let amount = self.normalize_amount(amount)?;
         let b = self.get_balance(bank_storage, &to_address)?;
         let b = NativeBalance(b) + NativeBalance(amount);
         self.set_balance(bank_storage, &to_address, b.into_vec())
@@ -95,9 +96,20 @@ impl BankKeeper {
         from_address: Addr,
         amount: Vec<Coin>,
     ) -> AnyResult<()> {
+        let amount = self.normalize_amount(amount)?;
         let a = self.get_balance(bank_storage, &from_address)?;
         let a = (NativeBalance(a) - amount)?;
         self.set_balance(bank_storage, &from_address, a.into_vec())
+    }
+
+    /// Filters out all 0 value coins and returns an error if the resulting Vec is empty
+    fn normalize_amount(&self, amount: Vec<Coin>) -> AnyResult<Vec<Coin>> {
+        let res: Vec<_> = amount.into_iter().filter(|x| !x.amount.is_zero()).collect();
+        if res.is_empty() {
+            bail!("Cannot transfer empty coins amount")
+        } else {
+            Ok(res)
+        }
     }
 }
 
