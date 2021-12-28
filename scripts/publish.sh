@@ -54,7 +54,7 @@ done
 echo "Waiting for publishing all packages"
 sleep $SLEEP_TIME
 
-for cont in CW20_BASE; do
+for cont in $CW20_BASE; do
   (
     cd "contracts/$cont"
     echo "Publishing $cont"
