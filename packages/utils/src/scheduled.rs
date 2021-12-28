@@ -84,17 +84,14 @@ mod test {
         // what happens for the uncomparables?? all compares are false
         assert_eq!(
             None,
-            Scheduled::AtTime(Timestamp::from_seconds(1000))
-                .partial_cmp(&Scheduled::AtHeight(230))
+            Scheduled::AtTime(Timestamp::from_seconds(1000)).partial_cmp(&Scheduled::AtHeight(230))
         );
         assert_eq!(
-            Scheduled::AtTime(Timestamp::from_seconds(1000))
-                .partial_cmp(&Scheduled::AtHeight(230)),
+            Scheduled::AtTime(Timestamp::from_seconds(1000)).partial_cmp(&Scheduled::AtHeight(230)),
             None
         );
         assert_eq!(
-            Scheduled::AtTime(Timestamp::from_seconds(1000))
-                .partial_cmp(&Scheduled::AtHeight(230)),
+            Scheduled::AtTime(Timestamp::from_seconds(1000)).partial_cmp(&Scheduled::AtHeight(230)),
             None
         );
         assert!(!(Scheduled::AtTime(Timestamp::from_seconds(1000)) == Scheduled::AtHeight(230)));
