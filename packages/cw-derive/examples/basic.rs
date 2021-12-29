@@ -9,7 +9,7 @@ struct Error;
 struct Member;
 
 #[cw_derive::interface(module=msg, exec=Execute, query=Query)]
-trait Cw4 {
+pub trait Cw4 {
     #[msg(exec)]
     fn update_admin(&self, ctx: Ctx, admin: Option<String>) -> Result<Response, Error>;
 
