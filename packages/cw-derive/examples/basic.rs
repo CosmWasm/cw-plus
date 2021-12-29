@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 use cosmwasm_std::Response;
 
-struct Ctx;
-struct Error;
+pub struct Ctx;
+pub struct Error;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-struct Member;
+pub struct Member;
 
 #[cw_derive::interface(module=msg, exec=Execute, query=Query)]
 pub trait Cw4 {
