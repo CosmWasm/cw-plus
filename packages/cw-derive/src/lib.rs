@@ -87,7 +87,6 @@ use strip_input::StripInput;
 ///   * `query` - this is query message variant
 #[proc_macro_attribute]
 pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = item.clone();
     let attrs = parse_macro_input!(attr as parser::InterfaceArgs);
     let input = parse_macro_input!(item as ItemTrait);
 
@@ -252,7 +251,7 @@ fn msg_variant(method: &TraitItemMethod, generics_checker: &mut CheckGenerics) -
     variant
 }
 
-fn msg_field<'g>(item: &PatType, idx: usize, generics_checker: &mut CheckGenerics) -> TokenStream2 {
+fn msg_field(item: &PatType, idx: usize, generics_checker: &mut CheckGenerics) -> TokenStream2 {
     let name = match &*item.pat {
         Pat::Ident(p) => &p.ident,
         pat => {
