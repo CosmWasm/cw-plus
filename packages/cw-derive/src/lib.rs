@@ -90,7 +90,7 @@ pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let expanded = if let Some(module) = attrs.module {
         quote! {
-            mod #module {
+            pub mod #module {
                 use super::*;
                 #exec
 
@@ -134,7 +134,7 @@ fn build_msg(name: &Ident, source: &ItemTrait, ty: parser::InterfaceMsgAttr) -> 
     quote! {
         #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
         #[serde(rename_all="snake_case")]
-        enum #name {
+        pub enum #name {
             #(#variants,)*
         }
     }
