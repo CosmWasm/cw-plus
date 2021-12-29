@@ -1,6 +1,7 @@
 use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
+use proc_macro_error::{emit_error, proc_macro_error};
 use quote::quote;
 use syn::fold::Fold;
 use syn::parse::{Parse, Parser};
@@ -8,7 +9,7 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
     parse_macro_input, Error, FnArg, GenericParam, Ident, ItemTrait, Pat, PatType, TraitItem,
-    TraitItemMethod,
+    TraitItemMethod, Type,
 };
 
 mod check_generics;
@@ -85,6 +86,7 @@ use strip_input::StripInput;
 /// which are not marked with this attribute are ignored by generator. `msg_type` is one of:
 ///   * `exec` - this is execute message variant
 ///   * `query` - this is query message variant
+#[proc_macro_error]
 #[proc_macro_attribute]
 pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attr as parser::InterfaceArgs);
@@ -160,7 +162,10 @@ fn build_msg(
                 let msg_attr = method.attrs.iter().find(|attr| attr.path.is_ident("msg"))?;
                 let attr = match parser::InterfaceMsgAttr::parse.parse2(msg_attr.tokens.clone()) {
                     Ok(attr) => attr,
-                    Err(err) => return Some(msg_variant_err(&method, err)),
+                    Err(err) => {
+                        emit_error!(method.span(), err);
+                        return None;
+                    }
                 };
 
                 if attr == ty {
@@ -204,18 +209,6 @@ fn build_msg(
     }
 }
 
-/// Builds message variant error
-fn msg_variant_err(method: &TraitItemMethod, err: Error) -> TokenStream2 {
-    let variant = &method.sig.ident;
-    let name = variant.to_string().to_case(Case::Camel);
-    let variant = Ident::new(&name, variant.span());
-    let err = err.into_compile_error();
-
-    quote! {
-        #variant(#err)
-    }
-}
-
 /// Builds single message variant from method definition
 fn msg_variant(method: &TraitItemMethod, generics_checker: &mut CheckGenerics) -> TokenStream2 {
     let name = &method.sig.ident;
@@ -226,18 +219,18 @@ fn msg_variant(method: &TraitItemMethod, generics_checker: &mut CheckGenerics) -
         .inputs
         .iter()
         .skip(2)
-        .enumerate()
-        .map(|(idx, arg)| match arg {
+        .filter_map(|arg| match arg {
             FnArg::Receiver(item) => {
-                let err =
-                    Error::new(item.span(), "Unexpected `self` argument").into_compile_error();
-
-                quote! {
-                    _self: #err
-                }
+                emit_error!(item.span(), "Unexpected `self` argument");
+                None
             }
 
-            FnArg::Typed(item) => msg_field(item, idx, generics_checker),
+            FnArg::Typed(item) => {
+                let (name, ty) = msg_field(item, generics_checker)?;
+                Some(quote! {
+                    #name: #ty
+                })
+            }
         });
 
     let fields: Vec<_> = fields.collect();
@@ -251,7 +244,10 @@ fn msg_variant(method: &TraitItemMethod, generics_checker: &mut CheckGenerics) -
     variant
 }
 
-fn msg_field(item: &PatType, idx: usize, generics_checker: &mut CheckGenerics) -> TokenStream2 {
+fn msg_field<'a>(
+    item: &'a PatType,
+    generics_checker: &mut CheckGenerics,
+) -> Option<(&'a Ident, &'a Type)> {
     let name = match &*item.pat {
         Pat::Ident(p) => &p.ident,
         pat => {
@@ -271,21 +267,13 @@ fn msg_field(item: &PatType, idx: usize, generics_checker: &mut CheckGenerics) -
             //   metadata: SomeDaa
             // }
             // ```
-            let err = Error::new(pat.span(), "Expected argument name, pattern occurred")
-                .into_compile_error();
-            let name = format!("_invalid_{}", idx);
-            return quote! {
-                #name: #err
-            };
+            emit_error!(pat.span(), "Expected argument name, pattern occurred");
+            return None;
         }
     };
 
-    let name = Ident::new(&name.to_string().to_case(Case::Snake), name.span());
     let ty = &item.ty;
-
     generics_checker.visit_type(ty);
 
-    quote! {
-        #name: #ty
-    }
+    Some((name, ty))
 }
