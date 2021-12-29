@@ -59,7 +59,7 @@ impl Parse for Mapping {
 }
 
 /// `#[msg(...)]` attribute for `interface` macro
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum InterfaceMsgAttr {
     Exec,
     Query,
