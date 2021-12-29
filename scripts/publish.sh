@@ -13,7 +13,7 @@ ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw1155 multi-test"
 CW20_BASE="cw20-base"
 # these are imported by other contracts
 BASE_CONTRACTS="cw1-whitelist cw4-group cw3-fixed-multisig "
-ALL_CONTRACTS="cw1-subkeys cw3-flex-multisig cw4-stake cw20-atomic-swap cw20-bonding cw20-escrow cw20-ics20 cw20-staking cw1155-base"
+ALL_CONTRACTS="cw1-subkeys cw3-flex-multisig cw4-stake cw20-ics20 cw1155-base"
 
 SLEEP_TIME=30
 
