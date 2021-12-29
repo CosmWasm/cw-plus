@@ -2,12 +2,12 @@ use syn::visit::Visit;
 use syn::Ident;
 
 pub struct CheckGenerics<'g> {
-    generics: &'g [Ident],
+    generics: &'g [&'g Ident],
     used: Vec<&'g Ident>,
 }
 
 impl<'g> CheckGenerics<'g> {
-    pub fn new(generics: &'g [Ident]) -> Self {
+    pub fn new(generics: &'g [&'g Ident]) -> Self {
         Self {
             generics,
             used: vec![],
@@ -22,7 +22,7 @@ impl<'g> CheckGenerics<'g> {
 impl<'ast, 'g> Visit<'ast> for CheckGenerics<'g> {
     fn visit_path(&mut self, p: &'ast syn::Path) {
         if let Some(p) = p.get_ident() {
-            if let Some(gen) = self.generics.iter().find(|gen| p == *gen) {
+            if let Some(gen) = self.generics.iter().find(|gen| p == **gen) {
                 if !self.used.contains(&gen) {
                     self.used.push(gen);
                 }
