@@ -45,7 +45,7 @@ many custom contracts.
 If you don't know what CosmWasm is, please check out
 [our homepage](https://cosmwasm.com) and
 [our documentation](https://docs.cosmwasm.com) to get more background.
-We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/coralnet/README.md)
+We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/sandynet-1/README.md)
 you can use to test out any contracts.
 
 **Warning** None of these contracts have been audited and no liability is
