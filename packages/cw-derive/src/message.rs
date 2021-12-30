@@ -14,6 +14,7 @@ use syn::{
 /// Representation of single message
 pub struct Message<'a> {
     pub name: &'a Ident,
+    pub trait_name: &'a Ident,
     pub variants: Vec<MsgVariant<'a>>,
     pub generics: Vec<&'a Ident>,
     pub wheres: Vec<&'a WherePredicate>,
@@ -26,6 +27,8 @@ impl<'a> Message<'a> {
         ty: InterfaceMsgAttr,
         generics: &'a [&'a Ident],
     ) -> Self {
+        let trait_name = &source.ident;
+
         let mut generics_checker = CheckGenerics::new(generics);
         let variants: Vec<_> = source
             .items
@@ -74,6 +77,7 @@ impl<'a> Message<'a> {
 
         Self {
             name,
+            trait_name,
             variants,
             generics: used_generics,
             wheres,
@@ -87,11 +91,13 @@ impl<'a> Message<'a> {
     fn emit_enum(&self) -> TokenStream {
         let Self {
             name,
+            trait_name,
             variants,
             generics,
             wheres,
         } = self;
 
+        let match_arms = variants.iter().map(MsgVariant::emit_dispatch_leg);
         let variants = variants.iter().map(MsgVariant::emit);
         let where_clause = if !wheres.is_empty() {
             quote! {
@@ -102,18 +108,23 @@ impl<'a> Message<'a> {
         };
 
         quote! {
-            #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-            #[serde(rename_all="snake_case")]
-            pub enum #name <#(#generics,)*> #where_clause {
-                #(#variants,)*
-            }
-        }
+                   #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
+                   #[serde(rename_all="snake_case")]
+                   pub enum #name <#(#generics,)*> #where_clause {
+                       #(#variants,)*
+                   }
+
+                   impl<#(#generics,)*> #name<#(#generics,)*> #where_clause {
+        //               pub fn dispatch(self, contract: &impl #trait_name, ctx: Ctx,
+                   }
+               }
     }
 }
 
 /// Representation of whole message variant
 pub struct MsgVariant<'a> {
     name: Ident,
+    function_name: &'a Ident,
     // With https://github.com/rust-lang/rust/issues/63063 this could be just an iterator over
     // `MsgField<'a>`
     fields: Vec<MsgField<'a>>,
@@ -125,8 +136,13 @@ impl<'a> MsgVariant<'a> {
         method: &'a TraitItemMethod,
         generics_checker: &mut CheckGenerics,
     ) -> MsgVariant<'a> {
-        let name = &method.sig.ident;
-        let name = Ident::new(&name.to_string().to_case(Case::UpperCamel), name.span());
+        let function_name = &method.sig.ident;
+        let name = Ident::new(
+            &function_name.to_string().to_case(Case::UpperCamel),
+            function_name.span(),
+        );
+
+        let mut args = method.sig.inputs.iter().skip(1);
 
         let fields = method
             .sig
@@ -143,18 +159,41 @@ impl<'a> MsgVariant<'a> {
             })
             .collect();
 
-        Self { name, fields }
+        Self {
+            name,
+            function_name,
+            fields,
+        }
     }
 
     /// Emits message variant
     pub fn emit(&self) -> TokenStream {
-        let Self { name, fields } = self;
+        let Self { name, fields, .. } = self;
         let fields = fields.iter().map(MsgField::emit);
 
         quote! {
             #name {
                 #(#fields,)*
             }
+        }
+    }
+
+    /// Emits match leg dispatching againts this variant. Assumes enum variants are imported into the
+    /// scope. Dispatching is performed by calling the function this variant is build from on the
+    /// `contract` variable, with `ctx` as its first argument - both of them should be in scope.
+    pub fn emit_dispatch_leg(&self) -> TokenStream {
+        let Self {
+            name,
+            fields,
+            function_name,
+        } = self;
+        let args = fields.iter().map(|field| field.name);
+        let fields = fields.iter().map(|field| field.name);
+
+        quote! {
+            #name {
+                #(#fields,)*
+            } => contract.#function_name(ctx, #(#args),*),
         }
     }
 }
