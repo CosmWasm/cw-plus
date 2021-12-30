@@ -8,7 +8,8 @@ use syn::parse::{Parse, Parser};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    FnArg, Ident, ItemTrait, Pat, PatType, TraitItem, TraitItemMethod, Type, WherePredicate,
+    FnArg, Ident, ItemTrait, Pat, PatType, TraitItem, TraitItemMethod, Type, WhereClause,
+    WherePredicate,
 };
 
 /// Representation of single message
@@ -17,7 +18,11 @@ pub struct Message<'a> {
     pub trait_name: &'a Ident,
     pub variants: Vec<MsgVariant<'a>>,
     pub generics: Vec<&'a Ident>,
+    pub unsused_generics: Vec<&'a Ident>,
+    pub all_generics: &'a [&'a Ident],
     pub wheres: Vec<&'a WherePredicate>,
+    pub full_where: Option<&'a WhereClause>,
+    pub msg_attr: InterfaceMsgAttr,
 }
 
 impl<'a> Message<'a> {
@@ -54,7 +59,7 @@ impl<'a> Message<'a> {
             })
             .collect();
 
-        let used_generics = generics_checker.used();
+        let (used_generics, unsused_generics) = generics_checker.used_unused();
         let wheres = source
             .generics
             .where_clause
@@ -80,7 +85,11 @@ impl<'a> Message<'a> {
             trait_name,
             variants,
             generics: used_generics,
+            unsused_generics,
+            all_generics: generics,
             wheres,
+            full_where: source.generics.where_clause.as_ref(),
+            msg_attr: ty,
         }
     }
 
@@ -94,10 +103,16 @@ impl<'a> Message<'a> {
             trait_name,
             variants,
             generics,
+            unsused_generics,
+            all_generics,
             wheres,
+            full_where,
+            msg_attr,
         } = self;
 
-        let match_arms = variants.iter().map(MsgVariant::emit_dispatch_leg);
+        let match_arms = variants
+            .iter()
+            .map(|variant| variant.emit_dispatch_leg(*msg_attr));
         let variants = variants.iter().map(MsgVariant::emit);
         let where_clause = if !wheres.is_empty() {
             quote! {
@@ -107,17 +122,28 @@ impl<'a> Message<'a> {
             quote! {}
         };
 
-        quote! {
-                   #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-                   #[serde(rename_all="snake_case")]
-                   pub enum #name <#(#generics,)*> #where_clause {
-                       #(#variants,)*
-                   }
+        let ctx_type = msg_attr.emit_ctx_type();
+        let dispatch_type = msg_attr.emit_result_type();
 
-                   impl<#(#generics,)*> #name<#(#generics,)*> #where_clause {
-        //               pub fn dispatch(self, contract: &impl #trait_name, ctx: Ctx,
-                   }
-               }
+        quote! {
+            #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
+            #[serde(rename_all="snake_case")]
+            pub enum #name <#(#generics,)*> #where_clause {
+                #(#variants,)*
+            }
+
+            impl<#(#generics,)*> #name<#(#generics,)*> #where_clause {
+                pub fn dispatch<C: #trait_name<#(#all_generics,)*>, #(#unsused_generics,)*>(self, contract: &C, ctx: #ctx_type)
+                    -> #dispatch_type #full_where
+                {
+                    use #name::*;
+
+                    match self {
+                        #(#match_arms,)*
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -141,8 +167,6 @@ impl<'a> MsgVariant<'a> {
             &function_name.to_string().to_case(Case::UpperCamel),
             function_name.span(),
         );
-
-        let mut args = method.sig.inputs.iter().skip(1);
 
         let fields = method
             .sig
@@ -178,10 +202,10 @@ impl<'a> MsgVariant<'a> {
         }
     }
 
-    /// Emits match leg dispatching againts this variant. Assumes enum variants are imported into the
+    /// Emits match leg dispatching against this variant. Assumes enum variants are imported into the
     /// scope. Dispatching is performed by calling the function this variant is build from on the
     /// `contract` variable, with `ctx` as its first argument - both of them should be in scope.
-    pub fn emit_dispatch_leg(&self) -> TokenStream {
+    pub fn emit_dispatch_leg(&self, msg_attr: InterfaceMsgAttr) -> TokenStream {
         let Self {
             name,
             fields,
@@ -190,10 +214,17 @@ impl<'a> MsgVariant<'a> {
         let args = fields.iter().map(|field| field.name);
         let fields = fields.iter().map(|field| field.name);
 
-        quote! {
-            #name {
-                #(#fields,)*
-            } => contract.#function_name(ctx, #(#args),*),
+        match msg_attr {
+            InterfaceMsgAttr::Exec => quote! {
+                #name {
+                    #(#fields,)*
+                } => contract.#function_name(ctx.into(), #(#args),*).map_err(Into::into)
+            },
+            InterfaceMsgAttr::Query => quote! {
+                #name {
+                    #(#fields,)*
+                } => cosmwasm_std::to_binary(&contract.#function_name(ctx.into(), #(#args),*)?).map_err(Into::into)
+            },
         }
     }
 }

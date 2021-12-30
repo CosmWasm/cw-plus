@@ -1,4 +1,5 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
+use quote::quote;
 use syn::parse::{Error, Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{parenthesized, Ident, Result, Token};
@@ -63,6 +64,35 @@ impl Parse for Mapping {
 pub enum InterfaceMsgAttr {
     Exec,
     Query,
+}
+
+impl InterfaceMsgAttr {
+    pub fn emit_ctx_type(self) -> TokenStream {
+        use InterfaceMsgAttr::*;
+
+        match self {
+            Exec => quote! {
+                (cosmwasm_std::DepsMut, cosmwasm_std::Env, cosmwasm_std::MessageInfo)
+            },
+            Query => quote! {
+                (cosmwasm_std::Deps, cosmwasm_std::Env)
+            },
+        }
+    }
+
+    /// Emits type which should be returned by dispatch function for this kind of message
+    pub fn emit_result_type(self) -> TokenStream {
+        use InterfaceMsgAttr::*;
+
+        match self {
+            Exec => quote! {
+                std::result::Result<cosmwasm_std::Response, C::Error>
+            },
+            Query => quote! {
+                std::result::Result<cosmwasm_std::Binary, C::Error>
+            },
+        }
+    }
 }
 
 impl Parse for InterfaceMsgAttr {
