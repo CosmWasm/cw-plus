@@ -17,6 +17,18 @@ impl<'g> CheckGenerics<'g> {
     pub fn used(self) -> Vec<&'g Ident> {
         self.used
     }
+
+    /// Returns split between used and unused generics
+    pub fn used_unused(self) -> (Vec<&'g Ident>, Vec<&'g Ident>) {
+        let unused = self
+            .generics
+            .iter()
+            .filter(|gen| !self.used.contains(*gen))
+            .map(|gen| *gen)
+            .collect();
+
+        (self.used, unused)
+    }
 }
 
 impl<'ast, 'g> Visit<'ast> for CheckGenerics<'g> {
