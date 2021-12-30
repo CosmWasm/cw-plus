@@ -1,6 +1,6 @@
 [package]
 name = "cw4-group"
-version = "0.11.0"
+version = "0.10.3"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Simple cw4 implementation of group membership controlled by admin "
@@ -26,11 +26,11 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-utils = { path = "../../packages/utils", version = "0.11.0" }
-cw2 = { path = "../../packages/cw2", version = "0.11.0" }
-cw4 = { path = "../../packages/cw4", version = "0.11.0" }
-cw-controllers = { path = "../../packages/controllers", version = "0.11.0" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.11.0" }
+utils = { path = "../../packages/utils", version = "0.10.3" }
+cw2 = { path = "../../packages/cw2", version = "0.10.3" }
+cw4 = { path = "../../packages/cw4", version = "0.10.3" }
+cw-controllers = { path = "../../packages/controllers", version = "0.10.3" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.10.3" }
 cosmwasm-std = { version = "1.0.0-beta3" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

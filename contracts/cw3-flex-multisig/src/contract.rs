@@ -9,17 +9,16 @@ use cosmwasm_std::{
 
 use cw2::set_contract_version;
 use cw3::{
-    ProposalListResponse, ProposalResponse, Status, Vote, VoteInfo, VoteListResponse, VoteResponse,
-    VoterDetail, VoterListResponse, VoterResponse,
+    ProposalListResponse, ProposalResponse, Status, ThresholdResponse, Vote, VoteInfo,
+    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse,
 };
-use cw3_fixed_multisig::state::{next_id, Ballot, Proposal, Votes, BALLOTS, PROPOSALS};
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
-use utils::{maybe_addr, Expiration, ThresholdResponse};
+use utils::{maybe_addr, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Config, CONFIG};
+use crate::state::{next_id, Ballot, Config, Proposal, Votes, BALLOTS, CONFIG, PROPOSALS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -432,9 +431,10 @@ mod tests {
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
     use cw_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
-    use utils::{Duration, Threshold};
+    use utils::Duration;
 
     use super::*;
+    use crate::msg::Threshold;
 
     const OWNER: &str = "admin0001";
     const VOTER1: &str = "voter0001";
@@ -625,10 +625,7 @@ mod tests {
                 None,
             )
             .unwrap_err();
-        assert_eq!(
-            ContractError::Threshold(utils::ThresholdError::InvalidThreshold {}),
-            err.downcast().unwrap()
-        );
+        assert_eq!(ContractError::InvalidThreshold {}, err.downcast().unwrap());
 
         // Total weight less than required weight not allowed
         let instantiate_msg = InstantiateMsg {
@@ -646,10 +643,7 @@ mod tests {
                 None,
             )
             .unwrap_err();
-        assert_eq!(
-            ContractError::Threshold(utils::ThresholdError::UnreachableWeight {}),
-            err.downcast().unwrap()
-        );
+        assert_eq!(ContractError::UnreachableWeight {}, err.downcast().unwrap());
 
         // All valid
         let instantiate_msg = InstantiateMsg {
