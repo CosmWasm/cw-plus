@@ -38,6 +38,6 @@ pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
-pub use prefix::{range_with_prefix, Bound, Prefix};
+pub use prefix::{range_with_prefix, Bound, Prefix, PrefixBound};
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
