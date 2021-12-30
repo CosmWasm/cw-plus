@@ -1,24 +1,29 @@
-use cosmwasm_std::{Addr, Decimal, Response};
-
-pub struct Ctx;
-pub struct Error;
+use cosmwasm_std::{Addr, Decimal, Deps, DepsMut, Env, MessageInfo, Response, StdError};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
 pub struct QueryResult;
 
 #[cw_derive::interface(module=msg)]
 pub trait Interface {
-    #[msg(exec)]
-    fn no_args_execution(&self, ctx: Ctx) -> Result<Response, Error>;
+    type Error: From<StdError>;
 
     #[msg(exec)]
-    fn argumented_execution(&self, ctx: Ctx, addr: Addr, coef: Decimal, desc: String);
+    fn no_args_execution(&self, ctx: (DepsMut, Env, MessageInfo)) -> Result<Response, Self::Error>;
+
+    #[msg(exec)]
+    fn argumented_execution(
+        &self,
+        ctx: (DepsMut, Env, MessageInfo),
+        addr: Addr,
+        coef: Decimal,
+        desc: String,
+    ) -> Result<Response, Self::Error>;
 
     #[msg(query)]
-    fn no_args_query(&self, ctx: Ctx) -> Result<QueryResult, Error>;
+    fn no_args_query(&self, ctx: (Deps, Env)) -> Result<QueryResult, Self::Error>;
 
     #[msg(query)]
-    fn argumented_query(&self, ctx: Ctx, user: Addr) -> Result<QueryResult, Error>;
+    fn argumented_query(&self, ctx: (Deps, Env), user: Addr) -> Result<QueryResult, Self::Error>;
 }
 
 #[test]
