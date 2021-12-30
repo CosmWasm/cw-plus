@@ -1,4 +1,5 @@
 mod de;
+mod de_old;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -8,6 +9,7 @@ mod int_key;
 mod item;
 mod iter_helpers;
 mod keys;
+mod keys_old;
 mod map;
 mod path;
 mod prefix;
@@ -31,7 +33,8 @@ pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
 // TODO: Remove along with `IntKey`
 pub use int_key::CwIntKey;
 #[allow(deprecated)]
-pub use keys::{Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
+pub use keys::{Key, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
+pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
