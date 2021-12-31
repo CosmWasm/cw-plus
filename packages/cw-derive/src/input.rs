@@ -25,14 +25,10 @@ impl<'a> TraitInput<'a> {
             })
             .collect();
 
-        if item
+        if !item
             .items
             .iter()
-            .find(|item| match item {
-                TraitItem::Type(ty) if ty.ident == Ident::new("Error", ty.ident.span()) => true,
-                _ => false,
-            })
-            .is_none()
+            .any(|item| matches!(item, TraitItem::Type(ty) if ty.ident == Ident::new("Error", ty.ident.span())))
         {
             emit_error!(
                 item.ident.span(), "Missing `Error` type defined for trait.";

@@ -24,7 +24,7 @@ impl<'g> CheckGenerics<'g> {
             .generics
             .iter()
             .filter(|gen| !self.used.contains(*gen))
-            .map(|gen| *gen)
+            .copied()
             .collect();
 
         (self.used, unused)
