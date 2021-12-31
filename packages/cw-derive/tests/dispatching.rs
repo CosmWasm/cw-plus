@@ -113,7 +113,7 @@ fn dispatch() {
         coef: Decimal::percent(70),
         desc: "False".to_owned(),
     }
-    .dispatch(&contract, (deps.as_mut(), env.clone(), info.clone()))
+    .dispatch(&contract, (deps.as_mut(), env.clone(), info))
     .unwrap();
     assert_eq!(resp, Response::new());
 
@@ -125,7 +125,7 @@ fn dispatch() {
     let resp = QueryMsg::ArgumentedQuery {
         user: Addr::unchecked("addr2"),
     }
-    .dispatch(&contract, (deps.as_ref(), env.clone()))
+    .dispatch(&contract, (deps.as_ref(), env))
     .unwrap();
     let resp: QueryResponse = from_binary(&resp).unwrap();
     assert_eq!(
