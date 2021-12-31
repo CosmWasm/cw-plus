@@ -7,9 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
-pub struct QueryResult;
-
 #[cw_derive::interface]
 pub trait Interface {
     type Error: From<StdError>;
