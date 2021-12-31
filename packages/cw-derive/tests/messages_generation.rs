@@ -28,14 +28,25 @@ pub trait Interface {
 
 #[test]
 fn messages_constructible() {
-    let _no_args_exec = ExecMsg::NoArgsExecution {};
+    let no_args_exec = ExecMsg::NoArgsExecution {};
     let _argumented_exec = ExecMsg::ArgumentedExecution {
         addr: Addr::unchecked("owner"),
         coef: Decimal::percent(10),
         desc: "Some description".to_owned(),
     };
-    let _no_args_query = QueryMsg::NoArgsQuery {};
+    let no_args_query = QueryMsg::NoArgsQuery {};
     let _argumented_query = QueryMsg::ArgumentedQuery {
         user: Addr::unchecked("owner"),
     };
+
+    // Ensure no extra variants are generated
+    match no_args_exec {
+        ExecMsg::NoArgsExecution {} => (),
+        ExecMsg::ArgumentedExecution { .. } => (),
+    }
+
+    match no_args_query {
+        QueryMsg::NoArgsQuery {} => (),
+        QueryMsg::ArgumentedQuery { .. } => (),
+    }
 }
