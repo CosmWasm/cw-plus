@@ -9,7 +9,7 @@ use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
-use crate::snapshot::Snapshot;
+use crate::snapshot::{ChangeSet, Snapshot};
 use crate::{Bound, Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
@@ -259,6 +259,30 @@ where
 
     fn no_prefix(&self) -> Prefix<K, T> {
         Prefix::new(self.primary.namespace(), &[])
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T> SnapshotMap<'a, K, T>
+    where
+        T: Serialize + DeserializeOwned + Clone,
+        K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
+{
+    pub fn changelog_range<'c>(
+        &self,
+        store: &'c dyn Storage,
+        k: &K,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order
+    ) -> Box<dyn Iterator<Item=StdResult<(u64, ChangeSet<T>)>> + 'c>
+        where
+            T: 'c,
+            'a: 'c,
+            K: 'c,
+            K::Output: 'static,
+    {
+        self.snapshots.changelog.prefix(k.clone()).range(store,min,max,order)
     }
 }
 
