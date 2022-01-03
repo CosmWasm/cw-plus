@@ -8,7 +8,7 @@ use std::ops::Deref;
 
 use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
-use crate::int_key::CwIntKey;
+use crate::int_key::IntKey;
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::keys::Key;
 use crate::{Endian, Prefixer};
@@ -35,12 +35,12 @@ impl Bound {
     }
 
     /// Turns an int, like Option<u32> into an inclusive bound
-    pub fn inclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
+    pub fn inclusive_int<T: IntKey + Endian>(limit: T) -> Self {
         Bound::Inclusive(limit.to_cw_bytes().into())
     }
 
     /// Turns an int, like Option<u64> into an exclusive bound
-    pub fn exclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
+    pub fn exclusive_int<T: IntKey + Endian>(limit: T) -> Self {
         Bound::Exclusive(limit.to_cw_bytes().into())
     }
 }
