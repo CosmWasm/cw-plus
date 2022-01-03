@@ -26,14 +26,9 @@ pub use indexes::MultiIndex;
 pub use indexes::UniqueIndex;
 #[cfg(feature = "iterator")]
 pub use indexes::{index_string, index_string_tuple, index_triple, index_tuple, Index};
-pub use item::Item;
-// TODO: Remove along with `IntKey`
-#[allow(deprecated)]
-pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
-// TODO: Remove along with `IntKey`
 pub use int_key::CwIntKey;
-#[allow(deprecated)]
-pub use keys::{Key, Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
+pub use item::Item;
+pub use keys::{Key, Prefixer, PrimaryKey};
 pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
