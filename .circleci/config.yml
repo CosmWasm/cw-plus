@@ -680,7 +680,8 @@ jobs:
     environment:
       RUST_BACKTRACE: 1
     steps:
-      - checkout
+      - checkout:
+          path: ~/project
       - run:
           name: Version information (default; stable)
           command: rustc --version && cargo --version
