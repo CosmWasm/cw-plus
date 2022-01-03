@@ -4,6 +4,7 @@ mod expiration;
 mod pagination;
 mod parse_reply;
 mod payment;
+mod scheduled;
 mod threshold;
 
 pub use pagination::{
@@ -20,3 +21,4 @@ pub use threshold::{Threshold, ThresholdError, ThresholdResponse};
 pub use crate::balance::NativeBalance;
 pub use crate::event::Event;
 pub use crate::expiration::{Duration, Expiration, DAY, HOUR, WEEK};
+pub use crate::scheduled::Scheduled;

@@ -1,13 +1,8 @@
-// TODO: Remove along with IntKey
-#![allow(deprecated)]
-
-use cosmwasm_std::{Addr, Timestamp};
-use std::marker::PhantomData;
+use cosmwasm_std::Addr;
 
 use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::int_key::CwIntKey;
-use crate::Endian;
 
 #[derive(Debug)]
 pub enum Key<'a> {
@@ -305,152 +300,9 @@ macro_rules! integer_prefix {
 
 integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
 
-// this auto-implements PrimaryKey for all the IntKey types
-impl<'a, T: Endian + Clone> PrimaryKey<'a> for IntKey<T>
-where
-    IntKey<T>: KeyDeserialize,
-{
-    type Prefix = ();
-    type SubPrefix = ();
-    type Suffix = Self;
-    type SuperSuffix = Self;
-
-    fn key(&self) -> Vec<Key> {
-        self.wrapped.key()
-    }
-}
-
-// this auto-implements Prefixer for all the IntKey types
-impl<'a, T: Endian> Prefixer<'a> for IntKey<T> {
-    fn prefix(&self) -> Vec<Key> {
-        self.wrapped.prefix()
-    }
-}
-
-#[deprecated(note = "It is suggested to use `u8` as key type instead of the `U8Key` wrapper")]
-pub type U8Key = IntKey<u8>;
-#[deprecated(note = "It is suggested to use `u16` as key type instead of the `U16Key` wrapper")]
-pub type U16Key = IntKey<u16>;
-#[deprecated(note = "It is suggested to use `u32` as key type instead of the `U32Key` wrapper")]
-pub type U32Key = IntKey<u32>;
-#[deprecated(note = "It is suggested to use `u64` as key type instead of the `U64Key` wrapper")]
-pub type U64Key = IntKey<u64>;
-#[deprecated(note = "Consider using 64-bit keys instead of the `U128Key` wrapper")]
-pub type U128Key = IntKey<u128>;
-
-#[deprecated(note = "It is suggested to use `i8` as key type instead of the `I8Key` wrapper")]
-pub type I8Key = IntKey<i8>;
-#[deprecated(note = "It is suggested to use `i16` as key type instead of the `I16Key` wrapper")]
-pub type I16Key = IntKey<i16>;
-#[deprecated(note = "It is suggested to use `i32` as key type instead of the `I32Key` wrapper")]
-pub type I32Key = IntKey<i32>;
-#[deprecated(note = "It is suggested to use `i64` as key type instead of the `I64Key` wrapper")]
-pub type I64Key = IntKey<i64>;
-#[deprecated(note = "Consider using 64-bit keys instead of the `I128Key` wrapper")]
-pub type I128Key = IntKey<i128>;
-
-/// It will cast one-particular int type into a Key via Vec<u8>, ensuring you don't mix up u32 and u64
-/// You can use new or the from/into pair to build a key from an int:
-///
-///   let k = U64Key::new(12345);
-///   let k = U32Key::from(12345);
-///   let k: U16Key = 12345.into();
-#[deprecated(note = "It is suggested to use naked int types instead of IntKey wrapper")]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IntKey<T: Endian> {
-    pub wrapped: Vec<u8>,
-    pub data: PhantomData<T>,
-}
-
-impl<T: CwIntKey + Endian> IntKey<T> {
-    pub fn new(val: T) -> Self {
-        IntKey {
-            wrapped: val.to_cw_bytes().into(),
-            data: PhantomData,
-        }
-    }
-}
-
-impl<T: CwIntKey + Endian> From<T> for IntKey<T> {
-    fn from(val: T) -> Self {
-        IntKey::new(val)
-    }
-}
-
-impl<T: Endian> From<Vec<u8>> for IntKey<T> {
-    fn from(wrap: Vec<u8>) -> Self {
-        // TODO: Consider properly handling case, when `wrap` has length not conforming for the
-        // wrapped integer type.
-        IntKey {
-            wrapped: wrap,
-            data: PhantomData,
-        }
-    }
-}
-
-impl<T: Endian> From<IntKey<T>> for Vec<u8> {
-    fn from(k: IntKey<T>) -> Vec<u8> {
-        k.wrapped
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TimestampKey(U64Key);
-
-impl TimestampKey {
-    pub fn new(ts: Timestamp) -> Self {
-        Self(ts.nanos().into())
-    }
-}
-
-impl<'a> PrimaryKey<'a> for TimestampKey {
-    type Prefix = ();
-    type SubPrefix = ();
-    type Suffix = Self;
-    type SuperSuffix = Self;
-
-    fn key(&self) -> Vec<Key> {
-        self.0.key()
-    }
-}
-
-impl<'a> Prefixer<'a> for TimestampKey {
-    fn prefix(&self) -> Vec<Key> {
-        self.0.prefix()
-    }
-}
-
-impl From<Vec<u8>> for TimestampKey {
-    fn from(val: Vec<u8>) -> Self {
-        Self(val.into())
-    }
-}
-
-impl From<Timestamp> for TimestampKey {
-    fn from(val: Timestamp) -> Self {
-        Self::new(val)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn u64key_works() {
-        let k: U64Key = 134u64.into();
-        let path = k.key();
-        assert_eq!(1, path.len());
-        assert_eq!(134u64.to_cw_bytes(), path[0].as_ref());
-    }
-
-    #[test]
-    fn u32key_works() {
-        let k: U32Key = 4242u32.into();
-        let path = k.key();
-        assert_eq!(1, path.len());
-        assert_eq!(4242u32.to_cw_bytes(), path[0].as_ref());
-    }
 
     #[test]
     fn naked_8key_works() {
@@ -550,21 +402,8 @@ mod test {
     }
 
     #[test]
-    fn composite_int_key() {
-        // Note we don't spec the int types (u32, u64) on the right,
-        // just the keys they convert into
-        let k: (U32Key, U64Key) = (123.into(), 87654.into());
-        let path = k.key();
-        assert_eq!(2, path.len());
-        assert_eq!(4, path[0].as_ref().len());
-        assert_eq!(8, path[1].as_ref().len());
-        assert_eq!(path[0].as_ref(), 123u32.to_cw_bytes());
-        assert_eq!(path[1].as_ref(), 87654u64.to_cw_bytes());
-    }
-
-    #[test]
     fn naked_composite_int_key() {
-        let k: (u32, U64Key) = (123, 87654.into());
+        let k: (u32, u64) = (123, 87654);
         let path = k.key();
         assert_eq!(2, path.len());
         assert_eq!(4, path[0].as_ref().len());
@@ -587,35 +426,6 @@ mod test {
         let dir = k.0.prefix();
         assert_eq!(2, dir.len());
         assert_eq!(dir, vec![first, b"bar"]);
-    }
-
-    #[test]
-    fn proper_prefixes() {
-        let simple: &str = "hello";
-        assert_eq!(simple.prefix().len(), 1);
-        assert_eq!(simple.prefix()[0].as_ref(), b"hello");
-
-        let pair: (U32Key, &[u8]) = (12345.into(), b"random");
-        let one: Vec<u8> = vec![0, 0, 48, 57];
-        let two: Vec<u8> = b"random".to_vec();
-        assert_eq!(pair.prefix(), vec![one.as_slice(), two.as_slice()]);
-
-        let triple: (&str, U32Key, &[u8]) = ("begin", 12345.into(), b"end");
-        let one: Vec<u8> = b"begin".to_vec();
-        let two: Vec<u8> = vec![0, 0, 48, 57];
-        let three: Vec<u8> = b"end".to_vec();
-        assert_eq!(
-            triple.prefix(),
-            vec![one.as_slice(), two.as_slice(), three.as_slice()]
-        );
-
-        // same works with owned variants (&str -> String, &[u8] -> Vec<u8>)
-        let owned_triple: (String, U32Key, Vec<u8>) =
-            ("begin".to_string(), 12345.into(), b"end".to_vec());
-        assert_eq!(
-            owned_triple.prefix(),
-            vec![one.as_slice(), two.as_slice(), three.as_slice()]
-        );
     }
 
     #[test]

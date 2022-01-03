@@ -1,4 +1,5 @@
 mod de;
+mod de_old;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -8,6 +9,7 @@ mod int_key;
 mod item;
 mod iter_helpers;
 mod keys;
+mod keys_old;
 mod map;
 mod path;
 mod prefix;
@@ -24,17 +26,13 @@ pub use indexes::MultiIndex;
 pub use indexes::UniqueIndex;
 #[cfg(feature = "iterator")]
 pub use indexes::{index_string, index_string_tuple, index_triple, index_tuple, Index};
-pub use item::Item;
-// TODO: Remove along with `IntKey`
-#[allow(deprecated)]
-pub use keys::{I128Key, I16Key, I32Key, I64Key, I8Key};
-// TODO: Remove along with `IntKey`
 pub use int_key::CwIntKey;
-#[allow(deprecated)]
-pub use keys::{Prefixer, PrimaryKey, U128Key, U16Key, U32Key, U64Key, U8Key};
+pub use item::Item;
+pub use keys::{Key, Prefixer, PrimaryKey};
+pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
-pub use prefix::{range_with_prefix, Bound, Prefix};
+pub use prefix::{range_with_prefix, Bound, Prefix, PrefixBound};
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};

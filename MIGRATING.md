@@ -6,9 +6,90 @@ This guide lists API changes between *cw-plus* major releases.
 
 ### Breaking Issues / PRs
 
+- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
+  Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
+
+As part of range iterators revamping, we fixed the order of signed integer keys. You shouldn't change anything in your
+code base for this, but if you were using signed keys and relying on their ordering, that has now changed for the better.
+Take into account also that **the internal representation of signed integer keys has changed**. So, if you
+have data stored under signed integer keys you would need to **migrate it**, or recreate it under the new representation.
+
+As part of this, a couple helpers for handling int keys serialization and deserialization were introduced:
+- `from_cw_bytes` Integer (signed and unsigned) values deserialization.
+- `to_cw_bytes` - Integer (signed and unsigned) values serialization.
+
+You shouldn't need these, except when manually handling raw integer keys serialization / deserialization.
+
+Migration code example:
+```rust
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
+  let version: Version = CONTRACT_VERSION.parse()?;
+  let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;
+
+  if storage_version < version {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    // Do the migration
+    // Original map
+    let signed_int_map: Map<IntKeyOld<i8>, String> = Map::new("signed_int_map");
+
+    // New map (using a different namespace for safety. It could be the same with enough care)
+    let signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
+
+    // Obtain all current keys (this will need to be paginated if there are many entries,
+    // i.e. i32 or i64 instead of i8).
+    // This may be gas intensive
+    let current = signed_int_map
+            .range(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+
+    // Store length for quality control (adjust if paginated)
+    let current_count = current.len();
+
+    // Remove the old map keys
+    for (k, _) in current.iter() {
+      signed_int_map.remove(deps.storage, (*k).into());
+    }
+
+    // Save in new format
+    for (k, v) in current.into_iter() {
+      signed_int_map_new.save(deps.storage, k, &v)?;
+    }
+
+    // Confirm old map is empty
+    if signed_int_map
+            .keys_raw(deps.storage, None, None, Order::Ascending)
+            .next()
+            .is_some()
+    {
+      return Err(StdError::generic_err("Original still not empty!").into());
+    }
+
+    // Obtain new keys, and confirm their amount.
+    // May be gas intensive.
+    let new_count = signed_int_map_new
+            .keys_raw(deps.storage, None, None, Order::Ascending)
+            .count();
+
+    if current_count != new_count {
+      return Err(StdError::generic_err(format!(
+        "Current ({}) and new ({}) counts differ!",
+        current_count, new_count
+      ))
+              .into());
+    }
+  }
+
+  Ok(Response::new())
+}
+```
+
+---
+
 - Rename cw0 to utils [\#471](https://github.com/CosmWasm/cw-plus/issues/471) / Cw0 rename [\#508](https://github.com/CosmWasm/cw-plus/pull/508)
 
-The `cw0` package was renamed to `utils`. The required changes are straightforward:
+The `cw0` package was renamed to `cw-utils`. The required changes are straightforward:
 
 ```diff
 diff --git a/contracts/cw1-subkeys/Cargo.toml b/contracts/cw1-subkeys/Cargo.toml
@@ -189,52 +270,6 @@ index 022a4504..c7a3bb9d 100644
          let key = map.idx.name.index_key(key);
          // Iterate using a bound over the raw key
          let count = map
-```
-
----
-
-- Incorrect I32Key Index Ordering [\#489](https://github.com/CosmWasm/cw-plus/issues/489) /
-Signed int keys order [\#582](https://github.com/CosmWasm/cw-plus/pull/582)
-
-As part of range iterators revamping, we fixed the order of signed integer keys. You shouldn't change anything in your
-code base for this, but if you were using signed keys and relying on their ordering, that has now changed for the better.
-Take into account also that **the internal representation of signed integer keys has changed**. So, if you
-have data stored under signed integer keys you would need to **migrate it**, or recreate it under the new representation.
-
-As part of this, a couple helpers for handling int keys serialization and deserialization were introduced:
- - `from_cw_bytes` Integer (signed and unsigned) values deserialization.
- - `to_cw_bytes` - Integer (signed and unsigned) values serialization.
-
-You shouldn't need these, except when manually handling raw integer keys serialization / deserialization.
-
-Migration code example:
-```rust
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let version = get_contract_version(deps.storage)?;
-    if version.contract != CONTRACT_NAME {
-        return Err(ContractError::CannotMigrate {
-            previous_contract: version.contract,
-        });
-    }
-    // Original map
-    signed_int_map: Map<i8, String> = Map::new("signed_int_map");
-    // New map
-    signed_int_map_new: Map<i8, String> = Map::new("signed_int_map-v2");
-
-    signed_int_map
-        .range_raw(deps.storage, None, None, Order::Ascending)
-        .map(|(k, v)| {
-            let signed = i8::from_be_bytes(k);
-            signed_int_map_new.save(deps.storage, signed, v);
-        })
-        .collect()?;
-
-    // Code to remove the old map keys
-    ...
-
-    Ok(Response::default())
-}
 ```
 
 ---
