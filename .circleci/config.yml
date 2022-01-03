@@ -33,10 +33,7 @@ workflows:
               only:
                 # Long living branches
                 - main
-                - /^[0-9]+\.[0-9]+$/
                 # 👇Add your branch here if benchmarking matters to your work
-                - benchmarking
-                - signed-int-key-bench
   deploy:
     jobs:
       - build_and_upload_contracts:
