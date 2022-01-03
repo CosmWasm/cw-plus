@@ -3,7 +3,7 @@ use std::convert::TryInto;
 
 use cosmwasm_std::{Addr, StdError, StdResult};
 
-use crate::int_key::IntKey;
+use crate::int_key::CwIntKey;
 
 pub trait KeyDeserialize {
     type Output: Sized;

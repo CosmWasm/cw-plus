@@ -254,7 +254,7 @@ mod test {
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
-    use crate::int_key::IntKey;
+    use crate::int_key::CwIntKey;
     use crate::keys_old::IntKeyOld;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]

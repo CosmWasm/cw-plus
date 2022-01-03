@@ -2,7 +2,7 @@ use cosmwasm_std::Addr;
 
 use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
-use crate::int_key::IntKey;
+use crate::int_key::CwIntKey;
 
 #[derive(Debug)]
 pub enum Key<'a> {
