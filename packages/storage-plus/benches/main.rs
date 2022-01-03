@@ -12,8 +12,7 @@ fn bench_signed_int_key(c: &mut Criterion) {
     fn k() -> i32 {
         // let k: i32 = 0x42434445;
         // k
-        let r = rand::thread_rng().gen_range(i32::MIN..i32::MAX);
-        r
+        rand::thread_rng().gen_range(i32::MIN..i32::MAX)
     }
     // For the asserts
     let k_check = k();
@@ -103,8 +102,7 @@ fn bench_unsigned_int_key(c: &mut Criterion) {
     fn k() -> u32 {
         // let k: u32 = 0x42434445;
         // k
-        let r = rand::thread_rng().gen_range(u32::MIN..u32::MAX);
-        r
+        rand::thread_rng().gen_range(u32::MIN..u32::MAX)
     }
     // For the asserts
     let k_check = k();
