@@ -6,11 +6,11 @@ pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
 use crate::de::KeyDeserialize;
-use crate::{Bound, keys, Map, Prefix, Prefixer, PrimaryKey};
+use crate::prefix::PrefixBound;
+use crate::{keys, Bound, Map, Prefix, Prefixer, PrimaryKey};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use crate::prefix::PrefixBound;
 
 /// Structure holding a map of checkpoints composited from
 /// height (as u64) and counter of how many times it has
@@ -162,9 +162,9 @@ where
 
 #[cfg(feature = "iterator")]
 impl<'a, K, T> Snapshot<'a, K, T>
-    where
-        T: Serialize + DeserializeOwned + Clone,
-        K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
     pub fn changelog_range<'c>(
         &self,
@@ -172,15 +172,17 @@ impl<'a, K, T> Snapshot<'a, K, T>
         k: K,
         min: Option<Bound>,
         max: Option<Bound>,
-        order: cosmwasm_std::Order
-    ) -> Box<dyn Iterator<Item=StdResult<(u64, ChangeSet<T>)>> + 'c>
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'c>
     where
         T: 'c,
         'a: 'c,
         K: 'c,
         K::Output: 'static,
     {
-        self.changelog.prefix(k.clone()).range(store,min,max,order)
+        self.changelog
+            .prefix(k.clone())
+            .range(store, min, max, order)
     }
 }
 

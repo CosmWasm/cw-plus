@@ -264,9 +264,9 @@ where
 
 #[cfg(feature = "iterator")]
 impl<'a, K, T> SnapshotMap<'a, K, T>
-    where
-        T: Serialize + DeserializeOwned + Clone,
-        K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
+where
+    T: Serialize + DeserializeOwned + Clone,
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
     pub fn changelog_range<'c>(
         &self,
@@ -274,15 +274,18 @@ impl<'a, K, T> SnapshotMap<'a, K, T>
         k: &K,
         min: Option<Bound>,
         max: Option<Bound>,
-        order: cosmwasm_std::Order
-    ) -> Box<dyn Iterator<Item=StdResult<(u64, ChangeSet<T>)>> + 'c>
-        where
-            T: 'c,
-            'a: 'c,
-            K: 'c,
-            K::Output: 'static,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'c>
+    where
+        T: 'c,
+        'a: 'c,
+        K: 'c,
+        K::Output: 'static,
     {
-        self.snapshots.changelog.prefix(k.clone()).range(store,min,max,order)
+        self.snapshots
+            .changelog
+            .prefix(k.clone())
+            .range(store, min, max, order)
     }
 }
 
