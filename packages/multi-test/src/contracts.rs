@@ -342,7 +342,7 @@ where
         (self.execute_fn)(deps, env, info.clone(), msg.clone())
             .map_err(|err| anyhow!("{}", err))
             .context(format!(
-                r#"Contract returned an error on execute
+                r#"aContract returned an error on execute
 Contract address: {}
 Message sender: {}
 Funds: {:?}
