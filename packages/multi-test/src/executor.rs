@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use utils::{parse_execute_response_data, parse_instantiate_response_data};
 
-use anyhow::{Context, Result as AnyResult};
+use anyhow::Result as AnyResult;
 
 #[derive(Default, Clone, Debug)]
 pub struct AppResponse {
@@ -111,18 +111,7 @@ where
             msg: binary_msg,
             funds: send_funds.to_vec(),
         };
-        let mut res = self
-            .execute(sender.clone(), wrapped_msg.into())
-            .context(format!(
-                r#"Contract returned an error on execute
-Contract address: {}
-Message sender: {}
-Funds: {:?}
-Message dump:
-{:?}
-"#,
-                contract_addr, sender, send_funds, msg,
-            ))?;
+        let mut res = self.execute(sender.clone(), wrapped_msg.into())?;
         res.data = res
             .data
             .and_then(|d| parse_execute_response_data(d.as_slice()).unwrap().data);

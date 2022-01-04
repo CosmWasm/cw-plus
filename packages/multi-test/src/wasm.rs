@@ -23,7 +23,7 @@ use crate::executor::AppResponse;
 use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
 
-use anyhow::{bail, Result as AnyResult};
+use anyhow::{bail, Context, Result as AnyResult};
 
 // TODO: we should import this from cosmwasm-std, but cannot due to non_exhaustive so copy here
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -174,7 +174,11 @@ where
         sender: Addr,
         msg: WasmMsg,
     ) -> AnyResult<AppResponse> {
-        self.execute_wasm(api, storage, router, block, sender, msg)
+        self.execute_wasm(api, storage, router, block, sender.clone(), msg.clone())
+            .context(format!(
+                "error executing WasmMsg:\nsender: {}\n{:?}",
+                sender, msg
+            ))
     }
 
     fn sudo(
@@ -297,7 +301,10 @@ where
                 )?;
 
                 // then call the contract
-                let info = MessageInfo { sender, funds };
+                let info = MessageInfo {
+                    sender: sender.clone(),
+                    funds: funds.clone(),
+                };
                 let res = self.call_execute(
                     api,
                     storage,

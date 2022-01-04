@@ -339,18 +339,11 @@ where
         msg: Vec<u8>,
     ) -> AnyResult<Response<C>> {
         let msg: T1 = from_slice(&msg)?;
-        let address = env.contract.address.clone();
         (self.execute_fn)(deps, env, info.clone(), msg.clone())
             .map_err(|err| anyhow::Error::from(err))
             .context(format!(
-                r#"Contract returned an error on execute
-Contract address: {}
-Message sender: {}
-Funds: {:?}
-Message dump:
-{:?}
-"#,
-                address, info.sender, info.funds, msg,
+                "Contract returned an error on execute msg:\n{:?}",
+                msg,
             ))
     }
 

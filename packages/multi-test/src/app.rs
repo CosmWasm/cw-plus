@@ -2600,35 +2600,19 @@ mod test {
             let err = app
                 .execute_contract(Addr::unchecked("random"), contract_addr.clone(), &msg, &[])
                 .unwrap_err();
+
+            // we should be able to retrieve the original error by downcasting
             let source: &StdError = err.downcast_ref().unwrap();
             if let StdError::GenericErr { msg } = source {
                 assert_eq!(msg, "Handle failed");
             } else {
                 panic!("wrong StdError variant");
             }
+
+            // we're expecting exactly 3 wrapped errors
+            // (the original error, execute msg context, WasmMsg context)
+            assert_eq!(err.chain().count(), 3);
         }
-
-        // #[test]
-        // fn simple_call_gives_one_context_layer() {
-        //     let owner = Addr::unchecked("owner");
-        //     let mut app = App::default();
-
-        //     let error_code_id = app.store_code(error::contract(true));
-
-        //     // set up contract
-        //     let msg = EmptyMsg {};
-        //     let error_addr = app
-        //         .instantiate_contract(error_code_id, owner, &msg, &[], "error", None)
-        //         .unwrap();
-
-        //     // execute should error
-        //     let err = app
-        //         .execute_contract(Addr::unchecked("random"), error_addr.clone(), &msg, &[])
-        //         .unwrap();
-        //     //let source = err.source().unwrap();
-        //     //let foo: &StdError = source.downcast_ref().unwrap();
-        //     //assert_eq!(source.to_string(), "aContract returned an error on execute\nContract address: Contract #0\nMessage sender: random\nFunds: []\nMessage dump:\nEmptyMsg\n");
-        // }
 
         #[test]
         fn nested_call() {
@@ -2664,6 +2648,10 @@ mod test {
             } else {
                 panic!("wrong StdError variant");
             }
+
+            // we're expecting exactly 4 wrapped errors
+            // (the original error, execute msg context, 2 WasmMsg contexts)
+            assert_eq!(err.chain().count(), 4);
         }
 
         #[test]
@@ -2708,6 +2696,10 @@ mod test {
             } else {
                 panic!("wrong StdError variant");
             }
+
+            // we're expecting exactly 5 wrapped errors
+            // (the original error, execute msg context, 3 WasmMsg contexts)
+            assert_eq!(err.chain().count(), 5);
         }
     }
 }
