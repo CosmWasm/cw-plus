@@ -9,7 +9,7 @@ use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
-use crate::snapshot::Snapshot;
+use crate::snapshot::{ChangeSet, Snapshot};
 use crate::{Bound, Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
@@ -43,6 +43,10 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
             primary: Map::new(pk),
             snapshots: Snapshot::new(checkpoints, changelog, strategy),
         }
+    }
+
+    pub fn changelog(&self) -> &Map<'a, (K, u64), ChangeSet<T>> {
+        &self.snapshots.changelog
     }
 }
 

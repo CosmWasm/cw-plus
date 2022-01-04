@@ -172,7 +172,7 @@ pub enum Strategy {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
-pub(crate) struct ChangeSet<T> {
+pub struct ChangeSet<T> {
     pub old: Option<T>,
 }
 
