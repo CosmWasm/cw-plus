@@ -268,24 +268,19 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
-    pub fn changelog_range<'c>(
+    pub fn changelog_range(
         &self,
-        store: &'c dyn Storage,
-        k: &K,
+        store: &'a dyn Storage,
+        k: K,
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'a>
     where
-        T: 'c,
-        'a: 'c,
-        K: 'c,
         K::Output: 'static,
+        T: 'a,
     {
-        self.snapshots
-            .changelog
-            .prefix(k.clone())
-            .range(store, min, max, order)
+        self.snapshots.changelog_range(store, k, min, max, order)
     }
 }
 
@@ -613,5 +608,24 @@ mod tests {
                 (("C".into(), "A".into()), 22)
             ]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn changelog_range() {
+        use cosmwasm_std::Order;
+
+        let mut store = MockStorage::new();
+        init_data_composite_key(&EVERY_COMPOSITE_KEY, &mut store);
+
+        let res: StdResult<Vec<_>> = EVERY_COMPOSITE_KEY
+            .changelog_range(&store, ("A", "B"), None, None, Order::Ascending)
+            .collect();
+        let expected = vec![
+            (1, ChangeSet { old: None }),
+            (3, ChangeSet { old: Some(5) }),
+            (5, ChangeSet { old: Some(8) }),
+        ];
+        assert_eq!(res.unwrap(), expected)
     }
 }

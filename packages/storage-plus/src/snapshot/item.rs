@@ -3,8 +3,8 @@ use serde::Serialize;
 
 use cosmwasm_std::{StdError, StdResult, Storage};
 
-use crate::snapshot::Snapshot;
-use crate::{Item, Strategy};
+use crate::snapshot::{ChangeSet, Snapshot};
+use crate::{Bound, Item, Strategy};
 
 /// Item that maintains a snapshot of one or more checkpoints.
 /// We can query historical data as well as current state.
@@ -121,11 +121,30 @@ where
         Ok(output)
     }
 }
+#[cfg(feature = "iterator")]
+impl<'a, T> SnapshotItem<'a, T>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
+    pub fn changelog_range(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound>,
+        max: Option<Bound>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'a>
+    where
+        T: 'a,
+    {
+        self.snapshots.changelog_range(store, (), min, max, order)
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::Order;
 
     type TestItem = SnapshotItem<'static, u64>;
 
@@ -271,5 +290,42 @@ mod tests {
             .unwrap();
         assert_eq!(None, EVERY.may_load_at_height(&storage, 5).unwrap());
         assert_eq!(Some(2), EVERY.may_load_at_height(&storage, 6).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn changelog_range() {
+        let mut storage = MockStorage::new();
+        init_data(&EVERY, &mut storage);
+
+        let res: StdResult<Vec<_>> = EVERY
+            .changelog_range(
+                &storage,
+                Some(Bound::exclusive_int(3u64)),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let expected = vec![
+            (4, ChangeSet { old: Some(8) }),
+            (5, ChangeSet { old: Some(13) }),
+        ];
+        assert_eq!(res.unwrap(), expected);
+
+        let res: StdResult<Vec<_>> = EVERY
+            .changelog_range(
+                &storage,
+                None,
+                Some(Bound::exclusive_int(5u64)),
+                Order::Ascending,
+            )
+            .collect();
+        let expected = vec![
+            (1, ChangeSet { old: None }),
+            (2, ChangeSet { old: Some(5) }),
+            (3, ChangeSet { old: Some(7) }),
+            (4, ChangeSet { old: Some(8) }),
+        ];
+        assert_eq!(res.unwrap(), expected)
     }
 }

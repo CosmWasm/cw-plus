@@ -174,12 +174,9 @@ where
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'a>
     where
-        K::Output: 'static,
-        T: 'a
+        T: 'a,
     {
-        self.changelog
-            .prefix(k)
-            .range(store, min, max, order)
+        self.changelog.prefix(k).range(store, min, max, order)
     }
 }
 
@@ -436,29 +433,44 @@ mod tests {
             .write_changelog(&mut storage, DUMMY_KEY, 5, Some(600))
             .unwrap();
 
-        let res: StdResult<Vec<_>> = EVERY.changelog_range(&storage,DUMMY_KEY, None, None, Order::Ascending).collect();
+        let res: StdResult<Vec<_>> = EVERY
+            .changelog_range(&storage, DUMMY_KEY, None, None, Order::Ascending)
+            .collect();
         let expected = vec![
-            (3, ChangeSet{ old: Some(101)}),
-            (4, ChangeSet{ old: Some(500)}),
-            (5, ChangeSet{ old: Some(600)}),
+            (3, ChangeSet { old: Some(101) }),
+            (4, ChangeSet { old: Some(500) }),
+            (5, ChangeSet { old: Some(600) }),
         ];
         assert_eq!(res.unwrap(), expected);
 
-        let res: StdResult<Vec<_>> =
-            EVERY.changelog_range(&storage,  DUMMY_KEY,Some(Bound::exclusive_int(3u64)),None, Order::Ascending).collect();
+        let res: StdResult<Vec<_>> = EVERY
+            .changelog_range(
+                &storage,
+                DUMMY_KEY,
+                Some(Bound::exclusive_int(3u64)),
+                None,
+                Order::Ascending,
+            )
+            .collect();
         let expected = vec![
-            (4, ChangeSet{ old: Some(500)}),
-            (5, ChangeSet{ old: Some(600)}),
+            (4, ChangeSet { old: Some(500) }),
+            (5, ChangeSet { old: Some(600) }),
         ];
         assert_eq!(res.unwrap(), expected);
 
-        let res: StdResult<Vec<_>> =
-            EVERY.changelog_range(&storage,  DUMMY_KEY,None, Some(Bound::exclusive_int(5u64)), Order::Ascending).collect();
+        let res: StdResult<Vec<_>> = EVERY
+            .changelog_range(
+                &storage,
+                DUMMY_KEY,
+                None,
+                Some(Bound::exclusive_int(5u64)),
+                Order::Ascending,
+            )
+            .collect();
         let expected = vec![
-            (3, ChangeSet{ old: Some(101)}),
-            (4, ChangeSet{ old: Some(500)}),
+            (3, ChangeSet { old: Some(101) }),
+            (4, ChangeSet { old: Some(500) }),
         ];
         assert_eq!(res.unwrap(), expected)
-
     }
 }
