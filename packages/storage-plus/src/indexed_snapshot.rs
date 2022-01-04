@@ -9,8 +9,8 @@ use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
-use crate::snapshot::SnapshotMap;
-use crate::{IndexList, Path, Strategy};
+use crate::snapshot::{ChangeSet, SnapshotMap};
+use crate::{IndexList, Map, Path, Strategy};
 
 /// `IndexedSnapshotMap` works like a `SnapshotMap` but has a secondary index
 pub struct IndexedSnapshotMap<'a, K, T, I> {
@@ -55,6 +55,10 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
             primary: SnapshotMap::new(pk_namespace, checkpoints, changelog, strategy),
             idx: indexes,
         }
+    }
+
+    pub fn changelog(&self) -> &Map<'a, (K, u64), ChangeSet<T>> {
+        &self.primary.changelog()
     }
 }
 
