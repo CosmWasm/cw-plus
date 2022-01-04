@@ -2585,6 +2585,31 @@ mod test {
         use super::*;
 
         #[test]
+        fn simple_instantiation() {
+            let owner = Addr::unchecked("owner");
+            let mut app = App::default();
+
+            // set up contract
+            let code_id = app.store_code(error::contract(false));
+            let msg = EmptyMsg {};
+            let err = app
+                .instantiate_contract(code_id, owner, &msg, &[], "error", None)
+                .unwrap_err();
+
+            // we should be able to retrieve the original error by downcasting
+            let source: &StdError = err.downcast_ref().unwrap();
+            if let StdError::GenericErr { msg } = source {
+                assert_eq!(msg, "Init failed");
+            } else {
+                panic!("wrong StdError variant");
+            }
+
+            // we're expecting exactly 3 nested error types
+            // (the original error, initiate msg context, WasmMsg context)
+            assert_eq!(err.chain().count(), 3);
+        }
+
+        #[test]
         fn simple_call() {
             let owner = Addr::unchecked("owner");
             let mut app = App::default();

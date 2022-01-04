@@ -319,13 +319,13 @@ impl<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6> Contract<C>
     for ContractWrapper<T1, T2, T3, E1, E2, E3, C, T4, E4, E5, T6, E6>
 where
     T1: DeserializeOwned + Debug + Clone,
-    T2: DeserializeOwned,
-    T3: DeserializeOwned,
+    T2: DeserializeOwned + Debug + Clone,
+    T3: DeserializeOwned + Debug + Clone,
     T4: DeserializeOwned,
     T6: DeserializeOwned,
     E1: Display + Debug + Send + Sync + Error + 'static,
-    E2: Display + Debug + Send + Sync + 'static,
-    E3: Display + Debug + Send + Sync + 'static,
+    E2: Display + Debug + Send + Sync + Error + 'static,
+    E3: Display + Debug + Send + Sync + Error + 'static,
     E4: Display + Debug + Send + Sync + 'static,
     E5: Display + Debug + Send + Sync + 'static,
     E6: Display + Debug + Send + Sync + 'static,
@@ -354,13 +354,23 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<C>> {
-        let msg = from_slice(&msg)?;
-        (self.instantiate_fn)(deps, env, info, msg).map_err(|err| anyhow!(err))
+        let msg: T2 = from_slice(&msg)?;
+        (self.instantiate_fn)(deps, env, info, msg.clone())
+            .map_err(anyhow::Error::from)
+            .context(format!(
+                "Contract returned an error on instantiate msg:\n{:?}",
+                msg,
+            ))
     }
 
     fn query(&self, deps: Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
-        let msg = from_slice(&msg)?;
-        (self.query_fn)(deps, env, msg).map_err(|err| anyhow!(err))
+        let msg: T3 = from_slice(&msg)?;
+        (self.query_fn)(deps, env, msg.clone())
+            .map_err(anyhow::Error::from)
+            .context(format!(
+                "Contract returned an error on query msg:\n{:?}",
+                msg,
+            ))
     }
 
     // this returns an error if the contract doesn't implement sudo
