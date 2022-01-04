@@ -612,6 +612,65 @@ mod test {
     }
 
     #[test]
+    fn changelog_range_works() {
+        let mut store = MockStorage::new();
+        let map = build_snapshot_map();
+        let mut height = 1;
+
+        // simple data for testing
+        // EVERY.remove(&mut store, "B", 4).unwrap();
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk_a = "A";
+        map.save(&mut store, pk_a, &data1, height).unwrap();
+        height += 1;
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk_b = "B";
+        map.save(&mut store, pk_b, &data2, height).unwrap();
+        height += 1;
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Williams".to_string(),
+            age: 24,
+        };
+        map.update(&mut store, pk_a, height, |_| -> StdResult<Data> {
+            Ok(data3)
+        })
+        .unwrap();
+
+        height += 1;
+        map.remove(&mut store, pk_b, height).unwrap();
+
+        let changes: Vec<_> = map
+            .changelog()
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<_>>()
+            .unwrap();
+        let count = changes.len();
+        assert_eq!(4, count);
+
+        // sorted by ascending key, height
+        assert_eq!(
+            changes,
+            vec![
+                (("A".into(), 1), ChangeSet { old: None }),
+                (("A".into(), 3), ChangeSet { old: Some(data1) }),
+                (("B".into(), 2), ChangeSet { old: None }),
+                (("B".into(), 4), ChangeSet { old: Some(data2) })
+            ]
+        );
+    }
+
+    #[test]
     fn range_raw_composite_key_by_multi_index() {
         let mut store = MockStorage::new();
         let mut height = 2;
