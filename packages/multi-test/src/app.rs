@@ -2609,7 +2609,7 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 3 wrapped errors
+            // we're expecting exactly 3 nested error types
             // (the original error, execute msg context, WasmMsg context)
             assert_eq!(err.chain().count(), 3);
         }
@@ -2649,7 +2649,7 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 4 wrapped errors
+            // we're expecting exactly 4 nested error types
             // (the original error, execute msg context, 2 WasmMsg contexts)
             assert_eq!(err.chain().count(), 4);
         }
@@ -2689,6 +2689,9 @@ mod test {
                 .execute_contract(Addr::unchecked("random"), caller_addr1, &msg, &[])
                 .unwrap_err();
 
+            // uncomment to have the test fail and see how the error stringifies
+            // panic!("{:?}", err);
+
             // we can downcast to get the original error
             let source: &StdError = err.downcast_ref().unwrap();
             if let StdError::GenericErr { msg } = source {
@@ -2697,7 +2700,7 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 5 wrapped errors
+            // we're expecting exactly 5 nested error types
             // (the original error, execute msg context, 3 WasmMsg contexts)
             assert_eq!(err.chain().count(), 5);
         }
