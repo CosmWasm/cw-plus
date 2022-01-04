@@ -6,8 +6,7 @@ pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
 use crate::de::KeyDeserialize;
-use crate::prefix::PrefixBound;
-use crate::{keys, Bound, Map, Prefix, Prefixer, PrimaryKey};
+use crate::{Bound, Map, Prefixer, PrimaryKey};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -22,7 +21,7 @@ pub(crate) struct Snapshot<'a, K, T> {
 
     // this stores all changes (key, height). Must differentiate between no data written,
     // and explicit None (just inserted)
-    pub changelog: Map<'a, (K, u64), ChangeSet<T>>,
+    changelog: Map<'a, (K, u64), ChangeSet<T>>,
 
     // How aggressive we are about checkpointing all data
     strategy: Strategy,
@@ -166,22 +165,20 @@ where
     T: Serialize + DeserializeOwned + Clone,
     K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
 {
-    pub fn changelog_range<'c>(
+    pub fn changelog_range(
         &self,
-        store: &'c dyn Storage,
+        store: &'a dyn Storage,
         k: K,
         min: Option<Bound>,
         max: Option<Bound>,
         order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'c>
+    ) -> Box<dyn Iterator<Item = StdResult<(u64, ChangeSet<T>)>> + 'a>
     where
-        T: 'c,
-        'a: 'c,
-        K: 'c,
         K::Output: 'static,
+        T: 'a
     {
         self.changelog
-            .prefix(k.clone())
+            .prefix(k)
             .range(store, min, max, order)
     }
 }
@@ -414,5 +411,54 @@ mod tests {
             SELECT.may_load_at_height(&storage, DUMMY_KEY, 3),
             Ok(Some(Some(102)))
         );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn test_changelog_range() {
+        let mut storage = MockStorage::new();
+
+        // Add a checkpoint at 3
+        EVERY.add_checkpoint(&mut storage, 3).unwrap();
+        EVERY.add_checkpoint(&mut storage, 4).unwrap();
+        EVERY.add_checkpoint(&mut storage, 5).unwrap();
+
+        assert_eq!(EVERY.may_load_at_height(&storage, DUMMY_KEY, 3), Ok(None));
+
+        // Write a changelog between 3-5
+        EVERY
+            .write_changelog(&mut storage, DUMMY_KEY, 3, Some(101))
+            .unwrap();
+        EVERY
+            .write_changelog(&mut storage, DUMMY_KEY, 4, Some(500))
+            .unwrap();
+        EVERY
+            .write_changelog(&mut storage, DUMMY_KEY, 5, Some(600))
+            .unwrap();
+
+        let res: StdResult<Vec<_>> = EVERY.changelog_range(&storage,DUMMY_KEY, None, None, Order::Ascending).collect();
+        let expected = vec![
+            (3, ChangeSet{ old: Some(101)}),
+            (4, ChangeSet{ old: Some(500)}),
+            (5, ChangeSet{ old: Some(600)}),
+        ];
+        assert_eq!(res.unwrap(), expected);
+
+        let res: StdResult<Vec<_>> =
+            EVERY.changelog_range(&storage,  DUMMY_KEY,Some(Bound::exclusive_int(3u64)),None, Order::Ascending).collect();
+        let expected = vec![
+            (4, ChangeSet{ old: Some(500)}),
+            (5, ChangeSet{ old: Some(600)}),
+        ];
+        assert_eq!(res.unwrap(), expected);
+
+        let res: StdResult<Vec<_>> =
+            EVERY.changelog_range(&storage,  DUMMY_KEY,None, Some(Bound::exclusive_int(5u64)), Order::Ascending).collect();
+        let expected = vec![
+            (3, ChangeSet{ old: Some(101)}),
+            (4, ChangeSet{ old: Some(500)}),
+        ];
+        assert_eq!(res.unwrap(), expected)
+
     }
 }
