@@ -31,6 +31,10 @@ impl<'a, K, T> Map<'a, K, T> {
             key_type: PhantomData,
         }
     }
+
+    pub fn namespace(&self) -> &'a [u8] {
+        self.namespace
+    }
 }
 
 impl<'a, K, T> Map<'a, K, T>
@@ -38,10 +42,6 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn namespace(&self) -> &'a [u8] {
-        self.namespace
-    }
-
     pub fn key(&self, k: K) -> Path<T> {
         Path::new(
             self.namespace,
