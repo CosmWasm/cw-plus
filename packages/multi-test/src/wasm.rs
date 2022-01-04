@@ -301,10 +301,7 @@ where
                 )?;
 
                 // then call the contract
-                let info = MessageInfo {
-                    sender: sender.clone(),
-                    funds: funds.clone(),
-                };
+                let info = MessageInfo { sender, funds };
                 let res = self.call_execute(
                     api,
                     storage,

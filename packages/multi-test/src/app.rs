@@ -2598,7 +2598,7 @@ mod test {
 
             // execute should error
             let err = app
-                .execute_contract(Addr::unchecked("random"), contract_addr.clone(), &msg, &[])
+                .execute_contract(Addr::unchecked("random"), contract_addr, &msg, &[])
                 .unwrap_err();
 
             // we should be able to retrieve the original error by downcasting
@@ -2638,7 +2638,7 @@ mod test {
                 funds: vec![],
             };
             let err = app
-                .execute_contract(Addr::unchecked("random"), caller_addr.clone(), &msg, &[])
+                .execute_contract(Addr::unchecked("random"), caller_addr, &msg, &[])
                 .unwrap_err();
 
             // we can downcast to get the original error
@@ -2686,7 +2686,7 @@ mod test {
                 funds: vec![],
             };
             let err = app
-                .execute_contract(Addr::unchecked("random"), caller_addr1.clone(), &msg, &[])
+                .execute_contract(Addr::unchecked("random"), caller_addr1, &msg, &[])
                 .unwrap_err();
 
             // we can downcast to get the original error

@@ -339,8 +339,8 @@ where
         msg: Vec<u8>,
     ) -> AnyResult<Response<C>> {
         let msg: T1 = from_slice(&msg)?;
-        (self.execute_fn)(deps, env, info.clone(), msg.clone())
-            .map_err(|err| anyhow::Error::from(err))
+        (self.execute_fn)(deps, env, info, msg.clone())
+            .map_err(anyhow::Error::from)
             .context(format!(
                 "Contract returned an error on execute msg:\n{:?}",
                 msg,

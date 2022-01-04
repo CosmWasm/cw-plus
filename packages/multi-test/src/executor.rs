@@ -111,7 +111,7 @@ where
             msg: binary_msg,
             funds: send_funds.to_vec(),
         };
-        let mut res = self.execute(sender.clone(), wrapped_msg.into())?;
+        let mut res = self.execute(sender, wrapped_msg.into())?;
         res.data = res
             .data
             .and_then(|d| parse_execute_response_data(d.as_slice()).unwrap().data);
