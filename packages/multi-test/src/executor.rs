@@ -107,7 +107,7 @@ where
     ) -> AnyResult<AppResponse> {
         let binary_msg = to_binary(msg)?;
         let wrapped_msg = WasmMsg::Execute {
-            contract_addr: contract_addr.to_string(),
+            contract_addr: contract_addr.into_string(),
             msg: binary_msg,
             funds: send_funds.to_vec(),
         };
