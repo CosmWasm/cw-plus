@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
+use std::error::Error;
 use std::fmt::{self, Debug, Display};
 
 use cosmwasm_std::{
@@ -322,7 +323,7 @@ where
     T3: DeserializeOwned,
     T4: DeserializeOwned,
     T6: DeserializeOwned,
-    E1: Display + Debug + Send + Sync + 'static,
+    E1: Display + Debug + Send + Sync + Error + 'static,
     E2: Display + Debug + Send + Sync + 'static,
     E3: Display + Debug + Send + Sync + 'static,
     E4: Display + Debug + Send + Sync + 'static,
@@ -340,9 +341,9 @@ where
         let msg: T1 = from_slice(&msg)?;
         let address = env.contract.address.clone();
         (self.execute_fn)(deps, env, info.clone(), msg.clone())
-            .map_err(|err| anyhow!("{}", err))
+            .map_err(|err| anyhow::Error::from(err))
             .context(format!(
-                r#"aContract returned an error on execute
+                r#"Contract returned an error on execute
 Contract address: {}
 Message sender: {}
 Funds: {:?}

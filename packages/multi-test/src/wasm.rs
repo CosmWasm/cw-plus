@@ -946,7 +946,7 @@ mod test {
         let mut wasm_storage = MockStorage::new();
         let mut keeper = WasmKeeper::new();
         let block = mock_env().block;
-        let code_id = keeper.store_code(error::contract());
+        let code_id = keeper.store_code(error::contract(false));
 
         transactional(&mut wasm_storage, |cache, _| {
             // cannot register contract with unregistered codeId
