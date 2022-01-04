@@ -23,7 +23,7 @@ use crate::executor::AppResponse;
 use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
 
-use anyhow::{bail, Result as AnyResult};
+use anyhow::{bail, Context, Result as AnyResult};
 
 // TODO: we should import this from cosmwasm-std, but cannot due to non_exhaustive so copy here
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -174,7 +174,11 @@ where
         sender: Addr,
         msg: WasmMsg,
     ) -> AnyResult<AppResponse> {
-        self.execute_wasm(api, storage, router, block, sender, msg)
+        self.execute_wasm(api, storage, router, block, sender.clone(), msg.clone())
+            .context(format!(
+                "error executing WasmMsg:\nsender: {}\n{:?}",
+                sender, msg
+            ))
     }
 
     fn sudo(
@@ -946,7 +950,7 @@ mod test {
         let mut wasm_storage = MockStorage::new();
         let mut keeper = WasmKeeper::new();
         let block = mock_env().block;
-        let code_id = keeper.store_code(error::contract());
+        let code_id = keeper.store_code(error::contract(false));
 
         transactional(&mut wasm_storage, |cache, _| {
             // cannot register contract with unregistered codeId

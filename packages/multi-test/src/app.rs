@@ -947,7 +947,7 @@ mod test {
     };
 
     use crate::error::Error;
-    use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
+    use crate::test_helpers::contracts::{caller, echo, error, hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
 
@@ -2578,6 +2578,156 @@ mod test {
             // execute_contract now decodes a protobuf wrapper, so we get the top-level response
             let exec_res = app.execute_contract(owner, echo_addr, &msg, &[]).unwrap();
             assert_eq!(exec_res.data, Some(Binary::from(b"hello")));
+        }
+    }
+
+    mod errors {
+        use super::*;
+
+        #[test]
+        fn simple_instantiation() {
+            let owner = Addr::unchecked("owner");
+            let mut app = App::default();
+
+            // set up contract
+            let code_id = app.store_code(error::contract(false));
+            let msg = EmptyMsg {};
+            let err = app
+                .instantiate_contract(code_id, owner, &msg, &[], "error", None)
+                .unwrap_err();
+
+            // we should be able to retrieve the original error by downcasting
+            let source: &StdError = err.downcast_ref().unwrap();
+            if let StdError::GenericErr { msg } = source {
+                assert_eq!(msg, "Init failed");
+            } else {
+                panic!("wrong StdError variant");
+            }
+
+            // we're expecting exactly 3 nested error types
+            // (the original error, initiate msg context, WasmMsg context)
+            assert_eq!(err.chain().count(), 3);
+        }
+
+        #[test]
+        fn simple_call() {
+            let owner = Addr::unchecked("owner");
+            let mut app = App::default();
+
+            // set up contract
+            let code_id = app.store_code(error::contract(true));
+            let msg = EmptyMsg {};
+            let contract_addr = app
+                .instantiate_contract(code_id, owner, &msg, &[], "error", None)
+                .unwrap();
+
+            // execute should error
+            let err = app
+                .execute_contract(Addr::unchecked("random"), contract_addr, &msg, &[])
+                .unwrap_err();
+
+            // we should be able to retrieve the original error by downcasting
+            let source: &StdError = err.downcast_ref().unwrap();
+            if let StdError::GenericErr { msg } = source {
+                assert_eq!(msg, "Handle failed");
+            } else {
+                panic!("wrong StdError variant");
+            }
+
+            // we're expecting exactly 3 nested error types
+            // (the original error, execute msg context, WasmMsg context)
+            assert_eq!(err.chain().count(), 3);
+        }
+
+        #[test]
+        fn nested_call() {
+            let owner = Addr::unchecked("owner");
+            let mut app = App::default();
+
+            let error_code_id = app.store_code(error::contract(true));
+            let caller_code_id = app.store_code(caller::contract());
+
+            // set up contracts
+            let msg = EmptyMsg {};
+            let caller_addr = app
+                .instantiate_contract(caller_code_id, owner.clone(), &msg, &[], "caller", None)
+                .unwrap();
+            let error_addr = app
+                .instantiate_contract(error_code_id, owner, &msg, &[], "error", None)
+                .unwrap();
+
+            // execute should error
+            let msg = WasmMsg::Execute {
+                contract_addr: error_addr.into(),
+                msg: to_binary(&EmptyMsg {}).unwrap(),
+                funds: vec![],
+            };
+            let err = app
+                .execute_contract(Addr::unchecked("random"), caller_addr, &msg, &[])
+                .unwrap_err();
+
+            // we can downcast to get the original error
+            let source: &StdError = err.downcast_ref().unwrap();
+            if let StdError::GenericErr { msg } = source {
+                assert_eq!(msg, "Handle failed");
+            } else {
+                panic!("wrong StdError variant");
+            }
+
+            // we're expecting exactly 4 nested error types
+            // (the original error, execute msg context, 2 WasmMsg contexts)
+            assert_eq!(err.chain().count(), 4);
+        }
+
+        #[test]
+        fn double_nested_call() {
+            let owner = Addr::unchecked("owner");
+            let mut app = App::default();
+
+            let error_code_id = app.store_code(error::contract(true));
+            let caller_code_id = app.store_code(caller::contract());
+
+            // set up contracts
+            let msg = EmptyMsg {};
+            let caller_addr1 = app
+                .instantiate_contract(caller_code_id, owner.clone(), &msg, &[], "caller", None)
+                .unwrap();
+            let caller_addr2 = app
+                .instantiate_contract(caller_code_id, owner.clone(), &msg, &[], "caller", None)
+                .unwrap();
+            let error_addr = app
+                .instantiate_contract(error_code_id, owner, &msg, &[], "error", None)
+                .unwrap();
+
+            // caller1 calls caller2, caller2 calls error
+            let msg = WasmMsg::Execute {
+                contract_addr: caller_addr2.into(),
+                msg: to_binary(&WasmMsg::Execute {
+                    contract_addr: error_addr.into(),
+                    msg: to_binary(&EmptyMsg {}).unwrap(),
+                    funds: vec![],
+                })
+                .unwrap(),
+                funds: vec![],
+            };
+            let err = app
+                .execute_contract(Addr::unchecked("random"), caller_addr1, &msg, &[])
+                .unwrap_err();
+
+            // uncomment to have the test fail and see how the error stringifies
+            // panic!("{:?}", err);
+
+            // we can downcast to get the original error
+            let source: &StdError = err.downcast_ref().unwrap();
+            if let StdError::GenericErr { msg } = source {
+                assert_eq!(msg, "Handle failed");
+            } else {
+                panic!("wrong StdError variant");
+            }
+
+            // we're expecting exactly 5 nested error types
+            // (the original error, execute msg context, 3 WasmMsg contexts)
+            assert_eq!(err.chain().count(), 5);
         }
     }
 }
