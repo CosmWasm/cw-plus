@@ -8,9 +8,12 @@ STORAGE_PACKAGES="storage-plus"
 BASE_PACKAGES="utils"
 ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw1155 multi-test"
 
+# This is imported by cw3-fixed-multisig, which is imported by cw3-flex-multisig
+# need to make a separate category to remove race conditions
+CW20_BASE="cw20-base"
 # these are imported by other contracts
-BASE_CONTRACTS="cw1-whitelist  cw4-group cw20-base"
-ALL_CONTRACTS="cw1-subkeys cw3-fixed-multisig cw3-flex-multisig cw4-stake cw20-atomic-swap cw20-bonding cw20-escrow cw20-ics20 cw20-staking cw1155-base"
+BASE_CONTRACTS="cw1-whitelist cw4-group cw3-fixed-multisig "
+ALL_CONTRACTS="cw1-subkeys cw3-flex-multisig cw4-stake cw20-ics20 cw1155-base"
 
 SLEEP_TIME=30
 
@@ -46,8 +49,21 @@ for pack in $ALL_PACKAGES; do
   )
 done
 
+
 # wait for these to be processed on crates.io
 echo "Waiting for publishing all packages"
+sleep $SLEEP_TIME
+
+for cont in $CW20_BASE; do
+  (
+    cd "contracts/$cont"
+    echo "Publishing $cont"
+    cargo publish
+  )
+done
+
+# wait for these to be processed on crates.io
+echo "Waiting for publishing cw20 base"
 sleep $SLEEP_TIME
 
 for cont in $BASE_CONTRACTS; do
@@ -59,7 +75,7 @@ for cont in $BASE_CONTRACTS; do
 done
 
 # wait for these to be processed on crates.io
-echo "Waiting for publishing base packages"
+echo "Waiting for publishing base contracts"
 sleep $SLEEP_TIME
 
 for cont in $ALL_CONTRACTS; do

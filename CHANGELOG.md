@@ -1,10 +1,33 @@
 # Changelog
 
+# Changelog
+
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.0...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.1...HEAD)
 
-## [v0.11.0](https://github.com/CosmWasm/cw-plus/tree/v0.11.0) (2021-11-22)
+## [v0.11.1](https://github.com/CosmWasm/cw-plus/tree/v0.11.1) (2021-12-28)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.0...v0.11.1)
+
+**Closed issues:**
+
+- multitest returns error on BankMsg with 0 tokens [\#610](https://github.com/CosmWasm/cw-plus/issues/610)
+- Add signed int keys migration example [\#602](https://github.com/CosmWasm/cw-plus/issues/602)
+- Issue running wasm compilation out-of-the-box [\#545](https://github.com/CosmWasm/cw-plus/issues/545)
+
+**Merged pull requests:**
+
+- Assert non-empty send/burn/mint in multitest bank module [\#611](https://github.com/CosmWasm/cw-plus/pull/611) ([ethanfrey](https://github.com/ethanfrey))
+- cw-storage-plus: Expose keys::Key [\#609](https://github.com/CosmWasm/cw-plus/pull/609) ([orkunkl](https://github.com/orkunkl))
+- Implement Expired variant, Scheduled [\#606](https://github.com/CosmWasm/cw-plus/pull/606) ([orkunkl](https://github.com/orkunkl))
+- Signed int keys migrate example [\#604](https://github.com/CosmWasm/cw-plus/pull/604) ([maurolacy](https://github.com/maurolacy))
+- Adjust order of publishing to handle new deps [\#603](https://github.com/CosmWasm/cw-plus/pull/603) ([ethanfrey](https://github.com/ethanfrey))
+- Fix cw-utils README entry [\#601](https://github.com/CosmWasm/cw-plus/pull/601) ([maurolacy](https://github.com/maurolacy))
+- Rename utils to cw-utils [\#598](https://github.com/CosmWasm/cw-plus/pull/598) ([ethanfrey](https://github.com/ethanfrey))
+- Mention latest workspace optimizer version in README [\#595](https://github.com/CosmWasm/cw-plus/pull/595) ([ueco-jb](https://github.com/ueco-jb))
+
+## [v0.11.0](https://github.com/CosmWasm/cw-plus/tree/v0.11.0) (2021-12-22)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.10.3...v0.11.0)
 

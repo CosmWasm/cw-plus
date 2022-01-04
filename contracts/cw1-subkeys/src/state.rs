@@ -4,7 +4,7 @@ use std::fmt;
 
 use cosmwasm_std::Addr;
 use cw_storage_plus::Map;
-use utils::{Expiration, NativeBalance};
+use cw_utils::{Expiration, NativeBalance};
 
 // Permissions struct defines users message execution permissions.
 // Could have implemented permissions for each cosmos module(StakingPermissions, GovPermissions etc...)
@@ -46,7 +46,7 @@ impl Allowance {
     /// Example:
     ///
     /// ```
-    /// # use utils::{Expiration, NativeBalance};
+    /// # use cw_utils::{Expiration, NativeBalance};
     /// # use cw1_subkeys::state::Allowance;
     /// # use cosmwasm_std::coin;
     ///

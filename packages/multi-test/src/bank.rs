@@ -8,7 +8,7 @@ use cosmwasm_std::{
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::Map;
-use utils::NativeBalance;
+use cw_utils::NativeBalance;
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;
@@ -84,6 +84,7 @@ impl BankKeeper {
         to_address: Addr,
         amount: Vec<Coin>,
     ) -> AnyResult<()> {
+        let amount = self.normalize_amount(amount)?;
         let b = self.get_balance(bank_storage, &to_address)?;
         let b = NativeBalance(b) + NativeBalance(amount);
         self.set_balance(bank_storage, &to_address, b.into_vec())
@@ -95,9 +96,20 @@ impl BankKeeper {
         from_address: Addr,
         amount: Vec<Coin>,
     ) -> AnyResult<()> {
+        let amount = self.normalize_amount(amount)?;
         let a = self.get_balance(bank_storage, &from_address)?;
         let a = (NativeBalance(a) - amount)?;
         self.set_balance(bank_storage, &from_address, a.into_vec())
+    }
+
+    /// Filters out all 0 value coins and returns an error if the resulting Vec is empty
+    fn normalize_amount(&self, amount: Vec<Coin>) -> AnyResult<Vec<Coin>> {
+        let res: Vec<_> = amount.into_iter().filter(|x| !x.amount.is_zero()).collect();
+        if res.is_empty() {
+            bail!("Cannot transfer empty coins amount")
+        } else {
+            Ok(res)
+        }
     }
 }
 
@@ -382,5 +394,80 @@ mod test {
             .execute(&api, &mut store, &router, &block, rcpt, msg)
             .unwrap_err();
         assert!(matches!(err.downcast().unwrap(), StdError::Overflow { .. }));
+    }
+
+    #[test]
+    fn fail_on_zero_values() {
+        let api = MockApi::default();
+        let mut store = MockStorage::new();
+        let block = mock_env().block;
+        let router = MockRouter::default();
+
+        let owner = Addr::unchecked("owner");
+        let rcpt = Addr::unchecked("recipient");
+        let init_funds = vec![coin(5000, "atom"), coin(100, "eth")];
+
+        // set money
+        let bank = BankKeeper::new();
+        bank.init_balance(&mut store, &owner, init_funds).unwrap();
+
+        // can send normal amounts
+        let msg = BankMsg::Send {
+            to_address: rcpt.to_string(),
+            amount: coins(100, "atom"),
+        };
+        bank.execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap();
+
+        // fails send on no coins
+        let msg = BankMsg::Send {
+            to_address: rcpt.to_string(),
+            amount: vec![],
+        };
+        bank.execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap_err();
+
+        // fails send on 0 coins
+        let msg = BankMsg::Send {
+            to_address: rcpt.to_string(),
+            amount: coins(0, "atom"),
+        };
+        bank.execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap_err();
+
+        // fails burn on no coins
+        let msg = BankMsg::Burn { amount: vec![] };
+        bank.execute(&api, &mut store, &router, &block, owner.clone(), msg)
+            .unwrap_err();
+
+        // fails burn on 0 coins
+        let msg = BankMsg::Burn {
+            amount: coins(0, "atom"),
+        };
+        bank.execute(&api, &mut store, &router, &block, owner, msg)
+            .unwrap_err();
+
+        // can mint via sudo
+        let msg = BankSudo::Mint {
+            to_address: rcpt.to_string(),
+            amount: coins(4321, "atom"),
+        };
+        bank.sudo(&api, &mut store, &router, &block, msg).unwrap();
+
+        // mint fails with 0 tokens
+        let msg = BankSudo::Mint {
+            to_address: rcpt.to_string(),
+            amount: coins(0, "atom"),
+        };
+        bank.sudo(&api, &mut store, &router, &block, msg)
+            .unwrap_err();
+
+        // mint fails with no tokens
+        let msg = BankSudo::Mint {
+            to_address: rcpt.to_string(),
+            amount: vec![],
+        };
+        bank.sudo(&api, &mut store, &router, &block, msg)
+            .unwrap_err();
     }
 }

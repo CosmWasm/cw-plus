@@ -16,7 +16,7 @@
 | cw-controllers      | [![cw-controllers on crates.io](https://img.shields.io/crates/v/cw-controllers.svg)](https://crates.io/crates/cw-controllers)             | [![Docs](https://docs.rs/cw-controllers/badge.svg)](https://docs.rs/cw-controllers)    |
 | cw-multi-test       | [![cw-multi-test on crates.io](https://img.shields.io/crates/v/cw-multi-test.svg)](https://crates.io/crates/cw-multi-test)                | [![Docs](https://docs.rs/cw-multi-test/badge.svg)](https://docs.rs/cw-multi-test)    |
 | cw-storage-plus     | [![cw-storage-plus on crates.io](https://img.shields.io/crates/v/cw-storage-plus.svg)](https://crates.io/crates/cw-storage-plus)          | [![Docs](https://docs.rs/cw-storage-plus/badge.svg)](https://docs.rs/cw-storage-plus)    |
-| utils             | [![utils on crates.io](https://img.shields.io/crates/v/utils.svg)](https://crates.io/crates/utils)        | [![Docs](https://docs.rs/utils/badge.svg)](https://docs.rs/utils)    |
+| cw-utils          | [![cw-utils on crates.io](https://img.shields.io/crates/v/cw-utils.svg)](https://crates.io/crates/cw-utils)        | [![Docs](https://docs.rs/cw-utils/badge.svg)](https://docs.rs/cw-utils)    |
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------  | -------------------------------------------------------------------------|
@@ -26,17 +26,15 @@
 | cw3-flex-multisig       | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw3_flex_multisig.wasm)          | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)    |
 | cw4-group               | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)    |
 | cw4-stake               | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)    |
-| cw20-atomic-swap        | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_atomic_swap.wasm)          | [![Docs](https://docs.rs/cw20-atomic-swap/badge.svg)](https://docs.rs/cw20-atomic-swap)    |
 | cw20-base               | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)    |
-| cw20-bonding            | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_bonding.wasm)          | [![Docs](https://docs.rs/cw20-bonding/badge.svg)](https://docs.rs/cw20-bonding)    |
-| cw20-escrow             | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_escrow.wasm)          | [![Docs](https://docs.rs/cw20-escrow/badge.svg)](https://docs.rs/cw20-escrow)    |
 | cw20-ics20              | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_ics20.wasm)          | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)    |
-| cw20-staking            | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_staking.wasm)          | [![Docs](https://docs.rs/cw20-staking/badge.svg)](https://docs.rs/cw20-staking)    |
-| cw20-merkle-airdrop     | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_merkle_airdrop.wasm)          | [![Docs](https://docs.rs/cw20-merkle-airdrop/badge.svg)](https://docs.rs/cw20-merkle-airdrop)    |
 | cw1155-base             | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw1155_base.wasm)          | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)    |
 
 
-Note that `cw721` and `cw721-base` have moved to the new [`cw-nfts` repo](https://github.com/CosmWasm/cw-nfts)
+Note: `cw721` and `cw721-base` have moved to the new [`cw-nfts` repo](https://github.com/CosmWasm/cw-nfts)
+and can be followed there.
+
+Note: most of the `cw20-*` contracts besides `cw20-base` have moved to the new [`cw-tokens` repo](https://github.com/CosmWasm/cw-tokens)
 and can be followed there.
 
 This is a collection of specification and contracts designed for
@@ -47,7 +45,7 @@ many custom contracts.
 If you don't know what CosmWasm is, please check out
 [our homepage](https://cosmwasm.com) and
 [our documentation](https://docs.cosmwasm.com) to get more background.
-We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/coralnet/README.md)
+We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/sandynet-1/README.md)
 you can use to test out any contracts.
 
 **Warning** None of these contracts have been audited and no liability is
@@ -154,7 +152,7 @@ To compile all the contracts, run the following in the repo root:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.12.3
+  cosmwasm/workspace-optimizer:0.12.4
 ```
 
 This will compile all packages in the `contracts` directory and output the

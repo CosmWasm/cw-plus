@@ -4,9 +4,9 @@ use cosmwasm_std::{
     to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, SubMsgExecutionResponse,
     WasmMsg,
 };
+use cw_utils::{parse_execute_response_data, parse_instantiate_response_data};
 use schemars::JsonSchema;
 use serde::Serialize;
-use utils::{parse_execute_response_data, parse_instantiate_response_data};
 
 use anyhow::Result as AnyResult;
 
