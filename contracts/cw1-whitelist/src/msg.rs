@@ -4,7 +4,7 @@ use std::fmt;
 
 use cosmwasm_std::{CosmosMsg, Empty};
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub admins: Vec<String>,
     pub mutable: bool,
