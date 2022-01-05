@@ -5,13 +5,13 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 
 use crate::snapshot::{ChangeSet, Snapshot};
 use crate::{Item, Map, Strategy};
-use std::str::from_utf8_unchecked;
 
 /// Item that maintains a snapshot of one or more checkpoints.
 /// We can query historical data as well as current state.
 /// What data is snapshotted depends on the Strategy.
 pub struct SnapshotItem<'a, T> {
     primary: Item<'a, T>,
+    changelog_namespace: &'a str,
     snapshots: Snapshot<'a, (), T>,
 }
 
@@ -35,6 +35,7 @@ impl<'a, T> SnapshotItem<'a, T> {
     ) -> Self {
         SnapshotItem {
             primary: Item::new(storage_key),
+            changelog_namespace: changelog,
             snapshots: Snapshot::new(checkpoints, changelog, strategy),
         }
     }
@@ -49,7 +50,7 @@ impl<'a, T> SnapshotItem<'a, T> {
 
     pub fn changelog(&self) -> Map<u64, ChangeSet<T>> {
         // Build and return a compatible Map with the proper key type
-        Map::new(unsafe { from_utf8_unchecked(self.snapshots.changelog.namespace()) })
+        Map::new(self.changelog_namespace)
     }
 }
 
