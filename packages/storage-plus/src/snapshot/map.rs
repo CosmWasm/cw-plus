@@ -9,7 +9,7 @@ use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
-use crate::snapshot::Snapshot;
+use crate::snapshot::{ChangeSet, Snapshot};
 use crate::{Bound, Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
@@ -43,6 +43,10 @@ impl<'a, K, T> SnapshotMap<'a, K, T> {
             primary: Map::new(pk),
             snapshots: Snapshot::new(checkpoints, changelog, strategy),
         }
+    }
+
+    pub fn changelog(&self) -> &Map<'a, (K, u64), ChangeSet<T>> {
+        &self.snapshots.changelog
     }
 }
 
@@ -456,6 +460,70 @@ mod tests {
             Some(16),
             EVERY.may_load_at_height(&storage, "C", 6).unwrap()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn changelog_range_works() {
+        use cosmwasm_std::Order;
+
+        let mut store = MockStorage::new();
+
+        // simple data for testing
+        EVERY.save(&mut store, "A", &5, 1).unwrap();
+        EVERY.save(&mut store, "B", &7, 2).unwrap();
+        EVERY
+            .update(&mut store, "A", 3, |_| -> StdResult<u64> { Ok(8) })
+            .unwrap();
+        EVERY.remove(&mut store, "B", 4).unwrap();
+
+        // let's try to iterate over the changelog
+        let all: StdResult<Vec<_>> = EVERY
+            .changelog()
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (("A".into(), 1), ChangeSet { old: None }),
+                (("A".into(), 3), ChangeSet { old: Some(5) }),
+                (("B".into(), 2), ChangeSet { old: None }),
+                (("B".into(), 4), ChangeSet { old: Some(7) })
+            ]
+        );
+
+        // let's try to iterate over a changelog key/prefix
+        let all: StdResult<Vec<_>> = EVERY
+            .changelog()
+            .prefix("B")
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (2, ChangeSet { old: None }),
+                (4, ChangeSet { old: Some(7) })
+            ]
+        );
+
+        // let's try to iterate over a changelog prefixed range
+        let all: StdResult<Vec<_>> = EVERY
+            .changelog()
+            .prefix("A")
+            .range(
+                &store,
+                Some(Bound::inclusive_int(3u64)),
+                None,
+                Order::Ascending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(3, ChangeSet { old: Some(5) }),]);
     }
 
     #[test]

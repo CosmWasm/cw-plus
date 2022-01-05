@@ -9,8 +9,8 @@ use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
-use crate::snapshot::SnapshotMap;
-use crate::{IndexList, Path, Strategy};
+use crate::snapshot::{ChangeSet, SnapshotMap};
+use crate::{IndexList, Map, Path, Strategy};
 
 /// `IndexedSnapshotMap` works like a `SnapshotMap` but has a secondary index
 pub struct IndexedSnapshotMap<'a, K, T, I> {
@@ -55,6 +55,10 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
             primary: SnapshotMap::new(pk_namespace, checkpoints, changelog, strategy),
             idx: indexes,
         }
+    }
+
+    pub fn changelog(&self) -> &Map<'a, (K, u64), ChangeSet<T>> {
+        &self.primary.changelog()
     }
 }
 
@@ -605,6 +609,65 @@ mod test {
         // Data is correct
         assert_eq!(marias[0].1, data3);
         assert_eq!(marias[1].1, data1);
+    }
+
+    #[test]
+    fn changelog_range_works() {
+        let mut store = MockStorage::new();
+        let map = build_snapshot_map();
+        let mut height = 1;
+
+        // simple data for testing
+        // EVERY.remove(&mut store, "B", 4).unwrap();
+        let data1 = Data {
+            name: "Maria".to_string(),
+            last_name: "".to_string(),
+            age: 42,
+        };
+        let pk_a = "A";
+        map.save(&mut store, pk_a, &data1, height).unwrap();
+        height += 1;
+
+        let data2 = Data {
+            name: "Juan".to_string(),
+            last_name: "Perez".to_string(),
+            age: 13,
+        };
+        let pk_b = "B";
+        map.save(&mut store, pk_b, &data2, height).unwrap();
+        height += 1;
+
+        let data3 = Data {
+            name: "Maria".to_string(),
+            last_name: "Williams".to_string(),
+            age: 24,
+        };
+        map.update(&mut store, pk_a, height, |_| -> StdResult<Data> {
+            Ok(data3)
+        })
+        .unwrap();
+
+        height += 1;
+        map.remove(&mut store, pk_b, height).unwrap();
+
+        let changes: Vec<_> = map
+            .changelog()
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<_>>()
+            .unwrap();
+        let count = changes.len();
+        assert_eq!(4, count);
+
+        // sorted by ascending key, height
+        assert_eq!(
+            changes,
+            vec![
+                (("A".into(), 1), ChangeSet { old: None }),
+                (("A".into(), 3), ChangeSet { old: Some(data1) }),
+                (("B".into(), 2), ChangeSet { old: None }),
+                (("B".into(), 4), ChangeSet { old: Some(data2) })
+            ]
+        );
     }
 
     #[test]
