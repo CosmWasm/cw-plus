@@ -324,6 +324,24 @@ impl<'a> Bounder<'a> for &'a [u8] {
     }
 }
 
+impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Bounder<'a> for (T, U) {
+    fn inclusive_bound(&self) -> Option<Bound> {
+        Some(Bound::Inclusive(self.joined_prefix()))
+    }
+    fn exclusive_bound(&self) -> Option<Bound> {
+        Some(Bound::Exclusive(self.joined_prefix()))
+    }
+}
+
+impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Bounder<'a> for (T, U, V) {
+    fn inclusive_bound(&self) -> Option<Bound> {
+        Some(Bound::Inclusive(self.joined_prefix()))
+    }
+    fn exclusive_bound(&self) -> Option<Bound> {
+        Some(Bound::Exclusive(self.joined_prefix()))
+    }
+}
+
 impl<'a> Bounder<'a> for &'a str {
     fn inclusive_bound(&self) -> Option<Bound> {
         Some(Bound::inclusive(self.as_bytes().to_vec()))
