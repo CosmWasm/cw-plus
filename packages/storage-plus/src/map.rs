@@ -546,6 +546,65 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
+    fn range2_simple_string_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE.save(&mut store, b"john", &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
+
+        let data3 = Data {
+            name: "Ada".to_string(),
+            age: 23,
+        };
+        PEOPLE.save(&mut store, b"ada", &data3).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range2(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (b"ada".to_vec(), data3),
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone())
+            ]
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range2(&store, b"j".inclusive_bound(), None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(
+            all,
+            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
+        );
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = PEOPLE
+            .range2(&store, b"jo".inclusive_bound(), None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(b"john".to_vec(), data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
     fn range_simple_integer_key() {
         let mut store = MockStorage::new();
 
@@ -591,6 +650,48 @@ mod test {
                 None,
                 Order::Ascending,
             )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(1234, data)]);
+    }
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range2_simple_integer_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on two keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE_ID.save(&mut store, 1234, &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE_ID.save(&mut store, 56, &data2).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = PEOPLE_ID
+            .range2(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(56, data2.clone()), (1234, data.clone())]);
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = PEOPLE_ID
+            .range2(&store, 56u32.inclusive_bound(), None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(56, data2), (1234, data.clone())]);
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = PEOPLE_ID
+            .range2(&store, 57u32.inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -652,6 +753,64 @@ mod test {
                 &store,
                 Some(Bound::inclusive_int(-55i32)),
                 Some(Bound::inclusive_int(50i32)),
+                Order::Descending,
+            )
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(1, all.len());
+        assert_eq!(all, vec![(50, data3)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range2_simple_signed_integer_key() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        SIGNED_ID.save(&mut store, -1234, &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        SIGNED_ID.save(&mut store, -56, &data2).unwrap();
+
+        let data3 = Data {
+            name: "Jules".to_string(),
+            age: 55,
+        };
+        SIGNED_ID.save(&mut store, 50, &data3).unwrap();
+
+        // let's try to iterate!
+        let all: StdResult<Vec<_>> = SIGNED_ID
+            .range2(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        // order is correct
+        assert_eq!(
+            all,
+            vec![(-1234, data), (-56, data2.clone()), (50, data3.clone())]
+        );
+
+        // let's try to iterate over a range
+        let all: StdResult<Vec<_>> = SIGNED_ID
+            .range2(&store, (-56i32).inclusive_bound(), None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(2, all.len());
+        assert_eq!(all, vec![(-56, data2), (50, data3.clone())]);
+
+        // let's try to iterate over a more restrictive range
+        let all: StdResult<Vec<_>> = SIGNED_ID
+            .range2(
+                &store,
+                (-55i32).inclusive_bound(),
+                50i32.inclusive_bound(),
                 Order::Descending,
             )
             .collect();
