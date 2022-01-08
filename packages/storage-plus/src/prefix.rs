@@ -13,10 +13,11 @@ use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::keys::Key;
 use crate::{Endian, Prefixer, PrimaryKey};
 
-/// Bound is used to defines the two ends of a range, more explicit than Option<u8>
-/// None means that we don't limit that side of the range at all.
-/// Include means we use the given bytes as a limit and *include* anything at that exact key
-/// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
+/// `RawBound` is used to define the two ends of a range, more explicit than `Option<u8>`.
+/// `None` means that we don't limit that side of the range at all.
+/// `Inclusive` means we use the given bytes as a limit and *include* anything at that exact key.
+/// `Exclusive` means we use the given bytes as a limit and *exclude* anything at that exact key.
+/// See `Bound` for a type safe way to build these bounds.
 #[derive(Clone, Debug)]
 pub enum RawBound {
     Inclusive(Vec<u8>),
@@ -45,6 +46,10 @@ impl RawBound {
     }
 }
 
+/// `Bound` is used to define the two ends of a range.
+/// `None` means that we don't limit that side of the range at all.
+/// `Inclusive` means we use the given value as a limit and *include* anything at that exact key.
+/// `Exclusive` means we use the given value as a limit and *exclude* anything at that exact key.
 #[derive(Clone, Debug)]
 pub enum Bound<'a, K: PrimaryKey<'a>> {
     Inclusive((K, PhantomData<&'a bool>)),
