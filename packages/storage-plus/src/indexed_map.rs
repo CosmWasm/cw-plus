@@ -10,7 +10,7 @@ use crate::indexes::Index;
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound, RawBound};
 use crate::Path;
 
 pub trait IndexList<T> {
@@ -147,8 +147,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -160,8 +160,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         self.no_prefix_raw().keys_raw(store, min, max, order)
@@ -247,8 +247,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -261,8 +261,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -469,7 +469,12 @@ mod test {
         let count = map
             .idx
             .name
-            .range_raw(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
+            .range_raw(
+                &store,
+                Some(RawBound::inclusive(key)),
+                None,
+                Order::Ascending,
+            )
             .count();
         // gets from the first "Maria" until the end
         assert_eq!(4, count);
@@ -484,7 +489,12 @@ mod test {
         let count = map
             .idx
             .name
-            .range_raw(&store, Some(Bound::exclusive(key)), None, Order::Ascending)
+            .range_raw(
+                &store,
+                Some(RawBound::exclusive(key)),
+                None,
+                Order::Ascending,
+            )
             .count();
         // gets from the 2nd "Maria" until the end
         assert_eq!(3, count);
@@ -499,7 +509,7 @@ mod test {
             .age
             .range_raw(
                 &store,
-                Some(Bound::inclusive(age_key)),
+                Some(RawBound::inclusive(age_key)),
                 None,
                 Order::Ascending,
             )
@@ -1009,7 +1019,7 @@ mod test {
         let all: StdResult<Vec<_>> = map
             .range(
                 &store,
-                Some(Bound::Inclusive(b"3".to_vec())),
+                Some(RawBound::Inclusive(b"3".to_vec())),
                 None,
                 Order::Ascending,
             )

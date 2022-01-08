@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::keys::{Prefixer, PrimaryKey};
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound, RawBound};
 use crate::snapshot::{ChangeSet, SnapshotMap};
 use crate::{IndexList, Map, Path, Strategy};
 
@@ -196,8 +196,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -209,8 +209,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         self.no_prefix_raw().keys_raw(store, min, max, order)
@@ -267,8 +267,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -281,8 +281,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -1060,7 +1060,7 @@ mod test {
         let all: StdResult<Vec<_>> = map
             .range(
                 &store,
-                Some(Bound::Inclusive(b"3".to_vec())),
+                Some(RawBound::Inclusive(b"3".to_vec())),
                 None,
                 Order::Ascending,
             )

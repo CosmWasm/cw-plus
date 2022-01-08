@@ -2,7 +2,7 @@ use cosmwasm_std::{Deps, Order, StdResult};
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
 use crate::state::{ALLOWANCES, BALANCES};
-use cw_storage_plus::Bound;
+use cw_storage_plus::RawBound;
 
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
@@ -16,7 +16,7 @@ pub fn query_all_allowances(
 ) -> StdResult<AllAllowancesResponse> {
     let owner_addr = deps.api.addr_validate(&owner)?;
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(Bound::exclusive);
+    let start = start_after.map(RawBound::exclusive);
 
     let allowances = ALLOWANCES
         .prefix(&owner_addr)
@@ -39,7 +39,7 @@ pub fn query_all_accounts(
     limit: Option<u32>,
 ) -> StdResult<AllAccountsResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(Bound::exclusive);
+    let start = start_after.map(RawBound::exclusive);
 
     let accounts = BALANCES
         .keys(deps.storage, start, None, Order::Ascending)

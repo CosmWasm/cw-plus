@@ -11,7 +11,7 @@ use crate::helpers::namespaces_with_key;
 use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
 use crate::prefix::{namespaced_prefix_range, PrefixBound};
-use crate::{Bound, Index, Prefix, Prefixer, PrimaryKey};
+use crate::{Index, Prefix, Prefixer, PrimaryKey, RawBound};
 use std::marker::PhantomData;
 
 /// MultiIndex stores (namespace, index_name, idx_value, pk) -> b"pk_len".
@@ -198,8 +198,8 @@ where
     pub fn range_raw<'c>(
         &'c self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'c>
     where
@@ -211,8 +211,8 @@ where
     pub fn keys_raw<'c>(
         &'c self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         self.no_prefix_raw().keys_raw(store, min, max, order)
@@ -304,8 +304,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
@@ -318,8 +318,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<PK::Output>> + 'c>
     where
