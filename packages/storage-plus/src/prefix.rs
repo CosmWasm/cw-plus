@@ -113,7 +113,7 @@ pub fn default_deserializer_kv<K: KeyDeserialize, T: DeserializeOwned>(
 }
 
 #[derive(Clone)]
-pub struct Prefix<K, T>
+pub struct Prefix<K, T, B = Vec<u8>>
 where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
@@ -121,7 +121,7 @@ where
     /// all namespaces prefixes and concatenated with the key
     storage_prefix: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
-    data: PhantomData<T>,
+    data: PhantomData<(T, B)>,
     pk_name: Vec<u8>,
     de_fn_kv: DeserializeKvFn<K, T>,
     de_fn_v: DeserializeVFn<T>,
@@ -139,7 +139,7 @@ where
     }
 }
 
-impl<K, T> Prefix<K, T>
+impl<K, T, B> Prefix<K, T, B>
 where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
@@ -238,16 +238,17 @@ where
     }
 }
 
-impl<'b, K, T> Prefix<K, T>
+impl<'b, K, T, B> Prefix<K, T, B>
 where
-    K: KeyDeserialize + Bounder<'b>,
+    B: Bounder<'b>,
+    K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
     pub fn range2<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound2<'b, K>>,
-        max: Option<Bound2<'b, K>>,
+        min: Option<Bound2<'b, B>>,
+        max: Option<Bound2<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
@@ -382,7 +383,7 @@ mod test {
         // manually create this - not testing nested prefixes here
         let prefix: Prefix<Vec<u8>, u64> = Prefix {
             storage_prefix: b"foo".to_vec(),
-            data: PhantomData::<u64>,
+            data: PhantomData::<(u64, _)>,
             pk_name: vec![],
             de_fn_kv: |_, _, kv| deserialize_kv::<Vec<u8>, u64>(kv),
             de_fn_v: |_, _, kv| deserialize_v(kv),
