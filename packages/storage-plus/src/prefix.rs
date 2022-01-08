@@ -11,7 +11,7 @@ use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::int_key::CwIntKey;
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::keys::{Bounder, Key};
-use crate::{Endian, Prefixer};
+use crate::{Endian, Prefixer, PrimaryKey};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
 /// None means that we don't limit that side of the range at all.
@@ -46,7 +46,7 @@ impl Bound {
 }
 
 #[derive(Clone, Debug)]
-pub enum Bound2<'a, K: Bounder<'a>> {
+pub enum Bound2<'a, K: PrimaryKey<'a>> {
     Inclusive((K, PhantomData<&'a bool>)),
     Exclusive((K, PhantomData<&'a bool>)),
 }
