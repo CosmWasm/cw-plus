@@ -10,7 +10,7 @@ use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::int_key::CwIntKey;
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
-use crate::keys::{Bounder, Key};
+use crate::keys::Key;
 use crate::{Endian, Prefixer, PrimaryKey};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
@@ -51,7 +51,7 @@ pub enum Bound2<'a, K: PrimaryKey<'a>> {
     Exclusive((K, PhantomData<&'a bool>)),
 }
 
-impl<'a, K: Bounder<'a>> Bound2<'a, K> {
+impl<'a, K: PrimaryKey<'a>> Bound2<'a, K> {
     pub fn inclusive<T: Into<K>>(k: T) -> Self {
         Self::Inclusive((k.into(), PhantomData))
     }
@@ -240,7 +240,7 @@ where
 
 impl<'b, K, T, B> Prefix<K, T, B>
 where
-    B: Bounder<'b>,
+    B: PrimaryKey<'b>,
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
