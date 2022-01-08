@@ -10,7 +10,7 @@ use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::int_key::CwIntKey;
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
-use crate::keys::Key;
+use crate::keys::{Bounder, Key};
 use crate::{Endian, Prefixer};
 
 /// Bound is used to defines the two ends of a range, more explicit than Option<u8>
@@ -42,6 +42,29 @@ impl Bound {
     /// Turns an int, like Option<u64> into an exclusive bound
     pub fn exclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
         Bound::Exclusive(limit.to_cw_bytes().into())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Bound2<'a, K: Bounder<'a>> {
+    Inclusive((K, PhantomData<&'a bool>)),
+    Exclusive((K, PhantomData<&'a bool>)),
+}
+
+impl<'a, K: Bounder<'a>> Bound2<'a, K> {
+    pub fn inclusive<T: Into<K>>(k: T) -> Self {
+        Self::Inclusive((k.into(), PhantomData))
+    }
+
+    pub fn exclusive<T: Into<K>>(k: T) -> Self {
+        Self::Exclusive((k.into(), PhantomData))
+    }
+
+    pub fn to_bound(&self) -> Bound {
+        match self {
+            Bound2::Exclusive((k, _)) => Bound::Exclusive(k.joined_prefix()),
+            Bound2::Inclusive((k, _)) => Bound::Inclusive(k.joined_prefix()),
+        }
     }
 }
 
@@ -211,6 +234,36 @@ where
         let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
             .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)))
             .flatten();
+        Box::new(mapped)
+    }
+}
+
+impl<'p, K, T> Prefix<K, T>
+where
+    K: KeyDeserialize + Bounder<'p>,
+    T: Serialize + DeserializeOwned,
+{
+    pub fn range2<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound2<'p, K>>,
+        max: Option<Bound2<'p, K>>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
+    where
+        T: 'a,
+        K::Output: 'static,
+    {
+        let de_fn = self.de_fn_kv;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_bound()),
+            max.map(|b| b.to_bound()),
+            order,
+        )
+        .map(move |kv| (de_fn)(store, &pk_name, kv));
         Box::new(mapped)
     }
 }

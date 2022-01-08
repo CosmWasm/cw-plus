@@ -301,7 +301,7 @@ macro_rules! integer_prefix {
 
 integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
 
-pub trait Bounder<'a> {
+pub trait Bounder<'a>: Prefixer<'a> {
     fn inclusive_bound(&self) -> Option<Bound>;
     fn exclusive_bound(&self) -> Option<Bound>;
 }

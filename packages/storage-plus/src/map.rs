@@ -9,8 +9,9 @@ use crate::helpers::query_raw;
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
-use crate::keys::{Key, PrimaryKey};
+use crate::keys::{Bounder, Key, PrimaryKey};
 use crate::path::Path;
+use crate::prefix::Bound2;
 #[cfg(feature = "iterator")]
 use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
@@ -241,6 +242,27 @@ where
 
     fn no_prefix(&self) -> Prefix<K, T> {
         Prefix::new(self.namespace, &[])
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
+{
+    pub fn range2<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound2<'a, K>>,
+        max: Option<Bound2<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
+    where
+        T: 'c,
+        K::Output: 'static,
+    {
+        self.no_prefix().range2(store, min, max, order)
     }
 }
 
