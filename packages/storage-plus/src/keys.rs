@@ -301,7 +301,7 @@ macro_rules! integer_prefix {
 
 integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
 
-pub trait Bounder<'a>: Prefixer<'a> + Sized {
+pub trait Bounder<'a>: PrimaryKey<'a> + Sized {
     fn inclusive_bound(&self) -> Option<Bound2<'a, Self>>;
     fn exclusive_bound(&self) -> Option<Bound2<'a, Self>>;
 }
@@ -324,7 +324,12 @@ impl<'a> Bounder<'a> for &'a [u8] {
     }
 }
 
-impl<'a, T: Prefixer<'a> + Clone, U: Prefixer<'a> + Clone> Bounder<'a> for (T, U) {
+impl<
+        'a,
+        T: PrimaryKey<'a> + KeyDeserialize + Prefixer<'a> + Clone,
+        U: PrimaryKey<'a> + KeyDeserialize + Clone,
+    > Bounder<'a> for (T, U)
+{
     fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
         Some(Bound2::inclusive(self.clone()))
     }
@@ -333,8 +338,12 @@ impl<'a, T: Prefixer<'a> + Clone, U: Prefixer<'a> + Clone> Bounder<'a> for (T, U
     }
 }
 
-impl<'a, T: Prefixer<'a> + Clone, U: Prefixer<'a> + Clone, V: Prefixer<'a> + Clone> Bounder<'a>
-    for (T, U, V)
+impl<
+        'a,
+        T: PrimaryKey<'a> + Prefixer<'a> + Clone,
+        U: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize + Clone,
+        V: PrimaryKey<'a> + KeyDeserialize + Clone,
+    > Bounder<'a> for (T, U, V)
 {
     fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
         Some(Bound2::inclusive(self.clone()))

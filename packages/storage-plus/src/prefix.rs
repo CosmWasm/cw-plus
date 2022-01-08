@@ -62,8 +62,8 @@ impl<'a, K: Bounder<'a>> Bound2<'a, K> {
 
     pub fn to_bound(&self) -> Bound {
         match self {
-            Bound2::Exclusive((k, _)) => Bound::Exclusive(k.joined_prefix()),
-            Bound2::Inclusive((k, _)) => Bound::Inclusive(k.joined_prefix()),
+            Bound2::Exclusive((k, _)) => Bound::Exclusive(k.joined_key()),
+            Bound2::Inclusive((k, _)) => Bound::Inclusive(k.joined_key()),
         }
     }
 }
