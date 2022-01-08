@@ -18,40 +18,40 @@ use crate::{Endian, Prefixer, PrimaryKey};
 /// Include means we use the given bytes as a limit and *include* anything at that exact key
 /// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
 #[derive(Clone, Debug)]
-pub enum Bound {
+pub enum RawBound {
     Inclusive(Vec<u8>),
     Exclusive(Vec<u8>),
 }
 
-impl Bound {
+impl RawBound {
     /// Turns optional binary, like Option<CanonicalAddr> into an inclusive bound
     pub fn inclusive<T: Into<Vec<u8>>>(limit: T) -> Self {
-        Bound::Inclusive(limit.into())
+        RawBound::Inclusive(limit.into())
     }
 
     /// Turns optional binary, like Option<CanonicalAddr> into an exclusive bound
     pub fn exclusive<T: Into<Vec<u8>>>(limit: T) -> Self {
-        Bound::Exclusive(limit.into())
+        RawBound::Exclusive(limit.into())
     }
 
     /// Turns an int, like Option<u32> into an inclusive bound
     pub fn inclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
-        Bound::Inclusive(limit.to_cw_bytes().into())
+        RawBound::Inclusive(limit.to_cw_bytes().into())
     }
 
     /// Turns an int, like Option<u64> into an exclusive bound
     pub fn exclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
-        Bound::Exclusive(limit.to_cw_bytes().into())
+        RawBound::Exclusive(limit.to_cw_bytes().into())
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum Bound2<'a, K: PrimaryKey<'a>> {
+pub enum Bound<'a, K: PrimaryKey<'a>> {
     Inclusive((K, PhantomData<&'a bool>)),
     Exclusive((K, PhantomData<&'a bool>)),
 }
 
-impl<'a, K: PrimaryKey<'a>> Bound2<'a, K> {
+impl<'a, K: PrimaryKey<'a>> Bound<'a, K> {
     pub fn inclusive<T: Into<K>>(k: T) -> Self {
         Self::Inclusive((k.into(), PhantomData))
     }
@@ -60,10 +60,10 @@ impl<'a, K: PrimaryKey<'a>> Bound2<'a, K> {
         Self::Exclusive((k.into(), PhantomData))
     }
 
-    pub fn to_bound(&self) -> Bound {
+    pub fn to_raw_bound(&self) -> RawBound {
         match self {
-            Bound2::Exclusive((k, _)) => Bound::Exclusive(k.joined_key()),
-            Bound2::Inclusive((k, _)) => Bound::Inclusive(k.joined_key()),
+            Bound::Exclusive((k, _)) => RawBound::Exclusive(k.joined_key()),
+            Bound::Inclusive((k, _)) => RawBound::Inclusive(k.joined_key()),
         }
     }
 }
@@ -83,10 +83,10 @@ impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
         Self::Exclusive((k.into(), PhantomData))
     }
 
-    pub fn to_bound(&self) -> Bound {
+    pub fn to_raw_bound(&self) -> RawBound {
         match self {
-            PrefixBound::Exclusive((k, _)) => Bound::Exclusive(k.joined_prefix()),
-            PrefixBound::Inclusive((k, _)) => Bound::Inclusive(k.joined_prefix()),
+            PrefixBound::Exclusive((k, _)) => RawBound::Exclusive(k.joined_prefix()),
+            PrefixBound::Inclusive((k, _)) => RawBound::Inclusive(k.joined_prefix()),
         }
     }
 }
@@ -174,8 +174,8 @@ where
     pub fn range_raw<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'a>
     where
@@ -191,8 +191,8 @@ where
     pub fn keys_raw<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
         let mapped =
@@ -203,8 +203,8 @@ where
     pub fn range<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
@@ -221,8 +221,8 @@ where
     pub fn keys<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
     where
@@ -247,8 +247,8 @@ where
     pub fn range2_raw<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound2<'b, B>>,
-        max: Option<Bound2<'b, B>>,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'a>
     where
@@ -259,8 +259,8 @@ where
         let mapped = range_with_prefix(
             store,
             &self.storage_prefix,
-            min.map(|b| b.to_bound()),
-            max.map(|b| b.to_bound()),
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
             order,
         )
         .map(move |kv| (de_fn)(store, &pk_name, kv));
@@ -270,8 +270,8 @@ where
     pub fn range2<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound2<'b, B>>,
-        max: Option<Bound2<'b, B>>,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
@@ -283,8 +283,8 @@ where
         let mapped = range_with_prefix(
             store,
             &self.storage_prefix,
-            min.map(|b| b.to_bound()),
-            max.map(|b| b.to_bound()),
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
             order,
         )
         .map(move |kv| (de_fn)(store, &pk_name, kv));
@@ -295,8 +295,8 @@ where
 pub fn range_with_prefix<'a>(
     storage: &'a dyn Storage,
     namespace: &[u8],
-    start: Option<Bound>,
-    end: Option<Bound>,
+    start: Option<RawBound>,
+    end: Option<RawBound>,
     order: Order,
 ) -> Box<dyn Iterator<Item = Record> + 'a> {
     let start = calc_start_bound(namespace, start);
@@ -311,21 +311,21 @@ pub fn range_with_prefix<'a>(
     Box::new(mapped)
 }
 
-fn calc_start_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
+fn calc_start_bound(namespace: &[u8], bound: Option<RawBound>) -> Vec<u8> {
     match bound {
         None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Exclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
     }
 }
 
-fn calc_end_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
+fn calc_end_bound(namespace: &[u8], bound: Option<RawBound>) -> Vec<u8> {
     match bound {
         None => increment_last_byte(namespace),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Inclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
     }
 }
 
@@ -352,11 +352,11 @@ fn calc_prefix_start_bound<'a, K: Prefixer<'a>>(
     namespace: &[u8],
     bound: Option<PrefixBound<'a, K>>,
 ) -> Vec<u8> {
-    match bound.map(|b| b.to_bound()) {
+    match bound.map(|b| b.to_raw_bound()) {
         None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Exclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
     }
 }
 
@@ -364,11 +364,11 @@ fn calc_prefix_end_bound<'a, K: Prefixer<'a>>(
     namespace: &[u8],
     bound: Option<PrefixBound<'a, K>>,
 ) -> Vec<u8> {
-    match bound.map(|b| b.to_bound()) {
+    match bound.map(|b| b.to_raw_bound()) {
         None => increment_last_byte(namespace),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Inclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
     }
 }
 
@@ -441,7 +441,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(RawBound::Inclusive(b"ra".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -451,7 +451,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"ra".to_vec())),
+                Some(RawBound::Exclusive(b"ra".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -461,7 +461,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"r".to_vec())),
+                Some(RawBound::Exclusive(b"r".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -473,7 +473,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(RawBound::Inclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -483,7 +483,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(Bound::Exclusive(b"ra".to_vec())),
+                Some(RawBound::Exclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -493,7 +493,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(Bound::Exclusive(b"rb".to_vec())),
+                Some(RawBound::Exclusive(b"rb".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -503,8 +503,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
-                Some(Bound::Exclusive(b"zi".to_vec())),
+                Some(RawBound::Inclusive(b"ra".to_vec())),
+                Some(RawBound::Exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();
@@ -513,8 +513,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
-                Some(Bound::Exclusive(b"zi".to_vec())),
+                Some(RawBound::Inclusive(b"ra".to_vec())),
+                Some(RawBound::Exclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -523,8 +523,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
-                Some(Bound::Inclusive(b"zi".to_vec())),
+                Some(RawBound::Inclusive(b"ra".to_vec())),
+                Some(RawBound::Inclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -533,8 +533,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"ra".to_vec())),
-                Some(Bound::Exclusive(b"zi".to_vec())),
+                Some(RawBound::Exclusive(b"ra".to_vec())),
+                Some(RawBound::Exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();

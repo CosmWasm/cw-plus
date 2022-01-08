@@ -11,9 +11,9 @@ use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::Prefixer;
 use crate::keys::{Bounder, Key, PrimaryKey};
 use crate::path::Path;
-use crate::prefix::Bound2;
+use crate::prefix::Bound;
 #[cfg(feature = "iterator")]
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound, RawBound};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -158,8 +158,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -171,8 +171,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
     where
@@ -215,8 +215,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -229,8 +229,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -254,8 +254,8 @@ where
     pub fn range2_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound2<'a, K>>,
-        max: Option<Bound2<'a, K>>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -267,8 +267,8 @@ where
     pub fn range2<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound2<'a, K>>,
-        max: Option<Bound2<'a, K>>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -471,7 +471,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"j".to_vec())),
+                Some(RawBound::Inclusive(b"j".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -487,7 +487,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"jo".to_vec())),
+                Some(RawBound::Inclusive(b"jo".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -531,7 +531,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Some(Bound::Inclusive(b"j".to_vec())),
+                Some(RawBound::Inclusive(b"j".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -547,7 +547,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Some(Bound::Inclusive(b"jo".to_vec())),
+                Some(RawBound::Inclusive(b"jo".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -646,7 +646,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range(
                 &store,
-                Some(Bound::inclusive_int(56u32)),
+                Some(RawBound::inclusive_int(56u32)),
                 None,
                 Order::Ascending,
             )
@@ -659,7 +659,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range(
                 &store,
-                Some(Bound::inclusive_int(57u32)),
+                Some(RawBound::inclusive_int(57u32)),
                 None,
                 Order::Ascending,
             )
@@ -751,7 +751,7 @@ mod test {
         let all: StdResult<Vec<_>> = SIGNED_ID
             .range(
                 &store,
-                Some(Bound::inclusive_int(-56i32)),
+                Some(RawBound::inclusive_int(-56i32)),
                 None,
                 Order::Ascending,
             )
@@ -764,8 +764,8 @@ mod test {
         let all: StdResult<Vec<_>> = SIGNED_ID
             .range(
                 &store,
-                Some(Bound::inclusive_int(-55i32)),
-                Some(Bound::inclusive_int(50i32)),
+                Some(RawBound::inclusive_int(-55i32)),
+                Some(RawBound::inclusive_int(50i32)),
                 Order::Descending,
             )
             .collect();
@@ -1459,7 +1459,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"jim".to_vec())),
+                Some(RawBound::Exclusive(b"jim".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -1486,8 +1486,8 @@ mod test {
             .prefix(b"owner")
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"spender1".to_vec())),
-                Some(Bound::Inclusive(b"spender2".to_vec())),
+                Some(RawBound::Exclusive(b"spender1".to_vec())),
+                Some(RawBound::Inclusive(b"spender2".to_vec())),
                 Order::Descending,
             )
             .collect();

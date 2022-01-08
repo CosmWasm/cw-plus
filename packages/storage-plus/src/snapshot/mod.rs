@@ -6,7 +6,7 @@ pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
 use crate::de::KeyDeserialize;
-use crate::{Bound, Map, Prefixer, PrimaryKey};
+use crate::{Map, Prefixer, PrimaryKey, RawBound};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ where
             .transpose()?;
         if let Some((height, _)) = checkpoint {
             // any changelog for the given key since then?
-            let start = Bound::inclusive(height);
+            let start = RawBound::inclusive(height);
             let first = self
                 .changelog
                 .prefix(k.clone())
@@ -143,7 +143,7 @@ where
 
         // this will look for the first snapshot of height >= given height
         // If None, there is no snapshot since that time.
-        let start = Bound::inclusive_int(height);
+        let start = RawBound::inclusive_int(height);
         let first = self
             .changelog
             .prefix(key)

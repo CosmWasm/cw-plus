@@ -283,7 +283,7 @@ mod tests {
     #[test]
     #[cfg(feature = "iterator")]
     fn changelog_range_works() {
-        use crate::Bound;
+        use crate::RawBound;
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -318,7 +318,7 @@ mod tests {
             .changelog()
             .range(
                 &store,
-                Some(Bound::exclusive_int(3u64)),
+                Some(RawBound::exclusive_int(3u64)),
                 None,
                 Order::Ascending,
             )

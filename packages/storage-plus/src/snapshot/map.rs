@@ -10,7 +10,7 @@ use crate::map::Map;
 use crate::path::Path;
 use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
 use crate::snapshot::{ChangeSet, Snapshot};
-use crate::{Bound, Prefixer, Strategy};
+use crate::{Prefixer, RawBound, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
 /// We can query historical data as well as current state.
@@ -171,8 +171,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -184,8 +184,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
     where
@@ -228,8 +228,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -242,8 +242,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<RawBound>,
+        max: Option<RawBound>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -516,7 +516,7 @@ mod tests {
             .prefix("A")
             .range(
                 &store,
-                Some(Bound::inclusive_int(3u64)),
+                Some(RawBound::inclusive_int(3u64)),
                 None,
                 Order::Ascending,
             )
@@ -544,7 +544,7 @@ mod tests {
         let all: StdResult<Vec<_>> = EVERY
             .range(
                 &store,
-                Some(Bound::Inclusive(b"C".to_vec())),
+                Some(RawBound::Inclusive(b"C".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -557,7 +557,7 @@ mod tests {
         let all: StdResult<Vec<_>> = EVERY
             .range(
                 &store,
-                Some(Bound::Inclusive(b"D".to_vec())),
+                Some(RawBound::Inclusive(b"D".to_vec())),
                 None,
                 Order::Ascending,
             )
