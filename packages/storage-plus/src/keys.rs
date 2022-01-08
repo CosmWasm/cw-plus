@@ -3,7 +3,7 @@ use cosmwasm_std::Addr;
 use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::int_key::CwIntKey;
-use crate::Bound;
+use crate::prefix::Bound2;
 
 #[derive(Debug)]
 pub enum Key<'a> {
@@ -301,100 +301,102 @@ macro_rules! integer_prefix {
 
 integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
 
-pub trait Bounder<'a>: Prefixer<'a> {
-    fn inclusive_bound(&self) -> Option<Bound>;
-    fn exclusive_bound(&self) -> Option<Bound>;
+pub trait Bounder<'a>: Prefixer<'a> + Sized {
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>>;
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>>;
 }
 
 impl<'a> Bounder<'a> for () {
-    fn inclusive_bound(&self) -> Option<Bound> {
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
         None
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
         None
     }
 }
 
 impl<'a> Bounder<'a> for &'a [u8] {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::inclusive(self.to_vec()))
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(*self))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::exclusive(self.to_vec()))
-    }
-}
-
-impl<'a, T: Prefixer<'a>, U: Prefixer<'a>> Bounder<'a> for (T, U) {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Inclusive(self.joined_prefix()))
-    }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Exclusive(self.joined_prefix()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(*self))
     }
 }
 
-impl<'a, T: Prefixer<'a>, U: Prefixer<'a>, V: Prefixer<'a>> Bounder<'a> for (T, U, V) {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Inclusive(self.joined_prefix()))
+impl<'a, T: Prefixer<'a> + Clone, U: Prefixer<'a> + Clone> Bounder<'a> for (T, U) {
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(self.clone()))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Exclusive(self.joined_prefix()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(self.clone()))
+    }
+}
+
+impl<'a, T: Prefixer<'a> + Clone, U: Prefixer<'a> + Clone, V: Prefixer<'a> + Clone> Bounder<'a>
+    for (T, U, V)
+{
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(self.clone()))
+    }
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(self.clone()))
     }
 }
 
 impl<'a> Bounder<'a> for &'a str {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::inclusive(self.as_bytes().to_vec()))
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(*self))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::exclusive(self.as_bytes().to_vec()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(*self))
     }
 }
 
 impl<'a> Bounder<'a> for String {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::inclusive(self.as_bytes().to_vec()))
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(self.clone()))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::exclusive(self.as_bytes().to_vec()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(self.clone()))
     }
 }
 
 impl<'a> Bounder<'a> for Vec<u8> {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::inclusive(self.clone()))
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(self.clone()))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::exclusive(self.clone()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(self.clone()))
     }
 }
 
 impl<'a> Bounder<'a> for &'a Addr {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Inclusive(self.as_ref().into()))
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(*self))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Exclusive(self.as_ref().into()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(*self))
     }
 }
 
 impl<'a> Bounder<'a> for Addr {
-    fn inclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Inclusive(self.as_ref().into()))
+    fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::inclusive(self.clone()))
     }
-    fn exclusive_bound(&self) -> Option<Bound> {
-        Some(Bound::Exclusive(self.as_ref().into()))
+    fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+        Some(Bound2::exclusive(self.clone()))
     }
 }
 
 macro_rules! integer_bound {
     (for $($t:ty),+) => {
         $(impl<'a> Bounder<'a> for $t {
-            fn inclusive_bound(&self) -> Option<Bound> {
-                Some(Bound::inclusive_int(*self))
+            fn inclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+                Some(Bound2::inclusive(*self))
             }
-            fn exclusive_bound(&self) -> Option<Bound> {
-                Some(Bound::exclusive_int(*self))
+            fn exclusive_bound(&self) -> Option<Bound2<'a, Self>> {
+                Some(Bound2::exclusive(*self))
             }
         })*
     }
