@@ -238,16 +238,16 @@ where
     }
 }
 
-impl<'p, K, T> Prefix<K, T>
+impl<'b, K, T> Prefix<K, T>
 where
-    K: KeyDeserialize + Bounder<'p>,
+    K: KeyDeserialize + Bounder<'b>,
     T: Serialize + DeserializeOwned,
 {
     pub fn range2<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound2<'p, K>>,
-        max: Option<Bound2<'p, K>>,
+        min: Option<Bound2<'b, K>>,
+        max: Option<Bound2<'b, K>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
