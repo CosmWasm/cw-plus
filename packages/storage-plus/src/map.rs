@@ -51,7 +51,7 @@ where
     }
 
     #[cfg(feature = "iterator")]
-    pub(crate) fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+    pub(crate) fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, K> {
         Prefix::new(self.namespace, &[])
     }
 
@@ -251,6 +251,19 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
 {
+    pub fn range2_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound2<'a, K>>,
+        max: Option<Bound2<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.no_prefix_raw().range2_raw(store, min, max, order)
+    }
+
     pub fn range2<'c>(
         &self,
         store: &'c dyn Storage,
