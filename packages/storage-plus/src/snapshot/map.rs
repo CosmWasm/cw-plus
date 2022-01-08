@@ -73,7 +73,7 @@ where
         self.primary.key(k)
     }
 
-    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, K> {
         self.primary.no_prefix_raw()
     }
 

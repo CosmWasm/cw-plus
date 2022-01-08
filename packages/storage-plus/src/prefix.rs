@@ -244,6 +244,29 @@ where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
+    pub fn range2_raw<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound2<'b, B>>,
+        max: Option<Bound2<'b, B>>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'a>
+    where
+        T: 'a,
+    {
+        let de_fn = self.de_fn_v;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_bound()),
+            max.map(|b| b.to_bound()),
+            order,
+        )
+        .map(move |kv| (de_fn)(store, &pk_name, kv));
+        Box::new(mapped)
+    }
+
     pub fn range2<'a>(
         &self,
         store: &'a dyn Storage,
