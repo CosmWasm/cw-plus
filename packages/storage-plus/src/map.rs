@@ -116,11 +116,11 @@ where
     T: Serialize + DeserializeOwned,
     K: PrimaryKey<'a>,
 {
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T, K::SuperSuffix> {
         Prefix::new(self.namespace, &p.prefix())
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T, K::Suffix> {
         Prefix::new(self.namespace, &p.prefix())
     }
 }
@@ -240,7 +240,7 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T, K> {
         Prefix::new(self.namespace, &[])
     }
 }
