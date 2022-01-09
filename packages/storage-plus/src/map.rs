@@ -263,7 +263,7 @@ mod test {
     use cosmwasm_std::{Order, StdResult};
 
     use crate::int_key::CwIntKey;
-    // use crate::keys_old::IntKeyOld;
+    use crate::IntKeyOld;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
@@ -274,8 +274,8 @@ mod test {
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
     #[cfg(feature = "iterator")]
     const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
-    // #[cfg(feature = "iterator")]
-    // const SIGNED_ID_OLD: Map<IntKeyOld<i32>, Data> = Map::new("signed_id");
+    #[cfg(feature = "iterator")]
+    const SIGNED_ID_OLD: Map<IntKeyOld<i32>, Data> = Map::new("signed_id");
     #[cfg(feature = "iterator")]
     const SIGNED_ID: Map<i32, Data> = Map::new("signed_id");
 
@@ -803,7 +803,6 @@ mod test {
         assert_eq!(all, vec![(50, data3)]);
     }
 
-    /*
     #[test]
     #[cfg(feature = "iterator")]
     fn range_signed_integer_key_migration() {
@@ -873,7 +872,6 @@ mod test {
         // confirm new order is right
         assert_eq!(new, vec![(-1234, data), (-56, data2), (50, data3)]);
     }
-     */
 
     #[test]
     #[cfg(feature = "iterator")]
