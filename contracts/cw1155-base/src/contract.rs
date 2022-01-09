@@ -3,7 +3,7 @@ use cosmwasm_std::{
     to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, SubMsg,
     Uint128,
 };
-use cw_storage_plus::RawBound;
+use cw_storage_plus::Bound;
 
 use cw1155::{
     ApproveAllEvent, ApprovedForAllResponse, BalanceResponse, BatchBalanceResponse,
@@ -494,7 +494,7 @@ fn query_all_approvals(
     limit: Option<u32>,
 ) -> StdResult<ApprovedForAllResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(|addr| RawBound::exclusive(addr.as_ref()));
+    let start = start_after.as_ref().map(Bound::exclusive);
 
     let operators = APPROVES
         .prefix(&owner)
@@ -513,7 +513,7 @@ fn query_tokens(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(RawBound::exclusive);
+    let start = start_after.as_ref().map(|s| Bound::exclusive(s.as_str()));
 
     let tokens = BALANCES
         .prefix(&owner)
@@ -529,7 +529,7 @@ fn query_all_tokens(
     limit: Option<u32>,
 ) -> StdResult<TokensResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = start_after.map(RawBound::exclusive);
+    let start = start_after.as_ref().map(|s| Bound::exclusive(s.as_str()));
     let tokens = TOKENS
         .keys(deps.storage, start, None, Order::Ascending)
         .take(limit)
