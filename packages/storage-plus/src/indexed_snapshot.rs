@@ -1058,12 +1058,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = map
-            .range(
-                &store,
-                Some(RawBound::Inclusive(b"3".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("3")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(
