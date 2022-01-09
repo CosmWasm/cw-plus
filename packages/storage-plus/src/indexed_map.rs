@@ -453,17 +453,18 @@ mod test {
         // Primary key may be empty (so that to iterate over all elements that match just the index)
         let key = ("Maria".to_string(), "".to_string());
         // Iterate using an inclusive bound over the key
-        let count = map
+        let marias = map
             .idx
             .name
             .range_raw(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
-            .count();
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
         // gets from the first "Maria" until the end
-        assert_eq!(4, count);
+        assert_eq!(4, marias.len());
 
         // This is equivalent to using prefix_range
         let key = "Maria".to_string();
-        let count = map
+        let marias2 = map
             .idx
             .name
             .prefix_range_raw(
@@ -472,9 +473,10 @@ mod test {
                 None,
                 Order::Ascending,
             )
-            .count();
-        // gets from the first "Maria" until the end
-        assert_eq!(4, count);
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(4, marias2.len());
+        assert_eq!(marias, marias2);
 
         // Build key including a non-empty pk
         let key = ("Maria".to_string(), "1".to_string());
