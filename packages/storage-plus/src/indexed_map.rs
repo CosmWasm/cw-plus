@@ -461,7 +461,7 @@ mod test {
             .name
             .range_raw(
                 &store,
-                Some(RawBound::inclusive(key)),
+                Some(Bound::InclusiveRaw(key)),
                 None,
                 Order::Ascending,
             )
@@ -481,7 +481,7 @@ mod test {
             .name
             .range_raw(
                 &store,
-                Some(RawBound::exclusive(key)),
+                Some(Bound::ExclusiveRaw(key)),
                 None,
                 Order::Ascending,
             )
@@ -491,15 +491,13 @@ mod test {
 
         // index_key() over UniqueIndex works.
         let age_key = 23u32;
-        // Use the index_key() helper to build the (raw) index key
-        let age_key = map.idx.age.index_key(age_key);
         // Iterate using a (inclusive) bound over the raw key.
         let count = map
             .idx
             .age
             .range_raw(
                 &store,
-                Some(RawBound::inclusive(age_key)),
+                Some(Bound::inclusive(age_key)),
                 None,
                 Order::Ascending,
             )
@@ -1007,12 +1005,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = map
-            .range(
-                &store,
-                Some(RawBound::Inclusive(b"3".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("3")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(

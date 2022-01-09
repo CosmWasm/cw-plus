@@ -263,7 +263,7 @@ mod test {
     use cosmwasm_std::{Order, StdResult};
 
     use crate::int_key::CwIntKey;
-    use crate::keys_old::IntKeyOld;
+    // use crate::keys_old::IntKeyOld;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
@@ -274,8 +274,8 @@ mod test {
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
     #[cfg(feature = "iterator")]
     const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
-    #[cfg(feature = "iterator")]
-    const SIGNED_ID_OLD: Map<IntKeyOld<i32>, Data> = Map::new("signed_id");
+    // #[cfg(feature = "iterator")]
+    // const SIGNED_ID_OLD: Map<IntKeyOld<i32>, Data> = Map::new("signed_id");
     #[cfg(feature = "iterator")]
     const SIGNED_ID: Map<i32, Data> = Map::new("signed_id");
 
@@ -444,7 +444,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range_raw(
                 &store,
-                Some(RawBound::Inclusive(b"j".to_vec())),
+                Some(Bound::inclusive(b"j" as &[u8])),
                 None,
                 Order::Ascending,
             )
@@ -460,7 +460,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range_raw(
                 &store,
-                Some(RawBound::Inclusive(b"jo".to_vec())),
+                Some(Bound::inclusive(b"jo" as &[u8])),
                 None,
                 Order::Ascending,
             )
@@ -504,7 +504,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Some(RawBound::Inclusive(b"j".to_vec())),
+                Some(Bound::inclusive(b"j" as &[u8])),
                 None,
                 Order::Ascending,
             )
@@ -520,7 +520,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range(
                 &store,
-                Some(RawBound::Inclusive(b"jo".to_vec())),
+                Some(Bound::inclusive(b"jo" as &[u8])),
                 None,
                 Order::Ascending,
             )
@@ -617,7 +617,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range(
                 &store,
-                Some(RawBound::inclusive_int(56u32)),
+                Some(Bound::inclusive(56u32)),
                 None,
                 Order::Ascending,
             )
@@ -630,7 +630,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE_ID
             .range(
                 &store,
-                Some(RawBound::inclusive_int(57u32)),
+                Some(Bound::inclusive(57u32)),
                 None,
                 Order::Ascending,
             )
@@ -722,7 +722,7 @@ mod test {
         let all: StdResult<Vec<_>> = SIGNED_ID
             .range(
                 &store,
-                Some(RawBound::inclusive_int(-56i32)),
+                Some(Bound::inclusive(-56i32)),
                 None,
                 Order::Ascending,
             )
@@ -735,8 +735,8 @@ mod test {
         let all: StdResult<Vec<_>> = SIGNED_ID
             .range(
                 &store,
-                Some(RawBound::inclusive_int(-55i32)),
-                Some(RawBound::inclusive_int(50i32)),
+                Some(Bound::inclusive(-55i32)),
+                Some(Bound::inclusive(50i32)),
                 Order::Descending,
             )
             .collect();
@@ -803,6 +803,7 @@ mod test {
         assert_eq!(all, vec![(50, data3)]);
     }
 
+    /*
     #[test]
     #[cfg(feature = "iterator")]
     fn range_signed_integer_key_migration() {
@@ -872,6 +873,7 @@ mod test {
         // confirm new order is right
         assert_eq!(new, vec![(-1234, data), (-56, data2), (50, data3)]);
     }
+     */
 
     #[test]
     #[cfg(feature = "iterator")]
@@ -1428,7 +1430,7 @@ mod test {
         let all: StdResult<Vec<_>> = PEOPLE
             .range_raw(
                 &store,
-                Some(RawBound::Exclusive(b"jim".to_vec())),
+                Some(Bound::exclusive(b"jim" as &[u8])),
                 None,
                 Order::Ascending,
             )
@@ -1455,8 +1457,8 @@ mod test {
             .prefix(b"owner")
             .range_raw(
                 &store,
-                Some(RawBound::Exclusive(b"spender1".to_vec())),
-                Some(RawBound::Inclusive(b"spender2".to_vec())),
+                Some(Bound::exclusive(b"spender1" as &[u8])),
+                Some(Bound::inclusive(b"spender2" as &[u8])),
                 Order::Descending,
             )
             .collect();

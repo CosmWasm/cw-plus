@@ -514,12 +514,7 @@ mod tests {
         let all: StdResult<Vec<_>> = EVERY
             .changelog()
             .prefix("A")
-            .range(
-                &store,
-                Some(RawBound::inclusive_int(3u64)),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive(3u64)), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -542,12 +537,7 @@ mod tests {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = EVERY
-            .range(
-                &store,
-                Some(RawBound::Inclusive(b"C".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("C")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -555,12 +545,7 @@ mod tests {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = EVERY
-            .range(
-                &store,
-                Some(RawBound::Inclusive(b"D".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("D")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());

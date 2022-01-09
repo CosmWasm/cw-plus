@@ -132,6 +132,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prefix::Bound;
     use cosmwasm_std::testing::MockStorage;
 
     type TestItem = SnapshotItem<'static, u64>;
@@ -283,7 +284,6 @@ mod tests {
     #[test]
     #[cfg(feature = "iterator")]
     fn changelog_range_works() {
-        use crate::RawBound;
         use cosmwasm_std::Order;
 
         let mut store = MockStorage::new();
@@ -316,12 +316,7 @@ mod tests {
         // let's try to iterate over a changelog range
         let all: StdResult<Vec<_>> = EVERY
             .changelog()
-            .range(
-                &store,
-                Some(RawBound::exclusive_int(3u64)),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::exclusive(3u64)), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());

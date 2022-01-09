@@ -54,6 +54,8 @@ impl RawBound {
 pub enum Bound<'a, K: PrimaryKey<'a>> {
     Inclusive((K, PhantomData<&'a bool>)),
     Exclusive((K, PhantomData<&'a bool>)),
+    InclusiveRaw(Vec<u8>),
+    ExclusiveRaw(Vec<u8>),
 }
 
 impl<'a, K: PrimaryKey<'a>> Bound<'a, K> {
@@ -67,8 +69,10 @@ impl<'a, K: PrimaryKey<'a>> Bound<'a, K> {
 
     pub fn to_raw_bound(&self) -> RawBound {
         match self {
-            Bound::Exclusive((k, _)) => RawBound::Exclusive(k.joined_key()),
             Bound::Inclusive((k, _)) => RawBound::Inclusive(k.joined_key()),
+            Bound::Exclusive((k, _)) => RawBound::Exclusive(k.joined_key()),
+            Bound::ExclusiveRaw(raw_k) => RawBound::Exclusive(raw_k.clone()),
+            Bound::InclusiveRaw(raw_k) => RawBound::Inclusive(raw_k.clone()),
         }
     }
 }
@@ -423,7 +427,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Inclusive(b"ra".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -433,7 +437,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Exclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"ra".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -443,7 +447,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Exclusive(b"r".to_vec())),
+                Some(Bound::exclusive(b"r".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -455,7 +459,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(RawBound::Inclusive(b"ra".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -465,7 +469,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(RawBound::Exclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -475,7 +479,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(RawBound::Exclusive(b"rb".to_vec())),
+                Some(Bound::exclusive(b"rb".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -485,8 +489,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Inclusive(b"ra".to_vec())),
-                Some(RawBound::Exclusive(b"zi".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();
@@ -495,8 +499,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Inclusive(b"ra".to_vec())),
-                Some(RawBound::Exclusive(b"zi".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -505,8 +509,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Inclusive(b"ra".to_vec())),
-                Some(RawBound::Inclusive(b"zi".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
+                Some(Bound::inclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -515,8 +519,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(RawBound::Exclusive(b"ra".to_vec())),
-                Some(RawBound::Exclusive(b"zi".to_vec())),
+                Some(Bound::exclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();
