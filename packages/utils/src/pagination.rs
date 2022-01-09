@@ -37,7 +37,7 @@ pub fn calc_range_start_string(start_after: Option<String>) -> Option<Vec<u8>> {
 mod test {
     use super::*;
     use cosmwasm_std::{testing::mock_dependencies, Order};
-    use cw_storage_plus::{RawBound, Map};
+    use cw_storage_plus::{Bound, Map};
 
     pub const HOLDERS: Map<&Addr, usize> = Map::new("some_data");
     const LIMIT: usize = 30;
@@ -64,7 +64,7 @@ mod test {
                 Some(addr_from_i(j * LIMIT - 1))
             };
 
-            let start = calc_range_start(start_after).map(RawBound::exclusive);
+            let start = calc_range_start(start_after).map(Bound::ExclusiveRaw);
 
             let holders = HOLDERS
                 .keys(&deps.storage, start, None, Order::Ascending)
@@ -93,7 +93,7 @@ mod test {
         for j in 0..4 {
             let end_before = Some(addr_from_i(total_elements_count - j * LIMIT));
 
-            let end = calc_range_end(end_before).map(RawBound::exclusive);
+            let end = calc_range_end(end_before).map(Bound::ExclusiveRaw);
 
             let holders = HOLDERS
                 .keys(&deps.storage, None, end, Order::Descending)
