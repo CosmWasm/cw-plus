@@ -8,9 +8,9 @@ use crate::iter_helpers::deserialize_kv;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
-use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
 use crate::snapshot::{ChangeSet, Snapshot};
-use crate::{Prefixer, RawBound, Strategy};
+use crate::{Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
 /// We can query historical data as well as current state.
@@ -171,8 +171,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -184,8 +184,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
     where
@@ -228,8 +228,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -242,8 +242,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -253,15 +253,15 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T, K::Suffix> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T, K::SuperSuffix> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    fn no_prefix(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T, K> {
         Prefix::new(self.primary.namespace(), &[])
     }
 }

@@ -13,7 +13,7 @@ use crate::keys::{Bounder, Key, PrimaryKey};
 use crate::path::Path;
 use crate::prefix::Bound;
 #[cfg(feature = "iterator")]
-use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound, RawBound};
+use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -154,32 +154,6 @@ where
             namespaced_prefix_range(store, self.namespace, min, max, order).map(deserialize_v);
         Box::new(mapped)
     }
-
-    pub fn range_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
-    where
-        T: 'c,
-    {
-        self.no_prefix_raw().range_raw(store, min, max, order)
-    }
-
-    pub fn keys_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
-    where
-        T: 'c,
-    {
-        self.no_prefix_raw().keys_raw(store, min, max, order)
-    }
 }
 
 #[cfg(feature = "iterator")]
@@ -212,11 +186,48 @@ where
         Box::new(mapped)
     }
 
+    fn no_prefix(&self) -> Prefix<K, T, K> {
+        Prefix::new(self.namespace, &[])
+    }
+}
+
+#[cfg(feature = "iterator")]
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
+{
+    pub fn range_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.no_prefix_raw().range_raw(store, min, max, order)
+    }
+
+    pub fn keys_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
+    where
+        T: 'c,
+    {
+        self.no_prefix_raw().keys_raw(store, min, max, order)
+    }
+
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -229,8 +240,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -238,44 +249,6 @@ where
         K::Output: 'static,
     {
         self.no_prefix().keys(store, min, max, order)
-    }
-
-    fn no_prefix(&self) -> Prefix<K, T, K> {
-        Prefix::new(self.namespace, &[])
-    }
-}
-
-#[cfg(feature = "iterator")]
-impl<'a, K, T> Map<'a, K, T>
-where
-    T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
-{
-    pub fn range2_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<Bound<'a, K>>,
-        max: Option<Bound<'a, K>>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
-    where
-        T: 'c,
-    {
-        self.no_prefix_raw().range2_raw(store, min, max, order)
-    }
-
-    pub fn range2<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<Bound<'a, K>>,
-        max: Option<Bound<'a, K>>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
-    where
-        T: 'c,
-        K::Output: 'static,
-    {
-        self.no_prefix().range2(store, min, max, order)
     }
 }
 
@@ -582,9 +555,7 @@ mod test {
         PEOPLE.save(&mut store, b"ada", &data3).unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range2(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
         assert_eq!(
@@ -598,7 +569,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range2(&store, b"j".inclusive_bound(), None, Order::Ascending)
+            .range(&store, b"j".inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -609,7 +580,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE
-            .range2(&store, b"jo".inclusive_bound(), None, Order::Ascending)
+            .range(&store, b"jo".inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -688,7 +659,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range2(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -696,7 +667,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range2(&store, 56u32.inclusive_bound(), None, Order::Ascending)
+            .range(&store, 56u32.inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -704,7 +675,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = PEOPLE_ID
-            .range2(&store, 57u32.inclusive_bound(), None, Order::Ascending)
+            .range(&store, 57u32.inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -800,7 +771,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = SIGNED_ID
-            .range2(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -812,7 +783,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = SIGNED_ID
-            .range2(&store, (-56i32).inclusive_bound(), None, Order::Ascending)
+            .range(&store, (-56i32).inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -820,7 +791,7 @@ mod test {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = SIGNED_ID
-            .range2(
+            .range(
                 &store,
                 (-55i32).inclusive_bound(),
                 50i32.inclusive_bound(),
@@ -1008,7 +979,7 @@ mod test {
 
         // let's try to iterate!
         let all: StdResult<Vec<_>> = ALLOWANCE
-            .range2(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -1024,7 +995,7 @@ mod test {
         // let's try to iterate over a prefix
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range2(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -1036,7 +1007,7 @@ mod test {
         // let's try to iterate over a prefixed restricted inclusive range
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range2(&store, b"spender".inclusive_bound(), None, Order::Ascending)
+            .range(&store, b"spender".inclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -1048,7 +1019,7 @@ mod test {
         // let's try to iterate over a prefixed restricted exclusive range
         let all: StdResult<Vec<_>> = ALLOWANCE
             .prefix(b"owner")
-            .range2(&store, b"spender".exclusive_bound(), None, Order::Ascending)
+            .range(&store, b"spender".exclusive_bound(), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -1220,9 +1191,7 @@ mod test {
             .unwrap();
 
         // let's try to iterate!
-        let all: StdResult<Vec<_>> = TRIPLE
-            .range2(&store, None, None, Order::Ascending)
-            .collect();
+        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
         let all = all.unwrap();
         assert_eq!(4, all.len());
         assert_eq!(
@@ -1238,7 +1207,7 @@ mod test {
         // let's iterate over a sub_prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .sub_prefix(b"owner")
-            .range2(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(3, all.len());
@@ -1254,7 +1223,7 @@ mod test {
         // let's iterate over a prefix
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9))
-            .range2(&store, None, None, Order::Ascending)
+            .range(&store, None, None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -1269,7 +1238,7 @@ mod test {
         // let's try to iterate over a prefixed restricted inclusive range
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9))
-            .range2(
+            .range(
                 &store,
                 "recipient".inclusive_bound(),
                 None,
@@ -1289,7 +1258,7 @@ mod test {
         // let's try to iterate over a prefixed restricted exclusive range
         let all: StdResult<Vec<_>> = TRIPLE
             .prefix((b"owner", 9))
-            .range2(
+            .range(
                 &store,
                 "recipient".exclusive_bound(),
                 None,

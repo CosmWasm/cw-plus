@@ -175,72 +175,6 @@ where
             de_fn_v,
         }
     }
-
-    pub fn range_raw<'a>(
-        &self,
-        store: &'a dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'a>
-    where
-        T: 'a,
-    {
-        let de_fn = self.de_fn_v;
-        let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &pk_name, kv));
-        Box::new(mapped)
-    }
-
-    pub fn keys_raw<'a>(
-        &self,
-        store: &'a dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
-        let mapped =
-            range_with_prefix(store, &self.storage_prefix, min, max, order).map(|(k, _)| k);
-        Box::new(mapped)
-    }
-
-    pub fn range<'a>(
-        &self,
-        store: &'a dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
-    where
-        T: 'a,
-        K::Output: 'static,
-    {
-        let de_fn = self.de_fn_kv;
-        let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &pk_name, kv));
-        Box::new(mapped)
-    }
-
-    pub fn keys<'a>(
-        &self,
-        store: &'a dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: Order,
-    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
-    where
-        T: 'a,
-        K::Output: 'static,
-    {
-        let de_fn = self.de_fn_kv;
-        let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)))
-            .flatten();
-        Box::new(mapped)
-    }
 }
 
 impl<'b, K, T, B> Prefix<K, T, B>
@@ -249,7 +183,7 @@ where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
 {
-    pub fn range2_raw<'a>(
+    pub fn range_raw<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound<'b, B>>,
@@ -272,7 +206,25 @@ where
         Box::new(mapped)
     }
 
-    pub fn range2<'a>(
+    pub fn keys_raw<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
+            order,
+        )
+        .map(|(k, _)| k);
+        Box::new(mapped)
+    }
+
+    pub fn range<'a>(
         &self,
         store: &'a dyn Storage,
         min: Option<Bound<'b, B>>,
@@ -293,6 +245,31 @@ where
             order,
         )
         .map(move |kv| (de_fn)(store, &pk_name, kv));
+        Box::new(mapped)
+    }
+
+    pub fn keys<'a>(
+        &self,
+        store: &'a dyn Storage,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
+        order: Order,
+    ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
+    where
+        T: 'a,
+        K::Output: 'static,
+    {
+        let de_fn = self.de_fn_kv;
+        let pk_name = self.pk_name.clone();
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
+            order,
+        )
+        .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)))
+        .flatten();
         Box::new(mapped)
     }
 }
