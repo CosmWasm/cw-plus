@@ -3,14 +3,15 @@ use serde::Serialize;
 
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+use crate::bound::PrefixBound;
 use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix};
 use crate::snapshot::{ChangeSet, Snapshot};
-use crate::{Prefixer, Strategy};
+use crate::{Bound, Prefixer, Strategy};
 
 /// Map that maintains a snapshots of one or more checkpoints.
 /// We can query historical data as well as current state.

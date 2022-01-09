@@ -3,17 +3,18 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 #[cfg(feature = "iterator")]
+use crate::bound::{Bound, Bounder, PrefixBound};
+#[cfg(feature = "iterator")]
 use crate::de::KeyDeserialize;
 use crate::helpers::query_raw;
 #[cfg(feature = "iterator")]
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 #[cfg(feature = "iterator")]
 use crate::keys::Prefixer;
-use crate::keys::{Bounder, Key, PrimaryKey};
+use crate::keys::{Key, PrimaryKey};
 use crate::path::Path;
-use crate::prefix::Bound;
 #[cfg(feature = "iterator")]
-use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix};
 use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
@@ -263,6 +264,7 @@ mod test {
     use cosmwasm_std::{Order, StdResult};
 
     use crate::int_key::CwIntKey;
+    #[cfg(feature = "iterator")]
     use crate::IntKeyOld;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]

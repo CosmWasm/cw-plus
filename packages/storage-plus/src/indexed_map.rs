@@ -1,6 +1,7 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
+use crate::PrefixBound;
 use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -10,8 +11,8 @@ use crate::indexes::Index;
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
-use crate::Path;
+use crate::prefix::{namespaced_prefix_range, Prefix};
+use crate::{Bound, Path};
 
 pub trait IndexList<T> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<T>> + '_>;

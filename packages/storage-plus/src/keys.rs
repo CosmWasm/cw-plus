@@ -3,7 +3,6 @@ use cosmwasm_std::Addr;
 use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::int_key::CwIntKey;
-use crate::prefix::Bound;
 
 #[derive(Debug)]
 pub enum Key<'a> {
@@ -300,118 +299,6 @@ macro_rules! integer_prefix {
 }
 
 integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
-
-pub trait Bounder<'a>: PrimaryKey<'a> + Sized {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>>;
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>>;
-}
-
-impl<'a> Bounder<'a> for () {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        None
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        None
-    }
-}
-
-impl<'a> Bounder<'a> for &'a [u8] {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<
-        'a,
-        T: PrimaryKey<'a> + KeyDeserialize + Prefixer<'a> + Clone,
-        U: PrimaryKey<'a> + KeyDeserialize + Clone,
-    > Bounder<'a> for (T, U)
-{
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<
-        'a,
-        T: PrimaryKey<'a> + Prefixer<'a> + Clone,
-        U: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize + Clone,
-        V: PrimaryKey<'a> + KeyDeserialize + Clone,
-    > Bounder<'a> for (T, U, V)
-{
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<'a> Bounder<'a> for &'a str {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<'a> Bounder<'a> for String {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<'a> Bounder<'a> for Vec<u8> {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<'a> Bounder<'a> for &'a Addr {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-impl<'a> Bounder<'a> for Addr {
-    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::inclusive(self))
-    }
-    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-        Some(Bound::exclusive(self))
-    }
-}
-
-macro_rules! integer_bound {
-    (for $($t:ty),+) => {
-        $(impl<'a> Bounder<'a> for $t {
-            fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
-                Some(Bound::inclusive(self))
-            }
-            fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
-                Some(Bound::exclusive(self))
-            }
-        })*
-    }
-}
-
-integer_bound!(for i8, u8, i16, u16, i32, u32, i64, u64);
 
 #[cfg(test)]
 mod test {

@@ -5,8 +5,8 @@ mod map;
 pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
+use crate::bound::Bound;
 use crate::de::KeyDeserialize;
-use crate::prefix::Bound;
 use crate::{Map, Prefixer, PrimaryKey};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;

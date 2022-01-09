@@ -1,6 +1,8 @@
 use crate::de::KeyDeserialize;
 use crate::keys::Key;
-use crate::{Bound, Bounder, Endian, Prefixer, PrimaryKey};
+#[cfg(feature = "iterator")]
+use crate::{Bound, Bounder};
+use crate::{Endian, Prefixer, PrimaryKey};
 use std::marker::PhantomData;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -62,6 +64,7 @@ impl<'a, T: Endian> Prefixer<'a> for IntKeyOld<T> {
 }
 
 // this auto-implements Bounder for all the IntKey types
+#[cfg(feature = "iterator")]
 impl<'a, T: Endian> Bounder<'a> for IntKeyOld<T>
 where
     IntKeyOld<T>: KeyDeserialize,

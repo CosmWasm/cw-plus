@@ -132,7 +132,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prefix::Bound;
+    use crate::bound::Bound;
     use cosmwasm_std::testing::MockStorage;
 
     type TestItem = SnapshotItem<'static, u64>;

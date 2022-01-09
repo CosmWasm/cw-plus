@@ -1,3 +1,4 @@
+mod bound;
 mod de;
 mod de_old;
 mod endian;
@@ -15,6 +16,8 @@ mod path;
 mod prefix;
 mod snapshot;
 
+#[cfg(feature = "iterator")]
+pub use bound::{Bound, Bounder, PrefixBound, RawBound};
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};
@@ -28,11 +31,11 @@ pub use indexes::UniqueIndex;
 pub use indexes::{index_string, index_string_tuple, index_triple, index_tuple, Index};
 pub use int_key::CwIntKey;
 pub use item::Item;
-pub use keys::{Bounder, Key, Prefixer, PrimaryKey};
+pub use keys::{Key, Prefixer, PrimaryKey};
 pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
-pub use prefix::{range_with_prefix, Bound, Prefix, PrefixBound, RawBound};
+pub use prefix::{range_with_prefix, Prefix};
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};

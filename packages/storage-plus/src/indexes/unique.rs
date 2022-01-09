@@ -8,11 +8,12 @@ use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{from_slice, Binary, Order, Record, StdError, StdResult, Storage};
 
+use crate::bound::PrefixBound;
 use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, Bound, PrefixBound};
-use crate::{Index, Prefix, Prefixer, PrimaryKey};
+use crate::prefix::namespaced_prefix_range;
+use crate::{Bound, Index, Prefix, Prefixer, PrimaryKey};
 
 /// UniqueRef stores Binary(Vec[u8]) representation of private key and index value
 #[derive(Deserialize, Serialize)]
