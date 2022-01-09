@@ -11,8 +11,8 @@ use cosmwasm_std::{from_slice, Binary, Order, Record, StdError, StdResult, Stora
 use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, PrefixBound};
-use crate::{Index, Prefix, Prefixer, PrimaryKey, RawBound};
+use crate::prefix::{namespaced_prefix_range, Bound, PrefixBound};
+use crate::{Index, Prefix, Prefixer, PrimaryKey};
 
 /// UniqueRef stores Binary(Vec[u8]) representation of private key and index value
 #[derive(Deserialize, Serialize)]
@@ -112,7 +112,7 @@ where
         k.joined_key()
     }
 
-    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, IK> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],
@@ -143,8 +143,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, IK>>,
+        max: Option<Bound<'a, IK>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'c>
     where
@@ -156,8 +156,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, IK>>,
+        max: Option<Bound<'a, IK>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
         self.no_prefix_raw().keys_raw(store, min, max, order)
@@ -199,8 +199,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, IK>>,
+        max: Option<Bound<'a, IK>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(PK::Output, T)>> + 'c>
     where
@@ -213,8 +213,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, IK>>,
+        max: Option<Bound<'a, IK>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<PK::Output>> + 'c>
     where
@@ -224,7 +224,7 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    pub fn prefix(&self, p: IK::Prefix) -> Prefix<PK, T> {
+    pub fn prefix(&self, p: IK::Prefix) -> Prefix<PK, T, IK::Suffix> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
@@ -234,7 +234,7 @@ where
         )
     }
 
-    pub fn sub_prefix(&self, p: IK::SubPrefix) -> Prefix<PK, T> {
+    pub fn sub_prefix(&self, p: IK::SubPrefix) -> Prefix<PK, T, IK::SuperSuffix> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
@@ -244,7 +244,7 @@ where
         )
     }
 
-    fn no_prefix(&self) -> Prefix<PK, T> {
+    fn no_prefix(&self) -> Prefix<PK, T, IK> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &[],

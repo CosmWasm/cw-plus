@@ -10,7 +10,7 @@ use crate::indexes::Index;
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound, RawBound};
+use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
 use crate::Path;
 
 pub trait IndexList<T> {
@@ -130,41 +130,8 @@ where
     }
 
     // use no_prefix to scan -> range
-    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, K> {
         Prefix::new(self.pk_namespace, &[])
-    }
-}
-
-// short-cut for simple keys, rather than .prefix(()).range_raw(...)
-impl<'a, K, T, I> IndexedMap<'a, K, T, I>
-where
-    K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone,
-    I: IndexList<T>,
-{
-    // I would prefer not to copy code from Prefix, but no other way
-    // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
-    where
-        T: 'c,
-    {
-        self.no_prefix_raw().range_raw(store, min, max, order)
-    }
-
-    pub fn keys_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 }
 
@@ -244,11 +211,34 @@ where
         Box::new(mapped)
     }
 
+    pub fn range_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.no_prefix_raw().range_raw(store, min, max, order)
+    }
+
+    pub fn keys_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        self.no_prefix_raw().keys_raw(store, min, max, order)
+    }
+
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -261,8 +251,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<RawBound>,
-        max: Option<RawBound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -272,7 +262,7 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T, K> {
         Prefix::new(self.pk_namespace, &[])
     }
 }
