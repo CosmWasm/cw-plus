@@ -449,19 +449,26 @@ mod test {
             .count();
         assert_eq!(0, count);
 
-        // index_key() over MultiIndex works (empty pk)
-        // In a MultiIndex, an index key is composed by the index and the primary key.
+        // In a MultiIndex, the index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
-        let key = "Maria".to_string();
-        // Use the index_key() helper to build the (raw) index key with an empty pk
-        let key = map.idx.name.index_key(key);
-        // Iterate using a bound over the raw key
+        let key = ("Maria".to_string(), "".to_string());
+        // Iterate using an inclusive bound over the key
         let count = map
             .idx
             .name
-            .range_raw(
+            .range_raw(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
+            .count();
+        // gets from the first "Maria" until the end
+        assert_eq!(4, count);
+
+        // This is equivalent to using prefix_range
+        let key = "Maria".to_string();
+        let count = map
+            .idx
+            .name
+            .prefix_range_raw(
                 &store,
-                Some(Bound::InclusiveRaw(key)),
+                Some(PrefixBound::inclusive(key)),
                 None,
                 Order::Ascending,
             )
@@ -469,29 +476,21 @@ mod test {
         // gets from the first "Maria" until the end
         assert_eq!(4, count);
 
-        // index_key() over MultiIndex works (non-empty pk)
         // Build key including a non-empty pk
         let key = ("Maria".to_string(), "1".to_string());
-        // Use the joined_key() helper to build the (raw) index key
-        let key = key.joined_key();
-        // Iterate using a (exclusive) bound over the raw key.
+        // Iterate using a (exclusive) bound over the key.
         // (Useful for pagination / continuation contexts).
         let count = map
             .idx
             .name
-            .range_raw(
-                &store,
-                Some(Bound::ExclusiveRaw(key)),
-                None,
-                Order::Ascending,
-            )
+            .range_raw(&store, Some(Bound::exclusive(key)), None, Order::Ascending)
             .count();
         // gets from the 2nd "Maria" until the end
         assert_eq!(3, count);
 
         // index_key() over UniqueIndex works.
         let age_key = 23u32;
-        // Iterate using a (inclusive) bound over the raw key.
+        // Iterate using a (inclusive) bound over the key.
         let count = map
             .idx
             .age
