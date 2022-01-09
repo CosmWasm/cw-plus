@@ -8,9 +8,10 @@ use serde::Serialize;
 use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::keys::{Prefixer, PrimaryKey};
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix};
 use crate::snapshot::{ChangeSet, SnapshotMap};
-use crate::{IndexList, Map, Path, Strategy};
+use crate::PrefixBound;
+use crate::{Bound, IndexList, Map, Path, Strategy};
 
 /// `IndexedSnapshotMap` works like a `SnapshotMap` but has a secondary index
 pub struct IndexedSnapshotMap<'a, K, T, I> {

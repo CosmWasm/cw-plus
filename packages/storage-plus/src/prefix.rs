@@ -6,76 +6,12 @@ use std::marker::PhantomData;
 use cosmwasm_std::{Order, Record, StdResult, Storage};
 use std::ops::Deref;
 
+use crate::bound::{PrefixBound, RawBound};
 use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::keys::Key;
-use crate::{Prefixer, PrimaryKey};
-
-/// `RawBound` is used to define the two ends of a range, more explicit than `Option<u8>`.
-/// `None` means that we don't limit that side of the range at all.
-/// `Inclusive` means we use the given bytes as a limit and *include* anything at that exact key.
-/// `Exclusive` means we use the given bytes as a limit and *exclude* anything at that exact key.
-/// See `Bound` for a type safe way to build these bounds.
-#[derive(Clone, Debug)]
-pub enum RawBound {
-    Inclusive(Vec<u8>),
-    Exclusive(Vec<u8>),
-}
-
-/// `Bound` is used to define the two ends of a range.
-/// `None` means that we don't limit that side of the range at all.
-/// `Inclusive` means we use the given value as a limit and *include* anything at that exact key.
-/// `Exclusive` means we use the given value as a limit and *exclude* anything at that exact key.
-#[derive(Clone, Debug)]
-pub enum Bound<'a, K: PrimaryKey<'a>> {
-    Inclusive((K, PhantomData<&'a bool>)),
-    Exclusive((K, PhantomData<&'a bool>)),
-    InclusiveRaw(Vec<u8>),
-    ExclusiveRaw(Vec<u8>),
-}
-
-impl<'a, K: PrimaryKey<'a>> Bound<'a, K> {
-    pub fn inclusive<T: Into<K>>(k: T) -> Self {
-        Self::Inclusive((k.into(), PhantomData))
-    }
-
-    pub fn exclusive<T: Into<K>>(k: T) -> Self {
-        Self::Exclusive((k.into(), PhantomData))
-    }
-
-    pub fn to_raw_bound(&self) -> RawBound {
-        match self {
-            Bound::Inclusive((k, _)) => RawBound::Inclusive(k.joined_key()),
-            Bound::Exclusive((k, _)) => RawBound::Exclusive(k.joined_key()),
-            Bound::ExclusiveRaw(raw_k) => RawBound::Exclusive(raw_k.clone()),
-            Bound::InclusiveRaw(raw_k) => RawBound::Inclusive(raw_k.clone()),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum PrefixBound<'a, K: Prefixer<'a>> {
-    Inclusive((K, PhantomData<&'a bool>)),
-    Exclusive((K, PhantomData<&'a bool>)),
-}
-
-impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
-    pub fn inclusive<T: Into<K>>(k: T) -> Self {
-        Self::Inclusive((k.into(), PhantomData))
-    }
-
-    pub fn exclusive<T: Into<K>>(k: T) -> Self {
-        Self::Exclusive((k.into(), PhantomData))
-    }
-
-    pub fn to_raw_bound(&self) -> RawBound {
-        match self {
-            PrefixBound::Exclusive((k, _)) => RawBound::Exclusive(k.joined_prefix()),
-            PrefixBound::Inclusive((k, _)) => RawBound::Inclusive(k.joined_prefix()),
-        }
-    }
-}
+use crate::{Bound, Prefixer, PrimaryKey};
 
 type DeserializeVFn<T> = fn(&dyn Storage, &[u8], Record) -> StdResult<Record<T>>;
 

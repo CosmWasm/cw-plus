@@ -6,12 +6,13 @@ use serde::Serialize;
 
 use cosmwasm_std::{from_slice, Order, Record, StdError, StdResult, Storage};
 
+use crate::bound::PrefixBound;
 use crate::de::KeyDeserialize;
 use crate::helpers::namespaces_with_key;
 use crate::iter_helpers::deserialize_kv;
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, Bound, PrefixBound};
-use crate::{Index, Prefix, Prefixer, PrimaryKey};
+use crate::prefix::namespaced_prefix_range;
+use crate::{Bound, Index, Prefix, Prefixer, PrimaryKey};
 use std::marker::PhantomData;
 
 /// MultiIndex stores (namespace, index_name, idx_value, pk) -> b"pk_len".
