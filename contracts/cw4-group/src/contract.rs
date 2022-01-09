@@ -9,7 +9,7 @@ use cw4::{
     Member, MemberChangedHookMsg, MemberDiff, MemberListResponse, MemberResponse,
     TotalWeightResponse,
 };
-use cw_storage_plus::RawBound;
+use cw_storage_plus::Bound;
 use cw_utils::maybe_addr;
 
 use crate::error::ContractError;
@@ -190,7 +190,7 @@ fn list_members(
 ) -> StdResult<MemberListResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
     let addr = maybe_addr(deps.api, start_after)?;
-    let start = addr.map(|addr| RawBound::exclusive(addr.to_string()));
+    let start = addr.as_ref().map(Bound::exclusive);
 
     let members = MEMBERS
         .range(deps.storage, start, None, Order::Ascending)
