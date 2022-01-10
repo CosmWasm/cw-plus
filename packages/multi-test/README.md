@@ -16,4 +16,24 @@ This only works with contracts and bank currently. We are working
 on refactoring to make it more extensible for more handlers,
 including custom messages/queries as well as IBC.
 
+# Implemented additional CosmWasm checks
+- Check order of sent coins on:
+    - WasmMsg::{Instantiate, Execute}
+    - BankMsg::Send
 
+# Implemented Terra features
+- Setting swap rates, tax rate, and tax caps
+- Custom queries
+    - TerraRoute::Market
+        - TerraMsg::Swap
+    - TerraRoute::Treasury
+        - TerraMsg::{TaxRate, TaxCap}
+- Custom messages
+    - TerraRoute::Market
+        - TerraMsg::MsgSwap
+        - TerraMsg::MsgSwapSend
+- Tax charging on (tax rate and cap should be set):
+    - BankMsg::Send
+    - TerraMsg::MsgSwapSend
+    - WasmMsg::Instantiate
+    - WasmMsg::Execute
