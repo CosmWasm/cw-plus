@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
-    PortIdResponse, Response, StdResult,
+    ensure_eq, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery,
+    MessageInfo, Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -135,13 +135,46 @@ pub fn execute_transfer(
     Ok(res)
 }
 
+/// The gov contract can allow new contracts, or increase the gas limit on existing contracts.
+/// It cannot block or reduce the limit to avoid forcible sticking tokens in the channel.
 pub fn execute_allow(
-    _deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
-    _allow: AllowMsg,
+    info: MessageInfo,
+    allow: AllowMsg,
 ) -> Result<Response, ContractError> {
-    unimplemented!()
+    let cfg = CONFIG.load(deps.storage)?;
+    ensure_eq!(info.sender, cfg.gov_contract, ContractError::Unauthorized);
+
+    let contract = deps.api.addr_validate(&allow.contract)?;
+    let set = AllowInfo {
+        gas_limit: allow.gas_limit,
+    };
+    ALLOW_LIST.update(deps.storage, &contract, |old| {
+        if let Some(old) = old {
+            // we must ensure it increases the limit
+            match (old.gas_limit, set.gas_limit) {
+                (None, Some(_)) => return Err(ContractError::CannotLowerGas),
+                (Some(old), Some(new)) if new < old => return Err(ContractError::CannotLowerGas),
+                _ => {}
+            };
+        }
+        Ok(AllowInfo {
+            gas_limit: allow.gas_limit,
+        })
+    })?;
+
+    let gas = if let Some(gas) = allow.gas_limit {
+        gas.to_string()
+    } else {
+        "None".to_string()
+    };
+
+    let res = Response::new()
+        .add_attribute("action", "allow")
+        .add_attribute("contract", allow.contract)
+        .add_attribute("gas_limit", gas);
+    Ok(res)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

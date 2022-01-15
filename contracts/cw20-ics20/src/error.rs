@@ -49,6 +49,12 @@ pub enum ContractError {
 
     #[error("Got a submessage reply with unknown id: {id}")]
     UnknownReplyId { id: u64 },
+
+    #[error("You cannot lower the gas limit for a contract on the allow list")]
+    CannotLowerGas,
+
+    #[error("Only the governance contract can do this")]
+    Unauthorized,
 }
 
 impl From<FromUtf8Error> for ContractError {
