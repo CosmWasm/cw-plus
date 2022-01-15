@@ -465,10 +465,12 @@ mod test {
     #[test]
     fn send_receive_cw20() {
         let send_channel = "channel-9";
-        let mut deps = setup(&["channel-1", "channel-7", send_channel]);
-
         let cw20_addr = "token-addr";
         let cw20_denom = "cw20:token-addr";
+        let mut deps = setup(
+            &["channel-1", "channel-7", send_channel],
+            &[(cw20_addr, 1234567)],
+        );
 
         // prepare some mock packets
         let sent_packet = mock_sent_packet(send_channel, 987654321, cw20_denom, "local-sender");
@@ -521,7 +523,7 @@ mod test {
     #[test]
     fn send_receive_native() {
         let send_channel = "channel-9";
-        let mut deps = setup(&["channel-1", "channel-7", send_channel]);
+        let mut deps = setup(&["channel-1", "channel-7", send_channel], &[]);
 
         let denom = "uatom";
 

@@ -93,7 +93,7 @@ pub fn execute_transfer(
         return Err(ContractError::NoFunds {});
     }
     // ensure the requested channel is registered
-    if CHANNEL_INFO.has(deps.storage, &msg.channel) {
+    if !CHANNEL_INFO.has(deps.storage, &msg.channel) {
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
 
@@ -318,7 +318,7 @@ mod test {
 
     #[test]
     fn setup_and_query() {
-        let deps = setup(&["channel-3", "channel-7"]);
+        let deps = setup(&["channel-3", "channel-7"], &[]);
 
         let raw_list = query(deps.as_ref(), mock_env(), QueryMsg::ListChannels {}).unwrap();
         let list_res: ListChannelsResponse = from_binary(&raw_list).unwrap();
@@ -353,7 +353,7 @@ mod test {
     #[test]
     fn proper_checks_on_execute_native() {
         let send_channel = "channel-5";
-        let mut deps = setup(&[send_channel, "channel-10"]);
+        let mut deps = setup(&[send_channel, "channel-10"], &[]);
 
         let mut transfer = TransferMsg {
             channel: send_channel.to_string(),
@@ -365,6 +365,7 @@ mod test {
         let msg = ExecuteMsg::Transfer(transfer.clone());
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(res.messages[0].gas_limit, None);
         assert_eq!(1, res.messages.len());
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
@@ -412,9 +413,10 @@ mod test {
     #[test]
     fn proper_checks_on_execute_cw20() {
         let send_channel = "channel-15";
-        let mut deps = setup(&["channel-3", send_channel]);
-
         let cw20_addr = "my-token";
+        let gas_limit = 123456;
+        let mut deps = setup(&["channel-3", send_channel], &[(cw20_addr, gas_limit)]);
+
         let transfer = TransferMsg {
             channel: send_channel.to_string(),
             remote_address: "foreign-address".to_string(),
@@ -430,6 +432,7 @@ mod test {
         let info = mock_info(cw20_addr, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
         assert_eq!(1, res.messages.len());
+        assert_eq!(res.messages[0].gas_limit, Some(gas_limit));
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,
@@ -452,5 +455,28 @@ mod test {
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(err, ContractError::Payment(PaymentError::NonPayable {}));
+    }
+
+    #[test]
+    fn execute_cw20_fails_if_not_whitelisted() {
+        let send_channel = "channel-15";
+        let mut deps = setup(&["channel-3", send_channel], &[]);
+
+        let cw20_addr = "my-token";
+        let transfer = TransferMsg {
+            channel: send_channel.to_string(),
+            remote_address: "foreign-address".to_string(),
+            timeout: Some(7777),
+        };
+        let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: "my-account".into(),
+            amount: Uint128::new(888777666),
+            msg: to_binary(&transfer).unwrap(),
+        });
+
+        // works with proper funds
+        let info = mock_info(cw20_addr, &[]);
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::NotOnAllowList);
     }
 }
