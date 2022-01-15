@@ -72,21 +72,25 @@ fn ack_fail(err: String) -> Binary {
     to_binary(&res).unwrap()
 }
 
-const SEND_TOKEN_ID: u64 = 1337;
+const RECEIVE_ID: u64 = 1337;
+const ACK_FAILURE_ID: u64 = 0xfa17;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
-    if reply.id != SEND_TOKEN_ID {
-        return Err(ContractError::UnknownReplyId { id: reply.id });
-    }
-    let res = match reply.result {
-        ContractResult::Ok(_) => Response::new(),
+    match reply.result {
+        ContractResult::Ok(_) => Ok(Response::new()),
         ContractResult::Err(err) => {
-            // encode an acknowledgement error
-            Response::new().set_data(ack_fail(err))
+            let res = Response::new().set_data(ack_fail(err));
+            match reply.id {
+                RECEIVE_ID => {
+                    // TODO: revert state change
+                    Ok(res)
+                }
+                ACK_FAILURE_ID => Ok(res),
+                _ => Err(ContractError::UnknownReplyId { id: reply.id }),
+            }
         }
-    };
-    Ok(res)
+    }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -212,6 +216,9 @@ fn do_ibc_packet_receive(
     // If it originated on our chain, it looks like "port/channel/ucosm".
     let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
 
+    // Important design note:  with ibcv2 and wasmd 0.22 we should return error so this gets reverted
+    // If we need compatibility with Juno (Jan 2022), we need to ensure that this state change gets reverted
+    // in the case of the submessage (transfer) erroring
     CHANNEL_STATE.update(
         deps.storage,
         (&channel, denom),
@@ -228,7 +235,7 @@ fn do_ibc_packet_receive(
 
     let to_send = Amount::from_parts(denom.to_string(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
-    let send = send_amount(to_send, msg.receiver.clone(), gas_limit);
+    let send = send_amount(to_send, msg.receiver.clone(), gas_limit, RECEIVE_ID);
 
     let res = IbcReceiveResponse::new()
         .set_ack(ack_success())
@@ -320,7 +327,7 @@ fn on_packet_failure(
 
     let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
-    let send = send_amount(to_send, msg.sender.clone(), gas_limit);
+    let send = send_amount(to_send, msg.sender.clone(), gas_limit, ACK_FAILURE_ID);
 
     // similar event messages like ibctransfer module
     let res = IbcBasicResponse::new()
@@ -336,14 +343,14 @@ fn on_packet_failure(
     Ok(res)
 }
 
-fn send_amount(amount: Amount, recipient: String, gas_limit: Option<u64>) -> SubMsg {
+fn send_amount(amount: Amount, recipient: String, gas_limit: Option<u64>, reply_id: u64) -> SubMsg {
     match amount {
         Amount::Native(coin) => SubMsg::reply_on_error(
             BankMsg::Send {
                 to_address: recipient,
                 amount: vec![coin],
             },
-            SEND_TOKEN_ID,
+            reply_id,
         ),
         Amount::Cw20(coin) => {
             let msg = Cw20ExecuteMsg::Transfer {
@@ -355,7 +362,7 @@ fn send_amount(amount: Amount, recipient: String, gas_limit: Option<u64>) -> Sub
                 msg: to_binary(&msg).unwrap(),
                 funds: vec![],
             };
-            let mut sub = SubMsg::reply_on_error(exec, SEND_TOKEN_ID);
+            let mut sub = SubMsg::reply_on_error(exec, reply_id);
             sub.gas_limit = gas_limit;
             sub
         }
@@ -413,7 +420,7 @@ mod test {
             msg: to_binary(&msg).unwrap(),
             funds: vec![],
         };
-        let mut msg = SubMsg::reply_on_error(exec, SEND_TOKEN_ID);
+        let mut msg = SubMsg::reply_on_error(exec, RECEIVE_ID);
         msg.gas_limit = gas_limit;
         msg
     }
@@ -424,7 +431,7 @@ mod test {
                 to_address: recipient.into(),
                 amount: coins(amount, denom),
             },
-            SEND_TOKEN_ID,
+            RECEIVE_ID,
         )
     }
 
