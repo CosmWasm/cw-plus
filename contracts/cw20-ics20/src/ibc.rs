@@ -228,24 +228,17 @@ fn do_ibc_packet_receive(
 
     let to_send = Amount::from_parts(denom.to_string(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
+    let send = send_amount(to_send, msg.receiver.clone(), gas_limit);
 
-    // build attributes first so we don't have to clone msg below
-    // similar event messages like ibctransfer module
-
-    let attributes = vec![
-        attr("action", "receive"),
-        attr("sender", &msg.sender),
-        attr("receiver", &msg.receiver),
-        attr("denom", denom),
-        attr("amount", msg.amount),
-        attr("success", "true"),
-    ];
-
-    let msg = send_amount(to_send, msg.receiver, gas_limit);
     let res = IbcReceiveResponse::new()
         .set_ack(ack_success())
-        .add_submessage(msg)
-        .add_attributes(attributes);
+        .add_submessage(send)
+        .add_attribute("action", "receive")
+        .add_attribute("sender", msg.sender)
+        .add_attribute("receiver", msg.receiver)
+        .add_attribute("denom", denom)
+        .add_attribute("amount", msg.amount)
+        .add_attribute("success", "true");
 
     Ok(res)
 }
@@ -324,23 +317,23 @@ fn on_packet_failure(
     err: String,
 ) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
-    // similar event messages like ibctransfer module
-    let attributes = vec![
-        attr("action", "acknowledge"),
-        attr("sender", &msg.sender),
-        attr("receiver", &msg.receiver),
-        attr("denom", &msg.denom),
-        attr("amount", &msg.amount.to_string()),
-        attr("success", "false"),
-        attr("error", err),
-    ];
 
-    let amount = Amount::from_parts(msg.denom, msg.amount);
-    let gas_limit = check_gas_limit(deps.as_ref(), &amount)?;
-    let msg = send_amount(amount, msg.sender, gas_limit);
-    Ok(IbcBasicResponse::new()
-        .add_attributes(attributes)
-        .add_submessage(msg))
+    let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
+    let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
+    let send = send_amount(to_send, msg.sender.clone(), gas_limit);
+
+    // similar event messages like ibctransfer module
+    let res = IbcBasicResponse::new()
+        .add_submessage(send)
+        .add_attribute("action", "acknowledge")
+        .add_attribute("sender", msg.sender)
+        .add_attribute("receiver", msg.receiver)
+        .add_attribute("denom", msg.denom)
+        .add_attribute("amount", msg.amount.to_string())
+        .add_attribute("success", "false")
+        .add_attribute("error", err);
+
+    Ok(res)
 }
 
 fn send_amount(amount: Amount, recipient: String, gas_limit: Option<u64>) -> SubMsg {
