@@ -53,6 +53,23 @@ pub struct ReplyArgs {
     pub amount: Uint128,
 }
 
+// this is like reduce_channel_balance, but doesn't change the state
+// it returns an error IFF reduce_channel_balance would return an error
+pub fn ensure_channel_balance(
+    storage: &dyn Storage,
+    channel: &str,
+    denom: &str,
+    amount: Uint128,
+) -> Result<(), ContractError> {
+    CHANNEL_STATE
+        .may_load(storage, (channel, denom))?
+        .ok_or(ContractError::InsufficientFunds {})?
+        .outstanding
+        .checked_sub(amount)
+        .map_err(|_| ContractError::InsufficientFunds {})?;
+    Ok(())
+}
+
 pub fn reduce_channel_balance(
     storage: &mut dyn Storage,
     channel: &str,

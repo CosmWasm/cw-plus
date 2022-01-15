@@ -11,8 +11,8 @@ use cosmwasm_std::{
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
-    increase_channel_balance, reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
-    CHANNEL_INFO, REPLY_ARGS,
+    ensure_channel_balance, increase_channel_balance, reduce_channel_balance, ChannelInfo,
+    ReplyArgs, ALLOW_LIST, CHANNEL_INFO, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -238,6 +238,9 @@ fn do_ibc_packet_receive(
     // If it originated on our chain, it looks like "port/channel/ucosm".
     let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
 
+    // make sure we have enough balance for this (that is, the later reduction in the reply handler should succeed)
+    ensure_channel_balance(deps.storage, &channel, denom, msg.amount)?;
+
     // we need to save the data to update the balances in reply
     let reply_args = ReplyArgs {
         channel,
@@ -428,13 +431,13 @@ mod test {
             msg: to_binary(&msg).unwrap(),
             funds: vec![],
         };
-        let mut msg = SubMsg::reply_on_error(exec, RECEIVE_ID);
+        let mut msg = SubMsg::reply_always(exec, RECEIVE_ID);
         msg.gas_limit = gas_limit;
         msg
     }
 
     fn native_payment(amount: u128, denom: &str, recipient: &str) -> SubMsg {
-        SubMsg::reply_on_error(
+        SubMsg::reply_always(
             BankMsg::Send {
                 to_address: recipient.into(),
                 amount: coins(amount, denom),
@@ -546,6 +549,8 @@ mod test {
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         matches!(ack, Ics20Ack::Result(_));
 
+        // TODO: we need to call the reply block
+
         // query channel state
         let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
         assert_eq!(state.balances, vec![Amount::cw20(111111111, cw20_addr)]);
@@ -599,6 +604,8 @@ mod test {
         );
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
         matches!(ack, Ics20Ack::Result(_));
+
+        // TODO: we must call the reply block
 
         // query channel state
         let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
