@@ -12,10 +12,10 @@ use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
 use crate::msg::{
-    ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg,
-    TransferMsg,
+    AllowMsg, ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, MigrateMsg, PortResponse,
+    QueryMsg, TransferMsg,
 };
-use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
+use crate::state::{AllowInfo, Config, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 use cw_utils::{nonpayable, one_coin};
 
 // version info for migration info
@@ -32,8 +32,18 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
+        gov_contract: deps.api.addr_validate(&msg.gov_contract)?,
     };
     CONFIG.save(deps.storage, &cfg)?;
+
+    // add all allows
+    for allowed in msg.allowlist {
+        let contract = deps.api.addr_validate(&allowed.contract)?;
+        let info = AllowInfo {
+            gas_limit: allowed.gas_limit,
+        };
+        ALLOW_LIST.save(deps.storage, &contract, &info)?;
+    }
     Ok(Response::default())
 }
 
@@ -50,6 +60,7 @@ pub fn execute(
             let coin = one_coin(&info)?;
             execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
         }
+        ExecuteMsg::Allow(allow) => execute_allow(deps, env, info, allow),
     }
 }
 
@@ -122,6 +133,15 @@ pub fn execute_transfer(
         .add_attribute("denom", &packet.denom)
         .add_attribute("amount", &packet.amount.to_string());
     Ok(res)
+}
+
+pub fn execute_allow(
+    _deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    _allow: AllowMsg,
+) -> Result<Response, ContractError> {
+    unimplemented!()
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

@@ -10,6 +10,16 @@ use crate::state::ChannelInfo;
 pub struct InitMsg {
     /// Default timeout for ics20 packets, specified in seconds
     pub default_timeout: u64,
+    /// who can allow more contracts
+    pub gov_contract: String,
+    /// initial allowlist - all cw20 tokens we will send must be previously allowed by governance
+    pub allowlist: Vec<AllowMsg>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct AllowMsg {
+    pub contract: String,
+    pub gas_limit: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
@@ -22,6 +32,8 @@ pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     /// This allows us to transfer *exactly one* native token
     Transfer(TransferMsg),
+    /// This must be called by gov_contract, will allow a new cw20 token to be sent
+    Allow(AllowMsg),
 }
 
 /// This is the message we accept via Receive

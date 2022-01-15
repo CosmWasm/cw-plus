@@ -60,6 +60,8 @@ pub fn setup(channels: &[&str]) -> OwnedDeps<MockStorage, MockApi, MockQuerier> 
     // instantiate an empty contract
     let instantiate_msg = InitMsg {
         default_timeout: DEFAULT_TIMEOUT,
+        gov_contract: "gov".to_string(),
+        allowlist: vec![],
     };
     let info = mock_info(&String::from("anyone"), &[]);
     let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
