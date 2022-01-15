@@ -49,6 +49,7 @@ pub struct TransferMsg {
     pub timeout: Option<u64>,
 }
 
+// TODO: query config, query allow list
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
@@ -59,6 +60,15 @@ pub enum QueryMsg {
     /// Returns the details of the name channel, error if not created.
     /// Return type: ChannelResponse.
     Channel { id: String },
+    /// Show the Config. Returns ConfigResponse
+    Config {},
+    /// Query if a given cw20 contract is allowed. Returns AllowedResponse
+    Allowed { contract: String },
+    /// List all allowed cw20 contracts. Returns ListAllowedResponse
+    ListAllowed {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -80,4 +90,27 @@ pub struct ChannelResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct PortResponse {
     pub port_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ConfigResponse {
+    pub default_timeout: u64,
+    pub gov_contract: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct AllowedResponse {
+    pub is_allowed: bool,
+    pub gas_limit: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ListAllowedResponse {
+    pub allow: Vec<AllowedInfo>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct AllowedInfo {
+    pub contract: String,
+    pub gas_limit: Option<u64>,
 }

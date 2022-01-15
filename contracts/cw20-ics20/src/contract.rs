@@ -7,13 +7,14 @@ use cosmwasm_std::{
 
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
+use cw_storage_plus::Bound;
 
 use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
 use crate::msg::{
-    AllowMsg, ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, MigrateMsg, PortResponse,
-    QueryMsg, TransferMsg,
+    AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
+    ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
 };
 use crate::state::{AllowInfo, Config, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 use cw_utils::{nonpayable, one_coin};
@@ -194,6 +195,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Port {} => to_binary(&query_port(deps)?),
         QueryMsg::ListChannels {} => to_binary(&query_list(deps)?),
         QueryMsg::Channel { id } => to_binary(&query_channel(deps, id)?),
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Allowed { contract } => to_binary(&query_allowed(deps, contract)?),
+        QueryMsg::ListAllowed { start_after, limit } => {
+            to_binary(&list_allowed(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -234,6 +240,59 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
         balances,
         total_sent,
     })
+}
+
+fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let cfg = CONFIG.load(deps.storage)?;
+    let res = ConfigResponse {
+        default_timeout: cfg.default_timeout,
+        gov_contract: cfg.gov_contract.into(),
+    };
+    Ok(res)
+}
+
+fn query_allowed(deps: Deps, contract: String) -> StdResult<AllowedResponse> {
+    let addr = deps.api.addr_validate(&contract)?;
+    let info = ALLOW_LIST.may_load(deps.storage, &addr)?;
+    let res = match info {
+        None => AllowedResponse {
+            is_allowed: false,
+            gas_limit: None,
+        },
+        Some(a) => AllowedResponse {
+            is_allowed: true,
+            gas_limit: a.gas_limit,
+        },
+    };
+    Ok(res)
+}
+
+// settings for pagination
+const MAX_LIMIT: u32 = 30;
+const DEFAULT_LIMIT: u32 = 10;
+
+fn list_allowed(
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<ListAllowedResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = match start_after {
+        Some(x) => Some(Bound::exclusive(deps.api.addr_validate(&x)?.into_string())),
+        None => None,
+    };
+
+    let allow = ALLOW_LIST
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.map(|(addr, allow)| AllowedInfo {
+                contract: addr.into(),
+                gas_limit: allow.gas_limit,
+            })
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(ListAllowedResponse { allow })
 }
 
 #[cfg(test)]
