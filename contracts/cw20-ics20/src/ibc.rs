@@ -2,15 +2,18 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, ContractResult, Deps, DepsMut, Env,
-    IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg,
-    IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
-    IbcReceiveResponse, Reply, Response, StdResult, SubMsg, Uint128, WasmMsg,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, ContractResult, CosmosMsg, Deps,
+    DepsMut, Env, IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg,
+    IbcChannelOpenMsg, IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg,
+    IbcPacketTimeoutMsg, IbcReceiveResponse, Reply, Response, SubMsg, Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
-use crate::state::{ChannelInfo, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE};
+use crate::state::{
+    increase_channel_balance, reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
+    CHANNEL_INFO, REPLY_ARGS,
+};
 use cw20::Cw20ExecuteMsg;
 
 pub const ICS20_VERSION: &str = "ics20-1";
@@ -76,20 +79,39 @@ const RECEIVE_ID: u64 = 1337;
 const ACK_FAILURE_ID: u64 = 0xfa17;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(_deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
-    match reply.result {
-        ContractResult::Ok(_) => Ok(Response::new()),
-        ContractResult::Err(err) => {
-            let res = Response::new().set_data(ack_fail(err));
-            match reply.id {
-                RECEIVE_ID => {
-                    // TODO: revert state change
-                    Ok(res)
-                }
-                ACK_FAILURE_ID => Ok(res),
-                _ => Err(ContractError::UnknownReplyId { id: reply.id }),
+pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
+    match reply.id {
+        RECEIVE_ID => match reply.result {
+            ContractResult::Ok(_) => {
+                // Important design note:  with ibcv2 and wasmd 0.22 we can implement this all much easier.
+                // No reply needed... the receive function and submessage should return error on failure and all
+                // state gets reverted with a proper app-level message auto-generated
+
+                // Since we need compatibility with Juno (Jan 2022), we need to ensure that no state gets written
+                // if the receive processing succeeds, but the submesage fails, so we can only write after we are
+                // sure all submessages succeeded.
+
+                // However, this requires passing some state between the ibc_packet_receive function and
+                // the reply handler. We do this with a singleton, with is "okay" for IBC as there is no
+                // reentrancy on these functions (cannot be called by another contract). This pattern
+                // should not be used for ExecuteMsg handlers
+                let reply_args = REPLY_ARGS.load(deps.storage)?;
+                reduce_channel_balance(
+                    deps.storage,
+                    &reply_args.channel,
+                    &reply_args.denom,
+                    reply_args.amount,
+                )?;
+
+                Ok(Response::new())
             }
-        }
+            ContractResult::Err(err) => Ok(Response::new().set_data(ack_fail(err))),
+        },
+        ACK_FAILURE_ID => match reply.result {
+            ContractResult::Ok(_) => Ok(Response::new()),
+            ContractResult::Err(err) => Ok(Response::new().set_data(ack_fail(err))),
+        },
+        _ => Err(ContractError::UnknownReplyId { id: reply.id }),
     }
 }
 
@@ -216,30 +238,23 @@ fn do_ibc_packet_receive(
     // If it originated on our chain, it looks like "port/channel/ucosm".
     let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
 
-    // Important design note:  with ibcv2 and wasmd 0.22 we should return error so this gets reverted
-    // If we need compatibility with Juno (Jan 2022), we need to ensure that this state change gets reverted
-    // in the case of the submessage (transfer) erroring
-    CHANNEL_STATE.update(
-        deps.storage,
-        (&channel, denom),
-        |orig| -> Result<_, ContractError> {
-            // this will return error if we don't have the funds there to cover the request (or no denom registered)
-            let mut cur = orig.ok_or(ContractError::InsufficientFunds {})?;
-            cur.outstanding = cur
-                .outstanding
-                .checked_sub(msg.amount)
-                .or(Err(ContractError::InsufficientFunds {}))?;
-            Ok(cur)
-        },
-    )?;
+    // we need to save the data to update the balances in reply
+    let reply_args = ReplyArgs {
+        channel,
+        denom: denom.to_string(),
+        amount: msg.amount,
+    };
+    REPLY_ARGS.save(deps.storage, &reply_args)?;
 
     let to_send = Amount::from_parts(denom.to_string(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
-    let send = send_amount(to_send, msg.receiver.clone(), gas_limit, RECEIVE_ID);
+    let send = send_amount(to_send, msg.receiver.clone());
+    let mut submsg = SubMsg::reply_always(send, RECEIVE_ID);
+    submsg.gas_limit = gas_limit;
 
     let res = IbcReceiveResponse::new()
         .set_ack(ack_success())
-        .add_submessage(send)
+        .add_submessage(submsg)
         .add_attribute("action", "receive")
         .add_attribute("sender", msg.sender)
         .add_attribute("receiver", msg.receiver)
@@ -271,7 +286,9 @@ pub fn ibc_packet_ack(
     _env: Env,
     msg: IbcPacketAckMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
-    // TODO: trap error like in receive?
+    // Design decision: should we trap error like in receive?
+    // TODO: unsure... as it is now a failed ack handling would revert the tx and would be
+    // retried again and again. is that good?
     let ics20msg: Ics20Ack = from_binary(&msg.acknowledgement.data)?;
     match ics20msg {
         Ics20Ack::Result(_) => on_packet_success(deps, msg.original_packet),
@@ -286,7 +303,7 @@ pub fn ibc_packet_timeout(
     _env: Env,
     msg: IbcPacketTimeoutMsg,
 ) -> Result<IbcBasicResponse, ContractError> {
-    // TODO: trap error like in receive?
+    // TODO: trap error like in receive? (same question as ack above)
     let packet = msg.packet;
     on_packet_failure(deps, packet, "timeout".to_string())
 }
@@ -304,15 +321,8 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         attr("success", "true"),
     ];
 
-    let channel = packet.src.channel_id;
-    let denom = msg.denom;
-    let amount = msg.amount;
-    CHANNEL_STATE.update(deps.storage, (&channel, &denom), |orig| -> StdResult<_> {
-        let mut state = orig.unwrap_or_default();
-        state.outstanding += amount;
-        state.total_sent += amount;
-        Ok(state)
-    })?;
+    // we have made a proper transfer, record this
+    increase_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
 
     Ok(IbcBasicResponse::new().add_attributes(attributes))
 }
@@ -327,11 +337,13 @@ fn on_packet_failure(
 
     let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
-    let send = send_amount(to_send, msg.sender.clone(), gas_limit, ACK_FAILURE_ID);
+    let send = send_amount(to_send, msg.sender.clone());
+    let mut submsg = SubMsg::reply_on_error(send, ACK_FAILURE_ID);
+    submsg.gas_limit = gas_limit;
 
     // similar event messages like ibctransfer module
     let res = IbcBasicResponse::new()
-        .add_submessage(send)
+        .add_submessage(submsg)
         .add_attribute("action", "acknowledge")
         .add_attribute("sender", msg.sender)
         .add_attribute("receiver", msg.receiver)
@@ -343,28 +355,24 @@ fn on_packet_failure(
     Ok(res)
 }
 
-fn send_amount(amount: Amount, recipient: String, gas_limit: Option<u64>, reply_id: u64) -> SubMsg {
+fn send_amount(amount: Amount, recipient: String) -> CosmosMsg {
     match amount {
-        Amount::Native(coin) => SubMsg::reply_on_error(
-            BankMsg::Send {
-                to_address: recipient,
-                amount: vec![coin],
-            },
-            reply_id,
-        ),
+        Amount::Native(coin) => BankMsg::Send {
+            to_address: recipient,
+            amount: vec![coin],
+        }
+        .into(),
         Amount::Cw20(coin) => {
             let msg = Cw20ExecuteMsg::Transfer {
                 recipient,
                 amount: coin.amount,
             };
-            let exec = WasmMsg::Execute {
+            WasmMsg::Execute {
                 contract_addr: coin.address,
                 msg: to_binary(&msg).unwrap(),
                 funds: vec![],
-            };
-            let mut sub = SubMsg::reply_on_error(exec, reply_id);
-            sub.gas_limit = gas_limit;
-            sub
+            }
+            .into()
         }
     }
 }
