@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     ensure_eq, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery,
-    MessageInfo, Order, PortIdResponse, Response, StdResult, SubMsg,
+    MessageInfo, Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -97,15 +97,12 @@ pub fn execute_transfer(
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
 
-    // if cw20 token, ensure it is whitelisted, and use the registered gas limit
-    let gas_limit = if let Amount::Cw20(coin) = &amount {
+    // if cw20 token, ensure it is whitelisted
+    if let Amount::Cw20(coin) = &amount {
         let addr = deps.api.addr_validate(&coin.address)?;
-        let allow = ALLOW_LIST
+        ALLOW_LIST
             .may_load(deps.storage, &addr)?
             .ok_or(ContractError::NotOnAllowList)?;
-        allow.gas_limit
-    } else {
-        None
     };
 
     // delta from user is in seconds
@@ -126,19 +123,18 @@ pub fn execute_transfer(
     packet.validate()?;
 
     // prepare message and set proper gas limit
-    let mut msg = SubMsg::new(IbcMsg::SendPacket {
+    let msg = IbcMsg::SendPacket {
         channel_id: msg.channel,
         data: to_binary(&packet)?,
         timeout: timeout.into(),
-    });
-    msg.gas_limit = gas_limit;
+    };
 
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
     // similar event messages like ibctransfer module
 
     // send response
     let res = Response::new()
-        .add_submessage(msg)
+        .add_message(msg)
         .add_attribute("action", "transfer")
         .add_attribute("sender", &packet.sender)
         .add_attribute("receiver", &packet.receiver)
@@ -414,8 +410,7 @@ mod test {
     fn proper_checks_on_execute_cw20() {
         let send_channel = "channel-15";
         let cw20_addr = "my-token";
-        let gas_limit = 123456;
-        let mut deps = setup(&["channel-3", send_channel], &[(cw20_addr, gas_limit)]);
+        let mut deps = setup(&["channel-3", send_channel], &[(cw20_addr, 123456)]);
 
         let transfer = TransferMsg {
             channel: send_channel.to_string(),
@@ -432,7 +427,7 @@ mod test {
         let info = mock_info(cw20_addr, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
         assert_eq!(1, res.messages.len());
-        assert_eq!(res.messages[0].gas_limit, Some(gas_limit));
+        assert_eq!(res.messages[0].gas_limit, None);
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,

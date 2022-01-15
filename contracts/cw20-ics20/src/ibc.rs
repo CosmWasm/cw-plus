@@ -181,6 +181,18 @@ pub fn ibc_packet_receive(
                 attr("success", "true"),
             ];
             let to_send = Amount::from_parts(denom.into(), msg.amount);
+
+            // TODO: add check..
+            // if cw20 token, ensure it is whitelisted, and use the registered gas limit
+            //     let gas_limit = if let Amount::Cw20(coin) = &amount {
+            //         let addr = deps.api.addr_validate(&coin.address)?;
+            //         let allow = ALLOW_LIST
+            //             .may_load(deps.storage, &addr)?
+            //             .ok_or(ContractError::NotOnAllowList)?;
+            //         allow.gas_limit
+            //     } else {
+            //         None
+            //     };
             let msg = send_amount(to_send, msg.receiver);
             IbcReceiveResponse::new()
                 .set_ack(ack_success())
