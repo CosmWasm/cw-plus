@@ -55,6 +55,9 @@ pub enum ContractError {
 
     #[error("Only the governance contract can do this")]
     Unauthorized,
+
+    #[error("You can only send cw20 tokens that have been explicitly allowed by governance")]
+    NotOnAllowList,
 }
 
 impl From<FromUtf8Error> for ContractError {

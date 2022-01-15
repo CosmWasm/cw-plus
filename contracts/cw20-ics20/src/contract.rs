@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     ensure_eq, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery,
-    MessageInfo, Order, PortIdResponse, Response, StdResult,
+    MessageInfo, Order, PortIdResponse, Response, StdResult, SubMsg,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -93,10 +93,20 @@ pub fn execute_transfer(
         return Err(ContractError::NoFunds {});
     }
     // ensure the requested channel is registered
-    // FIXME: add a .has method to map to make this faster
-    if CHANNEL_INFO.may_load(deps.storage, &msg.channel)?.is_none() {
+    if CHANNEL_INFO.has(deps.storage, &msg.channel) {
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
+
+    // if cw20 token, ensure it is whitelisted, and use the registered gas limit
+    let gas_limit = if let Amount::Cw20(coin) = &amount {
+        let addr = deps.api.addr_validate(&coin.address)?;
+        let allow = ALLOW_LIST
+            .may_load(deps.storage, &addr)?
+            .ok_or(ContractError::NotOnAllowList)?;
+        allow.gas_limit
+    } else {
+        None
+    };
 
     // delta from user is in seconds
     let timeout_delta = match msg.timeout {
@@ -115,19 +125,20 @@ pub fn execute_transfer(
     );
     packet.validate()?;
 
-    // prepare message
-    let msg = IbcMsg::SendPacket {
+    // prepare message and set proper gas limit
+    let mut msg = SubMsg::new(IbcMsg::SendPacket {
         channel_id: msg.channel,
         data: to_binary(&packet)?,
         timeout: timeout.into(),
-    };
+    });
+    msg.gas_limit = gas_limit;
 
     // Note: we update local state when we get ack - do not count this transfer towards anything until acked
     // similar event messages like ibctransfer module
 
     // send response
     let res = Response::new()
-        .add_message(msg)
+        .add_submessage(msg)
         .add_attribute("action", "transfer")
         .add_attribute("sender", &packet.sender)
         .add_attribute("receiver", &packet.receiver)
