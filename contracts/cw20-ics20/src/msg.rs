@@ -49,7 +49,6 @@ pub struct TransferMsg {
     pub timeout: Option<u64>,
 }
 
-// TODO: query config, query allow list
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
