@@ -409,7 +409,7 @@ fn demo() -> StdResult<()> {
 
 ## IndexedMap
 
-Let's sue one example of `IndexedMap` definition and usage, originally taken from the `cw721-base` contract.
+Let's use one example of `IndexedMap` definition and usage, originally taken from the `cw721-base` contract.
 
 ### Definition
 
