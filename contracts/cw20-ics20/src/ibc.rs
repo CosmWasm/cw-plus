@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, ContractResult, DepsMut, Env,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, ContractResult, Deps, DepsMut, Env,
     IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg,
     IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
     IbcReceiveResponse, Reply, Response, StdResult, SubMsg, Uint128, WasmMsg,
@@ -10,7 +10,7 @@ use cosmwasm_std::{
 
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
-use crate::state::{ChannelInfo, CHANNEL_INFO, CHANNEL_STATE};
+use crate::state::{ChannelInfo, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE};
 use cw20::Cw20ExecuteMsg;
 
 pub const ICS20_VERSION: &str = "ics20-1";
@@ -164,40 +164,15 @@ pub fn ibc_packet_receive(
 ) -> Result<IbcReceiveResponse, Never> {
     let packet = msg.packet;
 
-    let res = match do_ibc_packet_receive(deps, &packet) {
-        Ok(msg) => {
-            // build attributes first so we don't have to clone msg below
-            // similar event messages like ibctransfer module
-
-            // This cannot fail as we parse it in do_ibc_packet_receive. Best to pass the data somehow?
-            let denom = parse_voucher_denom(&msg.denom, &packet.src).unwrap();
-
-            let attributes = vec![
-                attr("action", "receive"),
-                attr("sender", &msg.sender),
-                attr("receiver", &msg.receiver),
-                attr("denom", denom),
-                attr("amount", msg.amount),
-                attr("success", "true"),
-            ];
-            let to_send = Amount::from_parts(denom.into(), msg.amount);
-            let msg = send_amount(to_send, msg.receiver);
-            IbcReceiveResponse::new()
-                .set_ack(ack_success())
-                .add_submessage(msg)
-                .add_attributes(attributes)
-        }
-        Err(err) => IbcReceiveResponse::new()
+    do_ibc_packet_receive(deps, &packet).or_else(|err| {
+        Ok(IbcReceiveResponse::new()
             .set_ack(ack_fail(err.to_string()))
             .add_attributes(vec![
                 attr("action", "receive"),
                 attr("success", "false"),
                 attr("error", err.to_string()),
-            ]),
-    };
-
-    // if we have funds, now send the tokens to the requested recipient
-    Ok(res)
+            ]))
+    })
 }
 
 // Returns local denom if the denom is an encoded voucher from the expected endpoint
@@ -226,7 +201,10 @@ fn parse_voucher_denom<'a>(
 }
 
 // this does the work of ibc_packet_receive, we wrap it to turn errors into acknowledgements
-fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packet, ContractError> {
+fn do_ibc_packet_receive(
+    deps: DepsMut,
+    packet: &IbcPacket,
+) -> Result<IbcReceiveResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
     let channel = packet.dest.channel_id.clone();
 
@@ -234,7 +212,6 @@ fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packe
     // If it originated on our chain, it looks like "port/channel/ucosm".
     let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
 
-    let amount = msg.amount;
     CHANNEL_STATE.update(
         deps.storage,
         (&channel, denom),
@@ -243,12 +220,41 @@ fn do_ibc_packet_receive(deps: DepsMut, packet: &IbcPacket) -> Result<Ics20Packe
             let mut cur = orig.ok_or(ContractError::InsufficientFunds {})?;
             cur.outstanding = cur
                 .outstanding
-                .checked_sub(amount)
+                .checked_sub(msg.amount)
                 .or(Err(ContractError::InsufficientFunds {}))?;
             Ok(cur)
         },
     )?;
-    Ok(msg)
+
+    let to_send = Amount::from_parts(denom.to_string(), msg.amount);
+    let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
+    let send = send_amount(to_send, msg.receiver.clone(), gas_limit);
+
+    let res = IbcReceiveResponse::new()
+        .set_ack(ack_success())
+        .add_submessage(send)
+        .add_attribute("action", "receive")
+        .add_attribute("sender", msg.sender)
+        .add_attribute("receiver", msg.receiver)
+        .add_attribute("denom", denom)
+        .add_attribute("amount", msg.amount)
+        .add_attribute("success", "true");
+
+    Ok(res)
+}
+
+fn check_gas_limit(deps: Deps, amount: &Amount) -> Result<Option<u64>, ContractError> {
+    match amount {
+        Amount::Cw20(coin) => {
+            // if cw20 token, use the registered gas limit, or error if not whitelisted
+            let addr = deps.api.addr_validate(&coin.address)?;
+            Ok(ALLOW_LIST
+                .may_load(deps.storage, &addr)?
+                .ok_or(ContractError::NotOnAllowList)?
+                .gas_limit)
+        }
+        _ => Ok(None),
+    }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -306,30 +312,31 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
 
 // return the tokens to sender
 fn on_packet_failure(
-    _deps: DepsMut,
+    deps: DepsMut,
     packet: IbcPacket,
     err: String,
 ) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
-    // similar event messages like ibctransfer module
-    let attributes = vec![
-        attr("action", "acknowledge"),
-        attr("sender", &msg.sender),
-        attr("receiver", &msg.receiver),
-        attr("denom", &msg.denom),
-        attr("amount", &msg.amount.to_string()),
-        attr("success", "false"),
-        attr("error", err),
-    ];
 
-    let amount = Amount::from_parts(msg.denom, msg.amount);
-    let msg = send_amount(amount, msg.sender);
-    Ok(IbcBasicResponse::new()
-        .add_attributes(attributes)
-        .add_submessage(msg))
+    let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
+    let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
+    let send = send_amount(to_send, msg.sender.clone(), gas_limit);
+
+    // similar event messages like ibctransfer module
+    let res = IbcBasicResponse::new()
+        .add_submessage(send)
+        .add_attribute("action", "acknowledge")
+        .add_attribute("sender", msg.sender)
+        .add_attribute("receiver", msg.receiver)
+        .add_attribute("denom", msg.denom)
+        .add_attribute("amount", msg.amount.to_string())
+        .add_attribute("success", "false")
+        .add_attribute("error", err);
+
+    Ok(res)
 }
 
-fn send_amount(amount: Amount, recipient: String) -> SubMsg {
+fn send_amount(amount: Amount, recipient: String, gas_limit: Option<u64>) -> SubMsg {
     match amount {
         Amount::Native(coin) => SubMsg::reply_on_error(
             BankMsg::Send {
@@ -348,7 +355,9 @@ fn send_amount(amount: Amount, recipient: String) -> SubMsg {
                 msg: to_binary(&msg).unwrap(),
                 funds: vec![],
             };
-            SubMsg::reply_on_error(exec, SEND_TOKEN_ID)
+            let mut sub = SubMsg::reply_on_error(exec, SEND_TOKEN_ID);
+            sub.gas_limit = gas_limit;
+            sub
         }
     }
 }
@@ -389,7 +398,12 @@ mod test {
         assert_eq!(expected, encdoded.as_str());
     }
 
-    fn cw20_payment(amount: u128, address: &str, recipient: &str) -> SubMsg {
+    fn cw20_payment(
+        amount: u128,
+        address: &str,
+        recipient: &str,
+        gas_limit: Option<u64>,
+    ) -> SubMsg {
         let msg = Cw20ExecuteMsg::Transfer {
             recipient: recipient.into(),
             amount: Uint128::new(amount),
@@ -399,7 +413,9 @@ mod test {
             msg: to_binary(&msg).unwrap(),
             funds: vec![],
         };
-        SubMsg::reply_on_error(exec, SEND_TOKEN_ID)
+        let mut msg = SubMsg::reply_on_error(exec, SEND_TOKEN_ID);
+        msg.gas_limit = gas_limit;
+        msg
     }
 
     fn native_payment(amount: u128, denom: &str, recipient: &str) -> SubMsg {
@@ -465,10 +481,13 @@ mod test {
     #[test]
     fn send_receive_cw20() {
         let send_channel = "channel-9";
-        let mut deps = setup(&["channel-1", "channel-7", send_channel]);
-
         let cw20_addr = "token-addr";
         let cw20_denom = "cw20:token-addr";
+        let gas_limit = 1234567;
+        let mut deps = setup(
+            &["channel-1", "channel-7", send_channel],
+            &[(cw20_addr, gas_limit)],
+        );
 
         // prepare some mock packets
         let sent_packet = mock_sent_packet(send_channel, 987654321, cw20_denom, "local-sender");
@@ -506,7 +525,7 @@ mod test {
         let res = ibc_packet_receive(deps.as_mut(), mock_env(), msg).unwrap();
         assert_eq!(1, res.messages.len());
         assert_eq!(
-            cw20_payment(876543210, cw20_addr, "local-rcpt"),
+            cw20_payment(876543210, cw20_addr, "local-rcpt", Some(gas_limit)),
             res.messages[0]
         );
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
@@ -521,7 +540,7 @@ mod test {
     #[test]
     fn send_receive_native() {
         let send_channel = "channel-9";
-        let mut deps = setup(&["channel-1", "channel-7", send_channel]);
+        let mut deps = setup(&["channel-1", "channel-7", send_channel], &[]);
 
         let denom = "uatom";
 

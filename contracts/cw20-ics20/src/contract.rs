@@ -1,21 +1,22 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
-    PortIdResponse, Response, StdResult,
+    ensure_eq, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery,
+    MessageInfo, Order, PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
+use cw_storage_plus::Bound;
 
 use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
 use crate::msg::{
-    ChannelResponse, ExecuteMsg, InitMsg, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg,
-    TransferMsg,
+    AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
+    ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
 };
-use crate::state::{Config, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
+use crate::state::{AllowInfo, Config, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 use cw_utils::{nonpayable, one_coin};
 
 // version info for migration info
@@ -32,8 +33,18 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
+        gov_contract: deps.api.addr_validate(&msg.gov_contract)?,
     };
     CONFIG.save(deps.storage, &cfg)?;
+
+    // add all allows
+    for allowed in msg.allowlist {
+        let contract = deps.api.addr_validate(&allowed.contract)?;
+        let info = AllowInfo {
+            gas_limit: allowed.gas_limit,
+        };
+        ALLOW_LIST.save(deps.storage, &contract, &info)?;
+    }
     Ok(Response::default())
 }
 
@@ -50,6 +61,7 @@ pub fn execute(
             let coin = one_coin(&info)?;
             execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
         }
+        ExecuteMsg::Allow(allow) => execute_allow(deps, env, info, allow),
     }
 }
 
@@ -81,10 +93,17 @@ pub fn execute_transfer(
         return Err(ContractError::NoFunds {});
     }
     // ensure the requested channel is registered
-    // FIXME: add a .has method to map to make this faster
-    if CHANNEL_INFO.may_load(deps.storage, &msg.channel)?.is_none() {
+    if !CHANNEL_INFO.has(deps.storage, &msg.channel) {
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
+
+    // if cw20 token, ensure it is whitelisted
+    if let Amount::Cw20(coin) = &amount {
+        let addr = deps.api.addr_validate(&coin.address)?;
+        ALLOW_LIST
+            .may_load(deps.storage, &addr)?
+            .ok_or(ContractError::NotOnAllowList)?;
+    };
 
     // delta from user is in seconds
     let timeout_delta = match msg.timeout {
@@ -103,7 +122,7 @@ pub fn execute_transfer(
     );
     packet.validate()?;
 
-    // prepare message
+    // prepare ibc message
     let msg = IbcMsg::SendPacket {
         channel_id: msg.channel,
         data: to_binary(&packet)?,
@@ -124,6 +143,48 @@ pub fn execute_transfer(
     Ok(res)
 }
 
+/// The gov contract can allow new contracts, or increase the gas limit on existing contracts.
+/// It cannot block or reduce the limit to avoid forcible sticking tokens in the channel.
+pub fn execute_allow(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    allow: AllowMsg,
+) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    ensure_eq!(info.sender, cfg.gov_contract, ContractError::Unauthorized);
+
+    let contract = deps.api.addr_validate(&allow.contract)?;
+    let set = AllowInfo {
+        gas_limit: allow.gas_limit,
+    };
+    ALLOW_LIST.update(deps.storage, &contract, |old| {
+        if let Some(old) = old {
+            // we must ensure it increases the limit
+            match (old.gas_limit, set.gas_limit) {
+                (None, Some(_)) => return Err(ContractError::CannotLowerGas),
+                (Some(old), Some(new)) if new < old => return Err(ContractError::CannotLowerGas),
+                _ => {}
+            };
+        }
+        Ok(AllowInfo {
+            gas_limit: allow.gas_limit,
+        })
+    })?;
+
+    let gas = if let Some(gas) = allow.gas_limit {
+        gas.to_string()
+    } else {
+        "None".to_string()
+    };
+
+    let res = Response::new()
+        .add_attribute("action", "allow")
+        .add_attribute("contract", allow.contract)
+        .add_attribute("gas_limit", gas);
+    Ok(res)
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let version = get_contract_version(deps.storage)?;
@@ -141,6 +202,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Port {} => to_binary(&query_port(deps)?),
         QueryMsg::ListChannels {} => to_binary(&query_list(deps)?),
         QueryMsg::Channel { id } => to_binary(&query_channel(deps, id)?),
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
+        QueryMsg::Allowed { contract } => to_binary(&query_allowed(deps, contract)?),
+        QueryMsg::ListAllowed { start_after, limit } => {
+            to_binary(&list_allowed(deps, start_after, limit)?)
+        }
     }
 }
 
@@ -183,6 +249,59 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
     })
 }
 
+fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let cfg = CONFIG.load(deps.storage)?;
+    let res = ConfigResponse {
+        default_timeout: cfg.default_timeout,
+        gov_contract: cfg.gov_contract.into(),
+    };
+    Ok(res)
+}
+
+fn query_allowed(deps: Deps, contract: String) -> StdResult<AllowedResponse> {
+    let addr = deps.api.addr_validate(&contract)?;
+    let info = ALLOW_LIST.may_load(deps.storage, &addr)?;
+    let res = match info {
+        None => AllowedResponse {
+            is_allowed: false,
+            gas_limit: None,
+        },
+        Some(a) => AllowedResponse {
+            is_allowed: true,
+            gas_limit: a.gas_limit,
+        },
+    };
+    Ok(res)
+}
+
+// settings for pagination
+const MAX_LIMIT: u32 = 30;
+const DEFAULT_LIMIT: u32 = 10;
+
+fn list_allowed(
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<ListAllowedResponse> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = match start_after {
+        Some(x) => Some(Bound::exclusive(deps.api.addr_validate(&x)?.into_string())),
+        None => None,
+    };
+
+    let allow = ALLOW_LIST
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.map(|(addr, allow)| AllowedInfo {
+                contract: addr.into(),
+                gas_limit: allow.gas_limit,
+            })
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(ListAllowedResponse { allow })
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -195,7 +314,7 @@ mod test {
 
     #[test]
     fn setup_and_query() {
-        let deps = setup(&["channel-3", "channel-7"]);
+        let deps = setup(&["channel-3", "channel-7"], &[]);
 
         let raw_list = query(deps.as_ref(), mock_env(), QueryMsg::ListChannels {}).unwrap();
         let list_res: ListChannelsResponse = from_binary(&raw_list).unwrap();
@@ -230,7 +349,7 @@ mod test {
     #[test]
     fn proper_checks_on_execute_native() {
         let send_channel = "channel-5";
-        let mut deps = setup(&[send_channel, "channel-10"]);
+        let mut deps = setup(&[send_channel, "channel-10"], &[]);
 
         let mut transfer = TransferMsg {
             channel: send_channel.to_string(),
@@ -242,6 +361,7 @@ mod test {
         let msg = ExecuteMsg::Transfer(transfer.clone());
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(res.messages[0].gas_limit, None);
         assert_eq!(1, res.messages.len());
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
@@ -289,9 +409,9 @@ mod test {
     #[test]
     fn proper_checks_on_execute_cw20() {
         let send_channel = "channel-15";
-        let mut deps = setup(&["channel-3", send_channel]);
-
         let cw20_addr = "my-token";
+        let mut deps = setup(&["channel-3", send_channel], &[(cw20_addr, 123456)]);
+
         let transfer = TransferMsg {
             channel: send_channel.to_string(),
             remote_address: "foreign-address".to_string(),
@@ -307,6 +427,7 @@ mod test {
         let info = mock_info(cw20_addr, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg.clone()).unwrap();
         assert_eq!(1, res.messages.len());
+        assert_eq!(res.messages[0].gas_limit, None);
         if let CosmosMsg::Ibc(IbcMsg::SendPacket {
             channel_id,
             data,
@@ -329,5 +450,28 @@ mod test {
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(err, ContractError::Payment(PaymentError::NonPayable {}));
+    }
+
+    #[test]
+    fn execute_cw20_fails_if_not_whitelisted() {
+        let send_channel = "channel-15";
+        let mut deps = setup(&["channel-3", send_channel], &[]);
+
+        let cw20_addr = "my-token";
+        let transfer = TransferMsg {
+            channel: send_channel.to_string(),
+            remote_address: "foreign-address".to_string(),
+            timeout: Some(7777),
+        };
+        let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender: "my-account".into(),
+            amount: Uint128::new(888777666),
+            msg: to_binary(&transfer).unwrap(),
+        });
+
+        // works with proper funds
+        let info = mock_info(cw20_addr, &[]);
+        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        assert_eq!(err, ContractError::NotOnAllowList);
     }
 }
