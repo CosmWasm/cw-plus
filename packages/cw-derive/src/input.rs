@@ -3,7 +3,7 @@ use proc_macro_error::emit_error;
 use quote::quote;
 use syn::{GenericParam, Ident, ItemImpl, ItemTrait, TraitItem};
 
-use crate::message::EnumMessage;
+use crate::message::{EnumMessage, StructMessage};
 use crate::parser::{ContractArgs, InterfaceArgs, MsgAttr, MsgType};
 
 /// Preprocessed `interface` macro input
@@ -119,19 +119,16 @@ impl<'a> ImplInput<'a> {
     }
 
     fn emit_messages(&self) -> TokenStream {
-        /*        let exec = self.emit_msg(&self.attributes.exec, InterfaceMsgAttr::Exec);
-        let query = self.emit_msg(&self.attributes.query, InterfaceMsgAttr::Query);
+        let instantiate = self.emit_msg(MsgType::Instantiate);
 
         quote! {
-            #exec
-
-            #query
-        }*/
-        todo!()
+            #instantiate
+        }
     }
 
-    fn emit_msg(&self, name: &Ident, msg_attr: MsgAttr) -> TokenStream {
-        //        Message::new(name, &self.item, msg_attr, &self.generics).emit()
-        todo!()
+    fn emit_msg(&self, msg_ty: MsgType) -> TokenStream {
+        StructMessage::new(&self.item, msg_ty, &self.generics)
+            .map(|msg| msg.emit())
+            .unwrap_or(quote! {})
     }
 }

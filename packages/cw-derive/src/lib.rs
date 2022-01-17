@@ -1,4 +1,4 @@
-use input::TraitInput;
+use input::{ImplInput, TraitInput};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::quote;
@@ -174,7 +174,7 @@ pub fn interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// * `instantiate` - this is instantiation message handler. There should be always exactly one
 /// handler for this kind of message.
 ///
-/// Additionaly `#[msg(...)]` attribute handles additional arguments for contracts:
+/// Additionally `#[msg(...)]` attribute handles additional arguments for contracts:
 /// * `name = "MessageName"` - overwrites generated message name. Valid for `instantiate` messages
 /// ("Instantiate" is default).
 #[proc_macro_error]
@@ -183,5 +183,14 @@ pub fn contract(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attr as parser::ContractArgs);
     let input = parse_macro_input!(item as ItemImpl);
 
-    todo!()
+    let expanded = ImplInput::new(&attrs, &input).process();
+    let input = StripInput.fold_item_impl(input);
+
+    let expanded = quote! {
+        #input
+
+        #expanded
+    };
+
+    TokenStream::from(expanded)
 }

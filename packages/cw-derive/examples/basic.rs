@@ -38,4 +38,12 @@ pub trait Cw4 {
     ) -> Result<Response, Self::Error>;
 }
 
+pub struct Cw4Contract {
+    admin: 
+}
+
+impl Cw4Contract {
+        fn instantiate(&self, (deps, env, msg): (DepsMut, Env, MessageInfo),
+}
+
 fn main() {}
