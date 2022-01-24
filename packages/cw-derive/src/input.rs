@@ -4,33 +4,25 @@ use quote::quote;
 use syn::{GenericParam, Ident, ItemImpl, ItemTrait, TraitItem};
 
 use crate::message::{EnumMessage, StructMessage};
-use crate::parser::{ContractArgs, InterfaceArgs, MsgAttr, MsgType};
+use crate::parser::{ContractArgs, InterfaceArgs, MsgType};
 
 /// Preprocessed `interface` macro input
 pub struct TraitInput<'a> {
     attributes: &'a InterfaceArgs,
     item: &'a ItemTrait,
-    generics: Vec<&'a Ident>,
+    generics: Vec<&'a GenericParam>,
 }
 
 /// Preprocessed `contract` macro input for non-trait impl block
 pub struct ImplInput<'a> {
     attributes: &'a ContractArgs,
     item: &'a ItemImpl,
-    generics: Vec<&'a Ident>,
+    generics: Vec<&'a GenericParam>,
 }
 
 impl<'a> TraitInput<'a> {
     pub fn new(attributes: &'a InterfaceArgs, item: &'a ItemTrait) -> Self {
-        let generics = item
-            .generics
-            .params
-            .iter()
-            .filter_map(|gp| match gp {
-                GenericParam::Type(tp) => Some(&tp.ident),
-                _ => None,
-            })
-            .collect();
+        let generics = item.generics.params.iter().collect();
 
         if !item
             .items
@@ -85,15 +77,7 @@ impl<'a> TraitInput<'a> {
 
 impl<'a> ImplInput<'a> {
     pub fn new(attributes: &'a ContractArgs, item: &'a ItemImpl) -> Self {
-        let generics = item
-            .generics
-            .params
-            .iter()
-            .filter_map(|gp| match gp {
-                GenericParam::Type(tp) => Some(&tp.ident),
-                _ => None,
-            })
-            .collect();
+        let generics = item.generics.params.iter().collect();
 
         Self {
             attributes,
@@ -127,8 +111,6 @@ impl<'a> ImplInput<'a> {
     }
 
     fn emit_msg(&self, msg_ty: MsgType) -> TokenStream {
-        StructMessage::new(&self.item, msg_ty, &self.generics)
-            .map(|msg| msg.emit())
-            .unwrap_or(quote! {})
+        StructMessage::new(&self.item, msg_ty, &self.generics).map_or(quote! {}, |msg| msg.emit())
     }
 }

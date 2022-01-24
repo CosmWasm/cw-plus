@@ -399,6 +399,7 @@ dependencies = [
 name = "cw-derive"
 version = "0.10.3"
 dependencies = [
+ "anyhow",
  "convert_case",
  "cosmwasm-std",
  "cw-storage-plus 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",

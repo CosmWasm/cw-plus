@@ -8,14 +8,14 @@ use syn::parse::{Parse, Parser};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    FnArg, Ident, ImplItem, ImplItemMethod, ItemImpl, ItemTrait, Pat, PatType, Signature,
+    FnArg, GenericParam, Ident, ImplItem, ItemImpl, ItemTrait, Pat, PatType, ReturnType, Signature,
     TraitItem, TraitItemMethod, Type, WhereClause, WherePredicate,
 };
 
 fn filter_wheres<'a>(
     clause: &'a Option<WhereClause>,
-    generics: &[&Ident],
-    used_generics: &[&Ident],
+    generics: &[&GenericParam],
+    used_generics: &[&GenericParam],
 ) -> Vec<&'a WherePredicate> {
     clause
         .as_ref()
@@ -59,11 +59,11 @@ pub struct StructMessage<'a> {
     contract_type: &'a Type,
     fields: Vec<MsgField<'a>>,
     function_name: &'a Ident,
-    generics: Vec<&'a Ident>,
-    unsused_generics: Vec<&'a Ident>,
-    all_generics: &'a [&'a Ident],
+    generics: Vec<&'a GenericParam>,
+    unused_generics: Vec<&'a GenericParam>,
     wheres: Vec<&'a WherePredicate>,
     full_where: Option<&'a WhereClause>,
+    result: &'a ReturnType,
     msg_attr: MsgAttr,
 }
 
@@ -72,7 +72,7 @@ impl<'a> StructMessage<'a> {
     pub fn new(
         source: &'a ItemImpl,
         ty: MsgType,
-        generics: &'a [&'a Ident],
+        generics: &'a [&'a GenericParam],
     ) -> Option<StructMessage<'a>> {
         let mut generics_checker = CheckGenerics::new(generics);
 
@@ -113,7 +113,7 @@ impl<'a> StructMessage<'a> {
 
         let function_name = &method.sig.ident;
         let fields = process_fields(&method.sig, &mut generics_checker);
-        let (used_generics, unsused_generics) = generics_checker.used_unused();
+        let (used_generics, unused_generics) = generics_checker.used_unused();
         let wheres = filter_wheres(&source.generics.where_clause, generics, &used_generics);
 
         Some(Self {
@@ -121,10 +121,10 @@ impl<'a> StructMessage<'a> {
             fields,
             function_name,
             generics: used_generics,
-            unsused_generics,
-            all_generics: generics,
+            unused_generics,
             wheres,
             full_where: source.generics.where_clause.as_ref(),
+            result: &method.sig.output,
             msg_attr,
         })
     }
@@ -147,10 +147,10 @@ impl<'a> StructMessage<'a> {
             fields,
             function_name,
             generics,
-            unsused_generics,
-            all_generics,
+            unused_generics,
             wheres,
             full_where,
+            result,
             msg_attr,
         } = self;
 
@@ -163,20 +163,35 @@ impl<'a> StructMessage<'a> {
         };
 
         let ctx_type = msg_attr.msg_type().emit_ctx_type();
-        let dispatch_type = msg_attr.msg_type().emit_result_type();
         let fields_names: Vec<_> = fields.iter().map(MsgField::name).collect();
         let fields = fields.iter().map(MsgField::emit);
+
+        let generics = if generics.is_empty() {
+            quote! {}
+        } else {
+            quote! {
+                <#(#generics,)*>
+            }
+        };
+
+        let unused_generics = if unused_generics.is_empty() {
+            quote! {}
+        } else {
+            quote! {
+                <#(#unused_generics,)*>
+            }
+        };
 
         quote! {
             #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
             #[serde(rename_all="snake_case")]
-            pub struct #name <#(#generics,)*> #where_clause {
+            pub struct #name #generics #where_clause {
                 #(#fields,)*
             }
 
-            impl<#(#generics,)*> #name<#(#generics,)*> #where_clause {
-                pub fn dispatch<#(#unsused_generics,)*>(self, contract: #contract_type<#(#all_generics,)*>, ctx: #ctx_type)
-                    -> #dispatch_type #full_where
+            impl #generics #name #generics #where_clause {
+                pub fn dispatch #unused_generics(self, contract: #contract_type, ctx: #ctx_type)
+                    #result #full_where
                 {
                     let Self { #(#fields_names,)* } = self;
                     contract.#function_name(ctx.into(), #(#fields_names,)*).map_err(Into::into)
@@ -191,9 +206,9 @@ pub struct EnumMessage<'a> {
     name: &'a Ident,
     trait_name: &'a Ident,
     variants: Vec<MsgVariant<'a>>,
-    generics: Vec<&'a Ident>,
-    unsused_generics: Vec<&'a Ident>,
-    all_generics: &'a [&'a Ident],
+    generics: Vec<&'a GenericParam>,
+    unused_generics: Vec<&'a GenericParam>,
+    all_generics: &'a [&'a GenericParam],
     wheres: Vec<&'a WherePredicate>,
     full_where: Option<&'a WhereClause>,
     msg_ty: MsgType,
@@ -204,7 +219,7 @@ impl<'a> EnumMessage<'a> {
         name: &'a Ident,
         source: &'a ItemTrait,
         ty: MsgType,
-        generics: &'a [&'a Ident],
+        generics: &'a [&'a GenericParam],
     ) -> Self {
         let trait_name = &source.ident;
 
@@ -233,7 +248,7 @@ impl<'a> EnumMessage<'a> {
             })
             .collect();
 
-        let (used_generics, unsused_generics) = generics_checker.used_unused();
+        let (used_generics, unused_generics) = generics_checker.used_unused();
         let wheres = filter_wheres(&source.generics.where_clause, generics, &used_generics);
 
         Self {
@@ -241,7 +256,7 @@ impl<'a> EnumMessage<'a> {
             trait_name,
             variants,
             generics: used_generics,
-            unsused_generics,
+            unused_generics,
             all_generics: generics,
             wheres,
             full_where: source.generics.where_clause.as_ref(),
@@ -255,7 +270,7 @@ impl<'a> EnumMessage<'a> {
             trait_name,
             variants,
             generics,
-            unsused_generics,
+            unused_generics,
             all_generics,
             wheres,
             full_where,
@@ -277,15 +292,27 @@ impl<'a> EnumMessage<'a> {
         let ctx_type = msg_ty.emit_ctx_type();
         let dispatch_type = msg_ty.emit_result_type();
 
+        let all_generics = if all_generics.is_empty() {
+            quote! {}
+        } else {
+            quote! { <#(#all_generics,)*> }
+        };
+
+        let generics = if generics.is_empty() {
+            quote! {}
+        } else {
+            quote! { <#(#generics,)*> }
+        };
+
         quote! {
             #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
             #[serde(rename_all="snake_case")]
-            pub enum #name <#(#generics,)*> #where_clause {
+            pub enum #name #generics #where_clause {
                 #(#variants,)*
             }
 
-            impl<#(#generics,)*> #name<#(#generics,)*> #where_clause {
-                pub fn dispatch<C: #trait_name<#(#all_generics,)*>, #(#unsused_generics,)*>(self, contract: &C, ctx: #ctx_type)
+            impl #generics #name #generics #where_clause {
+                pub fn dispatch<C: #trait_name #all_generics, #(#unused_generics,)*>(self, contract: &C, ctx: #ctx_type)
                     -> #dispatch_type #full_where
                 {
                     use #name::*;

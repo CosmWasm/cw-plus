@@ -1,25 +1,25 @@
 use syn::visit::Visit;
-use syn::Ident;
+use syn::GenericParam;
 
 pub struct CheckGenerics<'g> {
-    generics: &'g [&'g Ident],
-    used: Vec<&'g Ident>,
+    generics: &'g [&'g GenericParam],
+    used: Vec<&'g GenericParam>,
 }
 
 impl<'g> CheckGenerics<'g> {
-    pub fn new(generics: &'g [&'g Ident]) -> Self {
+    pub fn new(generics: &'g [&'g GenericParam]) -> Self {
         Self {
             generics,
             used: vec![],
         }
     }
 
-    pub fn used(self) -> Vec<&'g Ident> {
+    pub fn used(self) -> Vec<&'g GenericParam> {
         self.used
     }
 
     /// Returns split between used and unused generics
-    pub fn used_unused(self) -> (Vec<&'g Ident>, Vec<&'g Ident>) {
+    pub fn used_unused(self) -> (Vec<&'g GenericParam>, Vec<&'g GenericParam>) {
         let unused = self
             .generics
             .iter()
@@ -32,9 +32,24 @@ impl<'g> CheckGenerics<'g> {
 }
 
 impl<'ast, 'g> Visit<'ast> for CheckGenerics<'g> {
+    fn visit_lifetime(&mut self, i: &'ast syn::Lifetime) {
+        if let Some(gen) = self
+            .generics
+            .iter()
+            .find(|gen| matches!(gen, GenericParam::Lifetime(lt) if lt.lifetime == *i))
+        {
+            if !self.used.contains(&gen) {
+                self.used.push(gen);
+            }
+        }
+    }
     fn visit_path(&mut self, p: &'ast syn::Path) {
         if let Some(p) = p.get_ident() {
-            if let Some(gen) = self.generics.iter().find(|gen| p == **gen) {
+            if let Some(gen) = self
+                .generics
+                .iter()
+                .find(|gen| matches!(gen, GenericParam::Type(ty) if ty.ident == *p))
+            {
                 if !self.used.contains(&gen) {
                     self.used.push(gen);
                 }
