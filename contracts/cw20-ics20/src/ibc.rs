@@ -238,7 +238,7 @@ fn do_ibc_packet_receive(
     // If it originated on our chain, it looks like "port/channel/ucosm".
     let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
 
-    // make sure we have enough balance for this (that is, the later reduction in the reply handler should succeed)
+    // make sure we have enough balance for this
     reduce_channel_balance(deps.storage, &channel, denom, msg.amount)?;
 
     // we need to save the data to update the balances in reply
@@ -252,7 +252,7 @@ fn do_ibc_packet_receive(
     let to_send = Amount::from_parts(denom.to_string(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
     let send = send_amount(to_send, msg.receiver.clone());
-    let mut submsg = SubMsg::reply_always(send, RECEIVE_ID);
+    let mut submsg = SubMsg::reply_on_error(send, RECEIVE_ID);
     submsg.gas_limit = gas_limit;
 
     let res = IbcReceiveResponse::new()
@@ -431,13 +431,13 @@ mod test {
             msg: to_binary(&msg).unwrap(),
             funds: vec![],
         };
-        let mut msg = SubMsg::reply_always(exec, RECEIVE_ID);
+        let mut msg = SubMsg::reply_on_error(exec, RECEIVE_ID);
         msg.gas_limit = gas_limit;
         msg
     }
 
     fn native_payment(amount: u128, denom: &str, recipient: &str) -> SubMsg {
-        SubMsg::reply_always(
+        SubMsg::reply_on_error(
             BankMsg::Send {
                 to_address: recipient.into(),
                 amount: coins(amount, denom),
