@@ -53,20 +53,18 @@ pub struct ReplyArgs {
     pub amount: Uint128,
 }
 
-// this is like reduce_channel_balance, but doesn't change the state
-// it returns an error IFF reduce_channel_balance would return an error
-pub fn ensure_channel_balance(
-    storage: &dyn Storage,
+pub fn increase_channel_balance(
+    storage: &mut dyn Storage,
     channel: &str,
     denom: &str,
     amount: Uint128,
 ) -> Result<(), ContractError> {
-    CHANNEL_STATE
-        .may_load(storage, (channel, denom))?
-        .ok_or(ContractError::InsufficientFunds {})?
-        .outstanding
-        .checked_sub(amount)
-        .map_err(|_| ContractError::InsufficientFunds {})?;
+    CHANNEL_STATE.update(storage, (channel, denom), |orig| -> StdResult<_> {
+        let mut state = orig.unwrap_or_default();
+        state.outstanding += amount;
+        state.total_sent += amount;
+        Ok(state)
+    })?;
     Ok(())
 }
 
@@ -92,7 +90,9 @@ pub fn reduce_channel_balance(
     Ok(())
 }
 
-pub fn increase_channel_balance(
+// this is like increase, but it only "un-subtracts" (= adds) outstanding, not total_sent
+// calling `reduce_channel_balance` and then `undo_reduce_channel_balance` should leave state unchanged.
+pub fn undo_reduce_channel_balance(
     storage: &mut dyn Storage,
     channel: &str,
     denom: &str,
@@ -101,7 +101,6 @@ pub fn increase_channel_balance(
     CHANNEL_STATE.update(storage, (channel, denom), |orig| -> StdResult<_> {
         let mut state = orig.unwrap_or_default();
         state.outstanding += amount;
-        state.total_sent += amount;
         Ok(state)
     })?;
     Ok(())

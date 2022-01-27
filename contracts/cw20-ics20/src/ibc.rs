@@ -11,7 +11,7 @@ use cosmwasm_std::{
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
-    ensure_channel_balance, increase_channel_balance, reduce_channel_balance, ChannelInfo,
+    increase_channel_balance, reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo,
     ReplyArgs, ALLOW_LIST, CHANNEL_INFO, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
@@ -82,30 +82,30 @@ const ACK_FAILURE_ID: u64 = 0xfa17;
 pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
     match reply.id {
         RECEIVE_ID => match reply.result {
-            ContractResult::Ok(_) => {
+            ContractResult::Ok(_) => Ok(Response::new()),
+            ContractResult::Err(err) => {
                 // Important design note:  with ibcv2 and wasmd 0.22 we can implement this all much easier.
                 // No reply needed... the receive function and submessage should return error on failure and all
                 // state gets reverted with a proper app-level message auto-generated
 
-                // Since we need compatibility with Juno (Jan 2022), we need to ensure that no state gets written
-                // if the receive processing succeeds, but the submesage fails, so we can only write after we are
-                // sure all submessages succeeded.
+                // Since we need compatibility with Juno (Jan 2022), we need to ensure that optimisitic
+                // state updates in ibc_packet_receive get reverted in the (unlikely) chance of an
+                // error while sending the token
 
                 // However, this requires passing some state between the ibc_packet_receive function and
                 // the reply handler. We do this with a singleton, with is "okay" for IBC as there is no
                 // reentrancy on these functions (cannot be called by another contract). This pattern
                 // should not be used for ExecuteMsg handlers
                 let reply_args = REPLY_ARGS.load(deps.storage)?;
-                reduce_channel_balance(
+                undo_reduce_channel_balance(
                     deps.storage,
                     &reply_args.channel,
                     &reply_args.denom,
                     reply_args.amount,
                 )?;
 
-                Ok(Response::new())
+                Ok(Response::new().set_data(ack_fail(err)))
             }
-            ContractResult::Err(err) => Ok(Response::new().set_data(ack_fail(err))),
         },
         ACK_FAILURE_ID => match reply.result {
             ContractResult::Ok(_) => Ok(Response::new()),
@@ -239,7 +239,7 @@ fn do_ibc_packet_receive(
     let denom = parse_voucher_denom(&msg.denom, &packet.src)?;
 
     // make sure we have enough balance for this (that is, the later reduction in the reply handler should succeed)
-    ensure_channel_balance(deps.storage, &channel, denom, msg.amount)?;
+    reduce_channel_balance(deps.storage, &channel, denom, msg.amount)?;
 
     // we need to save the data to update the balances in reply
     let reply_args = ReplyArgs {
