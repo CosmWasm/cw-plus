@@ -798,7 +798,7 @@ where
             .range_raw(storage, None, None, Order::Ascending)
             .count();
         // we make this longer so it is not rejected by tests
-        Addr::unchecked(format!("Contract #{}", count.to_string()))
+        Addr::unchecked(format!("Contract #{}", count))
     }
 
     fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
