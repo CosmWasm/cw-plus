@@ -924,7 +924,7 @@ where
             Ok(v) => v,
             Err(e) => {
                 return SystemResult::Err(SystemError::InvalidRequest {
-                    error: format!("Parsing query request: {}", e.to_string()),
+                    error: format!("Parsing query request: {}", e),
                     request: bin_request.into(),
                 })
             }

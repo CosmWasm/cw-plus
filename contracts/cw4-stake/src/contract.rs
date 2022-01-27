@@ -669,7 +669,7 @@ mod tests {
             }) => {
                 assert_eq!(contract_addr.as_str(), CW20_ADDRESS);
                 assert_eq!(funds.len(), 0);
-                let parsed: Cw20ExecuteMsg = from_slice(&msg).unwrap();
+                let parsed: Cw20ExecuteMsg = from_slice(msg).unwrap();
                 assert_eq!(
                     parsed,
                     Cw20ExecuteMsg::Transfer {

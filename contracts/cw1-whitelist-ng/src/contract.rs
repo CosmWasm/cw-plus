@@ -223,7 +223,7 @@ mod tests {
 
         // instantiate the contract
         let admins = vec![alice.to_owned(), bob.to_owned(), carl.to_owned()];
-        let info = mock_info(&anyone, &[]);
+        let info = mock_info(anyone, &[]);
         contract
             .instantiate(deps.as_mut(), mock_env(), info, admins, true)
             .unwrap();
@@ -239,7 +239,7 @@ mod tests {
         );
 
         // anyone cannot modify the contract
-        let info = mock_info(&anyone, &[]);
+        let info = mock_info(anyone, &[]);
         let err = contract
             .update_admins(deps.as_mut(), mock_env(), info, vec![anyone.to_owned()])
             .unwrap_err();
@@ -247,7 +247,7 @@ mod tests {
 
         // but alice can kick out carl
         let admins = vec![alice.to_owned(), bob.to_owned()];
-        let info = mock_info(&alice, &[]);
+        let info = mock_info(alice, &[]);
         contract
             .update_admins(deps.as_mut(), mock_env(), info, admins)
             .unwrap();
@@ -263,14 +263,14 @@ mod tests {
         );
 
         // carl cannot freeze it
-        let info = mock_info(&carl, &[]);
+        let info = mock_info(carl, &[]);
         let err = contract
             .freeze(deps.as_mut(), mock_env(), info)
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but bob can
-        let info = mock_info(&bob, &[]);
+        let info = mock_info(bob, &[]);
         contract.freeze(deps.as_mut(), mock_env(), info).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.to_owned(), bob.to_owned()],
@@ -282,7 +282,7 @@ mod tests {
         );
 
         // and now alice cannot change it again
-        let info = mock_info(&alice, &[]);
+        let info = mock_info(alice, &[]);
         let err = contract
             .update_admins(deps.as_mut(), mock_env(), info, vec![alice.to_owned()])
             .unwrap_err();
@@ -300,7 +300,7 @@ mod tests {
 
         // instantiate the contract
         let admins = vec![alice.to_owned(), carl.to_owned()];
-        let info = mock_info(&bob, &[]);
+        let info = mock_info(bob, &[]);
         contract
             .instantiate(deps.as_mut(), mock_env(), info, admins, false)
             .unwrap();
@@ -321,14 +321,14 @@ mod tests {
         ];
 
         // bob cannot execute them
-        let info = mock_info(&bob, &[]);
+        let info = mock_info(bob, &[]);
         let err = contract
             .execute(deps.as_mut(), mock_env(), info, msgs.clone())
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but carl can
-        let info = mock_info(&carl, &[]);
+        let info = mock_info(carl, &[]);
         let res = contract
             .execute(deps.as_mut(), mock_env(), info, msgs.clone())
             .unwrap();
@@ -346,7 +346,7 @@ mod tests {
         let alice = "alice";
 
         let admins = vec![alice.to_owned()];
-        let info = mock_info(&alice, &[]);
+        let info = mock_info(alice, &[]);
         contract
             .instantiate(deps.as_mut(), mock_env(), info, admins, false)
             .unwrap();
@@ -357,7 +357,7 @@ mod tests {
             .execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(&alice, &[]),
+                mock_info(alice, &[]),
                 msgs.clone(),
             )
             .unwrap();
@@ -380,7 +380,7 @@ mod tests {
 
         // instantiate the contract
         let admins = vec![alice.to_owned(), bob.to_owned()];
-        let info = mock_info(&anyone, &[]);
+        let info = mock_info(anyone, &[]);
         contract
             .instantiate(deps.as_mut(), mock_env(), info, admins, false)
             .unwrap();
