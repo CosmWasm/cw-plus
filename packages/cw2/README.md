@@ -1,21 +1,28 @@
-# CW2 Spec: Contract Info for Migration
+# CW2 Spec: Contract Info
 
 Most of the CW* specs are focused on the *public interfaces*
 of the contract. The APIs used for `ExecuteMsg` or `QueryMsg`.
-However, when we wish to migrate from contract A to contract B,
-contract B needs to be aware somehow of how the *state was encoded*.
+However, when we wish to migrate or inspect smart contract info,
+we need some form of smart contract information embedded on state.
 
-Generally we use Singletons and Buckets to store the state, but
-if I upgrade to a `cw20-with-bonding-curve` contract, it will only
-work properly if I am migrating from a `cw20-base` contract. But how
-can the new contract know what format the data was stored.
+This is where CW2 comes in. It specifies on special Item to
+be stored on disk by all contracts on `instantiate`. 
 
-This is where CW2 comes in. It specifies on special Singleton to
-be stored on disk by all contracts on `instantiate`. When the `migrate`
-function is called, then the new contract can read that data and
-see if this is an expected contract we can migrate from. And also
-contain extra version information if we support multiple migrate
-paths.
+`ContractInfo` is must be stored under `"contract_info"` key which translates 
+to `"636F6E74726163745F696E666F"` in hex format.
+Since the state is well defined, we do not need to support any "smart queries".
+We do provide a helper to construct a "raw query" to read the ContractInfo
+of any CW2-compliant contract.
+
+You can query using:
+```shell
+wasmd query wasm contract-state raw [contract_addr] 636F6E74726163745F696E666F --node $RPC
+```
+
+When the `migrate` function is called, then the new contract
+can read that data andsee if this is an expected contract we can 
+migrate from. And also contain extra version information if we 
+support multiple migrate paths.
 
 ### Data structures
 
@@ -49,9 +56,3 @@ Thus, an serialized example may looks like:
     "version": "v0.1.0"
 }
 ```
-
-### Queries
-
-Since the state is well defined, we do not need to support any "smart queries".
-We do provide a helper to construct a "raw query" to read the ContractInfo
-of any CW2-compliant contract.
