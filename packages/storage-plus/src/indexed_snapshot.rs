@@ -58,7 +58,7 @@ impl<'a, K, T, I> IndexedSnapshotMap<'a, K, T, I> {
     }
 
     pub fn changelog(&self) -> &Map<'a, (K, u64), ChangeSet<T>> {
-        &self.primary.changelog()
+        self.primary.changelog()
     }
 }
 

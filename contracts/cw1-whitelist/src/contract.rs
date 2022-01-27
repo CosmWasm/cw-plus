@@ -162,7 +162,7 @@ mod tests {
             admins: vec![alice.to_string(), bob.to_string(), carl.to_string()],
             mutable: true,
         };
-        let info = mock_info(&anyone, &[]);
+        let info = mock_info(anyone, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         // ensure expected config
@@ -176,7 +176,7 @@ mod tests {
         let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![anyone.to_string()],
         };
-        let info = mock_info(&anyone, &[]);
+        let info = mock_info(anyone, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
@@ -184,7 +184,7 @@ mod tests {
         let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![alice.to_string(), bob.to_string()],
         };
-        let info = mock_info(&alice, &[]);
+        let info = mock_info(alice, &[]);
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // ensure expected config
@@ -195,12 +195,12 @@ mod tests {
         assert_eq!(query_admin_list(deps.as_ref()).unwrap(), expected);
 
         // carl cannot freeze it
-        let info = mock_info(&carl, &[]);
+        let info = mock_info(carl, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but bob can
-        let info = mock_info(&bob, &[]);
+        let info = mock_info(bob, &[]);
         execute(deps.as_mut(), mock_env(), info, ExecuteMsg::Freeze {}).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.to_string(), bob.to_string()],
@@ -212,7 +212,7 @@ mod tests {
         let msg = ExecuteMsg::UpdateAdmins {
             admins: vec![alice.to_string()],
         };
-        let info = mock_info(&alice, &[]);
+        let info = mock_info(alice, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
     }
@@ -230,7 +230,7 @@ mod tests {
             admins: vec![alice.to_string(), carl.to_string()],
             mutable: false,
         };
-        let info = mock_info(&bob, &[]);
+        let info = mock_info(bob, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
@@ -252,12 +252,12 @@ mod tests {
         let execute_msg = ExecuteMsg::Execute { msgs: msgs.clone() };
 
         // bob cannot execute them
-        let info = mock_info(&bob, &[]);
+        let info = mock_info(bob, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, execute_msg.clone()).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but carl can
-        let info = mock_info(&carl, &[]);
+        let info = mock_info(carl, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, execute_msg).unwrap();
         assert_eq!(
             res.messages,
@@ -280,7 +280,7 @@ mod tests {
             admins: vec![alice.to_string(), bob.to_string()],
             mutable: false,
         };
-        let info = mock_info(&anyone, &[]);
+        let info = mock_info(anyone, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
         // let us make some queries... different msg types by owner and by other
