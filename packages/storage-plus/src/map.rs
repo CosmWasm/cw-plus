@@ -581,9 +581,10 @@ mod test {
         assert_eq!(1, all.len());
         assert_eq!(all, vec![(1234, data)]);
     }
+
     #[test]
     #[cfg(feature = "iterator")]
-    fn range2_simple_integer_key() {
+    fn range_simple_integer_key_with_bounder_trait() {
         let mut store = MockStorage::new();
 
         // save and load on two keys
@@ -689,7 +690,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn range2_simple_signed_integer_key() {
+    fn range_simple_signed_integer_key_with_bounder_trait() {
         let mut store = MockStorage::new();
 
         // save and load on three keys
