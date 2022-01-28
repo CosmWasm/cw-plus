@@ -477,66 +477,6 @@ mod test {
     fn range_simple_string_key() {
         let mut store = MockStorage::new();
 
-        // save and load on two keys
-        let data = Data {
-            name: "John".to_string(),
-            age: 32,
-        };
-        PEOPLE.save(&mut store, b"john", &data).unwrap();
-
-        let data2 = Data {
-            name: "Jim".to_string(),
-            age: 44,
-        };
-        PEOPLE.save(&mut store, b"jim", &data2).unwrap();
-
-        // let's try to iterate!
-        let all: StdResult<Vec<_>> = PEOPLE.range(&store, None, None, Order::Ascending).collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
-            vec![
-                (b"jim".to_vec(), data2.clone()),
-                (b"john".to_vec(), data.clone())
-            ]
-        );
-
-        // let's try to iterate over a range
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range(
-                &store,
-                Some(Bound::inclusive(b"j" as &[u8])),
-                None,
-                Order::Ascending,
-            )
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
-            vec![(b"jim".to_vec(), data2), (b"john".to_vec(), data.clone())]
-        );
-
-        // let's try to iterate over a more restrictive range
-        let all: StdResult<Vec<_>> = PEOPLE
-            .range(
-                &store,
-                Some(Bound::inclusive(b"jo" as &[u8])),
-                None,
-                Order::Ascending,
-            )
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(1, all.len());
-        assert_eq!(all, vec![(b"john".to_vec(), data)]);
-    }
-
-    #[test]
-    #[cfg(feature = "iterator")]
-    fn range2_simple_string_key() {
-        let mut store = MockStorage::new();
-
         // save and load on three keys
         let data = Data {
             name: "John".to_string(),
