@@ -43,7 +43,7 @@ impl Cw4Contract {
     }
 
     pub fn remove_hook<T: Into<String>>(&self, addr: T) -> StdResult<CosmosMsg> {
-        let msg = Cw4ExecuteMsg::AddHook { addr: addr.into() };
+        let msg = Cw4ExecuteMsg::RemoveHook { addr: addr.into() };
         self.encode_msg(msg)
     }
 
