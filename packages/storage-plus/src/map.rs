@@ -902,50 +902,6 @@ mod test {
             all,
             vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000),]
         );
-    }
-
-    #[test]
-    #[cfg(feature = "iterator")]
-    fn range2_composite_key() {
-        let mut store = MockStorage::new();
-
-        // save and load on three keys, one under different owner
-        ALLOWANCE
-            .save(&mut store, (b"owner", b"spender"), &1000)
-            .unwrap();
-        ALLOWANCE
-            .save(&mut store, (b"owner", b"spender2"), &3000)
-            .unwrap();
-        ALLOWANCE
-            .save(&mut store, (b"owner2", b"spender"), &5000)
-            .unwrap();
-
-        // let's try to iterate!
-        let all: StdResult<Vec<_>> = ALLOWANCE
-            .range(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(3, all.len());
-        assert_eq!(
-            all,
-            vec![
-                ((b"owner".to_vec(), b"spender".to_vec()), 1000),
-                ((b"owner".to_vec(), b"spender2".to_vec()), 3000),
-                ((b"owner2".to_vec(), b"spender".to_vec()), 5000)
-            ]
-        );
-
-        // let's try to iterate over a prefix
-        let all: StdResult<Vec<_>> = ALLOWANCE
-            .prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
-            vec![(b"spender".to_vec(), 1000), (b"spender2".to_vec(), 3000),]
-        );
 
         // let's try to iterate over a prefixed restricted inclusive range
         let all: StdResult<Vec<_>> = ALLOWANCE
@@ -1052,71 +1008,6 @@ mod test {
     #[test]
     #[cfg(feature = "iterator")]
     fn range_triple_key() {
-        let mut store = MockStorage::new();
-
-        // save and load on three keys, one under different owner
-        TRIPLE
-            .save(&mut store, (b"owner", 9u8, "recipient"), &1000)
-            .unwrap();
-        TRIPLE
-            .save(&mut store, (b"owner", 9u8, "recipient2"), &3000)
-            .unwrap();
-        TRIPLE
-            .save(&mut store, (b"owner", 10u8, "recipient3"), &3000)
-            .unwrap();
-        TRIPLE
-            .save(&mut store, (b"owner2", 9u8, "recipient"), &5000)
-            .unwrap();
-
-        // let's try to iterate!
-        let all: StdResult<Vec<_>> = TRIPLE.range(&store, None, None, Order::Ascending).collect();
-        let all = all.unwrap();
-        assert_eq!(4, all.len());
-        assert_eq!(
-            all,
-            vec![
-                ((b"owner".to_vec(), 9, "recipient".to_string()), 1000),
-                ((b"owner".to_vec(), 9, "recipient2".to_string()), 3000),
-                ((b"owner".to_vec(), 10, "recipient3".to_string()), 3000),
-                ((b"owner2".to_vec(), 9, "recipient".to_string()), 5000)
-            ]
-        );
-
-        // let's iterate over a sub_prefix
-        let all: StdResult<Vec<_>> = TRIPLE
-            .sub_prefix(b"owner")
-            .range(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(3, all.len());
-        assert_eq!(
-            all,
-            vec![
-                ((9, "recipient".to_string()), 1000),
-                ((9, "recipient2".to_string()), 3000),
-                ((10, "recipient3".to_string()), 3000),
-            ]
-        );
-
-        // let's iterate over a prefix
-        let all: StdResult<Vec<_>> = TRIPLE
-            .prefix((b"owner", 9))
-            .range(&store, None, None, Order::Ascending)
-            .collect();
-        let all = all.unwrap();
-        assert_eq!(2, all.len());
-        assert_eq!(
-            all,
-            vec![
-                ("recipient".to_string(), 1000),
-                ("recipient2".to_string(), 3000),
-            ]
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "iterator")]
-    fn range2_triple_key() {
         let mut store = MockStorage::new();
 
         // save and load on three keys, one under different owner
