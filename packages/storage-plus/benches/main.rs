@@ -27,12 +27,15 @@ fn bench_signed_int_key(c: &mut Criterion) {
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
         assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
-        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
+        assert_eq!(
+            to_cw_bytes(&k_check.wrapping_neg()),
+            i32::to_cw_bytes(&k_check.wrapping_neg())
+        );
 
         b.iter(|| {
             let k = k();
             black_box(to_cw_bytes(&k));
-            black_box(to_cw_bytes(&-k));
+            black_box(to_cw_bytes(&k.wrapping_neg()));
         });
     });
 
@@ -44,12 +47,15 @@ fn bench_signed_int_key(c: &mut Criterion) {
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
         assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
-        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
+        assert_eq!(
+            to_cw_bytes(&k_check.wrapping_neg()),
+            i32::to_cw_bytes(&k_check.wrapping_neg())
+        );
 
         b.iter(|| {
             let k = k();
             black_box(to_cw_bytes(&k));
-            black_box(to_cw_bytes(&-k));
+            black_box(to_cw_bytes(&k.wrapping_neg()));
         });
     });
 
@@ -63,12 +69,15 @@ fn bench_signed_int_key(c: &mut Criterion) {
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
         assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
-        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
+        assert_eq!(
+            to_cw_bytes(&k_check.wrapping_neg()),
+            i32::to_cw_bytes(&k_check.wrapping_neg())
+        );
 
         b.iter(|| {
             let k = k();
             black_box(to_cw_bytes(&k));
-            black_box(to_cw_bytes(&-k));
+            black_box(to_cw_bytes(&k.wrapping_neg()));
         });
     });
 
@@ -76,20 +85,23 @@ fn bench_signed_int_key(c: &mut Criterion) {
         #[inline]
         fn to_cw_bytes(value: &i32) -> Buf {
             if value >= &0i32 {
-                (*value as u32 - i32::MIN as u32).to_be_bytes()
+                ((*value as u32).wrapping_sub(i32::MIN as u32)).to_be_bytes()
             } else {
-                (*value as u32 + i32::MIN as u32).to_be_bytes()
+                ((*value as u32).wrapping_add(i32::MIN as u32)).to_be_bytes()
             }
         }
 
         assert_eq!(to_cw_bytes(&0), i32::to_cw_bytes(&0));
         assert_eq!(to_cw_bytes(&k_check), i32::to_cw_bytes(&k_check));
-        assert_eq!(to_cw_bytes(&-k_check), i32::to_cw_bytes(&-k_check));
+        assert_eq!(
+            to_cw_bytes(&k_check.wrapping_neg()),
+            i32::to_cw_bytes(&k_check.wrapping_neg())
+        );
 
         b.iter(|| {
             let k = k();
             black_box(to_cw_bytes(&k));
-            black_box(to_cw_bytes(&-k));
+            black_box(to_cw_bytes(&k.wrapping_neg()));
         });
     });
 
