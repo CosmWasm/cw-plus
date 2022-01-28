@@ -3,12 +3,13 @@ use serde::Serialize;
 
 use cosmwasm_std::{StdError, StdResult, Storage};
 
+use crate::bound::PrefixBound;
 use crate::de::KeyDeserialize;
 use crate::iter_helpers::deserialize_kv;
 use crate::keys::PrimaryKey;
 use crate::map::Map;
 use crate::path::Path;
-use crate::prefix::{namespaced_prefix_range, Prefix, PrefixBound};
+use crate::prefix::{namespaced_prefix_range, Prefix};
 use crate::snapshot::{ChangeSet, Snapshot};
 use crate::{Bound, Prefixer, Strategy};
 
@@ -73,7 +74,7 @@ where
         self.primary.key(k)
     }
 
-    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, K> {
         self.primary.no_prefix_raw()
     }
 
@@ -171,8 +172,8 @@ where
     pub fn range_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
     where
@@ -184,8 +185,8 @@ where
     pub fn keys_raw<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c>
     where
@@ -228,8 +229,8 @@ where
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -242,8 +243,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -253,15 +254,15 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T, K::Suffix> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T, K::SuperSuffix> {
         Prefix::new(self.primary.namespace(), &p.prefix())
     }
 
-    fn no_prefix(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T, K> {
         Prefix::new(self.primary.namespace(), &[])
     }
 }
@@ -514,12 +515,7 @@ mod tests {
         let all: StdResult<Vec<_>> = EVERY
             .changelog()
             .prefix("A")
-            .range(
-                &store,
-                Some(Bound::inclusive_int(3u64)),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive(3u64)), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());
@@ -542,12 +538,7 @@ mod tests {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = EVERY
-            .range(
-                &store,
-                Some(Bound::Inclusive(b"C".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("C")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(2, all.len());
@@ -555,12 +546,7 @@ mod tests {
 
         // let's try to iterate over a more restrictive range
         let all: StdResult<Vec<_>> = EVERY
-            .range(
-                &store,
-                Some(Bound::Inclusive(b"D".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("D")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(1, all.len());

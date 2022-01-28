@@ -407,7 +407,7 @@ pub fn query_all_allowances(
 ) -> StdResult<AllAllowancesResponse> {
     let limit = calc_limit(limit);
     // we use raw addresses here....
-    let start = start_after.map(Bound::exclusive);
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into()));
 
     let allowances = ALLOWANCES
         .range(deps.storage, start, None, Order::Ascending)
@@ -437,7 +437,7 @@ pub fn query_all_permissions(
     limit: Option<u32>,
 ) -> StdResult<AllPermissionsResponse> {
     let limit = calc_limit(limit);
-    let start = start_after.map(Bound::exclusive);
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into()));
 
     let permissions = PERMISSIONS
         .range(deps.storage, start, None, Order::Ascending)

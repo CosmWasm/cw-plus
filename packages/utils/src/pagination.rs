@@ -64,7 +64,7 @@ mod test {
                 Some(addr_from_i(j * LIMIT - 1))
             };
 
-            let start = calc_range_start(start_after).map(Bound::exclusive);
+            let start = calc_range_start(start_after).map(Bound::ExclusiveRaw);
 
             let holders = HOLDERS
                 .keys(&deps.storage, start, None, Order::Ascending)
@@ -93,7 +93,7 @@ mod test {
         for j in 0..4 {
             let end_before = Some(addr_from_i(total_elements_count - j * LIMIT));
 
-            let end = calc_range_end(end_before).map(Bound::exclusive);
+            let end = calc_range_end(end_before).map(Bound::ExclusiveRaw);
 
             let holders = HOLDERS
                 .keys(&deps.storage, None, end, Order::Descending)

@@ -5,8 +5,9 @@ mod map;
 pub use item::SnapshotItem;
 pub use map::SnapshotMap;
 
+use crate::bound::Bound;
 use crate::de::KeyDeserialize;
-use crate::{Bound, Map, Prefixer, PrimaryKey};
+use crate::{Map, Prefixer, PrimaryKey};
 use cosmwasm_std::{Order, StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -79,7 +80,7 @@ where
         // most recent checkpoint
         let checkpoint = self
             .checkpoints
-            .range_raw(store, None, None, Order::Descending)
+            .range(store, None, None, Order::Descending)
             .next()
             .transpose()?;
         if let Some((height, _)) = checkpoint {
@@ -143,7 +144,7 @@ where
 
         // this will look for the first snapshot of height >= given height
         // If None, there is no snapshot since that time.
-        let start = Bound::inclusive_int(height);
+        let start = Bound::inclusive(height);
         let first = self
             .changelog
             .prefix(key)

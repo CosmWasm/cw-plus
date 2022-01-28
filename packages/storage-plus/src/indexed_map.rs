@@ -1,6 +1,7 @@
 // this module requires iterator to be useful at all
 #![cfg(feature = "iterator")]
 
+use crate::PrefixBound;
 use cosmwasm_std::{StdError, StdResult, Storage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -10,8 +11,8 @@ use crate::indexes::Index;
 use crate::iter_helpers::{deserialize_kv, deserialize_v};
 use crate::keys::{Prefixer, PrimaryKey};
 use crate::map::Map;
-use crate::prefix::{namespaced_prefix_range, Bound, Prefix, PrefixBound};
-use crate::Path;
+use crate::prefix::{namespaced_prefix_range, Prefix};
+use crate::{Bound, Path};
 
 pub trait IndexList<T> {
     fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<T>> + '_>;
@@ -130,41 +131,8 @@ where
     }
 
     // use no_prefix to scan -> range
-    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T> {
+    fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, K> {
         Prefix::new(self.pk_namespace, &[])
-    }
-}
-
-// short-cut for simple keys, rather than .prefix(()).range_raw(...)
-impl<'a, K, T, I> IndexedMap<'a, K, T, I>
-where
-    K: PrimaryKey<'a>,
-    T: Serialize + DeserializeOwned + Clone,
-    I: IndexList<T>,
-{
-    // I would prefer not to copy code from Prefix, but no other way
-    // with lifetimes (create Prefix inside function and return ref = no no)
-    pub fn range_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
-    where
-        T: 'c,
-    {
-        self.no_prefix_raw().range_raw(store, min, max, order)
-    }
-
-    pub fn keys_raw<'c>(
-        &self,
-        store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
-        order: cosmwasm_std::Order,
-    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
-        self.no_prefix_raw().keys_raw(store, min, max, order)
     }
 }
 
@@ -244,11 +212,34 @@ where
         Box::new(mapped)
     }
 
+    pub fn range_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = StdResult<cosmwasm_std::Record<T>>> + 'c>
+    where
+        T: 'c,
+    {
+        self.no_prefix_raw().range_raw(store, min, max, order)
+    }
+
+    pub fn keys_raw<'c>(
+        &self,
+        store: &'c dyn Storage,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
+        order: cosmwasm_std::Order,
+    ) -> Box<dyn Iterator<Item = Vec<u8>> + 'c> {
+        self.no_prefix_raw().keys_raw(store, min, max, order)
+    }
+
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'c>
     where
@@ -261,8 +252,8 @@ where
     pub fn keys<'c>(
         &self,
         store: &'c dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'a, K>>,
+        max: Option<Bound<'a, K>>,
         order: cosmwasm_std::Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'c>
     where
@@ -272,7 +263,7 @@ where
         self.no_prefix().keys(store, min, max, order)
     }
 
-    fn no_prefix(&self) -> Prefix<K, T> {
+    fn no_prefix(&self) -> Prefix<K, T, K> {
         Prefix::new(self.pk_namespace, &[])
     }
 }
@@ -459,27 +450,38 @@ mod test {
             .count();
         assert_eq!(0, count);
 
-        // index_key() over MultiIndex works (empty pk)
-        // In a MultiIndex, an index key is composed by the index and the primary key.
+        // In a MultiIndex, the index key is composed by the index and the primary key.
         // Primary key may be empty (so that to iterate over all elements that match just the index)
-        let key = "Maria".to_string();
-        // Use the index_key() helper to build the (raw) index key with an empty pk
-        let key = map.idx.name.index_key(key);
-        // Iterate using a bound over the raw key
-        let count = map
+        let key = ("Maria".to_string(), "".to_string());
+        // Iterate using an inclusive bound over the key
+        let marias = map
             .idx
             .name
             .range_raw(&store, Some(Bound::inclusive(key)), None, Order::Ascending)
-            .count();
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
         // gets from the first "Maria" until the end
-        assert_eq!(4, count);
+        assert_eq!(4, marias.len());
 
-        // index_key() over MultiIndex works (non-empty pk)
+        // This is equivalent to using prefix_range
+        let key = "Maria".to_string();
+        let marias2 = map
+            .idx
+            .name
+            .prefix_range_raw(
+                &store,
+                Some(PrefixBound::inclusive(key)),
+                None,
+                Order::Ascending,
+            )
+            .collect::<StdResult<Vec<_>>>()
+            .unwrap();
+        assert_eq!(4, marias2.len());
+        assert_eq!(marias, marias2);
+
         // Build key including a non-empty pk
         let key = ("Maria".to_string(), "1".to_string());
-        // Use the joined_key() helper to build the (raw) index key
-        let key = key.joined_key();
-        // Iterate using a (exclusive) bound over the raw key.
+        // Iterate using a (exclusive) bound over the key.
         // (Useful for pagination / continuation contexts).
         let count = map
             .idx
@@ -491,9 +493,7 @@ mod test {
 
         // index_key() over UniqueIndex works.
         let age_key = 23u32;
-        // Use the index_key() helper to build the (raw) index key
-        let age_key = map.idx.age.index_key(age_key);
-        // Iterate using a (inclusive) bound over the raw key.
+        // Iterate using a (inclusive) bound over the key.
         let count = map
             .idx
             .age
@@ -1007,12 +1007,7 @@ mod test {
 
         // let's try to iterate over a range
         let all: StdResult<Vec<_>> = map
-            .range(
-                &store,
-                Some(Bound::Inclusive(b"3".to_vec())),
-                None,
-                Order::Ascending,
-            )
+            .range(&store, Some(Bound::inclusive("3")), None, Order::Ascending)
             .collect();
         let all = all.unwrap();
         assert_eq!(

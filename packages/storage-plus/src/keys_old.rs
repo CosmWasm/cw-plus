@@ -1,5 +1,7 @@
 use crate::de::KeyDeserialize;
 use crate::keys::Key;
+#[cfg(feature = "iterator")]
+use crate::{Bound, Bounder};
 use crate::{Endian, Prefixer, PrimaryKey};
 use std::marker::PhantomData;
 
@@ -58,6 +60,21 @@ where
 impl<'a, T: Endian> Prefixer<'a> for IntKeyOld<T> {
     fn prefix(&self) -> Vec<Key> {
         self.wrapped.prefix()
+    }
+}
+
+// this auto-implements Bounder for all the IntKey types
+#[cfg(feature = "iterator")]
+impl<'a, T: Endian> Bounder<'a> for IntKeyOld<T>
+where
+    IntKeyOld<T>: KeyDeserialize,
+{
+    fn inclusive_bound(self) -> Option<Bound<'a, Self>> {
+        Some(Bound::inclusive(self))
+    }
+
+    fn exclusive_bound(self) -> Option<Bound<'a, Self>> {
+        Some(Bound::exclusive(self))
     }
 }
 

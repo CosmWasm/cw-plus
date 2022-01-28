@@ -17,7 +17,7 @@ use crate::msg::{
     ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
 };
 use crate::state::{AllowInfo, Config, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
-use cw_utils::{nonpayable, one_coin};
+use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
@@ -284,10 +284,8 @@ fn list_allowed(
     limit: Option<u32>,
 ) -> StdResult<ListAllowedResponse> {
     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
-    let start = match start_after {
-        Some(x) => Some(Bound::exclusive(deps.api.addr_validate(&x)?.into_string())),
-        None => None,
-    };
+    let addr = maybe_addr(deps.api, start_after)?;
+    let start = addr.as_ref().map(Bound::exclusive);
 
     let allow = ALLOW_LIST
         .range(deps.storage, start, None, Order::Ascending)

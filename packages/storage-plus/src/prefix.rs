@@ -6,67 +6,12 @@ use std::marker::PhantomData;
 use cosmwasm_std::{Order, Record, StdResult, Storage};
 use std::ops::Deref;
 
+use crate::bound::{PrefixBound, RawBound};
 use crate::de::KeyDeserialize;
 use crate::helpers::{namespaces_with_key, nested_namespaces_with_key};
-use crate::int_key::CwIntKey;
 use crate::iter_helpers::{concat, deserialize_kv, deserialize_v, trim};
 use crate::keys::Key;
-use crate::{Endian, Prefixer};
-
-/// Bound is used to defines the two ends of a range, more explicit than Option<u8>
-/// None means that we don't limit that side of the range at all.
-/// Include means we use the given bytes as a limit and *include* anything at that exact key
-/// Exclude means we use the given bytes as a limit and *exclude* anything at that exact key
-#[derive(Clone, Debug)]
-pub enum Bound {
-    Inclusive(Vec<u8>),
-    Exclusive(Vec<u8>),
-}
-
-impl Bound {
-    /// Turns optional binary, like Option<CanonicalAddr> into an inclusive bound
-    pub fn inclusive<T: Into<Vec<u8>>>(limit: T) -> Self {
-        Bound::Inclusive(limit.into())
-    }
-
-    /// Turns optional binary, like Option<CanonicalAddr> into an exclusive bound
-    pub fn exclusive<T: Into<Vec<u8>>>(limit: T) -> Self {
-        Bound::Exclusive(limit.into())
-    }
-
-    /// Turns an int, like Option<u32> into an inclusive bound
-    pub fn inclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
-        Bound::Inclusive(limit.to_cw_bytes().into())
-    }
-
-    /// Turns an int, like Option<u64> into an exclusive bound
-    pub fn exclusive_int<T: CwIntKey + Endian>(limit: T) -> Self {
-        Bound::Exclusive(limit.to_cw_bytes().into())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum PrefixBound<'a, K: Prefixer<'a>> {
-    Inclusive((K, PhantomData<&'a bool>)),
-    Exclusive((K, PhantomData<&'a bool>)),
-}
-
-impl<'a, K: Prefixer<'a>> PrefixBound<'a, K> {
-    pub fn inclusive<T: Into<K>>(k: T) -> Self {
-        Self::Inclusive((k.into(), PhantomData))
-    }
-
-    pub fn exclusive<T: Into<K>>(k: T) -> Self {
-        Self::Exclusive((k.into(), PhantomData))
-    }
-
-    pub fn to_bound(&self) -> Bound {
-        match self {
-            PrefixBound::Exclusive((k, _)) => Bound::Exclusive(k.joined_prefix()),
-            PrefixBound::Inclusive((k, _)) => Bound::Inclusive(k.joined_prefix()),
-        }
-    }
-}
+use crate::{Bound, Prefixer, PrimaryKey};
 
 type DeserializeVFn<T> = fn(&dyn Storage, &[u8], Record) -> StdResult<Record<T>>;
 
@@ -90,7 +35,7 @@ pub fn default_deserializer_kv<K: KeyDeserialize, T: DeserializeOwned>(
 }
 
 #[derive(Clone)]
-pub struct Prefix<K, T>
+pub struct Prefix<K, T, B = Vec<u8>>
 where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
@@ -98,7 +43,7 @@ where
     /// all namespaces prefixes and concatenated with the key
     storage_prefix: Vec<u8>,
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
-    data: PhantomData<T>,
+    data: PhantomData<(T, B)>,
     pk_name: Vec<u8>,
     de_fn_kv: DeserializeKvFn<K, T>,
     de_fn_v: DeserializeVFn<T>,
@@ -116,7 +61,7 @@ where
     }
 }
 
-impl<K, T> Prefix<K, T>
+impl<K, T, B> Prefix<K, T, B>
 where
     K: KeyDeserialize,
     T: Serialize + DeserializeOwned,
@@ -147,12 +92,19 @@ where
             de_fn_v,
         }
     }
+}
 
+impl<'b, K, T, B> Prefix<K, T, B>
+where
+    B: PrimaryKey<'b>,
+    K: KeyDeserialize,
+    T: Serialize + DeserializeOwned,
+{
     pub fn range_raw<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<Record<T>>> + 'a>
     where
@@ -160,28 +112,40 @@ where
     {
         let de_fn = self.de_fn_v;
         let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &pk_name, kv));
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
+            order,
+        )
+        .map(move |kv| (de_fn)(store, &pk_name, kv));
         Box::new(mapped)
     }
 
     pub fn keys_raw<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = Vec<u8>> + 'a> {
-        let mapped =
-            range_with_prefix(store, &self.storage_prefix, min, max, order).map(|(k, _)| k);
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
+            order,
+        )
+        .map(|(k, _)| k);
         Box::new(mapped)
     }
 
     pub fn range<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<(K::Output, T)>> + 'a>
     where
@@ -190,16 +154,22 @@ where
     {
         let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &pk_name, kv));
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
+            order,
+        )
+        .map(move |kv| (de_fn)(store, &pk_name, kv));
         Box::new(mapped)
     }
 
     pub fn keys<'a>(
         &self,
         store: &'a dyn Storage,
-        min: Option<Bound>,
-        max: Option<Bound>,
+        min: Option<Bound<'b, B>>,
+        max: Option<Bound<'b, B>>,
         order: Order,
     ) -> Box<dyn Iterator<Item = StdResult<K::Output>> + 'a>
     where
@@ -208,9 +178,15 @@ where
     {
         let de_fn = self.de_fn_kv;
         let pk_name = self.pk_name.clone();
-        let mapped = range_with_prefix(store, &self.storage_prefix, min, max, order)
-            .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)))
-            .flatten();
+        let mapped = range_with_prefix(
+            store,
+            &self.storage_prefix,
+            min.map(|b| b.to_raw_bound()),
+            max.map(|b| b.to_raw_bound()),
+            order,
+        )
+        .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)))
+        .flatten();
         Box::new(mapped)
     }
 }
@@ -218,8 +194,8 @@ where
 pub fn range_with_prefix<'a>(
     storage: &'a dyn Storage,
     namespace: &[u8],
-    start: Option<Bound>,
-    end: Option<Bound>,
+    start: Option<RawBound>,
+    end: Option<RawBound>,
     order: Order,
 ) -> Box<dyn Iterator<Item = Record> + 'a> {
     let start = calc_start_bound(namespace, start);
@@ -234,21 +210,21 @@ pub fn range_with_prefix<'a>(
     Box::new(mapped)
 }
 
-fn calc_start_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
+fn calc_start_bound(namespace: &[u8], bound: Option<RawBound>) -> Vec<u8> {
     match bound {
         None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Exclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
     }
 }
 
-fn calc_end_bound(namespace: &[u8], bound: Option<Bound>) -> Vec<u8> {
+fn calc_end_bound(namespace: &[u8], bound: Option<RawBound>) -> Vec<u8> {
     match bound {
         None => increment_last_byte(namespace),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Inclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &extend_one_byte(&limit)),
     }
 }
 
@@ -275,11 +251,11 @@ fn calc_prefix_start_bound<'a, K: Prefixer<'a>>(
     namespace: &[u8],
     bound: Option<PrefixBound<'a, K>>,
 ) -> Vec<u8> {
-    match bound.map(|b| b.to_bound()) {
+    match bound.map(|b| b.to_raw_bound()) {
         None => namespace.to_vec(),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Inclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Exclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
     }
 }
 
@@ -287,11 +263,11 @@ fn calc_prefix_end_bound<'a, K: Prefixer<'a>>(
     namespace: &[u8],
     bound: Option<PrefixBound<'a, K>>,
 ) -> Vec<u8> {
-    match bound.map(|b| b.to_bound()) {
+    match bound.map(|b| b.to_raw_bound()) {
         None => increment_last_byte(namespace),
         // this is the natural limits of the underlying Storage
-        Some(Bound::Exclusive(limit)) => concat(namespace, &limit),
-        Some(Bound::Inclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
+        Some(RawBound::Exclusive(limit)) => concat(namespace, &limit),
+        Some(RawBound::Inclusive(limit)) => concat(namespace, &increment_last_byte(&limit)),
     }
 }
 
@@ -329,7 +305,7 @@ mod test {
         // manually create this - not testing nested prefixes here
         let prefix: Prefix<Vec<u8>, u64> = Prefix {
             storage_prefix: b"foo".to_vec(),
-            data: PhantomData::<u64>,
+            data: PhantomData::<(u64, _)>,
             pk_name: vec![],
             de_fn_kv: |_, _, kv| deserialize_kv::<Vec<u8>, u64>(kv),
             de_fn_v: |_, _, kv| deserialize_v(kv),
@@ -364,7 +340,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -374,7 +350,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"ra".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -384,7 +360,7 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"r".to_vec())),
+                Some(Bound::exclusive(b"r".to_vec())),
                 None,
                 Order::Ascending,
             )
@@ -396,7 +372,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(Bound::Inclusive(b"ra".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -406,7 +382,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(Bound::Exclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"ra".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -416,7 +392,7 @@ mod test {
             .range_raw(
                 &store,
                 None,
-                Some(Bound::Exclusive(b"rb".to_vec())),
+                Some(Bound::exclusive(b"rb".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -426,8 +402,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
-                Some(Bound::Exclusive(b"zi".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();
@@ -436,8 +412,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
-                Some(Bound::Exclusive(b"zi".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -446,8 +422,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Inclusive(b"ra".to_vec())),
-                Some(Bound::Inclusive(b"zi".to_vec())),
+                Some(Bound::inclusive(b"ra".to_vec())),
+                Some(Bound::inclusive(b"zi".to_vec())),
                 Order::Descending,
             )
             .collect();
@@ -456,8 +432,8 @@ mod test {
         let res: StdResult<Vec<_>> = prefix
             .range_raw(
                 &store,
-                Some(Bound::Exclusive(b"ra".to_vec())),
-                Some(Bound::Exclusive(b"zi".to_vec())),
+                Some(Bound::exclusive(b"ra".to_vec())),
+                Some(Bound::exclusive(b"zi".to_vec())),
                 Order::Ascending,
             )
             .collect();
