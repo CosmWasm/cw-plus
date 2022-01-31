@@ -1146,12 +1146,7 @@ mod tests {
 
         // Trying to execute something that was already executed fails
         let err = app
-            .execute_contract(
-                Addr::unchecked(SOMEBODY),
-                flex_addr.clone(),
-                &execution,
-                &[],
-            )
+            .execute_contract(Addr::unchecked(SOMEBODY), flex_addr, &execution, &[])
             .unwrap_err();
         assert_eq!(
             ContractError::WrongExecuteStatus {},
@@ -1225,7 +1220,7 @@ mod tests {
         let res = app
             .execute_contract(
                 Addr::unchecked(SOMEBODY),
-                flex_addr.clone(),
+                flex_addr,
                 &ExecuteMsg::Execute { proposal_id },
                 &[],
             )
