@@ -52,6 +52,8 @@ pub fn query_all_allowances(
 ```
 Notice that here we build a bound for an address, and using a raw bound allows us to skip address validation / build up.
 
+See storage-plus [README.md](./packages/storage-plus/README.md#Bound) for more information on `Bound`.
+
 ## v0.10.3 -> v0.11.0
 
 ### Breaking Issues / PRs
