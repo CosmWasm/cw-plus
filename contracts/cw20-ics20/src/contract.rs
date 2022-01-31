@@ -2,8 +2,9 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
-    PortIdResponse, Response, StdResult,
+    PortIdResponse, Response, StdError, StdResult,
 };
+use semver::Version;
 
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
@@ -192,13 +193,36 @@ pub fn execute_allow(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let version = get_contract_version(deps.storage)?;
-    if version.contract != CONTRACT_NAME {
+    let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
+    let stored = get_contract_version(deps.storage)?;
+    let storage_version: Version = stored.version.parse().map_err(from_semver)?;
+
+    if CONTRACT_NAME != stored.contract {
         return Err(ContractError::CannotMigrate {
-            previous_contract: version.contract,
+            previous_contract: stored.contract,
         });
     }
-    Ok(Response::default())
+    if storage_version > version {
+        return Err(ContractError::CannotMigrateVersion {
+            previous_version: stored.version,
+        });
+    }
+
+    // for 0.12.0-alpha1 or earlier, migrate from the config.gov_contract to ADMIN
+    if storage_version <= "0.12.0-alpha1".parse().map_err(from_semver)? {
+        // DO migration
+    }
+
+    if storage_version < version {
+        // we don't need to save anything if migrating from the same version
+        set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    }
+
+    Ok(Response::new())
+}
+
+fn from_semver(err: semver::Error) -> StdError {
+    StdError::generic_err(format!("Semver: {}", err))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
