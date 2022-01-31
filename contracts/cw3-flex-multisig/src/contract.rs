@@ -1140,9 +1140,23 @@ mod tests {
 
         // In passing: Try to close Executed fails
         let err = app
-            .execute_contract(Addr::unchecked(OWNER), flex_addr, &closing, &[])
+            .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &closing, &[])
             .unwrap_err();
         assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
+
+        // Trying to execute something that was already executed fails
+        let err = app
+            .execute_contract(
+                Addr::unchecked(SOMEBODY),
+                flex_addr.clone(),
+                &execution,
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(
+            ContractError::WrongExecuteStatus {},
+            err.downcast().unwrap()
+        );
     }
 
     #[test]
