@@ -14,8 +14,10 @@ Migration code example:
 
 ```diff
 fn list_allowed(
-     limit: Option<u32>,
- ) -> StdResult<ListAllowedResponse> {
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<ListAllowedResponse> {
      let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
 -    let start = match start_after {
 -        Some(x) => Some(Bound::exclusive(deps.api.addr_validate(&x)?.into_string())),
@@ -35,7 +37,11 @@ Migration code example, in case you want to keep your raw bounds:
 
 ```diff
 pub fn query_all_allowances(
- ) -> StdResult<AllAllowancesResponse> {
+    deps: Deps,
+    env: Env,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<AllAllowancesResponse> {
      let limit = calc_limit(limit);
      // we use raw addresses here....
 -    let start = start_after.map(Bound::exclusive);
