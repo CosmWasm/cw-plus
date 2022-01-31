@@ -1,9 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::ContractError;
 use cosmwasm_std::{Addr, IbcEndpoint, StdResult, Storage, Uint128};
+use cw_controllers::Admin;
 use cw_storage_plus::{Item, Map};
+
+use crate::ContractError;
+
+pub const ADMIN: Admin = Admin::new("admin");
 
 pub const CONFIG: Item<Config> = Item::new("ics20_config");
 
@@ -28,7 +32,6 @@ pub struct ChannelState {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
     pub default_timeout: u64,
-    pub gov_contract: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

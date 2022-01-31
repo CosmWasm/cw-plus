@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure_eq, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery,
-    MessageInfo, Order, PortIdResponse, Response, StdResult,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
+    PortIdResponse, Response, StdResult,
 };
 
 use cw2::{get_contract_version, set_contract_version};
@@ -16,7 +16,7 @@ use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
     ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
 };
-use crate::state::{AllowInfo, Config, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
+use crate::state::{AllowInfo, Config, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 // version info for migration info
@@ -25,7 +25,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    deps: DepsMut,
+    mut deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
@@ -33,9 +33,11 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
-        gov_contract: deps.api.addr_validate(&msg.gov_contract)?,
     };
     CONFIG.save(deps.storage, &cfg)?;
+
+    let admin = deps.api.addr_validate(&msg.gov_contract)?;
+    ADMIN.set(deps.branch(), Some(admin))?;
 
     // add all allows
     for allowed in msg.allowlist {
@@ -62,6 +64,10 @@ pub fn execute(
             execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
         }
         ExecuteMsg::Allow(allow) => execute_allow(deps, env, info, allow),
+        ExecuteMsg::UpdateAdmin { admin } => {
+            let admin = deps.api.addr_validate(&admin)?;
+            Ok(ADMIN.execute_update_admin(deps, info, Some(admin))?)
+        }
     }
 }
 
@@ -151,8 +157,7 @@ pub fn execute_allow(
     info: MessageInfo,
     allow: AllowMsg,
 ) -> Result<Response, ContractError> {
-    let cfg = CONFIG.load(deps.storage)?;
-    ensure_eq!(info.sender, cfg.gov_contract, ContractError::Unauthorized);
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
     let contract = deps.api.addr_validate(&allow.contract)?;
     let set = AllowInfo {
@@ -207,6 +212,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListAllowed { start_after, limit } => {
             to_binary(&list_allowed(deps, start_after, limit)?)
         }
+        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
     }
 }
 
@@ -251,9 +257,10 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
 
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let cfg = CONFIG.load(deps.storage)?;
+    let admin = ADMIN.get(deps)?.unwrap_or_else(|| Addr::unchecked(""));
     let res = ConfigResponse {
         default_timeout: cfg.default_timeout,
-        gov_contract: cfg.gov_contract.into(),
+        gov_contract: admin.into(),
     };
     Ok(res)
 }
