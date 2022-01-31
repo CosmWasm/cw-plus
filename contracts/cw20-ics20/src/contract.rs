@@ -192,26 +192,43 @@ pub fn execute_allow(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
     let stored = get_contract_version(deps.storage)?;
     let storage_version: Version = stored.version.parse().map_err(from_semver)?;
 
+    // First, ensure we are working from an equal or older version of this contract
+    // wrong type
     if CONTRACT_NAME != stored.contract {
         return Err(ContractError::CannotMigrate {
             previous_contract: stored.contract,
         });
     }
+    // existing one is newer
     if storage_version > version {
         return Err(ContractError::CannotMigrateVersion {
             previous_version: stored.version,
         });
     }
 
+    // Then, run the proper migration
+    // unsupported old version
+    if storage_version < "0.11.1".parse().map_err(from_semver)? {
+        return Err(ContractError::CannotMigrateVersion {
+            previous_version: stored.version,
+        });
+    }
     // for 0.12.0-alpha1 or earlier, migrate from the config.gov_contract to ADMIN
     if storage_version <= "0.12.0-alpha1".parse().map_err(from_semver)? {
-        // DO migration
+        // Do v1 migration
+        let old_config = crate::migrations::v1::CONFIG.load(deps.storage)?;
+        ADMIN.set(deps.branch(), Some(old_config.gov_contract))?;
+        let config = Config {
+            default_timeout: old_config.default_timeout,
+        };
+        CONFIG.save(deps.storage, &config)?;
     }
+    // otherwise no migration (yet)
 
     if storage_version < version {
         // we don't need to save anything if migrating from the same version
