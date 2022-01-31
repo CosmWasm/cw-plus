@@ -314,7 +314,7 @@ fn demo() -> StdResult<()> {
 
 In addition to getting one particular item out of a map, we can iterate over the map
 (or a subset of the map). This let us answer questions like "show me all tokens",
-and we provide some nice `Bound`s helpers to easily allow pagination or custom ranges.
+and we provide some nice [`Bound`](#Bound) helpers to easily allow pagination or custom ranges.
 
 The general format is to get a `Prefix` by calling `map.prefix(k)`, where `k` is exactly
 one less item than the normal key (If `map.key()` took `(&[u8], &[u8])`, then `map.prefix()` takes `&[u8]`.
@@ -322,21 +322,28 @@ If `map.key()` took `&[u8]`, `map.prefix()` takes `()`). Once we have a prefix s
 over all items with `range(store, min, max, order)`. It supports `Order::Ascending` or `Order::Descending`.
 `min` is the lower bound and `max` is the higher bound.
 
+If the `min` and `max` bounds are `None`, `range` will return all items under the prefix. You can use `.take(n)` to
+limit the results to `n` items and start doing pagination. You can also set the `min` bound to
+eg. `Bound::exclusive(last_value)` to start iterating over all items *after* the last value. Combined with
+`take`, we easily have pagination support. You can also use `Bound::inclusive(x)` when you want to include any
+perfect matches.
+
+### Bound
+
+`Bound` is a helper to build type-safe bounds on the keys or sub-keys you want to iterate over.
+It also supports a raw (`Vec<u8>`) bounds specification, for the cases you don't want or can't use typed bounds.
+
 ```rust
-#[derive(Copy, Clone, Debug)]
-pub enum Bound {
-    Inclusive(Vec<u8>),
-    Exclusive(Vec<u8>),
-    None,
+#[derive(Clone, Debug)]
+pub enum Bound<'a, K: PrimaryKey<'a>> {
+  Inclusive((K, PhantomData<&'a bool>)),
+  Exclusive((K, PhantomData<&'a bool>)),
+  InclusiveRaw(Vec<u8>),
+  ExclusiveRaw(Vec<u8>),
 }
 ```
 
-If the `min` and `max` bounds, it will return all items under this prefix. You can use `.take(n)` to
-limit the results to `n` items and start doing pagination. You can also set the `min` bound to
-eg. `Bound::Exclusive(last_value)` to start iterating over all items *after* the last value. Combined with
-`take`, we easily have pagination support. You can also use `Bound::Inclusive(x)` when you want to include any
-perfect matches. To better understand the API, please read the following example:
-
+To better understand the API, please read the following example:
 ```rust
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct Data {
@@ -358,7 +365,7 @@ fn demo() -> StdResult<()> {
 
     // iterate over them all
     let all: StdResult<Vec<_>> = PEOPLE
-        .range(&store, Bound::None, Bound::None, Order::Ascending)
+        .range(&store, None, None, Order::Ascending)
         .collect();
     assert_eq!(
         all?,
@@ -369,8 +376,8 @@ fn demo() -> StdResult<()> {
     let all: StdResult<Vec<_>> = PEOPLE
         .range(
             &store,
-            Bound::Exclusive("jim"),
-            Bound::None,
+            Some(Bound::exclusive("jim")),
+            None,
             Order::Ascending,
         )
         .collect();
@@ -384,7 +391,7 @@ fn demo() -> StdResult<()> {
     // get all under one key
     let all: StdResult<Vec<_>> = ALLOWANCE
         .prefix("owner")
-        .range(&store, Bound::None, Bound::None, Order::Ascending)
+        .range(&store, None, None, Order::Ascending)
         .collect();
     assert_eq!(
         all?,
@@ -396,8 +403,8 @@ fn demo() -> StdResult<()> {
         .prefix("owner")
         .range(
             &store,
-            Bound::Exclusive("spender1"),
-            Bound::Inclusive("spender2"),
+            Some(Bound::exclusive("spender1")),
+            Some(Bound::inclusive("spender2")),
             Order::Descending,
         )
         .collect();
