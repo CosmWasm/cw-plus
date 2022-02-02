@@ -2,6 +2,58 @@
 
 This guide lists API changes between *cw-plus* major releases.
 
+## v0.11.0 -> v0.12.0
+
+### Breaking Issues / PRs
+
+- Type safe `Bound`s [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
+
+Bounds are now type-safe. That means the bound type must match the key / sub-key you are ranging over.
+
+Migration code example:
+
+```diff
+fn list_allowed(
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<ListAllowedResponse> {
+     let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+-    let start = match start_after {
+-        Some(x) => Some(Bound::exclusive(deps.api.addr_validate(&x)?.into_string())),
+-        None => None,
+-    };
++    let addr = maybe_addr(deps.api, start_after)?;
++    let start = addr.as_ref().map(Bound::exclusive);
+
+     let allow = ALLOW_LIST
+         .range(deps.storage, start, None, Order::Ascending)
+```
+Here the `ALLOW_LIST` key is of type `&Addr`. That's why we use `as_ref()` before the `map()` that builds the bound.
+Notice also that this "forces" you to use `addr_validate()`, in order to build a bound over the proper type.
+
+You can still use untyped bounds, with the `ExclusiveRaw` and `InclusiveRaw` enum types.
+Migration code example, in case you want to keep your raw bounds:
+
+```diff
+pub fn query_all_allowances(
+    deps: Deps,
+    env: Env,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<AllAllowancesResponse> {
+     let limit = calc_limit(limit);
+     // we use raw addresses here....
+-    let start = start_after.map(Bound::exclusive);
++    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into()));
+
+     let allowances = ALLOWANCES
+         .range(deps.storage, start, None, Order::Ascending)
+```
+Notice that here we build a bound for an address, and using a raw bound allows us to skip address validation / build up.
+
+See storage-plus [README.md](./packages/storage-plus/README.md#Bound) for more information on `Bound`.
+
 ## v0.10.3 -> v0.11.0
 
 ### Breaking Issues / PRs

@@ -1,10 +1,48 @@
 # Changelog
 
-# Changelog
-
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha1...HEAD)
+
+**Closed issues:**
+
+- Incorrect Cw4ExecuteMsg used during remove\_hook [\#637](https://github.com/CosmWasm/cw-plus/issues/637)
+- Make `Bound`s type safe [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
+
+**Merged pull requests:**
+
+- Fix benchmarks \(after 1.58.1 update\) [\#639](https://github.com/CosmWasm/cw-plus/pull/639) ([maurolacy](https://github.com/maurolacy))
+- Fix `remove_hook` helper [\#638](https://github.com/CosmWasm/cw-plus/pull/638) ([maurolacy](https://github.com/maurolacy))
+- Type safe bounds [\#627](https://github.com/CosmWasm/cw-plus/pull/627) ([maurolacy](https://github.com/maurolacy))
+
+## [v0.12.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha1) (2022-01-27)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.1...v0.12.0-alpha1)
+
+**Deprecated:**
+
+- Remove `IntKey` with surrounding implementation [\#570](https://github.com/CosmWasm/cw-plus/issues/570)
+
+**Closed issues:**
+
+- Move all cw20 examples to new repo [\#578](https://github.com/CosmWasm/cw-plus/issues/578)
+- Add more debug output from multi-test [\#575](https://github.com/CosmWasm/cw-plus/issues/575)
+
+**Merged pull requests:**
+
+- Update Rust to v1.54.0 in CI [\#636](https://github.com/CosmWasm/cw-plus/pull/636) ([maurolacy](https://github.com/maurolacy))
+- Refactor cw2 spec readme [\#635](https://github.com/CosmWasm/cw-plus/pull/635) ([orkunkl](https://github.com/orkunkl))
+- Fix tag consolidation for matching CHANGELOG entries [\#634](https://github.com/CosmWasm/cw-plus/pull/634) ([maurolacy](https://github.com/maurolacy))
+- Ics20 contract rollback [\#633](https://github.com/CosmWasm/cw-plus/pull/633) ([ethanfrey](https://github.com/ethanfrey))
+- Fix typo in README.md [\#632](https://github.com/CosmWasm/cw-plus/pull/632) ([josefrichter](https://github.com/josefrichter))
+- Update ics20 contract [\#631](https://github.com/CosmWasm/cw-plus/pull/631) ([ethanfrey](https://github.com/ethanfrey))
+- Publish snapshot map changelog [\#622](https://github.com/CosmWasm/cw-plus/pull/622) ([maurolacy](https://github.com/maurolacy))
+- Remove `IntKey` and `TimestampKey` [\#620](https://github.com/CosmWasm/cw-plus/pull/620) ([ueco-jb](https://github.com/ueco-jb))
+- Signed int key benchmarks [\#619](https://github.com/CosmWasm/cw-plus/pull/619) ([maurolacy](https://github.com/maurolacy))
+- fix readme update coralnet to sandynet-1 [\#617](https://github.com/CosmWasm/cw-plus/pull/617) ([yubrew](https://github.com/yubrew))
+- Publish `PrefixBound` [\#616](https://github.com/CosmWasm/cw-plus/pull/616) ([maurolacy](https://github.com/maurolacy))
+- Move contracts to cw-tokens [\#613](https://github.com/CosmWasm/cw-plus/pull/613) ([ethanfrey](https://github.com/ethanfrey))
+- Add context to multitest execution errors [\#597](https://github.com/CosmWasm/cw-plus/pull/597) ([uint](https://github.com/uint))
 
 ## [v0.11.1](https://github.com/CosmWasm/cw-plus/tree/v0.11.1) (2021-12-28)
 
