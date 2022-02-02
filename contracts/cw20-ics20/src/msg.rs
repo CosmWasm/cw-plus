@@ -34,6 +34,8 @@ pub enum ExecuteMsg {
     Transfer(TransferMsg),
     /// This must be called by gov_contract, will allow a new cw20 token to be sent
     Allow(AllowMsg),
+    /// Change the admin (must be called by current admin)
+    UpdateAdmin { admin: String },
 }
 
 /// This is the message we accept via Receive
@@ -59,8 +61,10 @@ pub enum QueryMsg {
     /// Returns the details of the name channel, error if not created.
     /// Return type: ChannelResponse.
     Channel { id: String },
-    /// Show the Config. Returns ConfigResponse
+    /// Show the Config. Returns ConfigResponse (currently including admin as well)
     Config {},
+    /// Return AdminResponse
+    Admin {},
     /// Query if a given cw20 contract is allowed. Returns AllowedResponse
     Allowed { contract: String },
     /// List all allowed cw20 contracts. Returns ListAllowedResponse

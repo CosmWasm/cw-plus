@@ -548,11 +548,13 @@ version = "0.12.0-alpha2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
  "cw2",
  "cw20",
  "schemars",
+ "semver",
  "serde",
  "thiserror",
 ]

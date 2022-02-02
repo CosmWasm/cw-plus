@@ -1,9 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure_eq, from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery,
-    MessageInfo, Order, PortIdResponse, Response, StdResult,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, IbcMsg, IbcQuery, MessageInfo, Order,
+    PortIdResponse, Response, StdError, StdResult,
 };
+use semver::Version;
 
 use cw2::{get_contract_version, set_contract_version};
 use cw20::{Cw20Coin, Cw20ReceiveMsg};
@@ -12,11 +13,12 @@ use cw_storage_plus::Bound;
 use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
+use crate::migrations::v1;
 use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
     ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
 };
-use crate::state::{AllowInfo, Config, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
+use crate::state::{AllowInfo, Config, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 // version info for migration info
@@ -25,7 +27,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
-    deps: DepsMut,
+    mut deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
@@ -33,9 +35,11 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
-        gov_contract: deps.api.addr_validate(&msg.gov_contract)?,
     };
     CONFIG.save(deps.storage, &cfg)?;
+
+    let admin = deps.api.addr_validate(&msg.gov_contract)?;
+    ADMIN.set(deps.branch(), Some(admin))?;
 
     // add all allows
     for allowed in msg.allowlist {
@@ -62,6 +66,10 @@ pub fn execute(
             execute_transfer(deps, env, msg, Amount::Native(coin), info.sender)
         }
         ExecuteMsg::Allow(allow) => execute_allow(deps, env, info, allow),
+        ExecuteMsg::UpdateAdmin { admin } => {
+            let admin = deps.api.addr_validate(&admin)?;
+            Ok(ADMIN.execute_update_admin(deps, info, Some(admin))?)
+        }
     }
 }
 
@@ -151,8 +159,7 @@ pub fn execute_allow(
     info: MessageInfo,
     allow: AllowMsg,
 ) -> Result<Response, ContractError> {
-    let cfg = CONFIG.load(deps.storage)?;
-    ensure_eq!(info.sender, cfg.gov_contract, ContractError::Unauthorized);
+    ADMIN.assert_admin(deps.as_ref(), &info.sender)?;
 
     let contract = deps.api.addr_validate(&allow.contract)?;
     let set = AllowInfo {
@@ -185,15 +192,56 @@ pub fn execute_allow(
     Ok(res)
 }
 
+const MIGRATE_MIN_VERSION: &str = "0.11.1";
+const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
+
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    let version = get_contract_version(deps.storage)?;
-    if version.contract != CONTRACT_NAME {
+pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
+    let stored = get_contract_version(deps.storage)?;
+    let storage_version: Version = stored.version.parse().map_err(from_semver)?;
+
+    // First, ensure we are working from an equal or older version of this contract
+    // wrong type
+    if CONTRACT_NAME != stored.contract {
         return Err(ContractError::CannotMigrate {
-            previous_contract: version.contract,
+            previous_contract: stored.contract,
         });
     }
-    Ok(Response::default())
+    // existing one is newer
+    if storage_version > version {
+        return Err(ContractError::CannotMigrateVersion {
+            previous_version: stored.version,
+        });
+    }
+
+    // Then, run the proper migration
+    if storage_version < MIGRATE_MIN_VERSION.parse().map_err(from_semver)? {
+        return Err(ContractError::CannotMigrateVersion {
+            previous_version: stored.version,
+        });
+    }
+    // run the v1->v2 converstion if we are v1 style
+    if storage_version <= MIGRATE_VERSION_2.parse().map_err(from_semver)? {
+        let old_config = v1::CONFIG.load(deps.storage)?;
+        ADMIN.set(deps.branch(), Some(old_config.gov_contract))?;
+        let config = Config {
+            default_timeout: old_config.default_timeout,
+        };
+        CONFIG.save(deps.storage, &config)?;
+    }
+    // otherwise no migration (yet) - add them here
+
+    // we don't need to save anything if migrating from the same version
+    if storage_version < version {
+        set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    }
+
+    Ok(Response::new())
+}
+
+fn from_semver(err: semver::Error) -> StdError {
+    StdError::generic_err(format!("Semver: {}", err))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -207,6 +255,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListAllowed { start_after, limit } => {
             to_binary(&list_allowed(deps, start_after, limit)?)
         }
+        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
     }
 }
 
@@ -251,9 +300,10 @@ pub fn query_channel(deps: Deps, id: String) -> StdResult<ChannelResponse> {
 
 fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let cfg = CONFIG.load(deps.storage)?;
+    let admin = ADMIN.get(deps)?.unwrap_or_else(|| Addr::unchecked(""));
     let res = ConfigResponse {
         default_timeout: cfg.default_timeout,
-        gov_contract: cfg.gov_contract.into(),
+        gov_contract: admin.into(),
     };
     Ok(res)
 }
