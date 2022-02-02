@@ -188,7 +188,7 @@ pub fn execute_vote(
 
 pub fn execute_execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<Response, ContractError> {
@@ -197,7 +197,7 @@ pub fn execute_execute(
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
-    if prop.status != Status::Passed {
+    if prop.current_status(&env.block) != Status::Passed {
         return Err(ContractError::WrongExecuteStatus {});
     }
 
@@ -1140,9 +1140,99 @@ mod tests {
 
         // In passing: Try to close Executed fails
         let err = app
-            .execute_contract(Addr::unchecked(OWNER), flex_addr, &closing, &[])
+            .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &closing, &[])
             .unwrap_err();
         assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
+
+        // Trying to execute something that was already executed fails
+        let err = app
+            .execute_contract(Addr::unchecked(SOMEBODY), flex_addr, &execution, &[])
+            .unwrap_err();
+        assert_eq!(
+            ContractError::WrongExecuteStatus {},
+            err.downcast().unwrap()
+        );
+    }
+
+    #[test]
+    fn proposal_pass_on_expiration() {
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
+
+        let threshold = Threshold::ThresholdQuorum {
+            threshold: Decimal::percent(51),
+            quorum: Decimal::percent(1),
+        };
+        let voting_period = 2000000;
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            Duration::Time(voting_period),
+            init_funds,
+            true,
+        );
+
+        // ensure we have cash to cover the proposal
+        let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
+        assert_eq!(contract_bal, coin(10, "BTC"));
+
+        // create proposal with 0 vote power
+        let proposal = pay_somebody_proposal();
+        let res = app
+            .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
+            .unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
+
+        // Vote it, so it passes after voting period is over
+        let vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let res = app
+            .execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &vote, &[])
+            .unwrap();
+        assert_eq!(
+            res.custom_attrs(1),
+            [
+                ("action", "vote"),
+                ("sender", VOTER3),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Open"),
+            ],
+        );
+
+        // Wait until the voting period is over.
+        app.update_block(|block| {
+            block.time = block.time.plus_seconds(voting_period);
+            block.height += std::cmp::max(1, voting_period / 5);
+        });
+
+        // Proposal should now be passed.
+        let prop: ProposalResponse = app
+            .wrap()
+            .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id })
+            .unwrap();
+        assert_eq!(prop.status, Status::Passed);
+
+        // Execution should now be possible.
+        let res = app
+            .execute_contract(
+                Addr::unchecked(SOMEBODY),
+                flex_addr,
+                &ExecuteMsg::Execute { proposal_id },
+                &[],
+            )
+            .unwrap();
+        assert_eq!(
+            res.custom_attrs(1),
+            [
+                ("action", "execute"),
+                ("sender", SOMEBODY),
+                ("proposal_id", proposal_id.to_string().as_str()),
+            ],
+        );
     }
 
     #[test]
