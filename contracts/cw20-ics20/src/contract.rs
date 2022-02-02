@@ -13,6 +13,7 @@ use cw_storage_plus::Bound;
 use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
+use crate::migrations::v1;
 use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
     ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
@@ -191,6 +192,9 @@ pub fn execute_allow(
     Ok(res)
 }
 
+const MIGRATE_MIN_VERSION: &str = "0.11.1";
+const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
@@ -212,26 +216,24 @@ pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Respons
     }
 
     // Then, run the proper migration
-    // unsupported old version
-    if storage_version < "0.11.1".parse().map_err(from_semver)? {
+    if storage_version < MIGRATE_MIN_VERSION.parse().map_err(from_semver)? {
         return Err(ContractError::CannotMigrateVersion {
             previous_version: stored.version,
         });
     }
-    // for 0.12.0-alpha1 or earlier, migrate from the config.gov_contract to ADMIN
-    if storage_version <= "0.12.0-alpha1".parse().map_err(from_semver)? {
-        // Do v1 migration
-        let old_config = crate::migrations::v1::CONFIG.load(deps.storage)?;
+    // run the v1->v2 converstion if we are v1 style
+    if storage_version <= MIGRATE_VERSION_2.parse().map_err(from_semver)? {
+        let old_config = v1::CONFIG.load(deps.storage)?;
         ADMIN.set(deps.branch(), Some(old_config.gov_contract))?;
         let config = Config {
             default_timeout: old_config.default_timeout,
         };
         CONFIG.save(deps.storage, &config)?;
     }
-    // otherwise no migration (yet)
+    // otherwise no migration (yet) - add them here
 
+    // we don't need to save anything if migrating from the same version
     if storage_version < version {
-        // we don't need to save anything if migrating from the same version
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     }
 

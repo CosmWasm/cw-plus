@@ -7,10 +7,10 @@ pub mod v1 {
     use cw_storage_plus::Item;
 
     #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-    pub struct ConfigV1 {
+    pub struct Config {
         pub default_timeout: u64,
         pub gov_contract: Addr,
     }
 
-    pub const CONFIG: Item<ConfigV1> = Item::new("ics20_config");
+    pub const CONFIG: Item<Config> = Item::new("ics20_config");
 }
