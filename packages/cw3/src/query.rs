@@ -99,6 +99,7 @@ pub struct VoteListResponse {
 /// the address of the voter who submitted it
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VoteInfo {
+    pub proposal_id: u64,
     pub voter: String,
     pub vote: Vote,
     pub weight: u64,
