@@ -337,6 +337,7 @@ fn query_vote(deps: Deps, proposal_id: u64, voter: String) -> StdResult<VoteResp
     let voter = deps.api.addr_validate(&voter)?;
     let ballot = BALLOTS.may_load(deps.storage, (proposal_id, &voter))?;
     let vote = ballot.map(|b| VoteInfo {
+        proposal_id,
         voter: voter.into(),
         vote: b.vote,
         weight: b.weight,
@@ -359,6 +360,7 @@ fn list_votes(
         .take(limit)
         .map(|item| {
             item.map(|(addr, ballot)| VoteInfo {
+                proposal_id,
                 voter: addr.into(),
                 vote: ballot.vote,
                 weight: ballot.weight,
