@@ -18,9 +18,9 @@ impl Default for PagingOptions {
 impl PagingOptions {
     pub fn new(start_after: Option<String>, limit: Option<u32>, page: Option<u32>) -> Self {
         PagingOptions {
-            start_after: start_after,
-            limit: limit,
-            page: page,
+            start_after,
+            limit,
+            page,
         }
     }
 }
