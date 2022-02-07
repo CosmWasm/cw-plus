@@ -1,5 +1,30 @@
 use cosmwasm_std::{Addr, Api, CanonicalAddr, StdResult};
 
+// PagingOptions work hand in hand with storage functionality
+// this specific struct is added to group attributes to have more concise linting
+pub struct PagingOptions {
+    pub start_after: Option<String>,
+    pub limit: Option<u32>,
+    pub page: Option<u32>,
+}
+
+// convenience method implemented
+impl Default for PagingOptions {
+    fn default() -> PagingOptions {
+        PagingOptions::new(None, None, None)
+    }
+}
+
+impl PagingOptions {
+    pub fn new(start_after: Option<String>, limit: Option<u32>, page: Option<u32>) -> Self {
+        PagingOptions {
+            start_after: start_after,
+            limit: limit,
+            page: page,
+        }
+    }
+}
+
 // this is used for pagination. Maybe we move it into the std lib one day?
 pub fn maybe_canonical(api: &dyn Api, human: Option<Addr>) -> StdResult<Option<CanonicalAddr>> {
     human.map(|x| api.addr_canonicalize(x.as_ref())).transpose()
