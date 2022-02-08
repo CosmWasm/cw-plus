@@ -389,7 +389,7 @@ mod test {
     use crate::contract::{execute, query_channel};
     use crate::msg::{ExecuteMsg, TransferMsg};
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcTimeout, Timestamp};
+    use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
     use cw20::Cw20ReceiveMsg;
 
     #[test]
@@ -446,29 +446,6 @@ mod test {
                 amount: coins(amount, denom),
             },
             RECEIVE_ID,
-        )
-    }
-
-    #[allow(dead_code)]
-    fn mock_sent_packet(my_channel: &str, amount: u128, denom: &str, sender: &str) -> IbcPacket {
-        let data = Ics20Packet {
-            denom: denom.into(),
-            amount: amount.into(),
-            sender: sender.to_string(),
-            receiver: "remote-rcpt".to_string(),
-        };
-        IbcPacket::new(
-            to_binary(&data).unwrap(),
-            IbcEndpoint {
-                port_id: CONTRACT_PORT.to_string(),
-                channel_id: my_channel.to_string(),
-            },
-            IbcEndpoint {
-                port_id: REMOTE_PORT.to_string(),
-                channel_id: "channel-1234".to_string(),
-            },
-            2,
-            IbcTimeout::with_timestamp(Timestamp::from_seconds(1665321069)),
         )
     }
 
@@ -537,7 +514,23 @@ mod test {
             msg: to_binary(&transfer).unwrap(),
         });
         let info = mock_info(cw20_addr, &[]);
-        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(1, res.messages.len());
+        let expected = Ics20Packet {
+            denom: cw20_denom.into(),
+            amount: Uint128::new(987654321),
+            sender: "local-sender".to_string(),
+            receiver: "remote-rcpt".to_string(),
+        };
+        let timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
+        assert_eq!(
+            &res.messages[0],
+            &SubMsg::new(IbcMsg::SendPacket {
+                channel_id: send_channel.to_string(),
+                data: to_binary(&expected).unwrap(),
+                timeout: IbcTimeout::with_timestamp(timeout),
+            })
+        );
 
         // query channel state|_|
         let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
