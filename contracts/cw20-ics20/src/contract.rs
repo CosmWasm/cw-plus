@@ -18,7 +18,10 @@ use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
     ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
 };
-use crate::state::{AllowInfo, Config, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE, CONFIG};
+use crate::state::{
+    increase_channel_balance, AllowInfo, Config, ADMIN, ALLOW_LIST, CHANNEL_INFO, CHANNEL_STATE,
+    CONFIG,
+};
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 // version info for migration info
@@ -130,15 +133,17 @@ pub fn execute_transfer(
     );
     packet.validate()?;
 
+    // Update the balance now (optimistically) like ibctransfer modules.
+    // In on_packet_failure (ack with error message or a timeout), we reduce the balance appropriately.
+    // This means the channel works fine if success acks are not relayed.
+    increase_channel_balance(deps.storage, &msg.channel, &amount.denom(), amount.amount())?;
+
     // prepare ibc message
     let msg = IbcMsg::SendPacket {
         channel_id: msg.channel,
         data: to_binary(&packet)?,
         timeout: timeout.into(),
     };
-
-    // Note: we update local state when we get ack - do not count this transfer towards anything until acked
-    // similar event messages like ibctransfer module
 
     // send response
     let res = Response::new()

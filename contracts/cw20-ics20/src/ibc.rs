@@ -11,8 +11,8 @@ use cosmwasm_std::{
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
-    increase_channel_balance, reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo,
-    ReplyArgs, ALLOW_LIST, CHANNEL_INFO, REPLY_ARGS,
+    reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
+    CHANNEL_INFO, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -312,8 +312,9 @@ pub fn ibc_packet_timeout(
 }
 
 // update the balance stored on this (channel, denom) index
-fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
+fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
+
     // similar event messages like ibctransfer module
     let attributes = vec![
         attr("action", "acknowledge"),
@@ -323,9 +324,6 @@ fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicRespons
         attr("amount", msg.amount),
         attr("success", "true"),
     ];
-
-    // we have made a proper transfer, record this
-    increase_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
 
     Ok(IbcBasicResponse::new().add_attributes(attributes))
 }
@@ -337,6 +335,9 @@ fn on_packet_failure(
     err: String,
 ) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
+
+    // undo the balance update
+    reduce_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
 
     let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
