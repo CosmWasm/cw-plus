@@ -10,7 +10,7 @@ use std::any::type_name;
 use crate::keys::Key;
 
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Binary, ContractResult, Empty, QuerierWrapper, QueryRequest,
+    from_slice, to_vec, Addr, Binary, ContractResult, CustomQuery, QuerierWrapper, QueryRequest,
     StdError, StdResult, SystemResult, WasmQuery,
 };
 
@@ -93,12 +93,12 @@ pub(crate) fn encode_length(namespace: &[u8]) -> [u8; 2] {
 /// This is similar to querier.query(WasmQuery::Raw{}), except it does NOT parse the
 /// result, but return a possibly empty Binary to be handled by the calling code.
 /// That is essential to handle b"" as None.
-pub(crate) fn query_raw(
-    querier: &QuerierWrapper,
+pub(crate) fn query_raw<Q: CustomQuery>(
+    querier: &QuerierWrapper<Q>,
     contract_addr: Addr,
     key: Binary,
 ) -> StdResult<Binary> {
-    let request: QueryRequest<Empty> = WasmQuery::Raw {
+    let request: QueryRequest<Q> = WasmQuery::Raw {
         contract_addr: contract_addr.into(),
         key,
     }

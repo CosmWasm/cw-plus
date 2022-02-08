@@ -2,7 +2,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::marker::PhantomData;
 
-use cosmwasm_std::{to_vec, Addr, QuerierWrapper, StdError, StdResult, Storage, WasmQuery};
+use cosmwasm_std::{
+    to_vec, Addr, CustomQuery, QuerierWrapper, StdError, StdResult, Storage, WasmQuery,
+};
 
 use crate::helpers::{may_deserialize, must_deserialize};
 
@@ -77,7 +79,11 @@ where
     /// from a remote contract in a type-safe way using WasmQuery::RawQuery.
     ///
     /// Note that we expect an Item to be set, and error if there is no data there
-    pub fn query(&self, querier: &QuerierWrapper, remote_contract: Addr) -> StdResult<T> {
+    pub fn query<Q: CustomQuery>(
+        &self,
+        querier: &QuerierWrapper<Q>,
+        remote_contract: Addr,
+    ) -> StdResult<T> {
         let request = WasmQuery::Raw {
             contract_addr: remote_contract.into(),
             key: self.storage_key.into(),

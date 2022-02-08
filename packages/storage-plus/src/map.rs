@@ -15,7 +15,7 @@ use crate::keys::{Key, PrimaryKey};
 use crate::path::Path;
 #[cfg(feature = "iterator")]
 use crate::prefix::{namespaced_prefix_range, Prefix};
-use cosmwasm_std::{from_slice, Addr, QuerierWrapper, StdError, StdResult, Storage};
+use cosmwasm_std::{from_slice, Addr, CustomQuery, QuerierWrapper, StdError, StdResult, Storage};
 
 #[derive(Debug, Clone)]
 pub struct Map<'a, K, T> {
@@ -95,9 +95,9 @@ where
 
     /// If you import the proper Map from the remote contract, this will let you read the data
     /// from a remote contract in a type-safe way using WasmQuery::RawQuery
-    pub fn query(
+    pub fn query<Q: CustomQuery>(
         &self,
-        querier: &QuerierWrapper,
+        querier: &QuerierWrapper<Q>,
         remote_contract: Addr,
         k: K,
     ) -> StdResult<Option<T>> {
