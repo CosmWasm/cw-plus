@@ -6,6 +6,8 @@
 //!
 //! To understand the design of this module, please refer to `../DESIGN.md`
 
+#![allow(clippy::type_complexity)]
+
 mod app;
 mod bank;
 mod contracts;
