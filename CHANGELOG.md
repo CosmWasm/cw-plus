@@ -36,10 +36,6 @@
 - Fix `remove_hook` helper [\#638](https://github.com/CosmWasm/cw-plus/pull/638) ([maurolacy](https://github.com/maurolacy))
 - Type safe bounds [\#627](https://github.com/CosmWasm/cw-plus/pull/627) ([maurolacy](https://github.com/maurolacy))
 
-## [juno-ics20](https://github.com/CosmWasm/cw-plus/tree/juno-ics20) (2022-01-27)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha1...juno-ics20)
-
 ## [v0.12.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha1) (2022-01-27)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.1...v0.12.0-alpha1)
