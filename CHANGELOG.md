@@ -2,15 +2,36 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha2...HEAD)
+
+**Breaking changes:**
+
+- Add `proposal_id` field to `VoteInfo` structure [\#647](https://github.com/CosmWasm/cw-plus/issues/647)
+
+**Merged pull requests:**
+
+- Ics20 same ack handling as ibctransfer [\#653](https://github.com/CosmWasm/cw-plus/pull/653) ([ethanfrey](https://github.com/ethanfrey))
+- packages: support custom queries [\#652](https://github.com/CosmWasm/cw-plus/pull/652) ([uint](https://github.com/uint))
+- CW20 - Fix Docs URL [\#649](https://github.com/CosmWasm/cw-plus/pull/649) ([entrancedjames](https://github.com/entrancedjames))
+
+## [v0.12.0-alpha2](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha2) (2022-02-07)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/juno-ics20...v0.12.0-alpha2)
 
 **Closed issues:**
 
 - Incorrect Cw4ExecuteMsg used during remove\_hook [\#637](https://github.com/CosmWasm/cw-plus/issues/637)
+- \[cw3-flex/fixed-multisig\] Status changes after voting and proposal expiration [\#630](https://github.com/CosmWasm/cw-plus/issues/630)
 - Make `Bound`s type safe [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
 
 **Merged pull requests:**
 
+- CW3: Add proposal\_id field to VoteInfo structure [\#648](https://github.com/CosmWasm/cw-plus/pull/648) ([ueco-jb](https://github.com/ueco-jb))
+- Use ContractInfoResponse from cosmwasm\_std [\#646](https://github.com/CosmWasm/cw-plus/pull/646) ([webmaster128](https://github.com/webmaster128))
+- Fix status/execution bugs in flex-multisig [\#643](https://github.com/CosmWasm/cw-plus/pull/643) ([uint](https://github.com/uint))
+- Set version: 0.12.0-alpha2 [\#642](https://github.com/CosmWasm/cw-plus/pull/642) ([ethanfrey](https://github.com/ethanfrey))
+- Allow modifying admin of Ics20 contract [\#641](https://github.com/CosmWasm/cw-plus/pull/641) ([ethanfrey](https://github.com/ethanfrey))
+- `MIGRATING.md` update / examples for type safe bounds [\#640](https://github.com/CosmWasm/cw-plus/pull/640) ([maurolacy](https://github.com/maurolacy))
 - Fix benchmarks \(after 1.58.1 update\) [\#639](https://github.com/CosmWasm/cw-plus/pull/639) ([maurolacy](https://github.com/maurolacy))
 - Fix `remove_hook` helper [\#638](https://github.com/CosmWasm/cw-plus/pull/638) ([maurolacy](https://github.com/maurolacy))
 - Type safe bounds [\#627](https://github.com/CosmWasm/cw-plus/pull/627) ([maurolacy](https://github.com/maurolacy))
