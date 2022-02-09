@@ -11,8 +11,8 @@ use cosmwasm_std::{
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
-    reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
-    CHANNEL_INFO, REPLY_ARGS,
+    increase_channel_balance, reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo,
+    ReplyArgs, ALLOW_LIST, CHANNEL_INFO, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -32,7 +32,11 @@ pub struct Ics20Packet {
     pub receiver: String,
     /// the sender address
     pub sender: String,
+    /// used only by us to control ack handling
+    pub v: Option<u32>,
 }
+
+const V2: u32 = 2;
 
 impl Ics20Packet {
     pub fn new<T: Into<String>>(amount: Uint128, denom: T, sender: &str, receiver: &str) -> Self {
@@ -41,6 +45,7 @@ impl Ics20Packet {
             amount,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
+            v: Some(V2),
         }
     }
 
@@ -312,8 +317,14 @@ pub fn ibc_packet_timeout(
 }
 
 // update the balance stored on this (channel, denom) index
-fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
+fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
+
+    // if this was for an older (pre-v2) packet we send continue with old behavior
+    // (this is needed for transitioning on a system with pending packet)
+    if msg.v.is_none() {
+        increase_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
+    }
 
     // similar event messages like ibctransfer module
     let attributes = vec![
@@ -336,8 +347,10 @@ fn on_packet_failure(
 ) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
 
-    // undo the balance update
-    reduce_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
+    // undo the balance update (but not for pre-v2/None packets which didn't add before sending)
+    if msg.v.is_some() {
+        reduce_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
+    }
 
     let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
@@ -413,7 +426,7 @@ mod test {
             "wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc",
         );
         // Example message generated from the SDK
-        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n"}"#;
+        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n","v":2}"#;
 
         let encdoded = String::from_utf8(to_vec(&packet).unwrap()).unwrap();
         assert_eq!(expected, encdoded.as_str());
@@ -461,6 +474,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
+            v: Some(V2),
         };
         print!("Packet denom: {}", &data.denom);
         IbcPacket::new(
@@ -521,6 +535,7 @@ mod test {
             amount: Uint128::new(987654321),
             sender: "local-sender".to_string(),
             receiver: "remote-rcpt".to_string(),
+            v: Some(V2),
         };
         let timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
         assert_eq!(
