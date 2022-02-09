@@ -557,7 +557,7 @@ where
 {
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT>>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT, CustomT::QueryT>>) -> u64 {
         self.init_modules(|router, _, _| router.wasm.store_code(code) as u64)
     }
 

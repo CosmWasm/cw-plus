@@ -2,7 +2,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, Empty, QuerierWrapper, QueryRequest, StdResult, WasmMsg, WasmQuery,
+    to_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, WasmMsg,
+    WasmQuery,
 };
 
 use crate::msg::Cw4ExecuteMsg;
@@ -54,7 +55,7 @@ impl Cw4Contract {
         self.encode_msg(msg)
     }
 
-    fn encode_smart_query(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Empty>> {
+    fn encode_smart_query<Q: CustomQuery>(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Q>> {
         Ok(WasmQuery::Smart {
             contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
@@ -63,7 +64,7 @@ impl Cw4Contract {
     }
 
     /// Show the hooks
-    pub fn hooks(&self, querier: &QuerierWrapper) -> StdResult<Vec<String>> {
+    pub fn hooks<Q: CustomQuery>(&self, querier: &QuerierWrapper<Q>) -> StdResult<Vec<String>> {
         let query = self.encode_smart_query(Cw4QueryMsg::Hooks {})?;
         let res: HooksResponse = querier.query(&query)?;
         Ok(res.hooks)
