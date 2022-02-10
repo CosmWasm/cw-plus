@@ -209,7 +209,7 @@ pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Respons
         });
     }
     // existing one is newer
-    if storage_version > version {
+    if storage_version.minor > version.minor {
         return Err(ContractError::CannotMigrateVersion {
             previous_version: stored.version,
         });
