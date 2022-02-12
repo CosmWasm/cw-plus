@@ -250,7 +250,7 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a> + Prefixer<'a>,
 {
-    pub fn prefix(&self, p: IK) -> Prefix<PK, T> {
+    pub fn prefix(&self, p: IK) -> Prefix<PK, T, PK> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
@@ -260,7 +260,7 @@ where
         )
     }
 
-    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<PK, T> {
+    pub fn sub_prefix(&self, p: IK::Prefix) -> Prefix<PK, T, (IK::Suffix, PK)> {
         Prefix::with_deserialization_functions(
             self.idx_namespace,
             &p.prefix(),
