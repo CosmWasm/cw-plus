@@ -91,7 +91,7 @@ impl<'a> Admin<'a> {
         Ok(Response::new().add_attributes(attributes))
     }
 
-    pub fn query_admin(&self, deps: Deps) -> StdResult<AdminResponse> {
+    pub fn query_admin<Q: CustomQuery>(&self, deps: Deps<Q>) -> StdResult<AdminResponse> {
         let admin = self.get(deps)?.map(String::from);
         Ok(AdminResponse { admin })
     }
