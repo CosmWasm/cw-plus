@@ -8,7 +8,7 @@ use cosmwasm_std::{
     Response, SubMsg,
 };
 
-use anyhow::{anyhow, bail, Context, Result as AnyResult};
+use anyhow::{anyhow, bail, Result as AnyResult};
 
 /// Interface to call into a Contract
 pub trait Contract<T, Q = Empty>
@@ -349,12 +349,7 @@ where
         msg: Vec<u8>,
     ) -> AnyResult<Response<C>> {
         let msg: T1 = from_slice(&msg)?;
-        (self.execute_fn)(deps, env, info, msg.clone())
-            .map_err(anyhow::Error::from)
-            .context(format!(
-                "Contract returned an error on execute msg:\n{:?}",
-                msg,
-            ))
+        (self.execute_fn)(deps, env, info, msg).map_err(|err| anyhow!(err))
     }
 
     fn instantiate(
@@ -365,22 +360,12 @@ where
         msg: Vec<u8>,
     ) -> AnyResult<Response<C>> {
         let msg: T2 = from_slice(&msg)?;
-        (self.instantiate_fn)(deps, env, info, msg.clone())
-            .map_err(anyhow::Error::from)
-            .context(format!(
-                "Contract returned an error on instantiate msg:\n{:?}",
-                msg,
-            ))
+        (self.instantiate_fn)(deps, env, info, msg).map_err(|err| anyhow!(err))
     }
 
     fn query(&self, deps: Deps<Q>, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
         let msg: T3 = from_slice(&msg)?;
-        (self.query_fn)(deps, env, msg.clone())
-            .map_err(anyhow::Error::from)
-            .context(format!(
-                "Contract returned an error on query msg:\n{:?}",
-                msg,
-            ))
+        (self.query_fn)(deps, env, msg).map_err(|err| anyhow!(err))
     }
 
     // this returns an error if the contract doesn't implement sudo
