@@ -2,7 +2,7 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha3...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0...HEAD)
 
 **Merged pull requests:**
 
@@ -10,13 +10,9 @@
 - Forward original errors in multitest `instantiate`, `execute` and `query` [\#656](https://github.com/CosmWasm/cw-plus/pull/656) ([maurolacy](https://github.com/maurolacy))
 - Fix missing prefix bound types [\#655](https://github.com/CosmWasm/cw-plus/pull/655) ([maurolacy](https://github.com/maurolacy))
 
-## [v0.12.0-alpha3](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha3) (2022-02-10)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0...v0.12.0-alpha3)
-
 ## [v0.12.0](https://github.com/CosmWasm/cw-plus/tree/v0.12.0) (2022-02-09)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha2...v0.12.0)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.1...v0.12.0)
 
 **Breaking changes:**
 
@@ -31,6 +27,11 @@
 - Move all cw20 examples to new repo [\#578](https://github.com/CosmWasm/cw-plus/issues/578)
 - Add more debug output from multi-test [\#575](https://github.com/CosmWasm/cw-plus/issues/575)
 - Make `Bound`s type safe [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
+- Incorrect Cw4ExecuteMsg used during remove\_hook [\#637](https://github.com/CosmWasm/cw-plus/issues/637)
+- \[cw3-flex/fixed-multisig\] Status changes after voting and proposal expiration [\#630](https://github.com/CosmWasm/cw-plus/issues/630)
+- Make `Bound`s type safe [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
+- Move all cw20 examples to new repo [\#578](https://github.com/CosmWasm/cw-plus/issues/578)
+- Add more debug output from multi-test [\#575](https://github.com/CosmWasm/cw-plus/issues/575)
 
 **Merged pull requests:**
 
@@ -38,19 +39,6 @@
 - Ics20 same ack handling as ibctransfer [\#653](https://github.com/CosmWasm/cw-plus/pull/653) ([ethanfrey](https://github.com/ethanfrey))
 - packages: support custom queries [\#652](https://github.com/CosmWasm/cw-plus/pull/652) ([uint](https://github.com/uint))
 - CW20 - Fix Docs URL [\#649](https://github.com/CosmWasm/cw-plus/pull/649) ([entrancedjames](https://github.com/entrancedjames))
-
-## [v0.12.0-alpha2](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha2) (2022-02-07)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/juno-ics20...v0.12.0-alpha2)
-
-**Closed issues:**
-
-- Incorrect Cw4ExecuteMsg used during remove\_hook [\#637](https://github.com/CosmWasm/cw-plus/issues/637)
-- \[cw3-flex/fixed-multisig\] Status changes after voting and proposal expiration [\#630](https://github.com/CosmWasm/cw-plus/issues/630)
-- Make `Bound`s type safe [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
-
-**Merged pull requests:**
-
 - CW3: Add proposal\_id field to VoteInfo structure [\#648](https://github.com/CosmWasm/cw-plus/pull/648) ([ueco-jb](https://github.com/ueco-jb))
 - Use ContractInfoResponse from cosmwasm\_std [\#646](https://github.com/CosmWasm/cw-plus/pull/646) ([webmaster128](https://github.com/webmaster128))
 - Fix status/execution bugs in flex-multisig [\#643](https://github.com/CosmWasm/cw-plus/pull/643) ([uint](https://github.com/uint))
@@ -60,22 +48,6 @@
 - Fix benchmarks \(after 1.58.1 update\) [\#639](https://github.com/CosmWasm/cw-plus/pull/639) ([maurolacy](https://github.com/maurolacy))
 - Fix `remove_hook` helper [\#638](https://github.com/CosmWasm/cw-plus/pull/638) ([maurolacy](https://github.com/maurolacy))
 - Type safe bounds [\#627](https://github.com/CosmWasm/cw-plus/pull/627) ([maurolacy](https://github.com/maurolacy))
-
-## [v0.12.0-alpha1](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha1) (2022-01-27)
-
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.11.1...v0.12.0-alpha1)
-
-**Deprecated:**
-
-- Remove `IntKey` with surrounding implementation [\#570](https://github.com/CosmWasm/cw-plus/issues/570)
-
-**Closed issues:**
-
-- Move all cw20 examples to new repo [\#578](https://github.com/CosmWasm/cw-plus/issues/578)
-- Add more debug output from multi-test [\#575](https://github.com/CosmWasm/cw-plus/issues/575)
-
-**Merged pull requests:**
-
 - Update Rust to v1.54.0 in CI [\#636](https://github.com/CosmWasm/cw-plus/pull/636) ([maurolacy](https://github.com/maurolacy))
 - Refactor cw2 spec readme [\#635](https://github.com/CosmWasm/cw-plus/pull/635) ([orkunkl](https://github.com/orkunkl))
 - Fix tag consolidation for matching CHANGELOG entries [\#634](https://github.com/CosmWasm/cw-plus/pull/634) ([maurolacy](https://github.com/maurolacy))
