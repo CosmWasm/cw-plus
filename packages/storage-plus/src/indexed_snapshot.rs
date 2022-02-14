@@ -225,11 +225,11 @@ where
     K: PrimaryKey<'a>,
     I: IndexList<T>,
 {
-    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T> {
+    pub fn sub_prefix(&self, p: K::SubPrefix) -> Prefix<K::SuperSuffix, T, K::SuperSuffix> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 
-    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T> {
+    pub fn prefix(&self, p: K::Prefix) -> Prefix<K::Suffix, T, K::Suffix> {
         Prefix::new(self.pk_namespace, &p.prefix())
     }
 }
