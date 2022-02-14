@@ -2,14 +2,39 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha2...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha3...HEAD)
+
+**Merged pull requests:**
+
+- Fix missing custom query [\#657](https://github.com/CosmWasm/cw-plus/pull/657) ([maurolacy](https://github.com/maurolacy))
+- Forward original errors in multitest `instantiate`, `execute` and `query` [\#656](https://github.com/CosmWasm/cw-plus/pull/656) ([maurolacy](https://github.com/maurolacy))
+- Fix missing prefix bound types [\#655](https://github.com/CosmWasm/cw-plus/pull/655) ([maurolacy](https://github.com/maurolacy))
+
+## [v0.12.0-alpha3](https://github.com/CosmWasm/cw-plus/tree/v0.12.0-alpha3) (2022-02-10)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0...v0.12.0-alpha3)
+
+## [v0.12.0](https://github.com/CosmWasm/cw-plus/tree/v0.12.0) (2022-02-09)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.0-alpha2...v0.12.0)
 
 **Breaking changes:**
 
 - Add `proposal_id` field to `VoteInfo` structure [\#647](https://github.com/CosmWasm/cw-plus/issues/647)
 
+**Deprecated:**
+
+- Remove `IntKey` with surrounding implementation [\#570](https://github.com/CosmWasm/cw-plus/issues/570)
+
+**Closed issues:**
+
+- Move all cw20 examples to new repo [\#578](https://github.com/CosmWasm/cw-plus/issues/578)
+- Add more debug output from multi-test [\#575](https://github.com/CosmWasm/cw-plus/issues/575)
+- Make `Bound`s type safe [\#462](https://github.com/CosmWasm/cw-plus/issues/462)
+
 **Merged pull requests:**
 
+- Prepare release v0.12.0 [\#654](https://github.com/CosmWasm/cw-plus/pull/654) ([uint](https://github.com/uint))
 - Ics20 same ack handling as ibctransfer [\#653](https://github.com/CosmWasm/cw-plus/pull/653) ([ethanfrey](https://github.com/ethanfrey))
 - packages: support custom queries [\#652](https://github.com/CosmWasm/cw-plus/pull/652) ([uint](https://github.com/uint))
 - CW20 - Fix Docs URL [\#649](https://github.com/CosmWasm/cw-plus/pull/649) ([entrancedjames](https://github.com/entrancedjames))
