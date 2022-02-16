@@ -262,8 +262,8 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
     let customized =
-        move |deps: DepsMut, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
-            let deps = decustomize_deps_mut(deps);
+        move |mut deps: DepsMut, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
+            let deps = decustomize_deps_mut(&mut deps);
             raw_fn(deps, env, info, msg).map(customize_response::<C>)
         };
     Box::new(customized)
@@ -275,13 +275,13 @@ where
     E: Display + Debug + Send + Sync + 'static,
 {
     let customized = move |deps: Deps, env: Env, msg: T| -> Result<Binary, E> {
-        let deps = decustomize_deps(deps);
+        let deps = decustomize_deps(&deps);
         raw_fn(deps, env, msg)
     };
     Box::new(customized)
 }
 
-fn decustomize_deps_mut<Q>(deps: DepsMut<Q>) -> DepsMut<Empty>
+fn decustomize_deps_mut<'a, Q>(deps: &'a mut DepsMut<Q>) -> DepsMut<'a, Empty>
 where
     Q: CustomQuery + DeserializeOwned + 'static,
 {
@@ -292,7 +292,7 @@ where
     }
 }
 
-fn decustomize_deps<Q>(deps: Deps<Q>) -> Deps<Empty>
+fn decustomize_deps<'a, Q>(deps: &'a Deps<'a, Q>) -> Deps<'a, Empty>
 where
     Q: CustomQuery + DeserializeOwned + 'static,
 {
