@@ -1,9 +1,11 @@
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::fmt::{self, Debug, Display};
+use std::ops::Deref;
 
 use cosmwasm_std::{
-    from_slice, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply, Response, SubMsg,
+    from_slice, Binary, CosmosMsg, CustomQuery, Deps, DepsMut, Empty, Env, MessageInfo,
+    QuerierWrapper, Reply, Response, SubMsg,
 };
 
 use anyhow::{anyhow, bail, Result as AnyResult};
@@ -121,7 +123,7 @@ where
         ContractWrapper {
             execute_fn: customize_fn(execute_fn),
             instantiate_fn: customize_fn(instantiate_fn),
-            query_fn: Box::new(query_fn),
+            query_fn: customize_query(query_fn),
             sudo_fn: None,
             reply_fn: None,
             migrate_fn: None,
@@ -261,9 +263,44 @@ where
 {
     let customized =
         move |deps: DepsMut, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
+            let deps = decustomize_deps_mut(deps);
             raw_fn(deps, env, info, msg).map(customize_response::<C>)
         };
     Box::new(customized)
+}
+
+fn customize_query<T, E>(raw_fn: QueryFn<T, E>) -> QueryClosure<T, E>
+where
+    T: DeserializeOwned + 'static,
+    E: Display + Debug + Send + Sync + 'static,
+{
+    let customized = move |deps: Deps, env: Env, msg: T| -> Result<Binary, E> {
+        let deps = decustomize_deps(deps);
+        raw_fn(deps, env, msg)
+    };
+    Box::new(customized)
+}
+
+fn decustomize_deps_mut<Q>(deps: DepsMut<Q>) -> DepsMut<Empty>
+where
+    Q: CustomQuery + DeserializeOwned + 'static,
+{
+    DepsMut {
+        storage: deps.storage,
+        api: deps.api,
+        querier: QuerierWrapper::new(deps.querier.deref()),
+    }
+}
+
+fn decustomize_deps<Q>(deps: Deps<Q>) -> Deps<Empty>
+where
+    Q: CustomQuery + DeserializeOwned + 'static,
+{
+    Deps {
+        storage: deps.storage,
+        api: deps.api,
+        querier: QuerierWrapper::new(deps.querier.deref()),
+    }
 }
 
 fn customize_permissioned_fn<T, C, E>(
