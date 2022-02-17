@@ -269,11 +269,14 @@ where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
     Q: CustomQuery + DeserializeOwned + 'static,
 {
-    let customized =
-        move |mut deps: DepsMut<Q>, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
-            let deps = decustomize_deps_mut(&mut deps);
-            raw_fn(deps, env, info, msg).map(customize_response::<C>)
-        };
+    let customized = move |mut deps: DepsMut<Q>,
+                           env: Env,
+                           info: MessageInfo,
+                           msg: T|
+          -> Result<Response<C>, E> {
+        let deps = decustomize_deps_mut(&mut deps);
+        raw_fn(deps, env, info, msg).map(customize_response::<C>)
+    };
     Box::new(customized)
 }
 
