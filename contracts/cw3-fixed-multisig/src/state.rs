@@ -44,10 +44,7 @@ impl Proposal {
         if status == Status::Open && self.is_passed(block) {
             status = Status::Passed;
         }
-        if status == Status::Open && self.expires.is_expired(block) {
-            status = Status::Rejected;
-        }
-        if status == Status::Open && self.is_rejected(block) {
+        if status == Status::Open && (self.is_rejected(block) || self.expires.is_expired(block)) {
             status = Status::Rejected;
         }
 
@@ -65,9 +62,8 @@ impl Proposal {
     /// Handles the different threshold types accordingly.
     /// This function returns true if and only if vote_count is greater than the threshold which
     /// is calculated.
-    /// In the case where we use yes votes, this function will return true if and only if the
-    /// proposal will pass.
-    /// In the case where we use no votes, this function will return true if and only if the
+    /// In the case where we use yes votes, this function will return true if the proposal will pass.
+    /// In the case where we use no votes, this function will return true if the
     /// proposal will be rejected regardless of other votes.
     fn does_vote_count_reach_threshold(&self, vote_count: u64, block: &BlockInfo) -> bool {
         match self.threshold {
@@ -99,14 +95,14 @@ impl Proposal {
         }
     }
 
-    /// returns true iff this proposal is sure to pass (even before expiration if no future
-    /// sequence of possible votes can cause it to fail)
+    /// Returns true if this proposal is sure to pass (even before expiration, if no future
+    /// sequence of possible votes could cause it to fail).
     pub fn is_passed(&self, block: &BlockInfo) -> bool {
         self.does_vote_count_reach_threshold(self.votes.yes, block)
     }
 
-    /// As above for the rejected check, used to check if a proposal is
-    /// already rejected.
+    /// Returns true if this proposal is sure to be rejected (even before expiration, if
+    /// no future sequence of possible votes could cause it to fail).
     pub fn is_rejected(&self, block: &BlockInfo) -> bool {
         self.does_vote_count_reach_threshold(self.votes.no, block)
     }
