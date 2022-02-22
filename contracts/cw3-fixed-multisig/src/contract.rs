@@ -778,7 +778,7 @@ mod tests {
             msgs,
             latest: None,
         };
-        let res = execute(deps.as_mut(), mock_env(), info.clone(), proposal).unwrap();
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
 
         // Get the proposal id from the logs
         let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
