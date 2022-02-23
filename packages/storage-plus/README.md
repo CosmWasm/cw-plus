@@ -188,7 +188,7 @@ fn demo() -> StdResult<()> {
 ### Key types
 
 A `Map` key can be anything that implements the `PrimaryKey` trait. There are a series of implementations of
-`PrimaryKey` already provided (see [keys.rs](src/keys.rs)):
+`PrimaryKey` already provided (see [keys.rs](./src/keys.rs)):
 
  - `impl<'a> PrimaryKey<'a> for &'a [u8]`
  - `impl<'a> PrimaryKey<'a> for &'a str`
@@ -211,8 +211,8 @@ legitimate address, and not random text which will fail later.
 `pub fn addr_validate(&self, &str) -> Addr` in `deps.api` can be used for address validation, and the returned `Addr`
 can then be conveniently used as key in a `Map` or similar structure.
 
-It's also convenient to use references (i.e. borrowed values) instead of values for keys (i.e. `&Addr` instead of `Addr`)
-, as that will typically save some cloning during key reading / writing.
+It's also convenient to use references (i.e. borrowed values) instead of values for keys (i.e. `&Addr` instead of `Addr`),
+as that will typically save some cloning during key reading / writing.
 
 ### Composite Keys
 
@@ -485,7 +485,7 @@ Then, this `TokenInfo` data will be indexed by token `owner` (which is an `Addr`
 an owner has. That's why the `owner` index key is `Addr`.
 
 Other important thing here is that the key (and its components, in the case of a composite key) must implement
-the `PrimaryKey` trait. You can see that `Addr` do implements `PrimaryKey`:
+the `PrimaryKey` trait. You can see that `Addr` does implement `PrimaryKey`:
 
 ```rust
 impl<'a> PrimaryKey<'a> for Addr {
@@ -615,12 +615,12 @@ the primary key to it.
 This `PK` type specification is also important for `MultiIndex` type-safe bounds, as the primary key
 is part of the multi-index key. See next section, [Type-safe bounds over MultiIndex](#type-safe-bounds-over-multiindex).
 
-**NB**: This specification is still a manual (and therefore error-prone) process / setup, that will if possible
+**NB**: This specification is still a manual (and therefore error-prone) process / setup, that will (if possible)
 be automated in the future (https://github.com/CosmWasm/cw-plus/issues/531).
 
 ### Type-safe bounds over MultiIndex
 
-In the particular case of `MultiIndex`, this primary key (`PK`) type also defines the type of the (partial) bounds over
+In the particular case of `MultiIndex`, the primary key (`PK`) type parameter also defines the type of the (partial) bounds over
 the index key (the part that corresponds to the primary key, that is).
-So, to being able to correctly use type-safe bounds over multi-indexes ranges, it is fundamental for this `PK` type
+So, to correctly use type-safe bounds over multi-indexes ranges, it is fundamental for this `PK` type
 to be correctly defined, so that it matches the primary key type, or its (typically owned) deserialization variant.
