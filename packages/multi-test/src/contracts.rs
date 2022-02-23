@@ -2,10 +2,11 @@ use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::error::Error;
 use std::fmt::{self, Debug, Display};
+use std::ops::Deref;
 
 use cosmwasm_std::{
-    from_slice, Binary, CosmosMsg, CustomQuery, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
-    Response, SubMsg,
+    from_slice, Binary, CosmosMsg, CustomQuery, Deps, DepsMut, Empty, Env, MessageInfo,
+    QuerierWrapper, Reply, Response, SubMsg,
 };
 
 use anyhow::{anyhow, bail, Result as AnyResult};
@@ -121,14 +122,14 @@ where
     /// this will take a contract that returns Response<Empty> and will "upgrade" it
     /// to Response<C> if needed to be compatible with a chain-specific extension
     pub fn new_with_empty(
-        execute_fn: ContractFn<T1, Empty, E1, Q>,
-        instantiate_fn: ContractFn<T2, Empty, E2, Q>,
-        query_fn: QueryFn<T3, E3, Q>,
+        execute_fn: ContractFn<T1, Empty, E1, Empty>,
+        instantiate_fn: ContractFn<T2, Empty, E2, Empty>,
+        query_fn: QueryFn<T3, E3, Empty>,
     ) -> Self {
         Self {
             execute_fn: customize_fn(execute_fn),
             instantiate_fn: customize_fn(instantiate_fn),
-            query_fn: Box::new(query_fn),
+            query_fn: customize_query(query_fn),
             sudo_fn: None,
             reply_fn: None,
             migrate_fn: None,
@@ -261,18 +262,57 @@ where
     }
 }
 
-fn customize_fn<T, C, E, Q>(raw_fn: ContractFn<T, Empty, E, Q>) -> ContractClosure<T, C, E, Q>
+fn customize_fn<T, C, E, Q>(raw_fn: ContractFn<T, Empty, E, Empty>) -> ContractClosure<T, C, E, Q>
 where
     T: DeserializeOwned + 'static,
     E: Display + Debug + Send + Sync + 'static,
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
     Q: CustomQuery + DeserializeOwned + 'static,
 {
-    let customized =
-        move |deps: DepsMut<Q>, env: Env, info: MessageInfo, msg: T| -> Result<Response<C>, E> {
-            raw_fn(deps, env, info, msg).map(customize_response::<C>)
-        };
+    let customized = move |mut deps: DepsMut<Q>,
+                           env: Env,
+                           info: MessageInfo,
+                           msg: T|
+          -> Result<Response<C>, E> {
+        let deps = decustomize_deps_mut(&mut deps);
+        raw_fn(deps, env, info, msg).map(customize_response::<C>)
+    };
     Box::new(customized)
+}
+
+fn customize_query<T, E, Q>(raw_fn: QueryFn<T, E, Empty>) -> QueryClosure<T, E, Q>
+where
+    T: DeserializeOwned + 'static,
+    E: Display + Debug + Send + Sync + 'static,
+    Q: CustomQuery + DeserializeOwned + 'static,
+{
+    let customized = move |deps: Deps<Q>, env: Env, msg: T| -> Result<Binary, E> {
+        let deps = decustomize_deps(&deps);
+        raw_fn(deps, env, msg)
+    };
+    Box::new(customized)
+}
+
+fn decustomize_deps_mut<'a, Q>(deps: &'a mut DepsMut<Q>) -> DepsMut<'a, Empty>
+where
+    Q: CustomQuery + DeserializeOwned + 'static,
+{
+    DepsMut {
+        storage: deps.storage,
+        api: deps.api,
+        querier: QuerierWrapper::new(deps.querier.deref()),
+    }
+}
+
+fn decustomize_deps<'a, Q>(deps: &'a Deps<'a, Q>) -> Deps<'a, Empty>
+where
+    Q: CustomQuery + DeserializeOwned + 'static,
+{
+    Deps {
+        storage: deps.storage,
+        api: deps.api,
+        querier: QuerierWrapper::new(deps.querier.deref()),
+    }
 }
 
 fn customize_permissioned_fn<T, C, E, Q>(
