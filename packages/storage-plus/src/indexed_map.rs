@@ -1391,7 +1391,59 @@ mod test {
         );
     }
 
-    mod bounds {
+    mod bounds_unique_index {
+        use super::*;
+
+        struct Indexes<'a> {
+            secondary: UniqueIndex<'a, u64, u64>,
+        }
+
+        impl<'a> IndexList<u64> for Indexes<'a> {
+            fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<u64>> + '_> {
+                let v: Vec<&dyn Index<u64>> = vec![&self.secondary];
+                Box::new(v.into_iter())
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "iterator")]
+        fn composite_key_query() {
+            let indexes = Indexes {
+                secondary: UniqueIndex::new(|secondary| *secondary, "test_map__secondary"),
+            };
+            let map = IndexedMap::<&str, u64, Indexes>::new("test_map", indexes);
+            let mut store = MockStorage::new();
+
+            map.save(&mut store, "one", &1).unwrap();
+            map.save(&mut store, "two", &2).unwrap();
+            map.save(&mut store, "three", &3).unwrap();
+
+            // Inclusive bound
+            let items: Vec<_> = map
+                .idx
+                .secondary
+                .range_raw(&store, None, Some(Bound::inclusive(1u64)), Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v).collect();
+
+            assert_eq!(items, vec![1]);
+
+            // Exclusive bound
+            let items: Vec<_> = map
+                .idx
+                .secondary
+                .range(&store, Some(Bound::exclusive(2u64)), None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            assert_eq!(items, vec![((), 3)]);
+        }
+    }
+
+    mod bounds_multi_index {
         use super::*;
 
         struct Indexes<'a> {
@@ -1456,7 +1508,10 @@ mod test {
                 .collect::<Result<_, _>>()
                 .unwrap();
 
-            assert_eq!(items, vec![("two2".to_string(), 2), ("three".to_string(), 3)]);
+            assert_eq!(
+                items,
+                vec![("two2".to_string(), 2), ("three".to_string(), 3)]
+            );
         }
     }
 }
