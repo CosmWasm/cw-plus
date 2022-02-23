@@ -1075,7 +1075,7 @@ mod tests {
             .execute_contract(Addr::unchecked(VOTER2), flex_addr.clone(), &no_vote, &[])
             .unwrap();
 
-        // Powerful voter supports it, so it rejects
+        // Powerful voter opposes it, so it rejects
         let res = app
             .execute_contract(Addr::unchecked(VOTER4), flex_addr, &no_vote, &[])
             .unwrap();
