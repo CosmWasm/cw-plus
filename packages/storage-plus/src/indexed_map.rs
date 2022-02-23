@@ -1391,11 +1391,12 @@ mod test {
         );
     }
 
-    mod inclusive_bound {
+    mod bounds {
         use super::*;
 
         struct Indexes<'a> {
-            secondary: MultiIndex<'a, u64, u64>,
+            // The last type param must match the `IndexedMap` primary key type, below
+            secondary: MultiIndex<'a, u64, u64, &'a str>,
         }
 
         impl<'a> IndexList<u64> for Indexes<'a> {
@@ -1420,7 +1421,9 @@ mod test {
 
             map.save(&mut store, "one", &1).unwrap();
             map.save(&mut store, "two", &2).unwrap();
+            map.save(&mut store, "three", &3).unwrap();
 
+            // Inclusive prefix-bound
             let items: Vec<_> = map
                 .idx
                 .secondary
@@ -1437,6 +1440,22 @@ mod test {
             let items: Vec<_> = items.into_iter().map(|(_, v)| v).collect();
 
             assert_eq!(items, vec![1]);
+
+            // Exclusive bound (used for pagination)
+            // Range over the index specifying a primary key (multi-index key includes the pk)
+            let items: Vec<_> = map
+                .idx
+                .secondary
+                .range(
+                    &store,
+                    Some(Bound::exclusive((2u64, "two"))),
+                    None,
+                    Order::Ascending,
+                )
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            assert_eq!(items, vec![("three".to_string(), 3)]);
         }
     }
 }
