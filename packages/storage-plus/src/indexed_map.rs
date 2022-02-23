@@ -1421,6 +1421,7 @@ mod test {
 
             map.save(&mut store, "one", &1).unwrap();
             map.save(&mut store, "two", &2).unwrap();
+            map.save(&mut store, "two2", &2).unwrap();
             map.save(&mut store, "three", &3).unwrap();
 
             // Inclusive prefix-bound
@@ -1455,7 +1456,7 @@ mod test {
                 .collect::<Result<_, _>>()
                 .unwrap();
 
-            assert_eq!(items, vec![("three".to_string(), 3)]);
+            assert_eq!(items, vec![("two2".to_string(), 2), ("three".to_string(), 3)]);
         }
     }
 }
