@@ -104,7 +104,7 @@ we support not only simple binary keys (`&[u8]`), but tuples, which are
 combined. This allows us to store allowances as composite keys
 eg. `(owner, spender)` to look up the balance.
 
-Beyond direct lookups, we have a super power not found in Ethereum -
+Beyond direct lookups, we have a super-power not found in Ethereum -
 iteration. That's right, you can list all items in a `Map`, or only
 part of them. We can efficiently allow pagination over these items as
 well, starting at the point the last query ended, with low gas costs.
@@ -317,7 +317,7 @@ fn demo() -> StdResult<()> {
 
 In addition to getting one particular item out of a map, we can iterate over the map
 (or a subset of the map). This let us answer questions like "show me all tokens",
-and we provide some nice [`Bound`](#Bound) helpers to easily allow pagination, or custom ranges.
+and we provide some nice [`Bound`](#bound) helpers to easily allow pagination, or custom ranges.
 
 The general format is to get a `Prefix` by calling `map.prefix(k)`, where `k` is exactly
 one less item than the normal key (If `map.key()` took `(&[u8], &[u8])`, then `map.prefix()` takes `&[u8]`.
@@ -417,7 +417,7 @@ fn demo() -> StdResult<()> {
 }
 ```
 
-*Note*: For properly defining and using type-safe bounds over a `MultiIndex`, see [Type-safe bounds over `MultiIndex`](#Type-safe bounds over MultiIndex),
+**NB**: For properly defining and using type-safe bounds over a `MultiIndex`, see [Type-safe bounds over `MultiIndex`](#type-safe-bounds-over-multiindex),
 below.
 
 ## IndexedMap
@@ -477,9 +477,9 @@ You can see this in the token creation code:
 Given that `token_id` is a string value, we specify `String` as the last argument of the `MultiIndex` definition.
 That way, the deserialization of the primary key will be done to the right type (an owned string).
 
-*Note*: In the particular case of a `MultiIndex`, and with the latest implementation of type-safe bounds, the definition of
+**NB**: In the particular case of a `MultiIndex`, and with the latest implementation of type-safe bounds, the definition of
 this last type parameter is crucial, for properly using type-safe bounds.
-See [Type-safe bounds over `MultiIndex`](#Type-safe bounds over MultiIndex), below.
+See [Type-safe bounds over `MultiIndex`](#type-safe-bounds-over-multiindex), below.
 
 Then, this `TokenInfo` data will be indexed by token `owner` (which is an `Addr`). So that we can list all the tokens
 an owner has. That's why the `owner` index key is `Addr`.
@@ -515,7 +515,8 @@ impl<'a> IndexList<TokenInfo> for TokenIndexes<'a> {
 ```
 
 This implements the `IndexList` trait for `TokenIndexes`.
-Note: this code is more or less boiler-plate, and needed for the internals. Do not try to customize this;
+
+**NB**: this code is more or less boiler-plate, and needed for the internals. Do not try to customize this;
 just return a list of all indexes.
 Implementing this trait serves two purposes (which are really one and the same): it allows the indexes
 to be queried through `get_indexes`, and, it allows `TokenIndexes` to be treated as an `IndexList`. So that
@@ -541,8 +542,7 @@ During index creation, we must supply an index function per index
 ```rust
         owner: MultiIndex::new(|d: &TokenInfo| d.owner.clone(),
 ```
-
-, which is the one that will take the value of the original map, and create the index key from it.
+which is the one that will take the value of the original map and create the index key from it.
 Of course, this requires that the elements required for the index key are present in the value.
 Besides the index function, we must also supply the namespace of the pk, and the one for the new index.
 
@@ -585,9 +585,9 @@ Notice this uses `prefix()`, explained above in the `Map` section.
     let tokens = res?;
 ```
 Now `tokens` contains `(token_id, TokenInfo)` pairs for the given `owner`.
-The pk values are `Vec<u8>` in the case of `prefix()` + `range_raw()`, but will be deserialized to the proper type using
-`prefix()` + `range()`; provided that the pk deserialization type (`String`, in this case)
-is correctly specified in the `MultiIndex` definition (see [Index keys deserialization](#Index keys deserialization),
+The pk values are `Vec<u8>` in the case of `range_raw()`, but will be deserialized to the proper type using
+`range()`; provided that the pk deserialization type (`String`, in this case) is correctly specified
+in the `MultiIndex` definition (see [Index keys deserialization](#index-keys-deserialization),
 below).
 
 Another example that is similar, but returning only the (raw) `token_id`s, using the `keys_raw()` method:
@@ -605,15 +605,18 @@ Another example that is similar, but returning only the (raw) `token_id`s, using
         .take(limit)
         .collect();
 ```
-Now `pks` contains `token_id` values (as raw `Vec<u8>`s) for the given `owner`. By using `prefix()` + `keys`,
-a deserialized key can be obtained instead, as detailed in the next section.
+Now `pks` contains `token_id` values (as raw `Vec<u8>`s) for the given `owner`. By using `keys` instead,
+a deserialized key can be obtained, as detailed in the next section.
 
 ### Index keys deserialization
 
 For `UniqueIndex` and `MultiIndex`, the primary key (`PK`) type needs to be specified, in order to deserialize
-the primary key to it. This generic type comes with a default of `()`, which means that no deserialization / data
-will be provided for the primary key. This is for backwards compatibility with previous `UniqueIndex` / `MultiIndex`
-usages, and will be likely be changed in the future.
+the primary key to it.
+This `PK` type specification is also important for `MultiIndex` type-safe bounds, as the primary key
+is part of the multi-index key. See next section, [Type-safe bounds over MultiIndex](#type-safe-bounds-over-multiindex).
+
+**NB**: This specification is still a manual (and therefore error-prone) process / setup, that will if possible
+be automated in the future (https://github.com/CosmWasm/cw-plus/issues/531).
 
 ### Type-safe bounds over MultiIndex
 
