@@ -102,7 +102,7 @@ impl Proposal {
     }
 
     /// Returns true if this proposal is sure to be rejected (even before expiration, if
-    /// no future sequence of possible votes could cause it to fail).
+    /// no future sequence of possible votes could cause it to pass).
     pub fn is_rejected(&self, block: &BlockInfo) -> bool {
         self.does_vote_count_reach_threshold(self.votes.no, block)
     }
