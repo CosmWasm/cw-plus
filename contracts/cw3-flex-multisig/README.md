@@ -64,10 +64,6 @@ be reverted, and it will remain "Passed", so you can try again).
 Once a proposal has expired without passing, anyone can submit a "Close"
 message to mark it closed. This has no effect beyond cleaning up the UI/database.
 
-TODO: this contract currently assumes the group membership is static during
-the lifetime of one proposal. If the membership changes when a proposal is
-open, this will calculate incorrect values (future PR).
-
 ## Running this contract
 
 You will need Rust 1.44.1+ with `wasm32-unknown-unknown` target installed.
