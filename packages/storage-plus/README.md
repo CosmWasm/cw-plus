@@ -317,7 +317,7 @@ fn demo() -> StdResult<()> {
 
 In addition to getting one particular item out of a map, we can iterate over the map
 (or a subset of the map). This let us answer questions like "show me all tokens",
-and we provide some nice [`Bound`](#bound) helpers to easily allow pagination, or custom ranges.
+and we provide some nice [`Bound`](#bound) helpers to easily allow pagination or custom ranges.
 
 The general format is to get a `Prefix` by calling `map.prefix(k)`, where `k` is exactly
 one less item than the normal key (If `map.key()` took `(&[u8], &[u8])`, then `map.prefix()` takes `&[u8]`.
@@ -326,7 +326,7 @@ over all items with `range(store, min, max, order)`. It supports `Order::Ascendi
 `min` is the lower bound and `max` is the higher bound.
 
 If the `min` and `max` bounds are `None`, `range` will return all items under the prefix. You can use `.take(n)` to
-limit the results to `n` items, and start doing pagination. You can also set the `min` bound to
+limit the results to `n` items and start doing pagination. You can also set the `min` bound to
 eg. `Bound::exclusive(last_value)` to start iterating over all items *after* the last value. Combined with
 `take`, we easily have pagination support. You can also use `Bound::inclusive(x)` when you want to include any
 perfect matches.
