@@ -557,7 +557,7 @@ where
 {
     /// This registers contract code (like uploading wasm bytecode on a chain),
     /// so it can later be used to instantiate a contract.
-    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT>>) -> u64 {
+    pub fn store_code(&mut self, code: Box<dyn Contract<CustomT::ExecT, CustomT::QueryT>>) -> u64 {
         self.init_modules(|router, _, _| router.wasm.store_code(code) as u64)
     }
 
@@ -2604,9 +2604,9 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 3 nested error types
-            // (the original error, initiate msg context, WasmMsg context)
-            assert_eq!(err.chain().count(), 3);
+            // We're expecting exactly 2 nested error types
+            // (the original error, WasmMsg context)
+            assert_eq!(err.chain().count(), 2);
         }
 
         #[test]
@@ -2634,9 +2634,9 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 3 nested error types
-            // (the original error, execute msg context, WasmMsg context)
-            assert_eq!(err.chain().count(), 3);
+            // We're expecting exactly 2 nested error types
+            // (the original error, WasmMsg context)
+            assert_eq!(err.chain().count(), 2);
         }
 
         #[test]
@@ -2674,9 +2674,9 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 4 nested error types
-            // (the original error, execute msg context, 2 WasmMsg contexts)
-            assert_eq!(err.chain().count(), 4);
+            // We're expecting exactly 3 nested error types
+            // (the original error, 2 WasmMsg contexts)
+            assert_eq!(err.chain().count(), 3);
         }
 
         #[test]
@@ -2725,9 +2725,9 @@ mod test {
                 panic!("wrong StdError variant");
             }
 
-            // we're expecting exactly 5 nested error types
-            // (the original error, execute msg context, 3 WasmMsg contexts)
-            assert_eq!(err.chain().count(), 5);
+            // We're expecting exactly 4 nested error types
+            // (the original error, 3 WasmMsg contexts)
+            assert_eq!(err.chain().count(), 4);
         }
     }
 }

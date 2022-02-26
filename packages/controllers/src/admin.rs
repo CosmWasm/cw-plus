@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
-use cosmwasm_std::{attr, Addr, Deps, DepsMut, MessageInfo, Response, StdError, StdResult};
+use cosmwasm_std::{
+    attr, Addr, CustomQuery, Deps, DepsMut, MessageInfo, Response, StdError, StdResult,
+};
 use cw_storage_plus::Item;
 
 // TODO: should the return values end up in utils, so eg. cw4 can import them as well as this module?
@@ -32,17 +34,17 @@ impl<'a> Admin<'a> {
         Admin(Item::new(namespace))
     }
 
-    pub fn set(&self, deps: DepsMut, admin: Option<Addr>) -> StdResult<()> {
+    pub fn set<Q: CustomQuery>(&self, deps: DepsMut<Q>, admin: Option<Addr>) -> StdResult<()> {
         self.0.save(deps.storage, &admin)
     }
 
-    pub fn get(&self, deps: Deps) -> StdResult<Option<Addr>> {
+    pub fn get<Q: CustomQuery>(&self, deps: Deps<Q>) -> StdResult<Option<Addr>> {
         self.0.load(deps.storage)
     }
 
     /// Returns Ok(true) if this is an admin, Ok(false) if not and an Error if
     /// we hit an error with Api or Storage usage
-    pub fn is_admin(&self, deps: Deps, caller: &Addr) -> StdResult<bool> {
+    pub fn is_admin<Q: CustomQuery>(&self, deps: Deps<Q>, caller: &Addr) -> StdResult<bool> {
         match self.0.load(deps.storage)? {
             Some(owner) => Ok(caller == &owner),
             None => Ok(false),
@@ -51,7 +53,11 @@ impl<'a> Admin<'a> {
 
     /// Like is_admin but returns AdminError::NotAdmin if not admin.
     /// Helper for a nice one-line auth check.
-    pub fn assert_admin(&self, deps: Deps, caller: &Addr) -> Result<(), AdminError> {
+    pub fn assert_admin<Q: CustomQuery>(
+        &self,
+        deps: Deps<Q>,
+        caller: &Addr,
+    ) -> Result<(), AdminError> {
         if !self.is_admin(deps, caller)? {
             Err(AdminError::NotAdmin {})
         } else {
@@ -59,9 +65,9 @@ impl<'a> Admin<'a> {
         }
     }
 
-    pub fn execute_update_admin<C>(
+    pub fn execute_update_admin<C, Q: CustomQuery>(
         &self,
-        deps: DepsMut,
+        deps: DepsMut<Q>,
         info: MessageInfo,
         new_admin: Option<Addr>,
     ) -> Result<Response<C>, AdminError>
@@ -85,7 +91,7 @@ impl<'a> Admin<'a> {
         Ok(Response::new().add_attributes(attributes))
     }
 
-    pub fn query_admin(&self, deps: Deps) -> StdResult<AdminResponse> {
+    pub fn query_admin<Q: CustomQuery>(&self, deps: Deps<Q>) -> StdResult<AdminResponse> {
         let admin = self.get(deps)?.map(String::from);
         Ok(AdminResponse { admin })
     }
@@ -160,14 +166,14 @@ mod tests {
         let info = mock_info(imposter.as_ref(), &[]);
         let new_admin = Some(friend.clone());
         let err = control
-            .execute_update_admin::<Empty>(deps.as_mut(), info, new_admin.clone())
+            .execute_update_admin::<Empty, Empty>(deps.as_mut(), info, new_admin.clone())
             .unwrap_err();
         assert_eq!(AdminError::NotAdmin {}, err);
 
         // owner can update
         let info = mock_info(owner.as_ref(), &[]);
         let res = control
-            .execute_update_admin::<Empty>(deps.as_mut(), info, new_admin)
+            .execute_update_admin::<Empty, Empty>(deps.as_mut(), info, new_admin)
             .unwrap();
         assert_eq!(0, res.messages.len());
 

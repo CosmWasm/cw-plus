@@ -8,6 +8,7 @@
 
 mod app;
 mod bank;
+#[allow(clippy::type_complexity)]
 mod contracts;
 pub mod custom_handler;
 pub mod error;

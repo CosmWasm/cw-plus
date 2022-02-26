@@ -44,5 +44,5 @@ calls, but then use the underlying implementation for the standard cw20
 messages you want to support. The same with `QueryMsg`. You *could* reuse `instantiate`
 as it, but it is likely you will want to change it. And it is rather simple.
 
-Look at [`cw20-staking`](../cw20-staking/README.md) for an example of how to "inherit"
+Look at [`cw20-staking`](https://github.com/CosmWasm/cw-tokens/tree/main/contracts/cw20-staking) for an example of how to "inherit"
 all this token functionality and combine it with custom logic.
