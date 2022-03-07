@@ -168,7 +168,7 @@ pub enum ParseReplyError {
 mod test {
     use super::*;
     use crate::parse_reply::ParseReplyError::{BrokenUtf8, ParseFailure};
-    use cosmwasm_std::{ContractResult, SubMsgExecutionResponse};
+    use cosmwasm_std::{SubMsgExecutionResponse, SubMsgResult};
     use prost::Message;
     use std::str::from_utf8;
 
@@ -466,7 +466,7 @@ mod test {
             // Build reply message
             let msg = Reply {
                 id: 1,
-                result: ContractResult::Ok(SubMsgExecutionResponse {
+                result: SubMsgResult::Ok(SubMsgExecutionResponse {
                     events: vec![],
                     data: Some(encoded_instantiate_reply.into()),
                 }),
@@ -514,7 +514,7 @@ mod test {
             // Build reply message
             let msg = Reply {
                 id: 1,
-                result: ContractResult::Ok(SubMsgExecutionResponse {
+                result: SubMsgResult::Ok(SubMsgExecutionResponse {
                     events: vec![],
                     data: Some(encoded_execute_reply.into()),
                 }),
