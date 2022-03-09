@@ -1,8 +1,12 @@
 # Changelog
 
+## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.0...HEAD)
+
 ## [v0.13.0](https://github.com/CosmWasm/cw-plus/tree/v0.13.0) (2022-03-09)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.1...0.13.0)
 
 **Breaking changes:**
 
