@@ -1,8 +1,25 @@
 # Changelog
 
-## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
+## [v0.13.0](https://github.com/CosmWasm/cw-plus/tree/v0.13.0) (2022-03-09)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.12.1...HEAD)
+
+**Breaking changes:**
+
+- Fix `MultiIndex` last type param default / docs [\#669](https://github.com/CosmWasm/cw-plus/issues/669)
+
+**Closed issues:**
+
+- Querying over composite key [\#664](https://github.com/CosmWasm/cw-plus/issues/664)
+- the method `may_load` exists for struct `cw_storage_plus::Map<'static, (std::string::String, Uint256), Uint256>`, but its trait bounds were not satisfied the following trait bounds were not satisfied: `(std::string::String, Uint256): PrimaryKey` [\#663](https://github.com/CosmWasm/cw-plus/issues/663)
+- Make `Bound` helpers return `Option<Self>` [\#644](https://github.com/CosmWasm/cw-plus/issues/644)
+
+**Merged pull requests:**
+
+- Update cosmwasm to 1.0.0-beta6 [\#672](https://github.com/CosmWasm/cw-plus/pull/672) ([webmaster128](https://github.com/webmaster128))
+- Update storage plus docs / Remove `MultiIndex` PK default [\#671](https://github.com/CosmWasm/cw-plus/pull/671) ([maurolacy](https://github.com/maurolacy))
+- fix: Remove old TODO comment in cw3-flex readme [\#661](https://github.com/CosmWasm/cw-plus/pull/661) ([apollo-sturdy](https://github.com/apollo-sturdy))
+- Properly handle generic queries in multi-test [\#660](https://github.com/CosmWasm/cw-plus/pull/660) ([ethanfrey](https://github.com/ethanfrey))
 
 ## [v0.12.1](https://github.com/CosmWasm/cw-plus/tree/v0.12.1) (2022-02-14)
 
