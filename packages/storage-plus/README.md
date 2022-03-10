@@ -1,14 +1,25 @@
-# CW-Storage-Plus: Enhanced/experimental storage engines for CosmWasm
+# CW-Storage-Plus: Enhanced storage engines for CosmWasm
 
-The ideas in here are based on the `cosmwasm-storage` crate. However,
-after much usage, we decided a complete rewrite could allow us to add
-more powerful and easy to use interfaces. Here are those interfaces.
+After building `cosmwasm-storage`, we realized many of the design decisions were
+limiting us and producing a lot of needless boilerplate. The decision was made to leave
+those APIs stable for anyone wanting a very basic abstraction on the KV-store and to
+build a much more powerful and complex ORM layer that can provide powerful accessors
+using complex key types, which are transparently turned into bytes.
+
+This led to a number of breaking API changes in this package of the course of several
+releases as we updated this with lots of experience, user feedback, and deep dives to harness
+the full power of generics.
 
 **Status: beta**
 
-This has been heavily used in many production-quality contracts and
-heavily refined. The code has demonstrated itself to be stable and powerful.
-Please feel free to use it in your contracts.
+As of `cw-storage-plus` `v0.12` the API should be quite stable.
+There are no major API breaking issues pending, and all API changes will be documented
+in [`MIGRATING.md`](../../MIGRATING.md).
+
+This has been heavily used in many production-quality contracts.
+The code has demonstrated itself to be stable and powerful.
+It has not been audited, and Confio assumes no liability, but we consider it mature enough
+to be the **standard storage layer** for your contracts.
 
 ## Usage Overview
 
