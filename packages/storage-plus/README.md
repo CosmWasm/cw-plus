@@ -19,7 +19,7 @@ in [`MIGRATING.md`](../../MIGRATING.md).
 This has been heavily used in many production-quality contracts.
 The code has demonstrated itself to be stable and powerful.
 It has not been audited, and Confio assumes no liability, but we consider it mature enough
-to be the standard storage layer for your contracts.
+to be the **standard storage layer** for your contracts.
 
 ## Usage Overview
 
