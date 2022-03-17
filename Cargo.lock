@@ -437,6 +437,7 @@ dependencies = [
  "cw1",
  "cw1-whitelist",
  "cw2",
+ "either",
  "schemars",
  "semver",
  "serde",
