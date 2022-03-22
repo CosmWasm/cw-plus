@@ -19,9 +19,9 @@ mod entry_points {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: Binary,
+        msg: crate::msg::InstantiateMsg,
     ) -> Result<Response, ContractError> {
-        CONTRACT.entry_instantiate(deps, env, info, &msg)
+        msg.dispatch(Cw1WhitelistContract::native(), (deps, env, info))
     }
 
     #[entry_point]

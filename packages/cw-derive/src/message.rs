@@ -1,5 +1,5 @@
 use crate::check_generics::CheckGenerics;
-use crate::parser::{MsgAttr, MsgType};
+use crate::parser::{InterfaceArgs, MsgAttr, MsgType};
 use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream};
 use proc_macro_error::emit_error;
@@ -212,6 +212,7 @@ pub struct EnumMessage<'a> {
     wheres: Vec<&'a WherePredicate>,
     full_where: Option<&'a WhereClause>,
     msg_ty: MsgType,
+    args: &'a InterfaceArgs,
 }
 
 impl<'a> EnumMessage<'a> {
@@ -220,6 +221,7 @@ impl<'a> EnumMessage<'a> {
         source: &'a ItemTrait,
         ty: MsgType,
         generics: &'a [&'a GenericParam],
+        args: &'a InterfaceArgs,
     ) -> Self {
         let trait_name = &source.ident;
 
@@ -261,6 +263,7 @@ impl<'a> EnumMessage<'a> {
             wheres,
             full_where: source.generics.where_clause.as_ref(),
             msg_ty: ty,
+            args,
         }
     }
 
@@ -275,6 +278,7 @@ impl<'a> EnumMessage<'a> {
             wheres,
             full_where,
             msg_ty,
+            args,
         } = self;
 
         let match_arms = variants
@@ -290,7 +294,7 @@ impl<'a> EnumMessage<'a> {
         };
 
         let ctx_type = msg_ty.emit_ctx_type();
-        let dispatch_type = msg_ty.emit_result_type();
+        let dispatch_type = msg_ty.emit_result_type(&args.msg_type);
 
         let all_generics = if all_generics.is_empty() {
             quote! {}

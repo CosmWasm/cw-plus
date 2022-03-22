@@ -6,9 +6,7 @@ use serde::de::DeserializeOwned;
 
 use crate::error::ContractError;
 use crate::interfaces::*;
-use crate::msg::{
-    AdminListResponse, Cw1ExecMsg, Cw1QueryMsg, InstantiateMsg, WhitelistExecMsg, WhitelistQueryMsg,
-};
+use crate::msg::{cw1_msg, whitelist, AdminListResponse};
 use crate::state::{AdminList, Cw1WhitelistContract};
 
 use cw1::CanExecuteResponse;
@@ -22,12 +20,12 @@ pub fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>>
     admins.iter().map(|addr| api.addr_validate(addr)).collect()
 }
 
+#[cw_derive::contract(module=msg)]
 impl<T> Cw1WhitelistContract<T> {
+    #[msg(instantiate)]
     pub fn instantiate(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        _info: MessageInfo,
+        (deps, _env, _info): (DepsMut, Env, MessageInfo),
         admins: Vec<String>,
         mutable: bool,
     ) -> Result<Response<T>, ContractError> {
@@ -46,19 +44,6 @@ impl<T> Cw1WhitelistContract<T> {
         Ok(cfg.is_admin(addr))
     }
 
-    // Entry points, to be called only in actual entry points and by multitest `Contract`
-    // implementation
-    pub(crate) fn entry_instantiate(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        msg: &[u8],
-    ) -> Result<Response<T>, ContractError> {
-        let msg: InstantiateMsg = from_slice(msg)?;
-        msg.dispatch(deps, env, info, self)
-    }
-
     pub(crate) fn entry_execute(
         &self,
         deps: DepsMut,
@@ -67,15 +52,15 @@ impl<T> Cw1WhitelistContract<T> {
         msg: &[u8],
     ) -> Result<Response<T>, ContractError>
     where
-        T: DeserializeOwned,
+        T: DeserializeOwned + std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
     {
-        let cw1_err = match from_slice::<Cw1ExecMsg<T>>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, info, self),
+        let cw1_err = match from_slice::<crate::msg::cw1_msg::ExecMsg<T>>(msg) {
+            Ok(msg) => return msg.dispatch(self, (deps, env, info)),
             Err(err) => err,
         };
 
-        let whitelist_err = match from_slice::<WhitelistExecMsg>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, info, self),
+        let whitelist_err = match from_slice::<crate::msg::whitelist::ExecMsg>(msg) {
+            Ok(msg) => return msg.dispatch(self, (deps, env, info)),
             Err(err) => err,
         };
 
@@ -95,15 +80,15 @@ impl<T> Cw1WhitelistContract<T> {
         msg: &[u8],
     ) -> Result<Binary, ContractError>
     where
-        T: DeserializeOwned,
+        T: DeserializeOwned + std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
     {
-        let cw1_err = match from_slice::<Cw1QueryMsg<T>>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, self),
+        let cw1_err = match from_slice::<crate::msg::cw1_msg::QueryMsg<T>>(msg) {
+            Ok(msg) => return msg.dispatch(self, (deps, env)),
             Err(err) => err,
         };
 
-        let whitelist_err = match from_slice::<WhitelistQueryMsg>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, self),
+        let whitelist_err = match from_slice::<crate::msg::whitelist::QueryMsg>(msg) {
+            Ok(msg) => return msg.dispatch(self, (deps, env)),
             Err(err) => err,
         };
 
@@ -117,14 +102,15 @@ impl<T> Cw1WhitelistContract<T> {
     }
 }
 
-impl<T> Cw1<T> for Cw1WhitelistContract<T> {
+impl<T> crate::interfaces::Cw1<T> for Cw1WhitelistContract<T>
+where
+    T: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
+{
     type Error = ContractError;
 
     fn execute(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
+        (deps, _env, info): (DepsMut, Env, MessageInfo),
         msgs: Vec<CosmosMsg<T>>,
     ) -> Result<Response<T>, Self::Error> {
         if !self.is_admin(deps.as_ref(), info.sender.as_ref())? {
@@ -139,8 +125,7 @@ impl<T> Cw1<T> for Cw1WhitelistContract<T> {
 
     fn can_execute(
         &self,
-        deps: Deps,
-        _env: Env,
+        (deps, _env): (Deps, Env),
         sender: String,
         _msg: CosmosMsg<T>,
     ) -> Result<CanExecuteResponse, Self::Error> {
@@ -150,14 +135,15 @@ impl<T> Cw1<T> for Cw1WhitelistContract<T> {
     }
 }
 
-impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
+impl<T> crate::interfaces::Whitelist<T> for Cw1WhitelistContract<T>
+where
+    T: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
+{
     type Error = ContractError;
 
     fn freeze(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
+        (deps, _env, info): (DepsMut, Env, MessageInfo),
     ) -> Result<Response<T>, Self::Error> {
         self.admin_list
             .update(deps.storage, |mut cfg| -> Result<_, ContractError> {
@@ -174,9 +160,7 @@ impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
 
     fn update_admins(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
+        (deps, _env, info): (DepsMut, Env, MessageInfo),
         admins: Vec<String>,
     ) -> Result<Response<T>, Self::Error> {
         let api = deps.api;
@@ -193,7 +177,7 @@ impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
         Ok(Response::new().add_attribute("action", "update_admins"))
     }
 
-    fn admin_list(&self, deps: Deps, _env: Env) -> Result<AdminListResponse, Self::Error> {
+    fn admin_list(&self, (deps, _env): (Deps, Env)) -> Result<AdminListResponse, Self::Error> {
         let cfg = self.admin_list.load(deps.storage)?;
         Ok(AdminListResponse {
             admins: cfg.admins.into_iter().map(|a| a.into()).collect(),
