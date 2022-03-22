@@ -1,8 +1,9 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::parse::{Error, Parse, ParseBuffer, ParseStream};
+use syn::parse::{Error, Nothing, Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{parenthesized, Ident, Result, Token};
+use syn::token::Comma;
+use syn::{parenthesized, parse2, Ident, Result, Token, Type};
 
 /// Parsed arguments for `interface` macro
 pub struct InterfaceArgs {
@@ -12,6 +13,10 @@ pub struct InterfaceArgs {
     pub exec: Ident,
     /// Name of generated query message enum, `QueryMsg` by default
     pub query: Ident,
+    /// The type being a parameter of `CosmosMsg` for blockchain it is intendet to be used; can be
+    /// set to any of generic parameters to create interface being generic over blockchains; If not
+    /// provided, cosmos messages would be unparametrized (so default would be used)
+    pub msg_type: Option<Type>,
 }
 
 /// Parser arguments for `contract` macro
@@ -22,7 +27,7 @@ pub struct ContractArgs {
 
 struct Mapping {
     index: Ident,
-    value: Ident,
+    value: TokenStream,
 }
 
 impl Parse for InterfaceArgs {
@@ -30,20 +35,50 @@ impl Parse for InterfaceArgs {
         let mut module = None;
         let mut exec = Ident::new("ExecMsg", Span::mixed_site());
         let mut query = Ident::new("QueryMsg", Span::mixed_site());
+        let mut msg_type = None;
 
+        while !input.is_empty() {
+            let attr: Ident = input.parse()?;
+            let _: Token![=] = input.parse()?;
+
+            if attr == "module" {
+                module = Some(input.parse()?);
+            } else if attr == "exec" {
+                exec = input.parse()?;
+            } else if attr == "query" {
+                query = input.parse()?;
+            } else if attr == "msg_type" {
+                msg_type = Some(input.parse()?);
+            } else {
+                return Err(Error::new(
+                    attr.span(),
+                    "expected `module`, `exec`, `query`, or `msg_type`",
+                ));
+            }
+
+            if input.peek(Token![,]) {
+                let _: Token![,] = input.parse()?;
+            } else if !input.is_empty() {
+                return Err(input.error("Unexpected token, comma expected"));
+            }
+        }
+
+        let _: Nothing = input.parse()?;
         let attrs: Punctuated<Mapping, Token![,]> = input.parse_terminated(Mapping::parse)?;
 
         for attr in attrs {
             if attr.index == "module" {
-                module = Some(attr.value);
+                module = Some(parse2(attr.value)?);
             } else if attr.index == "exec" {
-                exec = attr.value;
+                exec = parse2(attr.value)?;
             } else if attr.index == "query" {
-                query = attr.value;
+                query = parse2(attr.value)?;
+            } else if attr.index == "msg_type" {
+                msg_type = Some(parse2(attr.value)?);
             } else {
                 return Err(Error::new(
                     attr.index.span(),
-                    "expected `module`, `exec` or `query`",
+                    "expected `module`, `exec`, `query`, or `msg_type`",
                 ));
             }
         }
@@ -52,6 +87,7 @@ impl Parse for InterfaceArgs {
             module,
             exec,
             query,
+            msg_type,
         })
     }
 }
@@ -64,7 +100,7 @@ impl Parse for ContractArgs {
 
         for attr in attrs {
             if attr.index == "module" {
-                module = Some(attr.value);
+                module = Some(parse2(attr.value)?);
             } else {
                 return Err(Error::new(
                     attr.index.span(),
@@ -116,14 +152,18 @@ impl MsgType {
     }
 
     /// Emits type which should be returned by dispatch function for this kind of message
-    pub fn emit_result_type(self) -> TokenStream {
+    pub fn emit_result_type(self, msg_type: &Option<Type>) -> TokenStream {
         use MsgType::*;
 
-        match self {
-            Exec | Instantiate => quote! {
+        match (self, msg_type) {
+            (Exec, Some(msg_type)) | (Instantiate, Some(msg_type)) => quote! {
+                std::result::Result<cosmwasm_std::Response<#msg_type>, C::Error>
+            },
+            (Exec, None) | (Instantiate, None) => quote! {
                 std::result::Result<cosmwasm_std::Response, C::Error>
             },
-            Query => quote! {
+
+            (Query, _) => quote! {
                 std::result::Result<cosmwasm_std::Binary, C::Error>
             },
         }
@@ -165,7 +205,7 @@ impl MsgAttr {
             let attrs: Punctuated<Mapping, Token![,]> = content.parse_terminated(Mapping::parse)?;
             for attr in attrs {
                 if attr.index == "name" {
-                    name = attr.value;
+                    name = parse2(attr.value)?;
                 }
             }
         }

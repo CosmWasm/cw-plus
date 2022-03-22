@@ -1,44 +1,47 @@
 use crate::msg::AdminListResponse;
-use cosmwasm_std::{CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response};
+use cosmwasm_std::{CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError};
 use cw1::query::CanExecuteResponse;
 
-pub trait Cw1<T> {
-    type Error;
+#[cw_derive::interface(module=cw1_msg, msg_type=T)]
+pub trait Cw1<T>
+where
+    T: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
+{
+    type Error: From<StdError>;
 
+    #[msg(exec)]
     fn execute(
         &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
+        ctx: (DepsMut, Env, MessageInfo),
         msgs: Vec<CosmosMsg<T>>,
     ) -> Result<Response<T>, Self::Error>;
 
+    #[msg(query)]
     fn can_execute(
         &self,
-        deps: Deps,
-        env: Env,
+        ctx: (Deps, Env),
         sender: String,
         msg: CosmosMsg<T>,
     ) -> Result<CanExecuteResponse, Self::Error>;
 }
 
-pub trait Whitelist<T> {
-    type Error;
+#[cw_derive::interface(module=whitelist, msg_type=T)]
+pub trait Whitelist<T>
+where
+    T: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
+{
+    type Error: From<StdError>;
 
-    fn freeze(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-    ) -> Result<Response<T>, Self::Error>;
+    #[msg(exec)]
+    fn freeze(&self, ctx: (DepsMut, Env, MessageInfo)) -> Result<Response<T>, Self::Error>;
 
+    #[msg(exec)]
     fn update_admins(
         &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
+        ctx: (DepsMut, Env, MessageInfo),
         admins: Vec<String>,
     ) -> Result<Response<T>, Self::Error>;
 
-    fn admin_list(&self, deps: Deps, env: Env) -> Result<AdminListResponse, Self::Error>;
+    #[msg(query)]
+    fn admin_list(&self, ctx: (Deps, Env)) -> Result<AdminListResponse, Self::Error>;
 }

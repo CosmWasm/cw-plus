@@ -12,25 +12,11 @@ use crate::error::ContractError;
 use crate::interfaces::*;
 use crate::state::Cw1WhitelistContract;
 
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InstantiateMsg {
-    pub admins: Vec<String>,
-    pub mutable: bool,
-}
+pub use crate::contract::msg::InstantiateMsg;
 
-impl InstantiateMsg {
-    pub fn dispatch<T>(
-        self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        contract: &Cw1WhitelistContract<T>,
-    ) -> Result<Response<T>, ContractError> {
-        let InstantiateMsg { admins, mutable } = self;
-        contract.instantiate(deps, env, info, admins, mutable)
-    }
-}
+pub use crate::interfaces::{cw1_msg, whitelist};
 
+/*
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case", untagged)]
 enum ExecMsg<T = Empty> {
@@ -197,7 +183,7 @@ impl WhitelistQueryMsg {
         }
         .map_err(Contract::Error::from)
     }
-}
+}*/
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminListResponse {
