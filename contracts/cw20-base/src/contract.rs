@@ -151,14 +151,32 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20Coin]) -> StdResult<Uint128> {
+pub fn create_accounts(
+    deps: &mut DepsMut,
+    accounts: &[Cw20Coin],
+) -> Result<Uint128, ContractError> {
+    validate_accounts(accounts)?;
+
     let mut total_supply = Uint128::zero();
     for row in accounts {
         let address = deps.api.addr_validate(&row.address)?;
         BALANCES.save(deps.storage, &address, &row.amount)?;
         total_supply += row.amount;
     }
+
     Ok(total_supply)
+}
+
+pub fn validate_accounts(accounts: &[Cw20Coin]) -> Result<(), ContractError> {
+    let mut addresses = accounts.iter().map(|c| &c.address).collect::<Vec<_>>();
+    addresses.sort();
+    addresses.dedup();
+
+    if addresses.len() != accounts.len() {
+        Err(ContractError::DuplicateInitialBalanceAddresses {})
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -875,6 +893,32 @@ mod tests {
         let addr1 = String::from("addr0001");
         let amount2 = Uint128::from(7890987u128);
         let addr2 = String::from("addr0002");
+        let info = mock_info("creator", &[]);
+        let env = mock_env();
+
+        // Fails with duplicate addresses
+        let instantiate_msg = InstantiateMsg {
+            name: "Bash Shell".to_string(),
+            symbol: "BASH".to_string(),
+            decimals: 6,
+            initial_balances: vec![
+                Cw20Coin {
+                    address: addr1.clone(),
+                    amount: amount1,
+                },
+                Cw20Coin {
+                    address: addr1.clone(),
+                    amount: amount2,
+                },
+            ],
+            mint: None,
+            marketing: None,
+        };
+        let err =
+            instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap_err();
+        assert_eq!(err, ContractError::DuplicateInitialBalanceAddresses {});
+
+        // Works with unique addresses
         let instantiate_msg = InstantiateMsg {
             name: "Bash Shell".to_string(),
             symbol: "BASH".to_string(),
@@ -892,11 +936,8 @@ mod tests {
             mint: None,
             marketing: None,
         };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
         let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
-
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap(),
             TokenInfoResponse {
