@@ -4,8 +4,8 @@
 //! Additionally it bypass all events and attributes send to it
 
 use cosmwasm_std::{
-    to_binary, Attribute, Binary, ContractResult, Deps, DepsMut, Empty, Env, Event, MessageInfo,
-    Reply, Response, StdError, SubMsg, SubMsgExecutionResponse,
+    to_binary, Attribute, Binary, Deps, DepsMut, Empty, Env, Event, MessageInfo, Reply, Response,
+    StdError, SubMsg, SubMsgExecutionResponse, SubMsgResult,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -98,7 +98,7 @@ where
     if let Reply {
         id,
         result:
-            ContractResult::Ok(SubMsgExecutionResponse {
+            SubMsgResult::Ok(SubMsgExecutionResponse {
                 data: Some(data), ..
             }),
     } = msg

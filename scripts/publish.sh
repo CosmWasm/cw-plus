@@ -1,6 +1,17 @@
 #!/bin/bash
 set -o errexit -o nounset -o pipefail
-command -v shellcheck > /dev/null && shellcheck "$0"
+command -v shellcheck >/dev/null && shellcheck "$0"
+
+function print_usage() {
+  echo "Usage: $0 [-h|--help]"
+  echo "Publishes crates to crates.io."
+}
+
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]
+then
+    print_usage
+    exit 1
+fi
 
 # this should really more to cosmwasm...
 STORAGE_PACKAGES="storage-plus"

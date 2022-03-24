@@ -2,10 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
-    attr, entry_point, from_binary, to_binary, BankMsg, Binary, ContractResult, CosmosMsg, Deps,
-    DepsMut, Env, IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg,
-    IbcChannelOpenMsg, IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg,
-    IbcPacketTimeoutMsg, IbcReceiveResponse, Reply, Response, SubMsg, Uint128, WasmMsg,
+    attr, entry_point, from_binary, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Env,
+    IbcBasicResponse, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg,
+    IbcEndpoint, IbcOrder, IbcPacket, IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
+    IbcReceiveResponse, Reply, Response, SubMsg, SubMsgResult, Uint128, WasmMsg,
 };
 
 use crate::amount::Amount;
@@ -87,8 +87,8 @@ const ACK_FAILURE_ID: u64 = 0xfa17;
 pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
     match reply.id {
         RECEIVE_ID => match reply.result {
-            ContractResult::Ok(_) => Ok(Response::new()),
-            ContractResult::Err(err) => {
+            SubMsgResult::Ok(_) => Ok(Response::new()),
+            SubMsgResult::Err(err) => {
                 // Important design note:  with ibcv2 and wasmd 0.22 we can implement this all much easier.
                 // No reply needed... the receive function and submessage should return error on failure and all
                 // state gets reverted with a proper app-level message auto-generated
@@ -113,8 +113,8 @@ pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contrac
             }
         },
         ACK_FAILURE_ID => match reply.result {
-            ContractResult::Ok(_) => Ok(Response::new()),
-            ContractResult::Err(err) => Ok(Response::new().set_data(ack_fail(err))),
+            SubMsgResult::Ok(_) => Ok(Response::new()),
+            SubMsgResult::Err(err) => Ok(Response::new().set_data(ack_fail(err))),
         },
         _ => Err(ContractError::UnknownReplyId { id: reply.id }),
     }

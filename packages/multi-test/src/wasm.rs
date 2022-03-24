@@ -4,9 +4,9 @@ use std::ops::Deref;
 
 use cosmwasm_std::{
     to_binary, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo,
-    ContractInfoResponse, ContractResult, CustomQuery, Deps, DepsMut, Env, Event, MessageInfo,
-    Order, Querier, QuerierWrapper, Reply, ReplyOn, Response, StdResult, Storage, SubMsg,
-    SubMsgExecutionResponse, TransactionInfo, WasmMsg, WasmQuery,
+    ContractInfoResponse, CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier,
+    QuerierWrapper, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgExecutionResponse,
+    SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
@@ -436,7 +436,7 @@ where
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Success) {
                 let reply = Reply {
                     id,
-                    result: ContractResult::Ok(SubMsgExecutionResponse {
+                    result: SubMsgResult::Ok(SubMsgExecutionResponse {
                         events: r.events.clone(),
                         data: r.data,
                     }),
@@ -457,7 +457,7 @@ where
             if matches!(reply_on, ReplyOn::Always | ReplyOn::Error) {
                 let reply = Reply {
                     id,
-                    result: ContractResult::Err(e.to_string()),
+                    result: SubMsgResult::Err(e.to_string()),
                 };
                 self._reply(api, router, storage, block, contract, reply)
             } else {
