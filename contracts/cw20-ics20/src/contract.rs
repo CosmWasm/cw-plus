@@ -365,9 +365,10 @@ mod test {
     use super::*;
     use crate::test_helpers::*;
 
-    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, CosmosMsg, IbcMsg, StdError, Uint128};
 
+    use crate::state::ChannelState;
     use cw_utils::PaymentError;
 
     #[test]
@@ -531,5 +532,37 @@ mod test {
         let info = mock_info(cw20_addr, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
         assert_eq!(err, ContractError::NotOnAllowList);
+    }
+
+    #[test]
+    fn v3_migration_works() {
+        // basic state with one channel
+        let send_channel = "channel-15";
+        let cw20_addr = "my-token";
+        let native = "ucosm";
+        let mut deps = setup(&[send_channel], &[(cw20_addr, 123456)]);
+
+        // mock that we sent some tokens in both native and cw20 (TODO: cw20)
+        // balances set high
+        deps.querier
+            .update_balance(MOCK_CONTRACT_ADDR, coins(50000, native));
+
+        // channel state a bit lower (some in-flight acks)
+        let state = ChannelState {
+            // 14000 not accounted for (in-flight)
+            outstanding: Uint128::new(36000),
+            total_sent: Uint128::new(100000),
+        };
+        CHANNEL_STATE
+            .save(deps.as_mut().storage, (send_channel, native), &state)
+            .unwrap();
+
+        // run migration
+        migrate(deps.as_mut(), mock_env(), MigrateMsg {}).unwrap();
+
+        // check new channel state
+        let chan = query_channel(deps.as_ref(), send_channel.into()).unwrap();
+        assert_eq!(chan.balances, vec![Amount::native(50000, native)]);
+        assert_eq!(chan.total_sent, vec![Amount::native(114000, native)]);
     }
 }
