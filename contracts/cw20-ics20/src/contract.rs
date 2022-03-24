@@ -108,19 +108,23 @@ pub fn execute_transfer(
     if !CHANNEL_INFO.has(deps.storage, &msg.channel) {
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
+    let config = CONFIG.load(deps.storage)?;
 
-    // if cw20 token, ensure it is whitelisted
+    // if cw20 token, validate and ensure it is whitelisted, or we set default gas limit
     if let Amount::Cw20(coin) = &amount {
         let addr = deps.api.addr_validate(&coin.address)?;
-        ALLOW_LIST
-            .may_load(deps.storage, &addr)?
-            .ok_or(ContractError::NotOnAllowList)?;
+        // if limit is set, then we always allow cw20
+        if config.default_gas_limit.is_none() {
+            ALLOW_LIST
+                .may_load(deps.storage, &addr)?
+                .ok_or(ContractError::NotOnAllowList)?;
+        }
     };
 
     // delta from user is in seconds
     let timeout_delta = match msg.timeout {
         Some(t) => t,
-        None => CONFIG.load(deps.storage)?.default_timeout,
+        None => config.default_timeout,
     };
     // timeout is in nanoseconds
     let timeout = env.block.time.plus_seconds(timeout_delta);

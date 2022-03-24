@@ -12,7 +12,7 @@ use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
     reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
-    CHANNEL_INFO, REPLY_ARGS,
+    CHANNEL_INFO, CONFIG, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -273,10 +273,14 @@ fn check_gas_limit(deps: Deps, amount: &Amount) -> Result<Option<u64>, ContractE
         Amount::Cw20(coin) => {
             // if cw20 token, use the registered gas limit, or error if not whitelisted
             let addr = deps.api.addr_validate(&coin.address)?;
-            Ok(ALLOW_LIST
-                .may_load(deps.storage, &addr)?
-                .ok_or(ContractError::NotOnAllowList)?
-                .gas_limit)
+            let allowed = ALLOW_LIST.may_load(deps.storage, &addr)?;
+            match allowed {
+                Some(allow) => Ok(allow.gas_limit),
+                None => match CONFIG.load(deps.storage)?.default_gas_limit {
+                    Some(base) => Ok(Some(base)),
+                    None => Err(ContractError::NotOnAllowList),
+                },
+            }
         }
         _ => Ok(None),
     }
