@@ -81,7 +81,6 @@ impl Proposal {
                     self.votes.yes >= votes_needed(opinions, threshold)
                 } else {
                     // If not expired, we must assume all non-votes will be cast against
-                    // vote_count
                     let possible_opinions = self.total_weight - self.votes.abstain;
                     self.votes.yes >= votes_needed(possible_opinions, threshold)
                 }
@@ -108,18 +107,16 @@ impl Proposal {
                         Decimal::one() - percentage_needed,
                     )
             }
-            Threshold::ThresholdQuorum { threshold, quorum } => {
-                // we always require the quorum
-                if self.votes.total() < votes_needed(self.total_weight, quorum) {
-                    return false;
-                }
+            Threshold::ThresholdQuorum {
+                threshold,
+                quorum: _,
+            } => {
                 if self.expires.is_expired(block) {
                     // If expired, we compare vote_count against the total number of votes (minus abstain).
                     let opinions = self.votes.total() - self.votes.abstain;
                     self.votes.no > votes_needed(opinions, Decimal::one() - threshold)
                 } else {
-                    // If not expired, we must assume all non-votes will be cast against
-                    // vote_count
+                    // If not expired, we must assume all non-votes will be cast for
                     let possible_opinions = self.total_weight - self.votes.abstain;
                     self.votes.no > votes_needed(possible_opinions, Decimal::one() - threshold)
                 }
@@ -464,12 +461,37 @@ mod test {
             30,
             true
         ));
-        // Under quorum means it cannot be rejected
-        // (40% of 50 = 20), 13 votes casted
+
+        // Under quorum and cannot reject as it is not expired
         assert!(!check_is_rejected(
             quorum.clone(),
             rejecting.clone(),
             50,
+            false
+        ));
+        // Can reject when expired
+        assert!(check_is_rejected(
+            quorum.clone(),
+            rejecting.clone(),
+            50,
+            true
+        ));
+
+        // Check edgecase where quorum is not met but we can reject
+        // 35% vote no
+        let quorum_edgecase = Threshold::ThresholdQuorum {
+            threshold: Decimal::percent(67),
+            quorum: Decimal::percent(40),
+        };
+        assert!(check_is_rejected(
+            quorum_edgecase,
+            Votes {
+                yes: 15,
+                no: 35,
+                abstain: 0,
+                veto: 10
+            },
+            100,
             true
         ));
 
