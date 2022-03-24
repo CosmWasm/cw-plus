@@ -203,7 +203,7 @@ const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
 const MIGRATE_VERSION_3: &str = "0.13.1";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
     let stored = get_contract_version(deps.storage)?;
     let storage_version: Version = stored.version.parse().map_err(from_semver)?;
@@ -243,6 +243,15 @@ pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response
         v2::update_balances(deps.branch(), &env)?;
     }
     // otherwise no migration (yet) - add them here
+
+    // always allow setting the default gas limit via MigrateMsg, even if same version
+    // (Note this doesn't allow unsetting it now)
+    if msg.default_gas_limit.is_some() {
+        CONFIG.update(deps.storage, |mut old| -> StdResult<_> {
+            old.default_gas_limit = msg.default_gas_limit;
+            Ok(old)
+        })?;
+    }
 
     // we don't need to save anything if migrating from the same version
     if storage_version < version {
@@ -561,11 +570,22 @@ mod test {
             .unwrap();
 
         // run migration
-        migrate(deps.as_mut(), mock_env(), MigrateMsg {}).unwrap();
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                default_gas_limit: Some(123456),
+            },
+        )
+        .unwrap();
 
         // check new channel state
         let chan = query_channel(deps.as_ref(), send_channel.into()).unwrap();
         assert_eq!(chan.balances, vec![Amount::native(50000, native)]);
         assert_eq!(chan.total_sent, vec![Amount::native(114000, native)]);
+
+        // check config updates
+        let config = query_config(deps.as_ref()).unwrap();
+        assert_eq!(config.default_gas_limit, Some(123456));
     }
 }

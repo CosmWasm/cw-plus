@@ -26,7 +26,9 @@ pub struct AllowMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub default_gas_limit: Option<u64>,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
