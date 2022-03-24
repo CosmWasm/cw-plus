@@ -12,7 +12,7 @@ use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
     reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
-    CHANNEL_INFO, REPLY_ARGS,
+    CHANNEL_INFO, CONFIG, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -273,10 +273,14 @@ fn check_gas_limit(deps: Deps, amount: &Amount) -> Result<Option<u64>, ContractE
         Amount::Cw20(coin) => {
             // if cw20 token, use the registered gas limit, or error if not whitelisted
             let addr = deps.api.addr_validate(&coin.address)?;
-            Ok(ALLOW_LIST
-                .may_load(deps.storage, &addr)?
-                .ok_or(ContractError::NotOnAllowList)?
-                .gas_limit)
+            let allowed = ALLOW_LIST.may_load(deps.storage, &addr)?;
+            match allowed {
+                Some(allow) => Ok(allow.gas_limit),
+                None => match CONFIG.load(deps.storage)?.default_gas_limit {
+                    Some(base) => Ok(Some(base)),
+                    None => Err(ContractError::NotOnAllowList),
+                },
+            }
         }
         _ => Ok(None),
     }
@@ -386,8 +390,8 @@ mod test {
     use super::*;
     use crate::test_helpers::*;
 
-    use crate::contract::{execute, query_channel};
-    use crate::msg::{ExecuteMsg, TransferMsg};
+    use crate::contract::{execute, migrate, query_channel};
+    use crate::msg::{ExecuteMsg, MigrateMsg, TransferMsg};
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
     use cw20::Cw20ReceiveMsg;
@@ -620,5 +624,40 @@ mod test {
         let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
         assert_eq!(state.balances, vec![Amount::native(111111111, denom)]);
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
+    }
+
+    #[test]
+    fn check_gas_limit_handles_all_cases() {
+        let send_channel = "channel-9";
+        let allowed = "foobar";
+        let allowed_gas = 777666;
+        let mut deps = setup(&[send_channel], &[(allowed, allowed_gas)]);
+
+        // allow list will get proper gas
+        let limit = check_gas_limit(deps.as_ref(), &Amount::cw20(500, allowed)).unwrap();
+        assert_eq!(limit, Some(allowed_gas));
+
+        // non-allow list will error
+        let random = "tokenz";
+        check_gas_limit(deps.as_ref(), &Amount::cw20(500, random)).unwrap_err();
+
+        // add default_gas_limit
+        let def_limit = 54321;
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                default_gas_limit: Some(def_limit),
+            },
+        )
+        .unwrap();
+
+        // allow list still gets proper gas
+        let limit = check_gas_limit(deps.as_ref(), &Amount::cw20(500, allowed)).unwrap();
+        assert_eq!(limit, Some(allowed_gas));
+
+        // non-allow list will now get default
+        let limit = check_gas_limit(deps.as_ref(), &Amount::cw20(500, random)).unwrap();
+        assert_eq!(limit, Some(def_limit));
     }
 }

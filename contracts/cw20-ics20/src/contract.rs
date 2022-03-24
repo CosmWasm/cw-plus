@@ -38,6 +38,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
+        default_gas_limit: msg.default_gas_limit,
     };
     CONFIG.save(deps.storage, &cfg)?;
 
@@ -107,19 +108,23 @@ pub fn execute_transfer(
     if !CHANNEL_INFO.has(deps.storage, &msg.channel) {
         return Err(ContractError::NoSuchChannel { id: msg.channel });
     }
+    let config = CONFIG.load(deps.storage)?;
 
-    // if cw20 token, ensure it is whitelisted
+    // if cw20 token, validate and ensure it is whitelisted, or we set default gas limit
     if let Amount::Cw20(coin) = &amount {
         let addr = deps.api.addr_validate(&coin.address)?;
-        ALLOW_LIST
-            .may_load(deps.storage, &addr)?
-            .ok_or(ContractError::NotOnAllowList)?;
+        // if limit is set, then we always allow cw20
+        if config.default_gas_limit.is_none() {
+            ALLOW_LIST
+                .may_load(deps.storage, &addr)?
+                .ok_or(ContractError::NotOnAllowList)?;
+        }
     };
 
     // delta from user is in seconds
     let timeout_delta = match msg.timeout {
         Some(t) => t,
-        None => CONFIG.load(deps.storage)?.default_timeout,
+        None => config.default_timeout,
     };
     // timeout is in nanoseconds
     let timeout = env.block.time.plus_seconds(timeout_delta);
@@ -202,7 +207,7 @@ const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
 const MIGRATE_VERSION_3: &str = "0.13.1";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
     let stored = get_contract_version(deps.storage)?;
     let storage_version: Version = stored.version.parse().map_err(from_semver)?;
@@ -233,6 +238,7 @@ pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response
         ADMIN.set(deps.branch(), Some(old_config.gov_contract))?;
         let config = Config {
             default_timeout: old_config.default_timeout,
+            default_gas_limit: None,
         };
         CONFIG.save(deps.storage, &config)?;
     }
@@ -241,6 +247,15 @@ pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response
         v2::update_balances(deps.branch(), &env)?;
     }
     // otherwise no migration (yet) - add them here
+
+    // always allow setting the default gas limit via MigrateMsg, even if same version
+    // (Note this doesn't allow unsetting it now)
+    if msg.default_gas_limit.is_some() {
+        CONFIG.update(deps.storage, |mut old| -> StdResult<_> {
+            old.default_gas_limit = msg.default_gas_limit;
+            Ok(old)
+        })?;
+    }
 
     // we don't need to save anything if migrating from the same version
     if storage_version < version {
@@ -313,6 +328,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let admin = ADMIN.get(deps)?.unwrap_or_else(|| Addr::unchecked(""));
     let res = ConfigResponse {
         default_timeout: cfg.default_timeout,
+        default_gas_limit: cfg.default_gas_limit,
         gov_contract: admin.into(),
     };
     Ok(res)
@@ -512,9 +528,9 @@ mod test {
     }
 
     #[test]
-    fn execute_cw20_fails_if_not_whitelisted() {
+    fn execute_cw20_fails_if_not_whitelisted_unless_default_gas_limit() {
         let send_channel = "channel-15";
-        let mut deps = setup(&["channel-3", send_channel], &[]);
+        let mut deps = setup(&[send_channel], &[]);
 
         let cw20_addr = "my-token";
         let transfer = TransferMsg {
@@ -528,10 +544,23 @@ mod test {
             msg: to_binary(&transfer).unwrap(),
         });
 
-        // works with proper funds
+        // rejected as not on allow list
         let info = mock_info(cw20_addr, &[]);
-        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap_err();
         assert_eq!(err, ContractError::NotOnAllowList);
+
+        // add a default gas limit
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                default_gas_limit: Some(123456),
+            },
+        )
+        .unwrap();
+
+        // try again
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     }
 
     #[test]
@@ -558,11 +587,22 @@ mod test {
             .unwrap();
 
         // run migration
-        migrate(deps.as_mut(), mock_env(), MigrateMsg {}).unwrap();
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                default_gas_limit: Some(123456),
+            },
+        )
+        .unwrap();
 
         // check new channel state
         let chan = query_channel(deps.as_ref(), send_channel.into()).unwrap();
         assert_eq!(chan.balances, vec![Amount::native(50000, native)]);
         assert_eq!(chan.total_sent, vec![Amount::native(114000, native)]);
+
+        // check config updates
+        let config = query_config(deps.as_ref()).unwrap();
+        assert_eq!(config.default_gas_limit, Some(123456));
     }
 }
