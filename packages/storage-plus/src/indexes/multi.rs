@@ -23,8 +23,11 @@ use std::marker::PhantomData;
 /// The stored pk_len is used to recover the pk from the index namespace, and perform
 /// the secondary load of the associated value from the main map.
 ///
-/// The (optional) PK type defines the type of Primary Key deserialization.
-pub struct MultiIndex<'a, IK, T, PK = ()> {
+/// The PK type defines the type of Primary Key, both for deserialization, and
+/// more important, type-safe bound key type.
+/// This type must match the encompassing `IndexedMap` primary key type,
+/// or its owned variant.
+pub struct MultiIndex<'a, IK, T, PK> {
     index: fn(&T) -> IK,
     idx_namespace: &'a [u8],
     // note, we collapse the ik - combining everything under the namespace - and concatenating the pk
