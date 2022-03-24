@@ -116,12 +116,12 @@ impl Proposal {
                 if self.expires.is_expired(block) {
                     // If expired, we compare vote_count against the total number of votes (minus abstain).
                     let opinions = self.votes.total() - self.votes.abstain;
-                    self.votes.no >= votes_needed(opinions, Decimal::one() - threshold)
+                    self.votes.no > votes_needed(opinions, Decimal::one() - threshold)
                 } else {
                     // If not expired, we must assume all non-votes will be cast against
                     // vote_count
                     let possible_opinions = self.total_weight - self.votes.abstain;
-                    self.votes.no >= votes_needed(possible_opinions, Decimal::one() - threshold)
+                    self.votes.no > votes_needed(possible_opinions, Decimal::one() - threshold)
                 }
             }
         }
