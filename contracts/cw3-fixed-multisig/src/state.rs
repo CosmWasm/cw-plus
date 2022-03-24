@@ -469,7 +469,7 @@ mod test {
             50,
             false
         ));
-        // Can reject when expired
+        // Can reject when expired.
         assert!(check_is_rejected(
             quorum.clone(),
             rejecting.clone(),
