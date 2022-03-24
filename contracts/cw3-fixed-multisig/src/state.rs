@@ -103,7 +103,7 @@ impl Proposal {
                 percentage: percentage_needed,
             } => {
                 self.votes.no
-                    >= votes_needed(
+                    > votes_needed(
                         self.total_weight - self.votes.abstain,
                         Decimal::one() - percentage_needed,
                     )
