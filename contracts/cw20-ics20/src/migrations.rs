@@ -37,7 +37,7 @@ pub mod v2 {
                 for (denom, mut state) in states.into_iter() {
                     // this checks if we have received some coins that are "in flight" and not yet accounted in the state
                     let Coin { amount, .. } = deps.querier.query_balance(addr, &denom)?;
-                    let diff = state.outstanding - amount;
+                    let diff = amount - state.outstanding;
                     // if they are in flight, we add them to the internal state now, as if we added them when sent (not when acked)
                     // to match the current logic
                     if !diff.is_zero() {
