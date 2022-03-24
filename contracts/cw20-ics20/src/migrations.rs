@@ -60,16 +60,14 @@ pub mod v2 {
             Amount::Cw20(coin) => {
                 // FIXME: we should be able to do this with the following line, but QuerierWrapper doesn't play
                 // with the Querier generics
-                // Cw20Contract(contract.clone()).balance(&deps.querier, contract)?
-                let msg = Cw20QueryMsg::Balance {
-                    address: contract.into(),
-                };
+                // `Cw20Contract(contract.clone()).balance(&deps.querier, contract)?`
                 let query = WasmQuery::Smart {
                     contract_addr: coin.address,
-                    msg: to_binary(&msg)?,
-                }
-                .into();
-                let res: BalanceResponse = deps.querier.query(&query)?;
+                    msg: to_binary(&Cw20QueryMsg::Balance {
+                        address: contract.into(),
+                    })?,
+                };
+                let res: BalanceResponse = deps.querier.query(&query.into())?;
                 res.balance
             }
         };
