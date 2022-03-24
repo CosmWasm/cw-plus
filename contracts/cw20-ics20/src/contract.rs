@@ -13,7 +13,7 @@ use cw_storage_plus::Bound;
 use crate::amount::Amount;
 use crate::error::ContractError;
 use crate::ibc::Ics20Packet;
-use crate::migrations::v1;
+use crate::migrations::{v1, v2};
 use crate::msg::{
     AllowMsg, AllowedInfo, AllowedResponse, ChannelResponse, ConfigResponse, ExecuteMsg, InitMsg,
     ListAllowedResponse, ListChannelsResponse, MigrateMsg, PortResponse, QueryMsg, TransferMsg,
@@ -199,9 +199,10 @@ pub fn execute_allow(
 
 const MIGRATE_MIN_VERSION: &str = "0.11.1";
 const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
+const MIGRATE_VERSION_3: &str = "0.13.1";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
     let stored = get_contract_version(deps.storage)?;
     let storage_version: Version = stored.version.parse().map_err(from_semver)?;
@@ -234,6 +235,10 @@ pub fn migrate(mut deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Respons
             default_timeout: old_config.default_timeout,
         };
         CONFIG.save(deps.storage, &config)?;
+    }
+    // run the v2->v3 converstion if we are v2 style
+    if storage_version <= MIGRATE_VERSION_3.parse().map_err(from_semver)? {
+        v2::update_balances(deps.branch(), &env)?;
     }
     // otherwise no migration (yet) - add them here
 
