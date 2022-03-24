@@ -528,9 +528,9 @@ mod test {
     }
 
     #[test]
-    fn execute_cw20_fails_if_not_whitelisted() {
+    fn execute_cw20_fails_if_not_whitelisted_unless_default_gas_limit() {
         let send_channel = "channel-15";
-        let mut deps = setup(&["channel-3", send_channel], &[]);
+        let mut deps = setup(&[send_channel], &[]);
 
         let cw20_addr = "my-token";
         let transfer = TransferMsg {
@@ -544,10 +544,23 @@ mod test {
             msg: to_binary(&transfer).unwrap(),
         });
 
-        // works with proper funds
+        // rejected as not on allow list
         let info = mock_info(cw20_addr, &[]);
-        let err = execute(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+        let err = execute(deps.as_mut(), mock_env(), info.clone(), msg.clone()).unwrap_err();
         assert_eq!(err, ContractError::NotOnAllowList);
+
+        // add a default gas limit
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                default_gas_limit: Some(123456),
+            },
+        )
+        .unwrap();
+
+        // try again
+        execute(deps.as_mut(), mock_env(), info, msg).unwrap();
     }
 
     #[test]
