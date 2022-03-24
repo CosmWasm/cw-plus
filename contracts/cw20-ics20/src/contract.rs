@@ -38,6 +38,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
+        default_gas_limit: msg.default_gas_limit,
     };
     CONFIG.save(deps.storage, &cfg)?;
 
@@ -233,6 +234,7 @@ pub fn migrate(mut deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response
         ADMIN.set(deps.branch(), Some(old_config.gov_contract))?;
         let config = Config {
             default_timeout: old_config.default_timeout,
+            default_gas_limit: None,
         };
         CONFIG.save(deps.storage, &config)?;
     }
@@ -313,6 +315,7 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     let admin = ADMIN.get(deps)?.unwrap_or_else(|| Addr::unchecked(""));
     let res = ConfigResponse {
         default_timeout: cfg.default_timeout,
+        default_gas_limit: cfg.default_gas_limit,
         gov_contract: admin.into(),
     };
     Ok(res)

@@ -14,6 +14,9 @@ pub struct InitMsg {
     pub gov_contract: String,
     /// initial allowlist - all cw20 tokens we will send must be previously allowed by governance
     pub allowlist: Vec<AllowMsg>,
+    /// If set, contracts off the allowlist will run with this gas limit.
+    /// If unset, will refuse to accept any contract off the allow list.
+    pub default_gas_limit: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -98,6 +101,7 @@ pub struct PortResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ConfigResponse {
     pub default_timeout: u64,
+    pub default_gas_limit: Option<u64>,
     pub gov_contract: String,
 }
 
