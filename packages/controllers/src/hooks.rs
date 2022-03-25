@@ -121,6 +121,19 @@ impl<'a> Hooks<'a> {
         let hooks = hooks.into_iter().map(String::from).collect();
         Ok(HooksResponse { hooks })
     }
+
+    // Returns true is this_hook is in hooks; false otherwiseq
+    pub fn query_this_hook<Q: CustomQuery>(&self, deps: Deps<Q>, this_hook: String) -> StdResult<bool> {
+        let hooks = self.query_hooks(deps)?;
+
+        for i in 0..hooks.hooks.len() {
+             if hooks.hooks[i] == this_hook
+            {
+                return Ok(true);
+            }
+        }
+        return Ok(false);
+    }
 }
 
 // TODO: add test coverage
