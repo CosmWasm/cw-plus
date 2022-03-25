@@ -12,7 +12,6 @@
 
 - cw20-base: duplicate accounts get overwritten in Init [\#683](https://github.com/CosmWasm/cw-plus/issues/683)
 - Implementation of hooks.rs \(not\) as `HashMap` [\#682](https://github.com/CosmWasm/cw-plus/issues/682)
-- Release `cw-plus` v0.13.0 [\#673](https://github.com/CosmWasm/cw-plus/issues/673)
 - ICS20, invalid packet data [\#662](https://github.com/CosmWasm/cw-plus/issues/662)
 - Duplicate accounts in cw20 initial balances causes unrecoverable inconsistent state [\#626](https://github.com/CosmWasm/cw-plus/issues/626)
 
@@ -36,6 +35,7 @@
 
 **Closed issues:**
 
+- Release `cw-plus` v0.13.0 [\#673](https://github.com/CosmWasm/cw-plus/issues/673)
 - Querying over composite key [\#664](https://github.com/CosmWasm/cw-plus/issues/664)
 - the method `may_load` exists for struct `cw_storage_plus::Map<'static, (std::string::String, Uint256), Uint256>`, but its trait bounds were not satisfied the following trait bounds were not satisfied: `(std::string::String, Uint256): PrimaryKey` [\#663](https://github.com/CosmWasm/cw-plus/issues/663)
 - Make `Bound` helpers return `Option<Self>` [\#644](https://github.com/CosmWasm/cw-plus/issues/644)
