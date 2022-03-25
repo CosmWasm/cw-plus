@@ -7,7 +7,7 @@ function print_usage() {
   echo "Publishes crates to crates.io."
 }
 
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]
+if [ $# = 1 ] && ( [ "$1" = "-h" ] || [ "$1" = "--help" ] )
 then
     print_usage
     exit 1
