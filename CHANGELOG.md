@@ -2,7 +2,28 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.0...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.1...HEAD)
+
+## [v0.13.1](https://github.com/CosmWasm/cw-plus/tree/v0.13.1) (2022-03-25)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.0...v0.13.1)
+
+**Closed issues:**
+
+- cw20-base: duplicate accounts get overwritten in Init [\#683](https://github.com/CosmWasm/cw-plus/issues/683)
+- Implementation of hooks.rs \(not\) as `HashMap` [\#682](https://github.com/CosmWasm/cw-plus/issues/682)
+- ICS20, invalid packet data [\#662](https://github.com/CosmWasm/cw-plus/issues/662)
+- Duplicate accounts in cw20 initial balances causes unrecoverable inconsistent state [\#626](https://github.com/CosmWasm/cw-plus/issues/626)
+
+**Merged pull requests:**
+
+- Add default gas limit to cw20-ics20 [\#685](https://github.com/CosmWasm/cw-plus/pull/685) ([ethanfrey](https://github.com/ethanfrey))
+- Fix cw20 ics20 packets [\#684](https://github.com/CosmWasm/cw-plus/pull/684) ([ethanfrey](https://github.com/ethanfrey))
+- Clarify the stability of cw-storage-plus, no longer Experimental [\#676](https://github.com/CosmWasm/cw-plus/pull/676) ([ethanfrey](https://github.com/ethanfrey))
+- Update changelog add upcoming [\#675](https://github.com/CosmWasm/cw-plus/pull/675) ([maurolacy](https://github.com/maurolacy))
+- Reject proposals early [\#668](https://github.com/CosmWasm/cw-plus/pull/668) ([Callum-A](https://github.com/Callum-A))
+- cw20-base: validate addresses are unique in initial balances [\#659](https://github.com/CosmWasm/cw-plus/pull/659) ([harryscholes](https://github.com/harryscholes))
+- New SECURITY.md refering to wasmd [\#624](https://github.com/CosmWasm/cw-plus/pull/624) ([ethanfrey](https://github.com/ethanfrey))
 
 ## [v0.13.0](https://github.com/CosmWasm/cw-plus/tree/v0.13.0) (2022-03-09)
 
@@ -14,6 +35,7 @@
 
 **Closed issues:**
 
+- Release `cw-plus` v0.13.0 [\#673](https://github.com/CosmWasm/cw-plus/issues/673)
 - Querying over composite key [\#664](https://github.com/CosmWasm/cw-plus/issues/664)
 - the method `may_load` exists for struct `cw_storage_plus::Map<'static, (std::string::String, Uint256), Uint256>`, but its trait bounds were not satisfied the following trait bounds were not satisfied: `(std::string::String, Uint256): PrimaryKey` [\#663](https://github.com/CosmWasm/cw-plus/issues/663)
 - Make `Bound` helpers return `Option<Self>` [\#644](https://github.com/CosmWasm/cw-plus/issues/644)
