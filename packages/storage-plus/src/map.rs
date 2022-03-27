@@ -196,7 +196,7 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
+    K: PrimaryKey<'a> + Bounder<'a>,
 {
     pub fn range_raw<'c>(
         &self,
@@ -223,7 +223,14 @@ where
     {
         self.no_prefix_raw().keys_raw(store, min, max, order)
     }
+}
 
+#[cfg(feature = "iterator")]
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
+{
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
