@@ -106,7 +106,7 @@ pub enum QueryMsg {
     /// Return type: MarketingInfoResponse
     MarketingInfo {},
     /// Only with "marketing" extension
-    /// Downloads the mbeded logo data (if stored on chain). Errors if no logo data ftored for this
+    /// Downloads the embedded logo data (if stored on chain). Errors if no logo data is stored for this
     /// contract.
     /// Return type: DownloadLogoResponse.
     DownloadLogo {},
