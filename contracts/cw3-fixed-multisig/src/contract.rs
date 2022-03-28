@@ -764,6 +764,90 @@ mod tests {
         let info = mock_info(VOTER5, &[]);
         let err = execute(deps.as_mut(), mock_env(), info, yes_vote).unwrap_err();
         assert_eq!(err, ContractError::NotOpen {});
+
+        // Propose
+        let info = mock_info(OWNER, &[]);
+        let bank_msg = BankMsg::Send {
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = ExecuteMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // Cast a No vote
+        let no_vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::No,
+        };
+        // Voter1 vote no, weight 1
+        let info = mock_info(VOTER1, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
+
+        // Verify it is not enough to reject yet
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER1)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Open")
+        );
+
+        // Voter 4 votes no, weight 4, total weight for no so far 5, need 14 to reject
+        let info = mock_info(VOTER4, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
+
+        // Verify it is still open as we actually need no votes > 16 - 3
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER4)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Open")
+        );
+
+        // Voter 3 votes no, weight 3, total weight for no far 8, need 14
+        let info = mock_info(VOTER3, &[]);
+        let _res = execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
+
+        // Voter 5 votes no, weight 5, total weight for no far 13, need 14
+        let info = mock_info(VOTER5, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
+
+        // Verify it is still open as we actually need no votes > 16 - 3
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER5)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Open")
+        );
+
+        // Voter 2 votes no, weight 2, total weight for no so far 15, need 14.
+        // Can now reject
+        let info = mock_info(VOTER2, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, no_vote).unwrap();
+
+        // Verify it is rejected as, 15 no votes > 16 - 3
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER2)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Rejected")
+        );
     }
 
     #[test]

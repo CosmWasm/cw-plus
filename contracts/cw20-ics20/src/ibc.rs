@@ -11,8 +11,8 @@ use cosmwasm_std::{
 use crate::amount::Amount;
 use crate::error::{ContractError, Never};
 use crate::state::{
-    increase_channel_balance, reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo,
-    ReplyArgs, ALLOW_LIST, CHANNEL_INFO, REPLY_ARGS,
+    reduce_channel_balance, undo_reduce_channel_balance, ChannelInfo, ReplyArgs, ALLOW_LIST,
+    CHANNEL_INFO, CONFIG, REPLY_ARGS,
 };
 use cw20::Cw20ExecuteMsg;
 
@@ -32,11 +32,7 @@ pub struct Ics20Packet {
     pub receiver: String,
     /// the sender address
     pub sender: String,
-    /// used only by us to control ack handling
-    pub v: Option<u32>,
 }
-
-const V2: u32 = 2;
 
 impl Ics20Packet {
     pub fn new<T: Into<String>>(amount: Uint128, denom: T, sender: &str, receiver: &str) -> Self {
@@ -45,7 +41,6 @@ impl Ics20Packet {
             amount,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
-            v: Some(V2),
         }
     }
 
@@ -278,10 +273,14 @@ fn check_gas_limit(deps: Deps, amount: &Amount) -> Result<Option<u64>, ContractE
         Amount::Cw20(coin) => {
             // if cw20 token, use the registered gas limit, or error if not whitelisted
             let addr = deps.api.addr_validate(&coin.address)?;
-            Ok(ALLOW_LIST
-                .may_load(deps.storage, &addr)?
-                .ok_or(ContractError::NotOnAllowList)?
-                .gas_limit)
+            let allowed = ALLOW_LIST.may_load(deps.storage, &addr)?;
+            match allowed {
+                Some(allow) => Ok(allow.gas_limit),
+                None => match CONFIG.load(deps.storage)?.default_gas_limit {
+                    Some(base) => Ok(Some(base)),
+                    None => Err(ContractError::NotOnAllowList),
+                },
+            }
         }
         _ => Ok(None),
     }
@@ -317,14 +316,8 @@ pub fn ibc_packet_timeout(
 }
 
 // update the balance stored on this (channel, denom) index
-fn on_packet_success(deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
+fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
-
-    // if this was for an older (pre-v2) packet we send continue with old behavior
-    // (this is needed for transitioning on a system with pending packet)
-    if msg.v.is_none() {
-        increase_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
-    }
 
     // similar event messages like ibctransfer module
     let attributes = vec![
@@ -347,10 +340,8 @@ fn on_packet_failure(
 ) -> Result<IbcBasicResponse, ContractError> {
     let msg: Ics20Packet = from_binary(&packet.data)?;
 
-    // undo the balance update (but not for pre-v2/None packets which didn't add before sending)
-    if msg.v.is_some() {
-        reduce_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
-    }
+    // undo the balance update on failure (as we pre-emptively added it on send)
+    reduce_channel_balance(deps.storage, &packet.src.channel_id, &msg.denom, msg.amount)?;
 
     let to_send = Amount::from_parts(msg.denom.clone(), msg.amount);
     let gas_limit = check_gas_limit(deps.as_ref(), &to_send)?;
@@ -399,8 +390,8 @@ mod test {
     use super::*;
     use crate::test_helpers::*;
 
-    use crate::contract::{execute, query_channel};
-    use crate::msg::{ExecuteMsg, TransferMsg};
+    use crate::contract::{execute, migrate, query_channel};
+    use crate::msg::{ExecuteMsg, MigrateMsg, TransferMsg};
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
     use cw20::Cw20ReceiveMsg;
@@ -426,7 +417,7 @@ mod test {
             "wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc",
         );
         // Example message generated from the SDK
-        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n","v":2}"#;
+        let expected = r#"{"amount":"12345","denom":"ucosm","receiver":"wasm1fucynrfkrt684pm8jrt8la5h2csvs5cnldcgqc","sender":"cosmos1zedxv25ah8fksmg2lzrndrpkvsjqgk4zt5ff7n"}"#;
 
         let encdoded = String::from_utf8(to_vec(&packet).unwrap()).unwrap();
         assert_eq!(expected, encdoded.as_str());
@@ -474,7 +465,6 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
-            v: Some(V2),
         };
         print!("Packet denom: {}", &data.denom);
         IbcPacket::new(
@@ -535,7 +525,6 @@ mod test {
             amount: Uint128::new(987654321),
             sender: "local-sender".to_string(),
             receiver: "remote-rcpt".to_string(),
-            v: Some(V2),
         };
         let timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
         assert_eq!(
@@ -635,5 +624,40 @@ mod test {
         let state = query_channel(deps.as_ref(), send_channel.to_string()).unwrap();
         assert_eq!(state.balances, vec![Amount::native(111111111, denom)]);
         assert_eq!(state.total_sent, vec![Amount::native(987654321, denom)]);
+    }
+
+    #[test]
+    fn check_gas_limit_handles_all_cases() {
+        let send_channel = "channel-9";
+        let allowed = "foobar";
+        let allowed_gas = 777666;
+        let mut deps = setup(&[send_channel], &[(allowed, allowed_gas)]);
+
+        // allow list will get proper gas
+        let limit = check_gas_limit(deps.as_ref(), &Amount::cw20(500, allowed)).unwrap();
+        assert_eq!(limit, Some(allowed_gas));
+
+        // non-allow list will error
+        let random = "tokenz";
+        check_gas_limit(deps.as_ref(), &Amount::cw20(500, random)).unwrap_err();
+
+        // add default_gas_limit
+        let def_limit = 54321;
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                default_gas_limit: Some(def_limit),
+            },
+        )
+        .unwrap();
+
+        // allow list still gets proper gas
+        let limit = check_gas_limit(deps.as_ref(), &Amount::cw20(500, allowed)).unwrap();
+        assert_eq!(limit, Some(allowed_gas));
+
+        // non-allow list will now get default
+        let limit = check_gas_limit(deps.as_ref(), &Amount::cw20(500, random)).unwrap();
+        assert_eq!(limit, Some(def_limit));
     }
 }
