@@ -18,6 +18,7 @@ mod snapshot;
 
 #[cfg(feature = "iterator")]
 pub use bound::{Bound, Bounder, PrefixBound, RawBound};
+pub use de::KeyDeserialize;
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};

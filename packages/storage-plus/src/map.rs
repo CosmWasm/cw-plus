@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 #[cfg(feature = "iterator")]
-use crate::bound::{Bound, Bounder, PrefixBound};
+use crate::bound::{Bound, PrefixBound};
 #[cfg(feature = "iterator")]
 use crate::de::KeyDeserialize;
 use crate::helpers::query_raw;
@@ -196,7 +196,7 @@ where
 impl<'a, K, T> Map<'a, K, T>
 where
     T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a> + KeyDeserialize + Bounder<'a>,
+    K: PrimaryKey<'a>,
 {
     pub fn range_raw<'c>(
         &self,
@@ -223,7 +223,14 @@ where
     {
         self.no_prefix_raw().keys_raw(store, min, max, order)
     }
+}
 
+#[cfg(feature = "iterator")]
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a> + KeyDeserialize,
+{
     pub fn range<'c>(
         &self,
         store: &'c dyn Storage,
@@ -262,6 +269,9 @@ mod test {
     use cosmwasm_std::testing::MockStorage;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
+
+    #[cfg(feature = "iterator")]
+    use crate::bound::Bounder;
 
     use crate::int_key::CwIntKey;
     #[cfg(feature = "iterator")]
