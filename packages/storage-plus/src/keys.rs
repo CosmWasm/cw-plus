@@ -11,6 +11,7 @@ pub enum Key<'a> {
     Val16([u8; 2]),
     Val32([u8; 4]),
     Val64([u8; 8]),
+    Val128([u8; 16]),
 }
 
 impl<'a> AsRef<[u8]> for Key<'a> {
@@ -21,6 +22,7 @@ impl<'a> AsRef<[u8]> for Key<'a> {
             Key::Val16(v) => v,
             Key::Val32(v) => v,
             Key::Val64(v) => v,
+            Key::Val128(v) => v
         }
     }
 }
@@ -286,7 +288,7 @@ macro_rules! integer_key {
     }
 }
 
-integer_key!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
+integer_key!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64, i128, Val128, u128, Val128);
 
 macro_rules! integer_prefix {
     (for $($t:ty, $v:tt),+) => {
@@ -298,7 +300,7 @@ macro_rules! integer_prefix {
     }
 }
 
-integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64);
+integer_prefix!(for i8, Val8, u8, Val8, i16, Val16, u16, Val16, i32, Val32, u32, Val32, i64, Val64, u64, Val64, i128, Val128, u128, Val128);
 
 #[cfg(test)]
 mod test {
@@ -354,6 +356,19 @@ mod test {
         let path = k.key();
         assert_eq!(1, path.len());
         assert_eq!(4242i64.to_cw_bytes(), path[0].as_ref());
+    }
+
+    #[test]
+    fn naked_128key_works() {
+        let k: u128 = 4242u128;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242u128.to_cw_bytes(), path[0].as_ref());
+
+        let k: i128 = 4242i128;
+        let path = k.key();
+        assert_eq!(1, path.len());
+        assert_eq!(4242i128.to_cw_bytes(), path[0].as_ref());
     }
 
     #[test]
