@@ -22,7 +22,7 @@ impl<'a> AsRef<[u8]> for Key<'a> {
             Key::Val16(v) => v,
             Key::Val32(v) => v,
             Key::Val64(v) => v,
-            Key::Val128(v) => v
+            Key::Val128(v) => v,
         }
     }
 }
