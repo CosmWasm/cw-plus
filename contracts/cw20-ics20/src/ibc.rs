@@ -557,7 +557,7 @@ mod test {
             res.messages[0]
         );
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
-        matches!(ack, Ics20Ack::Result(_));
+        assert!(matches!(ack, Ics20Ack::Result(_)));
 
         // TODO: we need to call the reply block
 
@@ -616,7 +616,7 @@ mod test {
             res.messages[0]
         );
         let ack: Ics20Ack = from_binary(&res.acknowledgement).unwrap();
-        matches!(ack, Ics20Ack::Result(_));
+        assert!(matches!(ack, Ics20Ack::Result(_)));
 
         // only need to call reply block on error case
 
