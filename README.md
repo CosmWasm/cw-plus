@@ -127,22 +127,6 @@ CW20 Fungible Tokens:
 * [`cw20-base`](./contracts/cw20-base) a straightforward, but complete
 implementation of the cw20 spec along with all extensions. Can be deployed
 as-is, or imported by other contracts.
-* [`cw20-atomic-swap`](./contracts/cw20-atomic-swap) an implementation of atomic swaps for
-both native and cw20 tokens.
-* [`cw20-bonding`](./contracts/cw20-bonding) a smart contract implementing arbitrary bonding curves,
-which can use native and cw20 tokens as reserve tokens.
-* [`cw20-staking`](./contracts/cw20-staking) provides staking derivatives,
-staking native tokens on your behalf and minting cw20 tokens that can
-be used to claim them. It uses `cw20-base` for all the cw20 logic and
-only implements the interactions with the staking module and accounting
-for prices.
-* [`cw20-escrow`](./contracts/cw20-escrow) is a basic escrow contract
-(arbiter can release or refund tokens) that is compatible with all native
-and cw20 tokens. This is a good example to show how to interact with
-cw20 tokens.
-
-* [`cw20-merkle-airdrop`](./contracts/cw20-merkle-airdrop) is a contract
-  for efficient cw20 token airdrop distribution.
 
 ## Compiling
 
