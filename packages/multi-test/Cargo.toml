@@ -1,6 +1,6 @@
 [package]
 name = "cw-multi-test"
-version = "0.13.1"
+version = "0.13.2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Test helpers for multi-contract interactions"
@@ -18,8 +18,8 @@ staking = ["cosmwasm-std/staking"]
 backtrace = ["anyhow/backtrace"]
 
 [dependencies]
-cw-utils = { path = "../../packages/utils", version = "0.13.1" }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.13.1"}
+cw-utils = { path = "../../packages/utils", version = "0.13.2" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.13.2"}
 cosmwasm-std = { version = "1.0.0-beta8", features = ["staking"] }
 cosmwasm-storage = { version = "1.0.0-beta8" }
 itertools = "0.10.1"
