@@ -779,7 +779,7 @@ where
             .range_raw(storage, None, None, Order::Ascending)
             .count();
         // we make this longer so it is not rejected by tests
-        // it is lowercase to be compatible with beta8
+        // it is lowercase to be compatible with the MockApi implementation of cosmwasm-std >= 1.0.0-beta8
         Addr::unchecked(format!("contract{}", count))
     }
 
