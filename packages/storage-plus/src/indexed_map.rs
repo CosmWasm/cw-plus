@@ -130,6 +130,12 @@ where
         self.primary.may_load(store, key)
     }
 
+    /// has returns true or false if any data is at this key, without parsing or interpreting the
+    /// contents.
+    pub fn has(&self, store: &dyn Storage, k: K) -> bool {
+        self.primary.key(k).has(store)
+    }
+
     // use no_prefix to scan -> range
     fn no_prefix_raw(&self) -> Prefix<Vec<u8>, T, K> {
         Prefix::new(self.pk_namespace, &[])
@@ -517,6 +523,24 @@ mod test {
         let too_old = 43u32;
         let aged = map.idx.age.item(&store, too_old).unwrap();
         assert_eq!(None, aged);
+    }
+
+    #[test]
+    fn existence() {
+        let mut store = MockStorage::new();
+        let map = build_map();
+
+        // save data
+        let (pks, datas) = save_data(&mut store, &map);
+        let pk = pks[0];
+        let data = &datas[0];
+
+        // load it properly
+        let loaded = map.load(&store, pk).unwrap();
+        assert_eq!(*data, loaded);
+
+        assert!(map.has(&store, pks[1]));
+        assert!(!map.has(&store, "6"));
     }
 
     #[test]
