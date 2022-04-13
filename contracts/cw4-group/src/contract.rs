@@ -51,7 +51,12 @@ pub fn create(
     for member in members.into_iter() {
         total += member.weight;
         let member_addr = deps.api.addr_validate(&member.addr)?;
-        MEMBERS.save(deps.storage, &member_addr, &member.weight, height)?;
+        MEMBERS.update(deps.storage, &member_addr, height, |v| -> StdResult<u64> {
+            match v {
+                Some(weight) => Ok(weight + member.weight),
+                None => Ok(member.weight),
+            }
+        })?;
     }
     TOTAL.save(deps.storage, &total)?;
 
@@ -229,7 +234,11 @@ mod tests {
                 },
                 Member {
                     addr: USER2.into(),
-                    weight: 6,
+                    weight: 2,
+                },
+                Member {
+                    addr: USER2.into(),
+                    weight: 4,
                 },
             ],
         };
