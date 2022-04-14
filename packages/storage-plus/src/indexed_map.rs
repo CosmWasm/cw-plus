@@ -130,8 +130,7 @@ where
         self.primary.may_load(store, key)
     }
 
-    /// has returns true or false if any data is at this key, without parsing or interpreting the
-    /// contents.
+    /// Returns true if storage contains this key, without parsing or interpreting the contents.
     pub fn has(&self, store: &dyn Storage, k: K) -> bool {
         self.primary.key(k).has(store)
     }
