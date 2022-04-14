@@ -528,17 +528,9 @@ mod test {
     fn existence() {
         let mut store = MockStorage::new();
         let map = build_map();
+        let (pks, _) = save_data(&mut store, &map);
 
-        // save data
-        let (pks, datas) = save_data(&mut store, &map);
-        let pk = pks[0];
-        let data = &datas[0];
-
-        // load it properly
-        let loaded = map.load(&store, pk).unwrap();
-        assert_eq!(*data, loaded);
-
-        assert!(map.has(&store, pks[1]));
+        assert!(map.has(&store, pks[0]));
         assert!(!map.has(&store, "6"));
     }
 
