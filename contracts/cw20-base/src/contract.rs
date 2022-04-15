@@ -885,7 +885,7 @@ mod tests {
         let info = mock_info("genesis", &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::Unauthorized {});
+        assert_eq!(err, ContractError::NoMinterParams {});
     }
 
     #[test]
