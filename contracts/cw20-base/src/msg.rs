@@ -17,7 +17,7 @@ pub struct InstantiateMarketingInfo {
 pub struct InstantiateMsg {
     pub name: String,
     pub symbol: String,
-    pub decimals: u8,    
+    pub decimals: u8,
     pub initial_balances: Vec<Cw20Coin>,
     pub mint: Option<MinterResponse>,
     pub marketing: Option<InstantiateMarketingInfo>,

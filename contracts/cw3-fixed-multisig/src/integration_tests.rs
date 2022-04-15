@@ -82,7 +82,7 @@ fn cw3_controls_cw20() {
             cap: None,
         }),
         marketing: None,
-	bank_denom: None,
+        bank_denom: None,
     };
     let cw20_addr = router
         .instantiate_contract(
