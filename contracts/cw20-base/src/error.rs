@@ -15,6 +15,15 @@ pub enum ContractError {
     #[error("Invalid zero amount")]
     InvalidZeroAmount {},
 
+    #[error("Insufficient balance")]
+    InsufficientBalance {},
+
+    #[error("Bank denom not set for cw20")]
+    BankDenomNotSet {},
+
+    #[error("Invalid bank denom")]
+    InvalidBankDenom {},
+
     #[error("Allowance is expired")]
     Expired {},
 

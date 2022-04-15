@@ -8,6 +8,12 @@ use cw_utils::Expiration;
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Cw20ExecuteMsg {
+    /// Cw20ToBank is a base message to convert Cw20 to bank tokens
+    Cw20ToBank { amount: Uint128 },
+
+    /// BankToCw20 is a base message to convert bank tokens to Cw20 tokens
+    BankToCw20 {},
+
     /// Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
     /// Burn is a base message to destroy tokens forever

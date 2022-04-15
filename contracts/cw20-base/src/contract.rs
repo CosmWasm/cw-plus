@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128, BankMsg, coins,
 };
 
 use cw2::set_contract_version;
@@ -120,6 +120,7 @@ pub fn instantiate(
         decimals: msg.decimals,
         total_supply,
         mint,
+        bank_denom: msg.bank_denom,
     };
     TOKEN_INFO.save(deps.storage, &data)?;
 
@@ -186,7 +187,14 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
-    match msg {
+    match msg {        
+        ExecuteMsg::Cw20ToBank { amount } => {
+            execute_cw20_to_bank(deps, env, info, amount)
+        }
+        ExecuteMsg::BankToCw20 {} => {
+            execute_bank_to_cw20(deps, env, info)
+        }
+
         ExecuteMsg::Transfer { recipient, amount } => {
             execute_transfer(deps, env, info, recipient, amount)
         }
@@ -226,6 +234,96 @@ pub fn execute(
         } => execute_update_marketing(deps, env, info, project, description, marketing),
         ExecuteMsg::UploadLogo(logo) => execute_upload_logo(deps, env, info, logo),
     }
+}
+
+pub fn execute_cw20_to_bank(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,    
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+    if amount == Uint128::zero() {
+        return Err(ContractError::InvalidZeroAmount {});
+    }
+    // Verify Cw20 balance of the sender        
+    let balance = query_balance(deps.as_ref(), info.sender.to_string()).unwrap().balance;    
+    if amount > balance {
+        return Err(ContractError::InsufficientBalance {});
+    }
+
+    // Burn cw20 tokens of the user    
+    // lower balance
+    BALANCES.update(
+        deps.storage,
+        &info.sender,
+        |balance: Option<Uint128>| -> StdResult<_> {
+            Ok(balance.unwrap_or_default().checked_sub(amount)?)
+        },
+    )?;
+    // reduce total_supply
+    TOKEN_INFO.update(deps.storage, |mut info| -> StdResult<_> {
+        info.total_supply = info.total_supply.checked_sub(amount)?;
+        Ok(info)
+    })?;
+
+       // transfer the bank denom to user address from CW20 contract address.    
+    // Create and submit BankTransfer sub message. Here sender is the contract address.
+    let config = TOKEN_INFO.load(deps.storage)?;
+
+    let bank_transfer = BankMsg::Send {        
+        to_address: info.sender.to_string(),
+        amount: coins(amount.u128(), config.bank_denom.unwrap().to_string()),
+    };
+
+    let res = Response::new().add_message(bank_transfer);    
+    Ok(res)
+}
+
+
+pub fn execute_bank_to_cw20(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,        
+) -> Result<Response, ContractError> {
+    
+    let mut config = TOKEN_INFO.load(deps.storage)?;
+
+    // Make sure the user has transferred same bank denom to the contract address.
+    let coin = &info.funds[0];
+    match &config.bank_denom {
+        None => {return Err(ContractError:: BankDenomNotSet{})}, // Bank denom is not set        
+        Some(bank_denom) if (*bank_denom == coin.denom) => {}, // The transfered token match with Bank denom
+        Some(_) => {return Err(ContractError::InvalidBankDenom {})}, // The transfered token doesn't match with Bank denom        
+    }
+
+    let amount = coin.amount;
+    if amount == Uint128::zero() {
+        return Err(ContractError::InvalidZeroAmount {});
+    }
+
+    // Mint CW20 tokens for user address.        
+    config.total_supply += amount;
+    if let Some(limit) = config.get_cap() {
+        if config.total_supply > limit {
+            return Err(ContractError::CannotExceedCap {});
+        }
+    }
+    TOKEN_INFO.save(deps.storage, &config)?;
+
+    // add cw20 token amount to sender balance
+    let rcpt_addr = deps.api.addr_validate(&info.sender.as_str())?;
+    BALANCES.update(
+        deps.storage,
+        &rcpt_addr,
+        |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
+    )?;
+
+    
+    let res = Response::new()
+        .add_attribute("action", "bank_to_cw20")
+        .add_attribute("from", info.sender)
+        .add_attribute("amount", amount);
+    Ok(res)    
 }
 
 pub fn execute_transfer(
@@ -592,6 +690,7 @@ mod tests {
             }],
             mint: mint.clone(),
             marketing: None,
+                bank_denom: None,
         };
         let info = mock_info("creator", &[]);
         let env = mock_env();
@@ -632,6 +731,7 @@ mod tests {
                 }],
                 mint: None,
                 marketing: None,
+                bank_denom: None,                
             };
             let info = mock_info("creator", &[]);
             let env = mock_env();
@@ -672,6 +772,7 @@ mod tests {
                     cap: Some(limit),
                 }),
                 marketing: None,
+                bank_denom: None,
             };
             let info = mock_info("creator", &[]);
             let env = mock_env();
@@ -719,6 +820,7 @@ mod tests {
                     cap: Some(limit),
                 }),
                 marketing: None,
+                bank_denom: None,
             };
             let info = mock_info("creator", &[]);
             let env = mock_env();
@@ -747,6 +849,7 @@ mod tests {
                         marketing: Some("marketing".to_owned()),
                         logo: Some(Logo::Url("url".to_owned())),
                     }),
+                    bank_denom: None,
                 };
 
                 let info = mock_info("creator", &[]);
@@ -787,6 +890,7 @@ mod tests {
                         marketing: Some("m".to_owned()),
                         logo: Some(Logo::Url("url".to_owned())),
                     }),
+                    bank_denom: None,
                 };
 
                 let info = mock_info("creator", &[]);
@@ -913,6 +1017,7 @@ mod tests {
             ],
             mint: None,
             marketing: None,
+                bank_denom: None,
         };
         let err =
             instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap_err();
@@ -935,6 +1040,7 @@ mod tests {
             ],
             mint: None,
             marketing: None,
+                bank_denom: None,
         };
         let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
@@ -1189,6 +1295,7 @@ mod tests {
                     marketing: Some("marketing".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1243,6 +1350,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1256,7 +1364,7 @@ mod tests {
                 ExecuteMsg::UpdateMarketing {
                     project: Some("New project".to_owned()),
                     description: None,
-                    marketing: None,
+                    marketing: None,                
                 },
             )
             .unwrap();
@@ -1296,6 +1404,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1309,7 +1418,7 @@ mod tests {
                 ExecuteMsg::UpdateMarketing {
                     project: Some("".to_owned()),
                     description: None,
-                    marketing: None,
+                    marketing: None,                
                 },
             )
             .unwrap();
@@ -1349,6 +1458,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1362,7 +1472,7 @@ mod tests {
                 ExecuteMsg::UpdateMarketing {
                     project: None,
                     description: Some("Better description".to_owned()),
-                    marketing: None,
+                    marketing: None,                
                 },
             )
             .unwrap();
@@ -1402,6 +1512,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1416,6 +1527,7 @@ mod tests {
                     project: None,
                     description: Some("".to_owned()),
                     marketing: None,
+                
                 },
             )
             .unwrap();
@@ -1455,6 +1567,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1508,6 +1621,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1565,6 +1679,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1590,7 +1705,7 @@ mod tests {
                 MarketingInfoResponse {
                     project: Some("Project".to_owned()),
                     description: Some("Description".to_owned()),
-                    marketing: None,
+                    marketing: None,                
                     logo: Some(LogoInfo::Url("url".to_owned())),
                 }
             );
@@ -1618,6 +1733,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,                
             };
 
             let info = mock_info("creator", &[]);
@@ -1667,6 +1783,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1717,6 +1834,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1768,6 +1886,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1818,6 +1937,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1875,6 +1995,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
@@ -1925,6 +2046,7 @@ mod tests {
                     marketing: Some("creator".to_owned()),
                     logo: Some(Logo::Url("url".to_owned())),
                 }),
+                bank_denom: None,
             };
 
             let info = mock_info("creator", &[]);
