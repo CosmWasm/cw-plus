@@ -305,7 +305,9 @@ pub fn execute_mint(
     }
 
     let mut config = TOKEN_INFO.load(deps.storage)?;
-    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != info.sender {
+    if config.mint.is_none() {
+        return Err(ContractError::NoMinterParams {});
+    } else if config.mint.as_ref().unwrap().minter != info.sender {
         return Err(ContractError::Unauthorized {});
     }
 
