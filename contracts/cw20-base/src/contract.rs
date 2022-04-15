@@ -271,7 +271,7 @@ pub fn execute_cw20_to_bank(
 
     let bank_transfer = BankMsg::Send {
         to_address: info.sender.to_string(),
-        amount: coins(amount.u128(), config.bank_denom.unwrap().to_string()),
+        amount: coins(amount.u128(), config.bank_denom.unwrap()),
     };
 
     let res = Response::new().add_message(bank_transfer);
@@ -308,7 +308,7 @@ pub fn execute_bank_to_cw20(
     TOKEN_INFO.save(deps.storage, &config)?;
 
     // add cw20 token amount to sender balance
-    let rcpt_addr = deps.api.addr_validate(&info.sender.as_str())?;
+    let rcpt_addr = deps.api.addr_validate(info.sender.as_str())?;
     BALANCES.update(
         deps.storage,
         &rcpt_addr,
