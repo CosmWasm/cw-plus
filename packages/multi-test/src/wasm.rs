@@ -741,7 +741,8 @@ where
             .range(storage, None, None, Order::Ascending)
             .count();
         // we make this longer so it is not rejected by tests
-        Addr::unchecked(format!("Contract #{}", count.to_string()))
+        // it is lowercase to be compatible with the MockApi implementation of cosmwasm-std >= 0.16.7
+        Addr::unchecked(format!("contract #{}", count.to_string()))
     }
 
     fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
