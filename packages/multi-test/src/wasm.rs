@@ -742,7 +742,7 @@ where
             .count();
         // we make this longer so it is not rejected by tests
         // it is lowercase to be compatible with the MockApi implementation of cosmwasm-std >= 0.16.7
-        Addr::unchecked(format!("contract #{}", count.to_string()))
+        Addr::unchecked(format!("contract{}", count))
     }
 
     fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
