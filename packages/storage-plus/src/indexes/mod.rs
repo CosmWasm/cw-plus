@@ -32,10 +32,6 @@ pub mod test {
         (index_string(name), age)
     }
 
-    pub fn index_triple(name: &str, age: u32, pk: Vec<u8>) -> (Vec<u8>, u32, Vec<u8>) {
-        (index_string(name), age, pk)
-    }
-
     pub fn index_string_tuple(data1: &str, data2: &str) -> (Vec<u8>, Vec<u8>) {
         (index_string(data1), index_string(data2))
     }
