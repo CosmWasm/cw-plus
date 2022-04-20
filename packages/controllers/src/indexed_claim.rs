@@ -11,7 +11,7 @@ pub struct IndexedClaim<'a> {
     // if max index is set, defined number of claims will be indexed on the storage
     pub max_index: Option<u64>,
     pub index_size: Item<'a, u64>,
-    pub total_claims: Map<'a, &'a Addr, Uint128>,
+    pub total_claims: Map<'a, &'a Addr, u128>,
     pub total_claim_sort_index: Map<'a, (u128, &'a Addr), bool>
 }
 
@@ -39,51 +39,59 @@ impl<'a> IndexedClaim<'a> {
     ) -> StdResult<()> {
         self.claims.save(storage, (addr, release_at.nanos()), &amount)?;
 
-        // if max index is setup, save the
+        // if max index is setup, save the index
         if let Some(max_index) = self.max_index {
             // increase users total claim
-            let total_claim = self.total_claims.update(storage, addr, |old| -> StdResult<_> {
-                match old {
-                    None => Ok(amount),
-                    Some(o) => Ok(amount + o)
+            let new_claim = self.total_claims.update(storage, addr, |exists|
+                match exists {
+                    None => Ok(amount.u128()),
+                    Some(acc) => {
+                        Ok(acc + amount.u128())
+                    }
                 }
-            })?;
+            )?;
 
-            let mut current_index_size = self.index_size.may_load(storage)?.unwrap_or(0);
 
-            let prev_claim = self.total_claim_sort_index
-                // TODO: maybe implement keys_prefix?
-                .prefix_range(storage, Some(PrefixBound::exclusive((total_claim.u128().to_cw_bytes().as_slice()))), None, Order::Ascending)
-                .map(|r| r.map(|((amount, addr), v)| (amount, addr)))
-                .take(1 as usize)
-                .collect::<StdResult<Vec<_>>>()?;
+            let mut index_size = self.index_size.may_load(storage)?.unwrap_or(0);
 
-            let (raw_prev_claim_amount, _) = prev_claim.first().unwrap();
-
-            let prev_claim_amount = CwIntKey::from_cw_bytes(raw_prev_claim_amount);
-            if total_claim > prev_claim_amount {
-                // save indexes
-                current_index_size += 1;
-                self.index_size.save(storage, &current_index_size)?;
-                self.total_claim_sort_index.save(storage, (&amount.u128().to_cw_bytes(), &addr), &true)?;
-
+            // if index_size < max_index this means it has a place in the set
+            if index_size < max_index {
+                self.total_claim_sort_index.save(storage, (new_claim.u128(), &addr), &true)?;
+                self.index_size.save(storage, &(index_size + 1))
+            } else { // reached the limit
+                // get the last claim of the sorted index
+                let (last_claim_amount, last_claim_addr) = self.get_last_index(storage).unwrap();
+                // if current claim is bigger than last claim, save the current claim and remove the last one
+                if new_claim > *last_claim_amount {
+                        // save new index
+                        self.total_claim_sort_index.save(storage, (new_claim.u128(), &addr), &true)?;
+                        // remove last claim
+                        self.total_claim_sort_index.remove(storage, (*last_claim_amount, last_claim_addr))
+                    }
             }
-
-            if current_index_size >= max_index {
-                let last_claim = self.total_claim_sort_index
-                    // TODO: maybe implement keys_prefix?
-                    .prefix_range(storage, Some(PrefixBound::exclusive((total_claim.u128().to_cw_bytes().as_slice()))), None, Order::Ascending)
-                    .map(|r| r.map(|((amount, addr), v)| (amount, addr)))
-                    .take(1 as usize)
-                    .collect::<StdResult<Vec<_>>>()?;
-
-                let (raw_last_claim_amount, last_claim_addr) = last_claim.first().unwrap();
-                self.total_claim_sort_index.remove(storage, (prev_claim_amount, last_claim_addr))
-            }
-
         }
 
         Ok(())
+    }
+
+    fn get_prev_claim(&self, storage: &mut dyn Storage, total_claim: u128) -> Option<(u128, Addr)> {
+        self.total_claim_sort_index
+            // TODO: maybe implement keys_prefix?
+            .prefix_range(storage, Some(PrefixBound::exclusive((total_claim.u128()))), None, Order::Ascending)
+            .map(|r| r.map(|((amount, addr), _)| (amount, addr)))
+            .take(1 as usize)
+            .collect::<StdResult<(u128, Addr)>>()
+            .ok()
+    }
+
+    fn get_last_index(&self, storage: &mut dyn Storage) -> Option<&(u128, Addr)> {
+        self.total_claim_sort_index
+            // TODO: maybe implement keys_prefix?
+            .prefix_range(storage, None, None, Order::Descending)
+            .map(|r| r.map(|((amount, addr), _)| (amount, addr)))
+            .take(1 as usize)
+            .collect::<StdResult<Vec<_>>>()?
+            .first()
     }
 
     /// This iterates over all mature claims for the address, and removes them, up to an optional cap.
