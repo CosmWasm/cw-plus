@@ -1,0 +1,31 @@
+[package]
+name = "tracer"
+version = "0.13.2"
+authors = ["Bartłomiej Kuras <bart.k@confio.gmbh>"]
+edition = "2018"
+description = "State tracing"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cw-plus"
+homepage = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+test-utils = []
+
+[dependencies]
+cosmwasm-std = { version = "1.0.0-beta8", features = ["staking"] }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.13.2" }
+schemars = "0.8.8"
+serde = { version = "1", default-features = false, features = ["derive"] }
+thiserror = "1"
+semver = "1"
+
+[dev-dependencies]
+cosmwasm-schema = { version = "1.0.0-beta8" }
+cw1-whitelist = { path = "../cw1-whitelist", version = "0.13.2", features = ["library", "test-utils"] }
