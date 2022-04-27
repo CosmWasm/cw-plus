@@ -99,31 +99,33 @@ pub fn execute_forward(
     catch_failure: bool,
     fail_reply: bool,
 ) -> Result<Response, ContractError> {
-    let msg = ExecuteMsg::Forward {
-        addr: addr.clone(),
-        msg,
-        marker,
-        catch_success,
-        catch_failure,
-        fail_reply,
-    };
-
-    PROCESSED_MSG.save(deps.storage, &msg)?;
-    LOG.update(deps.storage, |mut log| {
-        let mut last = log.iter().last().cloned().unwrap_or_default();
-        last.push(LogEntry {
-            sender: info.sender,
+    {
+        let msg = ExecuteMsg::Forward {
+            addr: addr.clone(),
             msg: msg.clone(),
-            reply: false,
-            marker: Some(marker),
-        });
-        log.push(last);
-        Ok::<_, ContractError>(log)
-    })?;
+            marker,
+            catch_success,
+            catch_failure,
+            fail_reply,
+        };
+
+        PROCESSED_MSG.save(deps.storage, &msg)?;
+        LOG.update(deps.storage, |mut log| {
+            let mut last = log.iter().last().cloned().unwrap_or_default();
+            last.push(LogEntry {
+                sender: info.sender,
+                msg: msg.clone(),
+                reply: false,
+                marker: Some(marker),
+            });
+            log.push(last);
+            Ok::<_, ContractError>(log)
+        })?;
+    }
 
     let msg: CosmosMsg = WasmMsg::Execute {
         contract_addr: addr,
-        msg: to_binary(&msg)?,
+        msg,
         funds: vec![],
     }
     .into();
@@ -164,7 +166,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_log(deps: Deps, depth: Option<u64>) -> StdResult<LogResponse> {
+pub fn query_log(deps: Deps, depth: Option<u32>) -> StdResult<LogResponse> {
     let mut log = LOG.load(deps.storage)?;
     if let Some(depth) = depth {
         log = log[log.len() - (depth as usize)..].into();
