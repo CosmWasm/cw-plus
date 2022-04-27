@@ -25,8 +25,6 @@ pub fn execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    // Note: implement this function with different type to add support for custom messages
-    // and then import the rest of this contract code.
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     use ExecuteMsg::*;
@@ -166,10 +164,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-pub fn query_log(deps: Deps, depth: Option<usize>) -> StdResult<LogResponse> {
+pub fn query_log(deps: Deps, depth: Option<u64>) -> StdResult<LogResponse> {
     let mut log = LOG.load(deps.storage)?;
     if let Some(depth) = depth {
-        log = log[log.len() - depth..].into();
+        log = log[log.len() - (depth as usize)..].into();
     }
 
     Ok(LogResponse { log })
