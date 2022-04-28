@@ -10,7 +10,7 @@ use crate::helpers::{may_deserialize, must_deserialize};
 
 /// Item stores one typed item at the given key.
 /// This is an analog of Singleton.
-/// It functions just as Path but doesn't ue a Vec and thus has a const fn constructor.
+/// It functions the same way Path does but doesn't use a Vec and thus has a const fn constructor.
 pub struct Item<'a, T> {
     // this is full key - no need to length-prefix it, we only store one item
     storage_key: &'a [u8],
