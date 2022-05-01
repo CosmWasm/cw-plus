@@ -1,10 +1,10 @@
 use anyhow::Result as AnyResult;
 use cosmwasm_std::{to_binary, Addr, Empty};
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
-use serde::Serialize;
 use derivative::Derivative;
+use serde::Serialize;
 
-use crate::msg::{ExecuteMsg, QueryMsg, LogResponse};
+use crate::msg::{ExecuteMsg, LogResponse, QueryMsg};
 use crate::state::LogEntry;
 
 fn contract_tracer() -> Box<dyn Contract<Empty>> {
@@ -12,7 +12,8 @@ fn contract_tracer() -> Box<dyn Contract<Empty>> {
         crate::contract::execute,
         crate::contract::instantiate,
         crate::contract::query,
-    );
+    )
+    .with_reply(crate::contract::reply);
     Box::new(contract)
 }
 
@@ -55,6 +56,10 @@ pub struct Suite {
 impl Suite {
     pub fn new() -> Self {
         SuiteBuilder::new().build()
+    }
+
+    pub fn contract_addr(&self) -> String {
+        self.contract.as_str().to_owned()
     }
 
     pub fn touch(&mut self, sender: &str) -> AnyResult<AppResponse> {
@@ -120,14 +125,12 @@ impl Suite {
     }
 
     pub fn log(&self, depth: impl Into<Option<u32>>) -> AnyResult<Vec<Vec<LogEntry>>> {
-        let resp: LogResponse = self.app
-            .wrap()
-            .query_wasm_smart(
-                self.contract.clone(),
-                &QueryMsg::Log {
-                    depth: depth.into(),
-                },
-            )?;
+        let resp: LogResponse = self.app.wrap().query_wasm_smart(
+            self.contract.clone(),
+            &QueryMsg::Log {
+                depth: depth.into(),
+            },
+        )?;
 
         Ok(resp.log)
     }
