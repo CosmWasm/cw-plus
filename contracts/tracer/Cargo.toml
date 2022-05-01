@@ -28,3 +28,7 @@ semver = "1"
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0-beta8" }
+anyhow = "1"
+cw-multi-test = { path = "../../packages/multi-test", version = "0.13.2" }
+derivative = "2"
+assert_matches = "1"

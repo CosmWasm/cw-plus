@@ -16,7 +16,7 @@ pub fn instantiate(
     _info: MessageInfo,
     _msg: Empty,
 ) -> StdResult<Response> {
-    LOG.save(deps.storage, &vec![])?;
+    LOG.save(deps.storage, &vec![vec![]])?;
     Ok(Response::new())
 }
 
@@ -153,7 +153,7 @@ pub fn execute_clear(deps: DepsMut) -> Result<Response, ContractError> {
 }
 
 pub fn execute_reset(deps: DepsMut) -> Result<Response, ContractError> {
-    LOG.save(deps.storage, &vec![])?;
+    LOG.save(deps.storage, &vec![vec![]])?;
     Ok(Response::new())
 }
 

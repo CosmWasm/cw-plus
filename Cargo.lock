@@ -1354,9 +1354,13 @@ dependencies = [
 name = "tracer"
 version = "0.13.2"
 dependencies = [
+ "anyhow",
+ "assert_matches",
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-multi-test",
  "cw-storage-plus",
+ "derivative",
  "schemars",
  "semver",
  "serde",
