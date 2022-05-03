@@ -707,7 +707,8 @@ jobs:
 
   # This job follows the instructions from https://github.com/xd009642/tarpaulin#circleci
   coverage:
-    machine: true
+    machine:
+      image: ubuntu-2004:202201-02
     steps:
       - checkout
       - run:
