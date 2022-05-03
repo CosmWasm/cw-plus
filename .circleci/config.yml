@@ -43,6 +43,7 @@ workflows:
                 # Long living branches
                 - main
                 # 👇Add your branch here if code coverage matters to your work
+                - 172-code-coverage
   deploy:
     jobs:
       - build_and_upload_contracts:
