@@ -43,7 +43,7 @@ be logged again but flagged as a reply.
 
 Note that the `forward` message can be stacked deeply to simulate complex flows.
 
-There are to last helper messages just for making it easier to clearly reuse contracts instead
+There are two last helper messages just for making it easier to clearly reuse contracts instead
 of uploading it all over:
 
 * `{ "clear": {} }` - pushes the new clear log state, but doesn't clear whole log history (clears

@@ -1,5 +1,5 @@
-CW1-SubKeys: A CosmWasm proxy contract with send allowances
-Copyright (C) 2020 Confio OÜ
+Tracer: A CosmWasm proxy contract with send allowances
+Copyright (C) 2022 Confio GmbH
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
