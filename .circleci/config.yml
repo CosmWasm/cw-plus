@@ -34,6 +34,15 @@ workflows:
                 # Long living branches
                 - main
                 # 👇Add your branch here if benchmarking matters to your work
+  coverage:
+    jobs:
+      - coverage:
+          filters:
+            branches:
+              only:
+                # Long living branches
+                - main
+                # 👇Add your branch here if code coverage matters to your work
   deploy:
     jobs:
       - build_and_upload_contracts:
@@ -694,6 +703,15 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-v2-benchmarking-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
+
+  # This job follows the instructions from https://github.com/xd009642/tarpaulin#circleci
+  coverage:
+    machine: true
+    steps:
+      - checkout
+      - run:
+          name: Coverage with tarpaulin docker image
+          command: docker run --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin
 
   # This job roughly follows the instructions from https://circleci.com/blog/publishing-to-github-releases-via-circleci/
   build_and_upload_contracts:
