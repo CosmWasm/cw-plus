@@ -1,20 +1,15 @@
 // This whole file except `AdminListResponse` shall be generated form contract traits and
 // instantiate signature
 
+use cosmwasm_std::{Binary, CustomMsg, Deps, DepsMut, Env, MessageInfo, Response};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{
-    to_binary, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError,
-};
-
-use crate::error::ContractError;
-use crate::interfaces::*;
-use crate::state::Cw1WhitelistContract;
-
 pub use crate::contract::msg::InstantiateMsg;
 
+use crate::error::ContractError;
 pub use crate::interfaces::{cw1_msg, whitelist};
+use crate::state::Cw1WhitelistContract;
 
 /*
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -184,6 +179,62 @@ impl WhitelistQueryMsg {
         .map_err(Contract::Error::from)
     }
 }*/
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(untagged)]
+pub enum ExecMsg<T>
+where
+    T: CustomMsg,
+{
+    Cw1(crate::interfaces::cw1_msg::ExecMsg<T>),
+    Whitelist(crate::interfaces::whitelist::ExecMsg),
+}
+
+impl<T> ExecMsg<T>
+where
+    T: CustomMsg,
+{
+    pub fn dispatch(
+        self,
+        contract: &Cw1WhitelistContract<T>,
+        ctx: (DepsMut, Env, MessageInfo),
+    ) -> Result<Response<T>, ContractError> {
+        use ExecMsg::*;
+
+        match self {
+            Cw1(msg) => msg.dispatch(contract, ctx),
+            Whitelist(msg) => msg.dispatch(contract, ctx),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(untagged)]
+pub enum QueryMsg<T>
+where
+    T: CustomMsg,
+{
+    Cw1(crate::interfaces::cw1_msg::QueryMsg<T>),
+    Whitelist(crate::interfaces::whitelist::QueryMsg),
+}
+
+impl<T> QueryMsg<T>
+where
+    T: CustomMsg,
+{
+    pub fn dispatch(
+        self,
+        contract: &Cw1WhitelistContract<T>,
+        ctx: (Deps, Env),
+    ) -> Result<Binary, ContractError> {
+        use QueryMsg::*;
+
+        match self {
+            Cw1(msg) => msg.dispatch(contract, ctx),
+            Whitelist(msg) => msg.dispatch(contract, ctx),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct AdminListResponse {

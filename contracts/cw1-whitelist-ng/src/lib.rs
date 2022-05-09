@@ -1,4 +1,4 @@
-mod contract;
+pub(crate) mod contract;
 pub mod error;
 pub mod interfaces;
 pub mod msg;
@@ -9,6 +9,7 @@ pub mod state;
 #[cfg(not(feature = "library"))]
 mod entry_points {
     use crate::error::ContractError;
+    use crate::msg::{ExecMsg, InstantiateMsg, QueryMsg};
     use crate::state::Cw1WhitelistContract;
     use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response};
 
@@ -19,9 +20,9 @@ mod entry_points {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: crate::msg::InstantiateMsg,
+        msg: InstantiateMsg,
     ) -> Result<Response, ContractError> {
-        msg.dispatch(Cw1WhitelistContract::native(), (deps, env, info))
+        msg.dispatch(&CONTRACT, (deps, env, info))
     }
 
     #[entry_point]
@@ -29,14 +30,14 @@ mod entry_points {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: Binary,
+        msg: ExecMsg<Empty>,
     ) -> Result<Response, ContractError> {
-        CONTRACT.entry_execute(deps, env, info, &msg)
+        msg.dispatch(&CONTRACT, (deps, env, info))
     }
 
     #[entry_point]
-    pub fn query(deps: Deps, env: Env, msg: Binary) -> Result<Binary, ContractError> {
-        CONTRACT.entry_query(deps, env, &msg)
+    pub fn query(deps: Deps, env: Env, msg: QueryMsg<Empty>) -> Result<Binary, ContractError> {
+        msg.dispatch(&CONTRACT, (deps, env))
     }
 }
 

@@ -1,25 +1,19 @@
 // This whole thing is definitely to be easly generated from trait itself
 
-use cosmwasm_std::{Addr, CosmosMsg, CustomQuery, QuerierWrapper, StdResult};
+use cosmwasm_std::{Addr, CosmosMsg, QuerierWrapper, StdResult};
 use cw1::CanExecuteResponse;
 use serde::Serialize;
 
 use crate::msg::{self, AdminListResponse};
 
 #[must_use]
-pub struct Cw1Querier<'a, C>
-where
-    C: CustomQuery,
-{
+pub struct Cw1Querier<'a> {
     addr: &'a Addr,
-    querier: &'a QuerierWrapper<'a, C>,
+    querier: &'a QuerierWrapper<'a>,
 }
 
-impl<'a, C> Cw1Querier<'a, C>
-where
-    C: CustomQuery,
-{
-    pub fn new(addr: &'a Addr, querier: &'a QuerierWrapper<'a, C>) -> Self {
+impl<'a> Cw1Querier<'a> {
+    pub fn new(addr: &'a Addr, querier: &'a QuerierWrapper<'a>) -> Self {
         Self { addr, querier }
     }
 
@@ -36,19 +30,13 @@ where
 }
 
 #[must_use]
-pub struct WhitelistQuerier<'a, C>
-where
-    C: CustomQuery,
-{
+pub struct WhitelistQuerier<'a> {
     addr: &'a Addr,
-    querier: &'a QuerierWrapper<'a, C>,
+    querier: &'a QuerierWrapper<'a>,
 }
 
-impl<'a, C> WhitelistQuerier<'a, C>
-where
-    C: CustomQuery,
-{
-    pub fn new(addr: &'a Addr, querier: &'a QuerierWrapper<'a, C>) -> Self {
+impl<'a> WhitelistQuerier<'a> {
+    pub fn new(addr: &'a Addr, querier: &'a QuerierWrapper<'a>) -> Self {
         Self { addr, querier }
     }
 

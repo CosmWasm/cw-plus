@@ -2,18 +2,16 @@ use crate::msg::*;
 use crate::query::*;
 use crate::state::Cw1WhitelistContract;
 use anyhow::{bail, Result as AnyResult};
-use cosmwasm_std::CustomMsg;
 use cosmwasm_std::{
-    Addr, Binary, Coin, CosmosMsg, CustomQuery, DepsMut, Env, MessageInfo, QuerierWrapper, Reply,
-    Response,
+    from_slice, Addr, Binary, Coin, CosmosMsg, CustomMsg, DepsMut, Env, MessageInfo,
+    QuerierWrapper, Reply, Response,
 };
 use cw_multi_test::{AppResponse, Contract, Executor};
-use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 
 impl<T> Contract<T> for Cw1WhitelistContract<T>
 where
-    T: Clone + std::fmt::Debug + PartialEq + JsonSchema + DeserializeOwned,
+    T: CustomMsg + DeserializeOwned,
 {
     fn instantiate(
         &self,
@@ -22,8 +20,8 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<T>> {
-        self.entry_instantiate(deps, env, info, &msg)
-            .map_err(Into::into)
+        let msg: InstantiateMsg = from_slice(&msg)?;
+        msg.dispatch(self, (deps, env, info)).map_err(Into::into)
     }
 
     fn execute(
@@ -33,12 +31,13 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> AnyResult<Response<T>> {
-        self.entry_execute(deps, env, info, &msg)
-            .map_err(Into::into)
+        let msg: ExecMsg<T> = from_slice(&msg)?;
+        msg.dispatch(self, (deps, env, info)).map_err(Into::into)
     }
 
     fn query(&self, deps: cosmwasm_std::Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
-        self.entry_query(deps, env, &msg).map_err(Into::into)
+        let msg: QueryMsg<T> = from_slice(&msg)?;
+        msg.dispatch(self, (deps, env)).map_err(Into::into)
     }
 
     fn sudo(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response<T>> {
@@ -81,7 +80,7 @@ impl<'a, App> Cw1Executor<'a, App> {
         self.app.execute_contract(
             self.sender,
             self.addr,
-            &Cw1ExecMsg::Execute { msgs },
+            &cw1_msg::ExecMsg::Execute { msgs },
             self.send_funds,
         )
     }
@@ -114,7 +113,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
         self.app.execute_contract(
             self.sender,
             self.addr,
-            &WhitelistExecMsg::Freeze {},
+            &whitelist::ExecMsg::Freeze {},
             self.send_funds,
         )
     }
@@ -127,7 +126,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
         self.app.execute_contract(
             self.sender,
             self.addr,
-            &WhitelistExecMsg::UpdateAdmins { admins },
+            &whitelist::ExecMsg::UpdateAdmins { admins },
             self.send_funds,
         )
     }
@@ -220,20 +219,14 @@ impl Cw1WhitelistProxy {
         WhitelistExecutor::new(self.0.clone(), app, sender.clone(), send_funds)
     }
 
-    pub fn cw1_querier<'a, C>(&'a self, querier: &'a QuerierWrapper<'a, C>) -> Cw1Querier<'a, C>
-    where
-        C: CustomQuery,
-    {
+    pub fn cw1_querier<'a, C>(&'a self, querier: &'a QuerierWrapper<'a>) -> Cw1Querier<'a> {
         Cw1Querier::new(&self.0, querier)
     }
 
-    pub fn whitelist_querier<'a, C>(
+    pub fn whitelist_querier<'a>(
         &'a self,
-        querier: &'a QuerierWrapper<'a, C>,
-    ) -> WhitelistQuerier<'a, C>
-    where
-        C: CustomQuery,
-    {
+        querier: &'a QuerierWrapper<'a>,
+    ) -> WhitelistQuerier<'a> {
         WhitelistQuerier::new(&self.0, querier)
     }
 }

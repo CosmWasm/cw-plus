@@ -186,11 +186,11 @@ impl<'a> StructMessage<'a> {
             #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
             #[serde(rename_all="snake_case")]
             pub struct #name #generics #where_clause {
-                #(#fields,)*
+                #(pub #fields,)*
             }
 
             impl #generics #name #generics #where_clause {
-                pub fn dispatch #unused_generics(self, contract: #contract_type, ctx: #ctx_type)
+                pub fn dispatch #unused_generics(self, contract: &#contract_type, ctx: #ctx_type)
                     #result #full_where
                 {
                     let Self { #(#fields_names,)* } = self;
@@ -241,7 +241,7 @@ impl<'a> EnumMessage<'a> {
                     };
 
                     if attr == ty {
-                        Some(MsgVariant::new(&method, &mut generics_checker))
+                        Some(MsgVariant::new(method, &mut generics_checker))
                     } else {
                         None
                     }

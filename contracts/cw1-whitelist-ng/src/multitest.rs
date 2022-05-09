@@ -3,18 +3,17 @@ pub mod contract;
 
 #[cfg(test)]
 mod test {
+    use crate::contract::Cw1WhitelistContract;
+    use crate::msg::whitelist;
     use cosmwasm_std::{to_binary, Addr, CosmosMsg, WasmMsg};
     use cw_multi_test::AppBuilder;
 
-    use crate::msg::WhitelistExecMsg;
-    use crate::state::Cw1WhitelistContract;
-
-    use super::contract::Cw1WhitelistProxy;
+    use super::contract::*;
 
     #[test]
     fn proxy_freeze_message() {
         let mut app = AppBuilder::new().build(|_, _, _| ());
-        let contract_id = app.store_code(Box::new(Cw1WhitelistContract::new()));
+        let contract_id = app.store_code(Box::new(Cw1WhitelistContract::native()));
         let owner = Addr::unchecked("owner");
 
         let proxy = Cw1WhitelistProxy::instantiate(&mut app, contract_id, &owner, &[])
@@ -33,7 +32,7 @@ mod test {
             .cw1_exec(&mut app, &owner, &[])
             .execute(vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: remote.addr().into(),
-                msg: to_binary(&WhitelistExecMsg::Freeze {}).unwrap(),
+                msg: to_binary(&whitelist::ExecMsg::Freeze {}).unwrap(),
                 funds: vec![],
             })])
             .unwrap();

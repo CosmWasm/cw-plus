@@ -2,7 +2,6 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::parse::{Error, Nothing, Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::token::Comma;
 use syn::{parenthesized, parse2, Ident, Result, Token, Type};
 
 /// Parsed arguments for `interface` macro
