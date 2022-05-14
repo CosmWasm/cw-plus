@@ -524,6 +524,7 @@ dependencies = [
  "derivative",
  "schemars",
  "serde",
+ "serde-cw-value",
  "thiserror",
 ]
 
@@ -1299,6 +1300,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-cw-value"
+version = "0.7.0"
+source = "git+https://github.com/hashedone/serde-cw-value.git#9a141c181a7b661556857dea0f736dd3272c775d"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

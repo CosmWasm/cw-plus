@@ -33,6 +33,7 @@ thiserror = { version = "1.0.23" }
 cw-multi-test = { path = "../../packages/multi-test", version = "0.13.2", optional = true }
 anyhow = { version = "1", optional = true }
 cw-derive = { version = "0.13.2", path = "../../packages/cw-derive" }
+ serde-cw-value = { version = "0.7.0", git = "https://github.com/hashedone/serde-cw-value.git" }
 
 
 [dev-dependencies]

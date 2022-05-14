@@ -1,11 +1,6 @@
 [workspace]
 members = ["packages/*", "contracts/*"]
 
-# [patch.crates-io]
-# serde-json-wasm = { path = "../serde-json-wasm" }
-# serde = { path = "../../../git/serde/serde" }
-# serde_json = { path = "../../../git/json" }
-
 [profile.release.package.cw1-subkeys]
 codegen-units = 1
 incremental = false
@@ -51,6 +46,6 @@ incremental = false
 rpath = false
 lto = true
 overflow-checks = true
-opt-level = 3
+opt-level = 's'
 debug = false
 debug-assertions = false
