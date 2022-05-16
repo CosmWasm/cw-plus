@@ -38,7 +38,7 @@ impl<'ast, 'g> Visit<'ast> for CheckGenerics<'g> {
             .iter()
             .find(|gen| matches!(gen, GenericParam::Lifetime(lt) if lt.lifetime == *i))
         {
-            if !self.used.contains(&gen) {
+            if !self.used.contains(gen) {
                 self.used.push(gen);
             }
         }
@@ -50,7 +50,7 @@ impl<'ast, 'g> Visit<'ast> for CheckGenerics<'g> {
                 .iter()
                 .find(|gen| matches!(gen, GenericParam::Type(ty) if ty.ident == *p))
             {
-                if !self.used.contains(&gen) {
+                if !self.used.contains(gen) {
                     self.used.push(gen);
                 }
             }

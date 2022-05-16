@@ -21,7 +21,7 @@ proc-macro-error = "1"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-cosmwasm-std = { version = "1.0.0-rc.0" }
+cosmwasm-std = "1"
 cw-storage-plus = "0.13.2"
 schemars = "0.8"
 anyhow = "1"

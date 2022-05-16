@@ -60,8 +60,8 @@ impl<'a> TraitInput<'a> {
     }
 
     fn emit_messages(&self) -> TokenStream {
-        let exec = self.emit_msg(&self.attributes.exec, MsgType::Exec, &self.attributes);
-        let query = self.emit_msg(&self.attributes.query, MsgType::Query, &self.attributes);
+        let exec = self.emit_msg(&self.attributes.exec, MsgType::Exec, self.attributes);
+        let query = self.emit_msg(&self.attributes.query, MsgType::Query, self.attributes);
 
         quote! {
             #exec
@@ -71,7 +71,7 @@ impl<'a> TraitInput<'a> {
     }
 
     fn emit_msg(&self, name: &Ident, msg_ty: MsgType, args: &InterfaceArgs) -> TokenStream {
-        EnumMessage::new(name, &self.item, msg_ty, &self.generics, args).emit()
+        EnumMessage::new(name, self.item, msg_ty, &self.generics, args).emit()
     }
 }
 
@@ -111,6 +111,6 @@ impl<'a> ImplInput<'a> {
     }
 
     fn emit_msg(&self, msg_ty: MsgType) -> TokenStream {
-        StructMessage::new(&self.item, msg_ty, &self.generics).map_or(quote! {}, |msg| msg.emit())
+        StructMessage::new(self.item, msg_ty, &self.generics).map_or(quote! {}, |msg| msg.emit())
     }
 }
