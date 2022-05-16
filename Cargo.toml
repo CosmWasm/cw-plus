@@ -12,7 +12,6 @@ incremental = false
 [profile.release.package.cw1-whitelist-ng]
 codegen-units = 1
 incremental = false
-opt-level = 'z'
 
 [profile.release.package.cw3-fixed-multisig]
 codegen-units = 1
@@ -46,6 +45,6 @@ incremental = false
 rpath = false
 lto = true
 overflow-checks = true
-opt-level = 's'
+opt-level = 3
 debug = false
 debug-assertions = false
