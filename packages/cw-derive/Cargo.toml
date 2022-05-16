@@ -1,6 +1,6 @@
 [package]
 name = "cw-derive"
-version = "0.10.3"
+version = "0.13.2"
 authors = ["Bartłomiej Kuras <bart.k@confio.gmbh>"]
 edition = "2018"
 description = "Utilities for generating trait based contracts"
@@ -21,5 +21,7 @@ proc-macro-error = "1"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-cosmwasm-std = { version = "1.0.0-beta" }
+cosmwasm-std = "1"
+cw-storage-plus = "0.13.2"
 schemars = "0.8"
+anyhow = "1"

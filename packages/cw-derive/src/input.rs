@@ -1,29 +1,28 @@
 use proc_macro2::TokenStream;
 use proc_macro_error::emit_error;
 use quote::quote;
-use syn::{GenericParam, Ident, ItemTrait, TraitItem};
+use syn::{GenericParam, Ident, ItemImpl, ItemTrait, TraitItem};
 
-use crate::message::Message;
-use crate::parser::{InterfaceArgs, InterfaceMsgAttr};
+use crate::message::{EnumMessage, StructMessage};
+use crate::parser::{ContractArgs, InterfaceArgs, MsgType};
 
-/// Preprocessed macro input
+/// Preprocessed `interface` macro input
 pub struct TraitInput<'a> {
     attributes: &'a InterfaceArgs,
     item: &'a ItemTrait,
-    generics: Vec<&'a Ident>,
+    generics: Vec<&'a GenericParam>,
+}
+
+/// Preprocessed `contract` macro input for non-trait impl block
+pub struct ImplInput<'a> {
+    attributes: &'a ContractArgs,
+    item: &'a ItemImpl,
+    generics: Vec<&'a GenericParam>,
 }
 
 impl<'a> TraitInput<'a> {
     pub fn new(attributes: &'a InterfaceArgs, item: &'a ItemTrait) -> Self {
-        let generics = item
-            .generics
-            .params
-            .iter()
-            .filter_map(|gp| match gp {
-                GenericParam::Type(tp) => Some(&tp.ident),
-                _ => None,
-            })
-            .collect();
+        let generics = item.generics.params.iter().collect();
 
         if !item
             .items
@@ -61,8 +60,8 @@ impl<'a> TraitInput<'a> {
     }
 
     fn emit_messages(&self) -> TokenStream {
-        let exec = self.emit_msg(&self.attributes.exec, InterfaceMsgAttr::Exec);
-        let query = self.emit_msg(&self.attributes.query, InterfaceMsgAttr::Query);
+        let exec = self.emit_msg(&self.attributes.exec, MsgType::Exec, self.attributes);
+        let query = self.emit_msg(&self.attributes.query, MsgType::Query, self.attributes);
 
         quote! {
             #exec
@@ -71,7 +70,47 @@ impl<'a> TraitInput<'a> {
         }
     }
 
-    fn emit_msg(&self, name: &Ident, msg_attr: InterfaceMsgAttr) -> TokenStream {
-        Message::new(name, &self.item, msg_attr, &self.generics).emit()
+    fn emit_msg(&self, name: &Ident, msg_ty: MsgType, args: &InterfaceArgs) -> TokenStream {
+        EnumMessage::new(name, self.item, msg_ty, &self.generics, args).emit()
+    }
+}
+
+impl<'a> ImplInput<'a> {
+    pub fn new(attributes: &'a ContractArgs, item: &'a ItemImpl) -> Self {
+        let generics = item.generics.params.iter().collect();
+
+        Self {
+            attributes,
+            item,
+            generics,
+        }
+    }
+
+    pub fn process(&self) -> TokenStream {
+        let messages = self.emit_messages();
+
+        if let Some(module) = &self.attributes.module {
+            quote! {
+                pub mod #module {
+                    use super::*;
+
+                    #messages
+                }
+            }
+        } else {
+            messages
+        }
+    }
+
+    fn emit_messages(&self) -> TokenStream {
+        let instantiate = self.emit_msg(MsgType::Instantiate);
+
+        quote! {
+            #instantiate
+        }
+    }
+
+    fn emit_msg(&self, msg_ty: MsgType) -> TokenStream {
+        StructMessage::new(self.item, msg_ty, &self.generics).map_or(quote! {}, |msg| msg.emit())
     }
 }

@@ -1,15 +1,9 @@
-use cosmwasm_std::{
-    from_slice, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult,
-};
-use serde::de::DeserializeOwned;
+use cosmwasm_std::{Addr, Api, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use crate::error::ContractError;
-use crate::interfaces::*;
-use crate::msg::{
-    AdminListResponse, Cw1ExecMsg, Cw1QueryMsg, InstantiateMsg, WhitelistExecMsg, WhitelistQueryMsg,
-};
-use crate::state::{AdminList, Cw1WhitelistContract};
+use crate::msg::AdminListResponse;
+use crate::state::AdminList;
+pub use crate::state::Cw1WhitelistContract;
 
 use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
@@ -22,12 +16,12 @@ pub fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>>
     admins.iter().map(|addr| api.addr_validate(addr)).collect()
 }
 
+#[cw_derive::contract(module=msg)]
 impl<T> Cw1WhitelistContract<T> {
+    #[msg(instantiate)]
     pub fn instantiate(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        _info: MessageInfo,
+        (deps, _env, _info): (DepsMut, Env, MessageInfo),
         admins: Vec<String>,
         mutable: bool,
     ) -> Result<Response<T>, ContractError> {
@@ -45,86 +39,17 @@ impl<T> Cw1WhitelistContract<T> {
         let cfg = self.admin_list.load(deps.storage)?;
         Ok(cfg.is_admin(addr))
     }
-
-    // Entry points, to be called only in actual entry points and by multitest `Contract`
-    // implementation
-    pub(crate) fn entry_instantiate(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        msg: &[u8],
-    ) -> Result<Response<T>, ContractError> {
-        let msg: InstantiateMsg = from_slice(msg)?;
-        msg.dispatch(deps, env, info, self)
-    }
-
-    pub(crate) fn entry_execute(
-        &self,
-        deps: DepsMut,
-        env: Env,
-        info: MessageInfo,
-        msg: &[u8],
-    ) -> Result<Response<T>, ContractError>
-    where
-        T: DeserializeOwned,
-    {
-        let cw1_err = match from_slice::<Cw1ExecMsg<T>>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, info, self),
-            Err(err) => err,
-        };
-
-        let whitelist_err = match from_slice::<WhitelistExecMsg>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, info, self),
-            Err(err) => err,
-        };
-
-        let msg = format!(
-            "While parsing Cw1WhitelistExecMsg\n As Cw1ExecMsg: {}\n As WhitelistExecMsg: {}",
-            cw1_err, whitelist_err
-        );
-
-        let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
-        Err(err.into())
-    }
-
-    pub(crate) fn entry_query(
-        &self,
-        deps: Deps,
-        env: Env,
-        msg: &[u8],
-    ) -> Result<Binary, ContractError>
-    where
-        T: DeserializeOwned,
-    {
-        let cw1_err = match from_slice::<Cw1QueryMsg<T>>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, self),
-            Err(err) => err,
-        };
-
-        let whitelist_err = match from_slice::<WhitelistQueryMsg>(msg) {
-            Ok(msg) => return msg.dispatch(deps, env, self),
-            Err(err) => err,
-        };
-
-        let msg = format!(
-            "While parsing Cw1WhitelistQueryMsg\n As Cw1QueryMsg: {}\n As WhitelistQueryMsg: {}",
-            cw1_err, whitelist_err
-        );
-
-        let err = StdError::parse_err("Cw1WhitelistExecMsg", msg);
-        Err(err.into())
-    }
 }
 
-impl<T> Cw1<T> for Cw1WhitelistContract<T> {
+impl<T> crate::interfaces::Cw1<T> for Cw1WhitelistContract<T>
+where
+    T: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
+{
     type Error = ContractError;
 
     fn execute(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
+        (deps, _env, info): (DepsMut, Env, MessageInfo),
         msgs: Vec<CosmosMsg<T>>,
     ) -> Result<Response<T>, Self::Error> {
         if !self.is_admin(deps.as_ref(), info.sender.as_ref())? {
@@ -139,8 +64,7 @@ impl<T> Cw1<T> for Cw1WhitelistContract<T> {
 
     fn can_execute(
         &self,
-        deps: Deps,
-        _env: Env,
+        (deps, _env): (Deps, Env),
         sender: String,
         _msg: CosmosMsg<T>,
     ) -> Result<CanExecuteResponse, Self::Error> {
@@ -150,14 +74,15 @@ impl<T> Cw1<T> for Cw1WhitelistContract<T> {
     }
 }
 
-impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
+impl<T> crate::interfaces::Whitelist<T> for Cw1WhitelistContract<T>
+where
+    T: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,
+{
     type Error = ContractError;
 
     fn freeze(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
+        (deps, _env, info): (DepsMut, Env, MessageInfo),
     ) -> Result<Response<T>, Self::Error> {
         self.admin_list
             .update(deps.storage, |mut cfg| -> Result<_, ContractError> {
@@ -174,9 +99,7 @@ impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
 
     fn update_admins(
         &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
+        (deps, _env, info): (DepsMut, Env, MessageInfo),
         admins: Vec<String>,
     ) -> Result<Response<T>, Self::Error> {
         let api = deps.api;
@@ -193,7 +116,7 @@ impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
         Ok(Response::new().add_attribute("action", "update_admins"))
     }
 
-    fn admin_list(&self, deps: Deps, _env: Env) -> Result<AdminListResponse, Self::Error> {
+    fn admin_list(&self, (deps, _env): (Deps, Env)) -> Result<AdminListResponse, Self::Error> {
         let cfg = self.admin_list.load(deps.storage)?;
         Ok(AdminListResponse {
             admins: cfg.admins.into_iter().map(|a| a.into()).collect(),
@@ -205,6 +128,7 @@ impl<T> Whitelist<T> for Cw1WhitelistContract<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::interfaces::*;
     use crate::msg::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, to_binary, BankMsg, StakingMsg, SubMsg, WasmMsg};
@@ -225,7 +149,7 @@ mod tests {
         let admins = vec![alice.to_owned(), bob.to_owned(), carl.to_owned()];
         let info = mock_info(anyone, &[]);
         contract
-            .instantiate(deps.as_mut(), mock_env(), info, admins, true)
+            .instantiate((deps.as_mut(), mock_env(), info), admins, true)
             .unwrap();
 
         // ensure expected config
@@ -234,14 +158,14 @@ mod tests {
             mutable: true,
         };
         assert_eq!(
-            contract.admin_list(deps.as_ref(), mock_env()).unwrap(),
+            contract.admin_list((deps.as_ref(), mock_env())).unwrap(),
             expected
         );
 
         // anyone cannot modify the contract
         let info = mock_info(anyone, &[]);
         let err = contract
-            .update_admins(deps.as_mut(), mock_env(), info, vec![anyone.to_owned()])
+            .update_admins((deps.as_mut(), mock_env(), info), vec![anyone.to_owned()])
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
@@ -249,7 +173,7 @@ mod tests {
         let admins = vec![alice.to_owned(), bob.to_owned()];
         let info = mock_info(alice, &[]);
         contract
-            .update_admins(deps.as_mut(), mock_env(), info, admins)
+            .update_admins((deps.as_mut(), mock_env(), info), admins)
             .unwrap();
 
         // ensure expected config
@@ -258,33 +182,33 @@ mod tests {
             mutable: true,
         };
         assert_eq!(
-            contract.admin_list(deps.as_ref(), mock_env()).unwrap(),
+            contract.admin_list((deps.as_ref(), mock_env())).unwrap(),
             expected
         );
 
         // carl cannot freeze it
         let info = mock_info(carl, &[]);
         let err = contract
-            .freeze(deps.as_mut(), mock_env(), info)
+            .freeze((deps.as_mut(), mock_env(), info))
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but bob can
         let info = mock_info(bob, &[]);
-        contract.freeze(deps.as_mut(), mock_env(), info).unwrap();
+        contract.freeze((deps.as_mut(), mock_env(), info)).unwrap();
         let expected = AdminListResponse {
             admins: vec![alice.to_owned(), bob.to_owned()],
             mutable: false,
         };
         assert_eq!(
-            contract.admin_list(deps.as_ref(), mock_env()).unwrap(),
+            contract.admin_list((deps.as_ref(), mock_env())).unwrap(),
             expected
         );
 
         // and now alice cannot change it again
         let info = mock_info(alice, &[]);
         let err = contract
-            .update_admins(deps.as_mut(), mock_env(), info, vec![alice.to_owned()])
+            .update_admins((deps.as_mut(), mock_env(), info), vec![alice.to_owned()])
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
     }
@@ -302,10 +226,10 @@ mod tests {
         let admins = vec![alice.to_owned(), carl.to_owned()];
         let info = mock_info(bob, &[]);
         contract
-            .instantiate(deps.as_mut(), mock_env(), info, admins, false)
+            .instantiate((deps.as_mut(), mock_env(), info), admins, false)
             .unwrap();
 
-        let freeze = WhitelistExecMsg::Freeze {};
+        let freeze = whitelist::ExecMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
                 to_address: bob.to_string(),
@@ -323,14 +247,14 @@ mod tests {
         // bob cannot execute them
         let info = mock_info(bob, &[]);
         let err = contract
-            .execute(deps.as_mut(), mock_env(), info, msgs.clone())
+            .execute((deps.as_mut(), mock_env(), info), msgs.clone())
             .unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
 
         // but carl can
         let info = mock_info(carl, &[]);
         let res = contract
-            .execute(deps.as_mut(), mock_env(), info, msgs.clone())
+            .execute((deps.as_mut(), mock_env(), info), msgs.clone())
             .unwrap();
         assert_eq!(
             res.messages,
@@ -348,16 +272,14 @@ mod tests {
         let admins = vec![alice.to_owned()];
         let info = mock_info(alice, &[]);
         contract
-            .instantiate(deps.as_mut(), mock_env(), info, admins, false)
+            .instantiate((deps.as_mut(), mock_env(), info), admins, false)
             .unwrap();
 
         let msgs = vec![CosmosMsg::Custom("msg".to_owned())];
 
         let res = contract
             .execute(
-                deps.as_mut(),
-                mock_env(),
-                mock_info(alice, &[]),
+                (deps.as_mut(), mock_env(), mock_info(alice, &[])),
                 msgs.clone(),
             )
             .unwrap();
@@ -382,7 +304,7 @@ mod tests {
         let admins = vec![alice.to_owned(), bob.to_owned()];
         let info = mock_info(anyone, &[]);
         contract
-            .instantiate(deps.as_mut(), mock_env(), info, admins, false)
+            .instantiate((deps.as_mut(), mock_env(), info), admins, false)
             .unwrap();
 
         // let us make some queries... different msg types by owner and by other
@@ -398,8 +320,7 @@ mod tests {
         // owner can send
         let res = contract
             .can_execute(
-                deps.as_ref(),
-                mock_env(),
+                (deps.as_ref(), mock_env()),
                 alice.to_owned(),
                 send_msg.clone(),
             )
@@ -409,8 +330,7 @@ mod tests {
         // owner can stake
         let res = contract
             .can_execute(
-                deps.as_ref(),
-                mock_env(),
+                (deps.as_ref(), mock_env()),
                 bob.to_owned(),
                 staking_msg.clone(),
             )
@@ -419,13 +339,13 @@ mod tests {
 
         // anyone cannot send
         let res = contract
-            .can_execute(deps.as_ref(), mock_env(), anyone.to_owned(), send_msg)
+            .can_execute((deps.as_ref(), mock_env()), anyone.to_owned(), send_msg)
             .unwrap();
         assert!(!res.can_execute);
 
         // anyone cannot stake
         let res = contract
-            .can_execute(deps.as_ref(), mock_env(), anyone.to_owned(), staking_msg)
+            .can_execute((deps.as_ref(), mock_env()), anyone.to_owned(), staking_msg)
             .unwrap();
         assert!(!res.can_execute);
     }
