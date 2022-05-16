@@ -23,6 +23,7 @@ pub enum Cw4QueryMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct AdminResponse {
     pub admin: Option<String>,
 }
@@ -31,27 +32,32 @@ pub struct AdminResponse {
 /// This may all be equal, or may have meaning in the app that
 /// makes use of the group (eg. voting power)
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Member {
     pub addr: String,
     pub weight: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct MemberListResponse {
     pub members: Vec<Member>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct MemberResponse {
     pub weight: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct TotalWeightResponse {
     pub weight: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HooksResponse {
     pub hooks: Vec<String>,
 }
