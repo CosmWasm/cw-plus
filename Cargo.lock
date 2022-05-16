@@ -645,6 +645,7 @@ dependencies = [
  "cw4",
  "schemars",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 

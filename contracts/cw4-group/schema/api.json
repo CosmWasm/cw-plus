@@ -1,0 +1,438 @@
+{
+  "instantiate": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "InstantiateMsg",
+    "type": "object",
+    "required": [
+      "members"
+    ],
+    "properties": {
+      "admin": {
+        "description": "The admin is the only account that can update the group state. Omit it to make the group immutable.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "members": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/Member"
+        }
+      }
+    },
+    "additionalProperties": false,
+    "definitions": {
+      "Member": {
+        "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
+        "type": "object",
+        "required": [
+          "addr",
+          "weight"
+        ],
+        "properties": {
+          "addr": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "execute": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ExecuteMsg",
+    "oneOf": [
+      {
+        "description": "Change the admin",
+        "type": "object",
+        "required": [
+          "update_admin"
+        ],
+        "properties": {
+          "update_admin": {
+            "type": "object",
+            "properties": {
+              "admin": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "apply a diff to the existing members. remove is applied after add, so if an address is in both, it is removed",
+        "type": "object",
+        "required": [
+          "update_members"
+        ],
+        "properties": {
+          "update_members": {
+            "type": "object",
+            "required": [
+              "add",
+              "remove"
+            ],
+            "properties": {
+              "add": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Member"
+                }
+              },
+              "remove": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Add a new hook to be informed of all membership changes. Must be called by Admin",
+        "type": "object",
+        "required": [
+          "add_hook"
+        ],
+        "properties": {
+          "add_hook": {
+            "type": "object",
+            "required": [
+              "addr"
+            ],
+            "properties": {
+              "addr": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Remove a hook. Must be called by Admin",
+        "type": "object",
+        "required": [
+          "remove_hook"
+        ],
+        "properties": {
+          "remove_hook": {
+            "type": "object",
+            "required": [
+              "addr"
+            ],
+            "properties": {
+              "addr": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "Member": {
+        "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
+        "type": "object",
+        "required": [
+          "addr",
+          "weight"
+        ],
+        "properties": {
+          "addr": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "query": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QueryMsg",
+    "oneOf": [
+      {
+        "description": "Return AdminResponse",
+        "type": "object",
+        "required": [
+          "admin"
+        ],
+        "properties": {
+          "admin": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Return TotalWeightResponse",
+        "type": "object",
+        "required": [
+          "total_weight"
+        ],
+        "properties": {
+          "total_weight": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Returns MemberListResponse",
+        "type": "object",
+        "required": [
+          "list_members"
+        ],
+        "properties": {
+          "list_members": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0.0
+              },
+              "start_after": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Returns MemberResponse",
+        "type": "object",
+        "required": [
+          "member"
+        ],
+        "properties": {
+          "member": {
+            "type": "object",
+            "required": [
+              "addr"
+            ],
+            "properties": {
+              "addr": {
+                "type": "string"
+              },
+              "at_height": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint64",
+                "minimum": 0.0
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "description": "Shows all registered hooks. Returns HooksResponse.",
+        "type": "object",
+        "required": [
+          "hooks"
+        ],
+        "properties": {
+          "hooks": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    ]
+  },
+  "response": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "QueryResponse",
+    "description": "This type is never used in code, just for the JSON Schema export to allow tooling to easily map the response types to the original query variant.",
+    "oneOf": [
+      {
+        "type": "object",
+        "required": [
+          "admin"
+        ],
+        "properties": {
+          "admin": {
+            "$ref": "#/definitions/AdminResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "total_weight"
+        ],
+        "properties": {
+          "total_weight": {
+            "$ref": "#/definitions/TotalWeightResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "list_members"
+        ],
+        "properties": {
+          "list_members": {
+            "$ref": "#/definitions/MemberListResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "member"
+        ],
+        "properties": {
+          "member": {
+            "$ref": "#/definitions/MemberResponse"
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "hooks"
+        ],
+        "properties": {
+          "hooks": {
+            "$ref": "#/definitions/HooksResponse"
+          }
+        },
+        "additionalProperties": false
+      }
+    ],
+    "definitions": {
+      "AdminResponse": {
+        "type": "object",
+        "properties": {
+          "admin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "HooksResponse": {
+        "type": "object",
+        "required": [
+          "hooks"
+        ],
+        "properties": {
+          "hooks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Member": {
+        "description": "A group member has a weight associated with them. This may all be equal, or may have meaning in the app that makes use of the group (eg. voting power)",
+        "type": "object",
+        "required": [
+          "addr",
+          "weight"
+        ],
+        "properties": {
+          "addr": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemberListResponse": {
+        "type": "object",
+        "required": [
+          "members"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/Member"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MemberResponse": {
+        "type": "object",
+        "properties": {
+          "weight": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "additionalProperties": false
+      },
+      "TotalWeightResponse": {
+        "type": "object",
+        "required": [
+          "weight"
+        ],
+        "properties": {
+          "weight": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
