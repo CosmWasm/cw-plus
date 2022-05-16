@@ -7,10 +7,9 @@ description = "Implementation of an proxy contract using a whitelist"
 license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
-documentation = "https://docs.cosmwasm.com"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 backtraces = ["cosmwasm-std/backtraces"]
@@ -41,3 +40,4 @@ anyhow = "1"
 assert_matches = "1"
 cw-multi-test = { path = "../../packages/multi-test", version = "0.13.2" }
 derivative = "2"
+cosmwasm-schema = { version = "1.0.0-beta8" }
