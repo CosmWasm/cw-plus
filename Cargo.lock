@@ -1306,7 +1306,7 @@ dependencies = [
 [[package]]
 name = "serde-cw-value"
 version = "0.7.0"
-source = "git+https://github.com/hashedone/serde-cw-value.git#9a141c181a7b661556857dea0f736dd3272c775d"
+source = "git+https://github.com/CosmWasm/serde-cw-value.git#9a141c181a7b661556857dea0f736dd3272c775d"
 dependencies = [
  "serde",
 ]
