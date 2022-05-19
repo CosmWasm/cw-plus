@@ -3,23 +3,19 @@ use crate::query::*;
 use crate::state::Cw1WhitelistContract;
 use anyhow::{bail, Result as AnyResult};
 use cosmwasm_std::{
-    from_slice, Addr, Binary, Coin, CosmosMsg, CustomMsg, DepsMut, Env, MessageInfo,
+    from_slice, Addr, Binary, Coin, CosmosMsg, CustomMsg, DepsMut, Empty, Env, MessageInfo,
     QuerierWrapper, Reply, Response,
 };
 use cw_multi_test::{AppResponse, Contract, Executor};
-use serde::de::DeserializeOwned;
 
-impl<T> Contract<T> for Cw1WhitelistContract<T>
-where
-    T: CustomMsg + DeserializeOwned,
-{
+impl Contract<Empty> for Cw1WhitelistContract {
     fn instantiate(
         &self,
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<Response<T>> {
+    ) -> AnyResult<Response> {
         let msg: InstantiateMsg = from_slice(&msg)?;
         msg.dispatch(self, (deps, env, info)).map_err(Into::into)
     }
@@ -30,25 +26,25 @@ where
         env: Env,
         info: MessageInfo,
         msg: Vec<u8>,
-    ) -> AnyResult<Response<T>> {
-        let msg: ExecMsg<T> = from_slice(&msg)?;
+    ) -> AnyResult<Response> {
+        let msg: ExecMsg = from_slice(&msg)?;
         msg.dispatch(self, (deps, env, info)).map_err(Into::into)
     }
 
     fn query(&self, deps: cosmwasm_std::Deps, env: Env, msg: Vec<u8>) -> AnyResult<Binary> {
-        let msg: QueryMsg<T> = from_slice(&msg)?;
+        let msg: QueryMsg = from_slice(&msg)?;
         msg.dispatch(self, (deps, env)).map_err(Into::into)
     }
 
-    fn sudo(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response<T>> {
+    fn sudo(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response> {
         bail!("sudo not implemented for contract")
     }
 
-    fn reply(&self, _deps: DepsMut, _env: Env, _msg: Reply) -> AnyResult<Response<T>> {
+    fn reply(&self, _deps: DepsMut, _env: Env, _msg: Reply) -> AnyResult<Response> {
         bail!("reply not implemented for contract")
     }
 
-    fn migrate(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response<T>> {
+    fn migrate(&self, _deps: DepsMut, _env: Env, _msg: Vec<u8>) -> AnyResult<Response> {
         bail!("migrate not implemented for contract")
     }
 }

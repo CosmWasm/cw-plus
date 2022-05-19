@@ -24,7 +24,7 @@ impl AdminList {
     }
 }
 
-pub struct Cw1WhitelistContract<T> {
+pub struct Cw1WhitelistContract<T = Empty> {
     // I am pretty sure that just form this with some proper hint attributes it would be possible
     // to provide helpers for raw queries, this might be fun idea
     pub(crate) admin_list: Item<'static, AdminList>,

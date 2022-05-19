@@ -1,6 +1,13 @@
-use crate::msg::AdminListResponse;
 use cosmwasm_std::{CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdError};
 use cw1::query::CanExecuteResponse;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct AdminListResponse {
+    pub admins: Vec<String>,
+    pub mutable: bool,
+}
 
 #[cw_derive::interface(module=cw1_msg, msg_type=T)]
 pub trait Cw1<T>

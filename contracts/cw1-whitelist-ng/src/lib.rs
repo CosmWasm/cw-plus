@@ -1,10 +1,14 @@
 pub(crate) mod contract;
 pub mod error;
 pub mod interfaces;
-pub mod msg;
 pub mod multitest;
 pub mod query;
 pub mod state;
+
+pub mod msg {
+    pub use crate::contract::msg::*;
+    pub use crate::interfaces::{cw1_msg, whitelist, AdminListResponse};
+}
 
 #[cfg(not(feature = "library"))]
 mod entry_points {
@@ -30,13 +34,13 @@ mod entry_points {
         deps: DepsMut,
         env: Env,
         info: MessageInfo,
-        msg: ExecMsg<Empty>,
+        msg: ExecMsg,
     ) -> Result<Response, ContractError> {
         msg.dispatch(&CONTRACT, (deps, env, info))
     }
 
     #[entry_point]
-    pub fn query(deps: Deps, env: Env, msg: QueryMsg<Empty>) -> Result<Binary, ContractError> {
+    pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary, ContractError> {
         msg.dispatch(&CONTRACT, (deps, env))
     }
 }

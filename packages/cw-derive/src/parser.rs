@@ -1,17 +1,13 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::{Error, Nothing, Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{parenthesized, parse2, Ident, Result, Token, Type};
+use syn::{parenthesized, parse2, parse_quote, Ident, Path, Result, Token, Type};
 
 /// Parsed arguments for `interface` macro
 pub struct InterfaceArgs {
     /// Module name wrapping generated messages, by default no additional module is created
     pub module: Option<Ident>,
-    /// Name of generated exec message enum, `ExecMsg` by default
-    pub exec: Ident,
-    /// Name of generated query message enum, `QueryMsg` by default
-    pub query: Ident,
     /// The type being a parameter of `CosmosMsg` for blockchain it is intendet to be used; can be
     /// set to any of generic parameters to create interface being generic over blockchains; If not
     /// provided, cosmos messages would be unparametrized (so default would be used)
@@ -22,6 +18,8 @@ pub struct InterfaceArgs {
 pub struct ContractArgs {
     /// Module name wrapping generated messages, by default no additional module is created
     pub module: Option<Ident>,
+    /// The type of a contract error for entry points - `ContractError` by default
+    pub error: Type,
 }
 
 struct Mapping {
@@ -32,8 +30,6 @@ struct Mapping {
 impl Parse for InterfaceArgs {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut module = None;
-        let mut exec = Ident::new("ExecMsg", Span::mixed_site());
-        let mut query = Ident::new("QueryMsg", Span::mixed_site());
         let mut msg_type = None;
 
         while !input.is_empty() {
@@ -42,10 +38,6 @@ impl Parse for InterfaceArgs {
 
             if attr == "module" {
                 module = Some(input.parse()?);
-            } else if attr == "exec" {
-                exec = input.parse()?;
-            } else if attr == "query" {
-                query = input.parse()?;
             } else if attr == "msg_type" {
                 msg_type = Some(input.parse()?);
             } else {
@@ -68,38 +60,32 @@ impl Parse for InterfaceArgs {
         for attr in attrs {
             if attr.index == "module" {
                 module = Some(parse2(attr.value)?);
-            } else if attr.index == "exec" {
-                exec = parse2(attr.value)?;
-            } else if attr.index == "query" {
-                query = parse2(attr.value)?;
             } else if attr.index == "msg_type" {
                 msg_type = Some(parse2(attr.value)?);
             } else {
                 return Err(Error::new(
                     attr.index.span(),
-                    "expected `module`, `exec`, `query`, or `msg_type`",
+                    "Expected `module`, `exec`, `query`, or `msg_type`",
                 ));
             }
         }
 
-        Ok(InterfaceArgs {
-            module,
-            exec,
-            query,
-            msg_type,
-        })
+        Ok(InterfaceArgs { module, msg_type })
     }
 }
 
 impl Parse for ContractArgs {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut module = None;
+        let mut error = parse_quote!(ContractError);
 
         let attrs: Punctuated<Mapping, Token![,]> = input.parse_terminated(Mapping::parse)?;
 
         for attr in attrs {
             if attr.index == "module" {
                 module = Some(parse2(attr.value)?);
+            } else if attr.index == "error" {
+                error = parse2(attr.value)?;
             } else {
                 return Err(Error::new(
                     attr.index.span(),
@@ -108,7 +94,7 @@ impl Parse for ContractArgs {
             }
         }
 
-        Ok(ContractArgs { module })
+        Ok(ContractArgs { module, error })
     }
 }
 
@@ -151,19 +137,19 @@ impl MsgType {
     }
 
     /// Emits type which should be returned by dispatch function for this kind of message
-    pub fn emit_result_type(self, msg_type: &Option<Type>) -> TokenStream {
+    pub fn emit_result_type(self, msg_type: &Option<Type>, err_type: &Type) -> TokenStream {
         use MsgType::*;
 
         match (self, msg_type) {
             (Exec, Some(msg_type)) | (Instantiate, Some(msg_type)) => quote! {
-                std::result::Result<cosmwasm_std::Response<#msg_type>, C::Error>
+                std::result::Result<cosmwasm_std::Response<#msg_type>, #err_type>
             },
             (Exec, None) | (Instantiate, None) => quote! {
-                std::result::Result<cosmwasm_std::Response, C::Error>
+                std::result::Result<cosmwasm_std::Response, #err_type>
             },
 
             (Query, _) => quote! {
-                std::result::Result<cosmwasm_std::Binary, C::Error>
+                std::result::Result<cosmwasm_std::Binary, #err_type>
             },
         }
     }
@@ -183,7 +169,7 @@ impl Parse for MsgType {
         } else {
             Err(Error::new(
                 item.span(),
-                "Invalid message type, expected one of: `exec`, `query`",
+                "Invalid message type, expected one of: `exec`, `query`, `instantiate`",
             ))
         }
     }
@@ -241,5 +227,87 @@ impl Parse for MsgAttr {
                 "Invalid message type, expected one of: `exec`, `query`, `instantiate`",
             ))
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ContractMessageAttr {
+    pub module: Path,
+    pub exec_generic_params: Vec<Path>,
+    pub query_generic_params: Vec<Path>,
+    pub variant: Ident,
+}
+
+fn parse_generics(content: &ParseBuffer) -> Result<Vec<Path>> {
+    let _: Token![<] = content.parse()?;
+    let mut params = vec![];
+
+    loop {
+        let param: Path = content.parse()?;
+        params.push(param);
+
+        let generics_close: Option<Token![>]> = content.parse()?;
+        if generics_close.is_some() {
+            break;
+        }
+
+        let comma: Option<Token![,]> = content.parse()?;
+        if comma.is_none() {
+            return Err(Error::new(content.span(), "Expected comma or `>`"));
+        }
+    }
+
+    Ok(params)
+}
+
+impl Parse for ContractMessageAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        parenthesized!(content in input);
+
+        let module = content.parse()?;
+
+        let generics_open: Option<Token![:]> = content.parse()?;
+        let mut exec_generic_params = vec![];
+        let mut query_generic_params = vec![];
+
+        if generics_open.is_some() {
+            loop {
+                let ty: Ident = content.parse()?;
+                let params = if ty == "exec" {
+                    &mut exec_generic_params
+                } else if ty == "query" {
+                    &mut query_generic_params
+                } else {
+                    return Err(Error::new(ty.span(), "Invalid message type"));
+                };
+
+                *params = parse_generics(&content)?;
+
+                if content.peek(Token![as]) {
+                    break;
+                }
+
+                let _: Token![,] = content.parse()?;
+            }
+        }
+
+        let _: Token![as] = content.parse()?;
+
+        let variant = content.parse()?;
+
+        if !content.is_empty() {
+            return Err(Error::new(
+                content.span(),
+                "Unexpected token on the end of `message` attribtue",
+            ));
+        }
+
+        Ok(Self {
+            module,
+            exec_generic_params,
+            query_generic_params,
+            variant,
+        })
     }
 }

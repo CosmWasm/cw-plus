@@ -1,7 +1,9 @@
-use cosmwasm_std::{Addr, Api, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    Addr, Api, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
+};
 
 use crate::error::ContractError;
-use crate::msg::AdminListResponse;
+use crate::interfaces::{cw1_msg, whitelist, AdminListResponse};
 use crate::state::AdminList;
 pub use crate::state::Cw1WhitelistContract;
 
@@ -17,6 +19,8 @@ pub fn validate_admins(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>>
 }
 
 #[cw_derive::contract(module=msg)]
+#[messages(cw1_msg: query<Empty>, exec<Empty> as Cw1)]
+#[messages(whitelist as Whitelist)]
 impl<T> Cw1WhitelistContract<T> {
     #[msg(instantiate)]
     pub fn instantiate(
@@ -129,7 +133,6 @@ where
 mod tests {
     use super::*;
     use crate::interfaces::*;
-    use crate::msg::*;
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, to_binary, BankMsg, StakingMsg, SubMsg, WasmMsg};
 

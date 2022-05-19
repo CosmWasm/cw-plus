@@ -9,6 +9,7 @@ pub(crate) mod check_generics;
 mod input;
 mod message;
 mod parser;
+mod strip_generics;
 mod strip_input;
 
 use strip_input::StripInput;
@@ -31,7 +32,7 @@ use strip_input::StripInput;
 /// # #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
 /// # struct MemberQueryResponse;
 ///
-/// #[cw_derive::interface(module=msg, exec=Execute, query=Query)]
+/// #[cw_derive::interface(module=msg, query=Query)]
 /// trait Cw4 {
 ///     type Error: From<StdError>;
 ///
@@ -59,7 +60,7 @@ use strip_input::StripInput;
 ///
 ///     #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
 ///     #[serde(rename_all = "snake_case")]
-///     pub enum Execute {
+///     pub enum ExecMsg {
 ///         UpdateAdmin { admin: Option<String> },
 ///         UpdateMembers {
 ///             remove: Vec<String>,
@@ -69,7 +70,7 @@ use strip_input::StripInput;
 ///         RemoveHook { addr: String },
 ///     }
 ///
-///     impl Execute {
+///     impl ExecMsg {
 ///         pub fn dispatch<C: Cw4>(contract: &C, ctx: (DepsMut, Env, MessageInfo))
 ///             -> Result<Response, C::Error>
 ///         {
@@ -86,8 +87,6 @@ use strip_input::StripInput;
 /// `interface` attribute takes optional parameters:
 /// * `module` - defines module name, where all generated messages would be encapsulated; no
 /// additional module would be created if not provided
-/// * `exec` - sets name for execution messages type, `ExecMsg` by default
-/// * `query` - sets name for query messages type, `QueryMsg` by default
 ///
 /// ## Attributes
 ///

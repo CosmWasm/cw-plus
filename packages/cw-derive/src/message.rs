@@ -1,15 +1,17 @@
 use crate::check_generics::CheckGenerics;
-use crate::parser::{InterfaceArgs, MsgAttr, MsgType};
+use crate::parser::{ContractMessageAttr, InterfaceArgs, MsgAttr, MsgType};
+use crate::strip_generics::StripGenerics;
 use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream};
 use proc_macro_error::emit_error;
 use quote::quote;
+use syn::fold::Fold;
 use syn::parse::{Parse, Parser};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{
-    FnArg, GenericParam, Ident, ImplItem, ItemImpl, ItemTrait, Pat, PatType, ReturnType, Signature,
-    TraitItem, TraitItemMethod, Type, WhereClause, WherePredicate,
+    parse_quote, FnArg, GenericParam, Ident, ImplItem, ItemImpl, ItemTrait, Pat, PatType,
+    ReturnType, Signature, TraitItem, TraitItemMethod, Type, WhereClause, WherePredicate,
 };
 
 fn filter_wheres<'a>(
@@ -294,7 +296,7 @@ impl<'a> EnumMessage<'a> {
         };
 
         let ctx_type = msg_ty.emit_ctx_type();
-        let dispatch_type = msg_ty.emit_result_type(&args.msg_type);
+        let dispatch_type = msg_ty.emit_result_type(&args.msg_type, &parse_quote!(C::Error));
 
         let all_generics = if all_generics.is_empty() {
             quote! {}
@@ -454,5 +456,153 @@ impl<'a> MsgField<'a> {
 
     pub fn name(&self) -> &'a Ident {
         self.name
+    }
+}
+
+// pub struct EnumMessage<'a> {
+//     name: &'a Ident,
+//     trait_name: &'a Ident,
+//     variants: Vec<MsgVariant<'a>>,
+//     generics: Vec<&'a GenericParam>,
+//     unused_generics: Vec<&'a GenericParam>,
+//     all_generics: &'a [&'a GenericParam],
+//     wheres: Vec<&'a WherePredicate>,
+//     full_where: Option<&'a WhereClause>,
+//     msg_ty: MsgType,
+//     args: &'a InterfaceArgs,
+// }
+
+/// Glue message is the message composing Exec/Query messages from several traits
+#[derive(Debug)]
+pub struct GlueMessage<'a> {
+    interfaces: Vec<ContractMessageAttr>,
+    name: &'a Ident,
+    contract: &'a Type,
+    msg_ty: MsgType,
+    error: &'a Type,
+}
+
+impl<'a> GlueMessage<'a> {
+    pub fn new(name: &'a Ident, source: &'a ItemImpl, msg_ty: MsgType, error: &'a Type) -> Self {
+        let interfaces: Vec<_> = source
+            .attrs
+            .iter()
+            .filter(|attr| attr.path.is_ident("messages"))
+            .filter_map(|attr| {
+                let interface = match ContractMessageAttr::parse.parse2(attr.tokens.clone()) {
+                    Ok(interface) => interface,
+                    Err(err) => {
+                        emit_error!(attr.span(), err);
+                        return None;
+                    }
+                };
+
+                Some(interface)
+            })
+            .collect();
+
+        GlueMessage {
+            interfaces,
+            name,
+            contract: &source.self_ty,
+            msg_ty,
+            error,
+        }
+    }
+
+    pub fn emit(&self) -> TokenStream {
+        let Self {
+            interfaces,
+            name,
+            contract,
+            msg_ty,
+            error,
+        } = self;
+        let contract = StripGenerics.fold_type((*contract).clone());
+
+        let variants = interfaces.iter().map(|interface| {
+            let ContractMessageAttr {
+                module,
+                exec_generic_params,
+                query_generic_params,
+                variant,
+            } = interface;
+
+            let generics = match msg_ty {
+                MsgType::Exec => exec_generic_params.as_slice(),
+                MsgType::Query => query_generic_params.as_slice(),
+                _ => &[],
+            };
+
+            quote! { #variant(#module :: #name<#(#generics,)*>) }
+        });
+
+        let dispatch_arms = interfaces.iter().map(|interface| {
+            let ContractMessageAttr { variant, .. } = interface;
+
+            quote! { #name :: #variant(msg) => msg.dispatch(contract, ctx) }
+        });
+
+        let deserialization_attempts = interfaces.iter().map(|interface| {
+            let ContractMessageAttr { variant, .. } = interface;
+            let var = Ident::new(&variant.to_string().to_case(Case::Snake), variant.span());
+
+            quote! {
+                let #var = match val.clone().deserialize_into() {
+                    Ok(msg) => return Ok(Self:: #variant (msg)),
+                    Err(err) => err,
+                };
+            }
+        });
+
+        let deser_errors = interfaces.iter().map(|interface| {
+            let ContractMessageAttr { variant, .. } = interface;
+            let var = Ident::new(&variant.to_string().to_case(Case::Snake), variant.span());
+
+            quote! { format!("As {}: {}", stringify!(#variant), #var) }
+        });
+
+        let messages_type = interfaces.iter().map(|interface| &interface.variant);
+
+        let ctx_type = msg_ty.emit_ctx_type();
+        let ret_type = msg_ty.emit_result_type(&None, error);
+
+        quote! {
+            #[derive(serde::Serialize, Clone, Debug, PartialEq, schemars::JsonSchema)]
+            #[serde(rename_all="snake_case")]
+            pub enum #name {
+                #(#variants,)*
+            }
+
+            impl #name {
+                pub fn dispatch(
+                    self,
+                    contract: &#contract,
+                    ctx: #ctx_type,
+                ) -> #ret_type {
+                    match self {
+                        #(#dispatch_arms,)*
+                    }
+                }
+
+            }
+
+            impl<'de> serde::Deserialize<'de> for #name {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where D: serde::Deserializer<'de>,
+                {
+                    use serde::de::Error;
+                    let val = serde_cw_value::Value::deserialize(deserializer)?;
+
+                    #(#deserialization_attempts)*
+
+                    Err(D::Error::custom(format!(
+                        "Expected any of {} messages, but cannot deserialize to neither of those\n{}",
+                        stringify!(#(#messages_type),*),
+                        [#(#deser_errors,)*].join("\n")
+                    )))
+                }
+            }
+        }
     }
 }
