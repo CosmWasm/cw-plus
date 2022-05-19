@@ -408,6 +408,7 @@ dependencies = [
  "quote",
  "schemars",
  "serde",
+ "serde-cw-value",
  "syn",
 ]
 

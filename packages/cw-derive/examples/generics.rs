@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use cosmwasm_std::{CosmosMsg, DepsMut, Env, MessageInfo, Response};
 
-#[cw_derive::interface(module=msg, exec=Cw1Exec, query=Cw1Query)]
+#[cw_derive::interface(module=msg)]
 pub trait Cw1<Msg>
 where
     Msg: std::fmt::Debug + PartialEq + Clone + schemars::JsonSchema,

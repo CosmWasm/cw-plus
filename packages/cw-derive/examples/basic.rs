@@ -14,7 +14,7 @@ pub struct MemberResp {
     weight: u64,
 }
 
-#[cw_derive::interface(exec=Execute, query=Query)]
+#[cw_derive::interface(module=group)]
 pub trait Group {
     type Error: From<StdError>;
 
@@ -37,19 +37,45 @@ pub trait Group {
     fn member(&self, ctx: (Deps, Env), addr: String) -> Result<MemberResp, Self::Error>;
 }
 
-pub struct GroupContract<'a> {
-    admin: Item<'a, Addr>,
-    members: Map<'a, Addr, u64>,
+pub struct GroupContract {
+    admin: Item<'static, Addr>,
+    members: Map<'static, Addr, u64>,
 }
 
-impl<'a> Default for GroupContract<'a> {
+impl Default for GroupContract {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cw_derive::contract]
-impl<'a> GroupContract<'a> {
+impl Group for GroupContract {
+    type Error = Error;
+
+    fn update_admin(
+        &self,
+        _ctx: (DepsMut, Env, MessageInfo),
+        _admin: Option<String>,
+    ) -> Result<Response, Self::Error> {
+        todo!()
+    }
+
+    fn update_members(
+        &self,
+        _ctx: (DepsMut, Env, MessageInfo),
+        _remove: Vec<String>,
+        _add: Vec<Member>,
+    ) -> Result<Response, Self::Error> {
+        todo!()
+    }
+
+    fn member(&self, _ctx: (Deps, Env), _addr: String) -> Result<MemberResp, Self::Error> {
+        todo!()
+    }
+}
+
+#[cw_derive::contract(module=contract, error=Error)]
+#[messages(group as Group)]
+impl GroupContract {
     pub fn new() -> Self {
         Self {
             admin: Item::new("admin"),

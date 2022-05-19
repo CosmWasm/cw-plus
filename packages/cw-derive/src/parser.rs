@@ -41,10 +41,7 @@ impl Parse for InterfaceArgs {
             } else if attr == "msg_type" {
                 msg_type = Some(input.parse()?);
             } else {
-                return Err(Error::new(
-                    attr.span(),
-                    "expected `module`, `exec`, `query`, or `msg_type`",
-                ));
+                return Err(Error::new(attr.span(), "expected `module` or `msg_type`"));
             }
 
             if input.peek(Token![,]) {
@@ -55,20 +52,6 @@ impl Parse for InterfaceArgs {
         }
 
         let _: Nothing = input.parse()?;
-        let attrs: Punctuated<Mapping, Token![,]> = input.parse_terminated(Mapping::parse)?;
-
-        for attr in attrs {
-            if attr.index == "module" {
-                module = Some(parse2(attr.value)?);
-            } else if attr.index == "msg_type" {
-                msg_type = Some(parse2(attr.value)?);
-            } else {
-                return Err(Error::new(
-                    attr.index.span(),
-                    "Expected `module`, `exec`, `query`, or `msg_type`",
-                ));
-            }
-        }
 
         Ok(InterfaceArgs { module, msg_type })
     }
@@ -79,20 +62,26 @@ impl Parse for ContractArgs {
         let mut module = None;
         let mut error = parse_quote!(ContractError);
 
-        let attrs: Punctuated<Mapping, Token![,]> = input.parse_terminated(Mapping::parse)?;
+        while !input.is_empty() {
+            let attr: Ident = input.parse()?;
+            let _: Token![=] = input.parse()?;
 
-        for attr in attrs {
-            if attr.index == "module" {
-                module = Some(parse2(attr.value)?);
-            } else if attr.index == "error" {
-                error = parse2(attr.value)?;
+            if attr == "module" {
+                module = Some(input.parse()?);
+            } else if attr == "error" {
+                error = input.parse()?;
             } else {
-                return Err(Error::new(
-                    attr.index.span(),
-                    "expected `module`, `exec` or `query`",
-                ));
+                return Err(Error::new(attr.span(), "expected `module` or `error`"));
+            }
+
+            if input.peek(Token![,]) {
+                let _: Token![,] = input.parse()?;
+            } else if !input.is_empty() {
+                return Err(input.error("Unexpected token, comma expected"));
             }
         }
+
+        let _: Nothing = input.parse()?;
 
         Ok(ContractArgs { module, error })
     }
