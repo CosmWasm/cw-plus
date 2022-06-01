@@ -21,7 +21,7 @@ if [[ "$(realpath "$SCRIPT_DIR/..")" != "$(pwd)" ]]; then
 fi
 
 # Ensure repo is not dirty
-CHANGES_IN_REPO=$(git status --porcelain)
+CHANGES_IN_REPO=$(git status --porcelain --untracked-files=no)
 if [[ -n "$CHANGES_IN_REPO" ]]; then
     echo "Repository is dirty. Showing 'git status' and 'git --no-pager diff' for debugging now:"
     git status && git --no-pager diff
