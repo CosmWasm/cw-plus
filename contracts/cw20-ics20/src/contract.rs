@@ -204,7 +204,7 @@ pub fn execute_allow(
 
 const MIGRATE_MIN_VERSION: &str = "0.11.1";
 const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
-const MIGRATE_VERSION_3: &str = "0.13.2";
+const MIGRATE_VERSION_3: &str = "0.13.3";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
