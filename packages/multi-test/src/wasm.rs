@@ -1056,6 +1056,57 @@ mod test {
     }
 
     #[test]
+    fn can_dump_raw_wasm_state() {
+        let api = MockApi::default();
+        let mut keeper = WasmKeeper::<Empty, Empty>::new();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(payout::contract());
+
+        let mut wasm_storage = MockStorage::new();
+
+        let contract_addr = keeper
+            .register_contract(
+                &mut wasm_storage,
+                code_id,
+                Addr::unchecked("foobar"),
+                Addr::unchecked("admin"),
+                "label".to_owned(),
+                1000,
+            )
+            .unwrap();
+
+        // make a contract with state
+        let payout = coin(1500, "mlg");
+        let msg = payout::InstantiateMessage {
+            payout: payout.clone(),
+        };
+        keeper
+            .call_instantiate(
+                contract_addr.clone(),
+                &api,
+                &mut wasm_storage,
+                &mock_router(),
+                &block,
+                mock_info("foobar", &[]),
+                to_vec(&msg).unwrap(),
+            )
+            .unwrap();
+
+        // dump state
+        let state = keeper.dump_wasm_raw(&wasm_storage, &contract_addr);
+        assert_eq!(state.len(), 2);
+        // check contents
+        let (k, v) = &state[0];
+        assert_eq!(k.as_slice(), b"count");
+        let count: u32 = from_slice(v).unwrap();
+        assert_eq!(count, 1);
+        let (k, v) = &state[1];
+        assert_eq!(k.as_slice(), b"payout");
+        let stored_pay: payout::InstantiateMessage = from_slice(v).unwrap();
+        assert_eq!(stored_pay.payout, payout);
+    }
+
+    #[test]
     fn contract_send_coins() {
         let api = MockApi::default();
         let mut keeper = WasmKeeper::new();
