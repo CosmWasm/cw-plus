@@ -5,7 +5,7 @@ use std::ops::Deref;
 use cosmwasm_std::{
     to_binary, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo,
     ContractInfoResponse, CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier,
-    QuerierWrapper, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgResponse,
+    QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgResponse,
     SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
@@ -190,6 +190,80 @@ impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC> {
         CONTRACTS
             .load(&prefixed_read(storage, NAMESPACE_WASM), address)
             .map_err(Into::into)
+    }
+
+    pub fn dump_wasm_raw(&self, storage: &dyn Storage, address: &Addr) -> Vec<Record> {
+        let storage = self.contract_storage_readonly(storage, address);
+        storage.range(None, None, Order::Ascending).collect()
+    }
+
+    fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
+        let mut name = b"contract_data/".to_vec();
+        name.extend_from_slice(contract.as_bytes());
+        name
+    }
+
+    fn contract_storage<'a>(
+        &self,
+        storage: &'a mut dyn Storage,
+        address: &Addr,
+    ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
+        let namespace = self.contract_namespace(address);
+        let storage = PrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
+        Box::new(storage)
+    }
+
+    // fails RUNTIME if you try to write. please don't
+    fn contract_storage_readonly<'a>(
+        &self,
+        storage: &'a dyn Storage,
+        address: &Addr,
+    ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
+        let namespace = self.contract_namespace(address);
+        let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
+        Box::new(storage)
+    }
+
+    fn verify_attributes(attributes: &[Attribute]) -> AnyResult<()> {
+        for attr in attributes {
+            let key = attr.key.trim();
+            let val = attr.value.trim();
+
+            if key.is_empty() {
+                bail!(Error::empty_attribute_key(val));
+            }
+
+            if val.is_empty() {
+                bail!(Error::empty_attribute_value(key));
+            }
+
+            if key.starts_with('_') {
+                bail!(Error::reserved_attribute_key(key));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn verify_response<T>(response: Response<T>) -> AnyResult<Response<T>>
+    where
+        T: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        Self::verify_attributes(&response.attributes)?;
+
+        for event in &response.events {
+            Self::verify_attributes(&event.attributes)?;
+            let ty = event.ty.trim();
+            if ty.len() < 2 {
+                bail!(Error::event_type_too_short(ty));
+            }
+        }
+
+        Ok(response)
     }
 }
 
@@ -781,75 +855,6 @@ where
         // we make this longer so it is not rejected by tests
         // it is lowercase to be compatible with the MockApi implementation of cosmwasm-std >= 1.0.0-beta8
         Addr::unchecked(format!("contract{}", count))
-    }
-
-    fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
-        let mut name = b"contract_data/".to_vec();
-        name.extend_from_slice(contract.as_bytes());
-        name
-    }
-
-    fn contract_storage<'a>(
-        &self,
-        storage: &'a mut dyn Storage,
-        address: &Addr,
-    ) -> Box<dyn Storage + 'a> {
-        // We double-namespace this, once from global storage -> wasm_storage
-        // then from wasm_storage -> the contracts subspace
-        let namespace = self.contract_namespace(address);
-        let storage = PrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
-        Box::new(storage)
-    }
-
-    // fails RUNTIME if you try to write. please don't
-    fn contract_storage_readonly<'a>(
-        &self,
-        storage: &'a dyn Storage,
-        address: &Addr,
-    ) -> Box<dyn Storage + 'a> {
-        // We double-namespace this, once from global storage -> wasm_storage
-        // then from wasm_storage -> the contracts subspace
-        let namespace = self.contract_namespace(address);
-        let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
-        Box::new(storage)
-    }
-
-    fn verify_attributes(attributes: &[Attribute]) -> AnyResult<()> {
-        for attr in attributes {
-            let key = attr.key.trim();
-            let val = attr.value.trim();
-
-            if key.is_empty() {
-                bail!(Error::empty_attribute_key(val));
-            }
-
-            if val.is_empty() {
-                bail!(Error::empty_attribute_value(key));
-            }
-
-            if key.starts_with('_') {
-                bail!(Error::reserved_attribute_key(key));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn verify_response<T>(response: Response<T>) -> AnyResult<Response<T>>
-    where
-        T: Clone + fmt::Debug + PartialEq + JsonSchema,
-    {
-        Self::verify_attributes(&response.attributes)?;
-
-        for event in &response.events {
-            Self::verify_attributes(&event.attributes)?;
-            let ty = event.ty.trim();
-            if ty.len() < 2 {
-                bail!(Error::event_type_too_short(ty));
-            }
-        }
-
-        Ok(response)
     }
 }
 

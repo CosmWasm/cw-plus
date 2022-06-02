@@ -5,7 +5,8 @@ use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
     from_slice, to_binary, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty,
-    Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError, SystemResult,
+    Querier, QuerierResult, QuerierWrapper, QueryRequest, Record, Storage, SystemError,
+    SystemResult,
 };
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -564,6 +565,11 @@ where
     /// This allows to get `ContractData` for specific contract
     pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
         self.read_module(|router, _, storage| router.wasm.load_contract(storage, address))
+    }
+
+    /// This gets a raw state dump of all key-values held by a given contract
+    pub fn dump_wasm_raw(&self, address: &Addr) -> Vec<Record> {
+        self.read_module(|router, _, storage| router.wasm.dump_wasm_raw(storage, address))
     }
 }
 
