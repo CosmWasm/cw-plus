@@ -2,7 +2,15 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.3...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...HEAD)
+
+## [v0.13.4](https://github.com/CosmWasm/cw-plus/tree/v0.13.4) (2022-06-02)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.3...v0.13.4)
+
+**Merged pull requests:**
+
+- Dump state multitest [\#732](https://github.com/CosmWasm/cw-plus/pull/732) ([ethanfrey](https://github.com/ethanfrey))
 
 ## [v0.13.3](https://github.com/CosmWasm/cw-plus/tree/v0.13.3) (2022-06-01)
 
