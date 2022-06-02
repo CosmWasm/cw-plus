@@ -1,6 +1,6 @@
 [package]
 name = "cw-storage-plus"
-version = "0.13.3"
+version = "0.13.4"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Enhanced storage engines"

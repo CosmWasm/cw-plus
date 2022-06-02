@@ -204,7 +204,8 @@ pub fn execute_allow(
 
 const MIGRATE_MIN_VERSION: &str = "0.11.1";
 const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
-const MIGRATE_VERSION_3: &str = "0.13.3";
+// the new functionality starts in 0.13.1, this is the last release that needs to be migrated to v3
+const MIGRATE_VERSION_3: &str = "0.13.0";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
@@ -575,6 +576,8 @@ mod test {
         // balances set high
         deps.querier
             .update_balance(MOCK_CONTRACT_ADDR, coins(50000, native));
+        // pretend this is an old contract - set version explicitly
+        set_contract_version(deps.as_mut().storage, CONTRACT_NAME, MIGRATE_VERSION_3).unwrap();
 
         // channel state a bit lower (some in-flight acks)
         let state = ChannelState {
