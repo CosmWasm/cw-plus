@@ -1,11 +1,12 @@
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
 
+use anyhow::bail;
 use anyhow::Result as AnyResult;
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_binary, Addr, Api, Binary, BlockInfo, ContractResult, CustomQuery, Empty,
-    Querier, QuerierResult, QuerierWrapper, QueryRequest, Record, Storage, SystemError,
+    from_slice, to_binary, Addr, Api, Binary, BlockInfo, ContractResult, CosmosMsg, CustomQuery,
+    Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Record, Storage, SystemError,
     SystemResult,
 };
 use schemars::JsonSchema;
@@ -18,7 +19,6 @@ use crate::executor::{AppResponse, Executor};
 use crate::module::{FailingModule, Module};
 use crate::staking::{Distribution, FailingDistribution, FailingStaking, Staking, StakingSudo};
 use crate::transactions::transactional;
-use crate::untyped_msg::CosmosMsg;
 use crate::wasm::{ContractData, Wasm, WasmKeeper, WasmSudo};
 
 pub fn next_block(block: &mut BlockInfo) {
@@ -627,7 +627,7 @@ where
 
         transactional(&mut *storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg.into()))
+                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg))
                 .collect()
         })
     }
@@ -799,6 +799,7 @@ where
             CosmosMsg::Distribution(msg) => self
                 .distribution
                 .execute(api, storage, self, block, sender, msg),
+            _ => bail!("Cannot execute {:?}", msg),
         }
     }
 
@@ -1498,7 +1499,7 @@ mod test {
                 lucky_winner: winner.clone(),
                 runner_up: second.clone(),
             });
-            app.execute(Addr::unchecked("anyone"), msg.into()).unwrap();
+            app.execute(Addr::unchecked("anyone"), msg).unwrap();
 
             // see if coins were properly added
             let big_win = app.wrap().query_balance(&winner, denom).unwrap();

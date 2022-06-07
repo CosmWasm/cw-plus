@@ -320,7 +320,7 @@ where
                 amount: amount.to_vec(),
             }
             .into();
-            let res = router.execute(api, storage, block, sender.into(), msg.into())?;
+            let res = router.execute(api, storage, block, sender.into(), msg)?;
             Ok(res)
         } else {
             Ok(AppResponse::default())
@@ -502,7 +502,7 @@ where
 
         // execute in cache
         let res = transactional(storage, |write_cache, _| {
-            router.execute(api, write_cache, block, contract.clone(), msg.into())
+            router.execute(api, write_cache, block, contract.clone(), msg)
         });
 
         // call reply if meaningful
