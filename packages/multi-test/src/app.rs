@@ -627,7 +627,7 @@ where
 
         transactional(&mut *storage, |write_cache, _| {
             msgs.into_iter()
-                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg.into()))
+                .map(|msg| router.execute(&*api, write_cache, block, sender.clone(), msg))
                 .collect()
         })
     }
@@ -1499,7 +1499,7 @@ mod test {
                 lucky_winner: winner.clone(),
                 runner_up: second.clone(),
             });
-            app.execute(Addr::unchecked("anyone"), msg.into()).unwrap();
+            app.execute(Addr::unchecked("anyone"), msg).unwrap();
 
             // see if coins were properly added
             let big_win = app.wrap().query_balance(&winner, denom).unwrap();
