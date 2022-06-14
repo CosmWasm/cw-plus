@@ -1,4 +1,4 @@
-CW-Storage-Plus: Enhanced/experimental storage engines for CosmWasm
+CW-Storage-Macro: Macro helper for storage package
 Copyright (C) 2020 Confio OÜ
 
 Licensed under the Apache License, Version 2.0 (the "License");
