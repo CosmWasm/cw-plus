@@ -422,6 +422,7 @@ version = "0.13.4"
 dependencies = [
  "cosmwasm-std",
  "criterion",
+ "cw-storage-macro",
  "rand",
  "schemars",
  "serde",
