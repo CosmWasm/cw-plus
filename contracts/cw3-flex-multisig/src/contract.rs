@@ -193,12 +193,18 @@ pub fn execute_execute(
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<Response, ContractError> {
-    let cfg = CONFIG.load(deps.storage)?;
+    let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
+    // we allow execution even after the proposal "expiration" as long as all vote come in before
+    // that point. If it was approved on time, it can be executed any time.
+    if prop.current_status(&env.block) != Status::Passed {
+        return Err(ContractError::WrongExecuteStatus {});
+    }
 
     // Executor can be set in 3 ways:
     // - Member: any member of the voting group can execute
     // - Only: only passed address is able to execute
     // - None: Anyone can execute message
+    let cfg = CONFIG.load(deps.storage)?;
     if let Some(executor) = cfg.executor {
         match executor {
             Executor::Member => {
@@ -212,13 +218,6 @@ pub fn execute_execute(
                 }
             }
         }
-    }
-
-    let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    // we allow execution even after the proposal "expiration" as long as all vote come in before
-    // that point. If it was approved on time, it can be executed any time.
-    if prop.current_status(&env.block) != Status::Passed {
-        return Err(ContractError::WrongExecuteStatus {});
     }
 
     // set it to executed
@@ -517,12 +516,14 @@ mod tests {
         group: Addr,
         threshold: Threshold,
         max_voting_period: Duration,
+        executor: Option<crate::state::Executor>,
     ) -> Addr {
         let flex_id = app.store_code(contract_flex());
         let msg = crate::msg::InstantiateMsg {
             group_addr: group.to_string(),
             threshold,
             max_voting_period,
+            executor,
         };
         app.instantiate_contract(flex_id, Addr::unchecked(OWNER), &msg, &[], "flex", None)
             .unwrap()
@@ -547,6 +548,7 @@ mod tests {
             max_voting_period,
             init_funds,
             multisig_as_group_admin,
+            None,
         )
     }
 
@@ -557,6 +559,7 @@ mod tests {
         max_voting_period: Duration,
         init_funds: Vec<Coin>,
         multisig_as_group_admin: bool,
+        executor: Option<crate::state::Executor>,
     ) -> (Addr, Addr) {
         // 1. Instantiate group contract with members (and OWNER as admin)
         let members = vec![
@@ -571,7 +574,13 @@ mod tests {
         app.update_block(next_block);
 
         // 2. Set up Multisig backed by this group
-        let flex_addr = instantiate_flex(app, group_addr.clone(), threshold, max_voting_period);
+        let flex_addr = instantiate_flex(
+            app,
+            group_addr.clone(),
+            threshold,
+            max_voting_period,
+            executor,
+        );
         app.update_block(next_block);
 
         // 3. (Optional) Set the multisig as the group owner
@@ -636,6 +645,7 @@ mod tests {
                 quorum: Decimal::percent(1),
             },
             max_voting_period,
+            executor: None,
         };
         let err = app
             .instantiate_contract(
@@ -657,6 +667,7 @@ mod tests {
             group_addr: group_addr.to_string(),
             threshold: Threshold::AbsoluteCount { weight: 100 },
             max_voting_period,
+            executor: None,
         };
         let err = app
             .instantiate_contract(
@@ -678,6 +689,7 @@ mod tests {
             group_addr: group_addr.to_string(),
             threshold: Threshold::AbsoluteCount { weight: 1 },
             max_voting_period,
+            executor: None,
         };
         let flex_addr = app
             .instantiate_contract(
@@ -835,7 +847,8 @@ mod tests {
             threshold: Decimal::percent(80),
             quorum: Decimal::percent(20),
         };
-        let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, false);
+        let (flex_addr, _) =
+            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
 
         // create proposal with 1 vote power
         let proposal = pay_somebody_proposal();
@@ -930,7 +943,8 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, false);
+        let (flex_addr, _) =
+            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
 
         // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
@@ -1121,7 +1135,8 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, true);
+        let (flex_addr, _) =
+            setup_test_case(&mut app, threshold, voting_period, init_funds, true, None);
 
         // ensure we have cash to cover the proposal
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
@@ -1227,6 +1242,7 @@ mod tests {
             Duration::Time(voting_period),
             init_funds,
             true,
+            None,
         );
 
         // ensure we have cash to cover the proposal
@@ -1302,7 +1318,8 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Height(2000000);
-        let (flex_addr, _) = setup_test_case(&mut app, threshold, voting_period, init_funds, true);
+        let (flex_addr, _) =
+            setup_test_case(&mut app, threshold, voting_period, init_funds, true, None);
 
         // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
@@ -1354,7 +1371,7 @@ mod tests {
         };
         let voting_period = Duration::Time(20000);
         let (flex_addr, group_addr) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, false);
+            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
 
         // VOTER1 starts a proposal to send some tokens (1/4 votes)
         let proposal = pay_somebody_proposal();
@@ -1600,7 +1617,7 @@ mod tests {
         };
         let voting_period = Duration::Time(20000);
         let (flex_addr, group_addr) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, false);
+            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
 
         // VOTER3 starts a proposal to send some tokens (3/12 votes)
         let proposal = pay_somebody_proposal();
@@ -1683,6 +1700,7 @@ mod tests {
             voting_period,
             init_funds,
             false,
+            None,
         );
 
         // VOTER3 starts a proposal to send some tokens (3 votes)
@@ -1753,6 +1771,7 @@ mod tests {
             voting_period,
             init_funds,
             false,
+            None,
         );
 
         // create proposal
