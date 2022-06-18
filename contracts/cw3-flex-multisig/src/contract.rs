@@ -1227,6 +1227,128 @@ mod tests {
     }
 
     #[test]
+    fn execute_with_executor_member() {
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
+
+        let threshold = Threshold::ThresholdQuorum {
+            threshold: Decimal::percent(51),
+            quorum: Decimal::percent(1),
+        };
+        let voting_period = Duration::Time(2000000);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            true,
+            Some(crate::state::Executor::Member),
+        );
+
+        // create proposal with 0 vote power
+        let proposal = pay_somebody_proposal();
+        let res = app
+            .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
+            .unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
+
+        // Vote it, so it passes
+        let vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &vote, &[])
+            .unwrap();
+
+        let execution = ExecuteMsg::Execute { proposal_id };
+        let err = app
+            .execute_contract(
+                Addr::unchecked(Addr::unchecked("anyone")),
+                flex_addr.clone(),
+                &execution,
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+
+        app.execute_contract(
+            Addr::unchecked(Addr::unchecked(VOTER2)),
+            flex_addr,
+            &execution,
+            &[],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn execute_with_executor_only() {
+        let init_funds = coins(10, "BTC");
+        let mut app = mock_app(&init_funds);
+
+        let threshold = Threshold::ThresholdQuorum {
+            threshold: Decimal::percent(51),
+            quorum: Decimal::percent(1),
+        };
+        let voting_period = Duration::Time(2000000);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            true,
+            Some(crate::state::Executor::Only(Addr::unchecked(VOTER3))),
+        );
+
+        // create proposal with 0 vote power
+        let proposal = pay_somebody_proposal();
+        let res = app
+            .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
+            .unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
+
+        // Vote it, so it passes
+        let vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &vote, &[])
+            .unwrap();
+
+        let execution = ExecuteMsg::Execute { proposal_id };
+        let err = app
+            .execute_contract(
+                Addr::unchecked(Addr::unchecked("anyone")),
+                flex_addr.clone(),
+                &execution,
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+
+        let err = app
+            .execute_contract(
+                Addr::unchecked(Addr::unchecked(VOTER1)),
+                flex_addr.clone(),
+                &execution,
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
+
+        app.execute_contract(
+            Addr::unchecked(Addr::unchecked(VOTER3)),
+            flex_addr,
+            &execution,
+            &[],
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn proposal_pass_on_expiration() {
         let init_funds = coins(10, "BTC");
         let mut app = mock_app(&init_funds);
