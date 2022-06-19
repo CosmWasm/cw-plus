@@ -30,9 +30,9 @@ pub struct Config {
 
 impl Config {
     // Executor can be set in 3 ways:
-    // - Member: any member of the voting group can execute
-    // - Only: only passed address is able to execute
-    // - None: Anyone can execute message
+    // - Member: any member of the voting group is authorized
+    // - Only: only passed address is authorized
+    // - None: Everyone are authorized
     pub fn authorize(&self, querier: &QuerierWrapper, sender: &Addr) -> Result<(), ContractError> {
         if let Some(executor) = &self.executor {
             match executor {

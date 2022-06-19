@@ -1225,7 +1225,7 @@ mod tests {
             voting_period,
             init_funds,
             true,
-            Some(crate::state::Executor::Member),
+            Some(crate::state::Executor::Member), // set executor as Member of voting group
         );
 
         // create proposal with 0 vote power
@@ -1248,7 +1248,7 @@ mod tests {
         let execution = ExecuteMsg::Execute { proposal_id };
         let err = app
             .execute_contract(
-                Addr::unchecked(Addr::unchecked("anyone")),
+                Addr::unchecked(Addr::unchecked("anyone")), // anyone is not allowed to execute
                 flex_addr.clone(),
                 &execution,
                 &[],
@@ -1257,7 +1257,7 @@ mod tests {
         assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         app.execute_contract(
-            Addr::unchecked(Addr::unchecked(VOTER2)),
+            Addr::unchecked(Addr::unchecked(VOTER2)), // member of voting group is allowed to execute
             flex_addr,
             &execution,
             &[],
@@ -1281,7 +1281,7 @@ mod tests {
             voting_period,
             init_funds,
             true,
-            Some(crate::state::Executor::Only(Addr::unchecked(VOTER3))),
+            Some(crate::state::Executor::Only(Addr::unchecked(VOTER3))), // only VOTER3 can execute proposal
         );
 
         // create proposal with 0 vote power
@@ -1304,7 +1304,7 @@ mod tests {
         let execution = ExecuteMsg::Execute { proposal_id };
         let err = app
             .execute_contract(
-                Addr::unchecked(Addr::unchecked("anyone")),
+                Addr::unchecked(Addr::unchecked("anyone")), // anyone is not allowed to execute
                 flex_addr.clone(),
                 &execution,
                 &[],
@@ -1314,7 +1314,7 @@ mod tests {
 
         let err = app
             .execute_contract(
-                Addr::unchecked(Addr::unchecked(VOTER1)),
+                Addr::unchecked(Addr::unchecked(VOTER1)), // VOTER1 is not allowed to execute
                 flex_addr.clone(),
                 &execution,
                 &[],
@@ -1323,7 +1323,7 @@ mod tests {
         assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         app.execute_contract(
-            Addr::unchecked(Addr::unchecked(VOTER3)),
+            Addr::unchecked(Addr::unchecked(VOTER3)), // VOTER3 is allowed to execute
             flex_addr,
             &execution,
             &[],
