@@ -305,7 +305,9 @@ pub fn execute_mint(
     }
 
     let mut config = TOKEN_INFO.load(deps.storage)?;
-    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != info.sender {
+    if config.mint.is_none() {
+        return Err(ContractError::NoMinterParams {});
+    } else if config.mint.as_ref().unwrap().minter != info.sender {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -883,7 +885,7 @@ mod tests {
         let info = mock_info("genesis", &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::Unauthorized {});
+        assert_eq!(err, ContractError::NoMinterParams {});
     }
 
     #[test]

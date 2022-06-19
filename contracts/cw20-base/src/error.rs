@@ -9,6 +9,9 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Minter parameters not configured")]
+    NoMinterParams {},
+
     #[error("Cannot set to own account")]
     CannotSetOwnAccount {},
 
