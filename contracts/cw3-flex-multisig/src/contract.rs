@@ -19,7 +19,7 @@ use cw_utils::{maybe_addr, Expiration, ThresholdResponse};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Config, Executor, CONFIG};
+use crate::state::{Config, CONFIG};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
@@ -200,25 +200,8 @@ pub fn execute_execute(
         return Err(ContractError::WrongExecuteStatus {});
     }
 
-    // Executor can be set in 3 ways:
-    // - Member: any member of the voting group can execute
-    // - Only: only passed address is able to execute
-    // - None: Anyone can execute message
     let cfg = CONFIG.load(deps.storage)?;
-    if let Some(executor) = cfg.executor {
-        match executor {
-            Executor::Member => {
-                cfg.group_addr
-                    .is_member(&deps.querier, &info.sender, None)?
-                    .ok_or(ContractError::Unauthorized {})?;
-            }
-            Executor::Only(addr) => {
-                if addr != info.sender {
-                    return Err(ContractError::Unauthorized {});
-                }
-            }
-        }
-    }
+    cfg.authorize(&deps.querier, &info.sender)?;
 
     // set it to executed
     prop.status = Status::Executed;
