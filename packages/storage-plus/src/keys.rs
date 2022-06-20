@@ -12,6 +12,7 @@ pub enum Key<'a> {
     Val32([u8; 4]),
     Val64([u8; 8]),
     Val128([u8; 16]),
+    Arr([u8]), // support key to store indefinite number of bytes
 }
 
 impl<'a> AsRef<[u8]> for Key<'a> {
