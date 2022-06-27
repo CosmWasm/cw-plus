@@ -547,6 +547,7 @@ version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
+ "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
  "cw2",
