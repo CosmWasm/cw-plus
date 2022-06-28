@@ -144,6 +144,14 @@ the minter is a smart contract.
 This should be enabled with all blockchains that have iterator support.
 It allows us to get lists of results with pagination.
 
+### Queries
+
+`AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
+by the given owner. `start_after` and `limit` provide pagination.
+
+`AllAccounts{start_after, limit}` - Returns the list of all accounts that have been created on
+the contract (just the addresses). `start_after` and `limit` provide pagination.
+
 ## Marketing
 
 This allows us to attach more metadata on the token to help with displaying the token in
@@ -173,11 +181,3 @@ account, this will update some marketing-related metadata on the contract.
 `DownloadLogo{}` - If the token's logo was previously uploaded to the blockchain
 (see `UploadLogo` message), then it returns the raw data to be displayed in a browser.
 Return type is `DownloadLogoResponse{ mime_type, data }`.
-
-### Queries
-
-`AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
-by the given owner. `start_after` and `limit` provide pagination.
-
-`AllAccounts{start_after, limit}` - Returns the list of all accounts that have been created on
-the contract (just the addresses). `start_after` and `limit` provide pagination.
