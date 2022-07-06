@@ -514,7 +514,7 @@ mod test {
 
     #[test]
     fn nested_bytes_key() {
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         struct Test(String);
 
         impl PrimaryKey<'_> for Test {
@@ -564,5 +564,10 @@ mod test {
         assert_eq!(2, path.len());
         assert_eq!(b"TTT-Test", path[0].as_ref());
         assert_eq!(100u64.to_cw_bytes(), path[1].as_ref());
+
+        assert_eq!(
+            Test::from_vec(b"TTT-F".to_vec()).unwrap(),
+            Test("F".to_string())
+        );
     }
 }

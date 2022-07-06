@@ -1520,11 +1520,11 @@ mod test {
                     .unwrap()
                     .split('-')
                     .collect::<Vec<_>>();
-                Ok(match s[0] {
-                    "n" => AssetInfo::Native(s[1].to_string()),
-                    "c" => AssetInfo::Cw20(s[1].to_string()),
-                    _ => panic!(),
-                })
+                match s[0] {
+                    "n" => Ok(AssetInfo::Native(s[1].to_string())),
+                    "c" => Ok(AssetInfo::Cw20(s[1].to_string())),
+                    _ => Err(StdError::generic_err("Not supported")),
+                }
             }
         }
 
@@ -1557,5 +1557,15 @@ mod test {
                 AssetInfo::Native("uosmo".to_string()),
             ]
         );
+
+        assert_eq!(
+            <&AssetInfo>::from_vec(b"n-uluna".to_vec()).unwrap(),
+            AssetInfo::Native("uluna".to_string())
+        );
+
+        assert!(matches!(
+            <&AssetInfo>::from_vec(b"g-uluna".to_vec()).unwrap_err(),
+            StdError::GenericErr { msg: _ }
+        ));
     }
 }
