@@ -511,4 +511,58 @@ mod test {
             vec![one.as_slice(), two.as_slice(), three.as_slice()]
         );
     }
+
+    #[test]
+    fn nested_bytes_key() {
+        #[derive(Debug, Clone)]
+        struct Test(String);
+
+        impl PrimaryKey<'_> for Test {
+            type Prefix = ();
+
+            type SubPrefix = ();
+
+            type Suffix = ();
+
+            type SuperSuffix = ();
+
+            fn key(&self) -> Vec<Key> {
+                vec![Key::Bytes(Box::new(
+                    format!("TTT-{}", self.0).as_bytes().to_vec(),
+                ))]
+            }
+        }
+
+        impl Prefixer<'_> for Test {
+            fn prefix(&self) -> Vec<Key> {
+                vec![Key::Bytes(Box::new(
+                    format!("TTT-{}", self.0).as_bytes().to_vec(),
+                ))]
+            }
+        }
+
+        impl KeyDeserialize for Test {
+            type Output = Self;
+
+            fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+                Ok(Self(
+                    std::str::from_utf8(&value)
+                        .unwrap()
+                        .split("-")
+                        .last()
+                        .unwrap()
+                        .to_string(),
+                ))
+            }
+        }
+
+        type K = (Test, u64);
+
+        let k: K = (Test("Test".to_string()), 100u64);
+        let path = k.key();
+
+        assert_eq!(2, path.len());
+        assert_eq!(b"TTT-Test", path[0].as_ref());
+        assert_eq!(100u64.to_cw_bytes(), path[1].as_ref());
+    }
 }
