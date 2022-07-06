@@ -548,7 +548,7 @@ mod test {
                 Ok(Self(
                     std::str::from_utf8(&value)
                         .unwrap()
-                        .split("-")
+                        .split('-')
                         .last()
                         .unwrap()
                         .to_string(),
