@@ -12,6 +12,7 @@ pub enum Key<'a> {
     Val32([u8; 4]),
     Val64([u8; 8]),
     Val128([u8; 16]),
+    Bytes(Box<Vec<u8>>),
 }
 
 impl<'a> AsRef<[u8]> for Key<'a> {
@@ -23,6 +24,7 @@ impl<'a> AsRef<[u8]> for Key<'a> {
             Key::Val32(v) => v,
             Key::Val64(v) => v,
             Key::Val128(v) => v,
+            Key::Bytes(v) => v,
         }
     }
 }

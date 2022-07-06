@@ -1481,4 +1481,81 @@ mod test {
         assert_eq!(include.len(), 1);
         assert_eq!(include, vec![456]);
     }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn dynamic_sized_bytes() {
+        #[derive(Debug, Clone, PartialEq)]
+        enum AssetInfo {
+            Native(String),
+            Cw20(String),
+        }
+
+        impl PrimaryKey<'_> for &AssetInfo {
+            type Prefix = ();
+
+            type SubPrefix = ();
+
+            type Suffix = ();
+
+            type SuperSuffix = ();
+
+            fn key(&self) -> Vec<Key> {
+                vec![Key::Bytes(Box::new(
+                    match self {
+                        AssetInfo::Native(native) => format!("n-{}", native),
+                        AssetInfo::Cw20(cw20) => format!("c-{}", cw20),
+                    }
+                    .as_bytes()
+                    .to_vec(),
+                ))]
+            }
+        }
+
+        impl KeyDeserialize for &AssetInfo {
+            type Output = AssetInfo;
+
+            fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+                let s = std::str::from_utf8(&value)
+                    .unwrap()
+                    .split('-')
+                    .collect::<Vec<_>>();
+                Ok(match s[0] {
+                    "n" => AssetInfo::Native(s[1].to_string()),
+                    "c" => AssetInfo::Cw20(s[1].to_string()),
+                    _ => panic!(),
+                })
+            }
+        }
+
+        let mut storage = MockStorage::new();
+        let map: Map<&AssetInfo, ()> = Map::new("test");
+
+        map.save(&mut storage, &AssetInfo::Cw20("contract1".to_string()), &())
+            .unwrap();
+
+        map.save(&mut storage, &AssetInfo::Cw20("contract2".to_string()), &())
+            .unwrap();
+
+        map.save(&mut storage, &AssetInfo::Native("uluna".to_string()), &())
+            .unwrap();
+
+        map.save(&mut storage, &AssetInfo::Native("uosmo".to_string()), &())
+            .unwrap();
+
+        let all_assets = map
+            .keys(&storage, None, None, Order::Ascending)
+            .map(|e| e.unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            all_assets,
+            vec![
+                AssetInfo::Cw20("contract1".to_string()),
+                AssetInfo::Cw20("contract2".to_string()),
+                AssetInfo::Native("uluna".to_string()),
+                AssetInfo::Native("uosmo".to_string()),
+            ]
+        );
+    }
 }
