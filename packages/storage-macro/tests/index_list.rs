@@ -3,21 +3,21 @@ use cw_storage_macro::index_list;
 use cw_storage_plus::{IndexedMap, MultiIndex, UniqueIndex};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-struct TestStruct {
-    id: u64,
-    id2: u32,
-    addr: Addr,
-}
-
-#[index_list(TestStruct)]
-struct TestIndexes<'a> {
-    id: MultiIndex<'a, u32, TestStruct, u64>,
-    addr: UniqueIndex<'a, Addr, TestStruct>,
-}
-
 #[test]
 fn compile() {
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+    struct TestStruct {
+        id: u64,
+        id2: u32,
+        addr: Addr,
+    }
+
+    #[index_list(TestStruct)]
+    struct TestIndexes<'a> {
+        id: MultiIndex<'a, u32, TestStruct, u64>,
+        addr: UniqueIndex<'a, Addr, TestStruct>,
+    }
+
     let _: IndexedMap<u64, TestStruct, TestIndexes> = IndexedMap::new(
         "t",
         TestIndexes {
@@ -29,6 +29,19 @@ fn compile() {
 
 #[test]
 fn works() {
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+    struct TestStruct {
+        id: u64,
+        id2: u32,
+        addr: Addr,
+    }
+
+    #[index_list(TestStruct)]
+    struct TestIndexes<'a> {
+        id: MultiIndex<'a, u32, TestStruct, u64>,
+        addr: UniqueIndex<'a, Addr, TestStruct>,
+    }
+
     let mut storage = MockStorage::new();
     let idm: IndexedMap<u64, TestStruct, TestIndexes> = IndexedMap::new(
         "t",
