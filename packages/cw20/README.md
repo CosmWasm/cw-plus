@@ -128,6 +128,11 @@ minter address and handle updating the ACL there.
 this will create `amount` new tokens (updating total supply) and
 add them to the balance of `recipient`, as long as it does not exceed the cap.
 
+`UpdateMinter { new_minter: Option<String> }` - Callable only by the
+current minter. If `new_minter` is `Some(address)` the minter is set
+to the specified address, otherwise the minter is removed and no
+future minters may be set. 
+
 ### Queries
 
 `Minter{}` - Returns who and how much can be minted. Return type is
