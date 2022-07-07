@@ -1,12 +1,8 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::{Addr, CosmosMsg, Empty};
 use cw_utils::{Expiration, ThresholdResponse};
 
-use crate::msg::Vote;
+use crate::{msg::Vote, DepositInfo};
 
 #[cw_serde]
 pub enum Cw3QueryMsg {
@@ -53,24 +49,25 @@ pub enum Cw3QueryMsg {
 /// the querier needs to know what possible custom message types
 /// those are in order to parse the response
 #[cw_serde]
-pub struct ProposalResponse<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+pub struct ProposalResponse<T = Empty> {
     pub id: u64,
     pub title: String,
     pub description: String,
     pub msgs: Vec<CosmosMsg<T>>,
     pub status: Status,
     pub expires: Expiration,
-    /// This is the threshold that is applied to this proposal. Both the rules of the voting contract,
-    /// as well as the total_weight of the voting group may have changed since this time. That means
-    /// that the generic `Threshold{}` query does not provide valid information for existing proposals.
+    /// This is the threshold that is applied to this proposal. Both
+    /// the rules of the voting contract, as well as the total_weight
+    /// of the voting group may have changed since this time. That
+    /// means that the generic `Threshold{}` query does not provide
+    /// valid information for existing proposals.
     pub threshold: ThresholdResponse,
+    pub proposer: Addr,
+    pub deposit: Option<DepositInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, JsonSchema, Debug)]
-#[serde(rename_all = "lowercase")]
+#[cw_serde]
+#[derive(Copy)]
 #[repr(u8)]
 pub enum Status {
     /// proposal was created, but voting has not yet begun for whatever reason
@@ -86,10 +83,7 @@ pub enum Status {
 }
 
 #[cw_serde]
-pub struct ProposalListResponse<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+pub struct ProposalListResponse<T = Empty> {
     pub proposals: Vec<ProposalResponse<T>>,
 }
 

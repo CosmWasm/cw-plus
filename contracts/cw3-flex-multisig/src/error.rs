@@ -1,5 +1,6 @@
 use cosmwasm_std::StdError;
-use cw_utils::ThresholdError;
+use cw3::DepositError;
+use cw_utils::{PaymentError, ThresholdError};
 
 use thiserror::Error;
 
@@ -37,4 +38,10 @@ pub enum ContractError {
 
     #[error("Cannot close completed or passed proposals")]
     WrongCloseStatus {},
+
+    #[error("{0}")]
+    Payment(#[from] PaymentError),
+
+    #[error("{0}")]
+    Deposit(#[from] DepositError),
 }

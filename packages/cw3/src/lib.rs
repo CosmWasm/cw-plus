@@ -10,12 +10,16 @@ For more information on this specification, please check out the
 */
 
 // mod helpers;
+mod deposit;
 mod helpers;
 mod msg;
+mod proposal;
 mod query;
 
+pub use crate::deposit::{DepositError, DepositInfo, UncheckedDepositInfo};
 pub use crate::helpers::Cw3Contract;
 pub use crate::msg::{Cw3ExecuteMsg, Vote};
+pub use crate::proposal::{Ballot, Proposal, Votes};
 pub use crate::query::{
     Cw3QueryMsg, ProposalListResponse, ProposalResponse, Status, VoteInfo, VoteListResponse,
     VoteResponse, VoterDetail, VoterListResponse, VoterResponse,

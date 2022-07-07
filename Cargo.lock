@@ -367,8 +367,10 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-utils",
+ "cw20",
  "schemars",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -399,6 +401,8 @@ dependencies = [
  "cw-storage-plus",
  "cw-utils",
  "cw2 0.16.0",
+ "cw20",
+ "cw20-base",
  "cw3",
  "cw3-fixed-multisig",
  "cw4",
