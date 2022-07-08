@@ -225,6 +225,9 @@ pub fn execute(
             marketing,
         } => execute_update_marketing(deps, env, info, project, description, marketing),
         ExecuteMsg::UploadLogo(logo) => execute_upload_logo(deps, env, info, logo),
+        ExecuteMsg::UpdateMinter { new_minter } => {
+            execute_update_minter(deps, env, info, new_minter)
+        }
     }
 }
 
@@ -304,8 +307,17 @@ pub fn execute_mint(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let mut config = TOKEN_INFO.load(deps.storage)?;
-    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != info.sender {
+    let mut config = TOKEN_INFO
+        .may_load(deps.storage)?
+        .ok_or(ContractError::Unauthorized {})?;
+
+    if config
+        .mint
+        .as_ref()
+        .ok_or(ContractError::Unauthorized {})?
+        .minter
+        != info.sender
+    {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -375,6 +387,35 @@ pub fn execute_send(
             .into_cosmos_msg(contract)?,
         );
     Ok(res)
+}
+
+pub fn execute_update_minter(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    new_minter: String,
+) -> Result<Response, ContractError> {
+    let mut config = TOKEN_INFO
+        .may_load(deps.storage)?
+        .ok_or(ContractError::Unauthorized {})?;
+
+    let mint = config.mint.as_ref().ok_or(ContractError::Unauthorized {})?;
+    if mint.minter != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let minter = deps.api.addr_validate(&new_minter)?;
+    let minter_data = MinterData {
+        minter,
+        cap: mint.cap,
+    };
+    config.mint = Some(minter_data);
+
+    TOKEN_INFO.save(deps.storage, &config)?;
+
+    Ok(Response::default()
+        .add_attribute("action", "update_minter")
+        .add_attribute("new_minter", new_minter))
 }
 
 pub fn execute_update_marketing(
@@ -866,6 +907,59 @@ mod tests {
             amount: Uint128::new(222),
         };
         let info = mock_info("anyone else", &[]);
+        let env = mock_env();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
+    }
+
+    #[test]
+    fn minter_can_update_minter_but_not_cap() {
+        let mut deps = mock_dependencies();
+        let minter = String::from("minter");
+        let cap = Some(Uint128::from(3000000u128));
+        do_instantiate_with_minter(
+            deps.as_mut(),
+            &String::from("genesis"),
+            Uint128::new(1234),
+            &minter,
+            cap,
+        );
+
+        let new_minter = "new_minter";
+        let msg = ExecuteMsg::UpdateMinter {
+            new_minter: new_minter.to_string(),
+        };
+
+        let info = mock_info(&minter, &[]);
+        let env = mock_env();
+        let res = execute(deps.as_mut(), env.clone(), info, msg);
+        assert!(res.is_ok());
+        let query_minter_msg = QueryMsg::Minter {};
+        let res = query(deps.as_ref(), env, query_minter_msg);
+        let mint: MinterResponse = from_binary(&res.unwrap()).unwrap();
+
+        // Minter cannot update cap.
+        assert!(mint.cap == cap);
+        assert!(mint.minter == new_minter)
+    }
+
+    #[test]
+    fn others_cannot_update_minter() {
+        let mut deps = mock_dependencies();
+        let minter = String::from("minter");
+        do_instantiate_with_minter(
+            deps.as_mut(),
+            &String::from("genesis"),
+            Uint128::new(1234),
+            &minter,
+            None,
+        );
+
+        let msg = ExecuteMsg::UpdateMinter {
+            new_minter: String::from("new_minter"),
+        };
+
+        let info = mock_info("not the minter", &[]);
         let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Unauthorized {});
