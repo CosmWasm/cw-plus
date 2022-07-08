@@ -379,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "cw-controllers"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "cw-multi-test"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "cosmwasm-std",
@@ -408,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "cw-storage-plus"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-std",
  "criterion",
@@ -419,7 +419,7 @@ dependencies = [
 
 [[package]]
 name = "cw-utils"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "cw1"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-subkeys"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -477,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist-ng"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -496,7 +496,7 @@ dependencies = [
 
 [[package]]
 name = "cw1155"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "cw1155-base"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "cw2"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "cw20-ics20"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "cw3"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "cw3-fixed-multisig"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -604,7 +604,7 @@ dependencies = [
 
 [[package]]
 name = "cw3-flex-multisig"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "cw4"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "cw4-group"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "cw4-stake"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",

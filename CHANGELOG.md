@@ -2,7 +2,55 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...HEAD)
+
+## [v0.13.4](https://github.com/CosmWasm/cw-plus/tree/v0.13.4) (2022-06-02)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.3...v0.13.4)
+
+**Merged pull requests:**
+
+- Dump state multitest [\#732](https://github.com/CosmWasm/cw-plus/pull/732) ([ethanfrey](https://github.com/ethanfrey))
+
+## [v0.13.3](https://github.com/CosmWasm/cw-plus/tree/v0.13.3) (2022-06-01)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.2...v0.13.3)
+
+**Closed issues:**
+
+- Add code coverage tooling to the CI [\#172](https://github.com/CosmWasm/cw-plus/issues/172)
+
+**Merged pull requests:**
+
+- Repo reclippization [\#721](https://github.com/CosmWasm/cw-plus/pull/721) ([hashedone](https://github.com/hashedone))
+- Add code coverage to CI [\#715](https://github.com/CosmWasm/cw-plus/pull/715) ([maurolacy](https://github.com/maurolacy))
+- Update item.rs: typo [\#713](https://github.com/CosmWasm/cw-plus/pull/713) ([rtviii](https://github.com/rtviii))
+- Update link to new shared CosmWasm SECURITY.md [\#701](https://github.com/CosmWasm/cw-plus/pull/701) ([webmaster128](https://github.com/webmaster128))
+- Add existence checking to indexed map [\#700](https://github.com/CosmWasm/cw-plus/pull/700) ([shanev](https://github.com/shanev))
+
+**Closed issues:**
+
+- error: could not compile `ff` when running cargo test on cw20-base contract [\#714](https://github.com/CosmWasm/cw-plus/issues/714)
+
+## [v0.13.2](https://github.com/CosmWasm/cw-plus/tree/v0.13.2) (2022-04-11)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.1...v0.13.2)
+
+**Closed issues:**
+
+- `KeyDeserialize` trait is private making custom keys and generics over keys not possible. [\#691](https://github.com/CosmWasm/cw-plus/issues/691)
+- unresolved import cosmwasm\_std::testing [\#681](https://github.com/CosmWasm/cw-plus/issues/681)
+- Add non-owned `range_de` [\#463](https://github.com/CosmWasm/cw-plus/issues/463)
+
+**Merged pull requests:**
+
+- Upgrade all contracts and packages to cosmwasm-std beta8 [\#699](https://github.com/CosmWasm/cw-plus/pull/699) ([the-frey](https://github.com/the-frey))
+- Remove dead links [\#698](https://github.com/CosmWasm/cw-plus/pull/698) ([Psyf](https://github.com/Psyf))
+- cw20-ics20: fix missing assert [\#697](https://github.com/CosmWasm/cw-plus/pull/697) ([giansalex](https://github.com/giansalex))
+- storage-plus: Implement u128 key [\#694](https://github.com/CosmWasm/cw-plus/pull/694) ([orkunkl](https://github.com/orkunkl))
+- Make `KeyDeserialize` trait public [\#692](https://github.com/CosmWasm/cw-plus/pull/692) ([maurolacy](https://github.com/maurolacy))
+- Typo in QueryMsg::DownloadLogo description [\#690](https://github.com/CosmWasm/cw-plus/pull/690) ([nnoln](https://github.com/nnoln))
+- Fix publish.sh help / args [\#689](https://github.com/CosmWasm/cw-plus/pull/689) ([maurolacy](https://github.com/maurolacy))
 
 ## [v0.13.1](https://github.com/CosmWasm/cw-plus/tree/v0.13.1) (2022-03-25)
 

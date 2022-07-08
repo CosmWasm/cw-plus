@@ -5,7 +5,7 @@ use std::ops::Deref;
 use cosmwasm_std::{
     to_binary, Addr, Api, Attribute, BankMsg, Binary, BlockInfo, Coin, ContractInfo,
     ContractInfoResponse, CustomQuery, Deps, DepsMut, Env, Event, MessageInfo, Order, Querier,
-    QuerierWrapper, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgResponse,
+    QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgResponse,
     SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
 };
 use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
@@ -191,6 +191,80 @@ impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC> {
             .load(&prefixed_read(storage, NAMESPACE_WASM), address)
             .map_err(Into::into)
     }
+
+    pub fn dump_wasm_raw(&self, storage: &dyn Storage, address: &Addr) -> Vec<Record> {
+        let storage = self.contract_storage_readonly(storage, address);
+        storage.range(None, None, Order::Ascending).collect()
+    }
+
+    fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
+        let mut name = b"contract_data/".to_vec();
+        name.extend_from_slice(contract.as_bytes());
+        name
+    }
+
+    fn contract_storage<'a>(
+        &self,
+        storage: &'a mut dyn Storage,
+        address: &Addr,
+    ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
+        let namespace = self.contract_namespace(address);
+        let storage = PrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
+        Box::new(storage)
+    }
+
+    // fails RUNTIME if you try to write. please don't
+    fn contract_storage_readonly<'a>(
+        &self,
+        storage: &'a dyn Storage,
+        address: &Addr,
+    ) -> Box<dyn Storage + 'a> {
+        // We double-namespace this, once from global storage -> wasm_storage
+        // then from wasm_storage -> the contracts subspace
+        let namespace = self.contract_namespace(address);
+        let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
+        Box::new(storage)
+    }
+
+    fn verify_attributes(attributes: &[Attribute]) -> AnyResult<()> {
+        for attr in attributes {
+            let key = attr.key.trim();
+            let val = attr.value.trim();
+
+            if key.is_empty() {
+                bail!(Error::empty_attribute_key(val));
+            }
+
+            if val.is_empty() {
+                bail!(Error::empty_attribute_value(key));
+            }
+
+            if key.starts_with('_') {
+                bail!(Error::reserved_attribute_key(key));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn verify_response<T>(response: Response<T>) -> AnyResult<Response<T>>
+    where
+        T: Clone + fmt::Debug + PartialEq + JsonSchema,
+    {
+        Self::verify_attributes(&response.attributes)?;
+
+        for event in &response.events {
+            Self::verify_attributes(&event.attributes)?;
+            let ty = event.ty.trim();
+            if ty.len() < 2 {
+                bail!(Error::event_type_too_short(ty));
+            }
+        }
+
+        Ok(response)
+    }
 }
 
 impl<ExecC, QueryC> WasmKeeper<ExecC, QueryC>
@@ -246,7 +320,7 @@ where
                 amount: amount.to_vec(),
             }
             .into();
-            let res = router.execute(api, storage, block, sender.into(), msg.into())?;
+            let res = router.execute(api, storage, block, sender.into(), msg)?;
             Ok(res)
         } else {
             Ok(AppResponse::default())
@@ -428,7 +502,7 @@ where
 
         // execute in cache
         let res = transactional(storage, |write_cache, _| {
-            router.execute(api, write_cache, block, contract.clone(), msg.into())
+            router.execute(api, write_cache, block, contract.clone(), msg)
         });
 
         // call reply if meaningful
@@ -782,75 +856,6 @@ where
         // it is lowercase to be compatible with the MockApi implementation of cosmwasm-std >= 1.0.0-beta8
         Addr::unchecked(format!("contract{}", count))
     }
-
-    fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
-        let mut name = b"contract_data/".to_vec();
-        name.extend_from_slice(contract.as_bytes());
-        name
-    }
-
-    fn contract_storage<'a>(
-        &self,
-        storage: &'a mut dyn Storage,
-        address: &Addr,
-    ) -> Box<dyn Storage + 'a> {
-        // We double-namespace this, once from global storage -> wasm_storage
-        // then from wasm_storage -> the contracts subspace
-        let namespace = self.contract_namespace(address);
-        let storage = PrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
-        Box::new(storage)
-    }
-
-    // fails RUNTIME if you try to write. please don't
-    fn contract_storage_readonly<'a>(
-        &self,
-        storage: &'a dyn Storage,
-        address: &Addr,
-    ) -> Box<dyn Storage + 'a> {
-        // We double-namespace this, once from global storage -> wasm_storage
-        // then from wasm_storage -> the contracts subspace
-        let namespace = self.contract_namespace(address);
-        let storage = ReadonlyPrefixedStorage::multilevel(storage, &[NAMESPACE_WASM, &namespace]);
-        Box::new(storage)
-    }
-
-    fn verify_attributes(attributes: &[Attribute]) -> AnyResult<()> {
-        for attr in attributes {
-            let key = attr.key.trim();
-            let val = attr.value.trim();
-
-            if key.is_empty() {
-                bail!(Error::empty_attribute_key(val));
-            }
-
-            if val.is_empty() {
-                bail!(Error::empty_attribute_value(key));
-            }
-
-            if key.starts_with('_') {
-                bail!(Error::reserved_attribute_key(key));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn verify_response<T>(response: Response<T>) -> AnyResult<Response<T>>
-    where
-        T: Clone + fmt::Debug + PartialEq + JsonSchema,
-    {
-        Self::verify_attributes(&response.attributes)?;
-
-        for event in &response.events {
-            Self::verify_attributes(&event.attributes)?;
-            let ty = event.ty.trim();
-            if ty.len() < 2 {
-                bail!(Error::event_type_too_short(ty));
-            }
-        }
-
-        Ok(response)
-    }
 }
 
 // TODO: replace with code in utils
@@ -1048,6 +1053,57 @@ mod test {
         let mut expected = ContractInfoResponse::new(code_id as u64, "foobar");
         expected.admin = Some("admin".to_owned());
         assert_eq!(expected, from_slice(&info).unwrap());
+    }
+
+    #[test]
+    fn can_dump_raw_wasm_state() {
+        let api = MockApi::default();
+        let mut keeper = WasmKeeper::<Empty, Empty>::new();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(payout::contract());
+
+        let mut wasm_storage = MockStorage::new();
+
+        let contract_addr = keeper
+            .register_contract(
+                &mut wasm_storage,
+                code_id,
+                Addr::unchecked("foobar"),
+                Addr::unchecked("admin"),
+                "label".to_owned(),
+                1000,
+            )
+            .unwrap();
+
+        // make a contract with state
+        let payout = coin(1500, "mlg");
+        let msg = payout::InstantiateMessage {
+            payout: payout.clone(),
+        };
+        keeper
+            .call_instantiate(
+                contract_addr.clone(),
+                &api,
+                &mut wasm_storage,
+                &mock_router(),
+                &block,
+                mock_info("foobar", &[]),
+                to_vec(&msg).unwrap(),
+            )
+            .unwrap();
+
+        // dump state
+        let state = keeper.dump_wasm_raw(&wasm_storage, &contract_addr);
+        assert_eq!(state.len(), 2);
+        // check contents
+        let (k, v) = &state[0];
+        assert_eq!(k.as_slice(), b"count");
+        let count: u32 = from_slice(v).unwrap();
+        assert_eq!(count, 1);
+        let (k, v) = &state[1];
+        assert_eq!(k.as_slice(), b"payout");
+        let stored_pay: payout::InstantiateMessage = from_slice(v).unwrap();
+        assert_eq!(stored_pay.payout, payout);
     }
 
     #[test]
