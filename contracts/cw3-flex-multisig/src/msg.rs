@@ -6,12 +6,17 @@ use cw3::Vote;
 use cw4::MemberChangedHookMsg;
 use cw_utils::{Duration, Expiration, Threshold};
 
+use crate::state::Executor;
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct InstantiateMsg {
     // this is the group contract that contains the member list
     pub group_addr: String,
     pub threshold: Threshold,
     pub max_voting_period: Duration,
+    // who is able to execute passed proposals
+    // None means that anyone can execute
+    pub executor: Option<Executor>,
 }
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now

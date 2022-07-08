@@ -17,7 +17,6 @@ mod module;
 mod staking;
 mod test_helpers;
 mod transactions;
-mod untyped_msg;
 mod wasm;
 
 pub use crate::app::{

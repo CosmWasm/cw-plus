@@ -1,8 +1,7 @@
 use std::fmt;
 
 use cosmwasm_std::{
-    to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, SubMsgExecutionResponse,
-    WasmMsg,
+    to_binary, Addr, Attribute, BankMsg, Binary, Coin, CosmosMsg, Event, SubMsgResponse, WasmMsg,
 };
 use cw_utils::{parse_execute_response_data, parse_instantiate_response_data};
 use schemars::JsonSchema;
@@ -52,8 +51,8 @@ impl AppResponse {
 
 /// They have the same shape, SubMsgExecutionResponse is what is returned in reply.
 /// This is just to make some test cases easier.
-impl From<SubMsgExecutionResponse> for AppResponse {
-    fn from(reply: SubMsgExecutionResponse) -> Self {
+impl From<SubMsgResponse> for AppResponse {
+    fn from(reply: SubMsgResponse) -> Self {
         AppResponse {
             data: reply.data,
             events: reply.events,

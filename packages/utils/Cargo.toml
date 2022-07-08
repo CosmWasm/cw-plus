@@ -1,6 +1,6 @@
 [package]
 name = "cw-utils"
-version = "0.13.2"
+version = "0.13.4"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Common helpers for other cw specs"
@@ -11,11 +11,11 @@ homepage = "https://cosmwasm.com"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmwasm-std = { version = "1.0.0-beta8" }
+cosmwasm-std = { version = "1.0.0" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
 
 [dev-dependencies]
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.13.2" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.13.4" }
 prost = "0.9"
