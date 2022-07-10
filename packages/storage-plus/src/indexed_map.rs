@@ -277,8 +277,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::index_string_tuple;
-    use crate::{index_tuple, MultiIndex, UniqueIndex};
+    use crate::indexes::test::{index_string_tuple, index_tuple};
+    use crate::{MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
