@@ -44,7 +44,7 @@ many custom contracts.
 If you don't know what CosmWasm is, please check out
 [our homepage](https://cosmwasm.com) and
 [our documentation](https://docs.cosmwasm.com) to get more background.
-We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/sandynet-1/README.md)
+We are running [public testnets](https://github.com/CosmWasm/testnets#running)
 you can use to test out any contracts.
 
 **Warning** None of these contracts have been audited and no liability is
@@ -62,7 +62,7 @@ cleaner (before: `expires: {at_height: {height: 12345}}` after
 The most reusable components are the various cwXYZ specifications under
 `packages`. Each one defines a standard interface for different domains,
 e.g. [cw20](./packages/cw20/README.md) for fungible tokens,
-[cw721](./packages/cw721/README.md) for non-fungible tokens,
+[cw721](https://github.com/CosmWasm/cw-nfts/blob/main/packages/cw721/README.md) for non-fungible tokens,
 [cw1](./packages/cw1/README.md) for  "proxy contracts", etc.
 The interface comes with a human description in the READMEs, as well
 as Rust types that can be imported.
