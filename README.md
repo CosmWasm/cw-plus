@@ -160,7 +160,7 @@ and depth of discussion can give an idea how much review was present.
 
 After that, fuzzing it (ideally with an intelligent fuzzer that understands the domain)
 can be valuable. And beyond that formal verification can provide even more assurance
-(but is very time consuming and expensive).
+(but is very time-consuming and expensive).
 
 ### Code Coverage
 
@@ -213,7 +213,7 @@ relevant `Cargo.toml` file for clarity.
 
 All *specifications* will always be Apache-2.0. All contracts that are
 meant to be *building blocks* will also be Apache-2.0. This is along
-the lines of Open Zepellin or other public references.
+the lines of Open Zeppelin or other public references.
 
 Contracts that are "ready to deploy" may be licensed under AGPL 3.0 to
 encourage anyone using them to contribute back any improvements they
