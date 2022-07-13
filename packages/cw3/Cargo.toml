@@ -7,7 +7,6 @@ description = "CosmWasm-3 Interface: On-Chain MultiSig/Voting contracts"
 license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
-documentation = "https://docs.cosmwasm.com"
 
 [dependencies]
 cw-utils = { path = "../../packages/utils", version = "0.13.4" }

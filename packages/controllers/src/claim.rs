@@ -65,7 +65,7 @@ impl<'a> Claims<'a> {
         let mut to_send = Uint128::zero();
         self.0.update(storage, addr, |claim| -> StdResult<_> {
             let (_send, waiting): (Vec<_>, _) =
-                claim.unwrap_or_default().iter().cloned().partition(|c| {
+                claim.unwrap_or_default().into_iter().partition(|c| {
                     // if mature and we can pay fully, then include in _send
                     if c.release_at.is_expired(block) {
                         if let Some(limit) = cap {
