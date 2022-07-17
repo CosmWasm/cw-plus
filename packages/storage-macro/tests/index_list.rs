@@ -6,7 +6,7 @@ mod test {
     use serde::{Deserialize, Serialize};
 
     #[test]
-    fn compile() {
+    fn index_list_compiles() {
         #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
         struct TestStruct {
             id: u64,
@@ -30,7 +30,7 @@ mod test {
     }
 
     #[test]
-    fn works() {
+    fn index_list_works() {
         #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
         struct TestStruct {
             id: u64,
