@@ -40,3 +40,10 @@ pub use path::Path;
 pub use prefix::{range_with_prefix, Prefix};
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
+
+#[cfg(all(feature = "iterator", feature = "macro"))]
+#[macro_use]
+extern crate cw_storage_macro;
+#[cfg(all(feature = "iterator", feature = "macro"))]
+#[doc(hidden)]
+pub use cw_storage_macro::*;
