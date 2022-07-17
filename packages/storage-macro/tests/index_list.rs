@@ -21,7 +21,7 @@ fn compile() {
     let _: IndexedMap<u64, TestStruct, TestIndexes> = IndexedMap::new(
         "t",
         TestIndexes {
-            id: MultiIndex::new(|t| t.id2, "t", "t_2"),
+            id: MultiIndex::new(|t| t.id2, "t", "t_id2"),
             addr: UniqueIndex::new(|t| t.addr.clone(), "t_addr"),
         },
     );
