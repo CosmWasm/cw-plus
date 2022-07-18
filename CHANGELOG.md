@@ -4,6 +4,10 @@
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...HEAD)
 
+**Merged pull requests:**
+
+- Add ability to unset minter in UpdateMinter message. [\#748](https://github.com/CosmWasm/cw-plus/pull/748) ([ezekiiel](https://github.com/ezekiiel)) 
+
 ## [v0.13.4](https://github.com/CosmWasm/cw-plus/tree/v0.13.4) (2022-06-02)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.3...v0.13.4)
