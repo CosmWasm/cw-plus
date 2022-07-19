@@ -16,7 +16,7 @@ use crate::allowances::{
 };
 use crate::enumerable::{query_all_accounts, query_all_allowances};
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use crate::state::{MinterData, TokenInfo, BALANCES, LOGO, MARKETING_INFO, TOKEN_INFO};
 
 // version info for migration info
@@ -585,6 +585,11 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
         }),
         Logo::Url(_) => Err(StdError::not_found("logo")),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }
 
 #[cfg(test)]
@@ -1309,6 +1314,73 @@ mod tests {
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
         );
+    }
+
+    mod migration {
+        use super::*;
+
+        use cosmwasm_std::Empty;
+        use cw_multi_test::{App, Contract, ContractWrapper, Executor};
+
+        fn cw20_contract() -> Box<dyn Contract<Empty>> {
+            let contract = ContractWrapper::new(
+                crate::contract::execute,
+                crate::contract::instantiate,
+                crate::contract::query,
+            )
+            .with_migrate(crate::contract::migrate);
+            Box::new(contract)
+        }
+
+        #[test]
+        fn test_migrate() {
+            let mut app = App::default();
+
+            let cw20_id = app.store_code(cw20_contract());
+            let cw20_addr = app
+                .instantiate_contract(
+                    cw20_id,
+                    Addr::unchecked("sender"),
+                    &InstantiateMsg {
+                        name: "Token".to_string(),
+                        symbol: "TOKEN".to_string(),
+                        decimals: 6,
+                        initial_balances: vec![Cw20Coin {
+                            address: "sender".to_string(),
+                            amount: Uint128::new(100),
+                        }],
+                        mint: None,
+                        marketing: None,
+                    },
+                    &[],
+                    "TOKEN",
+                    Some("sender".to_string()),
+                )
+                .unwrap();
+
+            app.execute(
+                Addr::unchecked("sender"),
+                CosmosMsg::Wasm(WasmMsg::Migrate {
+                    contract_addr: cw20_addr.to_string(),
+                    new_code_id: cw20_id,
+                    msg: to_binary(&MigrateMsg {}).unwrap(),
+                }),
+            )
+            .unwrap();
+
+            // Smoke check that the contract still works.
+            let balance: cw20::BalanceResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    cw20_addr,
+                    &QueryMsg::Balance {
+                        address: "sender".to_string(),
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(balance.balance, Uint128::new(100))
+        }
     }
 
     mod marketing {

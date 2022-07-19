@@ -29,3 +29,4 @@ thiserror = { version = "1.0.23" }
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0" }
+cw-multi-test = { path = "../../packages/multi-test", version = "0.13.4" }
