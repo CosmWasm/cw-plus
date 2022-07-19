@@ -128,6 +128,11 @@ minter address and handle updating the ACL there.
 this will create `amount` new tokens (updating total supply) and
 add them to the balance of `recipient`, as long as it does not exceed the cap.
 
+`UpdateMinter { new_minter: Option<String> }` - Callable only by the
+current minter. If `new_minter` is `Some(address)` the minter is set
+to the specified address, otherwise the minter is removed and no
+future minters may be set. 
+
 ### Queries
 
 `Minter{}` - Returns who and how much can be minted. Return type is
@@ -143,6 +148,14 @@ the minter is a smart contract.
 
 This should be enabled with all blockchains that have iterator support.
 It allows us to get lists of results with pagination.
+
+### Queries
+
+`AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
+by the given owner. `start_after` and `limit` provide pagination.
+
+`AllAccounts{start_after, limit}` - Returns the list of all accounts that have been created on
+the contract (just the addresses). `start_after` and `limit` provide pagination.
 
 ## Marketing
 
@@ -173,11 +186,3 @@ account, this will update some marketing-related metadata on the contract.
 `DownloadLogo{}` - If the token's logo was previously uploaded to the blockchain
 (see `UploadLogo` message), then it returns the raw data to be displayed in a browser.
 Return type is `DownloadLogoResponse{ mime_type, data }`.
-
-### Queries
-
-`AllAllowances{owner, start_after, limit}` - Returns the list of all non-expired allowances
-by the given owner. `start_after` and `limit` provide pagination.
-
-`AllAccounts{start_after, limit}` - Returns the list of all accounts that have been created on
-the contract (just the addresses). `start_after` and `limit` provide pagination.

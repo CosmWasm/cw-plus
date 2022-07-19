@@ -55,8 +55,10 @@ pub enum Cw20ExecuteMsg {
     /// Only with the "mintable" extension. If authorized, creates amount new tokens
     /// and adds to the recipient balance.
     Mint { recipient: String, amount: Uint128 },
-    /// Only with the "mintable" extension. The current minter may set a new minter.
-    UpdateMinter { new_minter: String },
+    /// Only with the "mintable" extension. The current minter may set
+    /// a new minter. Setting the minter to None will remove the
+    /// token's minter forever.
+    UpdateMinter { new_minter: Option<String> },
     /// Only with the "marketing" extension. If authorized, updates marketing metadata.
     /// Setting None/null for any of these will leave it unchanged.
     /// Setting Some("") will clear this field on the contract storage
