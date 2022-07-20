@@ -67,25 +67,35 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a>,
 {
-    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data);
-        // error if this is already set
-        self.idx_map
-            .update(store, idx, |existing| -> StdResult<_> {
-                match existing {
-                    Some(_) => Err(StdError::generic_err("Violates unique constraint on index")),
-                    None => Ok(UniqueRef::<T> {
-                        pk: pk.into(),
-                        value: data.clone(),
-                    }),
-                }
-            })?;
-        Ok(())
-    }
+    fn update(
+        &self,
+        store: &mut dyn Storage,
+        pk: &[u8],
+        old_data: Option<&T>,
+        data: Option<&T>,
+    ) -> StdResult<()> {
+        if let Some(old_data) = old_data {
+            let idx = (self.index)(old_data);
+            self.idx_map.remove(store, idx);
+        }
 
-    fn remove(&self, store: &mut dyn Storage, _pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data);
-        self.idx_map.remove(store, idx);
+        if let Some(data) = data {
+            let idx = (self.index)(data);
+            // error if this is already set
+            self.idx_map
+                .update(store, idx, |existing| -> StdResult<_> {
+                    match existing {
+                        Some(_) => {
+                            Err(StdError::generic_err("Violates unique constraint on index"))
+                        }
+                        None => Ok(UniqueRef::<T> {
+                            pk: pk.into(),
+                            value: data.clone(),
+                        }),
+                    }
+                })?;
+        }
+
         Ok(())
     }
 }

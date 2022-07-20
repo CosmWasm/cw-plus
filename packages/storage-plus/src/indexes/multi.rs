@@ -130,14 +130,23 @@ where
     T: Serialize + DeserializeOwned + Clone,
     IK: PrimaryKey<'a>,
 {
-    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data).joined_extra_key(pk);
-        self.idx_map.save(store, idx, &(pk.len() as u32))
-    }
+    fn update(
+        &self,
+        store: &mut dyn Storage,
+        pk: &[u8],
+        old_data: Option<&T>,
+        data: Option<&T>,
+    ) -> StdResult<()> {
+        if let Some(old_data) = old_data {
+            let idx = (self.index)(old_data).joined_extra_key(pk);
+            self.idx_map.remove(store, idx);
+        }
 
-    fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data).joined_extra_key(pk);
-        self.idx_map.remove(store, idx);
+        if let Some(data) = data {
+            let idx = (self.index)(data).joined_extra_key(pk);
+            self.idx_map.save(store, idx, &(pk.len() as u32))?;
+        }
+
         Ok(())
     }
 }
