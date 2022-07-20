@@ -84,19 +84,16 @@ where
     ) -> StdResult<()> {
         // this is the key *relative* to the primary map namespace
         let pk = key.joined_key();
-        if let Some(old) = old_data {
-            for index in self.idx.get_indexes() {
-                index.remove(store, &pk, old)?;
-            }
+
+        for index in self.idx.get_indexes() {
+            index.update(store, &pk, old_data, data)?;
         }
-        if let Some(updated) = data {
-            for index in self.idx.get_indexes() {
-                index.save(store, &pk, updated)?;
-            }
-            self.primary.save(store, key, updated)?;
-        } else {
-            self.primary.remove(store, key);
-        }
+
+        match data {
+            Some(updated) => self.primary.save(store, key, updated)?,
+            None => self.primary.remove(store, key),
+        };
+
         Ok(())
     }
 
