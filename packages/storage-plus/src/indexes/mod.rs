@@ -17,8 +17,21 @@ pub trait Index<T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
-    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()>;
-    fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()>;
+    fn update(
+        &self,
+        store: &mut dyn Storage,
+        pk: &[u8],
+        old_data: Option<&T>,
+        data: Option<&T>,
+    ) -> StdResult<()>;
+
+    fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
+        self.update(store, pk, None, Some(data))
+    }
+
+    fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
+        self.update(store, pk, Some(old_data), None)
+    }
 }
 
 #[cfg(test)]
