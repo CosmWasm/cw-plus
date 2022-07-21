@@ -93,6 +93,14 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
     },
+    /// Only with "enumerable" extension (and "allowances")
+    /// Returns all allowances this spender has been granted. Supports pagination.
+    /// Return type: AllSpenderAllowancesResponse.
+    AllSpenderAllowances {
+        spender: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     /// Only with "enumerable" extension
     /// Returns all accounts that have balances. Supports pagination.
     /// Return type: AllAccountsResponse.
