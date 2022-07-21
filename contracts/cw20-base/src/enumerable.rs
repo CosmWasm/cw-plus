@@ -1,7 +1,7 @@
 use cosmwasm_std::{Deps, Order, StdResult};
 use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
 
-use crate::state::{ALLOWANCES, BALANCES};
+use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES};
 use cw_storage_plus::Bound;
 
 // settings for pagination
@@ -20,6 +20,31 @@ pub fn query_all_allowances(
 
     let allowances = ALLOWANCES
         .prefix(&owner_addr)
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.map(|(addr, allow)| AllowanceInfo {
+                spender: addr.into(),
+                allowance: allow.allowance,
+                expires: allow.expires,
+            })
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(AllAllowancesResponse { allowances })
+}
+
+pub fn query_allowances_by_spender(
+    deps: Deps,
+    spender: String,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<AllAllowancesResponse> {
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into_bytes()));
+
+    let allowances = ALLOWANCES_SPENDER
+        .prefix(&spender_addr)
         .range(deps.storage, start, None, Order::Ascending)
         .take(limit)
         .map(|item| {

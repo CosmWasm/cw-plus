@@ -34,3 +34,6 @@ pub const MARKETING_INFO: Item<MarketingInfoResponse> = Item::new("marketing_inf
 pub const LOGO: Item<Logo> = Item::new("logo");
 pub const BALANCES: Map<&Addr, Uint128> = Map::new("balance");
 pub const ALLOWANCES: Map<(&Addr, &Addr), AllowanceResponse> = Map::new("allowance");
+// TODO: After https://github.com/CosmWasm/cw-plus/issues/670 is implemented, replace this with a `MultiIndex` over `ALLOWANCES`
+pub const ALLOWANCES_SPENDER: Map<(&Addr, &Addr), AllowanceResponse> =
+    Map::new("allowance_spender");
