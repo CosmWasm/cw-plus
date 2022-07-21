@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn query_all_allowances_works() {
+    fn query_all_owner_allowances_works() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
         let owner = String::from("owner");
@@ -173,65 +173,68 @@ mod tests {
     }
 
     #[test]
-    fn query_allowances_by_spender_works() {
+    fn query_all_spender_allowances_works() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let owner = String::from("owner");
         // these are in alphabetical order same than insert order
-        let spender1 = String::from("earlier");
-        let spender2 = String::from("later");
+        let owner1 = String::from("owner1");
+        let owner2 = String::from("owner2");
+        let spender = String::from("spender");
 
-        let info = mock_info(owner.as_ref(), &[]);
+        let info = mock_info(owner1.as_ref(), &[]);
         let env = mock_env();
-        do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
+        do_instantiate(deps.as_mut(), &owner1, Uint128::new(12340000));
 
         // no allowance to start
         let allowances =
-            query_spender_allowances(deps.as_ref(), spender1.clone(), None, None).unwrap();
-        assert_eq!(allowances.allowances, vec![]);
-        let allowances =
-            query_spender_allowances(deps.as_ref(), spender2.clone(), None, None).unwrap();
+            query_spender_allowances(deps.as_ref(), spender.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances, vec![]);
 
         // set allowance with height expiration
         let allow1 = Uint128::new(7777);
         let expires = Expiration::AtHeight(5432);
         let msg = ExecuteMsg::IncreaseAllowance {
-            spender: spender1.clone(),
+            spender: spender.clone(),
             amount: allow1,
             expires: Some(expires),
         };
-        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), env, info, msg).unwrap();
 
-        // set allowance with no expiration
+        // set allowance with no expiration, from the other owner
+        let info = mock_info(owner2.as_ref(), &[]);
+        let env = mock_env();
+        do_instantiate(deps.as_mut(), &owner2, Uint128::new(12340000));
+
         let allow2 = Uint128::new(54321);
         let msg = ExecuteMsg::IncreaseAllowance {
-            spender: spender2.clone(),
+            spender: spender.clone(),
             amount: allow2,
             expires: None,
         };
         execute(deps.as_mut(), env, info, msg).unwrap();
 
-        // query list gets 1 each
+        // query list gets both
         let allowances =
-            query_spender_allowances(deps.as_ref(), spender1.clone(), None, None).unwrap();
-        assert_eq!(allowances.allowances.len(), 1);
-        let allowances =
-            query_spender_allowances(deps.as_ref(), spender2.clone(), None, None).unwrap();
-        assert_eq!(allowances.allowances.len(), 1);
+            query_spender_allowances(deps.as_ref(), spender.clone(), None, None).unwrap();
+        assert_eq!(allowances.allowances.len(), 2);
 
-        // one is just owner (order of CanonicalAddr uncorrelated with String)
-        let allowances = query_spender_allowances(deps.as_ref(), spender1, None, Some(1)).unwrap();
+        // one is owner1 (order of CanonicalAddr uncorrelated with String)
+        let allowances =
+            query_spender_allowances(deps.as_ref(), spender.clone(), None, Some(1)).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
-        assert_eq!(&allow.owner, &owner);
+        assert_eq!(&allow.owner, &owner1);
         assert_eq!(&allow.expires, &expires);
         assert_eq!(&allow.allowance, &allow1);
 
-        // other one is also owner (start_after works)
+        // other one is owner2
         let allowances =
-            query_spender_allowances(deps.as_ref(), spender2, Some(owner), Some(10000)).unwrap();
-        assert_eq!(allowances.allowances.len(), 0);
+            query_spender_allowances(deps.as_ref(), spender, Some(owner1), Some(10000)).unwrap();
+        assert_eq!(allowances.allowances.len(), 1);
+        let allow = &allowances.allowances[0];
+        assert_eq!(&allow.owner, &owner2);
+        assert_eq!(&allow.expires, &Expiration::Never {});
+        assert_eq!(&allow.allowance, &allow2);
     }
 
     #[test]
