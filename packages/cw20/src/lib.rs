@@ -7,7 +7,7 @@ pub use crate::helpers::Cw20Contract;
 pub use crate::logo::{EmbeddedLogo, Logo, LogoInfo};
 pub use crate::msg::Cw20ExecuteMsg;
 pub use crate::query::{
-    AllAccountsResponse, AllAllowancesResponse, AllowanceInfo, AllowanceResponse, BalanceResponse,
+    AllAccountsResponse, AllAllowancesResponse, AllowanceInfo, SpenderAllowanceInfo, AllowanceResponse, AllSpenderAllowancesResponse, BalanceResponse,
     Cw20QueryMsg, DownloadLogoResponse, MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
 pub use crate::receiver::Cw20ReceiveMsg;

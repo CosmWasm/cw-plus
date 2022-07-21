@@ -110,6 +110,18 @@ pub struct AllAllowancesResponse {
     pub allowances: Vec<AllowanceInfo>,
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct SpenderAllowanceInfo {
+    pub owner: String,
+    pub allowance: Uint128,
+    pub expires: Expiration,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+pub struct AllSpenderAllowancesResponse {
+    pub allowances: Vec<SpenderAllowanceInfo>,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct AllAccountsResponse {
     pub accounts: Vec<String>,
