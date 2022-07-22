@@ -566,6 +566,7 @@ dependencies = [
  "cw2",
  "cw20",
  "schemars",
+ "semver",
  "serde",
  "thiserror",
 ]
