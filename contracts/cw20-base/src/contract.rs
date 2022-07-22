@@ -10,6 +10,7 @@ use cw20::{
     BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
     MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
+use cw_utils::ensure_from_older_version;
 
 use crate::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
@@ -603,12 +604,17 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
-    // Build reverse map of allowances per spender
-    let data = ALLOWANCES
-        .range(deps.storage, None, None, Ascending)
-        .collect::<StdResult<Vec<_>>>()?;
-    for ((owner, spender), allowance) in data {
-        ALLOWANCES_SPENDER.save(deps.storage, (&spender, &owner), &allowance)?;
+    let original_version =
+        ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    if original_version.to_string() < "0.14.0".to_string() {
+        // Build reverse map of allowances per spender
+        let data = ALLOWANCES
+            .range(deps.storage, None, None, Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+        for ((owner, spender), allowance) in data {
+            ALLOWANCES_SPENDER.save(deps.storage, (&spender, &owner), &allowance)?;
+        }
     }
     Ok(Response::default())
 }
