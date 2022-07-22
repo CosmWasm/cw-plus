@@ -607,7 +607,7 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
     let original_version =
         ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    if original_version.to_string() < "0.14.0".to_string() {
+    if original_version < "0.14.0".parse::<semver::Version>().unwrap() {
         // Build reverse map of allowances per spender
         let data = ALLOWANCES
             .range(deps.storage, None, None, Ascending)
