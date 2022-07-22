@@ -434,8 +434,10 @@ version = "0.13.4"
 dependencies = [
  "cosmwasm-std",
  "cw-storage-plus",
+ "cw2",
  "prost",
  "schemars",
+ "semver",
  "serde",
  "thiserror",
 ]
