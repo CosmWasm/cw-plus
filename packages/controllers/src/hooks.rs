@@ -122,7 +122,7 @@ impl<'a> Hooks<'a> {
         Ok(HooksResponse { hooks })
     }
 
-    // Returns true if hook is in hooks
+    // Return true if hook is in hooks
     pub fn query_hook<Q: CustomQuery>(&self, deps: Deps<Q>, hook: String) -> StdResult<bool> {
         Ok(self.query_hooks(deps)?.hooks.into_iter().any(|h| h == hook))
     }
