@@ -122,7 +122,7 @@ impl<'a> Hooks<'a> {
         Ok(HooksResponse { hooks })
     }
 
-    // Returns true is this_hook is in hooks; false otherwiseq
+    // Returns true is this_hook is in hooks
     pub fn query_this_hook<Q: CustomQuery>(
         &self,
         deps: Deps<Q>,
