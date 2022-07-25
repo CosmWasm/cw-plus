@@ -70,8 +70,9 @@ pub fn execute(
             to,
             token_id,
             value,
+            url,
             msg,
-        } => execute_mint(env, to, token_id, value, msg),
+        } => execute_mint(env, to, token_id, value, url, msg),
         Cw1155ExecuteMsg::BatchMint { to, batch, msg } => execute_batch_mint(env, to, batch, msg),
         Cw1155ExecuteMsg::Burn {
             from,
@@ -204,6 +205,7 @@ pub fn execute_mint(
     to: String,
     token_id: TokenId,
     amount: Uint128,
+    url: Option<String>,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
@@ -234,8 +236,14 @@ pub fn execute_mint(
 
     // insert if not exist
     if !TOKENS.has(deps.storage, &token_id) {
-        // we must save some valid data here
-        TOKENS.save(deps.storage, &token_id, &String::new())?;
+
+        let token_url = if let Some(url) = url {
+            url
+        } else {
+            String::new()
+        };
+        
+        TOKENS.save(deps.storage, &token_id, &token_url)?;
     }
 
     Ok(rsp)
@@ -312,7 +320,7 @@ pub fn execute_batch_send_from(
 pub fn execute_batch_mint(
     env: ExecuteEnv,
     to: String,
-    batch: Vec<(TokenId, Uint128)>,
+    batch: Vec<(TokenId, Uint128, Option<String>)>,
     msg: Option<Binary>,
 ) -> Result<Response, ContractError> {
     let ExecuteEnv { mut deps, info, .. } = env;
@@ -324,14 +332,20 @@ pub fn execute_batch_mint(
 
     let mut rsp = Response::default();
 
-    for (token_id, amount) in batch.iter() {
+    for (token_id, amount, url) in batch.iter() {
         let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), token_id, *amount)?;
         event.add_attributes(&mut rsp);
 
         // insert if not exist
-        if !TOKENS.has(deps.storage, token_id) {
-            // we must save some valid data here
-            TOKENS.save(deps.storage, token_id, &String::new())?;
+        if !TOKENS.has(deps.storage, &token_id) {
+
+            let token_url = if let Some(url) = url.clone() {
+                url
+            } else {
+                String::new()
+            };
+            
+            TOKENS.save(deps.storage, &token_id, &token_url)?;
         }
     }
 
@@ -340,7 +354,9 @@ pub fn execute_batch_mint(
             Cw1155BatchReceiveMsg {
                 operator: info.sender.to_string(),
                 from: None,
-                batch,
+                batch: batch.iter().map(
+                    |(token_id, amount, _)| (token_id.clone(), amount.clone())
+                ).collect(),
                 msg,
             }
             .into_cosmos_msg(to)?,
@@ -583,6 +599,7 @@ mod tests {
             to: user1.clone(),
             token_id: token1.clone(),
             value: 1u64.into(),
+            url: None,
             msg: None,
         };
         assert!(matches!(
@@ -710,7 +727,7 @@ mod tests {
                 mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::BatchMint {
                     to: user2.clone(),
-                    batch: vec![(token2.clone(), 1u64.into()), (token3.clone(), 1u64.into())],
+                    batch: vec![(token2.clone(), 1u64.into(), None), (token3.clone(), 1u64.into(), None)],
                     msg: None
                 },
             )
@@ -910,6 +927,7 @@ mod tests {
                 to: user1.clone(),
                 token_id: token2.clone(),
                 value: 1u64.into(),
+                url: None,
                 msg: None,
             },
         )
@@ -925,6 +943,7 @@ mod tests {
                     to: receiver.clone(),
                     token_id: token1.clone(),
                     value: 1u64.into(),
+                    url: None,
                     msg: Some(dummy_msg.clone()),
                 },
             )
@@ -1003,7 +1022,7 @@ mod tests {
                 to: users[0].clone(),
                 batch: tokens
                     .iter()
-                    .map(|token_id| (token_id.clone(), 1u64.into()))
+                    .map(|token_id| (token_id.clone(), 1u64.into(), None))
                     .collect::<Vec<_>>(),
                 msg: None,
             },
@@ -1126,6 +1145,7 @@ mod tests {
                 to: user1.clone(),
                 token_id: token1,
                 value: 1u64.into(),
+                url: None,
                 msg: None,
             },
         )
@@ -1199,6 +1219,7 @@ mod tests {
                 to: user1.clone(),
                 token_id: token1.clone(),
                 value: u128::MAX.into(),
+                url: None,
                 msg: None,
             },
         )
@@ -1213,6 +1234,7 @@ mod tests {
                     to: user1,
                     token_id: token1,
                     value: 1u64.into(),
+                    url: None,
                     msg: None,
                 },
             ),
