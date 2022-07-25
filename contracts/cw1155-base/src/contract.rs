@@ -334,13 +334,13 @@ pub fn execute_batch_mint(
         let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), token_id, *amount)?;
         event.add_attributes(&mut rsp);
         // insert if not exist
-        if !TOKENS.has(deps.storage, &token_id) {
+        if !TOKENS.has(deps.storage, token_id) {
             let token_url = if let Some(url) = url.clone() {
                 url
             } else {
                 String::new()
             };
-            TOKENS.save(deps.storage, &token_id, &token_url)?;
+            TOKENS.save(deps.storage, token_id, &token_url)?;
         }
     }
 
@@ -351,7 +351,7 @@ pub fn execute_batch_mint(
                 from: None,
                 batch: batch
                     .iter()
-                    .map(|(token_id, amount, _)| (token_id.clone(), amount.clone()))
+                    .map(|(token_id, amount, _)| (token_id.clone(), *amount))
                     .collect(),
                 msg,
             }
