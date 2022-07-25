@@ -236,13 +236,11 @@ pub fn execute_mint(
 
     // insert if not exist
     if !TOKENS.has(deps.storage, &token_id) {
-
         let token_url = if let Some(url) = url {
             url
         } else {
             String::new()
         };
-        
         TOKENS.save(deps.storage, &token_id, &token_url)?;
     }
 
@@ -335,16 +333,13 @@ pub fn execute_batch_mint(
     for (token_id, amount, url) in batch.iter() {
         let event = execute_transfer_inner(&mut deps, None, Some(&to_addr), token_id, *amount)?;
         event.add_attributes(&mut rsp);
-
         // insert if not exist
         if !TOKENS.has(deps.storage, &token_id) {
-
             let token_url = if let Some(url) = url.clone() {
                 url
             } else {
                 String::new()
             };
-            
             TOKENS.save(deps.storage, &token_id, &token_url)?;
         }
     }
@@ -354,9 +349,10 @@ pub fn execute_batch_mint(
             Cw1155BatchReceiveMsg {
                 operator: info.sender.to_string(),
                 from: None,
-                batch: batch.iter().map(
-                    |(token_id, amount, _)| (token_id.clone(), amount.clone())
-                ).collect(),
+                batch: batch
+                    .iter()
+                    .map(|(token_id, amount, _)| (token_id.clone(), amount.clone()))
+                    .collect(),
                 msg,
             }
             .into_cosmos_msg(to)?,
@@ -727,7 +723,10 @@ mod tests {
                 mock_info(minter.as_ref(), &[]),
                 Cw1155ExecuteMsg::BatchMint {
                     to: user2.clone(),
-                    batch: vec![(token2.clone(), 1u64.into(), None), (token3.clone(), 1u64.into(), None)],
+                    batch: vec![
+                        (token2.clone(), 1u64.into(), None),
+                        (token3.clone(), 1u64.into(), None)
+                    ],
                     msg: None
                 },
             )
