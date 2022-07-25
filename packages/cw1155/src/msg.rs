@@ -36,6 +36,7 @@ pub enum Cw1155ExecuteMsg {
         to: String,
         token_id: TokenId,
         value: Uint128,
+        url: Option<String>,
         /// `None` means don't call the receiver interface
         msg: Option<Binary>,
     },
@@ -43,7 +44,7 @@ pub enum Cw1155ExecuteMsg {
     BatchMint {
         /// If `to` is not contract, `msg` should be `None`
         to: String,
-        batch: Vec<(TokenId, Uint128)>,
+        batch: Vec<(TokenId, Uint128, Option<String>)>,
         /// `None` means don't call the receiver interface
         msg: Option<Binary>,
     },
