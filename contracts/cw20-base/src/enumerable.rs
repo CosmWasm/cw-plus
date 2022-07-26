@@ -83,11 +83,11 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, DepsMut, Uint128};
+    use cosmwasm_std::{coins, from_binary, DepsMut, Uint128};
     use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 
-    use crate::contract::{execute, instantiate, query_token_info};
-    use crate::msg::{ExecuteMsg, InstantiateMsg};
+    use crate::contract::{execute, instantiate, query, query_token_info};
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
     // this will set up the instantiation for other tests
     fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
@@ -211,16 +211,26 @@ mod tests {
             amount: allow2,
             expires: None,
         };
-        execute(deps.as_mut(), env, info, msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
 
         // query list gets both
-        let allowances =
-            query_spender_allowances(deps.as_ref(), spender.clone(), None, None).unwrap();
+        let msg = QueryMsg::AllSpenderAllowances {
+            spender: spender.clone(),
+            start_after: None,
+            limit: None,
+        };
+        let allowances: AllSpenderAllowancesResponse =
+            from_binary(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
         // one is owner1 (order of CanonicalAddr uncorrelated with String)
-        let allowances =
-            query_spender_allowances(deps.as_ref(), spender.clone(), None, Some(1)).unwrap();
+        let msg = QueryMsg::AllSpenderAllowances {
+            spender: spender.clone(),
+            start_after: None,
+            limit: Some(1),
+        };
+        let allowances: AllSpenderAllowancesResponse =
+            from_binary(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.owner, &owner1);
@@ -228,8 +238,13 @@ mod tests {
         assert_eq!(&allow.allowance, &allow1);
 
         // other one is owner2
-        let allowances =
-            query_spender_allowances(deps.as_ref(), spender, Some(owner1), Some(10000)).unwrap();
+        let msg = QueryMsg::AllSpenderAllowances {
+            spender,
+            start_after: Some(owner1),
+            limit: Some(10000),
+        };
+        let allowances: AllSpenderAllowancesResponse =
+            from_binary(&query(deps.as_ref(), env, msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.owner, &owner2);
