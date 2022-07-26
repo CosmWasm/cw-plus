@@ -2,6 +2,9 @@ use cosmwasm_std::{StdError, StdResult, Storage};
 use cw2::{get_contract_version, set_contract_version};
 use semver::Version;
 
+/// This function not only validates that the right contract and version can be migrated, but also
+/// updates the contract version from the original (stored) version to the new version.
+/// It returns the original version for the convenience of doing external checks.
 pub fn ensure_from_older_version(
     storage: &mut dyn Storage,
     name: &str,
