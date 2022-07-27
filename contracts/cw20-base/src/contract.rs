@@ -1347,7 +1347,9 @@ mod tests {
         use super::*;
 
         use cosmwasm_std::Empty;
+        use cw20::{AllAllowancesResponse, AllSpenderAllowancesResponse, SpenderAllowanceInfo};
         use cw_multi_test::{App, Contract, ContractWrapper, Executor};
+        use cw_utils::Expiration;
 
         fn cw20_contract() -> Box<dyn Contract<Empty>> {
             let contract = ContractWrapper::new(
@@ -1385,6 +1387,36 @@ mod tests {
                 )
                 .unwrap();
 
+            // no allowance to start
+            let allowance: AllAllowancesResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    cw20_addr.to_string(),
+                    &QueryMsg::AllAllowances {
+                        owner: "sender".to_string(),
+                        start_after: None,
+                        limit: None,
+                    },
+                )
+                .unwrap();
+            assert_eq!(allowance, AllAllowancesResponse::default());
+
+            // Set allowance
+            let allow1 = Uint128::new(7777);
+            let expires = Expiration::AtHeight(5432);
+            let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_addr.to_string(),
+                msg: to_binary(&ExecuteMsg::IncreaseAllowance {
+                    spender: "spender".into(),
+                    amount: allow1,
+                    expires: Some(expires),
+                })
+                .unwrap(),
+                funds: vec![],
+            });
+            app.execute(Addr::unchecked("sender"), msg).unwrap();
+
+            // Now migrate
             app.execute(
                 Addr::unchecked("sender"),
                 CosmosMsg::Wasm(WasmMsg::Migrate {
@@ -1399,14 +1431,35 @@ mod tests {
             let balance: cw20::BalanceResponse = app
                 .wrap()
                 .query_wasm_smart(
-                    cw20_addr,
+                    cw20_addr.clone(),
                     &QueryMsg::Balance {
                         address: "sender".to_string(),
                     },
                 )
                 .unwrap();
 
-            assert_eq!(balance.balance, Uint128::new(100))
+            assert_eq!(balance.balance, Uint128::new(100));
+
+            // Confirm that the allowance per spender is there
+            let allowance: AllSpenderAllowancesResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    cw20_addr,
+                    &QueryMsg::AllSpenderAllowances {
+                        spender: "spender".to_string(),
+                        start_after: None,
+                        limit: None,
+                    },
+                )
+                .unwrap();
+            assert_eq!(
+                allowance.allowances,
+                &[SpenderAllowanceInfo {
+                    owner: "sender".to_string(),
+                    allowance: allow1,
+                    expires
+                }]
+            );
         }
     }
 
