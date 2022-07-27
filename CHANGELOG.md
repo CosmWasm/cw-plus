@@ -2,11 +2,40 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.14.0...HEAD)
+
+## [v0.14.0](https://github.com/CosmWasm/cw-plus/tree/v0.14.0) (2022-07-27)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...v0.14.0)
+
+**Closed issues:**
+
+- cw20-ics20 incorrectly encodes `ack_success`. [\#759](https://github.com/CosmWasm/cw-plus/issues/759)
+- Allow querying all granted allowances to a spender [\#756](https://github.com/CosmWasm/cw-plus/issues/756)
+- Store compiled wasms on repo [\#747](https://github.com/CosmWasm/cw-plus/issues/747)
+- Add optional executor restriction to cw3-flex [\#739](https://github.com/CosmWasm/cw-plus/issues/739)
+- Provide proc macro package for automatic `IndexList<T>` implementation on any index struct [\#736](https://github.com/CosmWasm/cw-plus/issues/736)
+- MultiIndex `prefix` and `sub_prefix` working incorrectly when using a triple element tuple as IK [\#730](https://github.com/CosmWasm/cw-plus/issues/730)
+- Errors when compiling all the contracts [\#724](https://github.com/CosmWasm/cw-plus/issues/724)
+- Test-specific helpers in storage-plus [\#708](https://github.com/CosmWasm/cw-plus/issues/708)
 
 **Merged pull requests:**
 
-- Add ability to unset minter in UpdateMinter message. [\#748](https://github.com/CosmWasm/cw-plus/pull/748) ([ezekiiel](https://github.com/ezekiiel)) 
+- Updated contract versions and links [\#762](https://github.com/CosmWasm/cw-plus/pull/762) ([daniel-farina](https://github.com/daniel-farina))
+- Allowances per spender [\#761](https://github.com/CosmWasm/cw-plus/pull/761) ([maurolacy](https://github.com/maurolacy))
+- Fix broken links, minor typo [\#752](https://github.com/CosmWasm/cw-plus/pull/752) ([mikedotexe](https://github.com/mikedotexe))
+- Use into\_iter\(\) instead of iter\(\).cloned\(\). [\#749](https://github.com/CosmWasm/cw-plus/pull/749) ([ezekiiel](https://github.com/ezekiiel))
+- Add ability to unset minter in UpdateMinter message. [\#748](https://github.com/CosmWasm/cw-plus/pull/748) ([ezekiiel](https://github.com/ezekiiel))
+- Fix specification about CW20 Enumerable Queries [\#746](https://github.com/CosmWasm/cw-plus/pull/746) ([lukepark327](https://github.com/lukepark327))
+- Add migrate method to cw20 base. [\#745](https://github.com/CosmWasm/cw-plus/pull/745) ([ezekiiel](https://github.com/ezekiiel))
+- Add optional executor restriction to cw3-flex [\#741](https://github.com/CosmWasm/cw-plus/pull/741) ([ueco-jb](https://github.com/ueco-jb))
+- Add proc macro package for automatic `IndexList<T>` implementation [\#737](https://github.com/CosmWasm/cw-plus/pull/737) ([y-pakorn](https://github.com/y-pakorn))
+- Bump workspace-optimizer version in README to `0.12.6` [\#735](https://github.com/CosmWasm/cw-plus/pull/735) ([uint](https://github.com/uint))
+- Use standard CosmosMsg [\#734](https://github.com/CosmWasm/cw-plus/pull/734) ([ethanfrey](https://github.com/ethanfrey))
+- add execute msg to update minter [\#729](https://github.com/CosmWasm/cw-plus/pull/729) ([janitachalam](https://github.com/janitachalam))
+- Removed documentation from Cargo.toml [\#711](https://github.com/CosmWasm/cw-plus/pull/711) ([hashedone](https://github.com/hashedone))
+- Move test helpers into a test section [\#709](https://github.com/CosmWasm/cw-plus/pull/709) ([shanev](https://github.com/shanev))
+- add query\_this\_hook to hooks.rs [\#688](https://github.com/CosmWasm/cw-plus/pull/688) ([ishaanh](https://github.com/ishaanh))
 
 ## [v0.13.4](https://github.com/CosmWasm/cw-plus/tree/v0.13.4) (2022-06-02)
 
