@@ -1243,4 +1243,119 @@ mod tests {
             }))
         ));
     }
+
+    #[test]
+    fn token_url() {
+        let minter = String::from("minter");
+        let user1 = String::from("user1");
+        let token1 = "token1".to_owned();
+        let token2 = "token2".to_owned();
+        let url1 = "url1".to_owned();
+        let url2 = "url2".to_owned();
+
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg {
+            minter: minter.clone(),
+        };
+        let res = instantiate(deps.as_mut(), mock_env(), mock_info("operator", &[]), msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // first mint
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(minter.as_ref(), &[]),
+            Cw1155ExecuteMsg::Mint {
+                to: user1.clone(),
+                token_id: token1.clone(),
+                value: 1u64.into(),
+                url: Some(url1.clone()),
+                msg: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::TokenInfo {
+                    token_id: token1.clone()
+                }
+            ),
+            to_binary(&TokenInfoResponse { url: url1.clone() })
+        );
+
+        // mint after the first mint
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(minter.as_ref(), &[]),
+            Cw1155ExecuteMsg::Mint {
+                to: user1.clone(),
+                token_id: token1.clone(),
+                value: 1u64.into(),
+                url: Some(url2.clone()),
+                msg: None,
+            },
+        )
+        .unwrap();
+
+        // url doesn't changed
+        assert_eq!(
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::TokenInfo { token_id: token1 }
+            ),
+            to_binary(&TokenInfoResponse { url: url1.clone() })
+        );
+
+        // first mint with batch_mint
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(minter.as_ref(), &[]),
+            Cw1155ExecuteMsg::BatchMint {
+                to: user1.clone(),
+                batch: vec![(token2.clone(), 1u64.into(), Some(url1.clone()))],
+                msg: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::TokenInfo {
+                    token_id: token2.clone()
+                }
+            ),
+            to_binary(&TokenInfoResponse { url: url1.clone() })
+        );
+
+        // mint after first mint with batch_mint
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info(minter.as_ref(), &[]),
+            Cw1155ExecuteMsg::BatchMint {
+                to: user1,
+                batch: vec![(token2.clone(), 1u64.into(), Some(url2))],
+                msg: None,
+            },
+        )
+        .unwrap();
+
+        // url doesn't changed
+        assert_eq!(
+            query(
+                deps.as_ref(),
+                mock_env(),
+                Cw1155QueryMsg::TokenInfo { token_id: token2 }
+            ),
+            to_binary(&TokenInfoResponse { url: url1 })
+        );
+    }
 }
