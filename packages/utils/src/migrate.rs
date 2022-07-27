@@ -86,4 +86,15 @@ mod tests {
         assert!(err.to_string().contains("0.10.2"), "{}", err);
         assert!(err.to_string().contains("0.9.7"), "{}", err);
     }
+
+    #[test]
+    fn errors_on_broken_version() {
+        let mut storage = MockStorage::new();
+        let err = ensure_from_older_version(&mut storage, "demo", "0.a.7").unwrap_err();
+        assert!(
+            err.to_string().contains("unexpected character 'a'"),
+            "{}",
+            err
+        );
+    }
 }
