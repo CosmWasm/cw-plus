@@ -1,14 +1,17 @@
 use cosmwasm_std::{Deps, Order, StdResult};
-use cw20::{AllAccountsResponse, AllAllowancesResponse, AllowanceInfo};
+use cw20::{
+    AllAccountsResponse, AllAllowancesResponse, AllSpenderAllowancesResponse, AllowanceInfo,
+    SpenderAllowanceInfo,
+};
 
-use crate::state::{ALLOWANCES, BALANCES};
+use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES};
 use cw_storage_plus::Bound;
 
 // settings for pagination
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-pub fn query_all_allowances(
+pub fn query_owner_allowances(
     deps: Deps,
     owner: String,
     start_after: Option<String>,
@@ -33,6 +36,31 @@ pub fn query_all_allowances(
     Ok(AllAllowancesResponse { allowances })
 }
 
+pub fn query_spender_allowances(
+    deps: Deps,
+    spender: String,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<AllSpenderAllowancesResponse> {
+    let spender_addr = deps.api.addr_validate(&spender)?;
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+    let start = start_after.map(|s| Bound::ExclusiveRaw(s.into_bytes()));
+
+    let allowances = ALLOWANCES_SPENDER
+        .prefix(&spender_addr)
+        .range(deps.storage, start, None, Order::Ascending)
+        .take(limit)
+        .map(|item| {
+            item.map(|(addr, allow)| SpenderAllowanceInfo {
+                owner: addr.into(),
+                allowance: allow.allowance,
+                expires: allow.expires,
+            })
+        })
+        .collect::<StdResult<_>>()?;
+    Ok(AllSpenderAllowancesResponse { allowances })
+}
+
 pub fn query_all_accounts(
     deps: Deps,
     start_after: Option<String>,
@@ -55,11 +83,11 @@ mod tests {
     use super::*;
 
     use cosmwasm_std::testing::{mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, DepsMut, Uint128};
+    use cosmwasm_std::{coins, from_binary, DepsMut, Uint128};
     use cw20::{Cw20Coin, Expiration, TokenInfoResponse};
 
-    use crate::contract::{execute, instantiate, query_token_info};
-    use crate::msg::{ExecuteMsg, InstantiateMsg};
+    use crate::contract::{execute, instantiate, query, query_token_info};
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
     // this will set up the instantiation for other tests
     fn do_instantiate(mut deps: DepsMut, addr: &str, amount: Uint128) -> TokenInfoResponse {
@@ -81,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn query_all_allowances_works() {
+    fn query_all_owner_allowances_works() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
         let owner = String::from("owner");
@@ -94,7 +122,7 @@ mod tests {
         do_instantiate(deps.as_mut(), &owner, Uint128::new(12340000));
 
         // no allowance to start
-        let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
+        let allowances = query_owner_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances, vec![]);
 
         // set allowance with height expiration
@@ -117,11 +145,12 @@ mod tests {
         execute(deps.as_mut(), env, info, msg).unwrap();
 
         // query list gets 2
-        let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
+        let allowances = query_owner_allowances(deps.as_ref(), owner.clone(), None, None).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
         // first one is spender1 (order of CanonicalAddr uncorrelated with String)
-        let allowances = query_all_allowances(deps.as_ref(), owner.clone(), None, Some(1)).unwrap();
+        let allowances =
+            query_owner_allowances(deps.as_ref(), owner.clone(), None, Some(1)).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.spender, &spender1);
@@ -129,7 +158,7 @@ mod tests {
         assert_eq!(&allow.allowance, &allow1);
 
         // next one is spender2
-        let allowances = query_all_allowances(
+        let allowances = query_owner_allowances(
             deps.as_ref(),
             owner,
             Some(allow.spender.clone()),
@@ -139,6 +168,86 @@ mod tests {
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.spender, &spender2);
+        assert_eq!(&allow.expires, &Expiration::Never {});
+        assert_eq!(&allow.allowance, &allow2);
+    }
+
+    #[test]
+    fn query_all_spender_allowances_works() {
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+
+        // these are in alphabetical order same than insert order
+        let owner1 = String::from("owner1");
+        let owner2 = String::from("owner2");
+        let spender = String::from("spender");
+
+        let info = mock_info(owner1.as_ref(), &[]);
+        let env = mock_env();
+        do_instantiate(deps.as_mut(), &owner1, Uint128::new(12340000));
+
+        // no allowance to start
+        let allowances =
+            query_spender_allowances(deps.as_ref(), spender.clone(), None, None).unwrap();
+        assert_eq!(allowances.allowances, vec![]);
+
+        // set allowance with height expiration
+        let allow1 = Uint128::new(7777);
+        let expires = Expiration::AtHeight(5432);
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow1,
+            expires: Some(expires),
+        };
+        execute(deps.as_mut(), env, info, msg).unwrap();
+
+        // set allowance with no expiration, from the other owner
+        let info = mock_info(owner2.as_ref(), &[]);
+        let env = mock_env();
+        do_instantiate(deps.as_mut(), &owner2, Uint128::new(12340000));
+
+        let allow2 = Uint128::new(54321);
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow2,
+            expires: None,
+        };
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // query list gets both
+        let msg = QueryMsg::AllSpenderAllowances {
+            spender: spender.clone(),
+            start_after: None,
+            limit: None,
+        };
+        let allowances: AllSpenderAllowancesResponse =
+            from_binary(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
+        assert_eq!(allowances.allowances.len(), 2);
+
+        // one is owner1 (order of CanonicalAddr uncorrelated with String)
+        let msg = QueryMsg::AllSpenderAllowances {
+            spender: spender.clone(),
+            start_after: None,
+            limit: Some(1),
+        };
+        let allowances: AllSpenderAllowancesResponse =
+            from_binary(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
+        assert_eq!(allowances.allowances.len(), 1);
+        let allow = &allowances.allowances[0];
+        assert_eq!(&allow.owner, &owner1);
+        assert_eq!(&allow.expires, &expires);
+        assert_eq!(&allow.allowance, &allow1);
+
+        // other one is owner2
+        let msg = QueryMsg::AllSpenderAllowances {
+            spender,
+            start_after: Some(owner1),
+            limit: Some(10000),
+        };
+        let allowances: AllSpenderAllowancesResponse =
+            from_binary(&query(deps.as_ref(), env, msg).unwrap()).unwrap();
+        assert_eq!(allowances.allowances.len(), 1);
+        let allow = &allowances.allowances[0];
+        assert_eq!(&allow.owner, &owner2);
         assert_eq!(&allow.expires, &Expiration::Never {});
         assert_eq!(&allow.allowance, &allow2);
     }

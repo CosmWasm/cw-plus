@@ -5,7 +5,7 @@ use cosmwasm_std::{
 use cw20::{AllowanceResponse, Cw20ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
-use crate::state::{ALLOWANCES, BALANCES, TOKEN_INFO};
+use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, TOKEN_INFO};
 
 pub fn execute_increase_allowance(
     deps: DepsMut,
@@ -20,18 +20,16 @@ pub fn execute_increase_allowance(
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    ALLOWANCES.update(
-        deps.storage,
-        (&info.sender, &spender_addr),
-        |allow| -> StdResult<_> {
-            let mut val = allow.unwrap_or_default();
-            if let Some(exp) = expires {
-                val.expires = exp;
-            }
-            val.allowance += amount;
-            Ok(val)
-        },
-    )?;
+    let update_fn = |allow: Option<AllowanceResponse>| -> StdResult<_> {
+        let mut val = allow.unwrap_or_default();
+        if let Some(exp) = expires {
+            val.expires = exp;
+        }
+        val.allowance += amount;
+        Ok(val)
+    };
+    ALLOWANCES.update(deps.storage, (&info.sender, &spender_addr), update_fn)?;
+    ALLOWANCES_SPENDER.update(deps.storage, (&spender_addr, &info.sender), update_fn)?;
 
     let res = Response::new().add_attributes(vec![
         attr("action", "increase_allowance"),
@@ -56,6 +54,11 @@ pub fn execute_decrease_allowance(
     }
 
     let key = (&info.sender, &spender_addr);
+
+    fn reverse<'a>(t: (&'a Addr, &'a Addr)) -> (&'a Addr, &'a Addr) {
+        (t.1, t.0)
+    }
+
     // load value and delete if it hits 0, or update otherwise
     let mut allowance = ALLOWANCES.load(deps.storage, key)?;
     if amount < allowance.allowance {
@@ -68,8 +71,10 @@ pub fn execute_decrease_allowance(
             allowance.expires = exp;
         }
         ALLOWANCES.save(deps.storage, key, &allowance)?;
+        ALLOWANCES_SPENDER.save(deps.storage, reverse(key), &allowance)?;
     } else {
         ALLOWANCES.remove(deps.storage, key);
+        ALLOWANCES_SPENDER.remove(deps.storage, reverse(key));
     }
 
     let res = Response::new().add_attributes(vec![
@@ -89,7 +94,7 @@ pub fn deduct_allowance(
     block: &BlockInfo,
     amount: Uint128,
 ) -> Result<AllowanceResponse, ContractError> {
-    ALLOWANCES.update(storage, (owner, spender), |current| {
+    let update_fn = |current: Option<AllowanceResponse>| -> _ {
         match current {
             Some(mut a) => {
                 if a.expires.is_expired(block) {
@@ -105,7 +110,9 @@ pub fn deduct_allowance(
             }
             None => Err(ContractError::NoAllowance {}),
         }
-    })
+    };
+    ALLOWANCES.update(storage, (owner, spender), update_fn)?;
+    ALLOWANCES_SPENDER.update(storage, (spender, owner), update_fn)
 }
 
 pub fn execute_transfer_from(
