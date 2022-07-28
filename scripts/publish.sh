@@ -7,14 +7,14 @@ function print_usage() {
   echo "Publishes crates to crates.io."
 }
 
-if [ $# = 1 ] && ( [ "$1" = "-h" ] || [ "$1" = "--help" ] )
+if [ $# = 1 ] && { [ "$1" = "-h" ] || [ "$1" = "--help" ] ; }
 then
     print_usage
     exit 1
 fi
 
 # this should really more to cosmwasm...
-STORAGE_PACKAGES="storage-plus"
+STORAGE_PACKAGES="storage-macro storage-plus"
 # these are imported by other packages
 BASE_PACKAGES="utils"
 ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw1155 multi-test"
