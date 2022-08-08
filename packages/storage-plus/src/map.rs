@@ -267,6 +267,8 @@ mod test {
     use std::ops::Deref;
 
     use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::to_binary;
+    use cosmwasm_std::StdError::InvalidUtf8;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
@@ -284,6 +286,10 @@ mod test {
     }
 
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
+    #[cfg(feature = "iterator")]
+    const PEOPLE_STR_KEY: &str = "people2";
+    #[cfg(feature = "iterator")]
+    const PEOPLE_STR: Map<&str, Data> = Map::new(PEOPLE_STR_KEY);
     #[cfg(feature = "iterator")]
     const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
     #[cfg(feature = "iterator")]
@@ -537,6 +543,104 @@ mod test {
         let all = all.unwrap();
         assert_eq!(1, all.len());
         assert_eq!(all, vec![(b"john".to_vec(), data)]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn range_key_broken_deserialization_errors() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE_STR.save(&mut store, "john", &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE_STR.save(&mut store, "jim", &data2).unwrap();
+
+        let data3 = Data {
+            name: "Ada".to_string(),
+            age: 23,
+        };
+        PEOPLE_STR.save(&mut store, "ada", &data3).unwrap();
+
+        // let's iterate!
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ("ada".to_string(), data3.clone()),
+                ("jim".to_string(), data2.clone()),
+                ("john".to_string(), data.clone())
+            ]
+        );
+
+        // Manually add a broken key (invalid utf-8)
+        store.set(
+            &*[
+                [0u8, PEOPLE_STR_KEY.len() as u8].as_slice(),
+                PEOPLE_STR_KEY.as_bytes(),
+                b"\xddim",
+            ]
+            .concat(),
+            &to_binary(&data2).unwrap(),
+        );
+
+        // Let's try to iterate again!
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        assert!(all.is_err());
+        assert!(matches!(all.unwrap_err(), InvalidUtf8 { .. }));
+
+        // And the same with keys()
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .keys(&store, None, None, Order::Ascending)
+            .collect();
+        assert!(all.is_err());
+        assert!(matches!(all.unwrap_err(), InvalidUtf8 { .. }));
+
+        // But range_raw still works
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
+
+        let all = all.unwrap();
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (b"ada".to_vec(), data3.clone()),
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone()),
+                (b"\xddim".to_vec(), data2.clone()),
+            ]
+        );
+
+        // And the same with keys_raw
+        let all: Vec<_> = PEOPLE_STR
+            .keys_raw(&store, None, None, Order::Ascending)
+            .collect();
+
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                b"ada".to_vec(),
+                b"jim".to_vec(),
+                b"john".to_vec(),
+                b"\xddim".to_vec(),
+            ]
+        );
     }
 
     #[test]
