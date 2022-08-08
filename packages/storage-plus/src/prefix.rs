@@ -185,7 +185,7 @@ where
             max.map(|b| b.to_raw_bound()),
             order,
         )
-        .flat_map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| Ok(k)));
+        .map(move |kv| (de_fn)(store, &pk_name, kv).map(|(k, _)| k));
         Box::new(mapped)
     }
 }
