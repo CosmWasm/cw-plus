@@ -28,7 +28,7 @@ on top of `cosmwasm_std::Storage`. They are `Item`, which is
 a typed wrapper around one database key, providing some helper functions
 for interacting with it without dealing with raw bytes. And `Map`,
 which allows you to store multiple unique typed objects under a prefix,
-indexed by a simple (`&[u8]`) or compound (eg. `(&[u8], &[u8])`) primary key.
+indexed by a simple or compound (eg. `(&[u8], &[u8])`) primary key.
 
 These correspond to the concepts represented in `cosmwasm_storage` by
 `Singleton` and `Bucket`, but with a re-designed API and implementation
@@ -111,9 +111,9 @@ fn demo() -> StdResult<()> {
 The usage of a [`Map`](./src/map.rs) is a little more complex, but
 is still pretty straight-forward. You can imagine it as a storage-backed
 `BTreeMap`, allowing key-value lookups with typed values. In addition,
-we support not only simple binary keys (`&[u8]`), but tuples, which are
-combined. This allows us to store allowances as composite keys
-eg. `(owner, spender)` to look up the balance.
+we support not only simple binary keys (like `&[u8]`), but tuples, which are
+combined. This allows us by example to store allowances as composite keys,
+i.e. `(owner, spender)` to look up the balance.
 
 Beyond direct lookups, we have a super-power not found in Ethereum -
 iteration. That's right, you can list all items in a `Map`, or only
@@ -209,8 +209,8 @@ A `Map` key can be anything that implements the `PrimaryKey` trait. There are a 
  - `impl<'a> PrimaryKey<'a> for &'a Addr`
  - `impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U)`
  - `impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>> PrimaryKey<'a> for (T, U, V)`
- - `PrimaryKey` implemented for unsigned integers up to `u64`
- - `PrimaryKey` implemented for signed integers up to `i64`
+ - `PrimaryKey` implemented for unsigned integers up to `u128`
+ - `PrimaryKey` implemented for signed integers up to `i128`
 
 That means that byte and string slices, byte vectors, and strings, can be conveniently used as keys.
 Moreover, some other types can be used as well, like addresses and address references, pairs, triples, and
@@ -236,7 +236,7 @@ one owner" (first part of the composite key). Just like you'd expect from your
 favorite database.
 
 Here's how we use it with composite keys. Just define a tuple as a key and use that
-everywhere you used a byte slice above.
+everywhere you used a single key above.
 
 ```rust
 // Note the tuple for primary key. We support one slice, or a 2 or 3-tuple.
@@ -271,13 +271,13 @@ fn demo() -> StdResult<()> {
 ### Path
 
 Under the scenes, we create a `Path` from the `Map` when accessing a key.
-`PEOPLE.load(&store, b"jack") == PEOPLE.key(b"jack").load()`.
+`PEOPLE.load(&store, "jack") == PEOPLE.key("jack").load()`.
 `Map.key()` returns a `Path`, which has the same interface as `Item`,
 re-using the calculated path to this key.
 
 For simple keys, this is just a bit less typing and a bit less gas if you
 use the same key for many calls. However, for composite keys, like
-`(b"owner", b"spender")` it is **much** less typing. And highly recommended anywhere
+`("owner", "spender")` it is **much** less typing. And highly recommended anywhere
 you will use a composite key even twice:
 
 ```rust
