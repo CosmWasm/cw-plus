@@ -1,6 +1,5 @@
 mod bound;
 mod de;
-mod de_old;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -10,7 +9,6 @@ mod int_key;
 mod item;
 mod iter_helpers;
 mod keys;
-mod keys_old;
 mod map;
 mod path;
 mod prefix;
@@ -33,7 +31,6 @@ pub use indexes::UniqueIndex;
 pub use int_key::CwIntKey;
 pub use item::Item;
 pub use keys::{Key, Prefixer, PrimaryKey};
-pub use keys_old::IntKeyOld;
 pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
