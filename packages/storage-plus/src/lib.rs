@@ -28,7 +28,7 @@ pub use indexes::Index;
 pub use indexes::MultiIndex;
 #[cfg(feature = "iterator")]
 pub use indexes::UniqueIndex;
-pub use int_key::CwIntKey;
+pub use int_key::IntKey;
 pub use item::Item;
 pub use keys::{Key, Prefixer, PrimaryKey};
 pub use map::Map;

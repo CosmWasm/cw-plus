@@ -275,7 +275,7 @@ mod test {
     #[cfg(feature = "iterator")]
     use crate::bound::Bounder;
 
-    use crate::int_key::CwIntKey;
+    use crate::int_key::IntKey;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
