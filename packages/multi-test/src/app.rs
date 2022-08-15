@@ -17,7 +17,9 @@ use crate::bank::{Bank, BankKeeper, BankSudo};
 use crate::contracts::Contract;
 use crate::executor::{AppResponse, Executor};
 use crate::module::{FailingModule, Module};
-use crate::staking::{Distribution, FailingDistribution, FailingStaking, Staking, StakingSudo};
+use crate::staking::{
+    Distribution, FailingDistribution, FailingStaking, StakeKeeper, Staking, StakingSudo,
+};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper, WasmSudo};
 
@@ -44,7 +46,7 @@ pub struct App<
     Storage = MockStorage,
     Custom = FailingModule<Empty, Empty, Empty>,
     Wasm = WasmKeeper<Empty, Empty>,
-    Staking = FailingStaking,
+    Staking = StakeKeeper,
     Distr = FailingDistribution,
 > {
     router: Router<Bank, Custom, Wasm, Staking, Distr>,
@@ -75,7 +77,7 @@ impl BasicApp {
                 BankKeeper,
                 FailingModule<Empty, Empty, Empty>,
                 WasmKeeper<Empty, Empty>,
-                FailingStaking,
+                StakeKeeper,
                 FailingDistribution,
             >,
             &dyn Api,
@@ -97,7 +99,7 @@ where
             BankKeeper,
             FailingModule<ExecC, QueryC, Empty>,
             WasmKeeper<ExecC, QueryC>,
-            FailingStaking,
+            StakeKeeper,
             FailingDistribution,
         >,
         &dyn Api,
@@ -159,7 +161,7 @@ pub type BasicAppBuilder<ExecC, QueryC> = AppBuilder<
     MockStorage,
     FailingModule<ExecC, QueryC, Empty>,
     WasmKeeper<ExecC, QueryC>,
-    FailingStaking,
+    StakeKeeper,
     FailingDistribution,
 >;
 
@@ -182,7 +184,7 @@ impl Default
         MockStorage,
         FailingModule<Empty, Empty, Empty>,
         WasmKeeper<Empty, Empty>,
-        FailingStaking,
+        StakeKeeper,
         FailingDistribution,
     >
 {
@@ -198,7 +200,7 @@ impl
         MockStorage,
         FailingModule<Empty, Empty, Empty>,
         WasmKeeper<Empty, Empty>,
-        FailingStaking,
+        StakeKeeper,
         FailingDistribution,
     >
 {
@@ -211,7 +213,7 @@ impl
             bank: BankKeeper::new(),
             wasm: WasmKeeper::new(),
             custom: FailingModule::new(),
-            staking: FailingStaking::new(),
+            staking: StakeKeeper::new(),
             distribution: FailingDistribution::new(),
         }
     }
@@ -224,7 +226,7 @@ impl<ExecC, QueryC>
         MockStorage,
         FailingModule<ExecC, QueryC, Empty>,
         WasmKeeper<ExecC, QueryC>,
-        FailingStaking,
+        StakeKeeper,
         FailingDistribution,
     >
 where
@@ -241,7 +243,7 @@ where
             bank: BankKeeper::new(),
             wasm: WasmKeeper::new(),
             custom: FailingModule::new(),
-            staking: FailingStaking::new(),
+            staking: StakeKeeper::new(),
             distribution: FailingDistribution::new(),
         }
     }
