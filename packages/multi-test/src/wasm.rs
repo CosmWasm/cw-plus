@@ -512,7 +512,11 @@ where
                     id,
                     result: SubMsgResult::Ok(SubMsgResponse {
                         events: r.events.clone(),
-                        data: r.data,
+                        data: if let Some(binary) = r.data {
+                            Some(ExecuteResponse::decode(binary.as_slice())?.data.into())
+                        } else {
+                            None
+                        },
                     }),
                 };
                 // do reply and combine it with the original response
