@@ -417,7 +417,7 @@ fn demo() -> StdResult<()> {
         .prefix("owner")
         .range(
             &store,
-            Some(Bound::exclusive("spender1")),
+            Some(Bound::exclusive("spender")),
             Some(Bound::inclusive("spender2")),
             Order::Descending,
         )
