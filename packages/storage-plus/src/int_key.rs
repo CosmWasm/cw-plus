@@ -4,8 +4,7 @@ use std::mem;
 /// but "sign-flipped" (xored msb) big-endian bytes for signed ints.
 ///
 /// So that the representation of signed integers is in the right lexicographical order.
-// TODO: Rename to `IntKey` after deprecating current `IntKey` (https://github.com/CosmWasm/cw-plus/issues/570)
-pub trait CwIntKey: Sized + Copy {
+pub trait IntKey: Sized + Copy {
     type Buf: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> + Default;
 
     fn to_cw_bytes(&self) -> Self::Buf;
@@ -14,7 +13,7 @@ pub trait CwIntKey: Sized + Copy {
 
 macro_rules! cw_uint_keys {
     (for $($t:ty),+) => {
-        $(impl CwIntKey for $t {
+        $(impl IntKey for $t {
             type Buf = [u8; mem::size_of::<$t>()];
 
             #[inline]
@@ -34,7 +33,7 @@ cw_uint_keys!(for u8, u16, u32, u64, u128);
 
 macro_rules! cw_int_keys {
     (for $($t:ty, $ut:ty),+) => {
-        $(impl CwIntKey for $t {
+        $(impl IntKey for $t {
             type Buf = [u8; mem::size_of::<$t>()];
 
             #[inline]
