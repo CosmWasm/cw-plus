@@ -18,6 +18,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
+cosmwasm-schema = { version = "1.0.0" }
 cw-utils = { path = "../../packages/utils", version = "0.14.0" }
 cw2 = { path = "../../packages/cw2", version = "0.14.0" }
 cw20 = { path = "../../packages/cw20", version = "0.14.0" }
@@ -29,5 +30,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "1.0.0" }
 cw-multi-test = { path = "../../packages/multi-test", version = "0.14.0" }

@@ -22,6 +22,7 @@ querier = ["library"]
 multitest = ["cw-multi-test", "anyhow"]
 
 [dependencies]
+cosmwasm-schema = { version = "1.0.0" }
 cw-utils = { path = "../../packages/utils", version = "0.14.0" }
 cw1 = { path = "../../packages/cw1", version = "0.14.0" }
 cw2 = { path = "../../packages/cw2", version = "0.14.0" }
@@ -36,6 +37,5 @@ anyhow = { version = "1", optional = true }
 [dev-dependencies]
 anyhow = "1"
 assert_matches = "1"
-cosmwasm-schema = { version = "1.0.0" }
 cw-multi-test = { path = "../../packages/multi-test", version = "0.14.0" }
 derivative = "2"
