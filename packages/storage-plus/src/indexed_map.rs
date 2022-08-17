@@ -1557,4 +1557,109 @@ mod test {
             );
         }
     }
+
+    mod pk_multi_index {
+        use super::*;
+        use cosmwasm_std::{Addr, Uint128};
+
+        struct Indexes<'a> {
+            // The last type param must match the `IndexedMap` primary key type below
+            spender: MultiIndex<'a, Addr, Uint128, (Addr, Addr)>,
+        }
+
+        impl<'a> IndexList<Uint128> for Indexes<'a> {
+            fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Uint128>> + '_> {
+                let v: Vec<&dyn Index<Uint128>> = vec![&self.spender];
+                Box::new(v.into_iter())
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "iterator")]
+        fn pk_based_index() {
+            fn pk_index(pk: &[u8]) -> Addr {
+                let (_owner, spender) = <(Addr, Addr)>::from_slice(pk).unwrap(); // mustn't fail
+                spender
+            }
+
+            let indexes = Indexes {
+                spender: MultiIndex::new(
+                    |pk, _allow| pk_index(pk),
+                    "allowances",
+                    "allowances__spender",
+                ),
+            };
+            let map = IndexedMap::<(&Addr, &Addr), Uint128, Indexes>::new("allowances", indexes);
+            let mut store = MockStorage::new();
+
+            map.save(
+                &mut store,
+                (&Addr::unchecked("owner1"), &Addr::unchecked("spender1")),
+                &Uint128::new(11),
+            )
+            .unwrap();
+            map.save(
+                &mut store,
+                (&Addr::unchecked("owner1"), &Addr::unchecked("spender2")),
+                &Uint128::new(12),
+            )
+            .unwrap();
+            map.save(
+                &mut store,
+                (&Addr::unchecked("owner2"), &Addr::unchecked("spender1")),
+                &Uint128::new(21),
+            )
+            .unwrap();
+
+            // Iterate over the main values
+            let items: Vec<_> = map
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 12, 21]);
+
+            // Iterate over the indexed values
+            let items: Vec<_> = map
+                .idx
+                .spender
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 21, 12]);
+
+            // Prefix over the main values
+            let items: Vec<_> = map
+                .prefix(&Addr::unchecked("owner1"))
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 12]);
+
+            // Prefix over the indexed values
+            let items: Vec<_> = map
+                .idx
+                .spender
+                .prefix(Addr::unchecked("spender1"))
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 21]);
+        }
+    }
 }
