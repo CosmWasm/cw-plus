@@ -1660,6 +1660,23 @@ mod test {
             let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
 
             assert_eq!(items, vec![11, 21]);
+
+            // Prefix over the indexed values, and deserialize primary key as well
+            let items: Vec<_> = map
+                .idx
+                .spender
+                .prefix(Addr::unchecked("spender2"))
+                .range(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            assert_eq!(
+                items,
+                vec![(
+                    (Addr::unchecked("owner1"), Addr::unchecked("spender2")),
+                    Uint128::new(12)
+                )]
+            );
         }
     }
 }
