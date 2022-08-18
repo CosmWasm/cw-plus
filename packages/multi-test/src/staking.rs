@@ -2,8 +2,9 @@ use anyhow::{bail, Result as AnyResult};
 use schemars::JsonSchema;
 
 use cosmwasm_std::{
-    Addr, Api, Binary, BlockInfo, Coin, Decimal, DistributionMsg, Empty, Event, Querier,
-    StakingMsg, StakingQuery, Storage, DelegationResponse, FullDelegation, to_binary, coin, Uint128
+    coin, to_binary, Addr, Api, Binary, BlockInfo, Coin, Decimal, DelegationResponse,
+    DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg, StakingQuery, Storage,
+    Uint128,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::Map;
@@ -133,7 +134,7 @@ impl Module for StakeKeeper {
                     .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))];
                 self.add_stake(&mut staking_storage, sender, vec![amount])?;
                 Ok(AppResponse { events, data: None })
-            },
+            }
             StakingMsg::Undelegate { validator, amount } => {
                 let events = vec![Event::new("undelegate")
                     .add_attribute("from", &validator)
@@ -169,7 +170,10 @@ impl Module for StakeKeeper {
     ) -> AnyResult<Binary> {
         let staking_storage = prefixed_read(storage, NAMESPACE_STAKING);
         match request {
-            StakingQuery::Delegation { delegator, validator } => {
+            StakingQuery::Delegation {
+                delegator,
+                validator,
+            } => {
                 // for now validator is ignored, as I want to support only one validator
                 let delegator = api.addr_validate(&delegator)?;
                 let stakes = match self.get_stakes(&staking_storage, &delegator) {
@@ -180,7 +184,10 @@ impl Module for StakeKeeper {
                     }
                 };
                 // set fixed reward ratio 1:10 per delegated amoutn
-                let reward = coin((stakes.amount / Uint128::new(10)).u128(), stakes.denom.clone());
+                let reward = coin(
+                    (stakes.amount / Uint128::new(10)).u128(),
+                    stakes.denom.clone(),
+                );
                 let full_delegation_response = FullDelegation {
                     delegator,
                     validator,
@@ -192,5 +199,114 @@ impl Module for StakeKeeper {
             }
             q => bail!("Unsupported staking sudo message: {:?}", q),
         }
+    }
+}
+
+#[derive(Default)]
+pub struct DistributionKeeper {}
+
+impl DistributionKeeper {
+    pub fn new() -> Self {
+        DistributionKeeper {}
+    }
+
+    fn get_stakes(&self, storage: &dyn Storage, account: &Addr) -> AnyResult<Vec<Coin>> {
+        let val = STAKES.may_load(storage, account)?;
+        Ok(val.unwrap_or_default().into_vec())
+    }
+
+    fn set_balance(
+        &self,
+        storage: &mut dyn Storage,
+        account: &Addr,
+        amount: Vec<Coin>,
+    ) -> AnyResult<()> {
+        let mut stake = NativeBalance(amount);
+        stake.normalize();
+        STAKES.save(storage, account, &stake).map_err(Into::into)
+    }
+
+    fn add_stake(
+        &self,
+        storage: &mut dyn Storage,
+        to_address: Addr,
+        amount: Vec<Coin>,
+    ) -> AnyResult<()> {
+        let amount = self.normalize_amount(amount)?;
+        let b = self.get_stakes(storage, &to_address)?;
+        let b = NativeBalance(b) + NativeBalance(amount);
+        self.set_balance(storage, &to_address, b.into_vec())
+    }
+
+    /// Filters out all 0 value coins and returns an error if the resulting Vec is empty
+    fn normalize_amount(&self, amount: Vec<Coin>) -> AnyResult<Vec<Coin>> {
+        let res: Vec<_> = amount.into_iter().filter(|x| !x.amount.is_zero()).collect();
+        if res.is_empty() {
+            bail!("Cannot transfer empty coins amount")
+        } else {
+            Ok(res)
+        }
+    }
+}
+
+impl Distribution for DistributionKeeper {}
+
+impl Module for DistributionKeeper {
+    type ExecT = DistributionMsg;
+    type QueryT = Empty;
+    type SudoT = Empty;
+
+    fn execute<ExecC, QueryC>(
+        &self,
+        _api: &dyn Api,
+        storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
+        sender: Addr,
+        msg: DistributionMsg,
+    ) -> AnyResult<AppResponse> {
+        let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
+        match msg {
+            // For now it ignores validator as I want to support only one
+            DistributionMsg::WithdrawDelegatorReward { validator } => {
+                let stakes = self.get_stakes(&staking_storage, &sender)?[0].clone();
+                // set fixed reward ratio 1:10 per delegated amoutn
+                let reward = coin(
+                    (stakes.amount / Uint128::new(10)).u128(),
+                    stakes.denom.clone(),
+                );
+
+                let events = vec![Event::new("withdraw_delegator_reward")
+                    .add_attribute("validator", &validator)
+                    .add_attribute("sender", &sender)
+                    .add_attribute("amount", format!("{}{}", reward.amount, reward.denom))];
+                // add balance to sender
+                self.add_stake(&mut staking_storage, sender, vec![reward])?;
+                Ok(AppResponse { events, data: None })
+            }
+            m => bail!("Unsupported distribution message: {:?}", m),
+        }
+    }
+
+    fn sudo<ExecC, QueryC>(
+        &self,
+        _api: &dyn Api,
+        _storage: &mut dyn Storage,
+        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        _block: &BlockInfo,
+        _msg: Empty,
+    ) -> AnyResult<AppResponse> {
+        bail!("Something went wrong - Distribution doesn't have sudo messages")
+    }
+
+    fn query(
+        &self,
+        _api: &dyn Api,
+        _storage: &dyn Storage,
+        _querier: &dyn Querier,
+        _block: &BlockInfo,
+        _request: Empty,
+    ) -> AnyResult<Binary> {
+        bail!("Something went wrong - Distribution doesn't have query messages")
     }
 }
