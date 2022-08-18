@@ -12,7 +12,6 @@ use cw_utils::NativeBalance;
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;
-use crate::module::FailingModule;
 use crate::Module;
 
 const STAKES: Map<&Addr, NativeBalance> = Map::new("stakes");
@@ -30,15 +29,7 @@ pub enum StakingSudo {
 
 pub trait Staking: Module<ExecT = StakingMsg, QueryT = StakingQuery, SudoT = StakingSudo> {}
 
-pub type FailingStaking = FailingModule<StakingMsg, StakingQuery, StakingSudo>;
-
-impl Staking for FailingStaking {}
-
 pub trait Distribution: Module<ExecT = DistributionMsg, QueryT = Empty, SudoT = Empty> {}
-
-pub type FailingDistribution = FailingModule<DistributionMsg, Empty, Empty>;
-
-impl Distribution for FailingDistribution {}
 
 #[derive(Default)]
 pub struct StakeKeeper {}
@@ -155,9 +146,7 @@ impl Module for StakeKeeper {
         _block: &BlockInfo,
         msg: StakingSudo,
     ) -> AnyResult<AppResponse> {
-        match msg {
-            s => bail!("Unsupported staking sudo message: {:?}", s),
-        }
+        bail!("Unsupported staking sudo message: {:?}", msg)
     }
 
     fn query(
@@ -271,10 +260,7 @@ impl Module for DistributionKeeper {
             DistributionMsg::WithdrawDelegatorReward { validator } => {
                 let stakes = self.get_stakes(&staking_storage, &sender)?[0].clone();
                 // set fixed reward ratio 1:10 per delegated amoutn
-                let reward = coin(
-                    (stakes.amount / Uint128::new(10)).u128(),
-                    stakes.denom.clone(),
-                );
+                let reward = coin((stakes.amount / Uint128::new(10)).u128(), stakes.denom);
 
                 let events = vec![Event::new("withdraw_delegator_reward")
                     .add_attribute("validator", &validator)

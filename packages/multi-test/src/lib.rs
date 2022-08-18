@@ -28,5 +28,5 @@ pub use crate::bank::{Bank, BankKeeper, BankSudo};
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::executor::{AppResponse, Executor};
 pub use crate::module::{FailingModule, Module};
-pub use crate::staking::{FailingDistribution, FailingStaking, StakeKeeper, Staking, StakingSudo};
+pub use crate::staking::{DistributionKeeper, StakeKeeper, Staking, StakingSudo};
 pub use crate::wasm::{Wasm, WasmKeeper, WasmSudo};
