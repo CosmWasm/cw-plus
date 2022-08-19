@@ -147,9 +147,11 @@ pub fn execute_vote(
 
     // ensure proposal exists and can be voted on
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if prop.status != Status::Open {
+    // Allow voting on Passed and Rejected proposals too,
+    if ![Status::Open, Status::Passed, Status::Rejected].contains(&prop.status) {
         return Err(ContractError::NotOpen {});
     }
+    // if they are not expired
     if prop.expires.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
@@ -431,6 +433,7 @@ mod tests {
     const VOTER3: &str = "voter0003";
     const VOTER4: &str = "voter0004";
     const VOTER5: &str = "voter0005";
+    const VOTER6: &str = "voter0006";
     const NOWEIGHT_VOTER: &str = "voterxxxx";
     const SOMEBODY: &str = "somebody";
 
@@ -457,6 +460,7 @@ mod tests {
             voter(VOTER3, 3),
             voter(VOTER4, 4),
             voter(VOTER5, 5),
+            voter(VOTER6, 1),
             voter(NOWEIGHT_VOTER, 0),
         ];
 
@@ -762,10 +766,19 @@ mod tests {
                 .add_attribute("status", "Passed")
         );
 
-        // non-Open proposals cannot be voted
+        // Passed proposals can still be voted (while they are not expired or executed)
         let info = mock_info(VOTER5, &[]);
-        let err = execute(deps.as_mut(), mock_env(), info, yes_vote).unwrap_err();
-        assert_eq!(err, ContractError::NotOpen {});
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER5)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Passed")
+        );
 
         // Propose
         let info = mock_info(OWNER, &[]);
@@ -808,7 +821,7 @@ mod tests {
         let info = mock_info(VOTER4, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
 
-        // Verify it is still open as we actually need no votes > 16 - 3
+        // Verify it is still open as we actually need no votes > 17 - 3
         assert_eq!(
             res,
             Response::new()
@@ -826,7 +839,7 @@ mod tests {
         let info = mock_info(VOTER5, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, no_vote.clone()).unwrap();
 
-        // Verify it is still open as we actually need no votes > 16 - 3
+        // Verify it is still open as we actually need no votes > 17 - 3
         assert_eq!(
             res,
             Response::new()
@@ -841,12 +854,30 @@ mod tests {
         let info = mock_info(VOTER2, &[]);
         let res = execute(deps.as_mut(), mock_env(), info, no_vote).unwrap();
 
-        // Verify it is rejected as, 15 no votes > 16 - 3
+        // Verify it is rejected as, 15 no votes > 17 - 3
         assert_eq!(
             res,
             Response::new()
                 .add_attribute("action", "vote")
                 .add_attribute("sender", VOTER2)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Rejected")
+        );
+
+        // Rejected proposals can still be voted (while they are not expired)
+        let info = mock_info(VOTER6, &[]);
+        let yes_vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, yes_vote).unwrap();
+
+        // Verify
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER6)
                 .add_attribute("proposal_id", proposal_id.to_string())
                 .add_attribute("status", "Rejected")
         );
