@@ -989,8 +989,18 @@ mod tests {
         .unwrap();
         assert_eq!(prop.status, Status::Passed);
 
-        // Execution should now be possible
+        // Closing should NOT be possible
         let info = mock_info(SOMEBODY, &[]);
+        let err = execute(
+            deps.as_mut(),
+            env.clone(),
+            info.clone(),
+            ExecuteMsg::Close { proposal_id },
+        )
+        .unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {});
+
+        // Execution should now be possible
         let res = execute(
             deps.as_mut(),
             env,

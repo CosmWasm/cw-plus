@@ -1394,6 +1394,17 @@ mod tests {
             .unwrap();
         assert_eq!(prop.status, Status::Passed);
 
+        // Closing should NOT be possible
+        let err = app
+            .execute_contract(
+                Addr::unchecked(SOMEBODY),
+                flex_addr.clone(),
+                &ExecuteMsg::Close { proposal_id },
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
+
         // Execution should now be possible.
         let res = app
             .execute_contract(
