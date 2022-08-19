@@ -213,8 +213,12 @@ pub fn execute_close(
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
     if [Status::Executed, Status::Rejected, Status::Passed]
         .iter()
-        .any(|x| *x == prop.status)
+        .any(|&s| s == prop.status)
     {
+        return Err(ContractError::WrongCloseStatus {});
+    }
+    // Avoid closing of Passed due to expiration proposals
+    if prop.current_status(&env.block) == Status::Passed {
         return Err(ContractError::WrongCloseStatus {});
     }
     if !prop.expires.is_expired(&env.block) {
