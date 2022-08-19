@@ -177,14 +177,18 @@ impl Module for StakeKeeper {
                     (stakes.amount / Uint128::new(10)).u128(),
                     stakes.denom.clone(),
                 );
-                let full_delegation_response = FullDelegation {
-                    delegator,
-                    validator,
-                    amount: stakes,
-                    can_redelegate: coin(0, "testcoin"),
-                    accumulated_rewards: vec![reward],
+                let full_delegation_response = DelegationResponse {
+                    delegation: Some(FullDelegation {
+                        delegator,
+                        validator,
+                        amount: stakes,
+                        can_redelegate: coin(0, "testcoin"),
+                        accumulated_rewards: vec![reward],
+                    }),
                 };
-                Ok(to_binary(&full_delegation_response)?)
+
+                let res = to_binary(&full_delegation_response)?;
+                Ok(res)
             }
             q => bail!("Unsupported staking sudo message: {:?}", q),
         }
