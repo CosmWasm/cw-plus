@@ -207,39 +207,6 @@ impl DistributionKeeper {
         let val = STAKES.may_load(storage, account)?;
         Ok(val.unwrap_or_default().into_vec())
     }
-
-    fn set_balance(
-        &self,
-        storage: &mut dyn Storage,
-        account: &Addr,
-        amount: Vec<Coin>,
-    ) -> AnyResult<()> {
-        let mut stake = NativeBalance(amount);
-        stake.normalize();
-        STAKES.save(storage, account, &stake).map_err(Into::into)
-    }
-
-    fn add_stake(
-        &self,
-        storage: &mut dyn Storage,
-        to_address: Addr,
-        amount: Vec<Coin>,
-    ) -> AnyResult<()> {
-        let amount = self.normalize_amount(amount)?;
-        let b = self.get_stakes(storage, &to_address)?;
-        let b = NativeBalance(b) + NativeBalance(amount);
-        self.set_balance(storage, &to_address, b.into_vec())
-    }
-
-    /// Filters out all 0 value coins and returns an error if the resulting Vec is empty
-    fn normalize_amount(&self, amount: Vec<Coin>) -> AnyResult<Vec<Coin>> {
-        let res: Vec<_> = amount.into_iter().filter(|x| !x.amount.is_zero()).collect();
-        if res.is_empty() {
-            bail!("Cannot transfer empty coins amount")
-        } else {
-            Ok(res)
-        }
-    }
 }
 
 impl Distribution for DistributionKeeper {}
@@ -258,7 +225,7 @@ impl Module for DistributionKeeper {
         sender: Addr,
         msg: DistributionMsg,
     ) -> AnyResult<AppResponse> {
-        let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
+        let staking_storage = prefixed(storage, NAMESPACE_STAKING);
         match msg {
             // For now it ignores validator as I want to support only one
             DistributionMsg::WithdrawDelegatorReward { validator } => {
@@ -270,8 +237,7 @@ impl Module for DistributionKeeper {
                     .add_attribute("validator", &validator)
                     .add_attribute("sender", &sender)
                     .add_attribute("amount", format!("{}{}", reward.amount, reward.denom))];
-                // add balance to sender
-                self.add_stake(&mut staking_storage, sender, vec![reward])?;
+                // TODO: add balance to sender by sending BankMsg transfer
                 Ok(AppResponse { events, data: None })
             }
             m => bail!("Unsupported distribution message: {:?}", m),
