@@ -186,7 +186,8 @@ pub fn execute_execute(
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
-    if prop.current_status(&env.block) != Status::Passed {
+    prop.update_status(&env.block);
+    if prop.status != Status::Passed {
         return Err(ContractError::WrongExecuteStatus {});
     }
 
