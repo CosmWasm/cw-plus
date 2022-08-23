@@ -196,7 +196,8 @@ pub fn execute_execute(
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
-    if prop.current_status(&env.block) != Status::Passed {
+    prop.update_status(&env.block);
+    if prop.status != Status::Passed {
         return Err(ContractError::WrongExecuteStatus {});
     }
 
@@ -224,10 +225,11 @@ pub fn execute_close(
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if [Status::Executed, Status::Rejected, Status::Passed]
-        .iter()
-        .any(|x| *x == prop.status)
-    {
+    if [Status::Executed, Status::Rejected, Status::Passed].contains(&prop.status) {
+        return Err(ContractError::WrongCloseStatus {});
+    }
+    // Avoid closing of Passed due to expiration proposals
+    if prop.current_status(&env.block) == Status::Passed {
         return Err(ContractError::WrongCloseStatus {});
     }
     if !prop.expires.is_expired(&env.block) {
@@ -1393,6 +1395,17 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id })
             .unwrap();
         assert_eq!(prop.status, Status::Passed);
+
+        // Closing should NOT be possible
+        let err = app
+            .execute_contract(
+                Addr::unchecked(SOMEBODY),
+                flex_addr.clone(),
+                &ExecuteMsg::Close { proposal_id },
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
 
         // Execution should now be possible.
         let res = app

@@ -177,7 +177,7 @@ pub fn execute_vote(
 
 pub fn execute_execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     proposal_id: u64,
 ) -> Result<Response, ContractError> {
@@ -186,6 +186,7 @@ pub fn execute_execute(
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
+    prop.update_status(&env.block);
     if prop.status != Status::Passed {
         return Err(ContractError::WrongExecuteStatus {});
     }
@@ -211,10 +212,11 @@ pub fn execute_close(
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if [Status::Executed, Status::Rejected, Status::Passed]
-        .iter()
-        .any(|x| *x == prop.status)
-    {
+    if [Status::Executed, Status::Rejected, Status::Passed].contains(&prop.status) {
+        return Err(ContractError::WrongCloseStatus {});
+    }
+    // Avoid closing of Passed due to expiration proposals
+    if prop.current_status(&env.block) == Status::Passed {
         return Err(ContractError::WrongCloseStatus {});
     }
     if !prop.expires.is_expired(&env.block) {
@@ -923,6 +925,99 @@ mod tests {
         let closing = ExecuteMsg::Close { proposal_id };
         let err = execute(deps.as_mut(), mock_env(), info, closing).unwrap_err();
         assert_eq!(err, ContractError::WrongCloseStatus {});
+    }
+
+    #[test]
+    fn proposal_pass_on_expiration() {
+        let mut deps = mock_dependencies();
+
+        let threshold = Threshold::ThresholdQuorum {
+            threshold: Decimal::percent(51),
+            quorum: Decimal::percent(1),
+        };
+        let voting_period = Duration::Time(2000000);
+
+        let info = mock_info(OWNER, &[]);
+        setup_test_case(deps.as_mut(), info.clone(), threshold, voting_period).unwrap();
+
+        // Propose
+        let bank_msg = BankMsg::Send {
+            to_address: SOMEBODY.into(),
+            amount: vec![coin(1, "BTC")],
+        };
+        let msgs = vec![CosmosMsg::Bank(bank_msg)];
+        let proposal = ExecuteMsg::Propose {
+            title: "Pay somebody".to_string(),
+            description: "Do I pay her?".to_string(),
+            msgs,
+            latest: None,
+        };
+        let res = execute(deps.as_mut(), mock_env(), info, proposal).unwrap();
+
+        // Get the proposal id from the logs
+        let proposal_id: u64 = res.attributes[2].value.parse().unwrap();
+
+        // Vote it, so it passes after voting period is over
+        let vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let info = mock_info(VOTER3, &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, vote).unwrap();
+        assert_eq!(
+            res,
+            Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("sender", VOTER3)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .add_attribute("status", "Open")
+        );
+
+        // Wait until the voting period is over
+        let env = match voting_period {
+            Duration::Time(duration) => mock_env_time(duration + 1),
+            Duration::Height(duration) => mock_env_height(duration + 1),
+        };
+
+        // Proposal should now be passed
+        let prop: ProposalResponse = from_binary(
+            &query(
+                deps.as_ref(),
+                env.clone(),
+                QueryMsg::Proposal { proposal_id },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(prop.status, Status::Passed);
+
+        // Closing should NOT be possible
+        let info = mock_info(SOMEBODY, &[]);
+        let err = execute(
+            deps.as_mut(),
+            env.clone(),
+            info.clone(),
+            ExecuteMsg::Close { proposal_id },
+        )
+        .unwrap_err();
+        assert_eq!(err, ContractError::WrongCloseStatus {});
+
+        // Execution should now be possible
+        let res = execute(
+            deps.as_mut(),
+            env,
+            info,
+            ExecuteMsg::Execute { proposal_id },
+        )
+        .unwrap();
+        assert_eq!(
+            res.attributes,
+            Response::<Empty>::new()
+                .add_attribute("action", "execute")
+                .add_attribute("sender", SOMEBODY)
+                .add_attribute("proposal_id", proposal_id.to_string())
+                .attributes
+        )
     }
 
     #[test]
