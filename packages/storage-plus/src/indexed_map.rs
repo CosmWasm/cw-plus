@@ -322,7 +322,7 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(|d| d.name.clone(), "data", "data__name"),
+            name: MultiIndex::new(|_pk, d| d.name.clone(), "data", "data__name"),
             age: UniqueIndex::new(|d| d.age, "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
@@ -651,7 +651,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -712,7 +716,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1070,7 +1078,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1125,7 +1137,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1177,7 +1193,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1235,7 +1255,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1316,7 +1340,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map = IndexedMap::new("data", indexes);
 
@@ -1478,7 +1506,7 @@ mod test {
         fn composite_key_query() {
             let indexes = Indexes {
                 secondary: MultiIndex::new(
-                    |secondary| *secondary,
+                    |_pk, secondary| *secondary,
                     "test_map",
                     "test_map__secondary",
                 ),
@@ -1526,6 +1554,128 @@ mod test {
             assert_eq!(
                 items,
                 vec![("two2".to_string(), 2), ("three".to_string(), 3)]
+            );
+        }
+    }
+
+    mod pk_multi_index {
+        use super::*;
+        use cosmwasm_std::{Addr, Uint128};
+
+        struct Indexes<'a> {
+            // The last type param must match the `IndexedMap` primary key type below
+            spender: MultiIndex<'a, Addr, Uint128, (Addr, Addr)>,
+        }
+
+        impl<'a> IndexList<Uint128> for Indexes<'a> {
+            fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Uint128>> + '_> {
+                let v: Vec<&dyn Index<Uint128>> = vec![&self.spender];
+                Box::new(v.into_iter())
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "iterator")]
+        fn pk_based_index() {
+            fn pk_index(pk: &[u8]) -> Addr {
+                let (_owner, spender) = <(Addr, Addr)>::from_slice(pk).unwrap(); // mustn't fail
+                spender
+            }
+
+            let indexes = Indexes {
+                spender: MultiIndex::new(
+                    |pk, _allow| pk_index(pk),
+                    "allowances",
+                    "allowances__spender",
+                ),
+            };
+            let map = IndexedMap::<(&Addr, &Addr), Uint128, Indexes>::new("allowances", indexes);
+            let mut store = MockStorage::new();
+
+            map.save(
+                &mut store,
+                (&Addr::unchecked("owner1"), &Addr::unchecked("spender1")),
+                &Uint128::new(11),
+            )
+            .unwrap();
+            map.save(
+                &mut store,
+                (&Addr::unchecked("owner1"), &Addr::unchecked("spender2")),
+                &Uint128::new(12),
+            )
+            .unwrap();
+            map.save(
+                &mut store,
+                (&Addr::unchecked("owner2"), &Addr::unchecked("spender1")),
+                &Uint128::new(21),
+            )
+            .unwrap();
+
+            // Iterate over the main values
+            let items: Vec<_> = map
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 12, 21]);
+
+            // Iterate over the indexed values
+            let items: Vec<_> = map
+                .idx
+                .spender
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 21, 12]);
+
+            // Prefix over the main values
+            let items: Vec<_> = map
+                .prefix(&Addr::unchecked("owner1"))
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 12]);
+
+            // Prefix over the indexed values
+            let items: Vec<_> = map
+                .idx
+                .spender
+                .prefix(Addr::unchecked("spender1"))
+                .range_raw(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            // Strip the index from values (for simpler comparison)
+            let items: Vec<_> = items.into_iter().map(|(_, v)| v.u128()).collect();
+
+            assert_eq!(items, vec![11, 21]);
+
+            // Prefix over the indexed values, and deserialize primary key as well
+            let items: Vec<_> = map
+                .idx
+                .spender
+                .prefix(Addr::unchecked("spender2"))
+                .range(&store, None, None, Order::Ascending)
+                .collect::<Result<_, _>>()
+                .unwrap();
+
+            assert_eq!(
+                items,
+                vec![(
+                    (Addr::unchecked("owner1"), Addr::unchecked("spender2")),
+                    Uint128::new(12)
+                )]
             );
         }
     }
