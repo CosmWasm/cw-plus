@@ -151,9 +151,11 @@ pub fn execute_vote(
 
     // ensure proposal exists and can be voted on
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if prop.status != Status::Open {
+    // Allow voting on Passed and Rejected proposals too,
+    if ![Status::Open, Status::Passed, Status::Rejected].contains(&prop.status) {
         return Err(ContractError::NotOpen {});
     }
+    // if they are not expired
     if prop.expires.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
@@ -1029,11 +1031,20 @@ mod tests {
             ],
         );
 
-        // non-Open proposals cannot be voted
-        let err = app
+        // Passed proposals can still be voted (while they are not expired or executed)
+        let res = app
             .execute_contract(Addr::unchecked(VOTER5), flex_addr.clone(), &yes_vote, &[])
-            .unwrap_err();
-        assert_eq!(ContractError::NotOpen {}, err.downcast().unwrap());
+            .unwrap();
+        // Verify
+        assert_eq!(
+            res.custom_attrs(1),
+            [
+                ("action", "vote"),
+                ("sender", VOTER5),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Passed")
+            ]
+        );
 
         // query individual votes
         // initial (with 0 weight)
@@ -1069,7 +1080,7 @@ mod tests {
         );
 
         // non-voter
-        let voter = VOTER5.into();
+        let voter = SOMEBODY.into();
         let vote: VoteResponse = app
             .wrap()
             .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
@@ -1096,7 +1107,7 @@ mod tests {
 
         // Powerful voter opposes it, so it rejects
         let res = app
-            .execute_contract(Addr::unchecked(VOTER4), flex_addr, &no_vote, &[])
+            .execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &no_vote, &[])
             .unwrap();
 
         assert_eq!(
@@ -1104,6 +1115,25 @@ mod tests {
             [
                 ("action", "vote"),
                 ("sender", VOTER4),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Rejected"),
+            ],
+        );
+
+        // Rejected proposals can still be voted (while they are not expired)
+        let yes_vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let res = app
+            .execute_contract(Addr::unchecked(VOTER5), flex_addr, &yes_vote, &[])
+            .unwrap();
+
+        assert_eq!(
+            res.custom_attrs(1),
+            [
+                ("action", "vote"),
+                ("sender", VOTER5),
                 ("proposal_id", proposal_id.to_string().as_str()),
                 ("status", "Rejected"),
             ],
