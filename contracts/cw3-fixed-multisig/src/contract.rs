@@ -212,10 +212,7 @@ pub fn execute_close(
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if [Status::Executed, Status::Rejected, Status::Passed]
-        .iter()
-        .any(|&s| s == prop.status)
-    {
+    if [Status::Executed, Status::Rejected, Status::Passed].contains(&prop.status) {
         return Err(ContractError::WrongCloseStatus {});
     }
     // Avoid closing of Passed due to expiration proposals
