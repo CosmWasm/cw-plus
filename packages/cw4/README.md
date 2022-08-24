@@ -40,7 +40,7 @@ Only the `admin` may execute any of these function. Thus, by omitting an
 If we include one, it may often be desired to be a `cw3` contract that
 uses this group contract as a group. This leads to a bit of chicken-and-egg
 problem, but we cover how to instantiate that in 
-[`cw3-flexible-multisig`](../../contracts/cw3-flexible-multisig/README.md#instantiation).
+[`cw3-flex-multisig`](../../contracts/cw3-flex-multisig/README.md#instantiation).
 
 ## Queries
 
