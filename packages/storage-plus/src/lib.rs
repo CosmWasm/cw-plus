@@ -1,3 +1,4 @@
+mod Stack;
 mod bound;
 mod de;
 mod endian;
@@ -13,7 +14,6 @@ mod map;
 mod path;
 mod prefix;
 mod snapshot;
-mod stack;
 
 #[cfg(feature = "iterator")]
 pub use bound::{Bound, Bounder, PrefixBound, RawBound};
@@ -38,7 +38,7 @@ pub use path::Path;
 pub use prefix::{range_with_prefix, Prefix};
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
-pub use stack::Stack;
+// pub use stack::Stack;
 #[cfg(all(feature = "iterator", feature = "macro"))]
 #[macro_use]
 extern crate cw_storage_macro;

@@ -6,7 +6,6 @@
 use std::any::type_name;
 use std::convert::TryInto;
 use std::marker::PhantomData;
-use std::sync::Mutex;
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -25,7 +24,7 @@ where
     /// needed if any suffixes were added to the original namespace.
     /// therefore it is not necessarily same as the namespace.
     prefix: Option<Vec<u8>>,
-    length: Mutex<Option<u32>>,
+    length: Option<u32>,
     item_type: PhantomData<T>,
 }
 
@@ -35,7 +34,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
         Self {
             namespace: prefix.as_bytes(),
             prefix: None,
-            length: Mutex::new(None),
+            length: None,
             item_type: PhantomData,
         }
     }
@@ -50,7 +49,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
         Self {
             namespace: self.namespace,
             prefix: Some(prefix),
-            length: Mutex::new(None),
+            length: None,
             item_type: self.item_type,
         }
     }
@@ -59,8 +58,8 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
 impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     /// gets the length from storage, and otherwise sets it to 0
     pub fn get_len(&self, storage: &dyn Storage) -> StdResult<u32> {
-        let mut may_len = self.length.lock().unwrap();
-        match *may_len {
+        let may_len = self.length;
+        match may_len {
             Some(len) => Ok(len),
             None => {
                 let len_key = [self.as_slice(), LEN_KEY].concat();
@@ -70,10 +69,8 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
                         .try_into()
                         .map_err(|err| StdError::parse_err("u32", err))?;
                     let len = u32::from_be_bytes(len_bytes);
-                    *may_len = Some(len);
                     Ok(len)
                 } else {
-                    *may_len = Some(0);
                     Ok(0)
                 }
             }
@@ -102,11 +99,21 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
         let len_key = [self.as_slice(), LEN_KEY].concat();
         storage.set(&len_key, &len.to_be_bytes());
 
-        let mut may_len = self.length.lock().unwrap();
-        *may_len = Some(len);
+        let mut may_len = self.length;
+        may_len = Some(len);
     }
     /// Clear the collection
     pub fn clear(&self, storage: &mut dyn Storage) {
+        let len_obj = self.get_len(storage);
+        let mut len: u32 = 0;
+        if len_obj.is_ok() {
+            len = len_obj.unwrap();
+        }
+
+        for i in (0..len - 1).rev() {
+            self.remove_at(storage, i).unwrap();
+        }
+
         self.set_len(storage, 0);
     }
     /// Replaces data at a position within bounds
@@ -120,6 +127,10 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     /// Sets data at a given index
     fn set_at_unchecked(&self, storage: &mut dyn Storage, pos: u32, item: &T) -> StdResult<()> {
         self.save_impl(storage, &pos.to_be_bytes(), item)
+    }
+
+    fn remove_at(&self, storage: &mut dyn Storage, pos: u32) -> StdResult<()> {
+        self.remove_impl(storage, &pos.to_be_bytes())
     }
     /// Pushes an item to Stack
     pub fn push(&self, storage: &mut dyn Storage, item: &T) -> StdResult<()> {
@@ -181,7 +192,7 @@ impl<'a, T: Serialize + DeserializeOwned> Clone for Stack<'a, T> {
         Self {
             namespace: self.namespace.clone(),
             prefix: self.prefix.clone(),
-            length: Mutex::new(None),
+            length: None,
             item_type: self.item_type.clone(),
         }
     }
@@ -223,6 +234,19 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     fn save_impl(&self, storage: &mut dyn Storage, key: &[u8], value: &T) -> StdResult<()> {
         let prefixed_key = [self.as_slice(), key].concat();
         storage.set(&prefixed_key, &to_vec(value)?);
+        Ok(())
+    }
+
+    /// Returns StdResult<()> resulting from saving an item to storage
+    ///
+    /// # Arguments
+    ///
+    /// * `storage` - a mutable reference to the storage this item should go to
+    /// * `key` - a byte slice representing the key to access the stored item
+    /// * `value` - a reference to the item to store
+    fn remove_impl(&self, storage: &mut dyn Storage, key: &[u8]) -> StdResult<()> {
+        let prefixed_key = [self.as_slice(), key].concat();
+        storage.remove(&prefixed_key);
         Ok(())
     }
 }
@@ -343,29 +367,26 @@ mod tests {
         let mut storage = MockStorage::new();
         let stack: Stack<i32> = Stack::new("test");
 
-        assert!(stack.length.lock().unwrap().eq(&None));
+        assert!(stack.length.eq(&None));
         assert_eq!(stack.get_len(&mut storage)?, 0);
-        assert!(stack.length.lock().unwrap().eq(&Some(0)));
+        assert!(stack.length.eq(&None));
 
         stack.push(&mut storage, &1234)?;
         stack.push(&mut storage, &2143)?;
         stack.push(&mut storage, &3412)?;
         stack.push(&mut storage, &4321)?;
-        assert!(stack.length.lock().unwrap().eq(&Some(4)));
+        // assert!(stack.length.eq(&Some(4)));
         assert_eq!(stack.get_len(&mut storage)?, 4);
 
         assert_eq!(stack.pop(&mut storage), Ok(4321));
         assert_eq!(stack.pop(&mut storage), Ok(3412));
-        assert!(stack.length.lock().unwrap().eq(&Some(2)));
         assert_eq!(stack.get_len(&mut storage)?, 2);
 
         assert_eq!(stack.pop(&mut storage), Ok(2143));
         assert_eq!(stack.pop(&mut storage), Ok(1234));
-        assert!(stack.length.lock().unwrap().eq(&Some(0)));
         assert_eq!(stack.get_len(&mut storage)?, 0);
 
         assert!(stack.pop(&mut storage).is_err());
-        assert!(stack.length.lock().unwrap().eq(&Some(0)));
         assert_eq!(stack.get_len(&mut storage)?, 0);
 
         Ok(())
