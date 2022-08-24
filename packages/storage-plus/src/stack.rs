@@ -81,12 +81,12 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
         Ok(self.get_len(storage)? == 0)
     }
     /// gets the element at pos if within bounds
-    pub fn get_at(&self, storage: &dyn Storage, pos: u32) -> StdResult<T> {
-        let len = self.get_len(storage)?;
+    pub fn get_at(&self, storage: &dyn Storage, pos: u32) -> Option<T> {
+        let len = self.get_len(storage).unwrap();
         if pos > len {
-            return Err(StdError::generic_err("Stack access out of bounds"));
+            return None;
         }
-        self.get_at_unchecked(storage, pos)
+        Some(self.get_at_unchecked(storage, pos).unwrap())
     }
     /// tries to get the element at pos
     fn get_at_unchecked(&self, storage: &dyn Storage, pos: u32) -> StdResult<T> {
@@ -150,29 +150,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
             None
         }
     }
-    /// Remove an element from the collection at the specified position.
-    ///
-    /// Removing the last element has a constant cost.
-    /// The cost of removing from the middle/start will depend on the proximity to tail of the list.
-    /// All elements above the specified position will be shifted in storage.
-    ///
-    /// Removing an element from the start (head) of the collection
-    /// has the worst runtime and gas cost.
-    pub fn remove(&self, storage: &mut dyn Storage, pos: u32) -> StdResult<T> {
-        let len = self.get_len(storage)?;
 
-        if pos >= len {
-            return Err(StdError::generic_err("DequeStorage access out of bounds"));
-        }
-        let item = self.get_at_unchecked(storage, pos);
-
-        for i in pos..(len - 1) {
-            let element_to_shift = self.get_at_unchecked(storage, i + 1)?;
-            self.set_at_unchecked(storage, i, &element_to_shift)?;
-        }
-        self.set_len(storage, len - 1);
-        item
-    }
     /// Returns a readonly iterator
     pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<StackIter<T>> {
         let len = self.get_len(storage)?;
@@ -288,9 +266,9 @@ where
         if self.start >= self.end {
             return None;
         }
-        let item = self.stack.get_at(self.storage, self.start);
+        let item = self.stack.get_at(self.storage, self.start).unwrap();
         self.start += 1;
-        Some(item)
+        Some(Ok(item))
     }
 
     // This needs to be implemented correctly for `ExactSizeIterator` to work.
@@ -320,8 +298,8 @@ where
             return None;
         }
         self.end -= 1;
-        let item = self.stack.get_at(self.storage, self.end);
-        Some(item)
+        let item = self.stack.get_at(self.storage, self.end).unwrap();
+        Some(Ok(item))
     }
 
     // I implement `nth_back` manually because it is used in the standard library whenever
@@ -596,54 +574,51 @@ mod tests {
         queue.push(&mut storage, &7)?;
         queue.push(&mut storage, &8)?;
 
-        assert!(queue.remove(&mut storage, 8).is_err());
-        assert!(queue.remove(&mut storage, 9).is_err());
+        assert_eq!(queue.pop(&mut storage), Some(8));
+        assert_eq!(queue.get_at(&storage, 6), Some(7));
+        assert_eq!(queue.get_at(&storage, 5), Some(6));
+        assert_eq!(queue.get_at(&storage, 4), Some(5));
+        assert_eq!(queue.get_at(&storage, 3), Some(4));
+        assert_eq!(queue.get_at(&storage, 2), Some(3));
+        assert_eq!(queue.get_at(&storage, 1), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 7), Ok(8));
-        assert_eq!(queue.get_at(&storage, 6), Ok(7));
-        assert_eq!(queue.get_at(&storage, 5), Ok(6));
-        assert_eq!(queue.get_at(&storage, 4), Ok(5));
-        assert_eq!(queue.get_at(&storage, 3), Ok(4));
-        assert_eq!(queue.get_at(&storage, 2), Ok(3));
-        assert_eq!(queue.get_at(&storage, 1), Ok(2));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(7));
+        assert_eq!(queue.get_at(&storage, 5), Some(6));
+        assert_eq!(queue.get_at(&storage, 4), Some(5));
+        assert_eq!(queue.get_at(&storage, 3), Some(4));
+        assert_eq!(queue.get_at(&storage, 2), Some(3));
+        assert_eq!(queue.get_at(&storage, 1), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 6), Ok(7));
-        assert_eq!(queue.get_at(&storage, 5), Ok(6));
-        assert_eq!(queue.get_at(&storage, 4), Ok(5));
-        assert_eq!(queue.get_at(&storage, 3), Ok(4));
-        assert_eq!(queue.get_at(&storage, 2), Ok(3));
-        assert_eq!(queue.get_at(&storage, 1), Ok(2));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(6));
+        assert_eq!(queue.get_at(&storage, 4), Some(5));
+        assert_eq!(queue.get_at(&storage, 3), Some(4));
+        assert_eq!(queue.get_at(&storage, 2), Some(3));
+        assert_eq!(queue.get_at(&storage, 1), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 3), Ok(4));
-        assert_eq!(queue.get_at(&storage, 4), Ok(6));
-        assert_eq!(queue.get_at(&storage, 3), Ok(5));
-        assert_eq!(queue.get_at(&storage, 2), Ok(3));
-        assert_eq!(queue.get_at(&storage, 1), Ok(2));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(5));
+        assert_eq!(queue.get_at(&storage, 3), Some(4));
+        assert_eq!(queue.get_at(&storage, 2), Some(3));
+        assert_eq!(queue.get_at(&storage, 1), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 1), Ok(2));
-        assert_eq!(queue.get_at(&storage, 3), Ok(6));
-        assert_eq!(queue.get_at(&storage, 2), Ok(5));
-        assert_eq!(queue.get_at(&storage, 1), Ok(3));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(4));
+        assert_eq!(queue.get_at(&storage, 2), Some(3));
+        assert_eq!(queue.get_at(&storage, 1), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 2), Ok(5));
-        assert_eq!(queue.get_at(&storage, 2), Ok(6));
-        assert_eq!(queue.get_at(&storage, 1), Ok(3));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(3));
+        assert_eq!(queue.get_at(&storage, 1), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 1), Ok(3));
-        assert_eq!(queue.get_at(&storage, 1), Ok(6));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(2));
+        assert_eq!(queue.get_at(&storage, 0), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 1), Ok(6));
-        assert_eq!(queue.get_at(&storage, 0), Ok(1));
+        assert_eq!(queue.pop(&mut storage), Some(1));
 
-        assert_eq!(queue.remove(&mut storage, 0), Ok(1));
-
-        assert!(queue.remove(&mut storage, 0).is_err());
+        assert!(queue.pop(&mut storage).is_none());
         Ok(())
     }
 
