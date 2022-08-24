@@ -143,6 +143,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     pub fn pop(&self, storage: &mut dyn Storage) -> Option<T> {
         if let Some(len) = self.get_len(storage).unwrap().checked_sub(1) {
             let item = self.get_at_unchecked(storage, len).unwrap();
+            self.remove_at(storage, len).unwrap();
             self.set_len(storage, len);
             Some(item)
         } else {
