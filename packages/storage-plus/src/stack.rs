@@ -140,13 +140,13 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
         Ok(())
     }
     /// Pops an item from Stack
-    pub fn pop(&self, storage: &mut dyn Storage) -> StdResult<T> {
-        if let Some(len) = self.get_len(storage)?.checked_sub(1) {
-            let item = self.get_at_unchecked(storage, len);
+    pub fn pop(&self, storage: &mut dyn Storage) -> Option<T> {
+        if let Some(len) = self.get_len(storage).unwrap().checked_sub(1) {
+            let item = self.get_at_unchecked(storage, len).unwrap();
             self.set_len(storage, len);
-            item
+            Some(item)
         } else {
-            Err(StdError::generic_err("Can not pop from empty Stack"))
+            None
         }
     }
     /// Remove an element from the collection at the specified position.
@@ -353,11 +353,11 @@ mod tests {
         stack.push(&mut storage, &3412)?;
         stack.push(&mut storage, &4321)?;
 
-        assert_eq!(stack.pop(&mut storage), Ok(4321));
-        assert_eq!(stack.pop(&mut storage), Ok(3412));
-        assert_eq!(stack.pop(&mut storage), Ok(2143));
-        assert_eq!(stack.pop(&mut storage), Ok(1234));
-        assert!(stack.pop(&mut storage).is_err());
+        assert_eq!(stack.pop(&mut storage), Some(4321));
+        assert_eq!(stack.pop(&mut storage), Some(3412));
+        assert_eq!(stack.pop(&mut storage), Some(2143));
+        assert_eq!(stack.pop(&mut storage), Some(1234));
+        assert!(stack.pop(&mut storage).is_none());
 
         Ok(())
     }
@@ -378,15 +378,15 @@ mod tests {
         // assert!(stack.length.eq(&Some(4)));
         assert_eq!(stack.get_len(&mut storage)?, 4);
 
-        assert_eq!(stack.pop(&mut storage), Ok(4321));
-        assert_eq!(stack.pop(&mut storage), Ok(3412));
+        assert_eq!(stack.pop(&mut storage), Some(4321));
+        assert_eq!(stack.pop(&mut storage), Some(3412));
         assert_eq!(stack.get_len(&mut storage)?, 2);
 
-        assert_eq!(stack.pop(&mut storage), Ok(2143));
-        assert_eq!(stack.pop(&mut storage), Ok(1234));
+        assert_eq!(stack.pop(&mut storage), Some(2143));
+        assert_eq!(stack.pop(&mut storage), Some(1234));
         assert_eq!(stack.get_len(&mut storage)?, 0);
 
-        assert!(stack.pop(&mut storage).is_err());
+        assert!(stack.pop(&mut storage).is_none());
         assert_eq!(stack.get_len(&mut storage)?, 0);
 
         Ok(())
@@ -473,11 +473,11 @@ mod tests {
         stack.push(&mut storage, &3412)?;
         stack.push(&mut storage, &4321)?;
 
-        assert_eq!(stack.pop(&mut storage), Ok(4321));
-        assert_eq!(stack.pop(&mut storage), Ok(3412));
-        assert_eq!(stack.pop(&mut storage), Ok(2143));
-        assert_eq!(stack.pop(&mut storage), Ok(1234));
-        assert!(stack.pop(&mut storage).is_err());
+        assert_eq!(stack.pop(&mut storage), Some(4321));
+        assert_eq!(stack.pop(&mut storage), Some(3412));
+        assert_eq!(stack.pop(&mut storage), Some(2143));
+        assert_eq!(stack.pop(&mut storage), Some(1234));
+        assert!(stack.pop(&mut storage).is_none());
 
         Ok(())
     }
@@ -493,11 +493,11 @@ mod tests {
         stack.push(&mut storage, &3412)?;
         stack.push(&mut storage, &4321)?;
 
-        assert_eq!(stack.pop(&mut storage), Ok(4321));
-        assert_eq!(stack.pop(&mut storage), Ok(3412));
-        assert_eq!(stack.pop(&mut storage), Ok(2143));
-        assert_eq!(stack.pop(&mut storage), Ok(1234));
-        assert!(stack.pop(&mut storage).is_err());
+        assert_eq!(stack.pop(&mut storage), Some(4321));
+        assert_eq!(stack.pop(&mut storage), Some(3412));
+        assert_eq!(stack.pop(&mut storage), Some(2143));
+        assert_eq!(stack.pop(&mut storage), Some(1234));
+        assert!(stack.pop(&mut storage).is_none());
 
         Ok(())
     }
