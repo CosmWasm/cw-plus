@@ -57,7 +57,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
 
 impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     /// gets the length from storage, and otherwise sets it to 0
-    pub fn get_len(&self, storage: &dyn Storage) -> StdResult<u32> {
+    pub fn len(&self, storage: &dyn Storage) -> StdResult<u32> {
         let may_len = self.length;
         match may_len {
             Some(len) => Ok(len),
