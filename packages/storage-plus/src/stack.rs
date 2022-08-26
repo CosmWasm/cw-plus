@@ -78,11 +78,11 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     }
     /// checks if the collection has any elements
     pub fn is_empty(&self, storage: &dyn Storage) -> StdResult<bool> {
-        Ok(self.get_len(storage)? == 0)
+        Ok(self.len(storage)? == 0)
     }
     /// gets the element at pos if within bounds
     pub fn get_at(&self, storage: &dyn Storage, pos: u32) -> Option<T> {
-        let len = self.get_len(storage).unwrap();
+        let len = self.len(storage).unwrap();
         if pos > len {
             return None;
         }
@@ -104,7 +104,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     }
     /// Clear the collection
     pub fn clear(&self, storage: &mut dyn Storage) {
-        let len_obj = self.get_len(storage);
+        let len_obj = self.len(storage);
         let mut len: u32 = 0;
         if len_obj.is_ok() {
             len = len_obj.unwrap();
@@ -118,7 +118,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     }
     /// Replaces data at a position within bounds
     pub fn set_at(&self, storage: &mut dyn Storage, pos: u32, item: &T) -> StdResult<()> {
-        let len = self.get_len(storage)?;
+        let len = self.len(storage)?;
         if pos >= len {
             return Err(StdError::generic_err("Stack access out of bounds"));
         }
@@ -134,14 +134,14 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
     }
     /// Pushes an item to Stack
     pub fn push(&self, storage: &mut dyn Storage, item: &T) -> StdResult<()> {
-        let len = self.get_len(storage)?;
+        let len = self.len(storage)?;
         self.set_at_unchecked(storage, len, item)?;
         self.set_len(storage, len + 1);
         Ok(())
     }
     /// Pops an item from Stack
     pub fn pop(&self, storage: &mut dyn Storage) -> Option<T> {
-        if let Some(len) = self.get_len(storage).unwrap().checked_sub(1) {
+        if let Some(len) = self.len(storage).unwrap().checked_sub(1) {
             let item = self.get_at_unchecked(storage, len).unwrap();
             self.remove_at(storage, len).unwrap();
             self.set_len(storage, len);
@@ -153,7 +153,7 @@ impl<'a, T: Serialize + DeserializeOwned> Stack<'a, T> {
 
     /// Returns a readonly iterator
     pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<StackIter<T>> {
-        let len = self.get_len(storage)?;
+        let len = self.len(storage)?;
         let iter = StackIter::new(self, storage, 0, len);
         Ok(iter)
     }
@@ -347,7 +347,7 @@ mod tests {
         let stack: Stack<i32> = Stack::new("test");
 
         assert!(stack.length.eq(&None));
-        assert_eq!(stack.get_len(&mut storage)?, 0);
+        assert_eq!(stack.len(&mut storage)?, 0);
         assert!(stack.length.eq(&None));
 
         stack.push(&mut storage, &1234)?;
@@ -355,18 +355,18 @@ mod tests {
         stack.push(&mut storage, &3412)?;
         stack.push(&mut storage, &4321)?;
         // assert!(stack.length.eq(&Some(4)));
-        assert_eq!(stack.get_len(&mut storage)?, 4);
+        assert_eq!(stack.len(&mut storage)?, 4);
 
         assert_eq!(stack.pop(&mut storage), Some(4321));
         assert_eq!(stack.pop(&mut storage), Some(3412));
-        assert_eq!(stack.get_len(&mut storage)?, 2);
+        assert_eq!(stack.len(&mut storage)?, 2);
 
         assert_eq!(stack.pop(&mut storage), Some(2143));
         assert_eq!(stack.pop(&mut storage), Some(1234));
-        assert_eq!(stack.get_len(&mut storage)?, 0);
+        assert_eq!(stack.len(&mut storage)?, 0);
 
         assert!(stack.pop(&mut storage).is_none());
-        assert_eq!(stack.get_len(&mut storage)?, 0);
+        assert_eq!(stack.len(&mut storage)?, 0);
 
         Ok(())
     }
@@ -493,7 +493,7 @@ mod tests {
         stack.push(&mut storage, &3412)?;
         stack.push(&mut storage, &4321)?;
 
-        assert_eq!(original_store.get_len(&storage)?, 0);
+        assert_eq!(original_store.len(&storage)?, 0);
 
         let mut iter = stack.iter(&storage)?.rev();
         assert_eq!(iter.next(), Some(Ok(4321)));
