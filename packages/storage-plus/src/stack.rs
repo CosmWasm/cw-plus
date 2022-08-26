@@ -277,7 +277,7 @@ where
         (len, Some(len))
     }
 
-    // I implement `nth` manually because it is used in the standard library whenever
+    // `nth` is implemented manually, because it is used in the standard library whenever
     // it wants to skip over elements, but the default implementation repeatedly calls next.
     // because that is very expensive in this case, and the items are just discarded, we wan
     // do better here.
