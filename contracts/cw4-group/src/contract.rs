@@ -165,12 +165,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
+pub fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
     let weight = TOTAL.load(deps.storage)?;
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
+pub fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
         Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
@@ -183,7 +183,7 @@ fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<Memb
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-fn list_members(
+pub fn list_members(
     deps: Deps,
     start_after: Option<String>,
     limit: Option<u32>,
