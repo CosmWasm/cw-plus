@@ -1,14 +1,15 @@
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Coin;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+
+
 use std::fmt;
 
 use cw_utils::NativeBalance;
 
 use crate::Cw20CoinVerified;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 pub enum Balance {
     Native(NativeBalance),
     Cw20(Cw20CoinVerified),

@@ -582,7 +582,7 @@ mod test {
 
         // Manually add a broken key (invalid utf-8)
         store.set(
-            &*[
+            &[
                 [0u8, PEOPLE_STR_KEY.len() as u8].as_slice(),
                 PEOPLE_STR_KEY.as_bytes(),
                 b"\xddim",

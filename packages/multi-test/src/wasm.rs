@@ -31,7 +31,7 @@ const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
 const CONTRACT_ATTR: &str = "_contract_addr";
 
-#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+#[derive(Clone, std::fmt::Debug, PartialEq, Eq, JsonSchema)]
 pub struct WasmSudo {
     pub contract_addr: Addr,
     pub msg: Binary,
@@ -48,7 +48,7 @@ impl WasmSudo {
 
 /// Contract Data includes information about contract, equivalent of `ContractInfo` in wasmd
 /// interface.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ContractData {
     /// Identifier of stored contract code
     pub code_id: usize,

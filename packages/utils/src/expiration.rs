@@ -1,16 +1,14 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{BlockInfo, StdError, StdResult, Timestamp};
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Add, Mul};
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
 /// Expiration represents a point in time when some event happens.
 /// It can compare with a BlockInfo and will return is_expired() == true
 /// once the condition is hit (and for every block in the future)
+#[cw_serde]
+#[derive(Copy)]
 pub enum Expiration {
     /// AtHeight will expire when `env.block.height` >= height
     AtHeight(u64),
@@ -88,8 +86,8 @@ pub const WEEK: Duration = Duration::Time(7 * 24 * 60 * 60);
 /// Duration is a delta of time. You can add it to a BlockInfo or Expiration to
 /// move that further in the future. Note that an height-based Duration and
 /// a time-based Expiration cannot be combined
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(Copy)]
 pub enum Duration {
     Height(u64),
     /// Time in seconds

@@ -1,18 +1,16 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, BlockInfo, CustomQuery, Deps, StdResult, Storage, Uint128};
 use cw_storage_plus::Map;
 use cw_utils::Expiration;
 
 // TODO: pull into utils?
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ClaimsResponse {
     pub claims: Vec<Claim>,
 }
 
 // TODO: pull into utils?
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Claim {
     pub amount: Uint128,
     pub release_at: Expiration,

@@ -1,8 +1,8 @@
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     attr, Addr, CustomQuery, Deps, DepsMut, MessageInfo, Response, StdError, StdResult,
 };
@@ -10,7 +10,7 @@ use cw_storage_plus::Item;
 
 // TODO: should the return values end up in utils, so eg. cw4 can import them as well as this module?
 /// Returned from Admin.query_admin()
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct AdminResponse {
     pub admin: Option<String>,
 }

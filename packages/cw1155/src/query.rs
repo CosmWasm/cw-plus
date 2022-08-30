@@ -1,13 +1,14 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
+
+
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Uint128;
 use cw_utils::Expiration;
 
 use crate::msg::TokenId;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 pub enum Cw1155QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     /// Return type: BalanceResponse.
@@ -53,17 +54,17 @@ pub enum Cw1155QueryMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct BalanceResponse {
     pub balance: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct BatchBalanceResponse {
     pub balances: Vec<Uint128>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct Approval {
     /// Account that can transfer/send the token
     pub spender: String,
@@ -71,23 +72,23 @@ pub struct Approval {
     pub expires: Expiration,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ApprovedForAllResponse {
     pub operators: Vec<Approval>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct IsApprovedForAllResponse {
     pub approved: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct TokenInfoResponse {
     /// Should be a url point to a json file
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct TokensResponse {
     /// Contains all token_ids in lexicographical ordering
     /// If there are more than `limit`, use `start_from` in future queries

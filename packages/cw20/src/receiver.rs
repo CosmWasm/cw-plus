@@ -1,11 +1,12 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
+
+
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
 
 /// Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 pub struct Cw20ReceiveMsg {
     pub sender: String,
     pub amount: Uint128,
@@ -32,8 +33,8 @@ impl Cw20ReceiveMsg {
 }
 
 // This is just a helper to properly serialize the above message
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 enum ReceiverExecuteMsg {
     Receive(Cw20ReceiveMsg),
 }

@@ -160,7 +160,7 @@ where
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Strategy {
     EveryBlock,
     Never,
@@ -172,7 +172,7 @@ pub enum Strategy {
     Selected,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct ChangeSet<T> {
     pub old: Option<T>,
 }

@@ -10,7 +10,7 @@ pub mod contracts;
 pub struct EmptyMsg {}
 
 /// This is just a demo place so we can test custom message handling
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename = "snake_case")]
 pub enum CustomMsg {
     SetName { name: String },

@@ -1,17 +1,15 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use crate::Duration;
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{BlockInfo, StdError, StdResult, Timestamp};
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::Add;
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
 /// Scheduled represents a point in time when an event happens.
 /// It can compare with a BlockInfo and will return is_triggered() == true
 /// once the condition is hit (and for every block in the future)
+#[cw_serde]
+#[derive(Copy)]
 pub enum Scheduled {
     /// AtHeight will schedule when `env.block.height` >= height
     AtHeight(u64),

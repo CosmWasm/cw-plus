@@ -1,6 +1,7 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
+
+
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     to_binary, Addr, CosmosMsg, CustomQuery, Querier, QuerierWrapper, StdResult, Uint128, WasmMsg,
     WasmQuery,
@@ -15,7 +16,7 @@ use crate::{
 /// for working with this.
 ///
 /// If you wish to persist this, convert to Cw20CanonicalContract via .canonical()
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Cw20Contract(pub Addr);
 
 impl Cw20Contract {

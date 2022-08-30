@@ -402,6 +402,7 @@ dependencies = [
 name = "cw-controllers"
 version = "0.14.0"
 dependencies = [
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -453,6 +454,7 @@ dependencies = [
 name = "cw-utils"
 version = "0.14.0"
 dependencies = [
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -558,6 +560,7 @@ dependencies = [
 name = "cw2"
 version = "0.14.0"
 dependencies = [
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "schemars",

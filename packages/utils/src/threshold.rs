@@ -1,6 +1,4 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Decimal, StdError};
 use thiserror::Error;
 
@@ -11,8 +9,7 @@ use thiserror::Error;
 /// the block at which the proposal starts (this is likely the responsibility of a
 /// correct cw4 implementation).
 /// See also `ThresholdResponse` in the cw3 spec.
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Threshold {
     /// Declares that a fixed weight of Yes votes is needed to pass.
     /// See `ThresholdResponse.AbsoluteCount` in the cw3 spec for details.
@@ -107,8 +104,7 @@ fn valid_quorum(percent: &Decimal) -> Result<(), ThresholdError> {
 /// individual voter used in tallying should be snapshotted at the beginning of
 /// the block at which the proposal starts (this is likely the responsibility of a
 /// correct cw4 implementation).
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ThresholdResponse {
     /// Declares that a fixed weight of yes votes is needed to pass.
     /// It does not matter how many no votes are cast, or how many do not vote,
