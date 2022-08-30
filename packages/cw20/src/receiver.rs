@@ -1,6 +1,3 @@
-
-
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
 

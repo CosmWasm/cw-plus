@@ -1,6 +1,3 @@
-
-
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     to_binary, Addr, CosmosMsg, CustomQuery, Querier, QuerierWrapper, StdResult, Uint128, WasmMsg,

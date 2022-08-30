@@ -1,6 +1,3 @@
-
-
-
 use crate::logo::Logo;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Uint128};

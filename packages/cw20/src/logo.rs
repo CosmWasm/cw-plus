@@ -1,8 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
 
-
-
 /// This is used for uploading logo data, or setting it in InstantiateData
 #[cw_serde]
 
