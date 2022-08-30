@@ -1,17 +1,17 @@
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+
 use std::fmt;
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{CosmosMsg, Empty};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     pub admins: Vec<String>,
     pub mutable: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -27,8 +27,7 @@ where
     UpdateAdmins { admins: Vec<String> },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum QueryMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -41,7 +40,7 @@ where
     CanExecute { sender: String, msg: CosmosMsg<T> },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct AdminListResponse {
     pub admins: Vec<String>,
     pub mutable: bool,

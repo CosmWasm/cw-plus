@@ -1,14 +1,14 @@
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+
 use std::fmt;
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, CosmosMsg, Empty};
 use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -43,8 +43,7 @@ where
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum QueryMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
@@ -76,7 +75,7 @@ where
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AllAllowancesResponse {
     pub allowances: Vec<AllowanceInfo>,
 }
@@ -94,7 +93,7 @@ impl AllAllowancesResponse {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AllowanceInfo {
     pub spender: String,
     pub balance: NativeBalance,
@@ -114,7 +113,7 @@ impl AllowanceInfo {
     /// ```
     /// # use cw_utils::{Expiration, NativeBalance};
     /// # use cw1_subkeys::msg::AllowanceInfo;
-    /// # use cosmwasm_std::coin;
+    /// # use cosmwasm_schema::cw_serde;use cosmwasm_std::coin;
     ///
     /// let mut allows = vec![AllowanceInfo {
     ///   spender: "spender2".to_owned(),
@@ -143,7 +142,7 @@ impl AllowanceInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct PermissionsInfo {
     pub spender: String,
     pub permissions: Permissions,
@@ -183,7 +182,7 @@ impl PermissionsInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AllPermissionsResponse {
     pub permissions: Vec<PermissionsInfo>,
 }

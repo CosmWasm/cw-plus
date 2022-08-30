@@ -1,12 +1,10 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cw20::Cw20ReceiveMsg;
 
 use crate::amount::Amount;
 use crate::state::ChannelInfo;
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[cw_serde]
 pub struct InitMsg {
     /// Default timeout for ics20 packets, specified in seconds
     pub default_timeout: u64,
@@ -19,19 +17,18 @@ pub struct InitMsg {
     pub default_gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AllowMsg {
     pub contract: String,
     pub gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[cw_serde]
 pub struct MigrateMsg {
     pub default_gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
@@ -44,7 +41,7 @@ pub enum ExecuteMsg {
 }
 
 /// This is the message we accept via Receive
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct TransferMsg {
     /// The local channel to send the packets on
     pub channel: String,
@@ -56,8 +53,7 @@ pub struct TransferMsg {
     pub timeout: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum QueryMsg {
     /// Return the port ID bound by this contract. Returns PortResponse
     Port {},
@@ -79,12 +75,12 @@ pub enum QueryMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ListChannelsResponse {
     pub channels: Vec<ChannelInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ChannelResponse {
     /// Information on the channel's connection
     pub info: ChannelInfo,
@@ -95,30 +91,30 @@ pub struct ChannelResponse {
     pub total_sent: Vec<Amount>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct PortResponse {
     pub port_id: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ConfigResponse {
     pub default_timeout: u64,
     pub default_gas_limit: Option<u64>,
     pub gov_contract: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct AllowedResponse {
     pub is_allowed: bool,
     pub gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ListAllowedResponse {
     pub allow: Vec<AllowedInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct AllowedInfo {
     pub contract: String,
     pub gas_limit: Option<u64>,
