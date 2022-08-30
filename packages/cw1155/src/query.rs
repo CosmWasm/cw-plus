@@ -1,23 +1,23 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
 use cw_utils::Expiration;
 
 use crate::msg::TokenId;
 
 #[cw_serde]
-
+#[derive(QueryResponses)]
 pub enum Cw1155QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
-    /// Return type: BalanceResponse.
+    #[returns(BalanceResponse)]
     Balance { owner: String, token_id: TokenId },
     /// Returns the current balance of the given address for a batch of tokens, 0 if unset.
-    /// Return type: BatchBalanceResponse.
+    #[returns(BatchBalanceResponse)]
     BatchBalance {
         owner: String,
         token_ids: Vec<TokenId>,
     },
     /// List all operators that can access all of the owner's tokens.
-    /// Return type: ApprovedForAllResponse.
+    #[returns(ApprovedForAllResponse)]
     ApprovedForAll {
         owner: String,
         /// unset or false will filter out expired approvals, you must set to true to see them
@@ -26,17 +26,17 @@ pub enum Cw1155QueryMsg {
         limit: Option<u32>,
     },
     /// Query approved status `owner` granted to `operator`.
-    /// Return type: IsApprovedForAllResponse
+    #[returns(IsApprovedForAllResponse)]
     IsApprovedForAll { owner: String, operator: String },
 
     /// With MetaData Extension.
     /// Query metadata of token
-    /// Return type: TokenInfoResponse.
+    #[returns(TokenInfoResponse)]
     TokenInfo { token_id: TokenId },
 
     /// With Enumerable extension.
     /// Returns all tokens owned by the given address, [] if unset.
-    /// Return type: TokensResponse.
+    #[returns(TokensResponse)]
     Tokens {
         owner: String,
         start_after: Option<String>,
@@ -44,7 +44,7 @@ pub enum Cw1155QueryMsg {
     },
     /// With Enumerable extension.
     /// Requires pagination. Lists all token_ids controlled by the contract.
-    /// Return type: TokensResponse.
+    #[returns(TokensResponse)]
     AllTokens {
         start_after: Option<String>,
         limit: Option<u32>,

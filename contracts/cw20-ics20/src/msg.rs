@@ -1,5 +1,6 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw20::Cw20ReceiveMsg;
+use cw_controllers::AdminResponse;
 
 use crate::amount::Amount;
 use crate::state::ChannelInfo;
@@ -54,21 +55,27 @@ pub struct TransferMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// Return the port ID bound by this contract. Returns PortResponse
+    /// Return the port ID bound by this contract.
+    #[returns(PortResponse)]
     Port {},
-    /// Show all channels we have connected to. Return type is ListChannelsResponse.
+    /// Show all channels we have connected to.
+    #[returns(ListChannelsResponse)]
     ListChannels {},
     /// Returns the details of the name channel, error if not created.
-    /// Return type: ChannelResponse.
+    #[returns(ChannelResponse)]
     Channel { id: String },
-    /// Show the Config. Returns ConfigResponse (currently including admin as well)
+    /// Show the Config.
+    #[returns(ConfigResponse)]
     Config {},
-    /// Return AdminResponse
+    #[returns(AdminResponse)]
     Admin {},
-    /// Query if a given cw20 contract is allowed. Returns AllowedResponse
+    /// Query if a given cw20 contract is allowed.
+    #[returns(AllowedResponse)]
     Allowed { contract: String },
-    /// List all allowed cw20 contracts. Returns ListAllowedResponse
+    /// List all allowed cw20 contracts.
+    #[returns(ListAllowedResponse)]
     ListAllowed {
         start_after: Option<String>,
         limit: Option<u32>,

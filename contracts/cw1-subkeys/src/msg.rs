@@ -2,8 +2,9 @@ use schemars::JsonSchema;
 
 use std::fmt;
 
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, CosmosMsg, Empty};
+use cw1::CanExecuteResponse;
 use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
@@ -44,31 +45,33 @@ where
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
 {
     /// Shows all admins and whether or not it is mutable
-    /// Returns cw1-whitelist::AdminListResponse
+    #[returns(cw1_whitelist::msg::AdminListResponse)]
     AdminList {},
     /// Get the current allowance for the given subkey (how much it can spend)
-    /// Returns crate::state::Allowance
+    #[returns(crate::state::Allowance)]
     Allowance { spender: String },
     /// Get the current permissions for the given subkey (how much it can spend)
-    /// Returns PermissionsInfo
+    #[returns(PermissionsInfo)]
     Permissions { spender: String },
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
+    #[returns(CanExecuteResponse)]
     CanExecute { sender: String, msg: CosmosMsg<T> },
     /// Gets all Allowances for this contract
-    /// Returns AllAllowancesResponse
+    #[returns(AllAllowancesResponse)]
     AllAllowances {
         start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Gets all Permissions for this contract
-    /// Returns AllPermissionsResponse
+    #[returns(AllPermissionsResponse)]
     AllPermissions {
         start_after: Option<String>,
         limit: Option<u32>,
@@ -113,7 +116,7 @@ impl AllowanceInfo {
     /// ```
     /// # use cw_utils::{Expiration, NativeBalance};
     /// # use cw1_subkeys::msg::AllowanceInfo;
-    /// # use cosmwasm_schema::cw_serde;use cosmwasm_std::coin;
+    /// # use cosmwasm_schema::{cw_serde, QueryResponses};use cosmwasm_std::coin;
     ///
     /// let mut allows = vec![AllowanceInfo {
     ///   spender: "spender2".to_owned(),

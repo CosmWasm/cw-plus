@@ -1,8 +1,9 @@
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
 
 use cw20::{Cw20ReceiveMsg, Denom};
-pub use cw_controllers::ClaimsResponse;
+use cw4::{MemberListResponse, MemberResponse, TotalWeightResponse};
+pub use cw_controllers::{AdminResponse, ClaimsResponse, HooksResponse};
 use cw_utils::Duration;
 
 #[cw_serde]
@@ -47,31 +48,31 @@ pub enum ReceiveMsg {
 }
 
 #[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
     /// Claims shows the tokens in process of unbonding for this address
-    Claims {
-        address: String,
-    },
+    #[returns(ClaimsResponse)]
+    Claims { address: String },
     // Show the number of tokens currently staked by this address.
-    Staked {
-        address: String,
-    },
+    #[returns(StakedResponse)]
+    Staked { address: String },
 
-    /// Return AdminResponse
+    #[returns(AdminResponse)]
     Admin {},
-    /// Return TotalWeightResponse
+    #[returns(TotalWeightResponse)]
     TotalWeight {},
-    /// Returns MembersListResponse
+    #[returns(MemberListResponse)]
     ListMembers {
         start_after: Option<String>,
         limit: Option<u32>,
     },
-    /// Returns MemberResponse
+    #[returns(MemberResponse)]
     Member {
         addr: String,
         at_height: Option<u64>,
     },
-    /// Shows all registered hooks. Returns HooksResponse.
+    /// Shows all registered hooks.
+    #[returns(HooksResponse)]
     Hooks {},
 }
 
