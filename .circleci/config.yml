@@ -578,7 +578,7 @@ jobs:
   # We also sanity-check the resultant wasm files.
   wasm-build:
     docker:
-      - image: rust:1.58.1
+      - image: rust:1.59.0
     steps:
       - checkout:
           path: ~/project
@@ -587,7 +587,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - restore_cache:
           keys:
-            - cargocache-wasm-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
+            - cargocache-wasm-rust:1.59.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
@@ -600,22 +600,17 @@ jobs:
               (cd $C && cargo build --release --lib --target wasm32-unknown-unknown --locked)
             done
       - run:
-          name: Install check_contract
+          name: Install cosmwasm-check
           # Uses --debug for compilation speed
-          command: cargo install --debug --version 1.0.0 --features iterator --example check_contract -- cosmwasm-vm
+          command: cargo install --debug --version 1.1.0-rc.1 cosmwasm-check
       - save_cache:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-wasm-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
+          key: cargocache-wasm-rust:1.59.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Check wasm contracts
-          command: |
-            for W in ./target/wasm32-unknown-unknown/release/*.wasm
-            do
-              echo -n "Checking `basename $W`... "
-              check_contract $W
-            done
+          command: cosmwasm-check ./target/wasm32-unknown-unknown/release/*.wasm
 
   package_multi_test:
     docker:
