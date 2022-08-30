@@ -19,8 +19,8 @@ backtrace = ["anyhow/backtrace"]
 [dependencies]
 cw-utils = { path = "../../packages/utils", version = "0.14.0" }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.14.0"}
-cosmwasm-std = { version = "1.0.0", features = ["staking"] }
-cosmwasm-storage = { version = "1.0.0" }
+cosmwasm-std = { version = "1.1.0-rc.1", features = ["staking"] }
+cosmwasm-storage = { version = "1.1.0-rc.1" }
 itertools = "0.10.1"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }

@@ -524,13 +524,13 @@ mod tests {
     // this tests the member queries
     fn assert_stake(deps: Deps, user1_stake: u128, user2_stake: u128, user3_stake: u128) {
         let stake1 = query_staked(deps, USER1.into()).unwrap();
-        assert_eq!(stake1.stake, user1_stake.into());
+        assert_eq!(stake1.stake, Uint128::from(user1_stake));
 
         let stake2 = query_staked(deps, USER2.into()).unwrap();
-        assert_eq!(stake2.stake, user2_stake.into());
+        assert_eq!(stake2.stake, Uint128::from(user2_stake));
 
         let stake3 = query_staked(deps, USER3.into()).unwrap();
-        assert_eq!(stake3.stake, user3_stake.into());
+        assert_eq!(stake3.stake, Uint128::from(user3_stake));
     }
 
     #[test]
