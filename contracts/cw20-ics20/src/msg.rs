@@ -1,6 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw20::Cw20ReceiveMsg;
-use cw_controllers::AdminResponse;
 
 use crate::amount::Amount;
 use crate::state::ChannelInfo;
@@ -69,7 +68,7 @@ pub enum QueryMsg {
     /// Show the Config.
     #[returns(ConfigResponse)]
     Config {},
-    #[returns(AdminResponse)]
+    #[returns(cw_controllers::AdminResponse)]
     Admin {},
     /// Query if a given cw20 contract is allowed.
     #[returns(AllowedResponse)]

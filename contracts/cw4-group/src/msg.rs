@@ -1,6 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cw4::{Member, MemberListResponse, MemberResponse, TotalWeightResponse};
-use cw_controllers::{AdminResponse, HooksResponse};
+use cw4::Member;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -29,21 +28,21 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(AdminResponse)]
+    #[returns(cw_controllers::AdminResponse)]
     Admin {},
-    #[returns(TotalWeightResponse)]
+    #[returns(cw4::TotalWeightResponse)]
     TotalWeight {},
-    #[returns(MemberListResponse)]
+    #[returns(cw4::MemberListResponse)]
     ListMembers {
         start_after: Option<String>,
         limit: Option<u32>,
     },
-    #[returns(MemberResponse)]
+    #[returns(cw4::MemberResponse)]
     Member {
         addr: String,
         at_height: Option<u64>,
     },
     /// Shows all registered hooks.
-    #[returns(HooksResponse)]
+    #[returns(cw_controllers::HooksResponse)]
     Hooks {},
 }

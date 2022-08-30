@@ -4,7 +4,6 @@ use std::fmt;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, CosmosMsg, Empty};
-use cw1::CanExecuteResponse;
 use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
@@ -62,7 +61,7 @@ where
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
-    #[returns(CanExecuteResponse)]
+    #[returns(cw1::CanExecuteResponse)]
     CanExecute { sender: String, msg: CosmosMsg<T> },
     /// Gets all Allowances for this contract
     #[returns(AllAllowancesResponse)]

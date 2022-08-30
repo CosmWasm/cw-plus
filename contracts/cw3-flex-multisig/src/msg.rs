@@ -1,11 +1,8 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
-use cw3::{
-    ProposalListResponse, ProposalResponse, Vote, VoteListResponse, VoteResponse,
-    VoterListResponse, VoterResponse,
-};
+use cw3::Vote;
 use cw4::MemberChangedHookMsg;
-use cw_utils::{Duration, Expiration, Threshold, ThresholdResponse};
+use cw_utils::{Duration, Expiration, Threshold};
 
 use crate::state::Executor;
 
@@ -48,31 +45,31 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    #[returns(ThresholdResponse)]
+    #[returns(cw_utils::ThresholdResponse)]
     Threshold {},
-    #[returns(ProposalResponse)]
+    #[returns(cw3::ProposalResponse)]
     Proposal { proposal_id: u64 },
-    #[returns(ProposalListResponse)]
+    #[returns(cw3::ProposalListResponse)]
     ListProposals {
         start_after: Option<u64>,
         limit: Option<u32>,
     },
-    #[returns(ProposalListResponse)]
+    #[returns(cw3::ProposalListResponse)]
     ReverseProposals {
         start_before: Option<u64>,
         limit: Option<u32>,
     },
-    #[returns(VoteResponse)]
+    #[returns(cw3::VoteResponse)]
     Vote { proposal_id: u64, voter: String },
-    #[returns(VoteListResponse)]
+    #[returns(cw3::VoteListResponse)]
     ListVotes {
         proposal_id: u64,
         start_after: Option<String>,
         limit: Option<u32>,
     },
-    #[returns(VoterResponse)]
+    #[returns(cw3::VoterResponse)]
     Voter { address: String },
-    #[returns(VoterListResponse)]
+    #[returns(cw3::VoterListResponse)]
     ListVoters {
         start_after: Option<String>,
         limit: Option<u32>,
