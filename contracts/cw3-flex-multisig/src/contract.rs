@@ -151,9 +151,11 @@ pub fn execute_vote(
 
     // ensure proposal exists and can be voted on
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if prop.status != Status::Open {
+    // Allow voting on Passed and Rejected proposals too,
+    if ![Status::Open, Status::Passed, Status::Rejected].contains(&prop.status) {
         return Err(ContractError::NotOpen {});
     }
+    // if they are not expired
     if prop.expires.is_expired(&env.block) {
         return Err(ContractError::Expired {});
     }
@@ -196,7 +198,8 @@ pub fn execute_execute(
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
     // we allow execution even after the proposal "expiration" as long as all vote come in before
     // that point. If it was approved on time, it can be executed any time.
-    if prop.current_status(&env.block) != Status::Passed {
+    prop.update_status(&env.block);
+    if prop.status != Status::Passed {
         return Err(ContractError::WrongExecuteStatus {});
     }
 
@@ -224,10 +227,11 @@ pub fn execute_close(
     // anyone can trigger this if the vote passed
 
     let mut prop = PROPOSALS.load(deps.storage, proposal_id)?;
-    if [Status::Executed, Status::Rejected, Status::Passed]
-        .iter()
-        .any(|x| *x == prop.status)
-    {
+    if [Status::Executed, Status::Rejected, Status::Passed].contains(&prop.status) {
+        return Err(ContractError::WrongCloseStatus {});
+    }
+    // Avoid closing of Passed due to expiration proposals
+    if prop.current_status(&env.block) == Status::Passed {
         return Err(ContractError::WrongCloseStatus {});
     }
     if !prop.expires.is_expired(&env.block) {
@@ -1027,11 +1031,20 @@ mod tests {
             ],
         );
 
-        // non-Open proposals cannot be voted
-        let err = app
+        // Passed proposals can still be voted (while they are not expired or executed)
+        let res = app
             .execute_contract(Addr::unchecked(VOTER5), flex_addr.clone(), &yes_vote, &[])
-            .unwrap_err();
-        assert_eq!(ContractError::NotOpen {}, err.downcast().unwrap());
+            .unwrap();
+        // Verify
+        assert_eq!(
+            res.custom_attrs(1),
+            [
+                ("action", "vote"),
+                ("sender", VOTER5),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Passed")
+            ]
+        );
 
         // query individual votes
         // initial (with 0 weight)
@@ -1067,7 +1080,7 @@ mod tests {
         );
 
         // non-voter
-        let voter = VOTER5.into();
+        let voter = SOMEBODY.into();
         let vote: VoteResponse = app
             .wrap()
             .query_wasm_smart(&flex_addr, &QueryMsg::Vote { proposal_id, voter })
@@ -1094,7 +1107,7 @@ mod tests {
 
         // Powerful voter opposes it, so it rejects
         let res = app
-            .execute_contract(Addr::unchecked(VOTER4), flex_addr, &no_vote, &[])
+            .execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &no_vote, &[])
             .unwrap();
 
         assert_eq!(
@@ -1102,6 +1115,25 @@ mod tests {
             [
                 ("action", "vote"),
                 ("sender", VOTER4),
+                ("proposal_id", proposal_id.to_string().as_str()),
+                ("status", "Rejected"),
+            ],
+        );
+
+        // Rejected proposals can still be voted (while they are not expired)
+        let yes_vote = ExecuteMsg::Vote {
+            proposal_id,
+            vote: Vote::Yes,
+        };
+        let res = app
+            .execute_contract(Addr::unchecked(VOTER5), flex_addr, &yes_vote, &[])
+            .unwrap();
+
+        assert_eq!(
+            res.custom_attrs(1),
+            [
+                ("action", "vote"),
+                ("sender", VOTER5),
                 ("proposal_id", proposal_id.to_string().as_str()),
                 ("status", "Rejected"),
             ],
@@ -1393,6 +1425,17 @@ mod tests {
             .query_wasm_smart(&flex_addr, &QueryMsg::Proposal { proposal_id })
             .unwrap();
         assert_eq!(prop.status, Status::Passed);
+
+        // Closing should NOT be possible
+        let err = app
+            .execute_contract(
+                Addr::unchecked(SOMEBODY),
+                flex_addr.clone(),
+                &ExecuteMsg::Close { proposal_id },
+                &[],
+            )
+            .unwrap_err();
+        assert_eq!(ContractError::WrongCloseStatus {}, err.downcast().unwrap());
 
         // Execution should now be possible.
         let res = app
