@@ -54,7 +54,7 @@ where
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 #[must_use]
 pub struct Cw1Executor<'a, App> {
     addr: Addr,
@@ -87,7 +87,7 @@ impl<'a, App> Cw1Executor<'a, App> {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 #[must_use]
 pub struct WhitelistExecutor<'a, App> {
     addr: Addr,
@@ -133,7 +133,7 @@ impl<'a, App> WhitelistExecutor<'a, App> {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 #[must_use]
 pub struct Instantiator<'a, App> {
     code_id: u64,
@@ -185,7 +185,7 @@ impl<'a, App> Instantiator<'a, App> {
 }
 
 // Proxy for direct execution in multitest.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Cw1WhitelistProxy(Addr);
 
 impl Cw1WhitelistProxy {

@@ -19,7 +19,7 @@ const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 pub const NAMESPACE_BANK: &[u8] = b"bank";
 
 // WIP
-#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+#[derive(Clone, std::fmt::Debug, PartialEq, Eq, JsonSchema)]
 pub enum BankSudo {
     Mint {
         to_address: String,

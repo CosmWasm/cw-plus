@@ -22,11 +22,11 @@ querier = ["library"]
 multitest = ["cw-multi-test", "anyhow"]
 
 [dependencies]
-cosmwasm-schema = { version = "1.0.0" }
+cosmwasm-schema = { version = "1.1.0-rc.1" }
 cw-utils = { path = "../../packages/utils", version = "0.14.0" }
 cw1 = { path = "../../packages/cw1", version = "0.14.0" }
 cw2 = { path = "../../packages/cw2", version = "0.14.0" }
-cosmwasm-std = { version = "1.0.0", features = ["staking"] }
+cosmwasm-std = { version = "1.1.0-rc.1", features = ["staking"] }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.14.0" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
