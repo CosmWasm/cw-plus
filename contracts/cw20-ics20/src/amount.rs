@@ -1,13 +1,10 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use crate::error::ContractError;
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, Uint128};
 use cw20::Cw20Coin;
 use std::convert::TryInto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Amount {
     Native(Coin),
     // FIXME? USe Cw20CoinVerified, and validate cw20 addresses

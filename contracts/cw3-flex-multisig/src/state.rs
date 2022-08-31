@@ -1,6 +1,4 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, QuerierWrapper};
 use cw4::Cw4Contract;
 use cw_storage_plus::Item;
@@ -9,7 +7,7 @@ use cw_utils::{Duration, Threshold};
 use crate::error::ContractError;
 
 /// Defines who is able to execute proposals once passed
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub enum Executor {
     /// Any member of the voting group, even with 0 points
     Member,
@@ -17,7 +15,7 @@ pub enum Executor {
     Only(Addr),
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct Config {
     pub threshold: Threshold,
     pub max_voting_period: Duration,

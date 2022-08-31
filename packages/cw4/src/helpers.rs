@@ -1,6 +1,4 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     to_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, WasmMsg,
     WasmQuery,
@@ -17,7 +15,7 @@ use cw_storage_plus::{Item, Map};
 /// for working with cw4 contracts
 ///
 /// If you wish to persist this, convert to Cw4CanonicalContract via .canonical()
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Cw4Contract(pub Addr);
 
 impl Cw4Contract {

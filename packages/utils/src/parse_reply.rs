@@ -7,13 +7,13 @@ const WIRE_TYPE_LENGTH_DELIMITED: u8 = 2;
 // Up to 9 bytes of varints as a practical limit (https://github.com/multiformats/unsigned-varint#practical-maximum-of-9-bytes-for-security)
 const VARINT_MAX_BYTES: usize = 9;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MsgInstantiateContractResponse {
     pub contract_address: String,
     pub data: Option<Binary>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MsgExecuteContractResponse {
     pub data: Option<Binary>,
 }
@@ -152,7 +152,7 @@ pub fn parse_execute_response_data(
     Ok(MsgExecuteContractResponse { data: inner_data })
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ParseReplyError {
     #[error("Failure response from sub-message: {0}")]
     SubMsgFailure(String),

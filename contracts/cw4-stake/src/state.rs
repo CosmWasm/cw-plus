@@ -1,6 +1,4 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint128};
 use cw20::Denom;
 use cw4::TOTAL_KEY;
@@ -10,7 +8,7 @@ use cw_utils::Duration;
 
 pub const CLAIMS: Claims = Claims::new("claims");
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct Config {
     /// denom of the token to stake
     pub denom: Denom,
