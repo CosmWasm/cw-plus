@@ -20,9 +20,12 @@ pub fn execute_increase_allowance(
         return Err(ContractError::CannotSetOwnAccount {});
     }
 
-    let update_fn = |allow: Option<AllowanceResponse>| -> StdResult<_> {
+    let update_fn = |allow: Option<AllowanceResponse>| -> Result<_, _> {
         let mut val = allow.unwrap_or_default();
         if let Some(exp) = expires {
+            if exp.is_expired(&env.block) {
+                return Err(ContractError::Expired { });
+            }
             val.expires = exp;
         }
         val.allowance += amount;
