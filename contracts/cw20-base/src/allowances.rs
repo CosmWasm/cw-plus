@@ -303,7 +303,7 @@ mod tests {
 
         // set allowance with height expiration
         let allow1 = Uint128::new(7777);
-        let expires = Expiration::AtHeight(5432);
+        let expires = Expiration::AtHeight(123_456);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -396,7 +396,7 @@ mod tests {
 
         // set allowance with height expiration
         let allow1 = Uint128::new(7777);
-        let expires = Expiration::AtHeight(5432);
+        let expires = Expiration::AtHeight(123_456);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
@@ -551,15 +551,17 @@ mod tests {
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
-        // let us increase limit, but set the expiration (default env height is 12_345)
+        // let us increase limit, but set the expiration to expire in the next block
         let info = mock_info(owner.as_ref(), &[]);
-        let env = mock_env();
+        let mut env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128::new(1000),
-            expires: Some(Expiration::AtHeight(env.block.height)),
+            expires: Some(Expiration::AtHeight(env.block.height + 1)),
         };
-        execute(deps.as_mut(), env, info, msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        env.block.height += 1;
 
         // we should now get the expiration error
         let msg = ExecuteMsg::TransferFrom {
@@ -568,7 +570,6 @@ mod tests {
             amount: Uint128::new(33443),
         };
         let info = mock_info(spender.as_ref(), &[]);
-        let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Expired {});
     }
@@ -628,15 +629,18 @@ mod tests {
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
-        // let us increase limit, but set the expiration (default env height is 12_345)
+        // let us increase limit, but set the expiration to expire in the next block
         let info = mock_info(owner.as_ref(), &[]);
-        let env = mock_env();
+        let mut env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128::new(1000),
-            expires: Some(Expiration::AtHeight(env.block.height)),
+            expires: Some(Expiration::AtHeight(env.block.height + 1)),
         };
-        execute(deps.as_mut(), env, info, msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // increase block height, so the limit is expired now
+        env.block.height += 1;
 
         // we should now get the expiration error
         let msg = ExecuteMsg::BurnFrom {
@@ -644,7 +648,6 @@ mod tests {
             amount: Uint128::new(33443),
         };
         let info = mock_info(spender.as_ref(), &[]);
-        let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Expired {});
     }
@@ -729,15 +732,18 @@ mod tests {
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert!(matches!(err, ContractError::Std(StdError::Overflow { .. })));
 
-        // let us increase limit, but set the expiration to current block (expired)
+        // let us increase limit, but set the expiration to the next block
         let info = mock_info(owner.as_ref(), &[]);
-        let env = mock_env();
+        let mut env = mock_env();
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: Uint128::new(1000),
-            expires: Some(Expiration::AtHeight(env.block.height)),
+            expires: Some(Expiration::AtHeight(env.block.height + 1)),
         };
-        execute(deps.as_mut(), env, info, msg).unwrap();
+        execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+
+        // increase block height, so the limit is expired now
+        env.block.height += 1;
 
         // we should now get the expiration error
         let msg = ExecuteMsg::SendFrom {
@@ -747,7 +753,6 @@ mod tests {
             msg: send_msg,
         };
         let info = mock_info(spender.as_ref(), &[]);
-        let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Expired {});
     }
