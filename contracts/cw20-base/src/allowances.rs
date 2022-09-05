@@ -24,7 +24,7 @@ pub fn execute_increase_allowance(
         let mut val = allow.unwrap_or_default();
         if let Some(exp) = expires {
             if exp.is_expired(&env.block) {
-                return Err(ContractError::Expired {});
+                return Err(ContractError::InvalidExpiration {});
             }
             val.expires = exp;
         }
@@ -72,7 +72,7 @@ pub fn execute_decrease_allowance(
             .map_err(StdError::overflow)?;
         if let Some(exp) = expires {
             if exp.is_expired(&env.block) {
-                return Err(ContractError::Expired {});
+                return Err(ContractError::InvalidExpiration {});
             }
             allowance.expires = exp;
         }
@@ -780,7 +780,7 @@ mod tests {
 
         // ensure it is rejected
         assert_eq!(
-            Err(ContractError::Expired {}),
+            Err(ContractError::InvalidExpiration {}),
             execute(deps.as_mut(), env.clone(), info.clone(), msg)
         );
 
@@ -794,7 +794,7 @@ mod tests {
 
         // ensure it is rejected
         assert_eq!(
-            Err(ContractError::Expired {}),
+            Err(ContractError::InvalidExpiration {}),
             execute(deps.as_mut(), env.clone(), info.clone(), msg)
         );
 
@@ -851,7 +851,7 @@ mod tests {
 
         // ensure it is rejected
         assert_eq!(
-            Err(ContractError::Expired {}),
+            Err(ContractError::InvalidExpiration {}),
             execute(deps.as_mut(), env.clone(), info.clone(), msg)
         );
 
