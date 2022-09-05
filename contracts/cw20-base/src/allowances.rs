@@ -864,10 +864,10 @@ mod tests {
             expires: Some(expires),
         };
 
-        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        execute(deps.as_mut(), env, info, msg).unwrap();
 
         // ensure it looks good
-        let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
+        let allowance = query_allowance(deps.as_ref(), owner, spender).unwrap();
         assert_eq!(
             allowance,
             AllowanceResponse {
