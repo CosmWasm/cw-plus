@@ -9,7 +9,7 @@ use crate::state::{ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, TOKEN_INFO};
 
 pub fn execute_increase_allowance(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     spender: String,
     amount: Uint128,
@@ -747,5 +747,80 @@ mod tests {
         let env = mock_env();
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::Expired {});
+    }
+
+    #[test]
+    fn no_past_expiration() {
+        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+
+        let owner = String::from("addr0001");
+        let spender = String::from("addr0002");
+        let info = mock_info(owner.as_ref(), &[]);
+        let env = mock_env();
+        do_instantiate(deps.as_mut(), owner.clone(), Uint128::new(12340000));
+
+        // set allowance with height expiration at current block height
+        let expires = Expiration::AtHeight(env.block.height);
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: Uint128::new(7777),
+            expires: Some(expires),
+        };
+        
+        // ensure it is rejected
+        assert_eq!(Err(ContractError::Expired {}), execute(deps.as_mut(), env.clone(), info.clone(), msg));
+
+        // set allowance with time expiration in the past
+        let expires = Expiration::AtTime(env.block.time.minus_seconds(1));
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: Uint128::new(7777),
+            expires: Some(expires),
+        };
+
+        // ensure it is rejected
+        assert_eq!(Err(ContractError::Expired {}), execute(deps.as_mut(), env.clone(), info.clone(), msg));
+
+        // set allowance with height expiration at next block height
+        let expires = Expiration::AtHeight(env.block.height + 1);
+        let allow = Uint128::new(7777);
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow,
+            expires: Some(expires),
+        };
+
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // ensure it looks good
+        let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            AllowanceResponse {
+                allowance: allow,
+                expires
+            }
+        );
+
+        // set allowance with time expiration in the future
+        let expires = Expiration::AtTime(env.block.time.plus_seconds(10));
+        let allow = Uint128::new(7777);
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow,
+            expires: Some(expires),
+        };
+
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // ensure it looks good
+        let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            AllowanceResponse {
+                allowance: allow + allow,
+                expires
+            }
+        );
     }
 }
