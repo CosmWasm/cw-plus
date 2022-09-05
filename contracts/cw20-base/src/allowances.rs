@@ -24,7 +24,7 @@ pub fn execute_increase_allowance(
         let mut val = allow.unwrap_or_default();
         if let Some(exp) = expires {
             if exp.is_expired(&env.block) {
-                return Err(ContractError::Expired { });
+                return Err(ContractError::Expired {});
             }
             val.expires = exp;
         }
@@ -45,7 +45,7 @@ pub fn execute_increase_allowance(
 
 pub fn execute_decrease_allowance(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     spender: String,
     amount: Uint128,
@@ -71,6 +71,9 @@ pub fn execute_decrease_allowance(
             .checked_sub(amount)
             .map_err(StdError::overflow)?;
         if let Some(exp) = expires {
+            if exp.is_expired(&env.block) {
+                return Err(ContractError::Expired {});
+            }
             allowance.expires = exp;
         }
         ALLOWANCES.save(deps.storage, key, &allowance)?;
@@ -774,9 +777,12 @@ mod tests {
             amount: Uint128::new(7777),
             expires: Some(expires),
         };
-        
+
         // ensure it is rejected
-        assert_eq!(Err(ContractError::Expired {}), execute(deps.as_mut(), env.clone(), info.clone(), msg));
+        assert_eq!(
+            Err(ContractError::Expired {}),
+            execute(deps.as_mut(), env.clone(), info.clone(), msg)
+        );
 
         // set allowance with time expiration in the past
         let expires = Expiration::AtTime(env.block.time.minus_seconds(1));
@@ -787,7 +793,10 @@ mod tests {
         };
 
         // ensure it is rejected
-        assert_eq!(Err(ContractError::Expired {}), execute(deps.as_mut(), env.clone(), info.clone(), msg));
+        assert_eq!(
+            Err(ContractError::Expired {}),
+            execute(deps.as_mut(), env.clone(), info.clone(), msg)
+        );
 
         // set allowance with height expiration at next block height
         let expires = Expiration::AtHeight(env.block.height + 1);
@@ -826,7 +835,43 @@ mod tests {
         assert_eq!(
             allowance,
             AllowanceResponse {
-                allowance: allow + allow,
+                allowance: allow + allow, // we increased twice
+                expires
+            }
+        );
+
+        // decrease with height expiration at current block height
+        let expires = Expiration::AtHeight(env.block.height);
+        let allow = Uint128::new(7777);
+        let msg = ExecuteMsg::IncreaseAllowance {
+            spender: spender.clone(),
+            amount: allow,
+            expires: Some(expires),
+        };
+
+        // ensure it is rejected
+        assert_eq!(
+            Err(ContractError::Expired {}),
+            execute(deps.as_mut(), env.clone(), info.clone(), msg)
+        );
+
+        // decrease with height expiration at next block height
+        let expires = Expiration::AtHeight(env.block.height + 1);
+        let allow = Uint128::new(7777);
+        let msg = ExecuteMsg::DecreaseAllowance {
+            spender: spender.clone(),
+            amount: allow,
+            expires: Some(expires),
+        };
+
+        execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // ensure it looks good
+        let allowance = query_allowance(deps.as_ref(), owner.clone(), spender.clone()).unwrap();
+        assert_eq!(
+            allowance,
+            AllowanceResponse {
+                allowance: allow,
                 expires
             }
         );
