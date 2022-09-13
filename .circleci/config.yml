@@ -47,12 +47,7 @@ workflows:
              only: /^v[0-9]+\.[0-9]+\.[0-9]+.*/
            branches:
              ignore: /.*/
-      - build_and_upload_schemas:
-          filters:
-           tags:
-             only: /^v[0-9]+\.[0-9]+\.[0-9]+.*/
-           branches:
-             ignore: /.*/
+      - build_and_upload_schemas
 
 jobs:
   contract_cw1_subkeys:
@@ -789,15 +784,15 @@ jobs:
       - run:
           name: Show data
           command: ls -l ./schemas
-      - run:
-          name: Publish schemas on GitHub
-          command: |
-            TAG="$CIRCLE_TAG"
-            TITLE="$TAG"
-            BODY="Attached there are some schemas and build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
-            ghr -t "$GITHUB_TOKEN" \
-              -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
-              -c "$CIRCLE_SHA1" \
-              -n "$TITLE" -b "$BODY" \
-              -replace \
-              "$TAG" ./schemas/
+      # - run:
+      #     name: Publish schemas on GitHub
+      #     command: |
+      #       TAG="$CIRCLE_TAG"
+      #       TITLE="$TAG"
+      #       BODY="Attached there are some schemas and build artifacts generated at this tag. Those are for development purposes only! Please use crates.io to find the packages of this release."
+      #       ghr -t "$GITHUB_TOKEN" \
+      #         -u "$CIRCLE_PROJECT_USERNAME" -r "$CIRCLE_PROJECT_REPONAME" \
+      #         -c "$CIRCLE_SHA1" \
+      #         -n "$TITLE" -b "$BODY" \
+      #         -replace \
+      #         "$TAG" ./schemas/
