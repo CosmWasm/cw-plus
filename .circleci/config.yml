@@ -772,19 +772,20 @@ jobs:
       - run:
           name: Build and run schema generator for packages
           command: |
-            for S in ./packages/*/examples/schema.rs
+            for S in ./packages/*/src/bin/schema.rs
             do
-              P=$(dirname $S)/..
+              P=$(dirname $S)/../..
               echo "Generating schema for $P ..."
               (cd $P && cargo schema --locked && tar -zcf ~/project/schemas/$(basename $(pwd))_schema.tar.gz ./schema)
             done
       - run:
           name: Build and run schema generator for contracts
           command: |
+            export GLOBIGNORE='./contracts/cw1-whitelist-ng/'
             for C in ./contracts/*/
             do
               echo "Generating schema for $C ..."
-              (cd $C && cargo schema --locked && tar -zcf ~/project/schemas/$(basename $(pwd))_schema.tar.gz ./schema)
+              (cd $C && cargo schema --locked && mv ./schema/*.json ~/project/schemas/)
             done
       - run:
           name: Show data
