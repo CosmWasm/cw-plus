@@ -784,7 +784,7 @@ jobs:
             for C in ./contracts/*/
             do
               echo "Generating schema for $C ..."
-              (cd $C && cargo schema --locked && mv ./schema/$(basename $(pwd)).json ~/project/schemas/)
+              (cd $C && cargo schema --locked && mv ./schema/*.json ~/project/schemas/)
             done
       - run:
           name: Show data
