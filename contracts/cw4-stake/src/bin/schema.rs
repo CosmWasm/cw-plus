@@ -1,9 +1,6 @@
 use cosmwasm_schema::write_api;
 
-pub use cw4::{AdminResponse, MemberListResponse, MemberResponse, TotalWeightResponse};
-pub use cw4_stake::msg::{
-    ClaimsResponse, ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse,
-};
+use cw4_stake::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
 fn main() {
     write_api! {
