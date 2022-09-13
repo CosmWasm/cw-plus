@@ -769,7 +769,7 @@ jobs:
           command: |
             for S in ./packages/*/src/bin/schema.rs
             do
-              P=$(dirname $S)/..
+              P=$(dirname $S)/../..
               echo "Generating schema for $P ..."
               (cd $P && cargo schema --locked && tar -zcf ~/project/schemas/$(basename $(pwd))_schema.tar.gz ./schema)
             done
