@@ -767,7 +767,7 @@ jobs:
       - run:
           name: Build and run schema generator for packages
           command: |
-            for S in ./packages/*/examples/schema.rs
+            for S in ./packages/*/src/bin/schema.rs
             do
               P=$(dirname $S)/..
               echo "Generating schema for $P ..."
