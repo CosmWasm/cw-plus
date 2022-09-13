@@ -776,6 +776,7 @@ jobs:
       - run:
           name: Build and run schema generator for contracts
           command: |
+            export GLOBIGNORE='./contracts/cw1-whitelist-ng/'
             for C in ./contracts/*/
             do
               echo "Generating schema for $C ..."
