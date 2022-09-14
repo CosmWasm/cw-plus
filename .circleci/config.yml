@@ -736,7 +736,7 @@ jobs:
       - run:
           name: Build development contracts
           command: |
-            docker run --volumes-from with_code cosmwasm/workspace-optimizer:0.12.6
+            docker run --volumes-from with_code cosmwasm/workspace-optimizer:0.12.8
             docker cp with_code:/code/artifacts ./artifacts
       - run:
           name: Show data
