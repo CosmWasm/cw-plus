@@ -1,6 +1,6 @@
 [package]
 name = "cw1-whitelist"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Implementation of an proxy contract using a whitelist"
@@ -20,11 +20,11 @@ test-utils = []
 
 [dependencies]
 cosmwasm-schema = { version = "1.1.0" }
-cw-utils = { path = "../../packages/utils", version = "0.14.0" }
-cw1 = { path = "../../packages/cw1", version = "0.14.0" }
-cw2 = { path = "../../packages/cw2", version = "0.14.0" }
+cw-utils = { path = "../../packages/utils", version = "0.15.0" }
+cw1 = { path = "../../packages/cw1", version = "0.15.0" }
+cw2 = { path = "../../packages/cw2", version = "0.15.0" }
 cosmwasm-std = { version = "1.1.0", features = ["staking"] }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.14.0" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.15.0" }
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
@@ -32,5 +32,5 @@ thiserror = { version = "1.0.23" }
 [dev-dependencies]
 anyhow = "1"
 assert_matches = "1"
-cw-multi-test = { path = "../../packages/multi-test", version = "0.14.0" }
+cw-multi-test = { path = "../../packages/multi-test", version = "0.15.0" }
 derivative = "2"
