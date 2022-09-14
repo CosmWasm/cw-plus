@@ -2,7 +2,58 @@
 
 ## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.14.0...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.0...HEAD)
+
+## [v0.15.0](https://github.com/CosmWasm/cw-plus/tree/v0.15.0) (2022-09-14)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.14.0...v0.15.0)
+
+**Breaking changes:**
+
+- Change `MultiIndex` index function signature to include the pk [\#670](https://github.com/CosmWasm/cw-plus/issues/670)
+- Improve `MultiIndex` pk deserialization [\#531](https://github.com/CosmWasm/cw-plus/issues/531)
+
+**Implemented enhancements:**
+
+- `Prefix::keys` method never fails [\#766](https://github.com/CosmWasm/cw-plus/issues/766)
+
+**Closed issues:**
+
+- Adapt build\_and\_upload\_schemas CI job to new schema format [\#795](https://github.com/CosmWasm/cw-plus/issues/795)
+- Remove `IntKeyOld` [\#775](https://github.com/CosmWasm/cw-plus/issues/775)
+- Can I cover all tests with cw\_multi\_test? [\#771](https://github.com/CosmWasm/cw-plus/issues/771)
+- Make cw1155 can add token's url at the first mint [\#764](https://github.com/CosmWasm/cw-plus/issues/764)
+- Expose `Response` from contract in cw-multi-test execute [\#763](https://github.com/CosmWasm/cw-plus/issues/763)
+- Restructure `Index` trait to allow for more extensive `Index` struct implementation. [\#757](https://github.com/CosmWasm/cw-plus/issues/757)
+- Consider moving schema boilerplate from `examples` to a binary crate [\#755](https://github.com/CosmWasm/cw-plus/issues/755)
+- Wrong/unclear explanation in IndexedMap docs [\#718](https://github.com/CosmWasm/cw-plus/issues/718)
+- Redundant logic in `ThresholdResponse` multisigs [\#677](https://github.com/CosmWasm/cw-plus/issues/677)
+- \[cw3-flex/fixed-multisig\] Reject proposals early [\#665](https://github.com/CosmWasm/cw-plus/issues/665)
+- cw20 allowance expiration can be set to a block height or timestamp in the past [\#628](https://github.com/CosmWasm/cw-plus/issues/628)
+- Add security policy [\#580](https://github.com/CosmWasm/cw-plus/issues/580)
+- Update MIGRATING.md doc for multi test [\#490](https://github.com/CosmWasm/cw-plus/issues/490)
+
+**Merged pull requests:**
+
+- CI: unified .json schema artifacts for contracts [\#798](https://github.com/CosmWasm/cw-plus/pull/798) ([uint](https://github.com/uint))
+- cw4 contracts: clean up imports and reexports [\#797](https://github.com/CosmWasm/cw-plus/pull/797) ([uint](https://github.com/uint))
+- Fix `cargo wasm` [\#794](https://github.com/CosmWasm/cw-plus/pull/794) ([uint](https://github.com/uint))
+- Validate allowance expiration [\#793](https://github.com/CosmWasm/cw-plus/pull/793) ([chipshort](https://github.com/chipshort))
+- Update to CosmWasm 1.1.0 [\#791](https://github.com/CosmWasm/cw-plus/pull/791) ([uint](https://github.com/uint))
+- CosmWasm `1.1.0-rc.1` [\#789](https://github.com/CosmWasm/cw-plus/pull/789) ([uint](https://github.com/uint))
+- Updating broken link to cw3-flex-multisig [\#787](https://github.com/CosmWasm/cw-plus/pull/787) ([0xriku](https://github.com/0xriku))
+- Multisig status logic follow-up [\#784](https://github.com/CosmWasm/cw-plus/pull/784) ([maurolacy](https://github.com/maurolacy))
+- Multisig status logic [\#783](https://github.com/CosmWasm/cw-plus/pull/783) ([maurolacy](https://github.com/maurolacy))
+- Add primary key to `MultiIndex` index fn params [\#781](https://github.com/CosmWasm/cw-plus/pull/781) ([maurolacy](https://github.com/maurolacy))
+- Fix typo [\#779](https://github.com/CosmWasm/cw-plus/pull/779) ([LeTurt333](https://github.com/LeTurt333))
+- Remove deprecated `IntKeyOld` [\#778](https://github.com/CosmWasm/cw-plus/pull/778) ([ueco-jb](https://github.com/ueco-jb))
+- Small fixes / updates to storage-plus docs [\#777](https://github.com/CosmWasm/cw-plus/pull/777) ([maurolacy](https://github.com/maurolacy))
+- Fix: `Prefix::keys` return errors [\#774](https://github.com/CosmWasm/cw-plus/pull/774) ([maurolacy](https://github.com/maurolacy))
+- Expose cw-multi-test `FailingModule` [\#773](https://github.com/CosmWasm/cw-plus/pull/773) ([dadamu](https://github.com/dadamu))
+- Style: move `InstantiateMsg` validation in impl [\#772](https://github.com/CosmWasm/cw-plus/pull/772) ([etienne-napoleone](https://github.com/etienne-napoleone))
+- Make ExecuteEnv fields public [\#770](https://github.com/CosmWasm/cw-plus/pull/770) ([ismellike](https://github.com/ismellike))
+- Change / fix packages publishing order [\#769](https://github.com/CosmWasm/cw-plus/pull/769) ([maurolacy](https://github.com/maurolacy))
+- contracts: move schema gen boilerplate to a binary crate [\#760](https://github.com/CosmWasm/cw-plus/pull/760) ([uint](https://github.com/uint))
 
 ## [v0.14.0](https://github.com/CosmWasm/cw-plus/tree/v0.14.0) (2022-07-27)
 
