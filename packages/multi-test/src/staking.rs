@@ -5,7 +5,7 @@ use crate::module::FailingModule;
 use crate::Module;
 
 // We need to expand on this, but we will need this to properly test out staking
-#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+#[derive(Clone, std::fmt::Debug, PartialEq, Eq, JsonSchema)]
 pub enum StakingSudo {
     Slash {
         validator: String,

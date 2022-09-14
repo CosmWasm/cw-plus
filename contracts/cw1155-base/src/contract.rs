@@ -39,9 +39,9 @@ pub fn instantiate(
 
 /// To mitigate clippy::too_many_arguments warning
 pub struct ExecuteEnv<'a> {
-    deps: DepsMut<'a>,
-    env: Env,
-    info: MessageInfo,
+    pub deps: DepsMut<'a>,
+    pub env: Env,
+    pub info: MessageInfo,
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

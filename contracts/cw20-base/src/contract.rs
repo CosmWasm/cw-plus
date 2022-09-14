@@ -1403,7 +1403,7 @@ mod tests {
 
             // Set allowance
             let allow1 = Uint128::new(7777);
-            let expires = Expiration::AtHeight(5432);
+            let expires = Expiration::AtHeight(123_456);
             let msg = CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: cw20_addr.to_string(),
                 msg: to_binary(&ExecuteMsg::IncreaseAllowance {

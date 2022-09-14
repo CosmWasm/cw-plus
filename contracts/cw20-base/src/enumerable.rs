@@ -127,7 +127,7 @@ mod tests {
 
         // set allowance with height expiration
         let allow1 = Uint128::new(7777);
-        let expires = Expiration::AtHeight(5432);
+        let expires = Expiration::AtHeight(123_456);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender1.clone(),
             amount: allow1,
@@ -192,7 +192,7 @@ mod tests {
 
         // set allowance with height expiration
         let allow1 = Uint128::new(7777);
-        let expires = Expiration::AtHeight(5432);
+        let expires = Expiration::AtHeight(123_456);
         let msg = ExecuteMsg::IncreaseAllowance {
             spender: spender.clone(),
             amount: allow1,
