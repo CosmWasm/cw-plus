@@ -260,6 +260,33 @@ where
     }
 }
 
+#[cfg(feature = "iterator")]
+impl<'a, K, T> Map<'a, K, T>
+where
+    T: Serialize + DeserializeOwned,
+    K: PrimaryKey<'a>,
+{
+    /// Clears the map, removing all elements.
+    pub fn clear(&self, store: &mut dyn Storage) {
+        const TAKE: usize = 10;
+        let prefix = self.no_prefix_raw();
+        let mut cleared = false;
+
+        while !cleared {
+            let paths = prefix
+                .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+                .map(|raw_key| Path::<T>::new(self.namespace, &[raw_key.as_slice()]))
+                // Take just TAKE elements to prevent possible heap overflow if the Map is big.
+                .take(TAKE)
+                .collect::<Vec<_>>();
+
+            paths.iter().for_each(|path| store.remove(path));
+
+            cleared = paths.len() < TAKE;
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1510,5 +1537,26 @@ mod test {
             .unwrap();
         assert_eq!(include.len(), 1);
         assert_eq!(include, vec![456]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn clear() {
+        const TEST_MAP: Map<&str, u32> = Map::new("test_map");
+
+        let mut storage = MockStorage::new();
+        TEST_MAP.save(&mut storage, "key0", &0u32).unwrap();
+        TEST_MAP.save(&mut storage, "key1", &1u32).unwrap();
+        TEST_MAP.save(&mut storage, "key2", &2u32).unwrap();
+        TEST_MAP.save(&mut storage, "key3", &3u32).unwrap();
+        TEST_MAP.save(&mut storage, "key4", &4u32).unwrap();
+
+        TEST_MAP.clear(&mut storage);
+
+        assert!(!TEST_MAP.has(&mut storage, "key0"));
+        assert!(!TEST_MAP.has(&mut storage, "key1"));
+        assert!(!TEST_MAP.has(&mut storage, "key2"));
+        assert!(!TEST_MAP.has(&mut storage, "key3"));
+        assert!(!TEST_MAP.has(&mut storage, "key4"));
     }
 }
