@@ -2,9 +2,9 @@ use anyhow::{bail, Result as AnyResult};
 use schemars::JsonSchema;
 
 use cosmwasm_std::{
-    coin, to_binary, Addr, Api, Binary, BlockInfo, Coin, Decimal, DelegationResponse,
-    DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg, StakingQuery, Storage,
-    Uint128,
+    coin, coins, to_binary, Addr, Api, BankMsg, Binary, BlockInfo, Coin, CustomQuery, Decimal,
+    DelegationResponse, DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg,
+    StakingQuery, Storage, Uint128,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::Map;
@@ -12,7 +12,7 @@ use cw_utils::NativeBalance;
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;
-use crate::Module;
+use crate::{BankSudo, Module};
 
 const STAKES: Map<&Addr, NativeBalance> = Map::new("stakes");
 
@@ -31,12 +31,16 @@ pub trait Staking: Module<ExecT = StakingMsg, QueryT = StakingQuery, SudoT = Sta
 
 pub trait Distribution: Module<ExecT = DistributionMsg, QueryT = Empty, SudoT = Empty> {}
 
-#[derive(Default)]
-pub struct StakeKeeper {}
+pub struct StakeKeeper {
+    module_addr: Addr,
+}
 
 impl StakeKeeper {
     pub fn new() -> Self {
-        StakeKeeper {}
+        StakeKeeper {
+            // define this better?? it is an account for everything held my the staking keeper
+            module_addr: Addr::unchecked("staking_module"),
+        }
     }
 
     pub fn init_balance(
@@ -107,23 +111,36 @@ impl Module for StakeKeeper {
     type QueryT = StakingQuery;
     type SudoT = StakingSudo;
 
-    fn execute<ExecC, QueryC>(
+    fn execute<ExecC, QueryC: CustomQuery>(
         &self,
-        _api: &dyn Api,
+        api: &dyn Api,
         storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        _block: &BlockInfo,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        block: &BlockInfo,
         sender: Addr,
         msg: StakingMsg,
     ) -> AnyResult<AppResponse> {
         let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
         match msg {
             StakingMsg::Delegate { validator, amount } => {
+                // TODO: assert amount is the proper denom
                 let events = vec![Event::new("delegate")
                     .add_attribute("recipient", &validator)
                     .add_attribute("sender", &sender)
                     .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))];
-                self.add_stake(&mut staking_storage, sender, vec![amount])?;
+                self.add_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
+                // move money from sender account to this module (note we can controller sender here)
+                router.execute(
+                    api,
+                    storage,
+                    block,
+                    sender,
+                    BankMsg::Send {
+                        to_address: self.module_addr.to_string(),
+                        amount: vec![amount],
+                    }
+                    .into(),
+                )?;
                 Ok(AppResponse { events, data: None })
             }
             StakingMsg::Undelegate { validator, amount } => {
@@ -131,7 +148,33 @@ impl Module for StakeKeeper {
                     .add_attribute("from", &validator)
                     .add_attribute("to", &sender)
                     .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))];
-                self.remove_stake(&mut staking_storage, sender, vec![amount])?;
+                self.remove_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
+                // move token from this module to sender account
+                // TODO: actually store this so it is released later after unbonding period
+                // but showing how to do the payback
+                router.execute(
+                    api,
+                    storage,
+                    block,
+                    self.module_addr.clone(),
+                    BankMsg::Send {
+                        to_address: sender.into_string(),
+                        amount: vec![amount],
+                    }
+                    .into(),
+                )?;
+
+                // NB: when you need more tokens for staking rewards you can do something like:
+                router.sudo(
+                    api,
+                    storage,
+                    block,
+                    BankSudo::Mint {
+                        to_address: self.module_addr.to_string(),
+                        amount: coins(123456000, "ucosm"),
+                    }
+                    .into(),
+                )?;
                 Ok(AppResponse { events, data: None })
             }
             m => bail!("Unsupported staking message: {:?}", m),
