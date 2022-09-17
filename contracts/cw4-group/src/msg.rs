@@ -31,7 +31,7 @@ pub enum QueryMsg {
     #[returns(cw_controllers::AdminResponse)]
     Admin {},
     #[returns(cw4::TotalWeightResponse)]
-    TotalWeight {},
+    TotalWeight { at_height: Option<u64> },
     #[returns(cw4::MemberListResponse)]
     ListMembers {
         start_after: Option<String>,

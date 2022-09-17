@@ -6,7 +6,7 @@ pub enum Cw4QueryMsg {
     /// Return AdminResponse
     Admin {},
     /// Return TotalWeightResponse
-    TotalWeight {},
+    TotalWeight { at_height: Option<u64> },
     /// Returns MembersListResponse
     ListMembers {
         start_after: Option<String>,
@@ -57,6 +57,8 @@ pub struct HooksResponse {
 
 /// TOTAL_KEY is meant for raw queries
 pub const TOTAL_KEY: &str = "total";
+pub const TOTAL_KEY_CHECKPOINTS: &str = "total__checkpoints";
+pub const TOTAL_KEY_CHANGELOG: &str = "total__changelog";
 pub const MEMBERS_KEY: &str = "members";
 pub const MEMBERS_CHECKPOINTS: &str = "members__checkpoints";
 pub const MEMBERS_CHANGELOG: &str = "members__changelog";

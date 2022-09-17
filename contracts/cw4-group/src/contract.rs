@@ -53,7 +53,7 @@ pub fn create(
         let member_addr = deps.api.addr_validate(&member.addr)?;
         MEMBERS.save(deps.storage, &member_addr, &member.weight, height)?;
     }
-    TOTAL.save(deps.storage, &total)?;
+    TOTAL.save(deps.storage, &total, height)?;
 
     Ok(())
 }
@@ -145,7 +145,7 @@ pub fn update_members(
         }
     }
 
-    TOTAL.save(deps.storage, &total)?;
+    TOTAL.save(deps.storage, &total, height)?;
     Ok(MemberChangedHookMsg { diffs })
 }
 
@@ -157,20 +157,26 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             at_height: height,
         } => to_binary(&query_member(deps, addr, height)?),
         QueryMsg::ListMembers { start_after, limit } => {
-            to_binary(&list_members(deps, start_after, limit)?)
+            to_binary(&query_list_members(deps, start_after, limit)?)
         }
-        QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
+        QueryMsg::TotalWeight { at_height: height } => {
+            to_binary(&query_total_weight(deps, height)?)
+        }
         QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
         QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
     }
 }
 
-fn query_total_weight(deps: Deps) -> StdResult<TotalWeightResponse> {
-    let weight = TOTAL.load(deps.storage)?;
+pub fn query_total_weight(deps: Deps, height: Option<u64>) -> StdResult<TotalWeightResponse> {
+    let weight = match height {
+        Some(h) => TOTAL.may_load_at_height(deps.storage, h),
+        None => TOTAL.may_load(deps.storage),
+    }?
+    .unwrap_or_default();
     Ok(TotalWeightResponse { weight })
 }
 
-fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
+pub fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<MemberResponse> {
     let addr = deps.api.addr_validate(&addr)?;
     let weight = match height {
         Some(h) => MEMBERS.may_load_at_height(deps.storage, &addr, h),
@@ -183,7 +189,7 @@ fn query_member(deps: Deps, addr: String, height: Option<u64>) -> StdResult<Memb
 const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 
-fn list_members(
+pub fn query_list_members(
     deps: Deps,
     start_after: Option<String>,
     limit: Option<u32>,
@@ -246,7 +252,7 @@ mod tests {
         let res = ADMIN.query_admin(deps.as_ref()).unwrap();
         assert_eq!(Some(INIT_ADMIN.into()), res.admin);
 
-        let res = query_total_weight(deps.as_ref()).unwrap();
+        let res = query_total_weight(deps.as_ref(), None).unwrap();
         assert_eq!(17, res.weight);
     }
 
@@ -264,7 +270,7 @@ mod tests {
         let member3 = query_member(deps.as_ref(), USER3.into(), None).unwrap();
         assert_eq!(member3.weight, None);
 
-        let members = list_members(deps.as_ref(), None, None).unwrap();
+        let members = query_list_members(deps.as_ref(), None, None).unwrap();
         assert_eq!(members.members.len(), 2);
         // TODO: assert the set is proper
     }
@@ -293,10 +299,10 @@ mod tests {
             let count = weights.iter().filter(|x| x.is_some()).count();
 
             // TODO: more detailed compare?
-            let members = list_members(deps.as_ref(), None, None).unwrap();
+            let members = query_list_members(deps.as_ref(), None, None).unwrap();
             assert_eq!(count, members.members.len());
 
-            let total = query_total_weight(deps.as_ref()).unwrap();
+            let total = query_total_weight(deps.as_ref(), None).unwrap();
             assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
         }
     }
