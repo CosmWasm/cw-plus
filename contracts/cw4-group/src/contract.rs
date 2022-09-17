@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
-    SubMsg,
+    SubMsg, Uint64,
 };
 use cw2::set_contract_version;
 use cw4::{
@@ -47,13 +47,14 @@ pub fn create(
         .transpose()?;
     ADMIN.set(deps.branch(), admin_addr)?;
 
-    let mut total = 0u64;
+    let mut total = Uint64::zero();
     for member in members.into_iter() {
-        total += member.weight;
+        let member_weight = Uint64::from(member.weight);
+        total = total.checked_add(member_weight)?;
         let member_addr = deps.api.addr_validate(&member.addr)?;
-        MEMBERS.save(deps.storage, &member_addr, &member.weight, height)?;
+        MEMBERS.save(deps.storage, &member_addr, &member_weight.u64(), height)?;
     }
-    TOTAL.save(deps.storage, &total, height)?;
+    TOTAL.save(deps.storage, &total.u64(), height)?;
 
     Ok(())
 }
@@ -120,15 +121,15 @@ pub fn update_members(
 ) -> Result<MemberChangedHookMsg, ContractError> {
     ADMIN.assert_admin(deps.as_ref(), &sender)?;
 
-    let mut total = TOTAL.load(deps.storage)?;
+    let mut total = Uint64::from(TOTAL.load(deps.storage)?);
     let mut diffs: Vec<MemberDiff> = vec![];
 
     // add all new members and update total
     for add in to_add.into_iter() {
         let add_addr = deps.api.addr_validate(&add.addr)?;
         MEMBERS.update(deps.storage, &add_addr, height, |old| -> StdResult<_> {
-            total -= old.unwrap_or_default();
-            total += add.weight;
+            total = total.checked_sub(Uint64::from(old.unwrap_or_default()))?;
+            total = total.checked_add(Uint64::from(add.weight))?;
             diffs.push(MemberDiff::new(add.addr, old, Some(add.weight)));
             Ok(add.weight)
         })?;
@@ -140,12 +141,12 @@ pub fn update_members(
         // Only process this if they were actually in the list before
         if let Some(weight) = old {
             diffs.push(MemberDiff::new(remove, Some(weight), None));
-            total -= weight;
+            total = total.checked_sub(Uint64::from(weight))?;
             MEMBERS.remove(deps.storage, &remove_addr, height)?;
         }
     }
 
-    TOTAL.save(deps.storage, &total, height)?;
+    TOTAL.save(deps.storage, &total.u64(), height)?;
     Ok(MemberChangedHookMsg { diffs })
 }
 
