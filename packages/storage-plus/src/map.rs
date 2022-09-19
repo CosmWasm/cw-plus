@@ -1561,11 +1561,11 @@ mod test {
 
         TEST_MAP.clear(&mut storage);
 
-        assert!(!TEST_MAP.has(&mut storage, "key0"));
-        assert!(!TEST_MAP.has(&mut storage, "key1"));
-        assert!(!TEST_MAP.has(&mut storage, "key2"));
-        assert!(!TEST_MAP.has(&mut storage, "key3"));
-        assert!(!TEST_MAP.has(&mut storage, "key4"));
+        assert!(!TEST_MAP.has(&storage, "key0"));
+        assert!(!TEST_MAP.has(&storage, "key1"));
+        assert!(!TEST_MAP.has(&storage, "key2"));
+        assert!(!TEST_MAP.has(&storage, "key3"));
+        assert!(!TEST_MAP.has(&storage, "key4"));
     }
 
     #[test]
