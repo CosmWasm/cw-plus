@@ -285,6 +285,14 @@ where
             cleared = paths.len() < TAKE;
         }
     }
+
+    /// Returns `true` if the map is empty.
+    pub fn is_empty(&self, store: &dyn Storage) -> bool {
+        self.no_prefix_raw()
+            .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+            .next()
+            .is_none()
+    }
 }
 
 #[cfg(test)]
@@ -1541,7 +1549,7 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
-    fn clear() {
+    fn clear_works() {
         const TEST_MAP: Map<&str, u32> = Map::new("test_map");
 
         let mut storage = MockStorage::new();
@@ -1558,5 +1566,20 @@ mod test {
         assert!(!TEST_MAP.has(&mut storage, "key2"));
         assert!(!TEST_MAP.has(&mut storage, "key3"));
         assert!(!TEST_MAP.has(&mut storage, "key4"));
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn is_empty_works() {
+        const TEST_MAP: Map<&str, u32> = Map::new("test_map");
+
+        let mut storage = MockStorage::new();
+
+        assert!(TEST_MAP.is_empty(&storage));
+
+        TEST_MAP.save(&mut storage, "key1", &1u32).unwrap();
+        TEST_MAP.save(&mut storage, "key2", &2u32).unwrap();
+
+        assert!(!TEST_MAP.is_empty(&storage));
     }
 }
