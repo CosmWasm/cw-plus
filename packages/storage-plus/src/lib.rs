@@ -12,6 +12,7 @@ mod keys;
 mod map;
 mod path;
 mod prefix;
+mod queue;
 mod snapshot;
 
 #[cfg(feature = "iterator")]
@@ -35,6 +36,9 @@ pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
 pub use prefix::{range_with_prefix, Prefix};
+pub use queue::Queue;
+#[cfg(feature = "iterator")]
+pub use queue::QueueIter;
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
 
