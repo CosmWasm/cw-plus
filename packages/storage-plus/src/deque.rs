@@ -88,6 +88,7 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     }
 
     /// Gets the length of the deque.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self, storage: &dyn Storage) -> StdResult<u32> {
         Ok(self.tail(storage)?.wrapping_sub(self.head(storage)?))
     }
@@ -315,7 +316,7 @@ mod tests {
         let mut store = MockStorage::new();
 
         assert_eq!(deque.len(&store).unwrap(), 0);
-        assert_eq!(deque.is_empty(&store).unwrap(), true);
+        assert!(deque.is_empty(&store).unwrap());
 
         // push some entries
         deque.push_front(&mut store, &1234).unwrap();
@@ -323,19 +324,19 @@ mod tests {
         deque.push_front(&mut store, &3456).unwrap();
         deque.push_back(&mut store, &4567).unwrap();
         assert_eq!(deque.len(&store).unwrap(), 4);
-        assert_eq!(deque.is_empty(&store).unwrap(), false);
+        assert!(!deque.is_empty(&store).unwrap());
 
         // pop some
         deque.pop_front(&mut store).unwrap();
         deque.pop_back(&mut store).unwrap();
         deque.pop_front(&mut store).unwrap();
         assert_eq!(deque.len(&store).unwrap(), 1);
-        assert_eq!(deque.is_empty(&store).unwrap(), false);
+        assert!(!deque.is_empty(&store).unwrap());
 
         // pop the last one
         deque.pop_front(&mut store).unwrap();
         assert_eq!(deque.len(&store).unwrap(), 0);
-        assert_eq!(deque.is_empty(&store).unwrap(), true);
+        assert!(deque.is_empty(&store).unwrap());
 
         // should stay 0 after that
         assert_eq!(deque.pop_back(&mut store).unwrap(), None);
@@ -344,7 +345,7 @@ mod tests {
             0,
             "popping from empty deque should keep length 0"
         );
-        assert_eq!(deque.is_empty(&store).unwrap(), true);
+        assert!(deque.is_empty(&store).unwrap());
     }
 
     #[test]
@@ -359,16 +360,16 @@ mod tests {
         deque.push_back(&mut store, &3).unwrap();
         deque.push_back(&mut store, &4).unwrap();
 
-        let items: StdResult<Vec<_>> = deque.iter(&mut store).unwrap().collect();
+        let items: StdResult<Vec<_>> = deque.iter(&store).unwrap().collect();
         assert_eq!(items.unwrap(), [1, 2, 3, 4]);
 
         // nth should work correctly
-        let mut iter = deque.iter(&mut store).unwrap();
+        let mut iter = deque.iter(&store).unwrap();
         assert_eq!(iter.nth(6), None);
         assert_eq!(iter.start, iter.end, "iter should detect skipping too far");
         assert_eq!(iter.next(), None);
 
-        let mut iter = deque.iter(&mut store).unwrap();
+        let mut iter = deque.iter(&store).unwrap();
         assert_eq!(iter.nth(1).unwrap().unwrap(), 2);
         assert_eq!(iter.next().unwrap().unwrap(), 3);
     }
@@ -385,21 +386,21 @@ mod tests {
         deque.push_back(&mut store, &3).unwrap();
         deque.push_back(&mut store, &4).unwrap();
 
-        let items: StdResult<Vec<_>> = deque.iter(&mut store).unwrap().rev().collect();
+        let items: StdResult<Vec<_>> = deque.iter(&store).unwrap().rev().collect();
         assert_eq!(items.unwrap(), [4, 3, 2, 1]);
 
         // nth should work correctly
-        let mut iter = deque.iter(&mut store).unwrap();
+        let mut iter = deque.iter(&store).unwrap();
         assert_eq!(iter.nth_back(6), None);
         assert_eq!(iter.start, iter.end, "iter should detect skipping too far");
         assert_eq!(iter.next_back(), None);
 
-        let mut iter = deque.iter(&mut store).unwrap().rev();
+        let mut iter = deque.iter(&store).unwrap().rev();
         assert_eq!(iter.nth(1).unwrap().unwrap(), 3);
         assert_eq!(iter.next().unwrap().unwrap(), 2);
 
         // mixed
-        let mut iter = deque.iter(&mut store).unwrap();
+        let mut iter = deque.iter(&store).unwrap();
         assert_eq!(iter.next().unwrap().unwrap(), 1);
         assert_eq!(iter.next_back().unwrap().unwrap(), 4);
         assert_eq!(iter.next_back().unwrap().unwrap(), 3);
