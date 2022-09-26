@@ -109,6 +109,36 @@ where
             from_slice(&result).map(Some)
         }
     }
+
+    /// Clears the map, removing all elements.
+    #[cfg(feature = "iterator")]
+    pub fn clear(&self, store: &mut dyn Storage) {
+        const TAKE: usize = 10;
+        let mut cleared = false;
+
+        while !cleared {
+            let paths = self
+                .no_prefix_raw()
+                .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+                .map(|raw_key| Path::<T>::new(self.namespace, &[raw_key.as_slice()]))
+                // Take just TAKE elements to prevent possible heap overflow if the Map is big.
+                .take(TAKE)
+                .collect::<Vec<_>>();
+
+            paths.iter().for_each(|path| store.remove(path));
+
+            cleared = paths.len() < TAKE;
+        }
+    }
+
+    /// Returns `true` if the map is empty.
+    #[cfg(feature = "iterator")]
+    pub fn is_empty(&self, store: &dyn Storage) -> bool {
+        self.no_prefix_raw()
+            .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+            .next()
+            .is_none()
+    }
 }
 
 #[cfg(feature = "iterator")]
@@ -257,41 +287,6 @@ where
         K::Output: 'static,
     {
         self.no_prefix().keys(store, min, max, order)
-    }
-}
-
-#[cfg(feature = "iterator")]
-impl<'a, K, T> Map<'a, K, T>
-where
-    T: Serialize + DeserializeOwned,
-    K: PrimaryKey<'a>,
-{
-    /// Clears the map, removing all elements.
-    pub fn clear(&self, store: &mut dyn Storage) {
-        const TAKE: usize = 10;
-        let prefix = self.no_prefix_raw();
-        let mut cleared = false;
-
-        while !cleared {
-            let paths = prefix
-                .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
-                .map(|raw_key| Path::<T>::new(self.namespace, &[raw_key.as_slice()]))
-                // Take just TAKE elements to prevent possible heap overflow if the Map is big.
-                .take(TAKE)
-                .collect::<Vec<_>>();
-
-            paths.iter().for_each(|path| store.remove(path));
-
-            cleared = paths.len() < TAKE;
-        }
-    }
-
-    /// Returns `true` if the map is empty.
-    pub fn is_empty(&self, store: &dyn Storage) -> bool {
-        self.no_prefix_raw()
-            .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
-            .next()
-            .is_none()
     }
 }
 
