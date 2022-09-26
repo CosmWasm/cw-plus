@@ -174,22 +174,52 @@ where
         (len, Some(len))
     }
 
-    /// The default implementation calls `next` repeatedly, which is very costly in our case.
-    /// It is used when skipping over items, so this allows cheap skipping.
-    ///
-    /// Once `advance_by` is stabilized, we can implement that instead (`nth` calls it internally).
+    // The default implementation calls `next` repeatedly, which is very costly in our case.
+    // It is used when skipping over items, so this allows cheap skipping.
+    //
+    // Once `advance_by` is stabilized, we can implement that instead (`nth` calls it internally).
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        let start_lt_end = self.start < self.end;
-        self.start = self.start.wrapping_add(n as u32);
-        // make sure that we didn't skip past the end
-        if self.start > self.end && start_lt_end || self.start < self.end && !start_lt_end {
-            // start and end switched places, which means the iterator is empty now
+        // make sure that we don't skip past the end
+        if self.end.wrapping_sub(self.start) < n as u32 {
+            // mark as empty
             self.start = self.end;
+        } else {
+            self.start = self.start.wrapping_add(n as u32);
         }
         self.next()
     }
 }
 
+impl<'a, T> DoubleEndedIterator for QueueIter<'a, T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start == self.end {
+            return None;
+        }
+
+        let item = self
+            .queue
+            .get_at(self.storage, self.end.wrapping_sub(1)) // end points to position after last element
+            .transpose()?;
+        self.end = self.end.wrapping_sub(1);
+
+        Some(item)
+    }
+
+    // see [`QueueIter::nth`]
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        // make sure that we don't skip past the start
+        if self.end.wrapping_sub(self.start) < n as u32 {
+            // mark as empty
+            self.end = self.start;
+        } else {
+            self.end = self.end.wrapping_sub(n as u32);
+        }
+        self.next_back()
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::queue::Queue;
