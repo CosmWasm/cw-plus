@@ -145,7 +145,7 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
         storage.set(&full_key, &value.to_be_bytes());
     }
 
-    /// Tries to get the value at the given position (without bounds checking)
+    /// Tries to get the value at the given position
     /// Used internally
     fn get_at_unchecked(&self, storage: &dyn Storage, pos: u32) -> StdResult<Option<T>> {
         let prefixed_key = namespaces_with_key(&[self.namespace], &pos.to_be_bytes());
@@ -159,7 +159,7 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
         storage.remove(&prefixed_key);
     }
 
-    /// Tries to set the value at the given position (without bounds checking)
+    /// Tries to set the value at the given position
     /// Used internally when pushing
     fn set_at_unchecked(&self, storage: &mut dyn Storage, pos: u32, value: &T) -> StdResult<()> {
         let prefixed_key = namespaces_with_key(&[self.namespace], &pos.to_be_bytes());
@@ -271,6 +271,7 @@ mod tests {
 
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::StdResult;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn push_and_pop() {
@@ -464,5 +465,59 @@ mod tests {
         deque.push_front(&mut store, &3).unwrap();
         assert_eq!(deque.back(&store).unwrap(), Some(2));
         assert_eq!(deque.front(&store).unwrap(), Some(3));
+    }
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+    struct Data {
+        pub name: String,
+        pub age: i32,
+    }
+
+    const DATA: Deque<Data> = Deque::new("data");
+
+    #[test]
+    fn readme_works() -> StdResult<()> {
+        let mut store = MockStorage::new();
+
+        // read methods return Option<T>, so None if the deque is empty
+        let empty = DATA.front(&store)?;
+        assert_eq!(None, empty);
+
+        // some example entries
+        let p1 = Data {
+            name: "admin".to_string(),
+            age: 1234,
+        };
+        let p2 = Data {
+            name: "user".to_string(),
+            age: 123,
+        };
+
+        // use it like a queue by pushing and popping at opposite ends
+        DATA.push_back(&mut store, &p1)?;
+        DATA.push_back(&mut store, &p2)?;
+
+        let admin = DATA.pop_front(&mut store)?;
+        assert_eq!(admin.as_ref(), Some(&p1));
+        let user = DATA.pop_front(&mut store)?;
+        assert_eq!(user.as_ref(), Some(&p2));
+
+        // or push and pop at the same end to use it as a stack
+        DATA.push_back(&mut store, &p1)?;
+        DATA.push_back(&mut store, &p2)?;
+
+        let user = DATA.pop_back(&mut store)?;
+        assert_eq!(user.as_ref(), Some(&p2));
+        let admin = DATA.pop_back(&mut store)?;
+        assert_eq!(admin.as_ref(), Some(&p1));
+
+        // you can also iterate over it
+        DATA.push_front(&mut store, &p1)?;
+        DATA.push_front(&mut store, &p2)?;
+
+        let all: StdResult<Vec<_>> = DATA.iter(&store)?.collect();
+        assert_eq!(all?, [p2, p1]);
+
+        Ok(())
     }
 }
