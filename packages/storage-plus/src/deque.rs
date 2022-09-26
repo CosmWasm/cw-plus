@@ -348,6 +348,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn iterator() {
         let deque: Deque<u32> = Deque::new("test");
         let mut store = MockStorage::new();
@@ -373,6 +374,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn reverse_iterator() {
         let deque: Deque<u32> = Deque::new("test");
         let mut store = MockStorage::new();
@@ -431,6 +433,13 @@ mod tests {
             Some(1),
             "popping should work, even when wrapping"
         );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn wrapping_iterator() {
+        let deque: Deque<u32> = Deque::new("test");
+        let mut store = MockStorage::new();
 
         deque.set_head(&mut store, u32::MAX);
         deque.set_tail(&mut store, u32::MAX);
@@ -476,6 +485,7 @@ mod tests {
     const DATA: Deque<Data> = Deque::new("data");
 
     #[test]
+    #[cfg(feature = "iterator")]
     fn readme_works() -> StdResult<()> {
         let mut store = MockStorage::new();
 
