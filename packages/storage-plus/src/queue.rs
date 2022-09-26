@@ -38,7 +38,7 @@ impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
         Ok(())
     }
 
-    /// Removes the first item of the queue and returns it
+    /// Removes the first element of the queue and returns it
     pub fn pop(&self, storage: &mut dyn Storage) -> StdResult<Option<T>> {
         // get position
         let pos = self.head(storage)?;
@@ -63,22 +63,26 @@ impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
 
     /// Gets the head position from storage.
     ///
-    /// Points to the front of the queue (where elements are popped).
+    /// Unless the queue is empty, this points to the first element.
+    #[inline]
     fn head(&self, storage: &dyn Storage) -> StdResult<u32> {
         self.read_meta_key(storage, HEAD_KEY)
     }
 
     /// Gets the tail position from storage.
     ///
-    /// Points to the end of the queue (where elements are pushed).
+    /// This points to the first empty position after the last element.
+    #[inline]
     fn tail(&self, storage: &dyn Storage) -> StdResult<u32> {
         self.read_meta_key(storage, TAIL_KEY)
     }
 
+    #[inline]
     fn set_head(&self, storage: &mut dyn Storage, value: u32) {
         self.set_meta_key(storage, HEAD_KEY, value);
     }
 
+    #[inline]
     fn set_tail(&self, storage: &mut dyn Storage, value: u32) {
         self.set_meta_key(storage, TAIL_KEY, value);
     }
@@ -260,6 +264,7 @@ mod tests {
         let mut store = MockStorage::new();
 
         assert_eq!(queue.len(&store).unwrap(), 0);
+        assert_eq!(queue.is_empty(&store).unwrap(), true);
 
         // push some entries
         queue.push(&mut store, &1234).unwrap();
@@ -267,16 +272,19 @@ mod tests {
         queue.push(&mut store, &3456).unwrap();
         queue.push(&mut store, &4567).unwrap();
         assert_eq!(queue.len(&store).unwrap(), 4);
+        assert_eq!(queue.is_empty(&store).unwrap(), false);
 
         // pop some
         queue.pop(&mut store).unwrap();
         queue.pop(&mut store).unwrap();
         queue.pop(&mut store).unwrap();
         assert_eq!(queue.len(&store).unwrap(), 1);
+        assert_eq!(queue.is_empty(&store).unwrap(), false);
 
         // pop the last one
         queue.pop(&mut store).unwrap();
         assert_eq!(queue.len(&store).unwrap(), 0);
+        assert_eq!(queue.is_empty(&store).unwrap(), true);
 
         // should stay 0 after that
         queue.pop(&mut store).unwrap();
@@ -285,6 +293,7 @@ mod tests {
             0,
             "popping from empty queue should keep length 0"
         );
+        assert_eq!(queue.is_empty(&store).unwrap(), true);
     }
 
     #[test]
@@ -301,10 +310,49 @@ mod tests {
         let items: StdResult<Vec<_>> = queue.iter(&mut store).unwrap().collect();
         assert_eq!(items.unwrap(), [1, 2, 3, 4]);
 
+        // nth should work correctly
         let mut iter = queue.iter(&mut store).unwrap();
         assert_eq!(iter.nth(6), None);
         assert_eq!(iter.start, iter.end, "iter should detect skipping too far");
         assert_eq!(iter.next(), None);
+
+        let mut iter = queue.iter(&mut store).unwrap();
+        assert_eq!(iter.nth(1).unwrap().unwrap(), 2);
+        assert_eq!(iter.next().unwrap().unwrap(), 3);
+    }
+
+    #[test]
+    fn reverse_iterator() {
+        let queue: Queue<u32> = Queue::new("test");
+        let mut store = MockStorage::new();
+
+        // push some items
+        queue.push(&mut store, &1).unwrap();
+        queue.push(&mut store, &2).unwrap();
+        queue.push(&mut store, &3).unwrap();
+        queue.push(&mut store, &4).unwrap();
+
+        let items: StdResult<Vec<_>> = queue.iter(&mut store).unwrap().rev().collect();
+        assert_eq!(items.unwrap(), [4, 3, 2, 1]);
+
+        // nth should work correctly
+        let mut iter = queue.iter(&mut store).unwrap();
+        assert_eq!(iter.nth_back(6), None);
+        assert_eq!(iter.start, iter.end, "iter should detect skipping too far");
+        assert_eq!(iter.next_back(), None);
+
+        let mut iter = queue.iter(&mut store).unwrap().rev();
+        assert_eq!(iter.nth(1).unwrap().unwrap(), 3);
+        assert_eq!(iter.next().unwrap().unwrap(), 2);
+
+        // mixed
+        let mut iter = queue.iter(&mut store).unwrap();
+        assert_eq!(iter.next().unwrap().unwrap(), 1);
+        assert_eq!(iter.next_back().unwrap().unwrap(), 4);
+        assert_eq!(iter.next_back().unwrap().unwrap(), 3);
+        assert_eq!(iter.next().unwrap().unwrap(), 2);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
     }
 
     #[test]
@@ -332,5 +380,22 @@ mod tests {
             Some(1),
             "popping should work, even when wrapping"
         );
+
+        queue.set_head(&mut store, u32::MAX);
+        queue.set_tail(&mut store, u32::MAX);
+
+        queue.push(&mut store, &1).unwrap();
+        queue.push(&mut store, &2).unwrap();
+        queue.push(&mut store, &3).unwrap();
+        queue.push(&mut store, &4).unwrap();
+        queue.push(&mut store, &5).unwrap();
+
+        let mut iter = queue.iter(&store).unwrap();
+        assert_eq!(iter.next().unwrap().unwrap(), 1);
+        assert_eq!(iter.next().unwrap().unwrap(), 2);
+        assert_eq!(iter.next_back().unwrap().unwrap(), 5);
+        assert_eq!(iter.nth(1).unwrap().unwrap(), 4);
+        assert_eq!(iter.nth(1), None);
+        assert_eq!(iter.start, iter.end);
     }
 }
