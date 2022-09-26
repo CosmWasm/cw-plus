@@ -10,14 +10,14 @@ const TAIL_KEY: &[u8] = b"t";
 const HEAD_KEY: &[u8] = b"h";
 
 /// A queue stores multiple items at the given key. It provides efficient FIFO access.
-pub struct Queue<'a, T> {
-    // prefix of the queue items
+pub struct Deque<'a, T> {
+    // prefix of the deque items
     namespace: &'a [u8],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     item_type: PhantomData<T>,
 }
 
-impl<'a, T> Queue<'a, T> {
+impl<'a, T> Deque<'a, T> {
     pub const fn new(prefix: &'a str) -> Self {
         Self {
             namespace: prefix.as_bytes(),
@@ -26,9 +26,9 @@ impl<'a, T> Queue<'a, T> {
     }
 }
 
-impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
-    /// Adds the given value to the end of the queue
-    pub fn push(&self, storage: &mut dyn Storage, value: &T) -> StdResult<()> {
+impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
+    /// Adds the given value to the end of the deque
+    pub fn push_back(&self, storage: &mut dyn Storage, value: &T) -> StdResult<()> {
         // save value
         let pos = self.tail(storage)?;
         self.set_at(storage, pos, value)?;
@@ -38,8 +38,32 @@ impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
         Ok(())
     }
 
-    /// Removes the first element of the queue and returns it
-    pub fn pop(&self, storage: &mut dyn Storage) -> StdResult<Option<T>> {
+    /// Adds the given value to the front of the deque
+    pub fn push_front(&self, storage: &mut dyn Storage, value: &T) -> StdResult<()> {
+        // need to subtract first, because head potentially points to existing element
+        let pos = self.head(storage)?.wrapping_sub(1);
+        self.set_at(storage, pos, value)?;
+        // update head
+        self.set_head(storage, pos);
+
+        Ok(())
+    }
+
+    /// Removes the last element of the deque and returns it
+    pub fn pop_back(&self, storage: &mut dyn Storage) -> StdResult<Option<T>> {
+        // get position
+        let pos = self.tail(storage)?.wrapping_sub(1);
+        let value = self.get_at(storage, pos)?;
+        if value.is_some() {
+            self.remove_at(storage, pos);
+            // only update tail if a value was popped
+            self.set_tail(storage, pos);
+        }
+        Ok(value)
+    }
+
+    /// Removes the first element of the deque and returns it
+    pub fn pop_front(&self, storage: &mut dyn Storage) -> StdResult<Option<T>> {
         // get position
         let pos = self.head(storage)?;
         let value = self.get_at(storage, pos)?;
@@ -51,19 +75,19 @@ impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
         Ok(value)
     }
 
-    /// Gets the length of the queue.
+    /// Gets the length of the deque.
     pub fn len(&self, storage: &dyn Storage) -> StdResult<u32> {
         Ok(self.tail(storage)?.wrapping_sub(self.head(storage)?))
     }
 
-    /// Returns `true` if the queue contains no elements.
+    /// Returns `true` if the deque contains no elements.
     pub fn is_empty(&self, storage: &dyn Storage) -> StdResult<bool> {
         Ok(self.len(storage)? == 0)
     }
 
     /// Gets the head position from storage.
     ///
-    /// Unless the queue is empty, this points to the first element.
+    /// Unless the deque is empty, this points to the first element.
     #[inline]
     fn head(&self, storage: &dyn Storage) -> StdResult<u32> {
         self.read_meta_key(storage, HEAD_KEY)
@@ -134,10 +158,10 @@ impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
-    pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<QueueIter<T>> {
-        Ok(QueueIter {
-            queue: self,
+impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
+    pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<DequeIter<T>> {
+        Ok(DequeIter {
+            deque: self,
             storage,
             start: self.head(storage)?,
             end: self.tail(storage)?,
@@ -146,17 +170,17 @@ impl<'a, T: Serialize + DeserializeOwned> Queue<'a, T> {
 }
 
 #[cfg(feature = "iterator")]
-pub struct QueueIter<'a, T>
+pub struct DequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
-    queue: &'a Queue<'a, T>,
+    deque: &'a Deque<'a, T>,
     storage: &'a dyn Storage,
     start: u32,
     end: u32,
 }
 
-impl<'a, T> Iterator for QueueIter<'a, T>
+impl<'a, T> Iterator for DequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
@@ -167,7 +191,7 @@ where
             return None;
         }
 
-        let item = self.queue.get_at(self.storage, self.start).transpose()?;
+        let item = self.deque.get_at(self.storage, self.start).transpose()?;
         self.start = self.start.wrapping_add(1);
 
         Some(item)
@@ -194,7 +218,7 @@ where
     }
 }
 
-impl<'a, T> DoubleEndedIterator for QueueIter<'a, T>
+impl<'a, T> DoubleEndedIterator for DequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
@@ -204,7 +228,7 @@ where
         }
 
         let item = self
-            .queue
+            .deque
             .get_at(self.storage, self.end.wrapping_sub(1)) // end points to position after last element
             .transpose()?;
         self.end = self.end.wrapping_sub(1);
@@ -212,7 +236,7 @@ where
         Some(item)
     }
 
-    // see [`QueueIter::nth`]
+    // see [`DequeIter::nth`]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         // make sure that we don't skip past the start
         if self.end.wrapping_sub(self.start) < n as u32 {
@@ -226,68 +250,77 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use crate::queue::Queue;
+    use crate::deque::Deque;
 
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::StdResult;
 
     #[test]
     fn push_and_pop() {
-        const PEOPLE: Queue<String> = Queue::new("people");
+        const PEOPLE: Deque<String> = Deque::new("people");
         let mut store = MockStorage::new();
 
         // push some entries
-        PEOPLE.push(&mut store, &"jack".to_owned()).unwrap();
-        PEOPLE.push(&mut store, &"john".to_owned()).unwrap();
-        PEOPLE.push(&mut store, &"joanne".to_owned()).unwrap();
+        PEOPLE.push_back(&mut store, &"jack".to_owned()).unwrap();
+        PEOPLE.push_back(&mut store, &"john".to_owned()).unwrap();
+        PEOPLE.push_back(&mut store, &"joanne".to_owned()).unwrap();
 
         // pop them, should be in correct order
-        assert_eq!("jack", PEOPLE.pop(&mut store).unwrap().unwrap());
-        assert_eq!("john", PEOPLE.pop(&mut store).unwrap().unwrap());
+        assert_eq!("jack", PEOPLE.pop_front(&mut store).unwrap().unwrap());
+        assert_eq!("john", PEOPLE.pop_front(&mut store).unwrap().unwrap());
 
         // push again in-between
-        PEOPLE.push(&mut store, &"jason".to_owned()).unwrap();
+        PEOPLE.push_back(&mut store, &"jason".to_owned()).unwrap();
 
         // pop last person from first batch
-        assert_eq!("joanne", PEOPLE.pop(&mut store).unwrap().unwrap());
+        assert_eq!("joanne", PEOPLE.pop_front(&mut store).unwrap().unwrap());
 
         // pop the entry pushed in-between
-        assert_eq!("jason", PEOPLE.pop(&mut store).unwrap().unwrap());
+        assert_eq!("jason", PEOPLE.pop_front(&mut store).unwrap().unwrap());
 
         // nothing after that
-        assert_eq!(None, PEOPLE.pop(&mut store).unwrap());
+        assert_eq!(None, PEOPLE.pop_front(&mut store).unwrap());
+
+        // now push to the front
+        PEOPLE.push_front(&mut store, &"pascal".to_owned()).unwrap();
+        PEOPLE.push_front(&mut store, &"peter".to_owned()).unwrap();
+        PEOPLE.push_front(&mut store, &"paul".to_owned()).unwrap();
+
+        assert_eq!("pascal", PEOPLE.pop_back(&mut store).unwrap().unwrap());
+        assert_eq!("paul", PEOPLE.pop_front(&mut store).unwrap().unwrap());
+        assert_eq!("peter", PEOPLE.pop_back(&mut store).unwrap().unwrap());
     }
 
     #[test]
     fn length() {
-        let queue: Queue<u32> = Queue::new("test");
+        let queue: Deque<u32> = Deque::new("test");
         let mut store = MockStorage::new();
 
         assert_eq!(queue.len(&store).unwrap(), 0);
         assert_eq!(queue.is_empty(&store).unwrap(), true);
 
         // push some entries
-        queue.push(&mut store, &1234).unwrap();
-        queue.push(&mut store, &2345).unwrap();
-        queue.push(&mut store, &3456).unwrap();
-        queue.push(&mut store, &4567).unwrap();
+        queue.push_back(&mut store, &1234).unwrap();
+        queue.push_back(&mut store, &2345).unwrap();
+        queue.push_back(&mut store, &3456).unwrap();
+        queue.push_back(&mut store, &4567).unwrap();
         assert_eq!(queue.len(&store).unwrap(), 4);
         assert_eq!(queue.is_empty(&store).unwrap(), false);
 
         // pop some
-        queue.pop(&mut store).unwrap();
-        queue.pop(&mut store).unwrap();
-        queue.pop(&mut store).unwrap();
+        queue.pop_front(&mut store).unwrap();
+        queue.pop_front(&mut store).unwrap();
+        queue.pop_front(&mut store).unwrap();
         assert_eq!(queue.len(&store).unwrap(), 1);
         assert_eq!(queue.is_empty(&store).unwrap(), false);
 
         // pop the last one
-        queue.pop(&mut store).unwrap();
+        queue.pop_front(&mut store).unwrap();
         assert_eq!(queue.len(&store).unwrap(), 0);
         assert_eq!(queue.is_empty(&store).unwrap(), true);
 
         // should stay 0 after that
-        queue.pop(&mut store).unwrap();
+        queue.pop_front(&mut store).unwrap();
         assert_eq!(
             queue.len(&store).unwrap(),
             0,
@@ -298,14 +331,14 @@ mod tests {
 
     #[test]
     fn iterator() {
-        let queue: Queue<u32> = Queue::new("test");
+        let queue: Deque<u32> = Deque::new("test");
         let mut store = MockStorage::new();
 
         // push some items
-        queue.push(&mut store, &1).unwrap();
-        queue.push(&mut store, &2).unwrap();
-        queue.push(&mut store, &3).unwrap();
-        queue.push(&mut store, &4).unwrap();
+        queue.push_back(&mut store, &1).unwrap();
+        queue.push_back(&mut store, &2).unwrap();
+        queue.push_back(&mut store, &3).unwrap();
+        queue.push_back(&mut store, &4).unwrap();
 
         let items: StdResult<Vec<_>> = queue.iter(&mut store).unwrap().collect();
         assert_eq!(items.unwrap(), [1, 2, 3, 4]);
@@ -323,14 +356,14 @@ mod tests {
 
     #[test]
     fn reverse_iterator() {
-        let queue: Queue<u32> = Queue::new("test");
+        let queue: Deque<u32> = Deque::new("test");
         let mut store = MockStorage::new();
 
         // push some items
-        queue.push(&mut store, &1).unwrap();
-        queue.push(&mut store, &2).unwrap();
-        queue.push(&mut store, &3).unwrap();
-        queue.push(&mut store, &4).unwrap();
+        queue.push_back(&mut store, &1).unwrap();
+        queue.push_back(&mut store, &2).unwrap();
+        queue.push_back(&mut store, &3).unwrap();
+        queue.push_back(&mut store, &4).unwrap();
 
         let items: StdResult<Vec<_>> = queue.iter(&mut store).unwrap().rev().collect();
         assert_eq!(items.unwrap(), [4, 3, 2, 1]);
@@ -357,7 +390,7 @@ mod tests {
 
     #[test]
     fn wrapping() {
-        let queue: Queue<u32> = Queue::new("test");
+        let queue: Deque<u32> = Deque::new("test");
         let mut store = MockStorage::new();
 
         // simulate queue that was pushed and popped `u32::MAX` times
@@ -365,18 +398,18 @@ mod tests {
         queue.set_tail(&mut store, u32::MAX);
 
         // should be empty
-        assert_eq!(queue.pop(&mut store).unwrap(), None);
+        assert_eq!(queue.pop_front(&mut store).unwrap(), None);
         assert_eq!(queue.len(&store).unwrap(), 0);
 
         // pushing should still work
-        queue.push(&mut store, &1).unwrap();
+        queue.push_back(&mut store, &1).unwrap();
         assert_eq!(
             queue.len(&store).unwrap(),
             1,
             "length should calculate correctly, even when wrapping"
         );
         assert_eq!(
-            queue.pop(&mut store).unwrap(),
+            queue.pop_front(&mut store).unwrap(),
             Some(1),
             "popping should work, even when wrapping"
         );
@@ -384,11 +417,11 @@ mod tests {
         queue.set_head(&mut store, u32::MAX);
         queue.set_tail(&mut store, u32::MAX);
 
-        queue.push(&mut store, &1).unwrap();
-        queue.push(&mut store, &2).unwrap();
-        queue.push(&mut store, &3).unwrap();
-        queue.push(&mut store, &4).unwrap();
-        queue.push(&mut store, &5).unwrap();
+        queue.push_back(&mut store, &1).unwrap();
+        queue.push_back(&mut store, &2).unwrap();
+        queue.push_back(&mut store, &3).unwrap();
+        queue.push_back(&mut store, &4).unwrap();
+        queue.push_back(&mut store, &5).unwrap();
 
         let mut iter = queue.iter(&store).unwrap();
         assert_eq!(iter.next().unwrap().unwrap(), 1);

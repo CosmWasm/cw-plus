@@ -1,5 +1,6 @@
 mod bound;
 mod de;
+mod deque;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -12,12 +13,14 @@ mod keys;
 mod map;
 mod path;
 mod prefix;
-mod queue;
 mod snapshot;
 
 #[cfg(feature = "iterator")]
 pub use bound::{Bound, Bounder, PrefixBound, RawBound};
 pub use de::KeyDeserialize;
+pub use deque::Deque;
+#[cfg(feature = "iterator")]
+pub use deque::DequeIter;
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};
@@ -36,9 +39,6 @@ pub use map::Map;
 pub use path::Path;
 #[cfg(feature = "iterator")]
 pub use prefix::{range_with_prefix, Prefix};
-pub use queue::Queue;
-#[cfg(feature = "iterator")]
-pub use queue::QueueIter;
 #[cfg(feature = "iterator")]
 pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
 
