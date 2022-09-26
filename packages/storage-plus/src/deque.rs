@@ -180,6 +180,7 @@ where
     end: u32,
 }
 
+#[cfg(feature = "iterator")]
 impl<'a, T> Iterator for DequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
@@ -218,6 +219,7 @@ where
     }
 }
 
+#[cfg(feature = "iterator")]
 impl<'a, T> DoubleEndedIterator for DequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
