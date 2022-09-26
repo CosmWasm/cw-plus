@@ -109,6 +109,36 @@ where
             from_slice(&result).map(Some)
         }
     }
+
+    /// Clears the map, removing all elements.
+    #[cfg(feature = "iterator")]
+    pub fn clear(&self, store: &mut dyn Storage) {
+        const TAKE: usize = 10;
+        let mut cleared = false;
+
+        while !cleared {
+            let paths = self
+                .no_prefix_raw()
+                .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+                .map(|raw_key| Path::<T>::new(self.namespace, &[raw_key.as_slice()]))
+                // Take just TAKE elements to prevent possible heap overflow if the Map is big.
+                .take(TAKE)
+                .collect::<Vec<_>>();
+
+            paths.iter().for_each(|path| store.remove(path));
+
+            cleared = paths.len() < TAKE;
+        }
+    }
+
+    /// Returns `true` if the map is empty.
+    #[cfg(feature = "iterator")]
+    pub fn is_empty(&self, store: &dyn Storage) -> bool {
+        self.no_prefix_raw()
+            .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+            .next()
+            .is_none()
+    }
 }
 
 #[cfg(feature = "iterator")]
@@ -1510,5 +1540,41 @@ mod test {
             .unwrap();
         assert_eq!(include.len(), 1);
         assert_eq!(include, vec![456]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn clear_works() {
+        const TEST_MAP: Map<&str, u32> = Map::new("test_map");
+
+        let mut storage = MockStorage::new();
+        TEST_MAP.save(&mut storage, "key0", &0u32).unwrap();
+        TEST_MAP.save(&mut storage, "key1", &1u32).unwrap();
+        TEST_MAP.save(&mut storage, "key2", &2u32).unwrap();
+        TEST_MAP.save(&mut storage, "key3", &3u32).unwrap();
+        TEST_MAP.save(&mut storage, "key4", &4u32).unwrap();
+
+        TEST_MAP.clear(&mut storage);
+
+        assert!(!TEST_MAP.has(&storage, "key0"));
+        assert!(!TEST_MAP.has(&storage, "key1"));
+        assert!(!TEST_MAP.has(&storage, "key2"));
+        assert!(!TEST_MAP.has(&storage, "key3"));
+        assert!(!TEST_MAP.has(&storage, "key4"));
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn is_empty_works() {
+        const TEST_MAP: Map<&str, u32> = Map::new("test_map");
+
+        let mut storage = MockStorage::new();
+
+        assert!(TEST_MAP.is_empty(&storage));
+
+        TEST_MAP.save(&mut storage, "key1", &1u32).unwrap();
+        TEST_MAP.save(&mut storage, "key2", &2u32).unwrap();
+
+        assert!(!TEST_MAP.is_empty(&storage));
     }
 }
