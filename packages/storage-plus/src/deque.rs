@@ -31,7 +31,7 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     pub fn push_back(&self, storage: &mut dyn Storage, value: &T) -> StdResult<()> {
         // save value
         let pos = self.tail(storage)?;
-        self.set_at_unchecked(storage, pos, value)?;
+        self.set_unchecked(storage, pos, value)?;
         // update tail
         self.set_tail(storage, pos.wrapping_add(1));
 
@@ -42,7 +42,7 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     pub fn push_front(&self, storage: &mut dyn Storage, value: &T) -> StdResult<()> {
         // need to subtract first, because head potentially points to existing element
         let pos = self.head(storage)?.wrapping_sub(1);
-        self.set_at_unchecked(storage, pos, value)?;
+        self.set_unchecked(storage, pos, value)?;
         // update head
         self.set_head(storage, pos);
 
@@ -53,9 +53,9 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     pub fn pop_back(&self, storage: &mut dyn Storage) -> StdResult<Option<T>> {
         // get position
         let pos = self.tail(storage)?.wrapping_sub(1);
-        let value = self.get_at_unchecked(storage, pos)?;
+        let value = self.get_unchecked(storage, pos)?;
         if value.is_some() {
-            self.remove_at_unchecked(storage, pos);
+            self.remove_unchecked(storage, pos);
             // only update tail if a value was popped
             self.set_tail(storage, pos);
         }
@@ -66,9 +66,9 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     pub fn pop_front(&self, storage: &mut dyn Storage) -> StdResult<Option<T>> {
         // get position
         let pos = self.head(storage)?;
-        let value = self.get_at_unchecked(storage, pos)?;
+        let value = self.get_unchecked(storage, pos)?;
         if value.is_some() {
-            self.remove_at_unchecked(storage, pos);
+            self.remove_unchecked(storage, pos);
             // only update head if a value was popped
             self.set_head(storage, pos.wrapping_add(1));
         }
@@ -78,13 +78,13 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     /// Returns the first element of the deque without removing it
     pub fn front(&self, storage: &dyn Storage) -> StdResult<Option<T>> {
         let pos = self.head(storage)?;
-        self.get_at_unchecked(storage, pos)
+        self.get_unchecked(storage, pos)
     }
 
     /// Returns the first element of the deque without removing it
     pub fn back(&self, storage: &dyn Storage) -> StdResult<Option<T>> {
         let pos = self.tail(storage)?.wrapping_sub(1);
-        self.get_at_unchecked(storage, pos)
+        self.get_unchecked(storage, pos)
     }
 
     /// Gets the length of the deque.
@@ -148,21 +148,21 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
 
     /// Tries to get the value at the given position
     /// Used internally
-    fn get_at_unchecked(&self, storage: &dyn Storage, pos: u32) -> StdResult<Option<T>> {
+    fn get_unchecked(&self, storage: &dyn Storage, pos: u32) -> StdResult<Option<T>> {
         let prefixed_key = namespaces_with_key(&[self.namespace], &pos.to_be_bytes());
         may_deserialize(&storage.get(&prefixed_key))
     }
 
     /// Removes the value at the given position
     /// Used internally
-    fn remove_at_unchecked(&self, storage: &mut dyn Storage, pos: u32) {
+    fn remove_unchecked(&self, storage: &mut dyn Storage, pos: u32) {
         let prefixed_key = namespaces_with_key(&[self.namespace], &pos.to_be_bytes());
         storage.remove(&prefixed_key);
     }
 
     /// Tries to set the value at the given position
     /// Used internally when pushing
-    fn set_at_unchecked(&self, storage: &mut dyn Storage, pos: u32, value: &T) -> StdResult<()> {
+    fn set_unchecked(&self, storage: &mut dyn Storage, pos: u32, value: &T) -> StdResult<()> {
         let prefixed_key = namespaces_with_key(&[self.namespace], &pos.to_be_bytes());
         storage.set(&prefixed_key, &to_vec(value)?);
 
@@ -207,7 +207,7 @@ where
 
         let item = self
             .deque
-            .get_at_unchecked(self.storage, self.start)
+            .get_unchecked(self.storage, self.start)
             .and_then(|item| item.ok_or_else(|| StdError::not_found(type_name::<T>())));
         self.start = self.start.wrapping_add(1);
 
@@ -247,7 +247,7 @@ where
 
         let item = self
             .deque
-            .get_at_unchecked(self.storage, self.end.wrapping_sub(1)) // end points to position after last element
+            .get_unchecked(self.storage, self.end.wrapping_sub(1)) // end points to position after last element
             .and_then(|item| item.ok_or_else(|| StdError::not_found(type_name::<T>())));
         self.end = self.end.wrapping_sub(1);
 
