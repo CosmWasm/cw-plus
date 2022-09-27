@@ -192,7 +192,7 @@ impl Module for StakeKeeper {
 
                 // this is not a noop, since there is validation regarding the amount
                 self.remove_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
-                self.add_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
+                self.add_stake(&mut staking_storage, sender, vec![amount])?;
 
                 Ok(AppResponse { events, data: None })
             }
