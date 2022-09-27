@@ -636,11 +636,12 @@ the index key (the part that corresponds to the primary key, that is).
 So, to correctly use type-safe bounds over multi-indexes ranges, it is fundamental for this `PK` type
 to be correctly defined, so that it matches the primary key type, or its (typically owned) deserialization variant.
 
-## Deque
+## VecDeque
 
-The usage of a [`Deque`](./src/deque.rs) is pretty straight-forward.
+The usage of a [`VecDeque`](./src/deque.rs) is pretty straight-forward.
 Conceptually it works like a storage-backed version of Rust std's `VecDeque` and can be used as a queue or stack.
 It allows you to push and pop elements on both ends and also read the first or last element without mutating the deque.
+You can also read a specific index directly.
 
 Example Usage:
 
@@ -694,6 +695,11 @@ fn demo() -> StdResult<()> {
 
     let all: StdResult<Vec<_>> = DATA.iter(&store)?.collect();
     assert_eq!(all?, [p2, p1]);
+
+    // or access an index directly
+    assert_eq!(DATA.get(&store, 0)?, Some(p2));
+    assert_eq!(DATA.get(&store, 1)?, Some(p1));
+    assert_eq!(DATA.get(&store, 3)?, None);
 
     Ok(())
 }

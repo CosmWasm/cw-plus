@@ -9,7 +9,8 @@ use crate::helpers::{may_deserialize, namespaces_with_key};
 const TAIL_KEY: &[u8] = b"t";
 const HEAD_KEY: &[u8] = b"h";
 
-/// A deque stores multiple items at the given key. It provides efficient FIFO and LIFO access.
+/// A deque stores multiple items at the given key. It provides efficient FIFO and LIFO access,
+/// as well as direct index access.
 ///
 /// It has a maximum capacity of `u32::MAX - 1`. Make sure to never exceed that number when using this type.
 /// If you do, the methods won't work as intended anymore.
@@ -552,7 +553,12 @@ mod tests {
         DATA.push_front(&mut store, &p2)?;
 
         let all: StdResult<Vec<_>> = DATA.iter(&store)?.collect();
-        assert_eq!(all?, [p2, p1]);
+        assert_eq!(all?, [p2.clone(), p1.clone()]);
+
+        // or access an index directly
+        assert_eq!(DATA.get(&store, 0)?, Some(p2));
+        assert_eq!(DATA.get(&store, 1)?, Some(p1));
+        assert_eq!(DATA.get(&store, 3)?, None);
 
         Ok(())
     }
