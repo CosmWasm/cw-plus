@@ -93,7 +93,7 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
     /// Gets the length of the deque.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self, storage: &dyn Storage) -> StdResult<u32> {
-        Ok(self.tail(storage)?.wrapping_sub(self.head(storage)?))
+        Ok(calc_len(self.head(storage)?, self.tail(storage)?))
     }
 
     /// Returns `true` if the deque contains no elements.
@@ -149,6 +149,22 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
         storage.set(&full_key, &value.to_be_bytes());
     }
 
+    /// Returns the value at the given position in the queue or `None` if the index is out of bounds
+    pub fn get(&self, storage: &dyn Storage, pos: u32) -> StdResult<Option<T>> {
+        let head = self.head(storage)?;
+        let tail = self.tail(storage)?;
+
+        if pos >= calc_len(head, tail) {
+            // out of bounds
+            return Ok(None);
+        }
+
+        let pos = head.wrapping_add(pos);
+        self.get_unchecked(storage, pos)
+            .and_then(|v| v.ok_or_else(|| StdError::not_found(format!("deque position {}", pos))))
+            .map(Some)
+    }
+
     /// Tries to get the value at the given position
     /// Used internally
     fn get_unchecked(&self, storage: &dyn Storage, pos: u32) -> StdResult<Option<T>> {
@@ -171,6 +187,12 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
 
         Ok(())
     }
+}
+
+// used internally to avoid additional storage loads
+#[inline]
+fn calc_len(head: u32, tail: u32) -> u32 {
+    tail.wrapping_sub(head)
 }
 
 #[cfg(feature = "iterator")]
@@ -218,7 +240,7 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.end.wrapping_sub(self.start) as usize;
+        let len = calc_len(self.start, self.end) as usize;
         (len, Some(len))
     }
 
@@ -228,7 +250,7 @@ where
     // Once `advance_by` is stabilized, we can implement that instead (`nth` calls it internally).
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         // make sure that we don't skip past the end
-        if self.end.wrapping_sub(self.start) < n as u32 {
+        if calc_len(self.start, self.end) < n as u32 {
             // mark as empty
             self.start = self.end;
         } else {
@@ -260,7 +282,7 @@ where
     // see [`DequeIter::nth`]
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
         // make sure that we don't skip past the start
-        if self.end.wrapping_sub(self.start) < n as u32 {
+        if calc_len(self.start, self.end) < n as u32 {
             // mark as empty
             self.end = self.start;
         } else {
@@ -558,6 +580,51 @@ mod tests {
         assert!(
             matches!(iter.next(), Some(Err(StdError::NotFound { .. }))),
             "reverse iterator should error when item is missing"
+        );
+    }
+
+    #[test]
+    fn get() {
+        let mut store = MockStorage::new();
+
+        let deque = Deque::new("test");
+
+        deque.push_back(&mut store, &1u32).unwrap();
+        deque.push_back(&mut store, &2).unwrap();
+
+        assert_eq!(deque.get(&store, 0).unwrap(), Some(1));
+        assert_eq!(deque.get(&store, 1).unwrap(), Some(2));
+        assert_eq!(
+            deque.get(&store, 2).unwrap(),
+            None,
+            "out of bounds access should return None"
+        );
+
+        // manually remove storage item
+        deque.remove_unchecked(&mut store, 1);
+
+        assert!(
+            matches!(deque.get(&store, 1), Err(StdError::NotFound { .. })),
+            "missing deque item should error"
+        );
+
+        // start fresh
+        let deque = Deque::new("test2");
+
+        deque.push_back(&mut store, &0u32).unwrap();
+        deque.push_back(&mut store, &1).unwrap();
+        // push to front to move the head index
+        deque.push_front(&mut store, &u32::MAX).unwrap();
+        deque.push_front(&mut store, &(u32::MAX - 1)).unwrap();
+
+        assert_eq!(deque.get(&store, 0).unwrap().unwrap(), u32::MAX - 1);
+        assert_eq!(deque.get(&store, 1).unwrap().unwrap(), u32::MAX);
+        assert_eq!(deque.get(&store, 2).unwrap().unwrap(), 0);
+        assert_eq!(deque.get(&store, 3).unwrap().unwrap(), 1);
+        assert_eq!(
+            deque.get(&store, 5).unwrap(),
+            None,
+            "out of bounds access should return None"
         );
     }
 }
