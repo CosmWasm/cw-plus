@@ -271,7 +271,7 @@ mod tests {
     use crate::deque::Deque;
 
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::StdResult;
+    use cosmwasm_std::{StdError, StdResult};
     use serde::{Deserialize, Serialize};
 
     #[test]
@@ -530,5 +530,31 @@ mod tests {
         assert_eq!(all?, [p2, p1]);
 
         Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn iterator_errors_when_item_missing() {
+        let mut store = MockStorage::new();
+
+        let deque = Deque::new("error_test");
+
+        deque.push_back(&mut store, &1u32).unwrap();
+        // manually remove it
+        deque.remove_unchecked(&mut store, 0);
+
+        let mut iter = deque.iter(&store).unwrap();
+
+        assert!(
+            matches!(iter.next(), Some(Err(StdError::NotFound { .. }))),
+            "iterator should error when item is missing"
+        );
+
+        let mut iter = deque.iter(&store).unwrap().rev();
+
+        assert!(
+            matches!(iter.next(), Some(Err(StdError::NotFound { .. }))),
+            "reverse iterator should error when item is missing"
+        );
     }
 }
