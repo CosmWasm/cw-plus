@@ -10,6 +10,9 @@ const TAIL_KEY: &[u8] = b"t";
 const HEAD_KEY: &[u8] = b"h";
 
 /// A deque stores multiple items at the given key. It provides efficient FIFO and LIFO access.
+///
+/// It has a maximum capacity of `u32::MAX - 1`. Make sure to never exceed that number when using this type.
+/// If you do, the methods won't work as intended anymore.
 pub struct Deque<'a, T> {
     // prefix of the deque items
     namespace: &'a [u8],
