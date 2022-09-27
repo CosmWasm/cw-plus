@@ -13,14 +13,14 @@ const HEAD_KEY: &[u8] = b"h";
 ///
 /// It has a maximum capacity of `u32::MAX - 1`. Make sure to never exceed that number when using this type.
 /// If you do, the methods won't work as intended anymore.
-pub struct Deque<'a, T> {
+pub struct VecDeque<'a, T> {
     // prefix of the deque items
     namespace: &'a [u8],
     // see https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters for why this is needed
     item_type: PhantomData<T>,
 }
 
-impl<'a, T> Deque<'a, T> {
+impl<'a, T> VecDeque<'a, T> {
     pub const fn new(prefix: &'a str) -> Self {
         Self {
             namespace: prefix.as_bytes(),
@@ -29,7 +29,7 @@ impl<'a, T> Deque<'a, T> {
     }
 }
 
-impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
+impl<'a, T: Serialize + DeserializeOwned> VecDeque<'a, T> {
     /// Adds the given value to the end of the deque
     pub fn push_back(&self, storage: &mut dyn Storage, value: &T) -> StdResult<()> {
         // save value
@@ -196,9 +196,9 @@ fn calc_len(head: u32, tail: u32) -> u32 {
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
-    pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<DequeIter<T>> {
-        Ok(DequeIter {
+impl<'a, T: Serialize + DeserializeOwned> VecDeque<'a, T> {
+    pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<VecDequeIter<T>> {
+        Ok(VecDequeIter {
             deque: self,
             storage,
             start: self.head(storage)?,
@@ -208,18 +208,18 @@ impl<'a, T: Serialize + DeserializeOwned> Deque<'a, T> {
 }
 
 #[cfg(feature = "iterator")]
-pub struct DequeIter<'a, T>
+pub struct VecDequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
-    deque: &'a Deque<'a, T>,
+    deque: &'a VecDeque<'a, T>,
     storage: &'a dyn Storage,
     start: u32,
     end: u32,
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, T> Iterator for DequeIter<'a, T>
+impl<'a, T> Iterator for VecDequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
@@ -261,7 +261,7 @@ where
 }
 
 #[cfg(feature = "iterator")]
-impl<'a, T> DoubleEndedIterator for DequeIter<'a, T>
+impl<'a, T> DoubleEndedIterator for VecDequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
 {
@@ -293,7 +293,7 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use crate::deque::Deque;
+    use crate::deque::VecDeque;
 
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{StdError, StdResult};
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn push_and_pop() {
-        const PEOPLE: Deque<String> = Deque::new("people");
+        const PEOPLE: VecDeque<String> = VecDeque::new("people");
         let mut store = MockStorage::new();
 
         // push some entries
@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn length() {
-        let deque: Deque<u32> = Deque::new("test");
+        let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
 
         assert_eq!(deque.len(&store).unwrap(), 0);
@@ -376,7 +376,7 @@ mod tests {
     #[test]
     #[cfg(feature = "iterator")]
     fn iterator() {
-        let deque: Deque<u32> = Deque::new("test");
+        let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
 
         // push some items
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     #[cfg(feature = "iterator")]
     fn reverse_iterator() {
-        let deque: Deque<u32> = Deque::new("test");
+        let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
 
         // push some items
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn wrapping() {
-        let deque: Deque<u32> = Deque::new("test");
+        let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
 
         // simulate deque that was pushed and popped `u32::MAX` times
@@ -464,7 +464,7 @@ mod tests {
     #[test]
     #[cfg(feature = "iterator")]
     fn wrapping_iterator() {
-        let deque: Deque<u32> = Deque::new("test");
+        let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
 
         deque.set_head(&mut store, u32::MAX);
@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn front_back() {
-        let deque: Deque<u64> = Deque::new("test");
+        let deque: VecDeque<u64> = VecDeque::new("test");
         let mut store = MockStorage::new();
 
         assert_eq!(deque.back(&store).unwrap(), None);
@@ -508,7 +508,7 @@ mod tests {
         pub age: i32,
     }
 
-    const DATA: Deque<Data> = Deque::new("data");
+    const DATA: VecDeque<Data> = VecDeque::new("data");
 
     #[test]
     #[cfg(feature = "iterator")]
@@ -562,7 +562,7 @@ mod tests {
     fn iterator_errors_when_item_missing() {
         let mut store = MockStorage::new();
 
-        let deque = Deque::new("error_test");
+        let deque = VecDeque::new("error_test");
 
         deque.push_back(&mut store, &1u32).unwrap();
         // manually remove it
@@ -587,7 +587,7 @@ mod tests {
     fn get() {
         let mut store = MockStorage::new();
 
-        let deque = Deque::new("test");
+        let deque = VecDeque::new("test");
 
         deque.push_back(&mut store, &1u32).unwrap();
         deque.push_back(&mut store, &2).unwrap();
@@ -609,7 +609,7 @@ mod tests {
         );
 
         // start fresh
-        let deque = Deque::new("test2");
+        let deque = VecDeque::new("test2");
 
         deque.push_back(&mut store, &0u32).unwrap();
         deque.push_back(&mut store, &1).unwrap();
