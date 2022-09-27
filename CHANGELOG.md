@@ -1,8 +1,20 @@
 # Changelog
 
-## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
+## [v0.15.1](https://github.com/CosmWasm/cw-plus/tree/v0.15.1) (2022-09-27)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.0...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.0...v0.15.1)
+
+**Closed issues:**
+
+- Add stack and queue implementations to storage-plus [\#776](https://github.com/CosmWasm/cw-plus/issues/776)
+
+**Merged pull requests:**
+
+- Release 0.15.1 [\#809](https://github.com/CosmWasm/cw-plus/pull/809) ([uint](https://github.com/uint))
+- Add Deque [\#807](https://github.com/CosmWasm/cw-plus/pull/807) ([chipshort](https://github.com/chipshort))
+- Cw1155-base public queries and move tests [\#804](https://github.com/CosmWasm/cw-plus/pull/804) ([ismellike](https://github.com/ismellike))
+- Add clear and is\_empty methods to Map [\#803](https://github.com/CosmWasm/cw-plus/pull/803) ([manu0466](https://github.com/manu0466))
+- SnapshotItem total, public query methods, and safe math [\#802](https://github.com/CosmWasm/cw-plus/pull/802) ([ismellike](https://github.com/ismellike))
 
 ## [v0.15.0](https://github.com/CosmWasm/cw-plus/tree/v0.15.0) (2022-09-14)
 
