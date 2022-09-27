@@ -124,10 +124,11 @@ impl Module for StakeKeeper {
         match msg {
             StakingMsg::Delegate { validator, amount } => {
                 // TODO: assert amount is the proper denom
+                // see https://github.com/cosmos/cosmos-sdk/blob/v0.46.1/x/staking/keeper/msg_server.go#L251-L256
                 let events = vec![Event::new("delegate")
-                    .add_attribute("recipient", &validator)
-                    .add_attribute("sender", &sender)
-                    .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))];
+                    .add_attribute("validator", &validator)
+                    .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))
+                    .add_attribute("new_shares", amount.amount.to_string())]; // TODO: calculate shares?
                 self.add_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
                 // move money from sender account to this module (note we can controller sender here)
                 router.execute(
@@ -144,10 +145,11 @@ impl Module for StakeKeeper {
                 Ok(AppResponse { events, data: None })
             }
             StakingMsg::Undelegate { validator, amount } => {
-                let events = vec![Event::new("undelegate")
-                    .add_attribute("from", &validator)
-                    .add_attribute("to", &sender)
-                    .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))];
+                // see https://github.com/cosmos/cosmos-sdk/blob/v0.46.1/x/staking/keeper/msg_server.go#L378-L383
+                let events = vec![Event::new("unbond")
+                    .add_attribute("validator", &validator)
+                    .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))
+                    .add_attribute("completion_time", "2022-09-27T14:00:00+00:00")]; // TODO: actual date?
                 self.remove_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
                 // move token from this module to sender account
                 // TODO: actually store this so it is released later after unbonding period
