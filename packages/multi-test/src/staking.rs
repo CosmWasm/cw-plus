@@ -179,6 +179,23 @@ impl Module for StakeKeeper {
                 )?;
                 Ok(AppResponse { events, data: None })
             }
+            StakingMsg::Redelegate {
+                src_validator,
+                dst_validator,
+                amount,
+            } => {
+                // see https://github.com/cosmos/cosmos-sdk/blob/v0.46.1/x/staking/keeper/msg_server.go#L316-L322
+                let events = vec![Event::new("redelegate")
+                    .add_attribute("source_validator", &src_validator)
+                    .add_attribute("destination_validator", &dst_validator)
+                    .add_attribute("amount", format!("{}{}", amount.amount, amount.denom))];
+
+                // this is not a noop, since there is validation regarding the amount
+                self.remove_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
+                self.add_stake(&mut staking_storage, sender.clone(), vec![amount.clone()])?;
+
+                Ok(AppResponse { events, data: None })
+            }
             m => bail!("Unsupported staking message: {:?}", m),
         }
     }
