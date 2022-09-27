@@ -635,3 +635,72 @@ In the particular case of `MultiIndex`, the primary key (`PK`) type parameter al
 the index key (the part that corresponds to the primary key, that is).
 So, to correctly use type-safe bounds over multi-indexes ranges, it is fundamental for this `PK` type
 to be correctly defined, so that it matches the primary key type, or its (typically owned) deserialization variant.
+
+## VecDeque
+
+The usage of a [`VecDeque`](./src/deque.rs) is pretty straight-forward.
+Conceptually it works like a storage-backed version of Rust std's `VecDeque` and can be used as a queue or stack.
+It allows you to push and pop elements on both ends and also read the first or last element without mutating the deque.
+You can also read a specific index directly.
+
+Example Usage:
+
+```rust
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct Data {
+    pub name: String,
+    pub age: i32,
+}
+
+const DATA: Deque<Data> = Deque::new("data");
+
+fn demo() -> StdResult<()> {
+    let mut store = MockStorage::new();
+
+    // read methods return a wrapped Option<T>, so None if the deque is empty
+    let empty = DATA.front(&store)?;
+    assert_eq!(None, empty);
+
+    // some example entries
+    let p1 = Data {
+        name: "admin".to_string(),
+        age: 1234,
+    };
+    let p2 = Data {
+        name: "user".to_string(),
+        age: 123,
+    };
+
+    // use it like a queue by pushing and popping at opposite ends
+    DATA.push_back(&mut store, &p1)?;
+    DATA.push_back(&mut store, &p2)?;
+
+    let admin = DATA.pop_front(&mut store)?;
+    assert_eq!(admin.as_ref(), Some(&p1));
+    let user = DATA.pop_front(&mut store)?;
+    assert_eq!(user.as_ref(), Some(&p2));
+
+    // or push and pop at the same end to use it as a stack
+    DATA.push_back(&mut store, &p1)?;
+    DATA.push_back(&mut store, &p2)?;
+
+    let user = DATA.pop_back(&mut store)?;
+    assert_eq!(user.as_ref(), Some(&p2));
+    let admin = DATA.pop_back(&mut store)?;
+    assert_eq!(admin.as_ref(), Some(&p1));
+
+    // you can also iterate over it
+    DATA.push_front(&mut store, &p1)?;
+    DATA.push_front(&mut store, &p2)?;
+
+    let all: StdResult<Vec<_>> = DATA.iter(&store)?.collect();
+    assert_eq!(all?, [p2, p1]);
+
+    // or access an index directly
+    assert_eq!(DATA.get(&store, 0)?, Some(p2));
+    assert_eq!(DATA.get(&store, 1)?, Some(p1));
+    assert_eq!(DATA.get(&store, 3)?, None);
+
+    Ok(())
+}
+```

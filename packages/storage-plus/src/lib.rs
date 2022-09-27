@@ -1,5 +1,6 @@
 mod bound;
 mod de;
+mod deque;
 mod endian;
 mod helpers;
 mod indexed_map;
@@ -17,6 +18,9 @@ mod snapshot;
 #[cfg(feature = "iterator")]
 pub use bound::{Bound, Bounder, PrefixBound, RawBound};
 pub use de::KeyDeserialize;
+pub use deque::VecDeque;
+#[cfg(feature = "iterator")]
+pub use deque::VecDequeIter;
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
 pub use indexed_map::{IndexList, IndexedMap};
