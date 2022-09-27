@@ -490,7 +490,7 @@ mod tests {
     fn readme_works() -> StdResult<()> {
         let mut store = MockStorage::new();
 
-        // read methods return Option<T>, so None if the deque is empty
+        // read methods return a wrapped Option<T>, so None if the deque is empty
         let empty = DATA.front(&store)?;
         assert_eq!(None, empty);
 

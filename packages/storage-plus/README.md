@@ -639,7 +639,7 @@ to be correctly defined, so that it matches the primary key type, or its (typica
 ## Deque
 
 The usage of a [`Deque`](./src/deque.rs) is pretty straight-forward.
-Conceptually it works like a storage-backed `VecDeque`and can be used as a queue or stack.
+Conceptually it works like a storage-backed version of Rust std's `VecDeque` and can be used as a queue or stack.
 It allows you to push and pop elements on both ends and also read the first or last element without mutating the deque.
 
 Example Usage:
@@ -656,7 +656,7 @@ const DATA: Deque<Data> = Deque::new("data");
 fn demo() -> StdResult<()> {
     let mut store = MockStorage::new();
 
-    // read methods return Option<T>, so None if the deque is empty
+    // read methods return a wrapped Option<T>, so None if the deque is empty
     let empty = DATA.front(&store)?;
     assert_eq!(None, empty);
 
