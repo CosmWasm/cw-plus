@@ -1,4 +1,4 @@
-use std::{convert::TryInto, marker::PhantomData};
+use std::{any::type_name, convert::TryInto, marker::PhantomData};
 
 use cosmwasm_std::{to_vec, StdError, StdResult, Storage};
 use serde::{de::DeserializeOwned, Serialize};
@@ -208,7 +208,7 @@ where
         let item = self
             .deque
             .get_at_unchecked(self.storage, self.start)
-            .transpose()?;
+            .and_then(|item| item.ok_or_else(|| StdError::not_found(type_name::<T>())));
         self.start = self.start.wrapping_add(1);
 
         Some(item)
@@ -248,7 +248,7 @@ where
         let item = self
             .deque
             .get_at_unchecked(self.storage, self.end.wrapping_sub(1)) // end points to position after last element
-            .transpose()?;
+            .and_then(|item| item.ok_or_else(|| StdError::not_found(type_name::<T>())));
         self.end = self.end.wrapping_sub(1);
 
         Some(item)
