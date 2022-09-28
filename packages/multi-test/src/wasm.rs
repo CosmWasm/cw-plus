@@ -1484,7 +1484,7 @@ mod test {
                 &mut wasm_storage,
                 &mock_router(),
                 &block,
-                admin.clone(),
+                admin,
                 WasmMsg::UpdateAdmin {
                     contract_addr: contract_addr.to_string(),
                     admin: new_admin.to_string(),

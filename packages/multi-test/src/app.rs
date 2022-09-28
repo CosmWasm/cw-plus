@@ -1887,7 +1887,7 @@ mod test {
 
         // check admin still the same
         let info = app.contract_data(&contract).unwrap();
-        assert_eq!(info.admin, Some(owner2.clone()));
+        assert_eq!(info.admin, Some(owner2));
     }
 
     mod reply_data_overwrite {
