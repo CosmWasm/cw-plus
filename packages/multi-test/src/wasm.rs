@@ -342,7 +342,7 @@ where
         // check admin status
         let mut data = self.load_contract(storage, &contract_addr)?;
         if data.admin != Some(sender) {
-            bail!("Only admin can clear contract admin: {:?}", data.admin);
+            bail!("Only admin can update the contract admin: {:?}", data.admin);
         }
         // update admin field
         data.admin = admin;
