@@ -53,6 +53,12 @@ workflows:
              only: /^v[0-9]+\.[0-9]+\.[0-9]+.*/
            branches:
              ignore: /.*/
+      - update_changelog:
+          filters:
+            tags:
+              only: /.*/ #/^v[0-9]+\.[0-9]+\.[0-9]+.*/
+            branches:
+              ignore: /.*/
 
 jobs:
   contract_cw1_subkeys:
@@ -802,3 +808,30 @@ jobs:
               -n "$TITLE" -b "$BODY" \
               -replace \
               "$TAG" ./schemas/
+
+  update_changelog:
+    docker:
+      - image: githubchangeloggenerator/github-changelog-generator:1.16.2
+    working_directory: ~/project
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Generate changelog
+          command: github_changelog_generator -u CosmWasm -p cw-plus --base CHANGELOG.md -t "$GITHUB_TOKEN" --future-release "$CIRCLE_TAG"
+      - run:
+          name: Commit changelog changes
+          command: |
+            git config user.email "uint@lavabit.com"
+            git config user.name "CI"
+            git add CHANGELOG.md
+            git fetch --all
+
+            echo $CIRCLE_BRANCH
+
+            # if something is staged (there were changes to the changelog)
+            git diff-index --quiet --cached HEAD -- || \
+            # then go ahead and commit
+            (git commit -m "[CI] Update CHANGELOG.md" && \
+            # this could easily cause an infinite loop if this job is triggered on commit pushes!
+            git push -q https://${GITHUB_TOKEN}@github.com/CosmWasm/cw-plus.git changelog-auto-gen)
