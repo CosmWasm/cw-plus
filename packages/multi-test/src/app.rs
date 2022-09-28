@@ -1828,6 +1828,68 @@ mod test {
         assert_eq!(state.beneficiary, random);
     }
 
+    #[test]
+    fn send_update_admin_works() {
+        // The plan:
+        // create a hackatom contract
+        // check admin set properly
+        // update admin succeeds if admin
+        // update admin fails if not (new) admin
+        // check admin set properly
+        let owner = Addr::unchecked("owner");
+        let owner2 = Addr::unchecked("owner2");
+        let beneficiary = Addr::unchecked("beneficiary");
+
+        let mut app = App::default();
+
+        // create a hackatom contract with some funds
+        let contract_id = app.store_code(hackatom::contract());
+        let contract = app
+            .instantiate_contract(
+                contract_id,
+                owner.clone(),
+                &hackatom::InstantiateMsg {
+                    beneficiary: beneficiary.as_str().to_owned(),
+                },
+                &[],
+                "Hackatom",
+                Some(owner.to_string()),
+            )
+            .unwrap();
+
+        // check admin set properly
+        let info = app.contract_data(&contract).unwrap();
+        assert_eq!(info.admin, Some(owner.clone()));
+
+        // transfer adminship to owner2
+        app.execute(
+            owner.clone(),
+            CosmosMsg::Wasm(WasmMsg::UpdateAdmin {
+                contract_addr: contract.to_string(),
+                admin: owner2.to_string(),
+            }),
+        )
+        .unwrap();
+
+        // check admin set properly
+        let info = app.contract_data(&contract).unwrap();
+        assert_eq!(info.admin, Some(owner2.clone()));
+
+        // update admin fails if not owner2
+        app.execute(
+            owner.clone(),
+            CosmosMsg::Wasm(WasmMsg::UpdateAdmin {
+                contract_addr: contract.to_string(),
+                admin: owner.to_string(),
+            }),
+        )
+        .unwrap_err();
+
+        // check admin still the same
+        let info = app.contract_data(&contract).unwrap();
+        assert_eq!(info.admin, Some(owner2));
+    }
+
     mod reply_data_overwrite {
         use super::*;
 
