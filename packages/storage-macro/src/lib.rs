@@ -5,6 +5,25 @@ use syn::{
     parse_macro_input, ItemStruct,
 };
 
+/// Auto generate an `IndexList` impl for your indexes struct.
+///
+/// # Example
+///
+/// ```rust
+/// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+/// struct TestStruct {
+///     id: u64,
+///     id2: u32,
+///     addr: Addr,
+/// }
+///
+/// #[index_list(TestStruct)] // <- Add this line right here.
+/// struct TestIndexes<'a> {
+///     id: MultiIndex<'a, u32, TestStruct, u64>,
+///     addr: UniqueIndex<'a, Addr, TestStruct>,
+/// }
+/// ```
+///
 #[proc_macro_attribute]
 pub fn index_list(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);

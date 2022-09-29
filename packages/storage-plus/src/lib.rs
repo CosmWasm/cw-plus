@@ -46,5 +46,4 @@ pub use snapshot::{SnapshotItem, SnapshotMap, Strategy};
 #[macro_use]
 extern crate cw_storage_macro;
 #[cfg(all(feature = "iterator", feature = "macro"))]
-#[doc(hidden)]
 pub use cw_storage_macro::*;
