@@ -71,5 +71,3 @@ extern crate cw_storage_macro;
 /// ```
 ///
 pub use cw_storage_macro::index_list;
-#[cfg(all(feature = "iterator", feature = "macro"))]
-pub use cw_storage_macro::*;
