@@ -135,14 +135,14 @@ pub fn execute_transfer_from(
     // deduct allowance before doing anything else have enough allowance
     deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
-    BALANCES.update(
+    let sender_balance = BALANCES.update(
         deps.storage,
         &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
-    BALANCES.update(
+    let receiver_balance = BALANCES.update(
         deps.storage,
         &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
@@ -154,6 +154,8 @@ pub fn execute_transfer_from(
         attr("to", recipient),
         attr("by", info.sender),
         attr("amount", amount),
+        attr("sender_balance", sender_balance),
+        attr("receiver_balance", receiver_balance)
     ]);
     Ok(res)
 }
@@ -172,7 +174,7 @@ pub fn execute_burn_from(
     deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     // lower balance
-    BALANCES.update(
+    let burner_balance = BALANCES.update(
         deps.storage,
         &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
@@ -180,7 +182,7 @@ pub fn execute_burn_from(
         },
     )?;
     // reduce total_supply
-    TOKEN_INFO.update(deps.storage, |mut meta| -> StdResult<_> {
+    let token_info = TOKEN_INFO.update(deps.storage, |mut meta| -> StdResult<_> {
         meta.total_supply = meta.total_supply.checked_sub(amount)?;
         Ok(meta)
     })?;
@@ -190,6 +192,8 @@ pub fn execute_burn_from(
         attr("from", owner),
         attr("by", info.sender),
         attr("amount", amount),
+        attr("burner_balance", burner_balance),
+        attr("total_supply", token_info.total_supply)
     ]);
     Ok(res)
 }

@@ -56,18 +56,17 @@ fn verify_xml_preamble(data: &[u8]) -> Result<(), ContractError> {
 }
 
 /// Validates XML logo
-fn verify_xml_logo(logo: &[u8]) -> Result<(), ContractError> {
+fn verify_xml_logo(logo: &[u8]) -> Result<String, ContractError> {
     verify_xml_preamble(logo)?;
-
     if logo.len() > LOGO_SIZE_CAP {
         Err(ContractError::LogoTooBig {})
     } else {
-        Ok(())
+        Ok(String::from("xml"))
     }
 }
 
 /// Validates png logo
-fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
+fn verify_png_logo(logo: &[u8]) -> Result<String, ContractError> {
     // PNG header format:
     // 0x89 - magic byte, out of ASCII table to fail on 7-bit systems
     // "PNG" ascii representation
@@ -80,16 +79,16 @@ fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
     } else if !logo.starts_with(&HEADER) {
         Err(ContractError::InvalidPngHeader {})
     } else {
-        Ok(())
+        Ok(String::from("png"))
     }
 }
 
 /// Checks if passed logo is correct, and if not, returns an error
-fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
+fn verify_logo(logo: &Logo) -> Result<String, ContractError> {
     match logo {
         Logo::Embedded(EmbeddedLogo::Svg(logo)) => verify_xml_logo(logo),
         Logo::Embedded(EmbeddedLogo::Png(logo)) => verify_png_logo(logo),
-        Logo::Url(_) => Ok(()), // Any reasonable url validation would be regex based, probably not worth it
+        Logo::Url(_) => Ok(String::from("url")), // Any reasonable url validation would be regex based, probably not worth it
     }
 }
 
@@ -132,14 +131,25 @@ pub fn instantiate(
     };
     TOKEN_INFO.save(deps.storage, &data)?;
 
+    let logo_string = &mut String::from("");
     if let Some(marketing) = msg.marketing {
         let logo = if let Some(logo) = marketing.logo {
-            verify_logo(&logo)?;
+            let logo_type = verify_logo(&logo)?;
             LOGO.save(deps.storage, &logo)?;
 
             match logo {
-                Logo::Url(url) => Some(LogoInfo::Url(url)),
-                Logo::Embedded(_) => Some(LogoInfo::Embedded),
+                Logo::Url(url) => {
+                    logo_string.push_str(url.as_str());
+                    Some(LogoInfo::Url(url))
+                },
+                Logo::Embedded(binary_type) => {
+                    let b64_logo = match binary_type {
+                        EmbeddedLogo::Svg(binary) => binary.to_base64(),
+                        EmbeddedLogo::Png(binary) => binary.to_base64(),
+                    };
+                    logo_string.push_str((logo_type + ":" + b64_logo.as_str()).as_str());
+                    Some(LogoInfo::Embedded)
+                }
             }
         } else {
             None
@@ -157,8 +167,13 @@ pub fn instantiate(
         MARKETING_INFO.save(deps.storage, &data)?;
     }
 
-    let serialized = serde_json::to_string(initial_balances).unwrap();
-    Ok(Response::new().add_attribute("balances", serialized))
+    let serialized_balances = serde_json::to_string(initial_balances).unwrap();
+    
+    let res = Response::new()
+        .add_attribute("balances", serialized_balances)
+        .add_attribute("total_supply", total_supply)
+        .add_attribute("logo", logo_string.as_str());
+    Ok(res)
 }
 
 pub fn create_accounts(
@@ -255,14 +270,15 @@ pub fn execute_transfer(
     let rcpt_addr = deps.api.addr_validate(&recipient)?;
     let sender_addr: &Addr = &info.sender;
 
-    BALANCES.update(
+    let sender_balance = BALANCES.update(
         deps.storage,
         sender_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
-    BALANCES.update(
+    
+    let receiver_balance = BALANCES.update(
         deps.storage,
         &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
@@ -273,8 +289,8 @@ pub fn execute_transfer(
         .add_attribute("from", sender_addr.as_str())
         .add_attribute("to", recipient)
         .add_attribute("amount", amount)
-        .add_attribute("from_account_balance", BALANCES.may_load(deps.storage, sender_addr)?.unwrap_or_default())
-        .add_attribute("to_account_balance", BALANCES.load(deps.storage, sender_addr).unwrap());
+        .add_attribute("sender_balance", sender_balance)
+        .add_attribute("receiver_balance", receiver_balance);
     Ok(res)
 }
 
@@ -290,7 +306,7 @@ pub fn execute_burn(
 
     let sender_addr: &Addr = &info.sender;
     // lower balance
-    BALANCES.update(
+    let burner_balance = BALANCES.update(
         deps.storage,
         sender_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
@@ -298,7 +314,7 @@ pub fn execute_burn(
         },
     )?;
     // reduce total_supply
-    TOKEN_INFO.update(deps.storage, |mut info| -> StdResult<_> {
+    let token_info = TOKEN_INFO.update(deps.storage, |mut info| -> StdResult<_> {
         info.total_supply = info.total_supply.checked_sub(amount)?;
         Ok(info)
     })?;
@@ -307,7 +323,8 @@ pub fn execute_burn(
         .add_attribute("action", "burn")
         .add_attribute("from", sender_addr.as_str())
         .add_attribute("amount", amount)
-        .add_attribute("from_balance", BALANCES.may_load(deps.storage, sender_addr)?.unwrap_or_default());
+        .add_attribute("burner_balance", burner_balance)
+        .add_attribute("total_supply", token_info.total_supply);
     Ok(res)
 }
 
@@ -347,7 +364,7 @@ pub fn execute_mint(
 
     // add amount to recipient balance
     let rcpt_addr = deps.api.addr_validate(&recipient)?;
-    BALANCES.update(
+    let minter_balance = BALANCES.update(
         deps.storage,
         &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
@@ -357,7 +374,8 @@ pub fn execute_mint(
         .add_attribute("action", "mint")
         .add_attribute("to", recipient)
         .add_attribute("amount", amount)
-        .add_attribute("balance", BALANCES.may_load(deps.storage, &rcpt_addr)?.unwrap_or_default());
+        .add_attribute("minter_balance", minter_balance)
+        .add_attribute("total_supply", config.total_supply);
     Ok(res)
 }
 
@@ -376,14 +394,14 @@ pub fn execute_send(
     let rcpt_addr = deps.api.addr_validate(&contract)?;
 
     // move the tokens to the contract
-    BALANCES.update(
+    let sender_balance = BALANCES.update(
         deps.storage,
         &info.sender,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
-    BALANCES.update(
+    let receiver_balance = BALANCES.update(
         deps.storage,
         &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
@@ -394,6 +412,8 @@ pub fn execute_send(
         .add_attribute("from", &info.sender)
         .add_attribute("to", &contract)
         .add_attribute("amount", amount)
+        .add_attribute("sender_balance", sender_balance)
+        .add_attribute("receiver_balance", receiver_balance)
         .add_message(
             Cw20ReceiveMsg {
                 sender: info.sender.into(),
