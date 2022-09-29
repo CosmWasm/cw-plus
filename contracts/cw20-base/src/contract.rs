@@ -1,5 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+use cosmwasm_std::Addr;
 use cosmwasm_std::Order::Ascending;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
@@ -10,6 +11,7 @@ use cw20::{
     BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
     MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
+use serde_json;
 use cw_utils::ensure_from_older_version;
 
 use crate::allowances::{
@@ -101,8 +103,10 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
+
+    let initial_balances = &msg.initial_balances;
     // create initial accounts
-    let total_supply = create_accounts(&mut deps, &msg.initial_balances)?;
+    let total_supply = create_accounts(&mut deps, initial_balances)?;
 
     if let Some(limit) = msg.get_cap() {
         if total_supply > limit {
@@ -153,7 +157,8 @@ pub fn instantiate(
         MARKETING_INFO.save(deps.storage, &data)?;
     }
 
-    Ok(Response::default())
+    let serialized = serde_json::to_string(initial_balances).unwrap();
+    Ok(Response::new().add_attribute("balances", serialized))
 }
 
 pub fn create_accounts(
@@ -248,10 +253,11 @@ pub fn execute_transfer(
     }
 
     let rcpt_addr = deps.api.addr_validate(&recipient)?;
+    let sender_addr: &Addr = &info.sender;
 
     BALANCES.update(
         deps.storage,
-        &info.sender,
+        sender_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -264,9 +270,11 @@ pub fn execute_transfer(
 
     let res = Response::new()
         .add_attribute("action", "transfer")
-        .add_attribute("from", info.sender)
+        .add_attribute("from", sender_addr.as_str())
         .add_attribute("to", recipient)
-        .add_attribute("amount", amount);
+        .add_attribute("amount", amount)
+        .add_attribute("from_account_balance", BALANCES.may_load(deps.storage, sender_addr)?.unwrap_or_default())
+        .add_attribute("to_account_balance", BALANCES.load(deps.storage, sender_addr).unwrap());
     Ok(res)
 }
 
@@ -280,10 +288,11 @@ pub fn execute_burn(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
+    let sender_addr: &Addr = &info.sender;
     // lower balance
     BALANCES.update(
         deps.storage,
-        &info.sender,
+        sender_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
@@ -296,8 +305,9 @@ pub fn execute_burn(
 
     let res = Response::new()
         .add_attribute("action", "burn")
-        .add_attribute("from", info.sender)
-        .add_attribute("amount", amount);
+        .add_attribute("from", sender_addr.as_str())
+        .add_attribute("amount", amount)
+        .add_attribute("from_balance", BALANCES.may_load(deps.storage, sender_addr)?.unwrap_or_default());
     Ok(res)
 }
 
@@ -346,7 +356,8 @@ pub fn execute_mint(
     let res = Response::new()
         .add_attribute("action", "mint")
         .add_attribute("to", recipient)
-        .add_attribute("amount", amount);
+        .add_attribute("amount", amount)
+        .add_attribute("balance", BALANCES.may_load(deps.storage, &rcpt_addr)?.unwrap_or_default());
     Ok(res)
 }
 

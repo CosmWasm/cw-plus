@@ -592,6 +592,7 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 
