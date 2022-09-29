@@ -660,11 +660,11 @@ jobs:
           name: Run unit tests (no iterator)
           command: cargo test --locked --no-default-features
       - run:
-          name: Build library for native target (with iterator)
-          command: cargo build --locked
+          name: Build library for native target (with iterator and macro)
+          command: cargo build --locked --all-features
       - run:
-          name: Run unit tests (with iterator)
-          command: cargo test --locked
+          name: Run unit tests (with iterator and macro)
+          command: cargo test --locked --all-features
       - save_cache:
           paths:
             - /usr/local/cargo/registry
