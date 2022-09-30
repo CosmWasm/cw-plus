@@ -1,3 +1,10 @@
+/*!
+Procedural macros helper for interacting with cw-storage-plus and cosmwasm-storage.
+
+For more information on this package, please check out the
+[README](https://github.com/CosmWasm/cw-plus/blob/main/packages/storage-macro/README.md).
+*/
+
 use proc_macro::TokenStream;
 use syn::{
     Ident,

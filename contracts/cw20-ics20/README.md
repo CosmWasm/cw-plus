@@ -1,7 +1,7 @@
 # CW20 ICS20
 
 This is an *IBC Enabled* contract that allows us to send CW20 tokens from one chain over the standard ICS20
-protocol to the bank module of another chain. In short, it let's us send our custom CW20 tokens with IBC and use
+protocol to the bank module of another chain. In short, it lets us send our custom CW20 tokens with IBC and use
 them just like native tokens on other chains.
 
 It is only designed to send tokens and redeem previously sent tokens. It will not mint tokens belonging
