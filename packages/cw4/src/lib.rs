@@ -11,9 +11,9 @@ the ones laid out here should be under the specified keys and in the
 same format.
 
 In this case, a cw3 contract could *read* an external group contract with
-no significant cost more than reading local storage. However, updating
+no significant cost besides reading local storage. However, updating
 that group contract (if allowed), would be an external message and
-charged the instantiation overhead for each contract.
+will be charged as part of the overhead for each contract.
 
 For more information on this specification, please check out the
 [README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw4/README.md).
