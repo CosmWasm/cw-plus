@@ -7,7 +7,7 @@ use cosmwasm_std::{
 use semver::Version;
 
 use cw2::{get_contract_version, set_contract_version};
-use cw20::{Cw20Coin, Cw20ReceiveMsg};
+use cw20::{Cw20CoinVerified, Cw20ReceiveMsg};
 use cw_storage_plus::Bound;
 
 use crate::amount::Amount;
@@ -86,8 +86,8 @@ pub fn execute_receive(
     nonpayable(&info)?;
 
     let msg: TransferMsg = from_binary(&wrapper.msg)?;
-    let amount = Amount::Cw20(Cw20Coin {
-        address: info.sender.to_string(),
+    let amount = Amount::Cw20(Cw20CoinVerified {
+        address: info.sender,
         amount: wrapper.amount,
     });
     let api = deps.api;
@@ -112,7 +112,7 @@ pub fn execute_transfer(
 
     // if cw20 token, validate and ensure it is whitelisted, or we set default gas limit
     if let Amount::Cw20(coin) = &amount {
-        let addr = deps.api.addr_validate(&coin.address)?;
+        let addr = deps.api.addr_validate(coin.address.as_ref())?;
         // if limit is set, then we always allow cw20
         if config.default_gas_limit.is_none() {
             ALLOW_LIST

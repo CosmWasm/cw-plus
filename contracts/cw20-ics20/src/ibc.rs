@@ -272,7 +272,7 @@ fn check_gas_limit(deps: Deps, amount: &Amount) -> Result<Option<u64>, ContractE
     match amount {
         Amount::Cw20(coin) => {
             // if cw20 token, use the registered gas limit, or error if not whitelisted
-            let addr = deps.api.addr_validate(&coin.address)?;
+            let addr = deps.api.addr_validate(coin.address.as_ref())?;
             let allowed = ALLOW_LIST.may_load(deps.storage, &addr)?;
             match allowed {
                 Some(allow) => Ok(allow.gas_limit),
@@ -376,7 +376,7 @@ fn send_amount(amount: Amount, recipient: String) -> CosmosMsg {
                 amount: coin.amount,
             };
             WasmMsg::Execute {
-                contract_addr: coin.address,
+                contract_addr: coin.address.to_string(),
                 msg: to_binary(&msg).unwrap(),
                 funds: vec![],
             }

@@ -1,30 +1,32 @@
 use crate::error::ContractError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Coin, Uint128};
-use cw20::Cw20Coin;
+use cosmwasm_std::{testing::MockApi, Api, Coin, Uint128};
+use cw20::Cw20CoinVerified;
 use std::convert::TryInto;
 
 #[cw_serde]
 pub enum Amount {
     Native(Coin),
-    // FIXME? USe Cw20CoinVerified, and validate cw20 addresses
-    Cw20(Cw20Coin),
+    Cw20(Cw20CoinVerified),
 }
 
 impl Amount {
-    // TODO: write test for this
     pub fn from_parts(denom: String, amount: Uint128) -> Self {
         if denom.starts_with("cw20:") {
-            let address = denom.get(5..).unwrap().into();
-            Amount::Cw20(Cw20Coin { address, amount })
+            Amount::Cw20(Cw20CoinVerified {
+                address: MockApi::default()
+                    .addr_validate(denom.get(5..).unwrap())
+                    .unwrap(),
+                amount,
+            })
         } else {
             Amount::Native(Coin { denom, amount })
         }
     }
 
     pub fn cw20(amount: u128, addr: &str) -> Self {
-        Amount::Cw20(Cw20Coin {
-            address: addr.into(),
+        Amount::Cw20(Cw20CoinVerified {
+            address: MockApi::default().addr_validate(addr).unwrap(),
             amount: Uint128::new(amount),
         })
     }
@@ -62,5 +64,49 @@ impl Amount {
             Amount::Native(c) => c.amount.is_zero(),
             Amount::Cw20(c) => c.amount.is_zero(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Amount, Coin, Cw20CoinVerified, Uint128};
+    use cosmwasm_std::Addr;
+
+    #[test]
+    fn from_parts_native() {
+        let amount = Uint128::new(1_000_000);
+        let denom = "token-denom";
+
+        assert_eq!(
+            Amount::from_parts(denom.into(), amount),
+            Amount::Native(Coin {
+                denom: denom.into(),
+                amount
+            })
+        );
+    }
+
+    #[test]
+    fn from_parts_cw20() {
+        let amount = Uint128::new(1_000_000);
+        let cw20_addr = Addr::unchecked("token-addr");
+        let cw20_denom = "cw20:token-addr";
+
+        assert_eq!(
+            Amount::from_parts(cw20_denom.into(), amount),
+            Amount::Cw20(Cw20CoinVerified {
+                address: cw20_addr,
+                amount
+            })
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn from_parts_cw20_bad_addr() {
+        let amount = Uint128::new(1_000_000);
+        let cw20_denom = "cw20:BAD-token-addr";
+
+        Amount::from_parts(cw20_denom.into(), amount);
     }
 }

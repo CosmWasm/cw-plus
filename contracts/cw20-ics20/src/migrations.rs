@@ -61,7 +61,7 @@ pub mod v2 {
                 // with the Querier generics
                 // `Cw20Contract(contract.clone()).balance(&deps.querier, contract)?`
                 let query = WasmQuery::Smart {
-                    contract_addr: coin.address,
+                    contract_addr: coin.address.to_string(),
                     msg: to_binary(&Cw20QueryMsg::Balance {
                         address: contract.into(),
                     })?,
