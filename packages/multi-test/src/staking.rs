@@ -2,12 +2,13 @@ use anyhow::{bail, Result as AnyResult};
 use schemars::JsonSchema;
 
 use cosmwasm_std::{
-    coin, coins, to_binary, Addr, Api, BankMsg, Binary, BlockInfo, Coin, CustomQuery, Decimal,
+    coin, coins, from_slice, to_binary, Addr, AllDelegationsResponse, AllValidatorsResponse, Api,
+    BankMsg, Binary, BlockInfo, BondedDenomResponse, Coin, CustomQuery, Decimal, Delegation,
     DelegationResponse, DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg,
-    StakingQuery, Storage, Uint128,
+    StakingQuery, Storage, Validator, ValidatorResponse,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
-use cw_storage_plus::Map;
+use cw_storage_plus::{Item, Map};
 use cw_utils::NativeBalance;
 
 use crate::app::CosmosRouter;
@@ -15,6 +16,7 @@ use crate::executor::AppResponse;
 use crate::{BankSudo, Module};
 
 const STAKES: Map<&Addr, NativeBalance> = Map::new("stakes");
+const REWARD_RATIO: Item<Decimal> = Item::new("reward_ratio");
 
 pub const NAMESPACE_STAKING: &[u8] = b"staking";
 
@@ -25,6 +27,9 @@ pub enum StakingSudo {
         validator: String,
         percentage: Decimal,
     },
+    UpdateRewardsRatio {
+        ratio: Decimal,
+    },
 }
 
 pub trait Staking: Module<ExecT = StakingMsg, QueryT = StakingQuery, SudoT = StakingSudo> {}
@@ -33,13 +38,28 @@ pub trait Distribution: Module<ExecT = DistributionMsg, QueryT = Empty, SudoT = 
 
 pub struct StakeKeeper {
     module_addr: Addr,
+    validator: Validator,
+    bonded_denom: String,
+}
+
+impl Default for StakeKeeper {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StakeKeeper {
     pub fn new() -> Self {
         StakeKeeper {
-            // define this better?? it is an account for everything held my the staking keeper
+            // define this better?? it is an account for everything held by the staking keeper
             module_addr: Addr::unchecked("staking_module"),
+            validator: Validator {
+                address: "testvaloper1".to_string(),
+                commission: Decimal::percent(10),
+                max_commission: Decimal::percent(20),
+                max_change_rate: Decimal::percent(1),
+            },
+            bonded_denom: "TOKEN".to_string(),
         }
     }
 
@@ -51,6 +71,28 @@ impl StakeKeeper {
     ) -> AnyResult<()> {
         let mut storage = prefixed(storage, NAMESPACE_STAKING);
         self.set_balance(&mut storage, account, amount)
+    }
+
+    pub fn set_reward_ratio(&self, storage: &mut dyn Storage, value: &Decimal) -> AnyResult<()> {
+        let mut storage = prefixed(storage, NAMESPACE_STAKING);
+        REWARD_RATIO.save(&mut storage, value).map_err(Into::into)
+    }
+
+    /// Calculates the staking reward for the given stake based on the fixed ratio set using
+    /// `set_reward_ratio`
+    fn calculate_rewards(&self, storage: &dyn Storage, stake: &Coin) -> AnyResult<Coin> {
+        let reward_radio = self.get_reward_ratio(storage)?;
+        Ok(coin(
+            (stake.amount * reward_radio).u128(),
+            stake.denom.clone(),
+        ))
+    }
+
+    /// Returns the set reward ratio, or `0.1` if none was set
+    fn get_reward_ratio(&self, storage: &dyn Storage) -> AnyResult<Decimal> {
+        let ratio = REWARD_RATIO.may_load(storage)?;
+
+        Ok(ratio.unwrap_or_else(|| Decimal::from_ratio(1u128, 10u128)))
     }
 
     fn get_stakes(&self, storage: &dyn Storage, account: &Addr) -> AnyResult<Vec<Coin>> {
@@ -203,12 +245,19 @@ impl Module for StakeKeeper {
     fn sudo<ExecC, QueryC>(
         &self,
         _api: &dyn Api,
-        _storage: &mut dyn Storage,
+        storage: &mut dyn Storage,
         _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
         _block: &BlockInfo,
         msg: StakingSudo,
     ) -> AnyResult<AppResponse> {
-        bail!("Unsupported staking sudo message: {:?}", msg)
+        let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
+        match msg {
+            StakingSudo::Slash { .. } => todo!("slash validator"),
+            StakingSudo::UpdateRewardsRatio { ratio } => {
+                self.set_reward_ratio(&mut staking_storage, &ratio)?;
+                Ok(AppResponse::default())
+            }
+        }
     }
 
     fn query(
@@ -221,11 +270,30 @@ impl Module for StakeKeeper {
     ) -> AnyResult<Binary> {
         let staking_storage = prefixed_read(storage, NAMESPACE_STAKING);
         match request {
+            StakingQuery::BondedDenom {} => Ok(to_binary(&BondedDenomResponse {
+                denom: self.bonded_denom.clone(),
+            })?),
+            StakingQuery::AllDelegations { delegator } => {
+                let delegator = api.addr_validate(&delegator)?;
+                let stakes = self.get_stakes(&staking_storage, &delegator)?;
+                Ok(to_binary(&AllDelegationsResponse {
+                    delegations: vec![Delegation {
+                        delegator,
+                        validator: self.validator.address.clone(),
+                        amount: stakes
+                            .get(0)
+                            .cloned()
+                            .unwrap_or_else(|| coin(0, &self.bonded_denom)),
+                    }],
+                })?)
+            }
             StakingQuery::Delegation {
                 delegator,
                 validator,
             } => {
-                // for now validator is ignored, as I want to support only one validator
+                if validator != self.validator.address {
+                    bail!("non-existent validator {}", validator);
+                }
                 let delegator = api.addr_validate(&delegator)?;
                 let stakes = match self.get_stakes(&staking_storage, &delegator) {
                     Ok(stakes) => stakes[0].clone(),
@@ -234,11 +302,8 @@ impl Module for StakeKeeper {
                         return Ok(to_binary(&response)?);
                     }
                 };
-                // set fixed reward ratio 1:10 per delegated amoutn
-                let reward = coin(
-                    (stakes.amount / Uint128::new(10)).u128(),
-                    stakes.denom.clone(),
-                );
+                // calculate rewards using fixed ratio
+                let reward = self.calculate_rewards(&staking_storage, &stakes)?;
                 let full_delegation_response = DelegationResponse {
                     delegation: Some(FullDelegation {
                         delegator,
@@ -252,6 +317,16 @@ impl Module for StakeKeeper {
                 let res = to_binary(&full_delegation_response)?;
                 Ok(res)
             }
+            StakingQuery::AllValidators {} => Ok(to_binary(&AllValidatorsResponse {
+                validators: vec![self.validator.clone()],
+            })?),
+            StakingQuery::Validator { address } => Ok(to_binary(&ValidatorResponse {
+                validator: if self.validator.address == address {
+                    Some(self.validator.clone())
+                } else {
+                    None
+                },
+            })?),
             q => bail!("Unsupported staking sudo message: {:?}", q),
         }
     }
@@ -264,11 +339,6 @@ impl DistributionKeeper {
     pub fn new() -> Self {
         DistributionKeeper {}
     }
-
-    fn get_stakes(&self, storage: &dyn Storage, account: &Addr) -> AnyResult<Vec<Coin>> {
-        let val = STAKES.may_load(storage, account)?;
-        Ok(val.unwrap_or_default().into_vec())
-    }
 }
 
 impl Distribution for DistributionKeeper {}
@@ -278,22 +348,29 @@ impl Module for DistributionKeeper {
     type QueryT = Empty;
     type SudoT = Empty;
 
-    fn execute<ExecC, QueryC>(
+    fn execute<ExecC, QueryC: CustomQuery>(
         &self,
-        _api: &dyn Api,
+        api: &dyn Api,
         storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        _block: &BlockInfo,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        block: &BlockInfo,
         sender: Addr,
         msg: DistributionMsg,
     ) -> AnyResult<AppResponse> {
-        let staking_storage = prefixed(storage, NAMESPACE_STAKING);
+        // let staking_storage = prefixed(storage, NAMESPACE_STAKING);
         match msg {
             // For now it ignores validator as I want to support only one
             DistributionMsg::WithdrawDelegatorReward { validator } => {
-                let stakes = self.get_stakes(&staking_storage, &sender)?[0].clone();
-                // set fixed reward ratio 1:10 per delegated amoutn
-                let reward = coin((stakes.amount / Uint128::new(10)).u128(), stakes.denom);
+                let response: DelegationResponse = from_slice(&router.query(
+                    api,
+                    storage,
+                    block,
+                    cosmwasm_std::QueryRequest::Staking(StakingQuery::Delegation {
+                        delegator: sender.to_string(),
+                        validator: validator.clone(),
+                    }),
+                )?)?;
+                let reward = &response.delegation.unwrap().accumulated_rewards[0];
 
                 let events = vec![Event::new("withdraw_delegator_reward")
                     .add_attribute("validator", &validator)
