@@ -196,7 +196,6 @@ fn calc_len(head: u32, tail: u32) -> u32 {
     tail.wrapping_sub(head)
 }
 
-#[cfg(feature = "iterator")]
 impl<'a, T: Serialize + DeserializeOwned> VecDeque<'a, T> {
     pub fn iter(&self, storage: &'a dyn Storage) -> StdResult<VecDequeIter<T>> {
         Ok(VecDequeIter {
@@ -208,7 +207,6 @@ impl<'a, T: Serialize + DeserializeOwned> VecDeque<'a, T> {
     }
 }
 
-#[cfg(feature = "iterator")]
 pub struct VecDequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
@@ -219,7 +217,6 @@ where
     end: u32,
 }
 
-#[cfg(feature = "iterator")]
 impl<'a, T> Iterator for VecDequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
@@ -261,7 +258,6 @@ where
     }
 }
 
-#[cfg(feature = "iterator")]
 impl<'a, T> DoubleEndedIterator for VecDequeIter<'a, T>
 where
     T: Serialize + DeserializeOwned,
@@ -375,7 +371,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "iterator")]
     fn iterator() {
         let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
@@ -401,7 +396,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "iterator")]
     fn reverse_iterator() {
         let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
@@ -463,7 +457,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "iterator")]
     fn wrapping_iterator() {
         let deque: VecDeque<u32> = VecDeque::new("test");
         let mut store = MockStorage::new();
@@ -512,7 +505,6 @@ mod tests {
     const DATA: VecDeque<Data> = VecDeque::new("data");
 
     #[test]
-    #[cfg(feature = "iterator")]
     fn readme_works() -> StdResult<()> {
         let mut store = MockStorage::new();
 
@@ -564,7 +556,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "iterator")]
     fn iterator_errors_when_item_missing() {
         let mut store = MockStorage::new();
 

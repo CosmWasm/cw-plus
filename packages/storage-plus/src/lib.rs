@@ -34,7 +34,6 @@ mod snapshot;
 pub use bound::{Bound, Bounder, PrefixBound, RawBound};
 pub use de::KeyDeserialize;
 pub use deque::VecDeque;
-#[cfg(feature = "iterator")]
 pub use deque::VecDequeIter;
 pub use endian::Endian;
 #[cfg(feature = "iterator")]
