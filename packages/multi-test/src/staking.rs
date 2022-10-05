@@ -7,7 +7,7 @@ use cosmwasm_std::{
     coin, coins, ensure, ensure_eq, from_slice, to_binary, Addr, AllDelegationsResponse,
     AllValidatorsResponse, Api, BankMsg, Binary, BlockInfo, BondedDenomResponse, Coin, CustomQuery,
     Decimal, Delegation, DelegationResponse, DistributionMsg, Empty, Event, FullDelegation,
-    Querier, StakingMsg, StakingQuery, Storage, Uint128, Validator, ValidatorResponse,
+    Querier, StakingMsg, StakingQuery, Storage, Timestamp, Uint128, Validator, ValidatorResponse,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::{Item, Map};
@@ -76,7 +76,7 @@ const VALIDATORS: Item<Vec<Validator>> = Item::new("validators");
 /// Contains additional info for each validator
 const VALIDATOR_INFO: Map<&Addr, ValidatorInfo> = Map::new("validator_info");
 // TODO: replace with `Deque`
-// const UNBONDING_QUEUE: Item<VecDeque<(Addr, StakeInfo)>> = Item::new("unbonding_queue");
+const UNBONDING_QUEUE: Item<VecDeque<(Addr, Timestamp, u128)>> = Item::new("unbonding_queue");
 
 pub const NAMESPACE_STAKING: &[u8] = b"staking";
 
@@ -294,17 +294,6 @@ impl StakeKeeper {
         Ok(())
     }
 
-    fn process_queue(&self, storage: &mut dyn Storage) -> AnyResult<()> {
-        // let mut queue = UNBONDING_QUEUE.may_load(storage)?.unwrap_or_default();
-
-        // while queue.front().is_some() {
-        //     let Some((delegator, info)) = queue.pop_front();
-        // }
-        // Ok(())
-
-        todo!("process queue")
-    }
-
     /// Filters out all 0 value coins and returns an error if the resulting Vec is empty
     fn normalize_amount(&self, amount: Vec<Coin>) -> AnyResult<Vec<Coin>> {
         let res: Vec<_> = amount.into_iter().filter(|x| !x.amount.is_zero()).collect();
@@ -390,6 +379,8 @@ impl Module for StakeKeeper {
             }
             StakingMsg::Undelegate { validator, amount } => {
                 let validator = api.addr_validate(&validator)?;
+                self.validate_denom(&amount)?;
+                self.validate_nonzero(&amount)?;
 
                 // see https://github.com/cosmos/cosmos-sdk/blob/v0.46.1/x/staking/keeper/msg_server.go#L378-L383
                 let events = vec![Event::new("unbond")
@@ -403,32 +394,27 @@ impl Module for StakeKeeper {
                     &validator,
                     amount.clone(),
                 )?;
-                // move token from this module to sender account
-                // TODO: actually store this so it is released later after unbonding period
-                // but showing how to do the payback
-                router.execute(
-                    api,
-                    storage,
-                    block,
-                    self.module_addr.clone(),
-                    BankMsg::Send {
-                        to_address: sender.into_string(),
-                        amount: vec![amount],
-                    }
-                    .into(),
-                )?;
+                // add tokens to unbonding queue
+                let mut queue = UNBONDING_QUEUE
+                    .may_load(&staking_storage)?
+                    .unwrap_or_default();
+                queue.push_back((
+                    sender.clone(),
+                    block.time.plus_seconds(self.unbonding_time),
+                    amount.amount.u128(),
+                ));
 
-                // NB: when you need more tokens for staking rewards you can do something like:
-                router.sudo(
-                    api,
-                    storage,
-                    block,
-                    BankSudo::Mint {
-                        to_address: self.module_addr.to_string(),
-                        amount: coins(123456000, "ucosm"),
-                    }
-                    .into(),
-                )?;
+                // // NB: when you need more tokens for staking rewards you can do something like:
+                // router.sudo(
+                //     api,
+                //     storage,
+                //     block,
+                //     BankSudo::Mint {
+                //         to_address: self.module_addr.to_string(),
+                //         amount: coins(123456000, "ucosm"),
+                //     }
+                //     .into(),
+                // )?;
                 Ok(AppResponse { events, data: None })
             }
             StakingMsg::Redelegate {
@@ -459,12 +445,12 @@ impl Module for StakeKeeper {
         }
     }
 
-    fn sudo<ExecC, QueryC>(
+    fn sudo<ExecC, QueryC: CustomQuery>(
         &self,
         api: &dyn Api,
         storage: &mut dyn Storage,
-        _router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
-        _block: &BlockInfo,
+        router: &dyn CosmosRouter<ExecC = ExecC, QueryC = QueryC>,
+        block: &BlockInfo,
         msg: StakingSudo,
     ) -> AnyResult<AppResponse> {
         let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
@@ -481,7 +467,30 @@ impl Module for StakeKeeper {
                 Ok(AppResponse::default())
             }
             StakingSudo::ProcessQueue {} => {
-                self.process_queue(&mut staking_storage)?;
+                let mut queue = UNBONDING_QUEUE.may_load(storage)?.unwrap_or_default();
+
+                loop {
+                    match queue.front() {
+                        // assuming the queue is sorted by payout_at
+                        Some((_, payout_at, _)) if payout_at <= &block.time => {
+                            // remove from queue
+                            let (delegator, _, amount) = queue.pop_front().unwrap();
+
+                            router.execute(
+                                api,
+                                storage,
+                                block,
+                                self.module_addr.clone(),
+                                BankMsg::Send {
+                                    to_address: delegator.into_string(),
+                                    amount: vec![coin(amount, &self.bonded_denom)],
+                                }
+                                .into(),
+                            )?;
+                        }
+                        _ => break,
+                    }
+                }
                 Ok(AppResponse::default())
             }
         }
