@@ -254,17 +254,23 @@ impl StakeKeeper {
         reward - commission
     }
 
-    /// Updates the staking reward for the given validator. This mutates the validator info,
-    /// but does not save it.
-    /// Always call this to update rewards before changing a validator stake.
+    /// Updates the staking reward for the given validator and their stakers
+    /// It saves the validator info and it's stakers, so make sure not to overwrite that.
+    /// Always call this to update rewards before changing anything that influences future rewards.
     fn update_rewards(
         api: &dyn Api,
         staking_storage: &mut dyn Storage,
         block: &BlockInfo,
-        staking_info: &StakingInfo,
-        validator_info: &mut ValidatorInfo,
-        validator: &Validator,
+        validator: &Addr,
     ) -> AnyResult<()> {
+        let staking_info = Self::get_staking_info(staking_storage)?;
+
+        let mut validator_info = VALIDATOR_INFO
+            .may_load(staking_storage, validator)?
+            .ok_or_else(|| anyhow!("validator not found"))?;
+
+        let validator_obj = VALIDATOR_MAP.load(staking_storage, validator)?;
+
         if validator_info.last_rewards_calculation >= block.time {
             return Ok(());
         }
@@ -273,7 +279,7 @@ impl StakeKeeper {
             block.time,
             validator_info.last_rewards_calculation,
             staking_info.apr,
-            validator.commission,
+            validator_obj.commission,
             validator_info.stake,
         );
 
@@ -281,7 +287,10 @@ impl StakeKeeper {
         if !new_rewards.is_zero() {
             validator_info.last_rewards_calculation = block.time;
 
-            let validator_addr = api.addr_validate(&validator.address)?;
+            // save updated validator
+            VALIDATOR_INFO.save(staking_storage, validator, &validator_info)?;
+
+            let validator_addr = api.addr_validate(&validator_obj.address)?;
             // update all delegators
             for staker in validator_info.stakers.iter() {
                 STAKES.update(
@@ -290,7 +299,7 @@ impl StakeKeeper {
                     |shares| -> AnyResult<_> {
                         let mut shares =
                             shares.expect("all stakers in validator_info should exist");
-                        shares.rewards += shares.share_of_rewards(validator_info, new_rewards);
+                        shares.rewards += shares.share_of_rewards(&validator_info, new_rewards);
                         Ok(shares)
                     },
                 )?;
@@ -389,23 +398,15 @@ impl StakeKeeper {
             return Ok(());
         }
 
+        // update rewards for this validator
+        // let validator_obj = VALIDATOR_MAP.load(staking_storage, validator)?;
+        // let staking_info = Self::get_staking_info(staking_storage)?;
+        Self::update_rewards(api, staking_storage, block, validator)?;
+
+        // now, we can update the stake of the delegator and validator
         let mut validator_info = VALIDATOR_INFO
             .may_load(staking_storage, validator)?
             .unwrap_or_else(|| ValidatorInfo::new(block.time));
-
-        // update rewards for this validator
-        let validator_obj = VALIDATOR_MAP.load(staking_storage, validator)?;
-        let staking_info = Self::get_staking_info(staking_storage)?;
-        Self::update_rewards(
-            api,
-            staking_storage,
-            block,
-            &staking_info,
-            &mut validator_info,
-            &validator_obj,
-        )?;
-
-        // now, we can update the stake of the delegator and validator
         let mut shares = STAKES
             .may_load(staking_storage, (delegator, validator))?
             .unwrap_or_default();
@@ -435,15 +436,19 @@ impl StakeKeeper {
 
     fn slash(
         &self,
+        api: &dyn Api,
         staking_storage: &mut dyn Storage,
+        block: &BlockInfo,
         validator: &Addr,
         percentage: Decimal,
     ) -> AnyResult<()> {
+        // calculate rewards before slashing
+        Self::update_rewards(api, staking_storage, block, validator)?;
+
+        // update stake of validator and stakers
         let mut validator_info = VALIDATOR_INFO
             .may_load(staking_storage, validator)?
             .ok_or_else(|| anyhow!("validator not found"))?;
-
-        // TODO: handle rewards? Either update them before slashing or set them to zero, depending on the slashing logic
 
         let remaining_percentage = Decimal::one() - percentage;
         validator_info.stake = validator_info.stake * remaining_percentage;
@@ -632,7 +637,7 @@ impl Module for StakeKeeper {
                 let validator = api.addr_validate(&validator)?;
                 self.validate_percentage(percentage)?;
 
-                self.slash(&mut staking_storage, &validator, percentage)?;
+                self.slash(api, &mut staking_storage, block, &validator, percentage)?;
 
                 Ok(AppResponse::default())
             }
@@ -734,15 +739,16 @@ impl Module for StakeKeeper {
                     &validator_info,
                 )?;
                 let staking_info = Self::get_staking_info(&staking_storage)?;
+                let amount = coin(
+                    (shares.stake * Uint128::new(1)).u128(),
+                    staking_info.bonded_denom,
+                );
                 let full_delegation_response = DelegationResponse {
                     delegation: Some(FullDelegation {
                         delegator,
                         validator,
-                        amount: coin(
-                            (shares.stake * Uint128::new(1)).u128(),
-                            staking_info.bonded_denom,
-                        ),
-                        can_redelegate: coin(0, "testcoin"), // TODO: not implemented right now
+                        amount: amount.clone(),
+                        can_redelegate: amount, // TODO: not implemented right now
                         accumulated_rewards: vec![reward],
                     }),
                 };
@@ -791,21 +797,10 @@ impl Module for DistributionKeeper {
             DistributionMsg::WithdrawDelegatorReward { validator } => {
                 let validator_addr = api.addr_validate(&validator)?;
 
-                let staking_info = STAKING_INFO.load(&staking_storage)?;
-                let mut validator_info = VALIDATOR_INFO.load(&staking_storage, &validator_addr)?;
-                let validator_obj = VALIDATOR_MAP.load(&staking_storage, &validator_addr)?;
-
                 // update the validator and staker rewards
-                StakeKeeper::update_rewards(
-                    api,
-                    &mut staking_storage,
-                    block,
-                    &staking_info,
-                    &mut validator_info,
-                    &validator_obj,
-                )?;
-                // save updated validator_info
-                VALIDATOR_INFO.save(&mut staking_storage, &validator_addr, &validator_info)?;
+                StakeKeeper::update_rewards(api, &mut staking_storage, block, &validator_addr)?;
+
+                let staking_info = STAKING_INFO.load(&staking_storage)?;
 
                 // load updated rewards for delegator
                 let mut shares = STAKES.load(&staking_storage, (&sender, &validator_addr))?;
