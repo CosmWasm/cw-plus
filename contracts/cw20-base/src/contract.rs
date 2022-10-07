@@ -11,7 +11,6 @@ use cw20::{
     BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
     MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
-use serde_json;
 use cw_utils::ensure_from_older_version;
 
 use crate::allowances::{
@@ -134,20 +133,15 @@ pub fn instantiate(
     let logo_string = &mut String::from("");
     if let Some(marketing) = msg.marketing {
         let logo = if let Some(logo) = marketing.logo {
-            let logo_type = verify_logo(&logo)?;
             LOGO.save(deps.storage, &logo)?;
 
             match logo {
                 Logo::Url(url) => {
-                    logo_string.push_str(url.as_str());
+                    logo_string.push_str(&url);
                     Some(LogoInfo::Url(url))
                 },
-                Logo::Embedded(binary_type) => {
-                    let b64_logo = match binary_type {
-                        EmbeddedLogo::Svg(binary) => binary.to_base64(),
-                        EmbeddedLogo::Png(binary) => binary.to_base64(),
-                    };
-                    logo_string.push_str((logo_type + ":" + b64_logo.as_str()).as_str());
+                Logo::Embedded(_) => {
+                    logo_string.push_str("embedded");
                     Some(LogoInfo::Embedded)
                 }
             }
@@ -167,10 +161,10 @@ pub fn instantiate(
         MARKETING_INFO.save(deps.storage, &data)?;
     }
 
-    let serialized_balances = serde_json::to_string(initial_balances).unwrap();
-    
     let res = Response::new()
-        .add_attribute("balances", serialized_balances)
+        .add_attribute("contract_name", CONTRACT_NAME)
+        .add_attribute("contract_version", CONTRACT_VERSION)
+        .add_attribute("token_decimal", msg.decimals.to_string())
         .add_attribute("total_supply", total_supply)
         .add_attribute("logo", logo_string.as_str());
     Ok(res)
