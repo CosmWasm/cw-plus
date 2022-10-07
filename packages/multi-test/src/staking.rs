@@ -131,20 +131,6 @@ impl StakeKeeper {
         Ok(())
     }
 
-    pub fn init_stake(
-        &self,
-        api: &dyn Api,
-        storage: &mut dyn Storage,
-        block: &BlockInfo,
-        account: &Addr,
-        validator: &Addr,
-        amount: Coin,
-    ) -> AnyResult<()> {
-        let mut storage = prefixed(storage, NAMESPACE_STAKING);
-
-        self.add_stake(api, &mut storage, block, account, validator, amount)
-    }
-
     /// Add a new validator available for staking
     pub fn add_validator(
         &self,
@@ -185,7 +171,7 @@ impl StakeKeeper {
 
         let validator_obj = match self.get_validator(&staking_storage, validator)? {
             Some(validator) => validator,
-            None => bail!("non-existent validator {}", validator),
+            None => bail!("validator {} not found", validator),
         };
         // calculate rewards using fixed ratio
         let shares = match STAKES.load(&staking_storage, (delegator, validator)) {
@@ -268,7 +254,7 @@ impl StakeKeeper {
 
         let mut validator_info = VALIDATOR_INFO
             .may_load(staking_storage, validator)?
-            .ok_or_else(|| anyhow!("validator not found"))?;
+            .ok_or_else(|| anyhow!("validator {} not found", validator))?;
 
         let validator_obj = VALIDATOR_MAP.load(staking_storage, validator)?;
 
@@ -452,7 +438,7 @@ impl StakeKeeper {
         // update stake of validator and stakers
         let mut validator_info = VALIDATOR_INFO
             .may_load(staking_storage, validator)?
-            .ok_or_else(|| anyhow!("validator not found"))?;
+            .ok_or_else(|| anyhow!("validator {} not found", validator))?;
 
         let remaining_percentage = Decimal::one() - percentage;
         validator_info.stake = validator_info.stake * remaining_percentage;
@@ -1592,6 +1578,69 @@ mod test {
             )
             .unwrap_err();
             assert_eq!(e.to_string(), "insufficient stake");
+        }
+
+        #[test]
+        fn denom_validation() {
+            let (mut test_env, validator) =
+                TestEnv::wrap(setup_test_env(Decimal::percent(10), Decimal::percent(10)));
+
+            let delegator1 = Addr::unchecked("delegator1");
+
+            // fund delegator1 account
+            test_env
+                .router
+                .bank
+                .init_balance(&mut test_env.store, &delegator1, vec![coin(100, "FAKE")])
+                .unwrap();
+
+            // try to delegate 100 to validator1
+            let e = execute_stake(
+                &mut test_env,
+                delegator1.clone(),
+                StakingMsg::Delegate {
+                    validator: validator.to_string(),
+                    amount: coin(100, "FAKE"),
+                },
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                e.to_string(),
+                "cannot delegate coins of denominator FAKE, only of TOKEN",
+            );
+        }
+
+        #[test]
+        fn cannot_slash_nonexistent() {
+            let (mut test_env, _) =
+                TestEnv::wrap(setup_test_env(Decimal::percent(10), Decimal::percent(10)));
+
+            let delegator1 = Addr::unchecked("delegator1");
+
+            // fund delegator1 account
+            test_env
+                .router
+                .bank
+                .init_balance(&mut test_env.store, &delegator1, vec![coin(100, "FAKE")])
+                .unwrap();
+
+            // try to delegate 100 to validator1
+            let e = test_env
+                .router
+                .staking
+                .sudo(
+                    &test_env.api,
+                    &mut test_env.store,
+                    &test_env.router,
+                    &test_env.block,
+                    StakingSudo::Slash {
+                        validator: "nonexistingvaloper".to_string(),
+                        percentage: Decimal::percent(50),
+                    },
+                )
+                .unwrap_err();
+            assert_eq!(e.to_string(), "validator nonexistingvaloper not found");
         }
 
         #[test]
