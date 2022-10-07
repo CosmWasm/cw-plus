@@ -33,6 +33,8 @@ pub type BasicApp<ExecC = Empty, QueryC = Empty> = App<
     MockStorage,
     FailingModule<ExecC, QueryC, Empty>,
     WasmKeeper<ExecC, QueryC>,
+    StakeKeeper,
+    DistributionKeeper,
 >;
 
 /// Router is a persisted state. You can query this.
