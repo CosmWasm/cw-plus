@@ -383,10 +383,6 @@ impl StakeKeeper {
     ) -> AnyResult<()> {
         let amount = amount.into();
 
-        if amount.is_zero() {
-            return Ok(());
-        }
-
         // update rewards for this validator
         Self::update_rewards(api, staking_storage, block, validator)?;
 
@@ -942,7 +938,7 @@ mod test {
     fn add_get_validators() {
         let api = MockApi::default();
         let mut store = MockStorage::new();
-        let stake = StakeKeeper::new();
+        let stake = StakeKeeper::default();
         let block = mock_env().block;
 
         // add validator
