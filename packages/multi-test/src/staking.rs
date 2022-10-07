@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::BTreeSet;
 
 use anyhow::{anyhow, bail, Result as AnyResult};
 use schemars::JsonSchema;
@@ -10,7 +10,7 @@ use cosmwasm_std::{
     StakingQuery, Storage, Timestamp, Uint128, Validator, ValidatorResponse,
 };
 use cosmwasm_storage::{prefixed, prefixed_read};
-use cw_storage_plus::{Item, Map};
+use cw_storage_plus::{Deque, Item, Map};
 use serde::{Deserialize, Serialize};
 
 use crate::app::CosmosRouter;
@@ -78,12 +78,11 @@ const STAKING_INFO: Item<StakingInfo> = Item::new("staking_info");
 const STAKES: Map<(&Addr, &Addr), Shares> = Map::new("stakes");
 const VALIDATOR_MAP: Map<&Addr, Validator> = Map::new("validator_map");
 /// Additional vec of validators, in case the `iterator` feature is disabled
-const VALIDATORS: Item<Vec<Validator>> = Item::new("validators");
+const VALIDATORS: Deque<Validator> = Deque::new("validators");
 /// Contains additional info for each validator
 const VALIDATOR_INFO: Map<&Addr, ValidatorInfo> = Map::new("validator_info");
 /// The queue of unbonding operations. This is needed because unbonding has a waiting time. See [`StakeKeeper`]
-/// TODO: replace with `Deque`
-const UNBONDING_QUEUE: Item<VecDeque<(Addr, Timestamp, u128)>> = Item::new("unbonding_queue");
+const UNBONDING_QUEUE: Deque<(Addr, Timestamp, u128)> = Deque::new("unbonding_queue");
 
 pub const NAMESPACE_STAKING: &[u8] = b"staking";
 
@@ -165,9 +164,7 @@ impl StakeKeeper {
         }
 
         VALIDATOR_MAP.save(&mut storage, &val_addr, &validator)?;
-        let mut vec = VALIDATORS.may_load(&storage)?.unwrap_or_default();
-        vec.push(validator);
-        VALIDATORS.save(&mut storage, &vec)?;
+        VALIDATORS.push_back(&mut storage, &validator)?;
         VALIDATOR_INFO.save(&mut storage, &val_addr, &ValidatorInfo::new(block.time))?;
         Ok(())
     }
@@ -323,7 +320,8 @@ impl StakeKeeper {
 
     /// Returns all available validators
     fn get_validators(&self, staking_storage: &dyn Storage) -> AnyResult<Vec<Validator>> {
-        Ok(VALIDATORS.may_load(staking_storage)?.unwrap_or_default())
+        let res: Result<_, _> = VALIDATORS.iter(staking_storage)?.collect();
+        Ok(res?)
     }
 
     fn get_stake(
@@ -580,15 +578,14 @@ impl Module for StakeKeeper {
                 )?;
                 // add tokens to unbonding queue
                 let staking_info = Self::get_staking_info(&staking_storage)?;
-                let mut queue = UNBONDING_QUEUE
-                    .may_load(&staking_storage)?
-                    .unwrap_or_default();
-                queue.push_back((
-                    sender.clone(),
-                    block.time.plus_seconds(staking_info.unbonding_time),
-                    amount.amount.u128(),
-                ));
-                UNBONDING_QUEUE.save(&mut staking_storage, &queue)?;
+                UNBONDING_QUEUE.push_back(
+                    &mut staking_storage,
+                    &(
+                        sender.clone(),
+                        block.time.plus_seconds(staking_info.unbonding_time),
+                        amount.amount.u128(),
+                    ),
+                )?;
                 Ok(AppResponse { events, data: None })
             }
             StakingMsg::Redelegate {
@@ -635,12 +632,12 @@ impl Module for StakeKeeper {
         block: &BlockInfo,
         msg: StakingSudo,
     ) -> AnyResult<AppResponse> {
-        let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
         match msg {
             StakingSudo::Slash {
                 validator,
                 percentage,
             } => {
+                let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
                 let validator = api.addr_validate(&validator)?;
                 self.validate_percentage(percentage)?;
 
@@ -649,18 +646,16 @@ impl Module for StakeKeeper {
                 Ok(AppResponse::default())
             }
             StakingSudo::ProcessQueue {} => {
-                let mut queue = UNBONDING_QUEUE
-                    .may_load(&staking_storage)?
-                    .unwrap_or_default();
-
                 loop {
-                    match queue.front() {
+                    let mut staking_storage = prefixed(storage, NAMESPACE_STAKING);
+                    let front = UNBONDING_QUEUE.front(&staking_storage)?;
+                    match front {
                         // assuming the queue is sorted by payout_at
-                        Some((_, payout_at, _)) if payout_at <= &block.time => {
+                        Some((_, payout_at, _)) if payout_at <= block.time => {
                             // remove from queue
-                            let (delegator, _, amount) = queue.pop_front().unwrap();
+                            let (delegator, _, amount) =
+                                UNBONDING_QUEUE.pop_front(&mut staking_storage)?.unwrap();
 
-                            let staking_storage = prefixed_read(storage, NAMESPACE_STAKING);
                             let staking_info = Self::get_staking_info(&staking_storage)?;
                             router.execute(
                                 api,
