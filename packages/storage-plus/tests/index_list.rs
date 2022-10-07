@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(all(test, feature = "iterator", feature = "macro"))]
 mod test {
     use cosmwasm_std::{testing::MockStorage, Addr};
     use cw_storage_macro::index_list;

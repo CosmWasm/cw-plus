@@ -433,7 +433,6 @@ name = "cw-storage-macro"
 version = "0.15.1"
 dependencies = [
  "cosmwasm-std",
- "cw-storage-plus",
  "serde",
  "syn",
 ]

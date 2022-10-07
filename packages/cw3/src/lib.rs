@@ -1,3 +1,14 @@
+/*!
+CW3 is a specification for voting contracts based on CosmWasm.
+It is an extension of CW1 (which served as an immediate 1 of N multisig).
+In this case, no key can immediately execute, but only propose
+a set of messages for execution. The proposal, subsequent
+approvals, and signature aggregation all happen on chain.
+
+For more information on this specification, please check out the
+[README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw3/README.md).
+*/
+
 // mod helpers;
 mod helpers;
 mod msg;

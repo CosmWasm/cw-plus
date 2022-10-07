@@ -8,6 +8,9 @@ license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
+[package.metadata.docs.rs]
+all-features = true # include macro feature when building docs
+
 [features]
 default = ["iterator"]
 iterator = ["cosmwasm-std/iterator"]
@@ -24,7 +27,7 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 cw-storage-macro = { version = "0.15.1", optional = true, path = "../storage-macro" }
 
 [dev-dependencies]
-criterion = { version = "0.3", features = [ "html_reports" ] }
+criterion = { version = "0.3", features = ["html_reports"] }
 rand = "0.8"
 
 [[bench]]
