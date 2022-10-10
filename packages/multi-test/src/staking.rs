@@ -21,11 +21,11 @@ use crate::{BankSudo, Module};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StakingInfo {
     /// The denominator of the staking token
-    bonded_denom: String,
+    pub bonded_denom: String,
     /// Time between unbonding and receiving tokens in seconds
-    unbonding_time: u64,
+    pub unbonding_time: u64,
     /// Interest rate per year (60 * 60 * 24 * 365 seconds)
-    apr: Decimal,
+    pub apr: Decimal,
 }
 
 impl Default for StakingInfo {
