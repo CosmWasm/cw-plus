@@ -337,7 +337,6 @@ impl StakeKeeper {
         amount: Coin,
     ) -> AnyResult<()> {
         self.validate_denom(staking_storage, &amount)?;
-        self.validate_nonzero(&amount)?;
         self.update_stake(
             api,
             staking_storage,
@@ -359,7 +358,6 @@ impl StakeKeeper {
         amount: Coin,
     ) -> AnyResult<()> {
         self.validate_denom(staking_storage, &amount)?;
-        self.validate_nonzero(&amount)?;
         self.update_stake(
             api,
             staking_storage,
@@ -465,11 +463,6 @@ impl StakeKeeper {
         Ok(())
     }
 
-    fn validate_nonzero(&self, amount: &Coin) -> AnyResult<()> {
-        ensure!(!amount.amount.is_zero(), anyhow!("cannot delegate 0 coins"));
-        Ok(())
-    }
-
     // Asserts that the given coin has the proper denominator
     fn validate_denom(&self, staking_storage: &dyn Storage, amount: &Coin) -> AnyResult<()> {
         let staking_info = Self::get_staking_info(staking_storage)?;
@@ -527,23 +520,24 @@ impl Module for StakeKeeper {
                     amount.clone(),
                 )?;
                 // move money from sender account to this module (note we can controller sender here)
-                router.execute(
-                    api,
-                    storage,
-                    block,
-                    sender,
-                    BankMsg::Send {
-                        to_address: self.module_addr.to_string(),
-                        amount: vec![amount],
-                    }
-                    .into(),
-                )?;
+                if !amount.amount.is_zero() {
+                    router.execute(
+                        api,
+                        storage,
+                        block,
+                        sender,
+                        BankMsg::Send {
+                            to_address: self.module_addr.to_string(),
+                            amount: vec![amount],
+                        }
+                        .into(),
+                    )?;
+                }
                 Ok(AppResponse { events, data: None })
             }
             StakingMsg::Undelegate { validator, amount } => {
                 let validator = api.addr_validate(&validator)?;
                 self.validate_denom(&staking_storage, &amount)?;
-                self.validate_nonzero(&amount)?;
 
                 // see https://github.com/cosmos/cosmos-sdk/blob/v0.46.1/x/staking/keeper/msg_server.go#L378-L383
                 let events = vec![Event::new("unbond")
@@ -639,17 +633,19 @@ impl Module for StakeKeeper {
                                 UNBONDING_QUEUE.pop_front(&mut staking_storage)?.unwrap();
 
                             let staking_info = Self::get_staking_info(&staking_storage)?;
-                            router.execute(
-                                api,
-                                storage,
-                                block,
-                                self.module_addr.clone(),
-                                BankMsg::Send {
-                                    to_address: delegator.into_string(),
-                                    amount: vec![coin(amount, &staking_info.bonded_denom)],
-                                }
-                                .into(),
-                            )?;
+                            if amount > 0 {
+                                router.execute(
+                                    api,
+                                    storage,
+                                    block,
+                                    self.module_addr.clone(),
+                                    BankMsg::Send {
+                                        to_address: delegator.into_string(),
+                                        amount: vec![coin(amount, &staking_info.bonded_denom)],
+                                    }
+                                    .into(),
+                                )?;
+                            }
                         }
                         _ => break,
                     }
@@ -1637,6 +1633,36 @@ mod test {
                 )
                 .unwrap_err();
             assert_eq!(e.to_string(), "validator nonexistingvaloper not found");
+        }
+
+        #[test]
+        fn zero_staking_allowed() {
+            let (mut test_env, validator) =
+                TestEnv::wrap(setup_test_env(Decimal::percent(10), Decimal::percent(10)));
+
+            let delegator = Addr::unchecked("delegator1");
+
+            // delegate 0
+            execute_stake(
+                &mut test_env,
+                delegator.clone(),
+                StakingMsg::Delegate {
+                    validator: validator.to_string(),
+                    amount: coin(0, "TOKEN"),
+                },
+            )
+            .unwrap();
+
+            // undelegate 0
+            execute_stake(
+                &mut test_env,
+                delegator,
+                StakingMsg::Undelegate {
+                    validator: validator.to_string(),
+                    amount: coin(0, "TOKEN"),
+                },
+            )
+            .unwrap();
         }
 
         #[test]
