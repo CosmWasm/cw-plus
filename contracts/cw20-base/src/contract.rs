@@ -55,17 +55,17 @@ fn verify_xml_preamble(data: &[u8]) -> Result<(), ContractError> {
 }
 
 /// Validates XML logo
-fn verify_xml_logo(logo: &[u8]) -> Result<String, ContractError> {
+fn verify_xml_logo(logo: &[u8]) -> Result<(), ContractError> {
     verify_xml_preamble(logo)?;
     if logo.len() > LOGO_SIZE_CAP {
         Err(ContractError::LogoTooBig {})
     } else {
-        Ok(String::from("xml"))
+        Ok(())
     }
 }
 
 /// Validates png logo
-fn verify_png_logo(logo: &[u8]) -> Result<String, ContractError> {
+fn verify_png_logo(logo: &[u8]) -> Result<(), ContractError> {
     // PNG header format:
     // 0x89 - magic byte, out of ASCII table to fail on 7-bit systems
     // "PNG" ascii representation
@@ -78,16 +78,16 @@ fn verify_png_logo(logo: &[u8]) -> Result<String, ContractError> {
     } else if !logo.starts_with(&HEADER) {
         Err(ContractError::InvalidPngHeader {})
     } else {
-        Ok(String::from("png"))
+        Ok(())
     }
 }
 
 /// Checks if passed logo is correct, and if not, returns an error
-fn verify_logo(logo: &Logo) -> Result<String, ContractError> {
+fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
     match logo {
         Logo::Embedded(EmbeddedLogo::Svg(logo)) => verify_xml_logo(logo),
         Logo::Embedded(EmbeddedLogo::Png(logo)) => verify_png_logo(logo),
-        Logo::Url(_) => Ok(String::from("url")), // Any reasonable url validation would be regex based, probably not worth it
+        Logo::Url(_) => Ok(()), // Any reasonable url validation would be regex based, probably not worth it
     }
 }
 
