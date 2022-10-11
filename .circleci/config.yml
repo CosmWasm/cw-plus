@@ -9,7 +9,6 @@ workflows:
     jobs:
       - contract_cw1_subkeys
       - contract_cw1_whitelist
-      - contract_cw1_whitelist_ng
       - contract_cw3_fixed_multisig
       - contract_cw3_flex_multisig
       - contract_cw4_group
@@ -108,33 +107,6 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-cw1-whitelist-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-
-  contract_cw1_whitelist_ng:
-    docker:
-      - image: rust:1.58.1
-    working_directory: ~/project/contracts/cw1-whitelist-ng
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version
-      - restore_cache:
-          keys:
-            - cargocache-cw1-whitelist-ng-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Unit Tests
-          environment:
-            RUST_BACKTRACE: 1
-          command: cargo unit-test --locked
-      - run:
-          name: Build and run schema generator
-          command: cargo schema --locked
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-cw1-whitelist-ng-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
 
   contract_cw3_fixed_multisig:
     docker:
@@ -781,7 +753,6 @@ jobs:
       - run:
           name: Build and run schema generator for contracts
           command: |
-            export GLOBIGNORE='./contracts/cw1-whitelist-ng/'
             for C in ./contracts/*/
             do
               echo "Generating schema for $C ..."
