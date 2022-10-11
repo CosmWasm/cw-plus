@@ -75,6 +75,7 @@ impl ValidatorInfo {
 }
 
 const STAKING_INFO: Item<StakingInfo> = Item::new("staking_info");
+/// (staker_addr, validator_addr) -> shares
 const STAKES: Map<(&Addr, &Addr), Shares> = Map::new("stakes");
 const VALIDATOR_MAP: Map<&Addr, Validator> = Map::new("validator_map");
 /// Additional vec of validators, in case the `iterator` feature is disabled
@@ -519,7 +520,7 @@ impl Module for StakeKeeper {
                     &validator,
                     amount.clone(),
                 )?;
-                // move money from sender account to this module (note we can controller sender here)
+                // move money from sender account to this module (note we can control sender here)
                 if !amount.amount.is_zero() {
                     router.execute(
                         api,
