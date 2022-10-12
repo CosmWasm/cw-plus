@@ -14,7 +14,7 @@ const USER1: &str = "somebody";
 const USER2: &str = "else";
 const USER3: &str = "funny";
 
-fn do_instantiate(deps: DepsMut) {
+fn set_up(deps: DepsMut) {
     let msg = InstantiateMsg {
         admin: Some(INIT_ADMIN.into()),
         members: vec![
@@ -32,10 +32,19 @@ fn do_instantiate(deps: DepsMut) {
     instantiate(deps, mock_env(), info, msg).unwrap();
 }
 
+fn set_up_with_members(deps: DepsMut, members: impl Into<Vec<Member>>) {
+    let msg = InstantiateMsg {
+        admin: Some(INIT_ADMIN.into()),
+        members: members.into(),
+    };
+    let info = mock_info("creator", &[]);
+    instantiate(deps, mock_env(), info, msg).unwrap();
+}
+
 #[test]
 fn proper_instantiation() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // it worked, let's query the state
     let res = ADMIN.query_admin(deps.as_ref()).unwrap();
@@ -48,7 +57,7 @@ fn proper_instantiation() {
 #[test]
 fn try_member_queries() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
     assert_eq!(member1.weight, Some(11));
@@ -62,6 +71,46 @@ fn try_member_queries() {
     let members = query_list_members(deps.as_ref(), None, None).unwrap();
     assert_eq!(members.members.len(), 2);
     // TODO: assert the set is proper
+}
+
+#[test]
+fn duplicate_members() {
+    let mut deps = mock_dependencies();
+
+    set_up_with_members(
+        deps.as_mut(),
+        [
+            Member {
+                addr: USER1.into(),
+                weight: 5,
+            },
+            Member {
+                addr: USER2.into(),
+                weight: 6,
+            },
+            Member {
+                addr: USER1.into(),
+                weight: 6,
+            },
+        ],
+    );
+
+    let res = query_total_weight(deps.as_ref(), None).unwrap();
+    assert_eq!(17, res.weight);
+
+    assert_eq!(
+        query_member(deps.as_ref(), USER1.into(), None)
+            .unwrap()
+            .weight,
+        Some(11)
+    );
+
+    assert_eq!(
+        query_member(deps.as_ref(), USER2.into(), None)
+            .unwrap()
+            .weight,
+        Some(6)
+    );
 }
 
 fn assert_users<S: Storage, A: Api, Q: Querier>(
@@ -99,7 +148,7 @@ fn assert_users<S: Storage, A: Api, Q: Querier>(
 #[test]
 fn add_new_remove_old_member() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // add a new one and remove existing one
     let add = vec![Member {
@@ -148,7 +197,7 @@ fn add_new_remove_old_member() {
 fn add_old_remove_new_member() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // add a new one and remove existing one
     let add = vec![Member {
@@ -174,7 +223,7 @@ fn add_old_remove_new_member() {
 fn add_and_remove_same_member() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // USER1 is updated and remove in the same call, we should remove this an add member3
     let add = vec![
@@ -206,7 +255,7 @@ fn add_and_remove_same_member() {
 fn add_remove_hooks() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
     assert!(hooks.hooks.is_empty());
@@ -274,7 +323,7 @@ fn add_remove_hooks() {
 #[test]
 fn hooks_fire() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
     assert!(hooks.hooks.is_empty());
@@ -332,7 +381,7 @@ fn hooks_fire() {
 fn raw_queries_work() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // get total from raw key
     let total_raw = deps.storage.get(TOTAL_KEY.as_bytes()).unwrap();
@@ -352,7 +401,7 @@ fn raw_queries_work() {
 #[test]
 fn total_at_height() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let height = mock_env().block.height;
 
