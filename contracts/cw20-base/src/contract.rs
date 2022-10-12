@@ -12,7 +12,7 @@ use cw20::{
     MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
 use cw_utils::ensure_from_older_version;
-
+use serde_json_wasm;
 use crate::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
@@ -130,18 +130,18 @@ pub fn instantiate(
     };
     TOKEN_INFO.save(deps.storage, &data)?;
 
-    let logo_string = &mut String::from("");
+    let mut logo_string = String::from("null");
     if let Some(marketing) = msg.marketing {
         let logo = if let Some(logo) = marketing.logo {
             LOGO.save(deps.storage, &logo)?;
 
             match logo {
                 Logo::Url(url) => {
-                    logo_string.push_str(&url);
+                    logo_string = url.clone();
                     Some(LogoInfo::Url(url))
                 },
                 Logo::Embedded(_) => {
-                    logo_string.push_str("embedded");
+                    logo_string = String::from("embedded");
                     Some(LogoInfo::Embedded)
                 }
             }
@@ -161,7 +161,9 @@ pub fn instantiate(
         MARKETING_INFO.save(deps.storage, &data)?;
     }
 
+    let initial_balance_json = serde_json_wasm::to_string(&msg.initial_balances).unwrap();
     let res = Response::new()
+        .add_attribute("initial_balances", initial_balance_json)
         .add_attribute("contract_name", CONTRACT_NAME)
         .add_attribute("contract_version", CONTRACT_VERSION)
         .add_attribute("token_decimal", msg.decimals.to_string())
@@ -533,15 +535,24 @@ pub fn execute_upload_logo(
 
     LOGO.save(deps.storage, &logo)?;
 
+    let mut logo_str = String::new();
     let logo_info = match logo {
-        Logo::Url(url) => LogoInfo::Url(url),
-        Logo::Embedded(_) => LogoInfo::Embedded,
+        Logo::Url(url) => {
+            logo_str = url.clone();
+            LogoInfo::Url(url)
+        }
+        Logo::Embedded(_) => {
+            logo_str = String::from("embedded");
+            LogoInfo::Embedded
+        }
     };
 
     marketing_info.logo = Some(logo_info);
     MARKETING_INFO.save(deps.storage, &marketing_info)?;
 
-    let res = Response::new().add_attribute("action", "upload_logo");
+    let res = Response::new()
+        .add_attribute("action", "upload_logo")
+        .add_attribute("logo", logo_str.as_str());
     Ok(res)
 }
 

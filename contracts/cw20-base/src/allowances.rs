@@ -162,7 +162,6 @@ pub fn execute_transfer_from(
 
 pub fn execute_burn_from(
     deps: DepsMut,
-
     env: Env,
     info: MessageInfo,
     owner: String,
@@ -214,14 +213,14 @@ pub fn execute_send_from(
     deduct_allowance(deps.storage, &owner_addr, &info.sender, &env.block, amount)?;
 
     // move the tokens to the contract
-    BALANCES.update(
+    let sender_balance = BALANCES.update(
         deps.storage,
         &owner_addr,
         |balance: Option<Uint128>| -> StdResult<_> {
             Ok(balance.unwrap_or_default().checked_sub(amount)?)
         },
     )?;
-    BALANCES.update(
+    let receiver_balance = BALANCES.update(
         deps.storage,
         &rcpt_addr,
         |balance: Option<Uint128>| -> StdResult<_> { Ok(balance.unwrap_or_default() + amount) },
@@ -233,6 +232,8 @@ pub fn execute_send_from(
         attr("to", &contract),
         attr("by", &info.sender),
         attr("amount", amount),
+        attr("sender_balance", sender_balance),
+        attr("receiver_balance", receiver_balance)
     ];
 
     // create a send message
