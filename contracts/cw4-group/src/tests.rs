@@ -8,6 +8,7 @@ use crate::contract::{
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{ADMIN, HOOKS};
+use crate::ContractError;
 
 const INIT_ADMIN: &str = "juan";
 const USER1: &str = "somebody";
@@ -27,15 +28,6 @@ fn set_up(deps: DepsMut) {
                 weight: 6,
             },
         ],
-    };
-    let info = mock_info("creator", &[]);
-    instantiate(deps, mock_env(), info, msg).unwrap();
-}
-
-fn set_up_with_members(deps: DepsMut, members: impl Into<Vec<Member>>) {
-    let msg = InstantiateMsg {
-        admin: Some(INIT_ADMIN.into()),
-        members: members.into(),
     };
     let info = mock_info("creator", &[]);
     instantiate(deps, mock_env(), info, msg).unwrap();
@@ -74,12 +66,12 @@ fn try_member_queries() {
 }
 
 #[test]
-fn duplicate_members() {
+fn duplicate_members_instantiation() {
     let mut deps = mock_dependencies();
 
-    set_up_with_members(
-        deps.as_mut(),
-        [
+    let msg = InstantiateMsg {
+        admin: Some(INIT_ADMIN.into()),
+        members: vec![
             Member {
                 addr: USER1.into(),
                 weight: 5,
@@ -93,23 +85,49 @@ fn duplicate_members() {
                 weight: 6,
             },
         ],
+    };
+    let info = mock_info("creator", &[]);
+    let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::DuplicateMembers {
+            member: USER1.to_string()
+        }
     );
+}
 
-    let res = query_total_weight(deps.as_ref(), None).unwrap();
-    assert_eq!(17, res.weight);
+#[test]
+fn duplicate_members_execution() {
+    let mut deps = mock_dependencies();
+
+    set_up(deps.as_mut());
+
+    let add = vec![
+        Member {
+            addr: USER3.into(),
+            weight: 15,
+        },
+        Member {
+            addr: USER3.into(),
+            weight: 11,
+        },
+    ];
+
+    let height = mock_env().block.height;
+    let err = update_members(
+        deps.as_mut(),
+        height + 5,
+        Addr::unchecked(INIT_ADMIN),
+        add,
+        vec![],
+    )
+    .unwrap_err();
 
     assert_eq!(
-        query_member(deps.as_ref(), USER1.into(), None)
-            .unwrap()
-            .weight,
-        Some(11)
-    );
-
-    assert_eq!(
-        query_member(deps.as_ref(), USER2.into(), None)
-            .unwrap()
-            .weight,
-        Some(6)
+        err,
+        ContractError::DuplicateMembers {
+            member: USER3.to_string()
+        }
     );
 }
 

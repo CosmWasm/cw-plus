@@ -19,4 +19,7 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
+
+    #[error("Message contained duplicate member: {member}")]
+    DuplicateMembers { member: String },
 }
