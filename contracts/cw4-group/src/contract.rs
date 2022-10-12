@@ -56,12 +56,6 @@ pub fn create(
         let member_weight = Uint64::from(member.weight);
         total = total.checked_add(member_weight)?;
         let member_addr = deps.api.addr_validate(&member.addr)?;
-        MEMBERS.update(deps.storage, &member_addr, height, |v| -> StdResult<u64> {
-            match v {
-                Some(weight) => Ok(weight + member_weight.u64()),
-                None => Ok(member_weight.u64()),
-            }
-        })?;
         MEMBERS.save(deps.storage, &member_addr, &member_weight.u64(), height)?;
     }
     TOTAL.save(deps.storage, &total.u64(), height)?;
