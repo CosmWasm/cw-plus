@@ -90,7 +90,7 @@ fn duplicate_members_instantiation() {
     let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
     assert_eq!(
         err,
-        ContractError::DuplicateMembers {
+        ContractError::DuplicateMember {
             member: USER1.to_string()
         }
     );
@@ -125,7 +125,7 @@ fn duplicate_members_execution() {
 
     assert_eq!(
         err,
-        ContractError::DuplicateMembers {
+        ContractError::DuplicateMember {
             member: USER3.to_string()
         }
     );

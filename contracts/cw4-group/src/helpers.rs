@@ -46,7 +46,7 @@ pub fn validate_unique_members(members: &mut [Member]) -> Result<(), ContractErr
     members.sort_by(|a, b| a.addr.cmp(&b.addr));
     for (a, b) in members.iter().zip(members.iter().skip(1)) {
         if a.addr == b.addr {
-            return Err(ContractError::DuplicateMembers {
+            return Err(ContractError::DuplicateMember {
                 member: a.addr.clone(),
             });
         }

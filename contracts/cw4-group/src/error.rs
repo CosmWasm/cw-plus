@@ -21,5 +21,5 @@ pub enum ContractError {
     Unauthorized {},
 
     #[error("Message contained duplicate member: {member}")]
-    DuplicateMembers { member: String },
+    DuplicateMember { member: String },
 }
