@@ -30,10 +30,6 @@ for interacting with it without dealing with raw bytes. And `Map`,
 which allows you to store multiple unique typed objects under a prefix,
 indexed by a simple or compound (eg. `(&[u8], &[u8])`) primary key.
 
-These correspond to the concepts represented in `cosmwasm_storage` by
-`Singleton` and `Bucket`, but with a re-designed API and implementation
-to require less typing for developers and less gas usage in the contracts.
-
 ## Item
 
 The usage of an [`Item`](./src/item.rs) is pretty straight-forward.
