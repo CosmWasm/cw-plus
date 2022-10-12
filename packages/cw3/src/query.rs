@@ -86,8 +86,11 @@ pub enum Status {
 }
 
 #[cw_serde]
-pub struct ProposalListResponse {
-    pub proposals: Vec<ProposalResponse>,
+pub struct ProposalListResponse<T = Empty>
+where
+    T: Clone + fmt::Debug + PartialEq + JsonSchema,
+{
+    pub proposals: Vec<ProposalResponse<T>>,
 }
 
 #[cw_serde]
