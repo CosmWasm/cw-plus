@@ -8,7 +8,6 @@ use cosmwasm_std::{
     QuerierWrapper, Record, Reply, ReplyOn, Response, StdResult, Storage, SubMsg, SubMsgResponse,
     SubMsgResult, TransactionInfo, WasmMsg, WasmQuery,
 };
-use cosmwasm_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use prost::Message;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -20,6 +19,7 @@ use crate::app::{CosmosRouter, RouterQuerier};
 use crate::contracts::Contract;
 use crate::error::Error;
 use crate::executor::AppResponse;
+use crate::prefixed_storage::{prefixed, prefixed_read, PrefixedStorage, ReadonlyPrefixedStorage};
 use crate::transactions::transactional;
 use cosmwasm_std::testing::mock_wasmd_attr;
 
@@ -31,7 +31,7 @@ const CONTRACTS: Map<&Addr, ContractData> = Map::new("contracts");
 pub const NAMESPACE_WASM: &[u8] = b"wasm";
 const CONTRACT_ATTR: &str = "_contract_addr";
 
-#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+#[derive(Clone, std::fmt::Debug, PartialEq, Eq, JsonSchema)]
 pub struct WasmSudo {
     pub contract_addr: Addr,
     pub msg: Binary,
@@ -48,7 +48,7 @@ impl WasmSudo {
 
 /// Contract Data includes information about contract, equivalent of `ContractInfo` in wasmd
 /// interface.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ContractData {
     /// Identifier of stored contract code
     pub code_id: usize,
@@ -327,6 +327,34 @@ where
         }
     }
 
+    /// unified logic for UpdateAdmin and ClearAdmin messages
+    fn update_admin(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        sender: Addr,
+        contract_addr: &str,
+        new_admin: Option<String>,
+    ) -> AnyResult<AppResponse> {
+        let contract_addr = api.addr_validate(contract_addr)?;
+        let admin = new_admin.map(|a| api.addr_validate(&a)).transpose()?;
+
+        // check admin status
+        let mut data = self.load_contract(storage, &contract_addr)?;
+        if data.admin != Some(sender) {
+            bail!("Only admin can update the contract admin: {:?}", data.admin);
+        }
+        // update admin field
+        data.admin = admin;
+        self.save_contract(storage, &contract_addr, &data)?;
+
+        // no custom event here
+        Ok(AppResponse {
+            data: None,
+            events: vec![],
+        })
+    }
+
     // this returns the contract address as well, so we can properly resend the data
     fn execute_wasm(
         &self,
@@ -473,6 +501,13 @@ where
                     self.process_response(api, router, storage, block, contract_addr, res, msgs)?;
                 res.data = execute_response(res.data);
                 Ok(res)
+            }
+            WasmMsg::UpdateAdmin {
+                contract_addr,
+                admin,
+            } => self.update_admin(api, storage, sender, &contract_addr, Some(admin)),
+            WasmMsg::ClearAdmin { contract_addr } => {
+                self.update_admin(api, storage, sender, &contract_addr, None)
             }
             msg => bail!(Error::UnsupportedWasmMsg(msg)),
         }
@@ -906,7 +941,8 @@ mod test {
     use crate::app::Router;
     use crate::bank::BankKeeper;
     use crate::module::FailingModule;
-    use crate::test_helpers::contracts::{error, payout};
+    use crate::test_helpers::contracts::{caller, error, payout};
+    use crate::test_helpers::EmptyMsg;
     use crate::transactions::StorageTransaction;
 
     use super::*;
@@ -1355,5 +1391,132 @@ mod test {
         assert_payout(&keeper, &mut wasm_storage, &contract1, &payout1);
         assert_payout(&keeper, &mut wasm_storage, &contract2, &payout2);
         assert_payout(&keeper, &mut wasm_storage, &contract3, &payout3);
+    }
+
+    fn assert_admin(
+        storage: &dyn Storage,
+        keeper: &WasmKeeper<Empty, Empty>,
+        contract_addr: &impl ToString,
+        admin: Option<Addr>,
+    ) {
+        let api = MockApi::default();
+        let querier: MockQuerier<Empty> = MockQuerier::new(&[]);
+        // query
+        let data = keeper
+            .query(
+                &api,
+                storage,
+                &querier,
+                &mock_env().block,
+                WasmQuery::ContractInfo {
+                    contract_addr: contract_addr.to_string(),
+                },
+            )
+            .unwrap();
+        let res: ContractInfoResponse = from_slice(&data).unwrap();
+        assert_eq!(res.admin, admin.as_ref().map(Addr::to_string));
+    }
+
+    #[test]
+    fn update_clear_admin_works() {
+        let api = MockApi::default();
+        let mut keeper = WasmKeeper::new();
+        let block = mock_env().block;
+        let code_id = keeper.store_code(caller::contract());
+
+        let mut wasm_storage = MockStorage::new();
+
+        let admin: Addr = Addr::unchecked("admin");
+        let new_admin: Addr = Addr::unchecked("new_admin");
+        let normal_user: Addr = Addr::unchecked("normal_user");
+
+        let contract_addr = keeper
+            .register_contract(
+                &mut wasm_storage,
+                code_id,
+                Addr::unchecked("creator"),
+                admin.clone(),
+                "label".to_owned(),
+                1000,
+            )
+            .unwrap();
+
+        // init the contract
+        let info = mock_info("admin", &[]);
+        let init_msg = to_vec(&EmptyMsg {}).unwrap();
+        let res = keeper
+            .call_instantiate(
+                contract_addr.clone(),
+                &api,
+                &mut wasm_storage,
+                &mock_router(),
+                &block,
+                info,
+                init_msg,
+            )
+            .unwrap();
+        assert_eq!(0, res.messages.len());
+
+        assert_admin(&wasm_storage, &keeper, &contract_addr, Some(admin.clone()));
+
+        // non-admin should not be allowed to become admin on their own
+        keeper
+            .execute_wasm(
+                &api,
+                &mut wasm_storage,
+                &mock_router(),
+                &block,
+                normal_user.clone(),
+                WasmMsg::UpdateAdmin {
+                    contract_addr: contract_addr.to_string(),
+                    admin: normal_user.to_string(),
+                },
+            )
+            .unwrap_err();
+
+        // should still be admin
+        assert_admin(&wasm_storage, &keeper, &contract_addr, Some(admin.clone()));
+
+        // admin should be allowed to transfers adminship
+        let res = keeper
+            .execute_wasm(
+                &api,
+                &mut wasm_storage,
+                &mock_router(),
+                &block,
+                admin,
+                WasmMsg::UpdateAdmin {
+                    contract_addr: contract_addr.to_string(),
+                    admin: new_admin.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(res.events.len(), 0);
+
+        // new_admin should now be admin
+        assert_admin(
+            &wasm_storage,
+            &keeper,
+            &contract_addr,
+            Some(new_admin.clone()),
+        );
+
+        // new_admin should now be able to clear to admin
+        let res = keeper
+            .execute_wasm(
+                &api,
+                &mut wasm_storage,
+                &mock_router(),
+                &block,
+                new_admin,
+                WasmMsg::ClearAdmin {
+                    contract_addr: contract_addr.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(res.events.len(), 0);
+
+        // should have no admin now
+        assert_admin(&wasm_storage, &keeper, &contract_addr, None);
     }
 }

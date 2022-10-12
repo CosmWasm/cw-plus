@@ -2,6 +2,30 @@
 
 This guide lists API changes between *cw-plus* major releases.
 
+## v0.13.x -> v0.14.0
+
+### Breaking Issues / PRs
+
+- `MultiIndex` index fn params now include the pk [\#670](https://github.com/CosmWasm/cw-plus/issues/670)
+
+The `idx_fn` param of the `MultiIndex` constructor now has signature `fn(&[u8], &T) -> IK`, where the first param is the
+primary key of the index (in raw format), and the second param is the associated value.
+That allows us to use the pk or parts of it for building the index key.
+
+Migration of existing code is straight-forward. Just add an (unused) `_pk` param to the index function definition:
+
+```diff
+fn build_map<'a>() -> IndexedMap<'a, &'a str, Data, DataIndexes<'a>> {
+   let indexes = DataIndexes {
+-     name: MultiIndex::new(|d| d.name.clone(), "data", "data__name"),
++     name: MultiIndex::new(|_pk, d| d.name.clone(), "data", "data__name"),
+      age: UniqueIndex::new(|d| d.age, "data__age"),
+      name_lastname: UniqueIndex::new(
+```
+
+If you want to leverage this new functionality, take a look at the `pk_based_index()` test / example
+in `src/indexed_map.rs`.
+
 ## v0.11.0 -> v0.12.0
 
 ### Breaking Issues / PRs

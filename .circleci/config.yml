@@ -578,7 +578,7 @@ jobs:
   # We also sanity-check the resultant wasm files.
   wasm-build:
     docker:
-      - image: rust:1.58.1
+      - image: rust:1.59.0
     steps:
       - checkout:
           path: ~/project
@@ -587,7 +587,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - restore_cache:
           keys:
-            - cargocache-wasm-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
+            - cargocache-wasm-rust:1.59.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
@@ -597,25 +597,20 @@ jobs:
             for C in ./contracts/*/
             do
               echo "Compiling `basename $C`..."
-              (cd $C && cargo build --release --target wasm32-unknown-unknown --locked)
+              (cd $C && cargo build --release --lib --target wasm32-unknown-unknown --locked)
             done
       - run:
-          name: Install check_contract
+          name: Install cosmwasm-check
           # Uses --debug for compilation speed
-          command: cargo install --debug --version 1.0.0 --features iterator --example check_contract -- cosmwasm-vm
+          command: cargo install --debug --version 1.1.0 cosmwasm-check
       - save_cache:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-wasm-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
+          key: cargocache-wasm-rust:1.59.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Check wasm contracts
-          command: |
-            for W in ./target/wasm32-unknown-unknown/release/*.wasm
-            do
-              echo -n "Checking `basename $W`... "
-              check_contract $W
-            done
+          command: cosmwasm-check ./target/wasm32-unknown-unknown/release/*.wasm
 
   package_multi_test:
     docker:
@@ -665,11 +660,11 @@ jobs:
           name: Run unit tests (no iterator)
           command: cargo test --locked --no-default-features
       - run:
-          name: Build library for native target (with iterator)
-          command: cargo build --locked
+          name: Build library for native target (with iterator and macro)
+          command: cargo build --locked --all-features
       - run:
-          name: Run unit tests (with iterator)
-          command: cargo test --locked
+          name: Run unit tests (with iterator and macro)
+          command: cargo test --locked --all-features
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -741,7 +736,7 @@ jobs:
       - run:
           name: Build development contracts
           command: |
-            docker run --volumes-from with_code cosmwasm/workspace-optimizer:0.12.6
+            docker run --volumes-from with_code cosmwasm/workspace-optimizer:0.12.8
             docker cp with_code:/code/artifacts ./artifacts
       - run:
           name: Show data
@@ -777,19 +772,20 @@ jobs:
       - run:
           name: Build and run schema generator for packages
           command: |
-            for S in ./packages/*/examples/schema.rs
+            for S in ./packages/*/src/bin/schema.rs
             do
-              P=$(dirname $S)/..
+              P=$(dirname $S)/../..
               echo "Generating schema for $P ..."
               (cd $P && cargo schema --locked && tar -zcf ~/project/schemas/$(basename $(pwd))_schema.tar.gz ./schema)
             done
       - run:
           name: Build and run schema generator for contracts
           command: |
+            export GLOBIGNORE='./contracts/cw1-whitelist-ng/'
             for C in ./contracts/*/
             do
               echo "Generating schema for $C ..."
-              (cd $C && cargo schema --locked && tar -zcf ~/project/schemas/$(basename $(pwd))_schema.tar.gz ./schema)
+              (cd $C && cargo schema --locked && mv ./schema/*.json ~/project/schemas/)
             done
       - run:
           name: Show data

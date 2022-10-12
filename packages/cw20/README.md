@@ -3,7 +3,7 @@
 CW20 is a specification for fungible tokens based on CosmWasm.
 The name and design is loosely based on Ethereum's ERC20 standard,
 but many changes have been made. The types in here can be imported by
-contracts that wish to implement this  spec, or by contracts that call
+contracts that wish to implement this spec, or by contracts that call
 to any standard cw20 contract.
 
 The specification is split into multiple sections, a contract may only
@@ -127,6 +127,11 @@ minter address and handle updating the ACL there.
 `Mint{recipient, amount}` - If the `info.sender` is the allowed minter,
 this will create `amount` new tokens (updating total supply) and
 add them to the balance of `recipient`, as long as it does not exceed the cap.
+
+`UpdateMinter { new_minter: Option<String> }` - Callable only by the
+current minter. If `new_minter` is `Some(address)` the minter is set
+to the specified address, otherwise the minter is removed and no
+future minters may be set. 
 
 ### Queries
 

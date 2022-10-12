@@ -1,8 +1,104 @@
 # Changelog
 
-## [Unreleased](https://github.com/CosmWasm/cw-plus/tree/HEAD)
+## [v0.15.1](https://github.com/CosmWasm/cw-plus/tree/v0.15.1) (2022-09-27)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.0...v0.15.1)
+
+**Closed issues:**
+
+- Add stack and queue implementations to storage-plus [\#776](https://github.com/CosmWasm/cw-plus/issues/776)
+
+**Merged pull requests:**
+
+- Release 0.15.1 [\#809](https://github.com/CosmWasm/cw-plus/pull/809) ([uint](https://github.com/uint))
+- Add Deque [\#807](https://github.com/CosmWasm/cw-plus/pull/807) ([chipshort](https://github.com/chipshort))
+- Cw1155-base public queries and move tests [\#804](https://github.com/CosmWasm/cw-plus/pull/804) ([ismellike](https://github.com/ismellike))
+- Add clear and is\_empty methods to Map [\#803](https://github.com/CosmWasm/cw-plus/pull/803) ([manu0466](https://github.com/manu0466))
+- SnapshotItem total, public query methods, and safe math [\#802](https://github.com/CosmWasm/cw-plus/pull/802) ([ismellike](https://github.com/ismellike))
+
+## [v0.15.0](https://github.com/CosmWasm/cw-plus/tree/v0.15.0) (2022-09-14)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.14.0...v0.15.0)
+
+**Breaking changes:**
+
+- Change `MultiIndex` index function signature to include the pk [\#670](https://github.com/CosmWasm/cw-plus/issues/670)
+- Improve `MultiIndex` pk deserialization [\#531](https://github.com/CosmWasm/cw-plus/issues/531)
+
+**Implemented enhancements:**
+
+- `Prefix::keys` method never fails [\#766](https://github.com/CosmWasm/cw-plus/issues/766)
+
+**Closed issues:**
+
+- Adapt build\_and\_upload\_schemas CI job to new schema format [\#795](https://github.com/CosmWasm/cw-plus/issues/795)
+- Remove `IntKeyOld` [\#775](https://github.com/CosmWasm/cw-plus/issues/775)
+- Can I cover all tests with cw\_multi\_test? [\#771](https://github.com/CosmWasm/cw-plus/issues/771)
+- Make cw1155 can add token's url at the first mint [\#764](https://github.com/CosmWasm/cw-plus/issues/764)
+- Expose `Response` from contract in cw-multi-test execute [\#763](https://github.com/CosmWasm/cw-plus/issues/763)
+- Restructure `Index` trait to allow for more extensive `Index` struct implementation. [\#757](https://github.com/CosmWasm/cw-plus/issues/757)
+- Consider moving schema boilerplate from `examples` to a binary crate [\#755](https://github.com/CosmWasm/cw-plus/issues/755)
+- Wrong/unclear explanation in IndexedMap docs [\#718](https://github.com/CosmWasm/cw-plus/issues/718)
+- Redundant logic in `ThresholdResponse` multisigs [\#677](https://github.com/CosmWasm/cw-plus/issues/677)
+- \[cw3-flex/fixed-multisig\] Reject proposals early [\#665](https://github.com/CosmWasm/cw-plus/issues/665)
+- cw20 allowance expiration can be set to a block height or timestamp in the past [\#628](https://github.com/CosmWasm/cw-plus/issues/628)
+- Add security policy [\#580](https://github.com/CosmWasm/cw-plus/issues/580)
+- Update MIGRATING.md doc for multi test [\#490](https://github.com/CosmWasm/cw-plus/issues/490)
+
+**Merged pull requests:**
+
+- CI: unified .json schema artifacts for contracts [\#798](https://github.com/CosmWasm/cw-plus/pull/798) ([uint](https://github.com/uint))
+- cw4 contracts: clean up imports and reexports [\#797](https://github.com/CosmWasm/cw-plus/pull/797) ([uint](https://github.com/uint))
+- Fix `cargo wasm` [\#794](https://github.com/CosmWasm/cw-plus/pull/794) ([uint](https://github.com/uint))
+- Validate allowance expiration [\#793](https://github.com/CosmWasm/cw-plus/pull/793) ([chipshort](https://github.com/chipshort))
+- Update to CosmWasm 1.1.0 [\#791](https://github.com/CosmWasm/cw-plus/pull/791) ([uint](https://github.com/uint))
+- CosmWasm `1.1.0-rc.1` [\#789](https://github.com/CosmWasm/cw-plus/pull/789) ([uint](https://github.com/uint))
+- Updating broken link to cw3-flex-multisig [\#787](https://github.com/CosmWasm/cw-plus/pull/787) ([0xriku](https://github.com/0xriku))
+- Multisig status logic follow-up [\#784](https://github.com/CosmWasm/cw-plus/pull/784) ([maurolacy](https://github.com/maurolacy))
+- Multisig status logic [\#783](https://github.com/CosmWasm/cw-plus/pull/783) ([maurolacy](https://github.com/maurolacy))
+- Add primary key to `MultiIndex` index fn params [\#781](https://github.com/CosmWasm/cw-plus/pull/781) ([maurolacy](https://github.com/maurolacy))
+- Fix typo [\#779](https://github.com/CosmWasm/cw-plus/pull/779) ([LeTurt333](https://github.com/LeTurt333))
+- Remove deprecated `IntKeyOld` [\#778](https://github.com/CosmWasm/cw-plus/pull/778) ([ueco-jb](https://github.com/ueco-jb))
+- Small fixes / updates to storage-plus docs [\#777](https://github.com/CosmWasm/cw-plus/pull/777) ([maurolacy](https://github.com/maurolacy))
+- Fix: `Prefix::keys` return errors [\#774](https://github.com/CosmWasm/cw-plus/pull/774) ([maurolacy](https://github.com/maurolacy))
+- Expose cw-multi-test `FailingModule` [\#773](https://github.com/CosmWasm/cw-plus/pull/773) ([dadamu](https://github.com/dadamu))
+- Style: move `InstantiateMsg` validation in impl [\#772](https://github.com/CosmWasm/cw-plus/pull/772) ([etienne-napoleone](https://github.com/etienne-napoleone))
+- Make ExecuteEnv fields public [\#770](https://github.com/CosmWasm/cw-plus/pull/770) ([ismellike](https://github.com/ismellike))
+- Change / fix packages publishing order [\#769](https://github.com/CosmWasm/cw-plus/pull/769) ([maurolacy](https://github.com/maurolacy))
+- contracts: move schema gen boilerplate to a binary crate [\#760](https://github.com/CosmWasm/cw-plus/pull/760) ([uint](https://github.com/uint))
+
+## [v0.14.0](https://github.com/CosmWasm/cw-plus/tree/v0.14.0) (2022-07-27)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.13.4...v0.14.0)
+
+**Closed issues:**
+
+- cw20-ics20 incorrectly encodes `ack_success`. [\#759](https://github.com/CosmWasm/cw-plus/issues/759)
+- Allow querying all granted allowances to a spender [\#756](https://github.com/CosmWasm/cw-plus/issues/756)
+- Store compiled wasms on repo [\#747](https://github.com/CosmWasm/cw-plus/issues/747)
+- Add optional executor restriction to cw3-flex [\#739](https://github.com/CosmWasm/cw-plus/issues/739)
+- Provide proc macro package for automatic `IndexList<T>` implementation on any index struct [\#736](https://github.com/CosmWasm/cw-plus/issues/736)
+- MultiIndex `prefix` and `sub_prefix` working incorrectly when using a triple element tuple as IK [\#730](https://github.com/CosmWasm/cw-plus/issues/730)
+- Errors when compiling all the contracts [\#724](https://github.com/CosmWasm/cw-plus/issues/724)
+- Test-specific helpers in storage-plus [\#708](https://github.com/CosmWasm/cw-plus/issues/708)
+
+**Merged pull requests:**
+
+- Updated contract versions and links [\#762](https://github.com/CosmWasm/cw-plus/pull/762) ([daniel-farina](https://github.com/daniel-farina))
+- Allowances per spender [\#761](https://github.com/CosmWasm/cw-plus/pull/761) ([maurolacy](https://github.com/maurolacy))
+- Fix broken links, minor typo [\#752](https://github.com/CosmWasm/cw-plus/pull/752) ([mikedotexe](https://github.com/mikedotexe))
+- Use into\_iter\(\) instead of iter\(\).cloned\(\). [\#749](https://github.com/CosmWasm/cw-plus/pull/749) ([ezekiiel](https://github.com/ezekiiel))
+- Add ability to unset minter in UpdateMinter message. [\#748](https://github.com/CosmWasm/cw-plus/pull/748) ([ezekiiel](https://github.com/ezekiiel))
+- Fix specification about CW20 Enumerable Queries [\#746](https://github.com/CosmWasm/cw-plus/pull/746) ([lukepark327](https://github.com/lukepark327))
+- Add migrate method to cw20 base. [\#745](https://github.com/CosmWasm/cw-plus/pull/745) ([ezekiiel](https://github.com/ezekiiel))
+- Add optional executor restriction to cw3-flex [\#741](https://github.com/CosmWasm/cw-plus/pull/741) ([ueco-jb](https://github.com/ueco-jb))
+- Add proc macro package for automatic `IndexList<T>` implementation [\#737](https://github.com/CosmWasm/cw-plus/pull/737) ([y-pakorn](https://github.com/y-pakorn))
+- Bump workspace-optimizer version in README to `0.12.6` [\#735](https://github.com/CosmWasm/cw-plus/pull/735) ([uint](https://github.com/uint))
+- Use standard CosmosMsg [\#734](https://github.com/CosmWasm/cw-plus/pull/734) ([ethanfrey](https://github.com/ethanfrey))
+- add execute msg to update minter [\#729](https://github.com/CosmWasm/cw-plus/pull/729) ([janitachalam](https://github.com/janitachalam))
+- Removed documentation from Cargo.toml [\#711](https://github.com/CosmWasm/cw-plus/pull/711) ([hashedone](https://github.com/hashedone))
+- Move test helpers into a test section [\#709](https://github.com/CosmWasm/cw-plus/pull/709) ([shanev](https://github.com/shanev))
+- add query\_this\_hook to hooks.rs [\#688](https://github.com/CosmWasm/cw-plus/pull/688) ([ishaanh](https://github.com/ishaanh))
 
 ## [v0.13.4](https://github.com/CosmWasm/cw-plus/tree/v0.13.4) (2022-06-02)
 

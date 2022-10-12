@@ -28,11 +28,7 @@ on top of `cosmwasm_std::Storage`. They are `Item`, which is
 a typed wrapper around one database key, providing some helper functions
 for interacting with it without dealing with raw bytes. And `Map`,
 which allows you to store multiple unique typed objects under a prefix,
-indexed by a simple (`&[u8]`) or compound (eg. `(&[u8], &[u8])`) primary key.
-
-These correspond to the concepts represented in `cosmwasm_storage` by
-`Singleton` and `Bucket`, but with a re-designed API and implementation
-to require less typing for developers and less gas usage in the contracts.
+indexed by a simple or compound (eg. `(&[u8], &[u8])`) primary key.
 
 ## Item
 
@@ -111,9 +107,9 @@ fn demo() -> StdResult<()> {
 The usage of a [`Map`](./src/map.rs) is a little more complex, but
 is still pretty straight-forward. You can imagine it as a storage-backed
 `BTreeMap`, allowing key-value lookups with typed values. In addition,
-we support not only simple binary keys (`&[u8]`), but tuples, which are
-combined. This allows us to store allowances as composite keys
-eg. `(owner, spender)` to look up the balance.
+we support not only simple binary keys (like `&[u8]`), but tuples, which are
+combined. This allows us by example to store allowances as composite keys,
+i.e. `(owner, spender)` to look up the balance.
 
 Beyond direct lookups, we have a super-power not found in Ethereum -
 iteration. That's right, you can list all items in a `Map`, or only
@@ -209,8 +205,8 @@ A `Map` key can be anything that implements the `PrimaryKey` trait. There are a 
  - `impl<'a> PrimaryKey<'a> for &'a Addr`
  - `impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a>> PrimaryKey<'a> for (T, U)`
  - `impl<'a, T: PrimaryKey<'a> + Prefixer<'a>, U: PrimaryKey<'a> + Prefixer<'a>, V: PrimaryKey<'a>> PrimaryKey<'a> for (T, U, V)`
- - `PrimaryKey` implemented for unsigned integers up to `u64`
- - `PrimaryKey` implemented for signed integers up to `i64`
+ - `PrimaryKey` implemented for unsigned integers up to `u128`
+ - `PrimaryKey` implemented for signed integers up to `i128`
 
 That means that byte and string slices, byte vectors, and strings, can be conveniently used as keys.
 Moreover, some other types can be used as well, like addresses and address references, pairs, triples, and
@@ -236,7 +232,7 @@ one owner" (first part of the composite key). Just like you'd expect from your
 favorite database.
 
 Here's how we use it with composite keys. Just define a tuple as a key and use that
-everywhere you used a byte slice above.
+everywhere you used a single key above.
 
 ```rust
 // Note the tuple for primary key. We support one slice, or a 2 or 3-tuple.
@@ -271,13 +267,13 @@ fn demo() -> StdResult<()> {
 ### Path
 
 Under the scenes, we create a `Path` from the `Map` when accessing a key.
-`PEOPLE.load(&store, b"jack") == PEOPLE.key(b"jack").load()`.
+`PEOPLE.load(&store, "jack") == PEOPLE.key("jack").load()`.
 `Map.key()` returns a `Path`, which has the same interface as `Item`,
 re-using the calculated path to this key.
 
 For simple keys, this is just a bit less typing and a bit less gas if you
 use the same key for many calls. However, for composite keys, like
-`(b"owner", b"spender")` it is **much** less typing. And highly recommended anywhere
+`("owner", "spender")` it is **much** less typing. And highly recommended anywhere
 you will use a composite key even twice:
 
 ```rust
@@ -417,7 +413,7 @@ fn demo() -> StdResult<()> {
         .prefix("owner")
         .range(
             &store,
-            Some(Bound::exclusive("spender1")),
+            Some(Bound::exclusive("spender")),
             Some(Bound::inclusive("spender2")),
             Order::Descending,
         )
@@ -635,3 +631,72 @@ In the particular case of `MultiIndex`, the primary key (`PK`) type parameter al
 the index key (the part that corresponds to the primary key, that is).
 So, to correctly use type-safe bounds over multi-indexes ranges, it is fundamental for this `PK` type
 to be correctly defined, so that it matches the primary key type, or its (typically owned) deserialization variant.
+
+## VecDeque
+
+The usage of a [`VecDeque`](./src/deque.rs) is pretty straight-forward.
+Conceptually it works like a storage-backed version of Rust std's `VecDeque` and can be used as a queue or stack.
+It allows you to push and pop elements on both ends and also read the first or last element without mutating the deque.
+You can also read a specific index directly.
+
+Example Usage:
+
+```rust
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+struct Data {
+    pub name: String,
+    pub age: i32,
+}
+
+const DATA: Deque<Data> = Deque::new("data");
+
+fn demo() -> StdResult<()> {
+    let mut store = MockStorage::new();
+
+    // read methods return a wrapped Option<T>, so None if the deque is empty
+    let empty = DATA.front(&store)?;
+    assert_eq!(None, empty);
+
+    // some example entries
+    let p1 = Data {
+        name: "admin".to_string(),
+        age: 1234,
+    };
+    let p2 = Data {
+        name: "user".to_string(),
+        age: 123,
+    };
+
+    // use it like a queue by pushing and popping at opposite ends
+    DATA.push_back(&mut store, &p1)?;
+    DATA.push_back(&mut store, &p2)?;
+
+    let admin = DATA.pop_front(&mut store)?;
+    assert_eq!(admin.as_ref(), Some(&p1));
+    let user = DATA.pop_front(&mut store)?;
+    assert_eq!(user.as_ref(), Some(&p2));
+
+    // or push and pop at the same end to use it as a stack
+    DATA.push_back(&mut store, &p1)?;
+    DATA.push_back(&mut store, &p2)?;
+
+    let user = DATA.pop_back(&mut store)?;
+    assert_eq!(user.as_ref(), Some(&p2));
+    let admin = DATA.pop_back(&mut store)?;
+    assert_eq!(admin.as_ref(), Some(&p1));
+
+    // you can also iterate over it
+    DATA.push_front(&mut store, &p1)?;
+    DATA.push_front(&mut store, &p2)?;
+
+    let all: StdResult<Vec<_>> = DATA.iter(&store)?.collect();
+    assert_eq!(all?, [p2, p1]);
+
+    // or access an index directly
+    assert_eq!(DATA.get(&store, 0)?, Some(p2));
+    assert_eq!(DATA.get(&store, 1)?, Some(p1));
+    assert_eq!(DATA.get(&store, 3)?, None);
+
+    Ok(())
+}
+```

@@ -1,13 +1,11 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_binary, Binary, CosmosMsg, StdResult, Uint128, WasmMsg};
 
 use crate::msg::TokenId;
 
 /// Cw1155ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 pub struct Cw1155ReceiveMsg {
     /// The account that executed the send message
     pub operator: String,
@@ -38,8 +36,8 @@ impl Cw1155ReceiveMsg {
 }
 
 /// Cw1155BatchReceiveMsg should be de/serialized under `BatchReceive()` variant in a ExecuteMsg
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 pub struct Cw1155BatchReceiveMsg {
     pub operator: String,
     pub from: Option<String>,
@@ -67,8 +65,8 @@ impl Cw1155BatchReceiveMsg {
 }
 
 // This is just a helper to properly serialize the above message
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+
 enum ReceiverExecuteMsg {
     Receive(Cw1155ReceiveMsg),
     BatchReceive(Cw1155BatchReceiveMsg),

@@ -1,12 +1,12 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::{fmt, ops};
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Coin, OverflowError, OverflowOperation, StdError, StdResult, Uint128};
 
 // Balance wraps Vec<Coin> and provides some nice helpers. It mutates the Vec and can be
 // unwrapped when done.
-#[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
+#[derive(Default)]
 pub struct NativeBalance(pub Vec<Coin>);
 
 impl NativeBalance {

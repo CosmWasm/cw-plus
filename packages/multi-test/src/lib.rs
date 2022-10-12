@@ -14,6 +14,7 @@ pub mod custom_handler;
 pub mod error;
 mod executor;
 mod module;
+mod prefixed_storage;
 mod staking;
 mod test_helpers;
 mod transactions;
@@ -26,6 +27,6 @@ pub use crate::app::{
 pub use crate::bank::{Bank, BankKeeper, BankSudo};
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::executor::{AppResponse, Executor};
-pub use crate::module::Module;
+pub use crate::module::{FailingModule, Module};
 pub use crate::staking::{FailingDistribution, FailingStaking, Staking, StakingSudo};
 pub use crate::wasm::{Wasm, WasmKeeper, WasmSudo};

@@ -1,12 +1,29 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+/*!
+Most of the CW* specs are focused on the *public interfaces*
+of the contract. The APIs used for `ExecuteMsg` or `QueryMsg`.
+However, when we wish to migrate or inspect smart contract info,
+we need some form of smart contract information embedded on state.
 
+This is where CW2 comes in. It specifies a special Item to
+be stored on disk by all contracts on `instantiate`.
+
+`ContractInfo` must be stored under the `"contract_info"` key which translates
+to `"636F6E74726163745F696E666F"` in hex format.
+Since the state is well defined, we do not need to support any "smart queries".
+We do provide a helper to construct a "raw query" to read the ContractInfo
+of any CW2-compliant contract.
+
+For more information on this specification, please check out the
+[README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw2/README.md).
+*/
+
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Empty, Querier, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery};
 use cw_storage_plus::Item;
 
 pub const CONTRACT: Item<ContractVersion> = Item::new("contract_info");
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ContractVersion {
     /// contract is the crate name of the implementing contract, eg. `crate:cw20-base`
     /// we will use other prefixes for other languages, and their standard global namespacing

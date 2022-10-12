@@ -33,6 +33,9 @@ pub enum ContractError {
     #[error("Invalid png header")]
     InvalidPngHeader {},
 
+    #[error("Invalid expiration value")]
+    InvalidExpiration {},
+
     #[error("Duplicate initial balance addresses")]
     DuplicateInitialBalanceAddresses {},
 }

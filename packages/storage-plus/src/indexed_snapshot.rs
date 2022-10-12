@@ -302,8 +302,8 @@ where
 mod test {
     use super::*;
 
-    use crate::indexes::index_string_tuple;
-    use crate::{index_tuple, Index, MultiIndex, UniqueIndex};
+    use crate::indexes::test::{index_string_tuple, index_tuple};
+    use crate::{Index, MultiIndex, UniqueIndex};
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::{MemoryStorage, Order};
     use serde::{Deserialize, Serialize};
@@ -347,7 +347,7 @@ mod test {
     // Can we make it easier to define this? (less wordy generic)
     fn build_snapshot_map<'a>() -> IndexedSnapshotMap<'a, &'a str, Data, DataIndexes<'a>> {
         let indexes = DataIndexes {
-            name: MultiIndex::new(|d| d.name.as_bytes().to_vec(), "data", "data__name"),
+            name: MultiIndex::new(|_pk, d| d.name.as_bytes().to_vec(), "data", "data__name"),
             age: UniqueIndex::new(|d| d.age, "data__age"),
             name_lastname: UniqueIndex::new(
                 |d| index_string_tuple(&d.name, &d.last_name),
@@ -677,7 +677,11 @@ mod test {
         let mut height = 2;
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map =
             IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);
@@ -743,7 +747,11 @@ mod test {
         let mut height = 2;
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map =
             IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);
@@ -1134,7 +1142,11 @@ mod test {
         let mut store = MockStorage::new();
 
         let indexes = DataCompositeMultiIndex {
-            name_age: MultiIndex::new(|d| index_tuple(&d.name, d.age), "data", "data__name_age"),
+            name_age: MultiIndex::new(
+                |_pk, d| index_tuple(&d.name, d.age),
+                "data",
+                "data__name_age",
+            ),
         };
         let map =
             IndexedSnapshotMap::new("data", "checks", "changes", Strategy::EveryBlock, indexes);

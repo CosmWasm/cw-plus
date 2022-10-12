@@ -7,17 +7,18 @@ function print_usage() {
   echo "Publishes crates to crates.io."
 }
 
-if [ $# = 1 ] && ( [ "$1" = "-h" ] || [ "$1" = "--help" ] )
+if [ $# = 1 ] && { [ "$1" = "-h" ] || [ "$1" = "--help" ] ; }
 then
     print_usage
     exit 1
 fi
 
 # this should really more to cosmwasm...
-STORAGE_PACKAGES="storage-plus"
+STORAGE_PACKAGES="storage-macro storage-plus"
 # these are imported by other packages
-BASE_PACKAGES="utils"
-ALL_PACKAGES="controllers cw1 cw2 cw3 cw4 cw20 cw1155 multi-test"
+BASE_PACKAGES="cw2"
+UTILS_PACKAGES="utils"
+ALL_PACKAGES="controllers cw1 cw3 cw4 cw20 cw1155 multi-test"
 
 # This is imported by cw3-fixed-multisig, which is imported by cw3-flex-multisig
 # need to make a separate category to remove race conditions
@@ -50,6 +51,18 @@ done
 
 # wait for these to be processed on crates.io
 echo "Waiting for publishing base packages"
+sleep $SLEEP_TIME
+
+for pack in $UTILS_PACKAGES; do
+  (
+    cd "packages/$pack"
+    echo "Publishing $pack"
+    cargo publish
+  )
+done
+
+# wait for these to be processed on crates.io
+echo "Waiting for publishing utils packages"
 sleep $SLEEP_TIME
 
 for pack in $ALL_PACKAGES; do

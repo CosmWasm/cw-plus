@@ -109,6 +109,36 @@ where
             from_slice(&result).map(Some)
         }
     }
+
+    /// Clears the map, removing all elements.
+    #[cfg(feature = "iterator")]
+    pub fn clear(&self, store: &mut dyn Storage) {
+        const TAKE: usize = 10;
+        let mut cleared = false;
+
+        while !cleared {
+            let paths = self
+                .no_prefix_raw()
+                .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+                .map(|raw_key| Path::<T>::new(self.namespace, &[raw_key.as_slice()]))
+                // Take just TAKE elements to prevent possible heap overflow if the Map is big.
+                .take(TAKE)
+                .collect::<Vec<_>>();
+
+            paths.iter().for_each(|path| store.remove(path));
+
+            cleared = paths.len() < TAKE;
+        }
+    }
+
+    /// Returns `true` if the map is empty.
+    #[cfg(feature = "iterator")]
+    pub fn is_empty(&self, store: &dyn Storage) -> bool {
+        self.no_prefix_raw()
+            .keys_raw(store, None, None, cosmwasm_std::Order::Ascending)
+            .next()
+            .is_none()
+    }
 }
 
 #[cfg(feature = "iterator")]
@@ -267,15 +297,15 @@ mod test {
     use std::ops::Deref;
 
     use cosmwasm_std::testing::MockStorage;
+    use cosmwasm_std::to_binary;
+    use cosmwasm_std::StdError::InvalidUtf8;
     #[cfg(feature = "iterator")]
     use cosmwasm_std::{Order, StdResult};
 
     #[cfg(feature = "iterator")]
     use crate::bound::Bounder;
 
-    use crate::int_key::CwIntKey;
-    #[cfg(feature = "iterator")]
-    use crate::IntKeyOld;
+    use crate::int_key::IntKey;
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     struct Data {
@@ -285,9 +315,11 @@ mod test {
 
     const PEOPLE: Map<&[u8], Data> = Map::new("people");
     #[cfg(feature = "iterator")]
-    const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
+    const PEOPLE_STR_KEY: &str = "people2";
     #[cfg(feature = "iterator")]
-    const SIGNED_ID_OLD: Map<IntKeyOld<i32>, Data> = Map::new("signed_id");
+    const PEOPLE_STR: Map<&str, Data> = Map::new(PEOPLE_STR_KEY);
+    #[cfg(feature = "iterator")]
+    const PEOPLE_ID: Map<u32, Data> = Map::new("people_id");
     #[cfg(feature = "iterator")]
     const SIGNED_ID: Map<i32, Data> = Map::new("signed_id");
 
@@ -541,6 +573,104 @@ mod test {
 
     #[test]
     #[cfg(feature = "iterator")]
+    fn range_key_broken_deserialization_errors() {
+        let mut store = MockStorage::new();
+
+        // save and load on three keys
+        let data = Data {
+            name: "John".to_string(),
+            age: 32,
+        };
+        PEOPLE_STR.save(&mut store, "john", &data).unwrap();
+
+        let data2 = Data {
+            name: "Jim".to_string(),
+            age: 44,
+        };
+        PEOPLE_STR.save(&mut store, "jim", &data2).unwrap();
+
+        let data3 = Data {
+            name: "Ada".to_string(),
+            age: 23,
+        };
+        PEOPLE_STR.save(&mut store, "ada", &data3).unwrap();
+
+        // let's iterate!
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        let all = all.unwrap();
+        assert_eq!(3, all.len());
+        assert_eq!(
+            all,
+            vec![
+                ("ada".to_string(), data3.clone()),
+                ("jim".to_string(), data2.clone()),
+                ("john".to_string(), data.clone())
+            ]
+        );
+
+        // Manually add a broken key (invalid utf-8)
+        store.set(
+            &[
+                [0u8, PEOPLE_STR_KEY.len() as u8].as_slice(),
+                PEOPLE_STR_KEY.as_bytes(),
+                b"\xddim",
+            ]
+            .concat(),
+            &to_binary(&data2).unwrap(),
+        );
+
+        // Let's try to iterate again!
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .range(&store, None, None, Order::Ascending)
+            .collect();
+        assert!(all.is_err());
+        assert!(matches!(all.unwrap_err(), InvalidUtf8 { .. }));
+
+        // And the same with keys()
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .keys(&store, None, None, Order::Ascending)
+            .collect();
+        assert!(all.is_err());
+        assert!(matches!(all.unwrap_err(), InvalidUtf8 { .. }));
+
+        // But range_raw still works
+        let all: StdResult<Vec<_>> = PEOPLE_STR
+            .range_raw(&store, None, None, Order::Ascending)
+            .collect();
+
+        let all = all.unwrap();
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                (b"ada".to_vec(), data3.clone()),
+                (b"jim".to_vec(), data2.clone()),
+                (b"john".to_vec(), data.clone()),
+                (b"\xddim".to_vec(), data2.clone()),
+            ]
+        );
+
+        // And the same with keys_raw
+        let all: Vec<_> = PEOPLE_STR
+            .keys_raw(&store, None, None, Order::Ascending)
+            .collect();
+
+        assert_eq!(4, all.len());
+        assert_eq!(
+            all,
+            vec![
+                b"ada".to_vec(),
+                b"jim".to_vec(),
+                b"john".to_vec(),
+                b"\xddim".to_vec(),
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
     fn range_simple_integer_key() {
         let mut store = MockStorage::new();
 
@@ -754,76 +884,6 @@ mod test {
         let all = all.unwrap();
         assert_eq!(1, all.len());
         assert_eq!(all, vec![(50, data3)]);
-    }
-
-    #[test]
-    #[cfg(feature = "iterator")]
-    fn range_signed_integer_key_migration() {
-        let mut store = MockStorage::new();
-
-        // save and load three keys with the old format
-        let data = Data {
-            name: "John".to_string(),
-            age: 32,
-        };
-        SIGNED_ID_OLD
-            .save(&mut store, IntKeyOld::<i32>::from(-1234), &data)
-            .unwrap();
-
-        let data2 = Data {
-            name: "Jim".to_string(),
-            age: 44,
-        };
-        SIGNED_ID_OLD
-            .save(&mut store, IntKeyOld::<i32>::from(-56), &data2)
-            .unwrap();
-
-        let data3 = Data {
-            name: "Jules".to_string(),
-            age: 55,
-        };
-        SIGNED_ID_OLD
-            .save(&mut store, IntKeyOld::<i32>::from(50), &data3)
-            .unwrap();
-
-        // obtain all current keys
-        let current = SIGNED_ID_OLD
-            .range(&store, None, None, Order::Ascending)
-            .collect::<StdResult<Vec<_>>>()
-            .unwrap();
-        // confirm wrong current order
-        assert_eq!(
-            current,
-            vec![
-                (50, data3.clone()),
-                (-1234, data.clone()),
-                (-56, data2.clone())
-            ]
-        );
-
-        // remove old entries
-        for (k, _) in current.iter() {
-            SIGNED_ID_OLD.remove(&mut store, (*k).into());
-        }
-
-        // confirm map is empty
-        assert!(SIGNED_ID_OLD
-            .range(&store, None, None, Order::Ascending)
-            .next()
-            .is_none());
-
-        // save in new format
-        for (k, v) in current.into_iter() {
-            SIGNED_ID.save(&mut store, k, &v).unwrap();
-        }
-
-        // obtain new keys
-        let new = SIGNED_ID
-            .range(&store, None, None, Order::Ascending)
-            .collect::<StdResult<Vec<_>>>()
-            .unwrap();
-        // confirm new order is right
-        assert_eq!(new, vec![(-1234, data), (-56, data2), (50, data3)]);
     }
 
     #[test]
@@ -1480,5 +1540,41 @@ mod test {
             .unwrap();
         assert_eq!(include.len(), 1);
         assert_eq!(include, vec![456]);
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn clear_works() {
+        const TEST_MAP: Map<&str, u32> = Map::new("test_map");
+
+        let mut storage = MockStorage::new();
+        TEST_MAP.save(&mut storage, "key0", &0u32).unwrap();
+        TEST_MAP.save(&mut storage, "key1", &1u32).unwrap();
+        TEST_MAP.save(&mut storage, "key2", &2u32).unwrap();
+        TEST_MAP.save(&mut storage, "key3", &3u32).unwrap();
+        TEST_MAP.save(&mut storage, "key4", &4u32).unwrap();
+
+        TEST_MAP.clear(&mut storage);
+
+        assert!(!TEST_MAP.has(&storage, "key0"));
+        assert!(!TEST_MAP.has(&storage, "key1"));
+        assert!(!TEST_MAP.has(&storage, "key2"));
+        assert!(!TEST_MAP.has(&storage, "key3"));
+        assert!(!TEST_MAP.has(&storage, "key4"));
+    }
+
+    #[test]
+    #[cfg(feature = "iterator")]
+    fn is_empty_works() {
+        const TEST_MAP: Map<&str, u32> = Map::new("test_map");
+
+        let mut storage = MockStorage::new();
+
+        assert!(TEST_MAP.is_empty(&storage));
+
+        TEST_MAP.save(&mut storage, "key1", &1u32).unwrap();
+        TEST_MAP.save(&mut storage, "key2", &2u32).unwrap();
+
+        assert!(!TEST_MAP.is_empty(&storage));
     }
 }

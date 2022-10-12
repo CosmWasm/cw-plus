@@ -20,15 +20,15 @@
 
 | Contracts          | Download                                                                                                 | Docs                                                                                        | Coverage                                                                                                                                  |
 |--------------------|----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| cw1-subkeys        | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw1_subkeys.wasm)        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw1-whitelist      | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw1_whitelist.wasm)      | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)           | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw3-fixed-multisig | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw3_fixed_multisig.wasm) | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw3-flex-multisig  | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw3_flex_multisig.wasm)  | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw4-group          | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw4-stake          | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw20-base          | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw20-ics20         | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw20_ics20.wasm)         | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)                 | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw1155-base        | [Release v0.10.3](https://github.com/CosmWasm/cw-plus/releases/download/v0.10.3/cw1155_base.wasm)        | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw1-subkeys        | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_subkeys.wasm)        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw1-whitelist      | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_whitelist.wasm)      | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)           | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw3-fixed-multisig | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw3_fixed_multisig.wasm) | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw3-flex-multisig  | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw3_flex_multisig.wasm)  | [![Docs](https://docs.rs/cw3-flex-multisig/badge.svg)](https://docs.rs/cw3-flex-multisig)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw4-group          | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw4_group.wasm)          | [![Docs](https://docs.rs/cw4-group/badge.svg)](https://docs.rs/cw4-group)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw4-stake          | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw4_stake.wasm)          | [![Docs](https://docs.rs/cw4-stake/badge.svg)](https://docs.rs/cw4-stake)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw20-base          | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw20_base.wasm)          | [![Docs](https://docs.rs/cw20-base/badge.svg)](https://docs.rs/cw20-base)                   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw20-ics20         | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw20_ics20.wasm)         | [![Docs](https://docs.rs/cw20-ics20/badge.svg)](https://docs.rs/cw20-ics20)                 | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw1155-base        | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1155_base.wasm)        | [![Docs](https://docs.rs/cw1155-base/badge.svg)](https://docs.rs/cw1155-base)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 
 Note: `cw721` and `cw721-base` have moved to the new [`cw-nfts` repo](https://github.com/CosmWasm/cw-nfts)
 and can be followed there.
@@ -44,7 +44,7 @@ many custom contracts.
 If you don't know what CosmWasm is, please check out
 [our homepage](https://cosmwasm.com) and
 [our documentation](https://docs.cosmwasm.com) to get more background.
-We are running a [public testnet](https://github.com/CosmWasm/testnets/blob/master/sandynet-1/README.md)
+We are running [public testnets](https://github.com/CosmWasm/testnets#running)
 you can use to test out any contracts.
 
 **Warning** None of these contracts have been audited and no liability is
@@ -62,7 +62,7 @@ cleaner (before: `expires: {at_height: {height: 12345}}` after
 The most reusable components are the various cwXYZ specifications under
 `packages`. Each one defines a standard interface for different domains,
 e.g. [cw20](./packages/cw20/README.md) for fungible tokens,
-[cw721](./packages/cw721/README.md) for non-fungible tokens,
+[cw721](https://github.com/CosmWasm/cw-nfts/blob/main/packages/cw721/README.md) for non-fungible tokens,
 [cw1](./packages/cw1/README.md) for  "proxy contracts", etc.
 The interface comes with a human description in the READMEs, as well
 as Rust types that can be imported.
@@ -160,7 +160,7 @@ and depth of discussion can give an idea how much review was present.
 
 After that, fuzzing it (ideally with an intelligent fuzzer that understands the domain)
 can be valuable. And beyond that formal verification can provide even more assurance
-(but is very time consuming and expensive).
+(but is very time-consuming and expensive).
 
 ### Code Coverage
 
@@ -213,7 +213,7 @@ relevant `Cargo.toml` file for clarity.
 
 All *specifications* will always be Apache-2.0. All contracts that are
 meant to be *building blocks* will also be Apache-2.0. This is along
-the lines of Open Zepellin or other public references.
+the lines of Open Zeppelin or other public references.
 
 Contracts that are "ready to deploy" may be licensed under AGPL 3.0 to
 encourage anyone using them to contribute back any improvements they

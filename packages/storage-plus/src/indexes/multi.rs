@@ -24,11 +24,11 @@ use std::marker::PhantomData;
 /// the secondary load of the associated value from the main map.
 ///
 /// The PK type defines the type of Primary Key, both for deserialization, and
-/// more important, type-safe bound key type.
+/// more important, as the type-safe bound key type.
 /// This type must match the encompassing `IndexedMap` primary key type,
 /// or its owned variant.
 pub struct MultiIndex<'a, IK, T, PK> {
-    index: fn(&T) -> IK,
+    index: fn(&[u8], &T) -> IK,
     idx_namespace: &'a [u8],
     // note, we collapse the ik - combining everything under the namespace - and concatenating the pk
     idx_map: Map<'a, Vec<u8>, u32>,
@@ -60,12 +60,12 @@ where
     /// }
     ///
     /// let index: MultiIndex<_, _, String> = MultiIndex::new(
-    ///     |d: &Data| d.age,
+    ///     |_pk: &[u8], d: &Data| d.age,
     ///     "age",
     ///     "age__owner",
     /// );
     /// ```
-    pub fn new(idx_fn: fn(&T) -> IK, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
+    pub fn new(idx_fn: fn(&[u8], &T) -> IK, pk_namespace: &'a str, idx_namespace: &'a str) -> Self {
         MultiIndex {
             index: idx_fn,
             idx_namespace: idx_namespace.as_bytes(),
@@ -131,12 +131,12 @@ where
     IK: PrimaryKey<'a>,
 {
     fn save(&self, store: &mut dyn Storage, pk: &[u8], data: &T) -> StdResult<()> {
-        let idx = (self.index)(data).joined_extra_key(pk);
+        let idx = (self.index)(pk, data).joined_extra_key(pk);
         self.idx_map.save(store, idx, &(pk.len() as u32))
     }
 
     fn remove(&self, store: &mut dyn Storage, pk: &[u8], old_data: &T) -> StdResult<()> {
-        let idx = (self.index)(old_data).joined_extra_key(pk);
+        let idx = (self.index)(pk, old_data).joined_extra_key(pk);
         self.idx_map.remove(store, idx);
         Ok(())
     }

@@ -6,20 +6,20 @@ use cosmwasm_std::{
     coin, to_binary, Addr, AllBalanceResponse, Api, BalanceResponse, BankMsg, BankQuery, Binary,
     BlockInfo, Coin, Event, Querier, Storage,
 };
-use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::Map;
 use cw_utils::NativeBalance;
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;
 use crate::module::Module;
+use crate::prefixed_storage::{prefixed, prefixed_read};
 
 const BALANCES: Map<&Addr, NativeBalance> = Map::new("balances");
 
 pub const NAMESPACE_BANK: &[u8] = b"bank";
 
 // WIP
-#[derive(Clone, std::fmt::Debug, PartialEq, JsonSchema)]
+#[derive(Clone, std::fmt::Debug, PartialEq, Eq, JsonSchema)]
 pub enum BankSudo {
     Mint {
         to_address: String,
