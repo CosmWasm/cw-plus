@@ -384,14 +384,18 @@ fn hooks_fire() {
     // ensure 2 messages for the 2 hooks
     assert_eq!(res.messages.len(), 2);
     // same order as in the message (adds first, then remove)
+    // order of added users is not guaranteed to be preserved
     let diffs = vec![
-        MemberDiff::new(USER1, Some(11), Some(20)),
         MemberDiff::new(USER3, None, Some(5)),
+        MemberDiff::new(USER1, Some(11), Some(20)),
         MemberDiff::new(USER2, Some(6), None),
     ];
     let hook_msg = MemberChangedHookMsg { diffs };
     let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1).unwrap());
     let msg2 = SubMsg::new(hook_msg.into_cosmos_msg(contract2).unwrap());
+    dbg!(&res.messages);
+    dbg!(&msg1);
+    dbg!(&msg2);
     assert_eq!(res.messages, vec![msg1, msg2]);
 }
 

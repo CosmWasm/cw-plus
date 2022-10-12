@@ -13,6 +13,7 @@ use cw_storage_plus::Bound;
 use cw_utils::maybe_addr;
 
 use crate::error::ContractError;
+use crate::helpers::validate_unique_members;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
@@ -39,9 +40,12 @@ pub fn instantiate(
 pub fn create(
     mut deps: DepsMut,
     admin: Option<String>,
-    members: Vec<Member>,
+    mut members: Vec<Member>,
     height: u64,
 ) -> Result<(), ContractError> {
+    validate_unique_members(&mut members)?;
+    let members = members; // let go of mutability
+
     let admin_addr = admin
         .map(|admin| deps.api.addr_validate(&admin))
         .transpose()?;
@@ -122,9 +126,12 @@ pub fn update_members(
     deps: DepsMut,
     height: u64,
     sender: Addr,
-    to_add: Vec<Member>,
+    mut to_add: Vec<Member>,
     to_remove: Vec<String>,
 ) -> Result<MemberChangedHookMsg, ContractError> {
+    validate_unique_members(&mut to_add)?;
+    let to_add = to_add; // let go of mutability
+
     ADMIN.assert_admin(deps.as_ref(), &sender)?;
 
     let mut total = Uint64::from(TOTAL.load(deps.storage)?);

@@ -4,7 +4,7 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 use cw4::{Cw4Contract, Member};
 
-use crate::msg::ExecuteMsg;
+use crate::{msg::ExecuteMsg, ContractError};
 
 /// Cw4GroupContract is a wrapper around Cw4Contract that provides a lot of helpers
 /// for working with cw4-group contracts.
@@ -39,4 +39,18 @@ impl Cw4GroupContract {
         let msg = ExecuteMsg::UpdateMembers { remove, add };
         self.encode_msg(msg)
     }
+}
+
+/// Sorts the slice and verifies all member addresses are unique.
+pub fn validate_unique_members(members: &mut [Member]) -> Result<(), ContractError> {
+    members.sort_by(|a, b| a.addr.cmp(&b.addr));
+    for (a, b) in members.iter().zip(members.iter().skip(1)) {
+        if a.addr == b.addr {
+            return Err(ContractError::DuplicateMembers {
+                member: a.addr.clone(),
+            });
+        }
+    }
+
+    Ok(())
 }
