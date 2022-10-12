@@ -14,6 +14,7 @@ pub mod custom_handler;
 pub mod error;
 mod executor;
 mod module;
+mod prefixed_storage;
 mod staking;
 mod test_helpers;
 mod transactions;
