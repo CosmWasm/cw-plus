@@ -9,12 +9,12 @@ use cosmwasm_std::{
     DelegationResponse, DistributionMsg, Empty, Event, FullDelegation, Querier, StakingMsg,
     StakingQuery, Storage, Timestamp, Uint128, Validator, ValidatorResponse,
 };
-use cosmwasm_storage::{prefixed, prefixed_read};
 use cw_storage_plus::{Deque, Item, Map};
 use serde::{Deserialize, Serialize};
 
 use crate::app::CosmosRouter;
 use crate::executor::AppResponse;
+use crate::prefixed_storage::{prefixed, prefixed_read};
 use crate::{BankSudo, Module};
 
 // Contains some general staking parameters
