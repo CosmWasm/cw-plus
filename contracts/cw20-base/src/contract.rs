@@ -535,7 +535,7 @@ pub fn execute_upload_logo(
 
     LOGO.save(deps.storage, &logo)?;
 
-    let mut logo_str = String::new();
+    let logo_str;
     let logo_info = match logo {
         Logo::Url(url) => {
             logo_str = url.clone();

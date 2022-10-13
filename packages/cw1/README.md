@@ -6,7 +6,7 @@ where one contract is meant to hold assets (or rights) on behalf of
 other contracts.
 
 The simplest example is a contract that will accept messages from
-the creator and resend them from it's address. Simply by making this
+the creator and resend them from its address. Simply by making this
 transferable, you can then begin to transfer non-transferable assets
 (eg. staked tokens, voting power, etc).
 

@@ -3,7 +3,7 @@
 CW20 is a specification for fungible tokens based on CosmWasm.
 The name and design is loosely based on Ethereum's ERC20 standard,
 but many changes have been made. The types in here can be imported by
-contracts that wish to implement this  spec, or by contracts that call
+contracts that wish to implement this spec, or by contracts that call
 to any standard cw20 contract.
 
 The specification is split into multiple sections, a contract may only
