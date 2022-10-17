@@ -1,6 +1,6 @@
 [package]
 name = "cw4"
-version = "0.15.2"
+version = "0.16.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "CosmWasm-4 Interface: Groups Members"
@@ -9,7 +9,7 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
-cw-storage-plus = { path = "../storage-plus", version = "0.15.2" }
+cw-storage-plus = { path = "../storage-plus", version = "0.16.0" }
 cosmwasm-schema = "1.1.0"
 cosmwasm-std = "1.1.0"
 schemars = "0.8.1"
