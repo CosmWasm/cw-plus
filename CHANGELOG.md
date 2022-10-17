@@ -1,8 +1,8 @@
 # Changelog
 
-## [v0.15.2](https://github.com/CosmWasm/cw-plus/tree/v0.15.2) (2022-10-14)
+## [v0.16.0](https://github.com/CosmWasm/cw-plus/tree/v0.16.0) (2022-10-14)
 
-[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.1...HEAD)
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.1...v0.16.0)
 
 **Closed issues:**
 
