@@ -8,13 +8,14 @@ use crate::contract::{
 };
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 use crate::state::{ADMIN, HOOKS};
+use crate::ContractError;
 
 const INIT_ADMIN: &str = "juan";
 const USER1: &str = "somebody";
 const USER2: &str = "else";
 const USER3: &str = "funny";
 
-fn do_instantiate(deps: DepsMut) {
+fn set_up(deps: DepsMut) {
     let msg = InstantiateMsg {
         admin: Some(INIT_ADMIN.into()),
         members: vec![
@@ -35,7 +36,7 @@ fn do_instantiate(deps: DepsMut) {
 #[test]
 fn proper_instantiation() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // it worked, let's query the state
     let res = ADMIN.query_admin(deps.as_ref()).unwrap();
@@ -48,7 +49,7 @@ fn proper_instantiation() {
 #[test]
 fn try_member_queries() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let member1 = query_member(deps.as_ref(), USER1.into(), None).unwrap();
     assert_eq!(member1.weight, Some(11));
@@ -62,6 +63,72 @@ fn try_member_queries() {
     let members = query_list_members(deps.as_ref(), None, None).unwrap();
     assert_eq!(members.members.len(), 2);
     // TODO: assert the set is proper
+}
+
+#[test]
+fn duplicate_members_instantiation() {
+    let mut deps = mock_dependencies();
+
+    let msg = InstantiateMsg {
+        admin: Some(INIT_ADMIN.into()),
+        members: vec![
+            Member {
+                addr: USER1.into(),
+                weight: 5,
+            },
+            Member {
+                addr: USER2.into(),
+                weight: 6,
+            },
+            Member {
+                addr: USER1.into(),
+                weight: 6,
+            },
+        ],
+    };
+    let info = mock_info("creator", &[]);
+    let err = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap_err();
+    assert_eq!(
+        err,
+        ContractError::DuplicateMember {
+            member: USER1.to_string()
+        }
+    );
+}
+
+#[test]
+fn duplicate_members_execution() {
+    let mut deps = mock_dependencies();
+
+    set_up(deps.as_mut());
+
+    let add = vec![
+        Member {
+            addr: USER3.into(),
+            weight: 15,
+        },
+        Member {
+            addr: USER3.into(),
+            weight: 11,
+        },
+    ];
+
+    let height = mock_env().block.height;
+    let err = update_members(
+        deps.as_mut(),
+        height + 5,
+        Addr::unchecked(INIT_ADMIN),
+        add,
+        vec![],
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        ContractError::DuplicateMember {
+            member: USER3.to_string()
+        }
+    );
 }
 
 fn assert_users<S: Storage, A: Api, Q: Querier>(
@@ -99,7 +166,7 @@ fn assert_users<S: Storage, A: Api, Q: Querier>(
 #[test]
 fn add_new_remove_old_member() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // add a new one and remove existing one
     let add = vec![Member {
@@ -148,7 +215,7 @@ fn add_new_remove_old_member() {
 fn add_old_remove_new_member() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // add a new one and remove existing one
     let add = vec![Member {
@@ -174,7 +241,7 @@ fn add_old_remove_new_member() {
 fn add_and_remove_same_member() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // USER1 is updated and remove in the same call, we should remove this an add member3
     let add = vec![
@@ -206,7 +273,7 @@ fn add_and_remove_same_member() {
 fn add_remove_hooks() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
     assert!(hooks.hooks.is_empty());
@@ -274,7 +341,7 @@ fn add_remove_hooks() {
 #[test]
 fn hooks_fire() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
     assert!(hooks.hooks.is_empty());
@@ -317,14 +384,18 @@ fn hooks_fire() {
     // ensure 2 messages for the 2 hooks
     assert_eq!(res.messages.len(), 2);
     // same order as in the message (adds first, then remove)
+    // order of added users is not guaranteed to be preserved
     let diffs = vec![
-        MemberDiff::new(USER1, Some(11), Some(20)),
         MemberDiff::new(USER3, None, Some(5)),
+        MemberDiff::new(USER1, Some(11), Some(20)),
         MemberDiff::new(USER2, Some(6), None),
     ];
     let hook_msg = MemberChangedHookMsg { diffs };
     let msg1 = SubMsg::new(hook_msg.clone().into_cosmos_msg(contract1).unwrap());
     let msg2 = SubMsg::new(hook_msg.into_cosmos_msg(contract2).unwrap());
+    dbg!(&res.messages);
+    dbg!(&msg1);
+    dbg!(&msg2);
     assert_eq!(res.messages, vec![msg1, msg2]);
 }
 
@@ -332,7 +403,7 @@ fn hooks_fire() {
 fn raw_queries_work() {
     // add will over-write and remove have no effect
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     // get total from raw key
     let total_raw = deps.storage.get(TOTAL_KEY.as_bytes()).unwrap();
@@ -352,7 +423,7 @@ fn raw_queries_work() {
 #[test]
 fn total_at_height() {
     let mut deps = mock_dependencies();
-    do_instantiate(deps.as_mut());
+    set_up(deps.as_mut());
 
     let height = mock_env().block.height;
 
