@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.16.0](https://github.com/CosmWasm/cw-plus/tree/v0.16.0) (2022-10-14)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.1...v0.16.0)
+
+**Closed issues:**
+
+- Unable to run workspace-optimizer [\#828](https://github.com/CosmWasm/cw-plus/issues/828)
+- Running the build command for the production-ready build for cw-20 and not only ends an error [\#821](https://github.com/CosmWasm/cw-plus/issues/821)
+- Fill out missing high-level docs [\#806](https://github.com/CosmWasm/cw-plus/issues/806)
+- Some multitest bindings for staking are missing such as `BondedDenom` [\#753](https://github.com/CosmWasm/cw-plus/issues/753)
+- Allow burn to have a callback just like Send [\#717](https://github.com/CosmWasm/cw-plus/issues/717)
+- Unable to upload cw20\_base wasm file on terra-station [\#716](https://github.com/CosmWasm/cw-plus/issues/716)
+- Cannot upload to localterra with cw-storage-plus 0.12.1 [\#666](https://github.com/CosmWasm/cw-plus/issues/666)
+- Is `MAX_LIMIT` a bug? [\#625](https://github.com/CosmWasm/cw-plus/issues/625)
+- Add support for admin migrations to cw-multitest [\#744](https://github.com/CosmWasm/cw-plus/issues/744)
+
+**Merged pull requests:**
+
+- Remove `cosmwasm-storage` dependency [\#827](https://github.com/CosmWasm/cw-plus/pull/827) ([uint](https://github.com/uint))
+- Generic query for cw3 unification [\#826](https://github.com/CosmWasm/cw-plus/pull/826) ([hashedone](https://github.com/hashedone))
+- Remove cw1-whitelist-ng [\#825](https://github.com/CosmWasm/cw-plus/pull/825) ([uint](https://github.com/uint))
+- Deque changes [\#822](https://github.com/CosmWasm/cw-plus/pull/822) ([chipshort](https://github.com/chipshort))
+- Add missing docs [\#818](https://github.com/CosmWasm/cw-plus/pull/818) ([chipshort](https://github.com/chipshort))
+- Remove storage-plus dependency from storage-macro [\#817](https://github.com/CosmWasm/cw-plus/pull/817) ([chipshort](https://github.com/chipshort))
+- \[multi-test\] Add update and clear admin support to WasmKeeper [\#812](https://github.com/CosmWasm/cw-plus/pull/812) ([chipshort](https://github.com/chipshort))
+- Update CHANGELOG [\#811](https://github.com/CosmWasm/cw-plus/pull/811) ([uint](https://github.com/uint))
+- \[multi-test\] Add staking and distribution module [\#782](https://github.com/CosmWasm/cw-plus/pull/782) ([ueco-jb](https://github.com/ueco-jb))
+- Handle duplicate members in cw4-group create [\#702](https://github.com/CosmWasm/cw-plus/pull/702) ([codehans](https://github.com/codehans))
+
 ## [v0.15.1](https://github.com/CosmWasm/cw-plus/tree/v0.15.1) (2022-09-27)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.0...v0.15.1)

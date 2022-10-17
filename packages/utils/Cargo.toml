@@ -1,6 +1,6 @@
 [package]
 name = "cw-utils"
-version = "0.15.1"
+version = "0.16.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
 description = "Common helpers for other cw specs"
@@ -13,12 +13,12 @@ homepage = "https://cosmwasm.com"
 [dependencies]
 cosmwasm-schema = "1.1.0"
 cosmwasm-std = "1.1.0"
-cw2 = { path = "../../packages/cw2", version = "0.15.1" }
+cw2 = { path = "../../packages/cw2", version = "0.16.0" }
 schemars = "0.8.1"
 semver = "1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = "1.0.21"
 
 [dev-dependencies]
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.15.1" }
+cw-storage-plus = { path = "../../packages/storage-plus", version = "0.16.0" }
 prost = "0.9"
