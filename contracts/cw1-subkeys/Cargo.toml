@@ -2,7 +2,7 @@
 name = "cw1-subkeys"
 version = "0.16.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 description = "Implement subkeys for authorizing native tokens as a cw1 proxy contract"
 license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
