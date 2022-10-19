@@ -15,28 +15,14 @@ workflows:
       - contract_cw4_stake
       - contract_cw20_base
       - contract_cw20_ics20
-      - contract_cw1155_base
       - package_controllers
-      - package_utils
       - package_cw1
       - package_cw2
       - package_cw3
       - package_cw4
       - package_cw20
-      - package_cw1155
-      - package_multi_test
-      - package_storage_plus
       - lint
       - wasm-build
-      - benchmarking:
-          requires:
-            - package_storage_plus
-          filters:
-            branches:
-              only:
-                # Long living branches
-                - main
-                # 👇Add your branch here if benchmarking matters to your work
       - coverage
   deploy:
     jobs:
@@ -270,33 +256,6 @@ jobs:
             - target
           key: cargocache-cw20-ics20-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
 
-  contract_cw1155_base:
-    docker:
-      - image: rust:1.58.1
-    working_directory: ~/project/contracts/cw1155-base
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version
-      - restore_cache:
-          keys:
-            - cargocache-cw1155-base-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Unit Tests
-          environment:
-            RUST_BACKTRACE: 1
-          command: cargo unit-test --locked
-      - run:
-          name: Build and run schema generator
-          command: cargo schema --locked
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-cw1155-base-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-
   package_controllers:
     docker:
       - image: rust:1.58.1
@@ -321,31 +280,6 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-v2-controllers:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-
-  package_utils:
-    docker:
-      - image: rust:1.58.1
-    working_directory: ~/project/packages/utils
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
-      - restore_cache:
-          keys:
-            - cargocache-v2-utils:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Build library for native target
-          command: cargo build --locked
-      - run:
-          name: Run unit tests
-          command: cargo test --locked
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-v2-utils:1.58.1-{{ checksum "~/project/Cargo.lock" }}
 
   package_cw1:
     docker:
@@ -583,89 +517,6 @@ jobs:
       - run:
           name: Check wasm contracts
           command: cosmwasm-check ./target/wasm32-unknown-unknown/release/*.wasm
-
-  package_multi_test:
-    docker:
-      - image: rust:1.58.1
-    working_directory: ~/project/packages/multi-test
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
-      - restore_cache:
-          keys:
-            - cargocache-v2-multi-test:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Build library for native target
-          command: cargo build --locked
-      - run:
-          name: Run unit tests
-          command: cargo test --locked
-      - run:
-          name: Run unit tests (with iterator)
-          command: cargo test --locked --features iterator
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-v2-multi-test:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-
-  package_storage_plus:
-    docker:
-      - image: rust:1.58.1
-    working_directory: ~/project/packages/storage-plus
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
-      - restore_cache:
-          keys:
-            - cargocache-v2-storage-plus:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Build library for native target (no iterator)
-          command: cargo build --locked --no-default-features
-      - run:
-          name: Run unit tests (no iterator)
-          command: cargo test --locked --no-default-features
-      - run:
-          name: Build library for native target (with iterator and macro)
-          command: cargo build --locked --all-features
-      - run:
-          name: Run unit tests (with iterator and macro)
-          command: cargo test --locked --all-features
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-v2-storage-plus:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-
-  benchmarking:
-    docker:
-      - image: rust:1.58.1
-    environment:
-      RUST_BACKTRACE: 1
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information (default; stable)
-          command: rustc --version && cargo --version
-      - restore_cache:
-          keys:
-            - cargocache-v2-benchmarking-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Run storage-plus benchmarks
-          working_directory: ~/project/packages/storage-plus
-          command: cargo bench -- --color never --save-baseline
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-v2-benchmarking-rust:1.58.1-{{ checksum "~/project/Cargo.lock" }}
 
   coverage:
     # https://circleci.com/developer/images?imageType=machine
