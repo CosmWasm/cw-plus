@@ -43,11 +43,11 @@ impl Cw20Contract {
     }
 
     /// Get token balance for the given address
-    pub fn balance<T: Into<String>, CQ: CustomQuery>(
-        &self,
-        querier: &QuerierWrapper<CQ>,
-        address: T,
-    ) -> StdResult<Uint128> {
+    pub fn balance<T, CQ>(&self, querier: &QuerierWrapper<CQ>, address: T) -> StdResult<Uint128>
+    where
+        T: Into<String>,
+        CQ: CustomQuery,
+    {
         let query = self.encode_smart_query(Cw20QueryMsg::Balance {
             address: address.into(),
         })?;
@@ -66,12 +66,17 @@ impl Cw20Contract {
     }
 
     /// Get allowance of spender to use owner's account
-    pub fn allowance<T: Into<String>, U: Into<String>, CQ: CustomQuery>(
+    pub fn allowance<T, U, CQ>(
         &self,
         querier: &QuerierWrapper<CQ>,
         owner: T,
         spender: U,
-    ) -> StdResult<AllowanceResponse> {
+    ) -> StdResult<AllowanceResponse>
+    where
+        T: Into<String>,
+        U: Into<String>,
+        CQ: CustomQuery,
+    {
         let query = self.encode_smart_query(Cw20QueryMsg::Allowance {
             owner: owner.into(),
             spender: spender.into(),
