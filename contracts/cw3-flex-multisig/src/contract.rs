@@ -690,7 +690,7 @@ mod tests {
             .unwrap();
 
         // Verify contract version set properly
-        let version = query_contract_info(&app, flex_addr.clone()).unwrap();
+        let version = query_contract_info(&app.wrap(), flex_addr.clone()).unwrap();
         assert_eq!(
             ContractVersion {
                 contract: CONTRACT_NAME.to_string(),
