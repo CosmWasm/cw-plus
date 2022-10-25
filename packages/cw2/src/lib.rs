@@ -18,7 +18,7 @@ For more information on this specification, please check out the
 */
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Empty, Querier, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery};
+use cosmwasm_std::{CustomQuery, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery};
 use cw_storage_plus::Item;
 
 pub const CONTRACT: Item<ContractVersion> = Item::new("contract_info");
@@ -59,15 +59,19 @@ pub fn set_contract_version<T: Into<String>, U: Into<String>>(
 /// if the other contract exists and claims to be a cw20-base contract for example.
 /// (Note: you usually want to require *interfaces* not *implementations* of the
 /// contracts you compose with, so be careful of overuse)
-pub fn query_contract_info<Q: Querier, T: Into<String>>(
-    querier: &Q,
+pub fn query_contract_info<T, CQ>(
+    querier: &QuerierWrapper<CQ>,
     contract_addr: T,
-) -> StdResult<ContractVersion> {
+) -> StdResult<ContractVersion>
+where
+    T: Into<String>,
+    CQ: CustomQuery,
+{
     let req = QueryRequest::Wasm(WasmQuery::Raw {
         contract_addr: contract_addr.into(),
         key: CONTRACT.as_slice().into(),
     });
-    QuerierWrapper::<Empty>::new(querier).query(&req)
+    querier.query(&req)
 }
 
 #[cfg(test)]
