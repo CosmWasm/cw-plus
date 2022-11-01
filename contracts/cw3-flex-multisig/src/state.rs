@@ -1,5 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, QuerierWrapper};
+use cw3::DepositInfo;
 use cw4::Cw4Contract;
 use cw_storage_plus::Item;
 use cw_utils::{Duration, Threshold};
@@ -24,6 +25,8 @@ pub struct Config {
     // who is able to execute passed proposals
     // None means that anyone can execute
     pub executor: Option<Executor>,
+    /// The price, if any, of creating a new proposal.
+    pub proposal_deposit: Option<DepositInfo>,
 }
 
 impl Config {

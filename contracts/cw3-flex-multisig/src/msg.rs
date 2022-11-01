@@ -1,6 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
-use cw3::Vote;
+use cw3::{UncheckedDepositInfo, Vote};
 use cw4::MemberChangedHookMsg;
 use cw_utils::{Duration, Expiration, Threshold};
 
@@ -15,6 +15,8 @@ pub struct InstantiateMsg {
     // who is able to execute passed proposals
     // None means that anyone can execute
     pub executor: Option<Executor>,
+    /// The cost of creating a proposal (if any).
+    pub proposal_deposit: Option<UncheckedDepositInfo>,
 }
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
@@ -74,4 +76,7 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
     },
+    /// Gets the current configuration.
+    #[returns(crate::state::Config)]
+    Config {},
 }

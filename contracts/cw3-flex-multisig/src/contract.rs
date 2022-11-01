@@ -8,11 +8,12 @@ use cosmwasm_std::{
 };
 
 use cw2::set_contract_version;
+
 use cw3::{
-    ProposalListResponse, ProposalResponse, Status, Vote, VoteInfo, VoteListResponse, VoteResponse,
-    VoterDetail, VoterListResponse, VoterResponse,
+    Ballot, Proposal, ProposalListResponse, ProposalResponse, Status, Vote, VoteInfo,
+    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse, Votes,
 };
-use cw3_fixed_multisig::state::{next_id, Ballot, Proposal, Votes, BALLOTS, PROPOSALS};
+use cw3_fixed_multisig::state::{next_id, BALLOTS, PROPOSALS};
 use cw4::{Cw4Contract, MemberChangedHookMsg, MemberDiff};
 use cw_storage_plus::Bound;
 use cw_utils::{maybe_addr, Expiration, ThresholdResponse};
@@ -40,6 +41,11 @@ pub fn instantiate(
     let total_weight = group_addr.total_weight(&deps.querier)?;
     msg.threshold.validate(total_weight)?;
 
+    let proposal_deposit = msg
+        .proposal_deposit
+        .map(|deposit| deposit.into_checked(deps.as_ref()))
+        .transpose()?;
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let cfg = Config {
@@ -47,6 +53,7 @@ pub fn instantiate(
         max_voting_period: msg.max_voting_period,
         group_addr,
         executor: msg.executor,
+        proposal_deposit,
     };
     CONFIG.save(deps.storage, &cfg)?;
 
@@ -89,6 +96,11 @@ pub fn execute_propose(
     // only members of the multisig can create a proposal
     let cfg = CONFIG.load(deps.storage)?;
 
+    // Check that the native deposit was paid (as needed).
+    if let Some(deposit) = cfg.proposal_deposit.as_ref() {
+        deposit.check_native_deposit_paid(&info)?;
+    }
+
     // Only members of the multisig can create a proposal
     // Non-voting members are special - they are allowed to create a proposal and
     // therefore "vote", but they aren't allowed to vote otherwise.
@@ -109,6 +121,15 @@ pub fn execute_propose(
         return Err(ContractError::WrongExpiration {});
     }
 
+    // Take the cw20 token deposit, if required. We do this before
+    // creating the proposal struct below so that we can avoid a clone
+    // and move the loaded deposit info into it.
+    let take_deposit_msg = if let Some(deposit_info) = cfg.proposal_deposit.as_ref() {
+        deposit_info.get_take_deposit_messages(&info.sender, &env.contract.address)?
+    } else {
+        vec![]
+    };
+
     // create a proposal
     let mut prop = Proposal {
         title,
@@ -120,6 +141,8 @@ pub fn execute_propose(
         votes: Votes::yes(vote_power),
         threshold: cfg.threshold,
         total_weight: cfg.group_addr.total_weight(&deps.querier)?,
+        proposer: info.sender.clone(),
+        deposit: cfg.proposal_deposit,
     };
     prop.update_status(&env.block);
     let id = next_id(deps.storage)?;
@@ -133,6 +156,7 @@ pub fn execute_propose(
     BALLOTS.save(deps.storage, (id, &info.sender), &ballot)?;
 
     Ok(Response::new()
+        .add_messages(take_deposit_msg)
         .add_attribute("action", "propose")
         .add_attribute("sender", info.sender)
         .add_attribute("proposal_id", id.to_string())
@@ -210,8 +234,16 @@ pub fn execute_execute(
     prop.status = Status::Executed;
     PROPOSALS.save(deps.storage, proposal_id, &prop)?;
 
+    // Unconditionally refund here.
+    let response = match prop.deposit {
+        Some(deposit) => {
+            Response::new().add_message(deposit.get_return_deposit_message(&prop.proposer)?)
+        }
+        None => Response::new(),
+    };
+
     // dispatch all proposed messages
-    Ok(Response::new()
+    Ok(response
         .add_messages(prop.msgs)
         .add_attribute("action", "execute")
         .add_attribute("sender", info.sender)
@@ -242,7 +274,15 @@ pub fn execute_close(
     prop.status = Status::Rejected;
     PROPOSALS.save(deps.storage, proposal_id, &prop)?;
 
-    Ok(Response::new()
+    // Refund the deposit if we have been configured to do so.
+    let mut response = Response::new();
+    if let Some(deposit) = prop.deposit {
+        if deposit.refund_failed_proposals {
+            response = response.add_message(deposit.get_return_deposit_message(&prop.proposer)?)
+        }
+    }
+
+    Ok(response
         .add_attribute("action", "close")
         .add_attribute("sender", info.sender)
         .add_attribute("proposal_id", proposal_id.to_string()))
@@ -286,6 +326,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListVoters { start_after, limit } => {
             to_binary(&list_voters(deps, start_after, limit)?)
         }
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
     }
 }
 
@@ -293,6 +334,10 @@ fn query_threshold(deps: Deps) -> StdResult<ThresholdResponse> {
     let cfg = CONFIG.load(deps.storage)?;
     let total_weight = cfg.group_addr.total_weight(&deps.querier)?;
     Ok(cfg.threshold.to_response(total_weight))
+}
+
+fn query_config(deps: Deps) -> StdResult<Config> {
+    CONFIG.load(deps.storage)
 }
 
 fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> {
@@ -306,6 +351,8 @@ fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> 
         msgs: prop.msgs,
         status,
         expires: prop.expires,
+        proposer: prop.proposer,
+        deposit: prop.deposit,
         threshold,
     })
 }
@@ -362,6 +409,8 @@ fn map_proposal(
             msgs: prop.msgs,
             status,
             expires: prop.expires,
+            deposit: prop.deposit,
+            proposer: prop.proposer,
             threshold,
         }
     })
@@ -434,12 +483,16 @@ fn list_voters(
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal, Timestamp};
+    use cosmwasm_std::{coin, coins, Addr, BankMsg, Coin, Decimal, Timestamp, Uint128};
 
     use cw2::{query_contract_info, ContractVersion};
+    use cw20::{Cw20Coin, UncheckedDenom};
+    use cw3::{DepositError, UncheckedDepositInfo};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
-    use cw_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
+    use cw_multi_test::{
+        next_block, App, AppBuilder, BankSudo, Contract, ContractWrapper, Executor, SudoMsg,
+    };
     use cw_utils::{Duration, Threshold};
 
     use super::*;
@@ -477,6 +530,15 @@ mod tests {
         Box::new(contract)
     }
 
+    fn contract_cw20() -> Box<dyn Contract<Empty>> {
+        let contract = ContractWrapper::new(
+            cw20_base::contract::execute,
+            cw20_base::contract::instantiate,
+            cw20_base::contract::query,
+        );
+        Box::new(contract)
+    }
+
     fn mock_app(init_funds: &[Coin]) -> App {
         AppBuilder::new().build(|router, _, storage| {
             router
@@ -504,6 +566,7 @@ mod tests {
         threshold: Threshold,
         max_voting_period: Duration,
         executor: Option<crate::state::Executor>,
+        proposal_deposit: Option<UncheckedDepositInfo>,
     ) -> Addr {
         let flex_id = app.store_code(contract_flex());
         let msg = crate::msg::InstantiateMsg {
@@ -511,6 +574,7 @@ mod tests {
             threshold,
             max_voting_period,
             executor,
+            proposal_deposit,
         };
         app.instantiate_contract(flex_id, Addr::unchecked(OWNER), &msg, &[], "flex", None)
             .unwrap()
@@ -536,6 +600,7 @@ mod tests {
             init_funds,
             multisig_as_group_admin,
             None,
+            None,
         )
     }
 
@@ -547,6 +612,7 @@ mod tests {
         init_funds: Vec<Coin>,
         multisig_as_group_admin: bool,
         executor: Option<crate::state::Executor>,
+        proposal_deposit: Option<UncheckedDepositInfo>,
     ) -> (Addr, Addr) {
         // 1. Instantiate group contract with members (and OWNER as admin)
         let members = vec![
@@ -567,6 +633,7 @@ mod tests {
             threshold,
             max_voting_period,
             executor,
+            proposal_deposit,
         );
         app.update_block(next_block);
 
@@ -614,6 +681,16 @@ mod tests {
         }
     }
 
+    fn text_proposal() -> ExecuteMsg {
+        let (_, title, description) = proposal_info();
+        ExecuteMsg::Propose {
+            title,
+            description,
+            msgs: vec![],
+            latest: None,
+        }
+    }
+
     #[test]
     fn test_instantiate_works() {
         let mut app = mock_app(&[]);
@@ -633,6 +710,7 @@ mod tests {
             },
             max_voting_period,
             executor: None,
+            proposal_deposit: None,
         };
         let err = app
             .instantiate_contract(
@@ -655,6 +733,7 @@ mod tests {
             threshold: Threshold::AbsoluteCount { weight: 100 },
             max_voting_period,
             executor: None,
+            proposal_deposit: None,
         };
         let err = app
             .instantiate_contract(
@@ -677,6 +756,7 @@ mod tests {
             threshold: Threshold::AbsoluteCount { weight: 1 },
             max_voting_period,
             executor: None,
+            proposal_deposit: None,
         };
         let flex_addr = app
             .instantiate_contract(
@@ -834,8 +914,15 @@ mod tests {
             threshold: Decimal::percent(80),
             quorum: Decimal::percent(20),
         };
-        let (flex_addr, _) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            false,
+            None,
+            None,
+        );
 
         // create proposal with 1 vote power
         let proposal = pay_somebody_proposal();
@@ -916,6 +1003,8 @@ mod tests {
                 threshold: Decimal::percent(80),
                 quorum: Decimal::percent(20),
             },
+            proposer: Addr::unchecked(VOTER2),
+            deposit: None,
         };
         assert_eq!(&expected, &res.proposals[0]);
     }
@@ -930,8 +1019,15 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            false,
+            None,
+            None,
+        );
 
         // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
@@ -1150,8 +1246,15 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(2000000);
-        let (flex_addr, _) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, true, None);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            true,
+            None,
+            None,
+        );
 
         // ensure we have cash to cover the proposal
         let contract_bal = app.wrap().query_balance(&flex_addr, "BTC").unwrap();
@@ -1258,6 +1361,7 @@ mod tests {
             init_funds,
             true,
             Some(crate::state::Executor::Member), // set executor as Member of voting group
+            None,
         );
 
         // create proposal with 0 vote power
@@ -1314,6 +1418,7 @@ mod tests {
             init_funds,
             true,
             Some(crate::state::Executor::Only(Addr::unchecked(VOTER3))), // only VOTER3 can execute proposal
+            None,
         );
 
         // create proposal with 0 vote power
@@ -1379,6 +1484,7 @@ mod tests {
             Duration::Time(voting_period),
             init_funds,
             true,
+            None,
             None,
         );
 
@@ -1466,8 +1572,15 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Height(2000000);
-        let (flex_addr, _) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, true, None);
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            true,
+            None,
+            None,
+        );
 
         // create proposal with 0 vote power
         let proposal = pay_somebody_proposal();
@@ -1518,8 +1631,15 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(20000);
-        let (flex_addr, group_addr) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
+        let (flex_addr, group_addr) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            false,
+            None,
+            None,
+        );
 
         // VOTER1 starts a proposal to send some tokens (1/4 votes)
         let proposal = pay_somebody_proposal();
@@ -1764,8 +1884,15 @@ mod tests {
             quorum: Decimal::percent(1),
         };
         let voting_period = Duration::Time(20000);
-        let (flex_addr, group_addr) =
-            setup_test_case(&mut app, threshold, voting_period, init_funds, false, None);
+        let (flex_addr, group_addr) = setup_test_case(
+            &mut app,
+            threshold,
+            voting_period,
+            init_funds,
+            false,
+            None,
+            None,
+        );
 
         // VOTER3 starts a proposal to send some tokens (3/12 votes)
         let proposal = pay_somebody_proposal();
@@ -1849,6 +1976,7 @@ mod tests {
             init_funds,
             false,
             None,
+            None,
         );
 
         // VOTER3 starts a proposal to send some tokens (3 votes)
@@ -1920,6 +2048,7 @@ mod tests {
             init_funds,
             false,
             None,
+            None,
         );
 
         // create proposal
@@ -1958,5 +2087,452 @@ mod tests {
         app.execute_contract(Addr::unchecked(VOTER3), flex_addr.clone(), &no_vote, &[])
             .unwrap();
         assert_eq!(prop_status(&app), Status::Passed);
+    }
+
+    #[test]
+    fn test_instantiate_with_invalid_deposit() {
+        let mut app = App::default();
+
+        let flex_id = app.store_code(contract_flex());
+
+        let group_addr = instantiate_group(
+            &mut app,
+            vec![Member {
+                addr: OWNER.to_string(),
+                weight: 10,
+            }],
+        );
+
+        // Instantiate with an invalid cw20 token.
+        let instantiate = InstantiateMsg {
+            group_addr: group_addr.to_string(),
+            threshold: Threshold::AbsoluteCount { weight: 10 },
+            max_voting_period: Duration::Time(10),
+            executor: None,
+            proposal_deposit: Some(UncheckedDepositInfo {
+                amount: Uint128::new(1),
+                refund_failed_proposals: true,
+                denom: UncheckedDenom::Cw20(group_addr.to_string()),
+            }),
+        };
+
+        let err: ContractError = app
+            .instantiate_contract(
+                flex_id,
+                Addr::unchecked(OWNER),
+                &instantiate,
+                &[],
+                "Bad cw20",
+                None,
+            )
+            .unwrap_err()
+            .downcast()
+            .unwrap();
+
+        assert_eq!(err, ContractError::Deposit(DepositError::InvalidCw20 {}));
+
+        // Instantiate with a zero amount.
+        let instantiate = InstantiateMsg {
+            group_addr: group_addr.to_string(),
+            threshold: Threshold::AbsoluteCount { weight: 10 },
+            max_voting_period: Duration::Time(10),
+            executor: None,
+            proposal_deposit: Some(UncheckedDepositInfo {
+                amount: Uint128::zero(),
+                refund_failed_proposals: true,
+                denom: UncheckedDenom::Native("native".to_string()),
+            }),
+        };
+
+        let err: ContractError = app
+            .instantiate_contract(
+                flex_id,
+                Addr::unchecked(OWNER),
+                &instantiate,
+                &[],
+                "Bad cw20",
+                None,
+            )
+            .unwrap_err()
+            .downcast()
+            .unwrap();
+
+        assert_eq!(err, ContractError::Deposit(DepositError::ZeroDeposit {}))
+    }
+
+    #[test]
+    fn test_cw20_proposal_deposit() {
+        let mut app = App::default();
+
+        let cw20_id = app.store_code(contract_cw20());
+
+        let cw20_addr = app
+            .instantiate_contract(
+                cw20_id,
+                Addr::unchecked(OWNER),
+                &cw20_base::msg::InstantiateMsg {
+                    name: "Token".to_string(),
+                    symbol: "TOKEN".to_string(),
+                    decimals: 6,
+                    initial_balances: vec![
+                        Cw20Coin {
+                            address: VOTER4.to_string(),
+                            amount: Uint128::new(10),
+                        },
+                        Cw20Coin {
+                            address: OWNER.to_string(),
+                            amount: Uint128::new(10),
+                        },
+                    ],
+                    mint: None,
+                    marketing: None,
+                },
+                &[],
+                "Token",
+                None,
+            )
+            .unwrap();
+
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            Threshold::AbsoluteCount { weight: 10 },
+            Duration::Height(10),
+            vec![],
+            true,
+            None,
+            Some(UncheckedDepositInfo {
+                amount: Uint128::new(10),
+                denom: UncheckedDenom::Cw20(cw20_addr.to_string()),
+                refund_failed_proposals: true,
+            }),
+        );
+
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            cw20_addr.clone(),
+            &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                spender: flex_addr.to_string(),
+                amount: Uint128::new(10),
+                expires: None,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Make a proposal that will pass.
+        let proposal = text_proposal();
+        app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &proposal, &[])
+            .unwrap();
+
+        // Make sure the deposit was transfered.
+        let balance: cw20::BalanceResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw20_addr.clone(),
+                &cw20::Cw20QueryMsg::Balance {
+                    address: VOTER4.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(balance.balance, Uint128::zero());
+
+        let balance: cw20::BalanceResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw20_addr.clone(),
+                &cw20::Cw20QueryMsg::Balance {
+                    address: flex_addr.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(balance.balance, Uint128::new(10));
+
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &ExecuteMsg::Execute { proposal_id: 1 },
+            &[],
+        )
+        .unwrap();
+
+        // Make sure the deposit was returned.
+        let balance: cw20::BalanceResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw20_addr.clone(),
+                &cw20::Cw20QueryMsg::Balance {
+                    address: VOTER4.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(balance.balance, Uint128::new(10));
+
+        let balance: cw20::BalanceResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw20_addr.clone(),
+                &cw20::Cw20QueryMsg::Balance {
+                    address: flex_addr.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(balance.balance, Uint128::zero());
+
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            cw20_addr.clone(),
+            &cw20::Cw20ExecuteMsg::IncreaseAllowance {
+                spender: flex_addr.to_string(),
+                amount: Uint128::new(10),
+                expires: None,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Make a proposal that fails.
+        let proposal = text_proposal();
+        app.execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &proposal, &[])
+            .unwrap();
+
+        // Check that the deposit was transfered.
+        let balance: cw20::BalanceResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw20_addr.clone(),
+                &cw20::Cw20QueryMsg::Balance {
+                    address: flex_addr.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(balance.balance, Uint128::new(10));
+
+        // Fail the proposal.
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &ExecuteMsg::Vote {
+                proposal_id: 2,
+                vote: Vote::No,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Expire the proposal.
+        app.update_block(|b| b.height += 10);
+
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr,
+            &ExecuteMsg::Close { proposal_id: 2 },
+            &[],
+        )
+        .unwrap();
+
+        // Make sure the deposit was returned despite the proposal failing.
+        let balance: cw20::BalanceResponse = app
+            .wrap()
+            .query_wasm_smart(
+                cw20_addr,
+                &cw20::Cw20QueryMsg::Balance {
+                    address: VOTER4.to_string(),
+                },
+            )
+            .unwrap();
+        assert_eq!(balance.balance, Uint128::new(10));
+    }
+
+    #[test]
+    fn proposal_deposit_no_failed_refunds() {
+        let mut app = App::default();
+
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            Threshold::AbsoluteCount { weight: 10 },
+            Duration::Height(10),
+            vec![],
+            true,
+            None,
+            Some(UncheckedDepositInfo {
+                amount: Uint128::new(10),
+                denom: UncheckedDenom::Native("TOKEN".to_string()),
+                refund_failed_proposals: false,
+            }),
+        );
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: OWNER.to_string(),
+            amount: vec![Coin {
+                amount: Uint128::new(10),
+                denom: "TOKEN".to_string(),
+            }],
+        }))
+        .unwrap();
+
+        // Make a proposal that fails.
+        let proposal = text_proposal();
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            flex_addr.clone(),
+            &proposal,
+            &[Coin {
+                amount: Uint128::new(10),
+                denom: "TOKEN".to_string(),
+            }],
+        )
+        .unwrap();
+
+        // Check that the deposit was transfered.
+        let balance = app
+            .wrap()
+            .query_balance(OWNER, "TOKEN".to_string())
+            .unwrap();
+        assert_eq!(balance.amount, Uint128::zero());
+
+        // Fail the proposal.
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &ExecuteMsg::Vote {
+                proposal_id: 1,
+                vote: Vote::No,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Expire the proposal.
+        app.update_block(|b| b.height += 10);
+
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr,
+            &ExecuteMsg::Close { proposal_id: 1 },
+            &[],
+        )
+        .unwrap();
+
+        // Check that the deposit wasn't returned.
+        let balance = app
+            .wrap()
+            .query_balance(OWNER, "TOKEN".to_string())
+            .unwrap();
+        assert_eq!(balance.amount, Uint128::zero());
+    }
+
+    #[test]
+    fn test_native_proposal_deposit() {
+        let mut app = App::default();
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: VOTER4.to_string(),
+            amount: vec![Coin {
+                amount: Uint128::new(10),
+                denom: "TOKEN".to_string(),
+            }],
+        }))
+        .unwrap();
+
+        app.sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: OWNER.to_string(),
+            amount: vec![Coin {
+                amount: Uint128::new(10),
+                denom: "TOKEN".to_string(),
+            }],
+        }))
+        .unwrap();
+
+        let (flex_addr, _) = setup_test_case(
+            &mut app,
+            Threshold::AbsoluteCount { weight: 10 },
+            Duration::Height(10),
+            vec![],
+            true,
+            None,
+            Some(UncheckedDepositInfo {
+                amount: Uint128::new(10),
+                denom: UncheckedDenom::Native("TOKEN".to_string()),
+                refund_failed_proposals: true,
+            }),
+        );
+
+        // Make a proposal that will pass.
+        let proposal = text_proposal();
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &proposal,
+            &[Coin {
+                amount: Uint128::new(10),
+                denom: "TOKEN".to_string(),
+            }],
+        )
+        .unwrap();
+
+        // Make sure the deposit was transfered.
+        let balance = app
+            .wrap()
+            .query_balance(flex_addr.clone(), "TOKEN")
+            .unwrap();
+        assert_eq!(balance.amount, Uint128::new(10));
+
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &ExecuteMsg::Execute { proposal_id: 1 },
+            &[],
+        )
+        .unwrap();
+
+        // Make sure the deposit was returned.
+        let balance = app.wrap().query_balance(VOTER4, "TOKEN").unwrap();
+        assert_eq!(balance.amount, Uint128::new(10));
+
+        // Make a proposal that fails.
+        let proposal = text_proposal();
+        app.execute_contract(
+            Addr::unchecked(OWNER),
+            flex_addr.clone(),
+            &proposal,
+            &[Coin {
+                amount: Uint128::new(10),
+                denom: "TOKEN".to_string(),
+            }],
+        )
+        .unwrap();
+
+        let balance = app
+            .wrap()
+            .query_balance(flex_addr.clone(), "TOKEN")
+            .unwrap();
+        assert_eq!(balance.amount, Uint128::new(10));
+
+        // Fail the proposal.
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr.clone(),
+            &ExecuteMsg::Vote {
+                proposal_id: 2,
+                vote: Vote::No,
+            },
+            &[],
+        )
+        .unwrap();
+
+        // Expire the proposal.
+        app.update_block(|b| b.height += 10);
+
+        app.execute_contract(
+            Addr::unchecked(VOTER4),
+            flex_addr,
+            &ExecuteMsg::Close { proposal_id: 2 },
+            &[],
+        )
+        .unwrap();
+
+        // Make sure the deposit was returned despite the proposal failing.
+        let balance = app.wrap().query_balance(OWNER, "TOKEN").unwrap();
+        assert_eq!(balance.amount, Uint128::new(10));
     }
 }
