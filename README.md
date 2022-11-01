@@ -2,19 +2,20 @@
 
 [![CircleCI](https://circleci.com/gh/CosmWasm/cw-plus/tree/main.svg?style=shield)](https://circleci.com/gh/CosmWasm/cw-plus/tree/main)
 
-| Specification | Crates.io                                                                                             | Docs                                                                | Coverage                                                                                                                                  |
-|---------------|-------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| cw1           | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)          | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)       | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw2           | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)          | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)       | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw3           | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)          | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)       | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw4           | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)          | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)       | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
-| cw20          | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20)       | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20)     | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| Specification | Crates.io                                                                                       | Docs                                                            | Coverage                                                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| cw1           | [![cw1 on crates.io](https://img.shields.io/crates/v/cw1.svg)](https://crates.io/crates/cw1)    | [![Docs](https://docs.rs/cw1/badge.svg)](https://docs.rs/cw1)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw2           | [![cw2 on crates.io](https://img.shields.io/crates/v/cw2.svg)](https://crates.io/crates/cw2)    | [![Docs](https://docs.rs/cw2/badge.svg)](https://docs.rs/cw2)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw3           | [![cw3 on crates.io](https://img.shields.io/crates/v/cw3.svg)](https://crates.io/crates/cw3)    | [![Docs](https://docs.rs/cw3/badge.svg)](https://docs.rs/cw3)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw4           | [![cw4 on crates.io](https://img.shields.io/crates/v/cw4.svg)](https://crates.io/crates/cw4)    | [![Docs](https://docs.rs/cw4/badge.svg)](https://docs.rs/cw4)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| cw20          | [![cw20 on crates.io](https://img.shields.io/crates/v/cw20.svg)](https://crates.io/crates/cw20) | [![Docs](https://docs.rs/cw20/badge.svg)](https://docs.rs/cw20) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 
-| Utilities       | Crates.io                                                                                                                        | Docs                                                                                  | Coverage                                                                                                                                  |
-|-----------------|----------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| cw-controllers  | [![cw-controllers on crates.io](https://img.shields.io/crates/v/cw-controllers.svg)](https://crates.io/crates/cw-controllers)    | [![Docs](https://docs.rs/cw-controllers/badge.svg)](https://docs.rs/cw-controllers)   | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+| Utilities      | Crates.io                                                                                                                     | Docs                                                                                | Coverage                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| cw-controllers | [![cw-controllers on crates.io](https://img.shields.io/crates/v/cw-controllers.svg)](https://crates.io/crates/cw-controllers) | [![Docs](https://docs.rs/cw-controllers/badge.svg)](https://docs.rs/cw-controllers) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
+
 | Contracts          | Download                                                                                                 | Docs                                                                                        | Coverage                                                                                                                                  |
-|--------------------|----------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | cw1-subkeys        | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_subkeys.wasm)        | [![Docs](https://docs.rs/cw1-subkeys/badge.svg)](https://docs.rs/cw1-subkeys)               | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw1-whitelist      | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw1_whitelist.wasm)      | [![Docs](https://docs.rs/cw1-whitelist/badge.svg)](https://docs.rs/cw1-whitelist)           | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
 | cw3-fixed-multisig | [Release v0.13.4](https://github.com/CosmWasm/cw-plus/releases/download/v0.13.4/cw3_fixed_multisig.wasm) | [![Docs](https://docs.rs/cw3-fixed-multisig/badge.svg)](https://docs.rs/cw3-fixed-multisig) | [![codecov](https://codecov.io/gh/CosmWasm/cw-plus/branch/main/graph/badge.svg?token=IYY72ZVS3X)](https://codecov.io/gh/CosmWasm/cw-plus) |
@@ -57,7 +58,7 @@ The most reusable components are the various cwXYZ specifications under
 `packages`. Each one defines a standard interface for different domains,
 e.g. [cw20](./packages/cw20/README.md) for fungible tokens,
 [cw721](https://github.com/CosmWasm/cw-nfts/blob/main/packages/cw721/README.md) for non-fungible tokens,
-[cw1](./packages/cw1/README.md) for  "proxy contracts", etc.
+[cw1](./packages/cw1/README.md) for "proxy contracts", etc.
 The interface comes with a human description in the READMEs, as well
 as Rust types that can be imported.
 
@@ -68,8 +69,7 @@ the real bonus of specifications, we can create an escrow contract that
 can handle many different fungible tokens, as long as they all adhere to
 the cw20 specification.
 
-If you have ideas for new specifications or want to make enhancements to
-existing spec, please [raise an issue](https://github.com/CosmWasm/cw-plus/issues)
+If you have ideas for new specifications , please [raise an issue](https://github.com/CosmWasm/cw-plus/issues)
 or [create a pull request](https://github.com/CosmWasm/cw-plus/pulls) on this repo.
 
 ## Contracts
@@ -84,42 +84,42 @@ contract you want to build on it.
 
 CW1 Proxy Contracts:
 
-* [`cw1-whitelist`](./contracts/cw1-whitelist) a minimal implementation of `cw1`
-mainly designed for reference.
-* [`cw1-subkeys`](./contracts/cw1-subkeys) a simple, but useful implementation,
-which lets us use a proxy contract to provide "allowances" for native tokens
-without modifying the `bank` module.
+- [`cw1-whitelist`](./contracts/cw1-whitelist) a minimal implementation of `cw1`
+  mainly designed for reference.
+- [`cw1-subkeys`](./contracts/cw1-subkeys) a simple, but useful implementation,
+  which lets us use a proxy contract to provide "allowances" for native tokens
+  without modifying the `bank` module.
 
 CW3 Multisig:
 
-* [`cw3-fixed-multisig`](./contracts/cw3-fixed-multisig) a simple implementation of the
-[cw3 spec](./packages/cw3/README.md). It is a multisig with a fixed set of addresses,
-created upon initialization.
-Each address may have the same weight (K of N), or some may have extra voting
-power. This works much like the native Cosmos SDK multisig, except that rather
-than aggregating the signatures off chain and submitting the final result,
-we aggregate the approvals on-chain.
-* [`cw3-flex-multisig`](./contracts/cw3-flex-multisig) builds on cw3-fixed-multisig,
-with a more powerful implementation of the cw3 spec. It's a multisig contract
-backed by a cw4 (group) contract, which independently maintains the voter set.
+- [`cw3-fixed-multisig`](./contracts/cw3-fixed-multisig) a simple implementation of the
+  [cw3 spec](./packages/cw3/README.md). It is a multisig with a fixed set of addresses,
+  created upon initialization.
+  Each address may have the same weight (K of N), or some may have extra voting
+  power. This works much like the native Cosmos SDK multisig, except that rather
+  than aggregating the signatures off chain and submitting the final result,
+  we aggregate the approvals on-chain.
+- [`cw3-flex-multisig`](./contracts/cw3-flex-multisig) builds on cw3-fixed-multisig,
+  with a more powerful implementation of the cw3 spec. It's a multisig contract
+  backed by a cw4 (group) contract, which independently maintains the voter set.
 
 CW4 Group:
 
-* [`cw4-group`](./contracts/cw4-group) a basic implementation of the
-[cw4 spec](./packages/cw4/README.md). It handles elected membership, by admin or multisig.
-It fulfills all elements of the spec, including raw query lookups,
-and is designed to be used as a backing storage for [cw3 compliant contracts](./packages/cw3/README.md).
-* [`cw4-stake`](./contracts/cw4-stake) a second implementation of the
-[cw4 spec](./packages/cw4/README.md). It fulfills all elements of the spec, including raw query lookups,
-and is designed to be used as a backing storage for [cw3 compliant contracts](./packages/cw3/README.md).
-It provides a similar API to [`cw4-group`], but rather than appointing members,
-their membership and weight are based on the number of staked tokens they have.
+- [`cw4-group`](./contracts/cw4-group) a basic implementation of the
+  [cw4 spec](./packages/cw4/README.md). It handles elected membership, by admin or multisig.
+  It fulfills all elements of the spec, including raw query lookups,
+  and is designed to be used as a backing storage for [cw3 compliant contracts](./packages/cw3/README.md).
+- [`cw4-stake`](./contracts/cw4-stake) a second implementation of the
+  [cw4 spec](./packages/cw4/README.md). It fulfills all elements of the spec, including raw query lookups,
+  and is designed to be used as a backing storage for [cw3 compliant contracts](./packages/cw3/README.md).
+  It provides a similar API to [`cw4-group`], but rather than appointing members,
+  their membership and weight are based on the number of staked tokens they have.
 
 CW20 Fungible Tokens:
 
-* [`cw20-base`](./contracts/cw20-base) a straightforward, but complete
-implementation of the cw20 spec along with all extensions. Can be deployed
-as-is, or imported by other contracts.
+- [`cw20-base`](./contracts/cw20-base) a straightforward, but complete
+  implementation of the cw20 spec along with all extensions. Can be deployed
+  as-is, or imported by other contracts.
 
 ## Compiling
 
@@ -173,6 +173,10 @@ analyze this package, which gives much faster turn-around:
 Note that it will produce a code coverage report for the entire project, but only the coverage in that
 package is the real value. If does give quick feedback for you if you unit test writing was successful.
 
+## Contributing
+
+See our [Contributing Guidelines](CONTRIBUTING.md).
+
 ## Generating changelog
 
 To generate a changelog we decided to use [github-changelog-generator](https://github.com/github-changelog-generator/github-changelog-generator).
@@ -202,7 +206,6 @@ auto-detect the latest version tag for you, with --latest-tag.
 
 This repo is licensed under [Apache 2.0](./LICENSE).
 
-All *specifications* will always be Apache-2.0. All contracts that are
-meant to be *building blocks* will also be Apache-2.0. This is along
+All _specifications_ will always be Apache-2.0. All contracts that are
+meant to be _building blocks_ will also be Apache-2.0. This is along
 the lines of Open Zeppelin or other public references.
-
