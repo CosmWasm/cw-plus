@@ -9,15 +9,15 @@ use cosmwasm_std::{
 
 use cw2::set_contract_version;
 use cw3::{
-    ProposalListResponse, ProposalResponse, Status, Vote, VoteInfo, VoteListResponse, VoteResponse,
-    VoterDetail, VoterListResponse, VoterResponse,
+    Ballot, Proposal, ProposalListResponse, ProposalResponse, Status, Vote, VoteInfo,
+    VoteListResponse, VoteResponse, VoterDetail, VoterListResponse, VoterResponse, Votes,
 };
 use cw_storage_plus::Bound;
 use cw_utils::{Expiration, ThresholdResponse};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{next_id, Ballot, Config, Proposal, Votes, BALLOTS, CONFIG, PROPOSALS, VOTERS};
+use crate::state::{next_id, Config, BALLOTS, CONFIG, PROPOSALS, VOTERS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
@@ -112,6 +112,8 @@ pub fn execute_propose(
         votes: Votes::yes(vote_power),
         threshold: cfg.threshold,
         total_weight: cfg.total_weight,
+        proposer: info.sender.clone(),
+        deposit: None,
     };
     prop.update_status(&env.block);
     let id = next_id(deps.storage)?;
@@ -276,6 +278,8 @@ fn query_proposal(deps: Deps, env: Env, id: u64) -> StdResult<ProposalResponse> 
         msgs: prop.msgs,
         status,
         expires: prop.expires,
+        deposit: prop.deposit,
+        proposer: prop.proposer,
         threshold,
     })
 }
@@ -331,6 +335,8 @@ fn map_proposal(
             description: prop.description,
             msgs: prop.msgs,
             status,
+            deposit: prop.deposit,
+            proposer: prop.proposer,
             expires: prop.expires,
             threshold,
         }
