@@ -16,6 +16,9 @@ pub struct ContractVersion {
     /// the only code that needs to understand the version parsing is code that knows how to
     /// migrate from the given contract (and is tied to it's implementation somehow)
     pub version: String,
+    ///Registry and interface create names
+    /// e.g ["creates.io.cw721","creates.io.cw2"]
+    pub supported_interface: Option<Vec<String>>,
 }
 
 /// get_contract_version can be use in migrate to read the previous version of this contract
@@ -29,10 +32,12 @@ pub fn set_contract_version<T: Into<String>, U: Into<String>>(
     store: &mut dyn Storage,
     name: T,
     version: U,
+    supported_interface: Option<Vec<String>>,
 ) -> StdResult<()> {
     let val = ContractVersion {
         contract: name.into(),
         version: version.into(),
+        supported_interface: supported_interface.into(),
     };
     CONTRACT.save(store, &val)
 }
@@ -57,6 +62,7 @@ pub fn query_contract_info<Q: Querier, T: Into<String>>(
 mod tests {
     use super::*;
     use cosmwasm_std::testing::MockStorage;
+    use std::vec::Vec;
 
     #[test]
     fn get_and_set_work() {
@@ -68,12 +74,27 @@ mod tests {
         // set and get
         let contract_name = "crate:cw20-base";
         let contract_version = "0.2.0";
-        set_contract_version(&mut store, contract_name, contract_version).unwrap();
+        set_contract_version(&mut store, contract_name, contract_version,None).unwrap();
 
         let loaded = get_contract_version(&store).unwrap();
         let expected = ContractVersion {
             contract: contract_name.to_string(),
             version: contract_version.to_string(),
+            supported_interface: None,
+        };
+        assert_eq!(expected, loaded);
+
+        // set and get with supported_interface
+        let contract_name = "crate:cw20-base";
+        let contract_version = "0.2.0";
+        let supported_interface = Some(Vec::from(["creates.io.cw2".to_string(),"creates.io.cw721".to_string()]));
+        set_contract_version(&mut store, contract_name, contract_version,supported_interface.clone()).unwrap();
+
+        let loaded = get_contract_version(&store).unwrap();
+        let expected = ContractVersion {
+            contract: contract_name.to_string(),
+            version: contract_version.to_string(),
+            supported_interface: supported_interface.clone(),
         };
         assert_eq!(expected, loaded);
     }
