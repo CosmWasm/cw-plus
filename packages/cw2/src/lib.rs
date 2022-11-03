@@ -16,8 +16,8 @@ pub struct ContractVersion {
     /// the only code that needs to understand the version parsing is code that knows how to
     /// migrate from the given contract (and is tied to it's implementation somehow)
     pub version: String,
-    ///Registry and interface create names
-    /// e.g ["creates.io.cw721","creates.io.cw2"]
+    /// Registry and interface create names
+    /// e.g ["crates.io:cw721","crates.io:cw2"]
     pub supported_interface: Option<Vec<String>>,
 }
 
@@ -87,7 +87,7 @@ mod tests {
         // set and get with supported_interface
         let contract_name = "crate:cw20-base";
         let contract_version = "0.2.0";
-        let supported_interface = Some(Vec::from(["creates.io.cw2".to_string(),"creates.io.cw721".to_string()]));
+        let supported_interface = Some(Vec::from(["crates.io:cw2".to_string(),"crates.io:cw721".to_string()]));
         set_contract_version(&mut store, contract_name, contract_version,supported_interface.clone()).unwrap();
 
         let loaded = get_contract_version(&store).unwrap();
