@@ -1,5 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+use cosmwasm_std::Order::Ascending;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
 };
@@ -9,15 +10,19 @@ use cw20::{
     BalanceResponse, Cw20Coin, Cw20ReceiveMsg, DownloadLogoResponse, EmbeddedLogo, Logo, LogoInfo,
     MarketingInfoResponse, MinterResponse, TokenInfoResponse,
 };
+use cw_utils::ensure_from_older_version;
 
 use crate::allowances::{
     execute_burn_from, execute_decrease_allowance, execute_increase_allowance, execute_send_from,
     execute_transfer_from, query_allowance,
 };
-use crate::enumerable::{query_all_accounts, query_all_allowances};
+use crate::enumerable::{query_all_accounts, query_owner_allowances, query_spender_allowances};
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{MinterData, TokenInfo, BALANCES, LOGO, MARKETING_INFO, TOKEN_INFO};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::state::{
+    MinterData, TokenInfo, ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, LOGO, MARKETING_INFO,
+    TOKEN_INFO,
+};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -151,14 +156,32 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-pub fn create_accounts(deps: &mut DepsMut, accounts: &[Cw20Coin]) -> StdResult<Uint128> {
+pub fn create_accounts(
+    deps: &mut DepsMut,
+    accounts: &[Cw20Coin],
+) -> Result<Uint128, ContractError> {
+    validate_accounts(accounts)?;
+
     let mut total_supply = Uint128::zero();
     for row in accounts {
         let address = deps.api.addr_validate(&row.address)?;
         BALANCES.save(deps.storage, &address, &row.amount)?;
         total_supply += row.amount;
     }
+
     Ok(total_supply)
+}
+
+pub fn validate_accounts(accounts: &[Cw20Coin]) -> Result<(), ContractError> {
+    let mut addresses = accounts.iter().map(|c| &c.address).collect::<Vec<_>>();
+    addresses.sort();
+    addresses.dedup();
+
+    if addresses.len() != accounts.len() {
+        Err(ContractError::DuplicateInitialBalanceAddresses {})
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -207,6 +230,9 @@ pub fn execute(
             marketing,
         } => execute_update_marketing(deps, env, info, project, description, marketing),
         ExecuteMsg::UploadLogo(logo) => execute_upload_logo(deps, env, info, logo),
+        ExecuteMsg::UpdateMinter { new_minter } => {
+            execute_update_minter(deps, env, info, new_minter)
+        }
     }
 }
 
@@ -286,8 +312,17 @@ pub fn execute_mint(
         return Err(ContractError::InvalidZeroAmount {});
     }
 
-    let mut config = TOKEN_INFO.load(deps.storage)?;
-    if config.mint.is_none() || config.mint.as_ref().unwrap().minter != info.sender {
+    let mut config = TOKEN_INFO
+        .may_load(deps.storage)?
+        .ok_or(ContractError::Unauthorized {})?;
+
+    if config
+        .mint
+        .as_ref()
+        .ok_or(ContractError::Unauthorized {})?
+        .minter
+        != info.sender
+    {
         return Err(ContractError::Unauthorized {});
     }
 
@@ -357,6 +392,44 @@ pub fn execute_send(
             .into_cosmos_msg(contract)?,
         );
     Ok(res)
+}
+
+pub fn execute_update_minter(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    new_minter: Option<String>,
+) -> Result<Response, ContractError> {
+    let mut config = TOKEN_INFO
+        .may_load(deps.storage)?
+        .ok_or(ContractError::Unauthorized {})?;
+
+    let mint = config.mint.as_ref().ok_or(ContractError::Unauthorized {})?;
+    if mint.minter != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    let minter_data = new_minter
+        .map(|new_minter| deps.api.addr_validate(&new_minter))
+        .transpose()?
+        .map(|minter| MinterData {
+            minter,
+            cap: mint.cap,
+        });
+
+    config.mint = minter_data;
+
+    TOKEN_INFO.save(deps.storage, &config)?;
+
+    Ok(Response::default()
+        .add_attribute("action", "update_minter")
+        .add_attribute(
+            "new_minter",
+            config
+                .mint
+                .map(|m| m.minter.into_string())
+                .unwrap_or_else(|| "None".to_string()),
+        ))
 }
 
 pub fn execute_update_marketing(
@@ -460,7 +533,17 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             owner,
             start_after,
             limit,
-        } => to_binary(&query_all_allowances(deps, owner, start_after, limit)?),
+        } => to_binary(&query_owner_allowances(deps, owner, start_after, limit)?),
+        QueryMsg::AllSpenderAllowances {
+            spender,
+            start_after,
+            limit,
+        } => to_binary(&query_spender_allowances(
+            deps,
+            spender,
+            start_after,
+            limit,
+        )?),
         QueryMsg::AllAccounts { start_after, limit } => {
             to_binary(&query_all_accounts(deps, start_after, limit)?)
         }
@@ -517,6 +600,23 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
         }),
         Logo::Url(_) => Err(StdError::not_found("logo")),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
+    let original_version =
+        ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    if original_version < "0.14.0".parse::<semver::Version>().unwrap() {
+        // Build reverse map of allowances per spender
+        let data = ALLOWANCES
+            .range(deps.storage, None, None, Ascending)
+            .collect::<StdResult<Vec<_>>>()?;
+        for ((owner, spender), allowance) in data {
+            ALLOWANCES_SPENDER.save(deps.storage, (&spender, &owner), &allowance)?;
+        }
+    }
+    Ok(Response::default())
 }
 
 #[cfg(test)]
@@ -854,6 +954,96 @@ mod tests {
     }
 
     #[test]
+    fn minter_can_update_minter_but_not_cap() {
+        let mut deps = mock_dependencies();
+        let minter = String::from("minter");
+        let cap = Some(Uint128::from(3000000u128));
+        do_instantiate_with_minter(
+            deps.as_mut(),
+            &String::from("genesis"),
+            Uint128::new(1234),
+            &minter,
+            cap,
+        );
+
+        let new_minter = "new_minter";
+        let msg = ExecuteMsg::UpdateMinter {
+            new_minter: Some(new_minter.to_string()),
+        };
+
+        let info = mock_info(&minter, &[]);
+        let env = mock_env();
+        let res = execute(deps.as_mut(), env.clone(), info, msg);
+        assert!(res.is_ok());
+        let query_minter_msg = QueryMsg::Minter {};
+        let res = query(deps.as_ref(), env, query_minter_msg);
+        let mint: MinterResponse = from_binary(&res.unwrap()).unwrap();
+
+        // Minter cannot update cap.
+        assert!(mint.cap == cap);
+        assert!(mint.minter == new_minter)
+    }
+
+    #[test]
+    fn others_cannot_update_minter() {
+        let mut deps = mock_dependencies();
+        let minter = String::from("minter");
+        do_instantiate_with_minter(
+            deps.as_mut(),
+            &String::from("genesis"),
+            Uint128::new(1234),
+            &minter,
+            None,
+        );
+
+        let msg = ExecuteMsg::UpdateMinter {
+            new_minter: Some("new_minter".to_string()),
+        };
+
+        let info = mock_info("not the minter", &[]);
+        let env = mock_env();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
+    }
+
+    #[test]
+    fn unset_minter() {
+        let mut deps = mock_dependencies();
+        let minter = String::from("minter");
+        let cap = None;
+        do_instantiate_with_minter(
+            deps.as_mut(),
+            &String::from("genesis"),
+            Uint128::new(1234),
+            &minter,
+            cap,
+        );
+
+        let msg = ExecuteMsg::UpdateMinter { new_minter: None };
+
+        let info = mock_info(&minter, &[]);
+        let env = mock_env();
+        let res = execute(deps.as_mut(), env.clone(), info, msg);
+        assert!(res.is_ok());
+        let query_minter_msg = QueryMsg::Minter {};
+        let res = query(deps.as_ref(), env, query_minter_msg);
+        let mint: Option<MinterResponse> = from_binary(&res.unwrap()).unwrap();
+
+        // Check that mint information was removed.
+        assert_eq!(mint, None);
+
+        // Check that old minter can no longer mint.
+        let msg = ExecuteMsg::Mint {
+            recipient: String::from("lucky"),
+            amount: Uint128::new(222),
+        };
+        let info = mock_info("minter", &[]);
+        let env = mock_env();
+        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
+        assert_eq!(err, ContractError::Unauthorized {});
+    }
+
+    #[test]
     fn no_one_mints_if_minter_unset() {
         let mut deps = mock_dependencies();
         do_instantiate(deps.as_mut(), &String::from("genesis"), Uint128::new(1234));
@@ -875,6 +1065,32 @@ mod tests {
         let addr1 = String::from("addr0001");
         let amount2 = Uint128::from(7890987u128);
         let addr2 = String::from("addr0002");
+        let info = mock_info("creator", &[]);
+        let env = mock_env();
+
+        // Fails with duplicate addresses
+        let instantiate_msg = InstantiateMsg {
+            name: "Bash Shell".to_string(),
+            symbol: "BASH".to_string(),
+            decimals: 6,
+            initial_balances: vec![
+                Cw20Coin {
+                    address: addr1.clone(),
+                    amount: amount1,
+                },
+                Cw20Coin {
+                    address: addr1.clone(),
+                    amount: amount2,
+                },
+            ],
+            mint: None,
+            marketing: None,
+        };
+        let err =
+            instantiate(deps.as_mut(), env.clone(), info.clone(), instantiate_msg).unwrap_err();
+        assert_eq!(err, ContractError::DuplicateInitialBalanceAddresses {});
+
+        // Works with unique addresses
         let instantiate_msg = InstantiateMsg {
             name: "Bash Shell".to_string(),
             symbol: "BASH".to_string(),
@@ -892,11 +1108,8 @@ mod tests {
             mint: None,
             marketing: None,
         };
-        let info = mock_info("creator", &[]);
-        let env = mock_env();
         let res = instantiate(deps.as_mut(), env, info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
-
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap(),
             TokenInfoResponse {
@@ -1128,6 +1341,126 @@ mod tests {
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
         );
+    }
+
+    mod migration {
+        use super::*;
+
+        use cosmwasm_std::Empty;
+        use cw20::{AllAllowancesResponse, AllSpenderAllowancesResponse, SpenderAllowanceInfo};
+        use cw_multi_test::{App, Contract, ContractWrapper, Executor};
+        use cw_utils::Expiration;
+
+        fn cw20_contract() -> Box<dyn Contract<Empty>> {
+            let contract = ContractWrapper::new(
+                crate::contract::execute,
+                crate::contract::instantiate,
+                crate::contract::query,
+            )
+            .with_migrate(crate::contract::migrate);
+            Box::new(contract)
+        }
+
+        #[test]
+        fn test_migrate() {
+            let mut app = App::default();
+
+            let cw20_id = app.store_code(cw20_contract());
+            let cw20_addr = app
+                .instantiate_contract(
+                    cw20_id,
+                    Addr::unchecked("sender"),
+                    &InstantiateMsg {
+                        name: "Token".to_string(),
+                        symbol: "TOKEN".to_string(),
+                        decimals: 6,
+                        initial_balances: vec![Cw20Coin {
+                            address: "sender".to_string(),
+                            amount: Uint128::new(100),
+                        }],
+                        mint: None,
+                        marketing: None,
+                    },
+                    &[],
+                    "TOKEN",
+                    Some("sender".to_string()),
+                )
+                .unwrap();
+
+            // no allowance to start
+            let allowance: AllAllowancesResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    cw20_addr.to_string(),
+                    &QueryMsg::AllAllowances {
+                        owner: "sender".to_string(),
+                        start_after: None,
+                        limit: None,
+                    },
+                )
+                .unwrap();
+            assert_eq!(allowance, AllAllowancesResponse::default());
+
+            // Set allowance
+            let allow1 = Uint128::new(7777);
+            let expires = Expiration::AtHeight(123_456);
+            let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: cw20_addr.to_string(),
+                msg: to_binary(&ExecuteMsg::IncreaseAllowance {
+                    spender: "spender".into(),
+                    amount: allow1,
+                    expires: Some(expires),
+                })
+                .unwrap(),
+                funds: vec![],
+            });
+            app.execute(Addr::unchecked("sender"), msg).unwrap();
+
+            // Now migrate
+            app.execute(
+                Addr::unchecked("sender"),
+                CosmosMsg::Wasm(WasmMsg::Migrate {
+                    contract_addr: cw20_addr.to_string(),
+                    new_code_id: cw20_id,
+                    msg: to_binary(&MigrateMsg {}).unwrap(),
+                }),
+            )
+            .unwrap();
+
+            // Smoke check that the contract still works.
+            let balance: cw20::BalanceResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    cw20_addr.clone(),
+                    &QueryMsg::Balance {
+                        address: "sender".to_string(),
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(balance.balance, Uint128::new(100));
+
+            // Confirm that the allowance per spender is there
+            let allowance: AllSpenderAllowancesResponse = app
+                .wrap()
+                .query_wasm_smart(
+                    cw20_addr,
+                    &QueryMsg::AllSpenderAllowances {
+                        spender: "spender".to_string(),
+                        start_after: None,
+                        limit: None,
+                    },
+                )
+                .unwrap();
+            assert_eq!(
+                allowance.allowances,
+                &[SpenderAllowanceInfo {
+                    owner: "sender".to_string(),
+                    allowance: allow1,
+                    expires
+                }]
+            );
+        }
     }
 
     mod marketing {

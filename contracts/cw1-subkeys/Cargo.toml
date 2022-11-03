@@ -1,8 +1,8 @@
 [package]
 name = "cw1-subkeys"
-version = "0.12.1"
+version = "0.16.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 description = "Implement subkeys for authorizing native tokens as a cw1 proxy contract"
 license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
@@ -19,17 +19,17 @@ library = []
 test-utils = []
 
 [dependencies]
-cw-utils = { path = "../../packages/utils", version = "0.12.1" }
-cw1 = { path = "../../packages/cw1", version = "0.12.1" }
-cw2 = { path = "../../packages/cw2", version = "0.12.1" }
-cw1-whitelist = { path = "../cw1-whitelist", version = "0.12.1", features = ["library"] }
-cosmwasm-std = { version = "1.0.0-beta5", features = ["staking"] }
-cw-storage-plus = { path = "../../packages/storage-plus", version = "0.12.1" }
+cosmwasm-schema = { version = "1.1.0" }
+cw-utils = "0.16.0"
+cw1 = { path = "../../packages/cw1", version = "0.16.0" }
+cw2 = { path = "../../packages/cw2", version = "0.16.0" }
+cw1-whitelist = { path = "../cw1-whitelist", version = "0.16.0", features = ["library"] }
+cosmwasm-std = { version = "1.1.0", features = ["staking"] }
+cw-storage-plus = "0.16.0"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = "1.0.23"
 semver = "1"
 
 [dev-dependencies]
-cosmwasm-schema = { version = "1.0.0-beta5" }
-cw1-whitelist = { path = "../cw1-whitelist", version = "0.12.1", features = ["library", "test-utils"] }
+cw1-whitelist = { path = "../cw1-whitelist", version = "0.16.0", features = ["library", "test-utils"] }

@@ -1,14 +1,10 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{Addr, CosmosMsg, Empty};
 use cw_utils::{Expiration, ThresholdResponse};
 
-use crate::msg::Vote;
+use crate::{msg::Vote, DepositInfo};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Cw3QueryMsg {
     /// Returns the threshold rules that would be used for a new proposal that was
     /// opened right now. The threshold rules do not change often, but the `total_weight`
@@ -52,25 +48,26 @@ pub enum Cw3QueryMsg {
 /// Note, if you are storing custom messages in the proposal,
 /// the querier needs to know what possible custom message types
 /// those are in order to parse the response
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ProposalResponse<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[cw_serde]
+pub struct ProposalResponse<T = Empty> {
     pub id: u64,
     pub title: String,
     pub description: String,
     pub msgs: Vec<CosmosMsg<T>>,
     pub status: Status,
     pub expires: Expiration,
-    /// This is the threshold that is applied to this proposal. Both the rules of the voting contract,
-    /// as well as the total_weight of the voting group may have changed since this time. That means
-    /// that the generic `Threshold{}` query does not provide valid information for existing proposals.
+    /// This is the threshold that is applied to this proposal. Both
+    /// the rules of the voting contract, as well as the total_weight
+    /// of the voting group may have changed since this time. That
+    /// means that the generic `Threshold{}` query does not provide
+    /// valid information for existing proposals.
     pub threshold: ThresholdResponse,
+    pub proposer: Addr,
+    pub deposit: Option<DepositInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "lowercase")]
+#[cw_serde]
+#[derive(Copy)]
 #[repr(u8)]
 pub enum Status {
     /// proposal was created, but voting has not yet begun for whatever reason
@@ -85,19 +82,19 @@ pub enum Status {
     Executed = 5,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct ProposalListResponse {
-    pub proposals: Vec<ProposalResponse>,
+#[cw_serde]
+pub struct ProposalListResponse<T = Empty> {
+    pub proposals: Vec<ProposalResponse<T>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct VoteListResponse {
     pub votes: Vec<VoteInfo>,
 }
 
 /// Returns the vote (opinion as well as weight counted) as well as
 /// the address of the voter who submitted it
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct VoteInfo {
     pub proposal_id: u64,
     pub voter: String,
@@ -105,22 +102,22 @@ pub struct VoteInfo {
     pub weight: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct VoteResponse {
     pub vote: Option<VoteInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct VoterResponse {
     pub weight: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct VoterListResponse {
     pub voters: Vec<VoterDetail>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct VoterDetail {
     pub addr: String,
     pub weight: u64,

@@ -1,19 +1,28 @@
 #!/bin/bash
-
+set -o errexit -o pipefail
 
 ORIGINAL_OPTS=$*
-OPTS=$(getopt -l "help,since-tag:,full,token:" -o "hft" -- "$@") || exit 1
+OPTS=$(getopt -l "help,since-tag:,upcoming-tag:,full,token:" -o "hu:ft" -- "$@") || exit 1
+
+function print_usage() {
+    echo -e "Usage: $0 [-h|--help] [-f|--full] [--since-tag <tag>] [-u|--upcoming-tag] <tag> [-t|--token <token>]
+-h, --help               Display help
+-f, --full               Process changes since the beginning (by default: since latest git version tag)
+--since-tag <tag>        Process changes since git version tag <tag> (by default: since latest git version tag)
+-u, --upcoming-tag <tag> Add a <tag> title in CHANGELOG for the new changes
+--token <token>          Pass changelog github token <token>"
+}
+
+function remove_opt() {
+    ORIGINAL_OPTS=$(echo "$ORIGINAL_OPTS" | sed "s/\\B$1\\b//")
+}
 
 eval set -- "$OPTS"
 while true
 do
 case $1 in
   -h|--help)
-    echo -e "Usage: $0 [-h|--help] [-f|--full] [--since-tag <tag>] [-t|--token <token>]
--h, --help          Display help
--f, --full          Process changes since the beginning (by default: since latest git version tag)
---since-tag <tag>   Process changes since git version tag <tag> (by default: since latest git version tag)
---token <token>     Pass changelog github token <token>"
+    print_usage
     exit 0
     ;;
   --since-tag)
@@ -22,7 +31,13 @@ case $1 in
     ;;
   -f|--full)
     TAG="<FULL>"
-    ORIGINAL_OPTS=$(echo "$ORIGINAL_OPTS" | sed "s/\\B$1\\b//")
+    remove_opt $1
+    ;;
+  -u|--upcoming-tag)
+    remove_opt $1
+    shift
+    UPCOMING_TAG="$1"
+    remove_opt $1
     ;;
   --)
     shift
@@ -49,5 +64,12 @@ echo "Consolidated tag: $TAG"
 sed -i -n "/^## \\[${TAG}[^]]*\\]/,\$p" CHANGELOG.md
 
 github_changelog_generator -u CosmWasm -p cw-plus --base CHANGELOG.md $ORIGINAL_OPTS || cp /tmp/CHANGELOG.md.$$ CHANGELOG.md
+
+if [ -n "$UPCOMING_TAG" ]
+then
+  # Add "upcoming" version tag
+  TODAY=$(date "+%Y-%m-%d")
+  sed -i "s+\[Full Changelog\](https://github.com/CosmWasm/cw-plus/compare/\(.*\)\.\.\.HEAD)+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/$UPCOMING_TAG...HEAD)\n\n## [$UPCOMING_TAG](https://github.com/CosmWasm/cw-plus/tree/$UPCOMING_TAG) ($TODAY)\n\n[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/\1...$UPCOMING_TAG)+" CHANGELOG.md
+fi
 
 rm -f /tmp/CHANGELOG.md.$$

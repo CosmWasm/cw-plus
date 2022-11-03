@@ -1,18 +1,16 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, BlockInfo, CustomQuery, Deps, StdResult, Storage, Uint128};
 use cw_storage_plus::Map;
 use cw_utils::Expiration;
 
 // TODO: pull into utils?
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ClaimsResponse {
     pub claims: Vec<Claim>,
 }
 
 // TODO: pull into utils?
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct Claim {
     pub amount: Uint128,
     pub release_at: Expiration,
@@ -65,7 +63,7 @@ impl<'a> Claims<'a> {
         let mut to_send = Uint128::zero();
         self.0.update(storage, addr, |claim| -> StdResult<_> {
             let (_send, waiting): (Vec<_>, _) =
-                claim.unwrap_or_default().iter().cloned().partition(|c| {
+                claim.unwrap_or_default().into_iter().partition(|c| {
                     // if mature and we can pay fully, then include in _send
                     if c.release_at.is_expired(block) {
                         if let Some(limit) = cap {
@@ -110,7 +108,7 @@ mod test {
     #[test]
     fn can_create_claim() {
         let claim = Claim::new(TEST_AMOUNT, TEST_EXPIRATION);
-        assert_eq!(claim.amount, TEST_AMOUNT.into());
+        assert_eq!(claim.amount, Uint128::from(TEST_AMOUNT));
         assert_eq!(claim.release_at, TEST_EXPIRATION);
     }
 
@@ -150,7 +148,7 @@ mod test {
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
         assert_eq!(saved_claims.len(), 1);
-        assert_eq!(saved_claims[0].amount, TEST_AMOUNT.into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT));
         assert_eq!(saved_claims[0].release_at, TEST_EXPIRATION);
 
         // Adding another claim to same address, make sure that both claims are saved.
@@ -169,9 +167,9 @@ mod test {
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
         assert_eq!(saved_claims.len(), 2);
-        assert_eq!(saved_claims[0].amount, TEST_AMOUNT.into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT));
         assert_eq!(saved_claims[0].release_at, TEST_EXPIRATION);
-        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[1].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[1].release_at, TEST_EXPIRATION);
 
         // Adding another claim to different address, make sure that other address only has one claim.
@@ -262,9 +260,9 @@ mod test {
 
         assert_eq!(amount, Uint128::zero());
         assert_eq!(saved_claims.len(), 2);
-        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
-        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[1].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[1].release_at, Expiration::AtHeight(100));
     }
 
@@ -308,9 +306,9 @@ mod test {
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
 
-        assert_eq!(amount, TEST_AMOUNT.into());
+        assert_eq!(amount, Uint128::from(TEST_AMOUNT));
         assert_eq!(saved_claims.len(), 1);
-        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(100));
     }
 
@@ -354,7 +352,7 @@ mod test {
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
 
-        assert_eq!(amount, (TEST_AMOUNT + TEST_AMOUNT + 100).into());
+        assert_eq!(amount, Uint128::from(TEST_AMOUNT + TEST_AMOUNT + 100));
         assert_eq!(saved_claims.len(), 0);
     }
 
@@ -400,9 +398,9 @@ mod test {
 
         assert_eq!(amount, Uint128::zero());
         assert_eq!(saved_claims.len(), 2);
-        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT).into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT));
         assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
-        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[1].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[1].release_at, Expiration::AtHeight(100));
     }
 
@@ -446,7 +444,7 @@ mod test {
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
 
-        assert_eq!(amount, (TEST_AMOUNT + TEST_AMOUNT + 100).into());
+        assert_eq!(amount, Uint128::from(TEST_AMOUNT + TEST_AMOUNT + 100));
         assert_eq!(saved_claims.len(), 0);
     }
 
@@ -484,14 +482,14 @@ mod test {
                 Some((TEST_AMOUNT + 50).into()),
             )
             .unwrap();
-        assert_eq!(amount, (TEST_AMOUNT).into());
+        assert_eq!(amount, Uint128::from(TEST_AMOUNT));
 
         let saved_claims = claims
             .0
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
         assert_eq!(saved_claims.len(), 1);
-        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
     }
 
@@ -536,9 +534,9 @@ mod test {
             .load(deps.as_mut().storage, &Addr::unchecked("addr"))
             .unwrap();
         assert_eq!(saved_claims.len(), 2);
-        assert_eq!(saved_claims[0].amount, (TEST_AMOUNT + 100).into());
+        assert_eq!(saved_claims[0].amount, Uint128::from(TEST_AMOUNT + 100));
         assert_eq!(saved_claims[0].release_at, Expiration::AtHeight(10));
-        assert_eq!(saved_claims[1].amount, (TEST_AMOUNT).into());
+        assert_eq!(saved_claims[1].amount, Uint128::from(TEST_AMOUNT));
         assert_eq!(saved_claims[1].release_at, Expiration::AtHeight(5));
     }
 

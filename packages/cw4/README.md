@@ -12,9 +12,9 @@ the ones laid out here should be under the specified keys and in the
 same format.
 
 In this case, a cw3 contract could *read* an external group contract with
-no significant cost more than reading local storage. However, updating
+no significant cost besides reading local storage. However, updating
 that group contract (if allowed), would be an external message and
-charged the instantiation overhead for each contract.
+will be charged as part of the overhead for each contract.
 
 ## Messages
 
@@ -40,7 +40,7 @@ Only the `admin` may execute any of these function. Thus, by omitting an
 If we include one, it may often be desired to be a `cw3` contract that
 uses this group contract as a group. This leads to a bit of chicken-and-egg
 problem, but we cover how to instantiate that in 
-[`cw3-flexible-multisig`](../../contracts/cw3-flexible-multisig/README.md#instantiation).
+[`cw3-flex-multisig`](../../contracts/cw3-flex-multisig/README.md#instantiation).
 
 ## Queries
 

@@ -1,12 +1,10 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw20::Cw20ReceiveMsg;
 
 use crate::amount::Amount;
 use crate::state::ChannelInfo;
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[cw_serde]
 pub struct InitMsg {
     /// Default timeout for ics20 packets, specified in seconds
     pub default_timeout: u64,
@@ -14,19 +12,23 @@ pub struct InitMsg {
     pub gov_contract: String,
     /// initial allowlist - all cw20 tokens we will send must be previously allowed by governance
     pub allowlist: Vec<AllowMsg>,
+    /// If set, contracts off the allowlist will run with this gas limit.
+    /// If unset, will refuse to accept any contract off the allow list.
+    pub default_gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct AllowMsg {
     pub contract: String,
     pub gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
-pub struct MigrateMsg {}
+#[cw_serde]
+pub struct MigrateMsg {
+    pub default_gas_limit: Option<u64>,
+}
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
@@ -39,7 +41,7 @@ pub enum ExecuteMsg {
 }
 
 /// This is the message we accept via Receive
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct TransferMsg {
     /// The local channel to send the packets on
     pub channel: String,
@@ -51,35 +53,40 @@ pub struct TransferMsg {
     pub timeout: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// Return the port ID bound by this contract. Returns PortResponse
+    /// Return the port ID bound by this contract.
+    #[returns(PortResponse)]
     Port {},
-    /// Show all channels we have connected to. Return type is ListChannelsResponse.
+    /// Show all channels we have connected to.
+    #[returns(ListChannelsResponse)]
     ListChannels {},
     /// Returns the details of the name channel, error if not created.
-    /// Return type: ChannelResponse.
+    #[returns(ChannelResponse)]
     Channel { id: String },
-    /// Show the Config. Returns ConfigResponse (currently including admin as well)
+    /// Show the Config.
+    #[returns(ConfigResponse)]
     Config {},
-    /// Return AdminResponse
+    #[returns(cw_controllers::AdminResponse)]
     Admin {},
-    /// Query if a given cw20 contract is allowed. Returns AllowedResponse
+    /// Query if a given cw20 contract is allowed.
+    #[returns(AllowedResponse)]
     Allowed { contract: String },
-    /// List all allowed cw20 contracts. Returns ListAllowedResponse
+    /// List all allowed cw20 contracts.
+    #[returns(ListAllowedResponse)]
     ListAllowed {
         start_after: Option<String>,
         limit: Option<u32>,
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ListChannelsResponse {
     pub channels: Vec<ChannelInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ChannelResponse {
     /// Information on the channel's connection
     pub info: ChannelInfo,
@@ -90,29 +97,30 @@ pub struct ChannelResponse {
     pub total_sent: Vec<Amount>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct PortResponse {
     pub port_id: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ConfigResponse {
     pub default_timeout: u64,
+    pub default_gas_limit: Option<u64>,
     pub gov_contract: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct AllowedResponse {
     pub is_allowed: bool,
     pub gas_limit: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct ListAllowedResponse {
     pub allow: Vec<AllowedInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[cw_serde]
 pub struct AllowedInfo {
     pub contract: String,
     pub gas_limit: Option<u64>,

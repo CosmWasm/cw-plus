@@ -1,11 +1,10 @@
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{CosmosMsg, Empty};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Cw1ExecuteMsg<T = Empty>
 where
     T: Clone + fmt::Debug + PartialEq + JsonSchema,
