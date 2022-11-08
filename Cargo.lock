@@ -331,6 +331,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw2-supported-interface"
+version = "1.0.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "cw20"
 version = "1.0.1"
 dependencies = [
