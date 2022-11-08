@@ -59,7 +59,7 @@ pub fn set_contract_version<T: Into<String>, U: Into<String>>(
     let val = ContractVersion {
         contract: name.into(),
         version: version.into(),
-        supported_interface: supported_interface.into(),
+        supported_interface,
     };
     CONTRACT.save(store, &val)
 }
@@ -88,7 +88,6 @@ where
 mod tests {
     use super::*;
     use cosmwasm_std::testing::MockStorage;
-    use std::vec::Vec;
 
     #[test]
     fn get_and_set_work() {
@@ -113,23 +112,18 @@ mod tests {
         // set and get with supported_interface
         let contract_name = "crate:cw20-base";
         let contract_version = "0.2.0";
-        let supported_interface = Some(Vec::from([
+        let supported_interface: Option<Vec<String>> = Some(Vec::from([
             "crates.io:cw2".to_string(),
             "crates.io:cw721".to_string(),
         ]));
-        set_contract_version(
-            &mut store,
-            contract_name,
-            contract_version,
-            supported_interface.clone(),
-        )
-        .unwrap();
+        let v_ref = &supported_interface;
+        set_contract_version(&mut store, contract_name, contract_version, v_ref.clone()).unwrap();
 
         let loaded = get_contract_version(&store).unwrap();
         let expected = ContractVersion {
             contract: contract_name.to_string(),
             version: contract_version.to_string(),
-            supported_interface: supported_interface.clone(),
+            supported_interface: v_ref.clone(),
         };
         assert_eq!(expected, loaded);
     }
