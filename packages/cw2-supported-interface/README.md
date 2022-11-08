@@ -45,6 +45,14 @@ pub struct ContractVersion {
     /// the only code that needs to understand the version parsing is code that knows how to
     /// migrate from the given contract (and is tied to it's implementation somehow)
     pub version: String,
+    /// supported_interface is an optional parameter returning a vector of string represents interfaces
+    /// that the contract support The string value is the interface crate names in Rust crate Registry.
+    /// This parameter is inspired by the EIP-165 from Ethereum.
+    /// Each string value should follow a common standard such as <Registry Domain>:<Crate Name>
+    /// e.g ["crates.io:cw721","crates.io:cw2"]
+    /// NOTE: this is just a hint for the caller to adapt on how to interact with this contract.
+    /// There is no guarantee that the contract actually implement these interfaces.
+    pub supported_interface: Option<Vec<String>>,
 }
 ```
 
@@ -53,6 +61,7 @@ Thus, an serialized example may looks like:
 ```json
 {
     "contract": "crates.io:cw20-base",
-    "version": "v0.1.0"
+    "version": "v0.1.0",
+    "supported_interface": ["crates.io:cw721","crates.io:cw2"]
 }
 ```
