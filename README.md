@@ -41,10 +41,6 @@ If you don't know what CosmWasm is, please check out [our homepage](https://cosm
 **Warning** None of these contracts have been audited and no liability is assumed for the use of this code. They are
 provided to turbo-start your projects.
 
-**Note** All code in pre-1.0 packages is in "draft" form, meaning it may undergo minor changes and additions until 1.0.
-For example between 0.1 and 0.2 we adjusted the `Expiration` type to make the JSON representation cleaner (before:
-`expires: {at_height: {height: 12345}}` after `expires: {at_height: 12345}`)
-
 ## Specifications
 
 The most reusable components are the various cwXYZ specifications under `packages`. Each one defines a standard
@@ -108,7 +104,7 @@ To compile all the contracts, run the following in the repo root:
 docker run --rm -v "$(pwd)":/code \
   --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.12.8
+  cosmwasm/workspace-optimizer:0.12.9
 ```
 
 This will compile all packages in the `contracts` directory and output the stripped and optimized wasm code under the
