@@ -1,6 +1,6 @@
 # CW22 Spec: Contract Info
 
-The standard used to declare which interface contract implements
+The standard used to declare which interface contract implements. 
 This standard is inspired by the EIP-165 from Ethereum.
 
 For more information on this specification, please check out the
