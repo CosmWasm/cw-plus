@@ -30,21 +30,11 @@ support multiple migrate paths.
 
 All CW2-compliant contracts must store the following data:
 
-* key: `contract_info`
-* data: Json-serialized `ContractVersion`
+* key: `contract_supported_interface`
+* data: Json-serialized `ContractSupportedInterface`
 
 ```rust
-pub struct ContractVersion {
-    /// contract is a globally unique identifier for the contract.
-    /// it should build off standard namespacing for whichever language it is in,
-    /// and prefix it with the registry we use.
-    /// For rust we prefix with `crates.io:`, to give us eg. `crates.io:cw20-base`
-    pub contract: String,
-    /// version is any string that this implementation knows. It may be simple counter "1", "2".
-    /// or semantic version on release tags "v0.7.0", or some custom feature flag list.
-    /// the only code that needs to understand the version parsing is code that knows how to
-    /// migrate from the given contract (and is tied to it's implementation somehow)
-    pub version: String,
+pub struct ContractSupportedInterface {
     /// supported_interface is an optional parameter returning a vector of string represents interfaces
     /// that the contract support The string value is the interface crate names in Rust crate Registry.
     /// This parameter is inspired by the EIP-165 from Ethereum.
@@ -52,7 +42,7 @@ pub struct ContractVersion {
     /// e.g ["crates.io:cw721","crates.io:cw2"]
     /// NOTE: this is just a hint for the caller to adapt on how to interact with this contract.
     /// There is no guarantee that the contract actually implement these interfaces.
-    pub supported_interface: Option<Vec<String>>,
+    pub supported_interface: Vec<String>,
 }
 ```
 
@@ -60,8 +50,6 @@ Thus, an serialized example may looks like:
 
 ```json
 {
-    "contract": "crates.io:cw20-base",
-    "version": "v0.1.0",
     "supported_interface": ["crates.io:cw721","crates.io:cw2"]
 }
 ```
