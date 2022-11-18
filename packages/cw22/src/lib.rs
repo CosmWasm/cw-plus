@@ -6,11 +6,10 @@ For more information on this specification, please check out the
 [README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw22/README.md).
  */
 
-mod error;
 mod query;
 
-use crate::error::ContractError;
 use cosmwasm_schema::cw_serde;
+use cosmwasm_std::StdError;
 use cosmwasm_std::{StdResult, Storage};
 use cw_storage_plus::Map;
 use query::VersionResponse;
@@ -37,7 +36,7 @@ pub struct ContractSupportedInterface {
 pub fn set_contract_supported_interface(
     store: &mut dyn Storage,
     mut supported_interfaces: Vec<ContractSupportedInterface>,
-) -> Result<(), ContractError> {
+) -> Result<(), StdError> {
     while let Some(supported_interface) = supported_interfaces.pop() {
         let id = supported_interface.supported_interface;
         let version = supported_interface.version;
