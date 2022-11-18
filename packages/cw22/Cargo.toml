@@ -14,3 +14,6 @@ cosmwasm-std = { version = "1.0.0", default-features = false }
 cw-storage-plus = "0.16.0"
 schemars = "0.8.1"
 serde = { version = "1.0.0", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.23" }
+version-compare = "0.1"
+semver = "1.0.14"
