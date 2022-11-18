@@ -1,8 +1,6 @@
-// use cosmwasm_schema::cw_serde;
-// use cosmwasm_std::{Uint128};
+use cosmwasm_schema::cw_serde;
 
-// #[cw_serde]
-#[derive(Debug, PartialEq)]
+#[cw_serde]
 pub struct VersionResponse {
     pub version_require: String,
     pub supported_version: String,
