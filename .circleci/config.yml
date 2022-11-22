@@ -439,9 +439,6 @@ jobs:
       - run:
           name: Run unit tests
           command: cargo test --locked
-      - run:
-          name: Build and run schema generator
-          command: cargo schema --locked
       - save_cache:
           paths:
             - /usr/local/cargo/registry
