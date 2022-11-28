@@ -1,9 +1,15 @@
 /*!
-The standard used to declare which interface contract implements
-This standard is inspired by the EIP-165 from Ethereum.
+CW22 defines a way for a contract to declare which interfaces do the contract implement
+This standard is inspired by the EIP-165 from Ethereum. Originally it was proposed to 
+be merged into CW2: Contract Info, then it is splitted to a separated cargo to keep CW2
+being backward compatible. 
 
-For more information on this specification, please check out the
-[README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw22/README.md).
+Each supported interface contains a string value pointing to the corresponding cargo package 
+and a specific release of the package. There is also a function to check whether the contract
+support a specific version of an interface or not.
+
+The version string for each interface follows Semantic Versioning standard. More info is in:
+https://docs.rs/semver/latest/semver/
  */
 
 mod query;
@@ -27,12 +33,13 @@ pub struct ContractSupportedInterface {
     /// NOTE: this is just a hint for the caller to adapt on how to interact with this contract.
     /// There is no guarantee that the contract actually implement these interfaces.
     pub supported_interface: String,
-    /// semantic version on release tags.
-    /// e.g  "v0.16.0"
+    /// semantic version on release tags of the interface package following SemVer guideline.
+    /// e.g  "0.16.0"
     pub version: String,
 }
 
-/// set_contract_supported_interface should be used in instantiate to store the original version
+/// set_contract_supported_interface should be used in instantiate to store the original version 
+/// of supported interfaces. It should also be used after every migration.
 pub fn set_contract_supported_interface(
     store: &mut dyn Storage,
     mut supported_interfaces: Vec<ContractSupportedInterface>,
@@ -45,7 +52,7 @@ pub fn set_contract_supported_interface(
     Ok(())
 }
 
-/// query_supported_interface_version show if contract supports interface and which version
+/// query_supported_interface_version show the version of an interface supported by the contract
 pub fn query_supported_interface_version(
     store: &dyn Storage,
     interface: String,
@@ -60,7 +67,7 @@ pub fn query_supported_interface_version(
     Ok(res)
 }
 
-/// query_supported_interface show if contract supports interface with specified version
+/// query_supported_interface show if contract supports an interface with version following SemVer query
 /// query example">=1.2.3, <1.8.0"
 pub fn query_supported_interface(
     store: &dyn Storage,
