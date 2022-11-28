@@ -1,16 +1,16 @@
 /*!
 CW22 defines a way for a contract to declare which interfaces do the contract implement
-This standard is inspired by the EIP-165 from Ethereum. Originally it was proposed to 
+This standard is inspired by the EIP-165 from Ethereum. Originally it was proposed to
 be merged into CW2: Contract Info, then it is splitted to a separated cargo to keep CW2
-being backward compatible. 
+being backward compatible.
 
-Each supported interface contains a string value pointing to the corresponding cargo package 
+Each supported interface contains a string value pointing to the corresponding cargo package
 and a specific release of the package. There is also a function to check whether the contract
 support a specific version of an interface or not.
 
 The version string for each interface follows Semantic Versioning standard. More info is in:
 https://docs.rs/semver/latest/semver/
- */
+*/
 
 mod query;
 
@@ -38,7 +38,7 @@ pub struct ContractSupportedInterface {
     pub version: String,
 }
 
-/// set_contract_supported_interface should be used in instantiate to store the original version 
+/// set_contract_supported_interface should be used in instantiate to store the original version
 /// of supported interfaces. It should also be used after every migration.
 pub fn set_contract_supported_interface(
     store: &mut dyn Storage,
