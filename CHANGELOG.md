@@ -1,5 +1,43 @@
 # Changelog
 
+## [v1.0.0](https://github.com/CosmWasm/cw-plus/tree/v1.0.0) (2022-11-29)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.16.0...v1.0.0)
+
+**Implemented enhancements:**
+
+- Proposal for improving contract interfaces [\#391](https://github.com/CosmWasm/cw-plus/issues/391)
+
+**Closed issues:**
+
+- u [\#840](https://github.com/CosmWasm/cw-plus/issues/840)
+- Workspace optimizer build failed [\#838](https://github.com/CosmWasm/cw-plus/issues/838)
+- Simplify licenses [\#833](https://github.com/CosmWasm/cw-plus/issues/833)
+- Update README [\#832](https://github.com/CosmWasm/cw-plus/issues/832)
+- Remove `cw1155` and `cw1155-base` [\#830](https://github.com/CosmWasm/cw-plus/issues/830)
+- Standardize protocol events [\#823](https://github.com/CosmWasm/cw-plus/issues/823)
+- Pull out `storage-plus`, `multitest` and `utils` into a separate repo [\#816](https://github.com/CosmWasm/cw-plus/issues/816)
+- Backport from DAO DAO: optionally charge to make proposal [\#742](https://github.com/CosmWasm/cw-plus/issues/742)
+- Cannot find Contract address and interface verification [\#679](https://github.com/CosmWasm/cw-plus/issues/679)
+- Investigate JSON Schema -\> html/md generator [\#573](https://github.com/CosmWasm/cw-plus/issues/573)
+- Simple framework for gas benchmarking [\#507](https://github.com/CosmWasm/cw-plus/issues/507)
+- Benchmark "ng" vs. "classic" frameworks [\#505](https://github.com/CosmWasm/cw-plus/issues/505)
+- Update reimplemented cw1-whitelist contract, so it uses the custom attribute [\#496](https://github.com/CosmWasm/cw-plus/issues/496)
+- Implement attribute macro for trait interface generating boilerplate specific for cw1-whitelist [\#495](https://github.com/CosmWasm/cw-plus/issues/495)
+- Deriving structural interfaces for contracts [\#493](https://github.com/CosmWasm/cw-plus/issues/493)
+- Accept &QuerierWrapper not &Querier in helpers [\#390](https://github.com/CosmWasm/cw-plus/issues/390)
+
+**Merged pull requests:**
+
+- Standardize spec events [\#845](https://github.com/CosmWasm/cw-plus/pull/845) ([uint](https://github.com/uint))
+- Add contributing guidelines [\#841](https://github.com/CosmWasm/cw-plus/pull/841) ([uint](https://github.com/uint))
+- Use QuerierWrapper not Querier in cw20 helpers [\#839](https://github.com/CosmWasm/cw-plus/pull/839) ([uint](https://github.com/uint))
+- Update CI to Rust 1.64 [\#837](https://github.com/CosmWasm/cw-plus/pull/837) ([uint](https://github.com/uint))
+- `README.md` update [\#836](https://github.com/CosmWasm/cw-plus/pull/836) ([uint](https://github.com/uint))
+- Remove the AGPL license [\#835](https://github.com/CosmWasm/cw-plus/pull/835) ([uint](https://github.com/uint))
+- Move `utils`, `storage-plus`, `multitest`; remove `cw1155` stuff [\#834](https://github.com/CosmWasm/cw-plus/pull/834) ([uint](https://github.com/uint))
+- Add an optional proposal deposit to cw3-flex-multisig [\#751](https://github.com/CosmWasm/cw-plus/pull/751) ([0xekez](https://github.com/0xekez))
+
 ## [v0.16.0](https://github.com/CosmWasm/cw-plus/tree/v0.16.0) (2022-10-14)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.15.1...v0.16.0)
