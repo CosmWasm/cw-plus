@@ -10,18 +10,16 @@ support a specific version of an interface or not.
 
 The version string for each interface follows Semantic Versioning standard. More info is in:
 https://docs.rs/semver/latest/semver/
-*/
+ */
+mod error;
 
-mod query;
-
+use crate::error::ContractError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::StdError;
 use cosmwasm_std::{StdResult, Storage};
 use cw_storage_plus::Map;
-use query::VersionResponse;
 use semver::{Version, VersionReq};
 
-pub const SUPPORTED_INTERFACES: Map<String, String> = Map::new("supported_interfaces");
+pub const SUPPORTED_INTERFACES: Map<&str, String> = Map::new("supported_interfaces");
 
 #[cw_serde]
 pub struct ContractSupportedInterface {
@@ -42,12 +40,18 @@ pub struct ContractSupportedInterface {
 /// of supported interfaces. It should also be used after every migration.
 pub fn set_contract_supported_interface(
     store: &mut dyn Storage,
-    mut supported_interfaces: Vec<ContractSupportedInterface>,
-) -> Result<(), StdError> {
-    while let Some(supported_interface) = supported_interfaces.pop() {
-        let id = supported_interface.supported_interface;
-        let version = supported_interface.version;
-        SUPPORTED_INTERFACES.save(store, id, &version)?;
+    supported_interfaces: &[ContractSupportedInterface],
+) -> Result<(), ContractError> {
+    for item in supported_interfaces {
+        let ver = Version::parse(&item.version);
+        match ver {
+            Ok(_) => {
+                SUPPORTED_INTERFACES.save(store, &item.supported_interface, &item.version)?;
+            }
+            Err(_) => {
+                return Err(ContractError::InvalidVersionFormat {});
+            }
+        }
     }
     Ok(())
 }
@@ -55,42 +59,50 @@ pub fn set_contract_supported_interface(
 /// query_supported_interface_version show the version of an interface supported by the contract
 pub fn query_supported_interface_version(
     store: &dyn Storage,
-    interface: String,
-) -> StdResult<ContractSupportedInterface> {
-    let version = SUPPORTED_INTERFACES
-        .may_load(store, interface.clone())?
-        .unwrap_or_default();
-    let res = ContractSupportedInterface {
-        supported_interface: interface,
-        version,
+    interface: &str,
+) -> StdResult<Option<String>> {
+    let version = SUPPORTED_INTERFACES.may_load(store, interface)?;
+    Ok(version)
+}
+
+pub fn minimum_version(version: &str, required: &str) -> bool {
+    let mut req_str = ">=".to_owned();
+    req_str.push_str(required);
+    let req = VersionReq::parse(req_str.as_str());
+    let req = match req {
+        Ok(r) => r,
+        Err(_) => {
+            return false;
+        }
     };
-    Ok(res)
+    let ver = Version::parse(version);
+    let ver = match ver {
+        Ok(v) => v,
+        Err(_) => {
+            return false;
+        }
+    };
+    req.matches(&ver)
 }
 
 /// query_supported_interface show if contract supports an interface with version following SemVer query
 /// query example">=1.2.3, <1.8.0"
-pub fn query_supported_interface(
-    store: &dyn Storage,
-    interface: String,
-    query: String,
-) -> StdResult<VersionResponse> {
-    let req = VersionReq::parse(&query).unwrap();
-    let supported_version_rs = SUPPORTED_INTERFACES
-        .may_load(store, interface)?
-        .unwrap_or_default();
-    let supported_version = Version::parse(&supported_version_rs);
-    match supported_version {
-        Ok(ver) => Ok(VersionResponse {
-            version_require: query,
-            supported_version: supported_version_rs,
-            result: req.matches(&ver),
-        }),
-        Err(_) => Ok(VersionResponse {
-            version_require: query,
-            supported_version: supported_version_rs,
-            result: false,
-        }),
-    }
+pub fn require_version(version: &str, request: &str) -> bool {
+    let req = VersionReq::parse(request);
+    let req = match req {
+        Ok(r) => r,
+        Err(_) => {
+            return false;
+        }
+    };
+    let ver = Version::parse(version);
+    let ver = match ver {
+        Ok(v) => v,
+        Err(_) => {
+            return false;
+        }
+    };
+    req.matches(&ver)
 }
 
 #[cfg(test)]
@@ -102,74 +114,82 @@ mod tests {
     fn get_and_set_work() {
         let mut store = MockStorage::new();
 
-        let interface = "crates.io:cw2";
-        let interface2 = "crates.io:cw22";
-        let contract_interface = ContractSupportedInterface {
-            supported_interface: String::from(interface),
-            version: String::from("0.16.0"),
-        };
+        let interface2 = "crates.io:cw2";
+        let interface22 = "crates.io:cw22";
+        let interface721 = "crates.io:cw721";
         let contract_interface2 = ContractSupportedInterface {
             supported_interface: String::from(interface2),
+            version: String::from("0.16.0"),
+        };
+        let contract_interface22 = ContractSupportedInterface {
+            supported_interface: String::from(interface22),
             version: String::from("0.1.0"),
         };
+        let contract_interface721 = ContractSupportedInterface {
+            supported_interface: String::from(interface22),
+            version: String::from("v0.1.0"),
+        };
 
-        // set and get with supported_interface
-        let supported_interface: Vec<ContractSupportedInterface> =
-            Vec::from([contract_interface, contract_interface2]);
+        // set supported_interface error
+        let supported_interface = &[contract_interface721];
+
+        let rs_error =
+            set_contract_supported_interface(&mut store, supported_interface).unwrap_err();
+        let expected = ContractError::InvalidVersionFormat {};
+        assert_eq!(expected, rs_error);
+
+        // set supported_interface
+        let supported_interface = &[contract_interface2, contract_interface22];
 
         set_contract_supported_interface(&mut store, supported_interface).unwrap();
-
         // get version of not supported interface
-        let loaded =
-            query_supported_interface_version(&store, "crates.io:cw721".to_string()).unwrap();
-        let expected = ContractSupportedInterface {
-            supported_interface: "crates.io:cw721".to_string(),
-            version: "".to_string(),
-        };
-        assert_eq!(expected, loaded);
+        let loaded = query_supported_interface_version(&store, interface721).unwrap();
+        assert_eq!(None, loaded);
 
         // get version of supported interface
-        let loaded =
-            query_supported_interface_version(&store, "crates.io:cw2".to_string()).unwrap();
-        let expected = ContractSupportedInterface {
-            supported_interface: "crates.io:cw2".to_string(),
-            version: "0.16.0".to_string(),
-        };
-        assert_eq!(expected, loaded);
+        let loaded = query_supported_interface_version(&store, interface2).unwrap();
+        let expected = String::from("0.16.0");
+        assert_eq!(Some(expected), loaded);
 
-        // check specified version of not supported interface
-        let version_req = ">=0.1.0".to_string();
-        let result =
-            query_supported_interface(&store, "crates.io:cw721".to_string(), version_req.clone())
-                .unwrap();
-        let expected = VersionResponse {
-            version_require: version_req,
-            supported_version: "".to_string(),
-            result: false,
-        };
-        assert_eq!(expected, result);
+        // check request version
+        let version_req = ">=0.1.0";
+        let result = require_version("0.16.0", version_req);
+        assert!(result);
 
-        // check specified version of supported interface
-        let version_req = ">=1.2.3, <1.8.0".to_string();
-        let result =
-            query_supported_interface(&store, "crates.io:cw2".to_string(), version_req.clone())
-                .unwrap();
-        let expected = VersionResponse {
-            version_require: version_req,
-            supported_version: "0.16.0".to_string(),
-            result: false,
-        };
-        assert_eq!(expected, result);
+        // check request version
+        let version_req = ">=0.16.0";
+        let result = require_version("0.1.0", version_req);
+        assert!(!result);
 
-        let version_req = ">=0.1.0".to_string();
-        let result =
-            query_supported_interface(&store, "crates.io:cw2".to_string(), version_req.clone())
-                .unwrap();
-        let expected = VersionResponse {
-            version_require: version_req,
-            supported_version: "0.16.0".to_string(),
-            result: true,
-        };
-        assert_eq!(expected, result);
+        // check request version
+        let version_req = ">=1.2.3, <1.8.0";
+        let result = require_version("0.16.0", version_req);
+        assert!(!result);
+
+        // check request version - version format invalid
+        let version_req = ">=0.2.3";
+        let result = require_version("v0.16.0", version_req);
+        assert!(!result);
+
+        // check require version - require version invalid
+        let version_req = "!=0.2.3";
+        let result = require_version("0.16.0", version_req);
+        assert!(!result);
+
+        // check minimum version
+        let result = minimum_version("0.16.0", "0.2.3");
+        assert!(result);
+
+        // check minimum version
+        let result = minimum_version("0.2.0", "0.2.3");
+        assert!(!result);
+
+        // check minimum version - version format error
+        let result = minimum_version("v0.16.0", "0.2.3");
+        assert!(!result);
+
+        // check minimum version - require version format error
+        let result = minimum_version("0.16.0", "v0.2.3");
+        assert!(!result);
     }
 }
