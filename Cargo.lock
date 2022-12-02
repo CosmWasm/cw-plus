@@ -372,7 +372,6 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
- "thiserror",
 ]
 
 [[package]]
