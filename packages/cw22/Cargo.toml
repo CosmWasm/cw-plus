@@ -1,6 +1,6 @@
 [package]
 name = "cw22"
-version = "1.0.0"
+version = "0.1.0"
 authors = ["ThienLK1@aura-nw"]
 edition = "2021"
 description = "Definition and types for the CosmWasm-22 interface"

@@ -11,11 +11,8 @@ support a specific version of an interface or not.
 The version string for each interface follows Semantic Versioning standard. More info is in:
 https://docs.rs/semver/latest/semver/
  */
-mod error;
-
-use crate::error::ContractError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{StdResult, Storage};
+use cosmwasm_std::{StdError, StdResult, Storage};
 use cw_storage_plus::Map;
 use semver::{Version, VersionReq};
 
@@ -41,7 +38,7 @@ pub struct ContractSupportedInterface {
 pub fn set_contract_supported_interface(
     store: &mut dyn Storage,
     supported_interfaces: &[ContractSupportedInterface],
-) -> Result<(), ContractError> {
+) -> StdResult<()> {
     for item in supported_interfaces {
         let ver = Version::parse(&item.version);
         match ver {
@@ -49,7 +46,7 @@ pub fn set_contract_supported_interface(
                 SUPPORTED_INTERFACES.save(store, &item.supported_interface, &item.version)?;
             }
             Err(_) => {
-                return Err(ContractError::InvalidVersionFormat {});
+                return Err(StdError::generic_err("Version's format is invalid"));
             }
         }
     }
@@ -135,7 +132,7 @@ mod tests {
 
         let rs_error =
             set_contract_supported_interface(&mut store, supported_interface).unwrap_err();
-        let expected = ContractError::InvalidVersionFormat {};
+        let expected = StdError::generic_err("Version's format is invalid");
         assert_eq!(expected, rs_error);
 
         // set supported_interface
