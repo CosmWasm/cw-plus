@@ -8,7 +8,6 @@ use crate::logo::LogoInfo;
 use cw_utils::Expiration;
 
 #[cw_serde]
-
 pub enum Cw20QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     /// Return type: BalanceResponse.
@@ -64,7 +63,7 @@ pub struct TokenInfoResponse {
     pub total_supply: Uint128,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct AllowanceResponse {
     pub allowance: Uint128,
     pub expires: Expiration,
@@ -79,7 +78,7 @@ pub struct MinterResponse {
     pub cap: Option<Uint128>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct MarketingInfoResponse {
     /// A URL pointing to the project behind this token.
     pub project: Option<String>,
@@ -106,7 +105,7 @@ pub struct AllowanceInfo {
     pub expires: Expiration,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct AllAllowancesResponse {
     pub allowances: Vec<AllowanceInfo>,
 }
@@ -118,12 +117,12 @@ pub struct SpenderAllowanceInfo {
     pub expires: Expiration,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct AllSpenderAllowancesResponse {
     pub allowances: Vec<SpenderAllowanceInfo>,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug, Default)]
+#[cw_serde]
 pub struct AllAccountsResponse {
     pub accounts: Vec<String>,
 }
