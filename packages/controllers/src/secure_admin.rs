@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    Addr, CustomQuery, DepsMut, MessageInfo, Response, StdError, StdResult, Storage,
+    Addr, Api, CustomQuery, DepsMut, MessageInfo, Response, StdError, StdResult, Storage,
 };
 use cw_storage_plus::Item;
 use schemars::JsonSchema;
@@ -22,13 +22,13 @@ pub enum SecureAdminError {
     Std(#[from] StdError),
 
     #[error("Caller is not admin")]
-    NotAdmin,
+    NotAdmin {},
 
     #[error("Caller is not the proposed admin")]
-    NotProposedAdmin,
+    NotProposedAdmin {},
 
     #[error("Admin state transition was not valid")]
-    StateTransitionError,
+    StateTransitionError {},
 }
 
 type AdminResult<T> = Result<T, SecureAdminError>;
@@ -63,18 +63,18 @@ struct AdminSetNoneProposed {
 }
 
 impl AdminSetNoneProposed {
-    pub fn propose(&self, proposed: &Addr) -> AdminState {
+    pub fn propose(self, proposed: &Addr) -> AdminState {
         AdminState::C(AdminSetWithProposed {
-            admin: self.admin.clone(),
+            admin: self.admin,
             proposed: proposed.clone(),
         })
     }
 
-    pub fn clear_admin(&self) -> AdminState {
+    pub fn clear_admin(self) -> AdminState {
         AdminState::A(AdminUninitialized)
     }
 
-    pub fn abolish_admin_role(&self) -> AdminState {
+    pub fn abolish_admin_role(self) -> AdminState {
         AdminState::D(AdminRoleAbolished)
     }
 }
@@ -86,19 +86,17 @@ struct AdminSetWithProposed {
 }
 
 impl AdminSetWithProposed {
-    pub fn clear_proposed(&self) -> AdminState {
+    pub fn clear_proposed(self) -> AdminState {
+        AdminState::B(AdminSetNoneProposed { admin: self.admin })
+    }
+
+    pub fn accept_proposed(self) -> AdminState {
         AdminState::B(AdminSetNoneProposed {
-            admin: self.admin.clone(),
+            admin: self.proposed,
         })
     }
 
-    pub fn accept_proposed(&self) -> AdminState {
-        AdminState::B(AdminSetNoneProposed {
-            admin: self.proposed.clone(),
-        })
-    }
-
-    pub fn abolish_admin_role(&self) -> AdminState {
+    pub fn abolish_admin_role(self) -> AdminState {
         AdminState::D(AdminRoleAbolished)
     }
 }
@@ -123,6 +121,40 @@ pub enum SecureAdminUpdate {
     AbolishAdminRole { sender: Option<Addr> },
 }
 
+impl<'a> SecureAdminUpdate {
+    fn from(
+        api: &'a dyn Api,
+        sender: &Addr,
+        update: SecureAdminExecuteUpdate,
+    ) -> StdResult<SecureAdminUpdate> {
+        Ok(match update {
+            SecureAdminExecuteUpdate::InitializeAdmin { admin } => {
+                let validated = api.addr_validate(&admin)?;
+                SecureAdminUpdate::InitializeAdmin { admin: validated }
+            }
+            SecureAdminExecuteUpdate::ClearAdmin => SecureAdminUpdate::ClearAdmin {
+                sender: sender.clone(),
+            },
+            SecureAdminExecuteUpdate::ProposeNewAdmin { proposed } => {
+                let validated = api.addr_validate(&proposed)?;
+                SecureAdminUpdate::ProposeNewAdmin {
+                    sender: sender.clone(),
+                    proposed: validated,
+                }
+            }
+            SecureAdminExecuteUpdate::ClearProposed => SecureAdminUpdate::ClearProposed {
+                sender: sender.clone(),
+            },
+            SecureAdminExecuteUpdate::AcceptProposed => SecureAdminUpdate::AcceptProposed {
+                sender: sender.clone(),
+            },
+            SecureAdminExecuteUpdate::AbolishAdminRole => SecureAdminUpdate::AbolishAdminRole {
+                sender: Some(sender.clone()),
+            },
+        })
+    }
+}
+
 /// Same as above, but used for execute helpers. Sender and inputs are validated.
 #[cw_serde]
 pub enum SecureAdminExecuteUpdate {
@@ -141,25 +173,24 @@ pub enum SecureAdminExecuteUpdate {
 /// State B: AdminSetNoneProposed
 ///     - Once admin is set. Only they can execute the following updates:
 ///       - ProposeNewAdmin
-///       - ClearAdmin
 ///       - ClearProposed
 /// State C: AdminSetWithProposed
 ///     - Only the proposed new admin can accept the new role via AcceptProposed {}
 ///     - The current admin can also clear the proposed new admin via ClearProposed {}
 ///
 ///```text
-///                        Clear Admin                               Clear Proposed
-///           +---------------------------------^      +-------------------------------------^
-///           |                                 |      |                                     |
-///           v                                 |      v                                     |
-/// +----------------+                      +---+------------+                       +-------+--------+
+///                                                                  Clear Proposed
+///                                                    +-------------------------------------^
+///                                                    |                                     |
+///                                                    v                                     |
+/// +----------------+                      +----------------+                       +-------+--------+
 /// | Admin: None    |   Initialize Admin   | Admin: Gabe    |   Propose New Admin   | Admin: Gabe    |
 /// | Proposed: None +--------------------->| Proposed: None +---------------------->| Proposed: Joy  |
 /// +-----+----------+                      ++---------------+                       +-------+----+---+
-///       |                                  |  Admin: Joy                                   |    |
-///       |                                  |  Proposed: None                               |    |
+///       |                                  | Admin: Joy                                    |    |
+///       |                                  | Proposed: None                                |    |
 ///   Abolish Role                           |      ^                                        |    |
-///       |                                  |      |              Accept Proposed           |    |
+///       |                *immutable        |      |              Accept Proposed           |    |
 ///       |            +----------------+    |      <----------------------------------------+    |
 ///       +----------->| Admin: None    |    |                                                    |
 ///                    | Proposed: None +----+------------------ Abolish Role --------------------+
@@ -184,10 +215,9 @@ impl<'a> SecureAdmin<'a> {
     //--------------------------------------------------------------------------------------------------
     pub fn current(&self, storage: &'a dyn Storage) -> StdResult<Option<Addr>> {
         Ok(match self.state(storage)? {
-            AdminState::A(_) => None,
             AdminState::B(b) => Some(b.admin),
             AdminState::C(c) => Some(c.admin),
-            AdminState::D(_) => None,
+            _ => None,
         })
     }
 
@@ -200,10 +230,8 @@ impl<'a> SecureAdmin<'a> {
 
     pub fn proposed(&self, storage: &'a dyn Storage) -> StdResult<Option<Addr>> {
         Ok(match self.state(storage)? {
-            AdminState::A(_) => None,
-            AdminState::B(_) => None,
             AdminState::C(c) => Some(c.proposed),
-            AdminState::D(_) => None,
+            _ => None,
         })
     }
 
@@ -248,7 +276,7 @@ impl<'a> SecureAdmin<'a> {
                 b.clear_admin()
             }
             (AdminState::B(b), SecureAdminUpdate::AbolishAdminRole { sender }) => {
-                let addr = sender.ok_or(SecureAdminError::NotAdmin)?;
+                let addr = sender.ok_or(SecureAdminError::NotAdmin {})?;
                 self.assert_admin(storage, &addr)?;
                 b.abolish_admin_role()
             }
@@ -261,7 +289,7 @@ impl<'a> SecureAdmin<'a> {
                 c.clear_proposed()
             }
             (AdminState::C(c), SecureAdminUpdate::AbolishAdminRole { sender }) => {
-                let addr = sender.ok_or(SecureAdminError::NotAdmin)?;
+                let addr = sender.ok_or(SecureAdminError::NotAdmin {})?;
                 self.assert_admin(storage, &addr)?;
                 c.abolish_admin_role()
             }
@@ -281,36 +309,9 @@ impl<'a> SecureAdmin<'a> {
     where
         C: Clone + Debug + PartialEq + JsonSchema,
     {
-        let validated_update = match update {
-            SecureAdminExecuteUpdate::InitializeAdmin { admin } => {
-                let validated = deps.api.addr_validate(&admin)?;
-                SecureAdminUpdate::InitializeAdmin { admin: validated }
-            }
-            SecureAdminExecuteUpdate::ClearAdmin => SecureAdminUpdate::ClearAdmin {
-                sender: info.sender.clone(),
-            },
-            SecureAdminExecuteUpdate::ProposeNewAdmin { proposed } => {
-                let validated = deps.api.addr_validate(&proposed)?;
-                SecureAdminUpdate::ProposeNewAdmin {
-                    sender: info.sender.clone(),
-                    proposed: validated,
-                }
-            }
-            SecureAdminExecuteUpdate::ClearProposed => SecureAdminUpdate::ClearProposed {
-                sender: info.sender.clone(),
-            },
-            SecureAdminExecuteUpdate::AcceptProposed => SecureAdminUpdate::AcceptProposed {
-                sender: info.sender.clone(),
-            },
-            SecureAdminExecuteUpdate::AbolishAdminRole => SecureAdminUpdate::AbolishAdminRole {
-                sender: Some(info.sender.clone()),
-            },
-        };
-
+        let validated_update = SecureAdminUpdate::from(deps.api, &info.sender, update)?;
         self.update(deps.storage, validated_update)?;
-
         let res = self.query(deps.storage)?;
-
         Ok(Response::new()
             .add_attribute("action", "update_admin")
             .add_attribute("admin", res.admin.unwrap_or_else(|| "None".to_string()))
@@ -374,7 +375,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -385,7 +386,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -395,12 +396,12 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(storage, AcceptProposed { sender: new_admin })
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
 
     #[test]
@@ -426,7 +427,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -436,7 +437,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -446,7 +447,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
 
     #[test]
@@ -482,7 +483,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -492,7 +493,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -503,7 +504,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
 
     #[test]
@@ -530,7 +531,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -540,7 +541,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -551,7 +552,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -561,7 +562,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -571,7 +572,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
             .update(
@@ -581,7 +582,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError);
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
 
     //--------------------------------------------------------------------------------------------------
@@ -625,7 +626,7 @@ mod tests {
         let err = admin
             .update(storage, ClearAdmin { sender: bad_guy })
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::NotAdmin);
+        assert_eq!(err, SecureAdminError::NotAdmin {});
     }
 
     #[test]
@@ -653,7 +654,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::NotAdmin)
+        assert_eq!(err, SecureAdminError::NotAdmin {})
     }
 
     #[test]
@@ -685,7 +686,7 @@ mod tests {
         let err = admin
             .update(storage, ClearProposed { sender: bad_guy })
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::NotAdmin)
+        assert_eq!(err, SecureAdminError::NotAdmin {})
     }
 
     #[test]
@@ -721,7 +722,7 @@ mod tests {
                 },
             )
             .unwrap_err();
-        assert_eq!(err, SecureAdminError::NotProposedAdmin)
+        assert_eq!(err, SecureAdminError::NotProposedAdmin {})
     }
 
     #[test]
