@@ -22,6 +22,4 @@ mod secure_admin;
 pub use admin::{Admin, AdminError, AdminResponse};
 pub use claim::{Claim, Claims, ClaimsResponse};
 pub use hooks::{HookError, Hooks, HooksResponse};
-pub use secure_admin::{
-    SecureAdmin, SecureAdminError, SecureAdminExecuteUpdate, SecureAdminResponse, SecureAdminUpdate,
-};
+pub use secure_admin::{SecureAdmin, SecureAdminError, SecureAdminResponse, SecureAdminUpdate};

@@ -70,10 +70,6 @@ impl AdminSetNoneProposed {
         })
     }
 
-    pub fn clear_admin(self) -> AdminState {
-        AdminState::A(AdminUninitialized)
-    }
-
     pub fn abolish_admin_role(self) -> AdminState {
         AdminState::D(AdminRoleAbolished)
     }
@@ -106,63 +102,21 @@ struct AdminRoleAbolished;
 
 #[cw_serde]
 pub enum SecureAdminUpdate {
-    /// Sets the initial admin when none. No restrictions permissions to modify.
-    InitializeAdmin { admin: Addr },
-    /// Clears the currently sent admin. Only current admin can execute.
-    ClearAdmin { sender: Addr },
     /// Proposes a new admin to take role. Only current admin can execute.
-    ProposeNewAdmin { sender: Addr, proposed: Addr },
-    /// Clears the currently proposed admin. Only current admin can execute.
-    ClearProposed { sender: Addr },
-    /// Promotes the proposed admin to be the current one. Only the proposed admin can execute.
-    AcceptProposed { sender: Addr },
-    /// Throws away the keys to the Admin role forever. Once done, no admin can ever be set later.
-    /// Requires Admin permission except if event is dispatched from AdminUninitialized state.
-    AbolishAdminRole { sender: Option<Addr> },
-}
-
-impl<'a> SecureAdminUpdate {
-    fn from(
-        api: &'a dyn Api,
-        sender: &Addr,
-        update: SecureAdminExecuteUpdate,
-    ) -> StdResult<SecureAdminUpdate> {
-        Ok(match update {
-            SecureAdminExecuteUpdate::InitializeAdmin { admin } => {
-                let validated = api.addr_validate(&admin)?;
-                SecureAdminUpdate::InitializeAdmin { admin: validated }
-            }
-            SecureAdminExecuteUpdate::ClearAdmin => SecureAdminUpdate::ClearAdmin {
-                sender: sender.clone(),
-            },
-            SecureAdminExecuteUpdate::ProposeNewAdmin { proposed } => {
-                let validated = api.addr_validate(&proposed)?;
-                SecureAdminUpdate::ProposeNewAdmin {
-                    sender: sender.clone(),
-                    proposed: validated,
-                }
-            }
-            SecureAdminExecuteUpdate::ClearProposed => SecureAdminUpdate::ClearProposed {
-                sender: sender.clone(),
-            },
-            SecureAdminExecuteUpdate::AcceptProposed => SecureAdminUpdate::AcceptProposed {
-                sender: sender.clone(),
-            },
-            SecureAdminExecuteUpdate::AbolishAdminRole => SecureAdminUpdate::AbolishAdminRole {
-                sender: Some(sender.clone()),
-            },
-        })
-    }
-}
-
-/// Same as above, but used for execute helpers. Sender and inputs are validated.
-#[cw_serde]
-pub enum SecureAdminExecuteUpdate {
-    InitializeAdmin { admin: String },
-    ClearAdmin,
     ProposeNewAdmin { proposed: String },
+    /// Clears the currently proposed admin. Only current admin can execute.
     ClearProposed,
+    /// Promotes the proposed admin to be the current one. Only the proposed admin can execute.
     AcceptProposed,
+    /// Throws away the keys to the Admin role forever. Once done, no admin can ever be set later.
+    AbolishAdminRole,
+}
+
+#[cw_serde]
+pub enum AdminInit {
+    /// Sets the initial admin when none. No restrictions permissions to modify.
+    SetInitialAdmin { admin: String },
+    /// Throws away the keys to the Admin role forever. Once done, no admin can ever be set later.
     AbolishAdminRole,
 }
 
@@ -177,6 +131,9 @@ pub enum SecureAdminExecuteUpdate {
 /// State C: AdminSetWithProposed
 ///     - Only the proposed new admin can accept the new role via AcceptProposed {}
 ///     - The current admin can also clear the proposed new admin via ClearProposed {}
+///
+/// In every state, the admin (or on init, the initializer) can choose to abandon the role
+/// and make the config immutable.
 ///
 ///```text
 ///                                                                  Clear Proposed
@@ -252,65 +209,44 @@ impl<'a> SecureAdmin<'a> {
     //--------------------------------------------------------------------------------------------------
     // Mutations
     //--------------------------------------------------------------------------------------------------
-    /// Executes admin state transitions
-    pub fn update(
+    /// Execute inside instantiate fn
+    pub fn initialize(
         &self,
         storage: &'a mut dyn Storage,
-        event: SecureAdminUpdate,
+        api: &'a dyn Api,
+        init_action: AdminInit,
     ) -> AdminResult<()> {
-        let state = self.state(storage)?;
-
-        let new_state = match (state, event) {
-            (AdminState::A(a), SecureAdminUpdate::InitializeAdmin { admin }) => {
-                a.initialize(&admin)
+        let initial_state = self.state(storage)?;
+        match initial_state {
+            AdminState::A(a) => {
+                let new_state = match init_action {
+                    AdminInit::SetInitialAdmin { admin } => {
+                        let validated = api.addr_validate(&admin)?;
+                        a.initialize(&validated)
+                    }
+                    AdminInit::AbolishAdminRole => a.abolish_admin_role(),
+                };
+                self.0.save(storage, &new_state)?;
+                Ok(())
             }
-            (AdminState::A(a), SecureAdminUpdate::AbolishAdminRole { .. }) => {
-                a.abolish_admin_role()
-            }
-            (AdminState::B(b), SecureAdminUpdate::ProposeNewAdmin { sender, proposed }) => {
-                self.assert_admin(storage, &sender)?;
-                b.propose(&proposed)
-            }
-            (AdminState::B(b), SecureAdminUpdate::ClearAdmin { sender }) => {
-                self.assert_admin(storage, &sender)?;
-                b.clear_admin()
-            }
-            (AdminState::B(b), SecureAdminUpdate::AbolishAdminRole { sender }) => {
-                let addr = sender.ok_or(SecureAdminError::NotAdmin {})?;
-                self.assert_admin(storage, &addr)?;
-                b.abolish_admin_role()
-            }
-            (AdminState::C(c), SecureAdminUpdate::AcceptProposed { sender }) => {
-                self.assert_proposed(storage, &sender)?;
-                c.accept_proposed()
-            }
-            (AdminState::C(c), SecureAdminUpdate::ClearProposed { sender }) => {
-                self.assert_admin(storage, &sender)?;
-                c.clear_proposed()
-            }
-            (AdminState::C(c), SecureAdminUpdate::AbolishAdminRole { sender }) => {
-                let addr = sender.ok_or(SecureAdminError::NotAdmin {})?;
-                self.assert_admin(storage, &addr)?;
-                c.abolish_admin_role()
-            }
-            (_, _) => return Err(SecureAdminError::StateTransitionError {}),
-        };
-        self.0.save(storage, &new_state)?;
-        Ok(())
+            // Can only be in uninitialized state to call this fn
+            _ => Err(SecureAdminError::StateTransitionError {}),
+        }
     }
 
-    /// Helper for composing execute responses
-    pub fn execute_update<C, Q: CustomQuery>(
+    /// Composes execute responses for admin state updates
+    pub fn update<C, Q: CustomQuery>(
         &self,
         deps: DepsMut<Q>,
         info: MessageInfo,
-        update: SecureAdminExecuteUpdate,
+        update: SecureAdminUpdate,
     ) -> AdminResult<Response<C>>
     where
         C: Clone + Debug + PartialEq + JsonSchema,
     {
-        let validated_update = SecureAdminUpdate::from(deps.api, &info.sender, update)?;
-        self.update(deps.storage, validated_update)?;
+        let new_state = self.transition_state(deps.storage, deps.api, &info.sender, update)?;
+        self.0.save(deps.storage, &new_state)?;
+
         let res = self.query(deps.storage)?;
         Ok(Response::new()
             .add_attribute("action", "update_admin")
@@ -320,6 +256,43 @@ impl<'a> SecureAdmin<'a> {
                 res.proposed.unwrap_or_else(|| "None".to_string()),
             )
             .add_attribute("sender", info.sender))
+    }
+
+    /// Executes admin state transitions
+    fn transition_state(
+        &self,
+        storage: &'a mut dyn Storage,
+        api: &'a dyn Api,
+        sender: &Addr,
+        event: SecureAdminUpdate,
+    ) -> AdminResult<AdminState> {
+        let state = self.state(storage)?;
+
+        let new_state = match (state, event) {
+            (AdminState::B(b), SecureAdminUpdate::ProposeNewAdmin { proposed }) => {
+                let validated = api.addr_validate(&proposed)?;
+                self.assert_admin(storage, sender)?;
+                b.propose(&validated)
+            }
+            (AdminState::B(b), SecureAdminUpdate::AbolishAdminRole) => {
+                self.assert_admin(storage, sender)?;
+                b.abolish_admin_role()
+            }
+            (AdminState::C(c), SecureAdminUpdate::AcceptProposed) => {
+                self.assert_proposed(storage, sender)?;
+                c.accept_proposed()
+            }
+            (AdminState::C(c), SecureAdminUpdate::ClearProposed) => {
+                self.assert_admin(storage, sender)?;
+                c.clear_proposed()
+            }
+            (AdminState::C(c), SecureAdminUpdate::AbolishAdminRole) => {
+                self.assert_admin(storage, sender)?;
+                c.abolish_admin_role()
+            }
+            (_, _) => return Err(SecureAdminError::StateTransitionError {}),
+        };
+        Ok(new_state)
     }
 
     //--------------------------------------------------------------------------------------------------
@@ -350,8 +323,7 @@ mod tests {
     use cosmwasm_std::Empty;
 
     use crate::SecureAdminUpdate::{
-        AbolishAdminRole, AcceptProposed, ClearAdmin, ClearProposed, InitializeAdmin,
-        ProposeNewAdmin,
+        AbolishAdminRole, AcceptProposed, ClearProposed, ProposeNewAdmin,
     };
 
     use super::*;
@@ -363,43 +335,33 @@ mod tests {
     #[test]
     fn invalid_uninitialized_state_transitions() {
         let mut deps = mock_dependencies();
+        let sender = Addr::unchecked("peter_parker");
+        let info = mock_info(sender.as_ref(), &[]);
         let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
-        let new_admin = Addr::unchecked("peter_parker");
 
         let err = admin
-            .update(
-                storage,
-                ClearAdmin {
-                    sender: new_admin.clone(),
-                },
-            )
-            .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError {});
-
-        let err = admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                deps.as_mut(),
+                info.clone(),
                 ProposeNewAdmin {
-                    sender: new_admin.clone(),
-                    proposed: new_admin.clone(),
+                    proposed: "abc".to_string(),
                 },
             )
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                ClearProposed {
-                    sender: new_admin.clone(),
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info.clone(), ClearProposed)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(storage, AcceptProposed { sender: new_admin })
+            .update::<Empty, Empty>(deps.as_mut(), info.clone(), AcceptProposed)
+            .unwrap_err();
+        assert_eq!(err, SecureAdminError::StateTransitionError {});
+
+        let err = admin
+            .update::<Empty, Empty>(deps.as_mut(), info, AbolishAdminRole)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
@@ -407,45 +369,40 @@ mod tests {
     #[test]
     fn invalid_admin_set_no_proposed_state_transitions() {
         let mut deps = mock_dependencies();
+        let sender = Addr::unchecked("peter_parker");
+        let info = mock_info(sender.as_ref(), &[]);
         let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
-        let original_admin = Addr::unchecked("peter_parker");
+
+        let mut_deps = deps.as_mut();
+
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: sender.to_string(),
                 },
             )
             .unwrap();
 
         let err = admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: "abc".to_string(),
                 },
             )
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                ClearProposed {
-                    sender: original_admin.clone(),
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info.clone(), ClearProposed)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                AcceptProposed {
-                    sender: original_admin,
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info, AcceptProposed)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
@@ -453,54 +410,51 @@ mod tests {
     #[test]
     fn invalid_admin_set_with_proposed_state_transitions() {
         let mut deps = mock_dependencies();
+        let sender = Addr::unchecked("peter_parker");
+        let info = mock_info(sender.as_ref(), &[]);
         let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
-        let original_admin = Addr::unchecked("peter_parker");
-        let proposed_admin = Addr::unchecked("miles_morales");
+
+        let mut_deps = deps.as_mut();
+
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
-                },
-            )
-            .unwrap();
-        admin
-            .update(
-                storage,
-                ProposeNewAdmin {
-                    sender: original_admin.clone(),
-                    proposed: proposed_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: sender.to_string(),
                 },
             )
             .unwrap();
 
+        admin
+            .update::<Empty, Empty>(
+                mut_deps,
+                info.clone(),
+                ProposeNewAdmin {
+                    proposed: "abc".to_string(),
+                },
+            )
+            .unwrap();
+
+        let mut_deps = deps.as_mut();
+
         let err = admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: "abc".to_string(),
                 },
             )
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                ClearAdmin {
-                    sender: original_admin.clone(),
-                },
-            )
-            .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError {});
-
-        let err = admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                deps.as_mut(),
+                info,
                 ProposeNewAdmin {
-                    sender: original_admin,
-                    proposed: proposed_admin,
+                    proposed: "efg".to_string(),
                 },
             )
             .unwrap_err();
@@ -510,77 +464,50 @@ mod tests {
     #[test]
     fn invalid_admin_role_abolished_state_transitions() {
         let mut deps = mock_dependencies();
+        let sender = Addr::unchecked("peter_parker");
+        let info = mock_info(sender.as_ref(), &[]);
         let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
-        let original_admin = Addr::unchecked("peter_parker");
-        let proposed_admin = Addr::unchecked("miles_morales");
+
+        let mut_deps = deps.as_mut();
+
         admin
-            .update(
-                storage,
-                AbolishAdminRole {
-                    sender: Some(original_admin.clone()),
-                },
-            )
+            .initialize(mut_deps.storage, mut_deps.api, AdminInit::AbolishAdminRole)
             .unwrap();
 
         let err = admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: "abc".to_string(),
                 },
             )
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                ClearAdmin {
-                    sender: proposed_admin.clone(),
-                },
-            )
-            .unwrap_err();
-        assert_eq!(err, SecureAdminError::StateTransitionError {});
-
-        let err = admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                deps.as_mut(),
+                info.clone(),
                 ProposeNewAdmin {
-                    sender: original_admin.clone(),
-                    proposed: proposed_admin.clone(),
+                    proposed: "efg".to_string(),
                 },
             )
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                ClearProposed {
-                    sender: original_admin.clone(),
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info.clone(), ClearProposed)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                AcceptProposed {
-                    sender: proposed_admin,
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info.clone(), AcceptProposed)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
 
         let err = admin
-            .update(
-                storage,
-                AbolishAdminRole {
-                    sender: Some(original_admin),
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info, AbolishAdminRole)
             .unwrap_err();
         assert_eq!(err, SecureAdminError::StateTransitionError {});
     }
@@ -592,157 +519,156 @@ mod tests {
     #[test]
     fn initialize_admin_permissions() {
         let mut deps = mock_dependencies();
+        let mut_deps = deps.as_mut();
         let admin = SecureAdmin::new("xyz");
 
-        // Anyone can initialize the first admin
-        let user_a = Addr::unchecked("peter_parker");
+        // Anyone can initialize
         admin
-            .update(deps.as_mut().storage, InitializeAdmin { admin: user_a })
+            .initialize(mut_deps.storage, mut_deps.api, AdminInit::AbolishAdminRole)
             .unwrap();
 
         let mut deps = mock_dependencies();
-        let user_b = Addr::unchecked("miles_morales");
-        admin
-            .update(deps.as_mut().storage, InitializeAdmin { admin: user_b })
-            .unwrap();
-    }
+        let mut_deps = deps.as_mut();
 
-    #[test]
-    fn clear_admin_permissions() {
-        let mut deps = mock_dependencies();
-        let storage = deps.as_mut().storage;
-        let admin = SecureAdmin::new("xyz");
-        let original_admin = Addr::unchecked("peter_parker");
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin,
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: "xyz".to_string(),
                 },
             )
             .unwrap();
-
-        let bad_guy = Addr::unchecked("doc_oc");
-        let err = admin
-            .update(storage, ClearAdmin { sender: bad_guy })
-            .unwrap_err();
-        assert_eq!(err, SecureAdminError::NotAdmin {});
     }
 
     #[test]
     fn propose_new_admin_permissions() {
         let mut deps = mock_dependencies();
-        let storage = deps.as_mut().storage;
+        let sender = Addr::unchecked("peter_parker");
         let admin = SecureAdmin::new("xyz");
-        let original_admin = Addr::unchecked("peter_parker");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin,
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: sender.to_string(),
                 },
             )
             .unwrap();
 
         let bad_guy = Addr::unchecked("doc_oc");
+        let info = mock_info(bad_guy.as_ref(), &[]);
         let err = admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                mut_deps,
+                info,
                 ProposeNewAdmin {
-                    sender: bad_guy.clone(),
-                    proposed: bad_guy,
+                    proposed: bad_guy.to_string(),
                 },
             )
             .unwrap_err();
+
         assert_eq!(err, SecureAdminError::NotAdmin {})
     }
 
     #[test]
     fn clear_proposed_permissions() {
         let mut deps = mock_dependencies();
-        let storage = deps.as_mut().storage;
+        let sender = Addr::unchecked("peter_parker");
+        let info = mock_info(sender.as_ref(), &[]);
         let admin = SecureAdmin::new("xyz");
-        let original_admin = Addr::unchecked("peter_parker");
-        let proposed_admin = Addr::unchecked("miles_morales");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: sender.to_string(),
                 },
             )
             .unwrap();
         admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                mut_deps,
+                info,
                 ProposeNewAdmin {
-                    sender: original_admin,
-                    proposed: proposed_admin,
+                    proposed: "miles_morales".to_string(),
                 },
             )
             .unwrap();
 
         let bad_guy = Addr::unchecked("doc_oc");
+        let info = mock_info(bad_guy.as_ref(), &[]);
         let err = admin
-            .update(storage, ClearProposed { sender: bad_guy })
+            .update::<Empty, Empty>(deps.as_mut(), info, ClearProposed)
             .unwrap_err();
+
         assert_eq!(err, SecureAdminError::NotAdmin {})
     }
 
     #[test]
     fn accept_proposed_permissions() {
         let mut deps = mock_dependencies();
-        let storage = deps.as_mut().storage;
+        let sender = Addr::unchecked("peter_parker");
+        let info = mock_info(sender.as_ref(), &[]);
         let admin = SecureAdmin::new("xyz");
-        let original_admin = Addr::unchecked("peter_parker");
-        let proposed_admin = Addr::unchecked("miles_morales");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: sender.to_string(),
                 },
             )
             .unwrap();
         admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                mut_deps,
+                info,
                 ProposeNewAdmin {
-                    sender: original_admin.clone(),
-                    proposed: proposed_admin,
+                    proposed: "miles_morales".to_string(),
                 },
             )
             .unwrap();
 
+        let bad_guy = Addr::unchecked("doc_oc");
+        let info = mock_info(bad_guy.as_ref(), &[]);
         let err = admin
-            .update(
-                storage,
-                AcceptProposed {
-                    sender: original_admin,
-                },
-            )
+            .update::<Empty, Empty>(deps.as_mut(), info, AcceptProposed)
             .unwrap_err();
+
         assert_eq!(err, SecureAdminError::NotProposedAdmin {})
     }
 
     #[test]
     fn abolish_admin_role_permissions() {
         let mut deps = mock_dependencies();
+        let sender = Addr::unchecked("peter_parker");
         let admin = SecureAdmin::new("xyz");
-        let user = Addr::unchecked("peter_parker");
 
-        // As no admin is set, no restrictions on abolishing from uninitialized state
+        let mut_deps = deps.as_mut();
         admin
-            .update(deps.as_mut().storage, AbolishAdminRole { sender: None })
-            .unwrap();
-
-        let mut deps = mock_dependencies();
-        admin
-            .update(
-                deps.as_mut().storage,
-                AbolishAdminRole { sender: Some(user) },
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: sender.to_string(),
+                },
             )
             .unwrap();
+
+        let bad_guy = Addr::unchecked("doc_oc");
+        let info = mock_info(bad_guy.as_ref(), &[]);
+        let err = admin
+            .update::<Empty, Empty>(deps.as_mut(), info, AbolishAdminRole)
+            .unwrap_err();
+
+        assert_eq!(err, SecureAdminError::NotAdmin {})
     }
 
     //--------------------------------------------------------------------------------------------------
@@ -782,32 +708,34 @@ mod tests {
     #[test]
     fn initialize_admin() {
         let mut deps = mock_dependencies();
-        let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
         let original_admin = Addr::unchecked("peter_parker");
+        let admin = SecureAdmin::new("xyz");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: original_admin.to_string(),
                 },
             )
             .unwrap();
 
-        let state = admin.state(storage).unwrap();
+        let state = admin.state(mut_deps.storage).unwrap();
         match state {
             AdminState::B(_) => {}
             _ => panic!("Should be in the AdminSetNoneProposed state"),
         }
 
-        let current = admin.current(storage).unwrap();
+        let current = admin.current(mut_deps.storage).unwrap();
         assert_eq!(current, Some(original_admin.clone()));
-        assert!(admin.is_admin(storage, &original_admin).unwrap());
+        assert!(admin.is_admin(mut_deps.storage, &original_admin).unwrap());
 
-        let proposed = admin.proposed(storage).unwrap();
+        let proposed = admin.proposed(mut_deps.storage).unwrap();
         assert_eq!(proposed, None);
 
-        let res = admin.query(storage).unwrap();
+        let res = admin.query(mut_deps.storage).unwrap();
         assert_eq!(
             res,
             SecureAdminResponse {
@@ -818,57 +746,35 @@ mod tests {
     }
 
     #[test]
-    fn clear_admin() {
-        let mut deps = mock_dependencies();
-        let storage = deps.as_mut().storage;
-        let admin = SecureAdmin::new("xyz");
-        assert_uninitialized(storage, &admin);
-
-        let original_admin = Addr::unchecked("peter_parker");
-        admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
-                },
-            )
-            .unwrap();
-
-        admin
-            .update(
-                storage,
-                ClearAdmin {
-                    sender: original_admin,
-                },
-            )
-            .unwrap();
-        assert_uninitialized(storage, &admin);
-    }
-
-    #[test]
     fn propose_new_admin() {
         let mut deps = mock_dependencies();
-        let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
         let original_admin = Addr::unchecked("peter_parker");
         let proposed_admin = Addr::unchecked("miles_morales");
+        let info = mock_info(original_admin.as_ref(), &[]);
+        let admin = SecureAdmin::new("xyz");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: original_admin.to_string(),
                 },
             )
             .unwrap();
+
         admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                mut_deps,
+                info,
                 ProposeNewAdmin {
-                    sender: original_admin.clone(),
-                    proposed: proposed_admin.clone(),
+                    proposed: "miles_morales".to_string(),
                 },
             )
             .unwrap();
+
+        let storage = deps.as_mut().storage;
 
         let state = admin.state(storage).unwrap();
         match state {
@@ -897,36 +803,39 @@ mod tests {
     #[test]
     fn clear_proposed() {
         let mut deps = mock_dependencies();
-        let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
         let original_admin = Addr::unchecked("peter_parker");
         let proposed_admin = Addr::unchecked("miles_morales");
+        let info = mock_info(original_admin.as_ref(), &[]);
+        let admin = SecureAdmin::new("xyz");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
-                },
-            )
-            .unwrap();
-        admin
-            .update(
-                storage,
-                ProposeNewAdmin {
-                    sender: original_admin.clone(),
-                    proposed: proposed_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: original_admin.to_string(),
                 },
             )
             .unwrap();
 
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                ClearProposed {
-                    sender: original_admin.clone(),
+            .update::<Empty, Empty>(
+                mut_deps,
+                info.clone(),
+                ProposeNewAdmin {
+                    proposed: "miles_morales".to_string(),
                 },
             )
             .unwrap();
+
+        let mut_deps = deps.as_mut();
+        admin
+            .update::<Empty, Empty>(mut_deps, info, ClearProposed)
+            .unwrap();
+
+        let storage = deps.as_mut().storage;
 
         let state = admin.state(storage).unwrap();
         match state {
@@ -955,35 +864,40 @@ mod tests {
     #[test]
     fn accept_proposed() {
         let mut deps = mock_dependencies();
-        let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
         let original_admin = Addr::unchecked("peter_parker");
         let proposed_admin = Addr::unchecked("miles_morales");
+        let info = mock_info(original_admin.as_ref(), &[]);
+        let admin = SecureAdmin::new("xyz");
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                InitializeAdmin {
-                    admin: original_admin.clone(),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: original_admin.to_string(),
                 },
             )
             .unwrap();
+
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
+            .update::<Empty, Empty>(
+                mut_deps,
+                info,
                 ProposeNewAdmin {
-                    sender: original_admin,
-                    proposed: proposed_admin.clone(),
+                    proposed: "miles_morales".to_string(),
                 },
             )
             .unwrap();
+
+        let info = mock_info(proposed_admin.as_ref(), &[]);
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                AcceptProposed {
-                    sender: proposed_admin.clone(),
-                },
-            )
+            .update::<Empty, Empty>(mut_deps, info, AcceptProposed)
             .unwrap();
+
+        let storage = deps.as_mut().storage;
 
         let state = admin.state(storage).unwrap();
         match state {
@@ -1012,18 +926,27 @@ mod tests {
     #[test]
     fn abolish_admin_role() {
         let mut deps = mock_dependencies();
-        let admin = SecureAdmin::new("xyz");
-        let storage = deps.as_mut().storage;
         let original_admin = Addr::unchecked("peter_parker");
+        let info = mock_info(original_admin.as_ref(), &[]);
+        let admin = SecureAdmin::new("xyz");
 
+        let mut_deps = deps.as_mut();
         admin
-            .update(
-                storage,
-                AbolishAdminRole {
-                    sender: Some(original_admin.clone()),
+            .initialize(
+                mut_deps.storage,
+                mut_deps.api,
+                AdminInit::SetInitialAdmin {
+                    admin: original_admin.to_string(),
                 },
             )
             .unwrap();
+
+        let mut_deps = deps.as_mut();
+        admin
+            .update::<Empty, Empty>(mut_deps, info, AbolishAdminRole)
+            .unwrap();
+
+        let storage = deps.as_mut().storage;
 
         let state = admin.state(storage).unwrap();
         match state {
@@ -1044,46 +967,6 @@ mod tests {
             res,
             SecureAdminResponse {
                 admin: None,
-                proposed: None
-            }
-        );
-    }
-
-    #[test]
-    fn execute_helper() {
-        let mut deps = mock_dependencies();
-        let sender = Addr::unchecked("peter_parker");
-        let info = mock_info(sender.as_ref(), &[]);
-        let admin = SecureAdmin::new("xyz");
-        admin
-            .execute_update::<Empty, Empty>(
-                deps.as_mut(),
-                info,
-                SecureAdminExecuteUpdate::InitializeAdmin {
-                    admin: sender.clone().into(),
-                },
-            )
-            .unwrap();
-
-        let storage = deps.as_ref().storage;
-        let state = admin.state(storage).unwrap();
-        match state {
-            AdminState::B(_) => {}
-            _ => panic!("Should be in the AdminSetNoneProposed state"),
-        }
-
-        let current = admin.current(storage).unwrap();
-        assert_eq!(current, Some(sender.clone()));
-        assert!(admin.is_admin(storage, &sender).unwrap());
-
-        let proposed = admin.proposed(storage).unwrap();
-        assert_eq!(proposed, None);
-
-        let res = admin.query(storage).unwrap();
-        assert_eq!(
-            res,
-            SecureAdminResponse {
-                admin: Some(sender.to_string()),
                 proposed: None
             }
         );
