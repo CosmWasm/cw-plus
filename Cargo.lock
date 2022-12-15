@@ -311,7 +311,6 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
- "schemars",
  "serde",
 ]
 
@@ -386,7 +385,6 @@ dependencies = [
  "cw20",
  "cw20-base",
  "cw3",
- "schemars",
  "serde",
  "thiserror",
 ]
@@ -407,7 +405,6 @@ dependencies = [
  "cw3-fixed-multisig",
  "cw4",
  "cw4-group",
- "schemars",
  "serde",
  "thiserror",
 ]
@@ -419,7 +416,6 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
- "schemars",
  "serde",
 ]
 
@@ -434,7 +430,6 @@ dependencies = [
  "cw-utils",
  "cw2 1.0.0",
  "cw4",
- "schemars",
  "serde",
  "thiserror",
 ]
@@ -451,7 +446,6 @@ dependencies = [
  "cw2 1.0.0",
  "cw20",
  "cw4",
- "schemars",
  "serde",
  "thiserror",
 ]
