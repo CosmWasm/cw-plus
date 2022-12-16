@@ -1,6 +1,6 @@
 [package]
 name = "cw1-subkeys"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implement subkeys for authorizing native tokens as a cw1 proxy contract"
@@ -21,9 +21,9 @@ test-utils = []
 [dependencies]
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
-cw1 = { path = "../../packages/cw1", version = "1.0.0" }
-cw2 = { path = "../../packages/cw2", version = "1.0.0" }
-cw1-whitelist = { path = "../cw1-whitelist", version = "1.0.0", features = ["library"] }
+cw1 = { path = "../../packages/cw1", version = "1.0.1" }
+cw2 = { path = "../../packages/cw2", version = "1.0.1" }
+cw1-whitelist = { path = "../cw1-whitelist", version = "1.0.1", features = ["library"] }
 cosmwasm-std = { version = "1.1.0", features = ["staking"] }
 cw-storage-plus = "1.0.1"
 schemars = "0.8.1"
@@ -32,4 +32,4 @@ thiserror = "1.0.23"
 semver = "1"
 
 [dev-dependencies]
-cw1-whitelist = { path = "../cw1-whitelist", version = "1.0.0", features = ["library", "test-utils"] }
+cw1-whitelist = { path = "../cw1-whitelist", version = "1.0.1", features = ["library", "test-utils"] }
