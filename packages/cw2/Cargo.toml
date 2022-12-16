@@ -11,6 +11,6 @@ homepage = "https://cosmwasm.com"
 [dependencies]
 cosmwasm-schema = "1.0.0"
 cosmwasm-std = { version = "1.0.0", default-features = false }
-cw-storage-plus = "0.16.0"
+cw-storage-plus = "1.0.1"
 schemars = "0.8.1"
 serde = { version = "1.0.0", default-features = false, features = ["derive"] }
