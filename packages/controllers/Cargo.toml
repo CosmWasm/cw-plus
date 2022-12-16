@@ -14,7 +14,7 @@ homepage = "https://cosmwasm.com"
 cosmwasm-schema = "1.0.0"
 cosmwasm-std = "1.0.0"
 cw-utils = "1.0.1"
-cw-storage-plus = "1"
+cw-storage-plus = "1.0.1"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.21" }
