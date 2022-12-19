@@ -202,7 +202,7 @@ dependencies = [
 
 [[package]]
 name = "cw-controllers"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -262,7 +262,7 @@ checksum = "c80e93d1deccb8588db03945016a292c3c631e6325d349ebb35d2db6f4f946f7"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw2 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw2 1.0.0",
  "schemars",
  "semver",
  "serde",
@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "cw1"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-subkeys"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -289,7 +289,7 @@ dependencies = [
  "cw-utils",
  "cw1",
  "cw1-whitelist",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "schemars",
  "semver",
  "serde",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -308,22 +308,11 @@ dependencies = [
  "cw-storage-plus 1.0.1",
  "cw-utils",
  "cw1",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "derivative",
  "schemars",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "cw2"
-version = "1.0.0"
-dependencies = [
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-storage-plus 1.0.1",
- "schemars",
- "serde",
 ]
 
 [[package]]
@@ -340,8 +329,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw2"
+version = "1.0.1"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus 1.0.1",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "cw20"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -352,14 +352,14 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus 1.0.1",
  "cw-utils",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "cw20",
  "schemars",
  "semver",
@@ -369,14 +369,14 @@ dependencies = [
 
 [[package]]
 name = "cw20-ics20"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
  "cw-storage-plus 1.0.1",
  "cw-utils",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "cw20",
  "schemars",
  "semver",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "cw3"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -399,14 +399,14 @@ dependencies = [
 
 [[package]]
 name = "cw3-fixed-multisig"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus 1.0.1",
  "cw-utils",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "cw20",
  "cw20-base",
  "cw3",
@@ -417,14 +417,14 @@ dependencies = [
 
 [[package]]
 name = "cw3-flex-multisig"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus 1.0.1",
  "cw-utils",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "cw20",
  "cw20-base",
  "cw3",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "cw4"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -449,14 +449,14 @@ dependencies = [
 
 [[package]]
 name = "cw4-group"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
  "cw-storage-plus 1.0.1",
  "cw-utils",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "cw4",
  "schemars",
  "serde",
@@ -465,14 +465,14 @@ dependencies = [
 
 [[package]]
 name = "cw4-stake"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
  "cw-storage-plus 1.0.1",
  "cw-utils",
- "cw2 1.0.0",
+ "cw2 1.0.1",
  "cw20",
  "cw4",
  "schemars",

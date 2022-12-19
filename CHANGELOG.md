@@ -1,5 +1,19 @@
 # Changelog
 
+## [v1.0.1](https://github.com/CosmWasm/cw-plus/tree/v1.0.1) (2022-12-16)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.0.0...v1.0.1)
+
+**Closed issues:**
+
+- Package versioning is a huge mess right now [\#851](https://github.com/CosmWasm/cw-plus/issues/851)
+- MINT function is not working [\#848](https://github.com/CosmWasm/cw-plus/issues/848)
+- Document the release process [\#810](https://github.com/CosmWasm/cw-plus/issues/810)
+
+**Merged pull requests:**
+
+- Update dependencies [\#853](https://github.com/CosmWasm/cw-plus/pull/853) ([apollo-sturdy](https://github.com/apollo-sturdy))
+
 ## [v1.0.0](https://github.com/CosmWasm/cw-plus/tree/v1.0.0) (2022-11-29)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v0.16.0...v1.0.0)
