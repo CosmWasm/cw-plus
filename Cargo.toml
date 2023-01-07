@@ -33,10 +33,6 @@ incremental = false
 codegen-units = 1
 incremental = false
 
-[profile.release.package.cw1155-base]
-codegen-units = 1
-incremental = false
-
 [profile.release]
 rpath = false
 lto = true
