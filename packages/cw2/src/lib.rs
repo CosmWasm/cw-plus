@@ -18,8 +18,11 @@ For more information on this specification, please check out the
 */
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{CustomQuery, QuerierWrapper, QueryRequest, StdResult, Storage, WasmQuery};
+use cosmwasm_std::{
+    CustomQuery, QuerierWrapper, QueryRequest, StdError, StdResult, Storage, WasmQuery,
+};
 use cw_storage_plus::Item;
+use thiserror::Error;
 
 pub const CONTRACT: Item<ContractVersion> = Item::new("contract_info");
 
@@ -33,6 +36,50 @@ pub struct ContractVersion {
     /// the only code that needs to understand the version parsing is code that knows how to
     /// migrate from the given contract (and is tied to it's implementation somehow)
     pub version: String,
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum VersionError {
+    #[error(transparent)]
+    Std(#[from] StdError),
+
+    #[error("Contract version info not found")]
+    NotFound,
+
+    #[error("Wrong contract: expecting `{expected}`, found `{found}`")]
+    WrongContract { expected: String, found: String },
+
+    #[error("Wrong contract version: expecting `{expected}`, found `{found}`")]
+    WrongVersion { expected: String, found: String },
+}
+
+/// Assert that the stored contract version info matches the given value.
+/// This is useful during migrations, for making sure that the correct contract
+/// is being migrated, and it's being migrated from the correct version.
+pub fn assert_contract_version(
+    storage: &dyn Storage,
+    expected_contract: &str,
+    expected_version: &str,
+) -> Result<(), VersionError> {
+    let Some(ContractVersion { contract, version }) = CONTRACT.may_load(storage)? else {
+        return Err(VersionError::NotFound);
+    };
+
+    if contract != expected_contract {
+        return Err(VersionError::WrongContract {
+            expected: expected_contract.into(),
+            found: contract,
+        });
+    }
+
+    if version != expected_version {
+        return Err(VersionError::WrongVersion {
+            expected: expected_version.into(),
+            found: version,
+        });
+    }
+
+    Ok(())
 }
 
 /// get_contract_version can be use in migrate to read the previous version of this contract
@@ -97,5 +144,45 @@ mod tests {
             version: contract_version.to_string(),
         };
         assert_eq!(expected, loaded);
+    }
+
+    #[test]
+    fn assert_work() {
+        let mut store = MockStorage::new();
+
+        const EXPECTED_CONTRACT: &str = "crate:mars-red-bank";
+        const EXPECTED_VERSION: &str = "1.0.0";
+
+        // error if contract version is not set
+        let err = assert_contract_version(&store, EXPECTED_CONTRACT, EXPECTED_VERSION).unwrap_err();
+        assert_eq!(err, VersionError::NotFound);
+
+        // wrong contract name
+        let wrong_contract = "crate:cw20-base";
+        set_contract_version(&mut store, wrong_contract, EXPECTED_VERSION).unwrap();
+        let err = assert_contract_version(&store, EXPECTED_CONTRACT, EXPECTED_VERSION).unwrap_err();
+        assert_eq!(
+            err,
+            VersionError::WrongContract {
+                expected: EXPECTED_CONTRACT.into(),
+                found: wrong_contract.into()
+            },
+        );
+
+        // wrong contract version
+        let wrong_version = "8.8.8";
+        set_contract_version(&mut store, EXPECTED_CONTRACT, wrong_version).unwrap();
+        let err = assert_contract_version(&store, EXPECTED_CONTRACT, EXPECTED_VERSION).unwrap_err();
+        assert_eq!(
+            err,
+            VersionError::WrongVersion {
+                expected: EXPECTED_VERSION.into(),
+                found: wrong_version.into()
+            },
+        );
+
+        // correct name and version
+        set_contract_version(&mut store, EXPECTED_CONTRACT, EXPECTED_VERSION).unwrap();
+        assert!(assert_contract_version(&store, EXPECTED_CONTRACT, EXPECTED_VERSION).is_ok());
     }
 }
