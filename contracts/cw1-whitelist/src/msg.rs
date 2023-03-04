@@ -51,8 +51,8 @@ pub struct AdminListResponse {
 
 #[cfg(any(test, feature = "test-utils"))]
 impl AdminListResponse {
-    /// Utility function forconverting message to its canonical form, so two messages with
-    /// different representation but same semantical meaning can be easly compared.
+    /// Utility function for converting message to its canonical form, so two messages with
+    /// different representation but same semantic meaning can be easily compared.
     ///
     /// It could be encapsulated in custom `PartialEq` implementation, but `PartialEq` is expected
     /// to be quickly, so it seems to be reasonable to keep it as representation-equality, and
