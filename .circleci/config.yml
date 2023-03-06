@@ -484,7 +484,7 @@ jobs:
   # We also sanity-check the resultant wasm files.
   wasm-build:
     docker:
-      - image: rust:1.59.0
+      - image: rust:1.64.0
     steps:
       - checkout:
           path: ~/project
@@ -493,7 +493,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - restore_cache:
           keys:
-            - cargocache-wasm-rust:1.59.0-{{ checksum "~/project/Cargo.lock" }}
+            - cargocache-wasm-rust:1.64.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Add wasm32 target
           command: rustup target add wasm32-unknown-unknown
@@ -513,7 +513,7 @@ jobs:
           paths:
             - /usr/local/cargo/registry
             - target
-          key: cargocache-wasm-rust:1.59.0-{{ checksum "~/project/Cargo.lock" }}
+          key: cargocache-wasm-rust:1.64.0-{{ checksum "~/project/Cargo.lock" }}
       - run:
           name: Check wasm contracts
           command: cosmwasm-check ./target/wasm32-unknown-unknown/release/*.wasm
