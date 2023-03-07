@@ -61,9 +61,8 @@ pub fn assert_contract_version(
     expected_contract: &str,
     expected_version: &str,
 ) -> Result<(), VersionError> {
-    let ContractVersion { contract, version } = match CONTRACT.may_load(storage)? {
-        Some(contract) => contract,
-        None => return Err(VersionError::NotFound),
+    let Some(ContractVersion { contract, version }) = CONTRACT.may_load(storage)? else {
+        return Err(VersionError::NotFound);
     };
 
     if contract != expected_contract {
