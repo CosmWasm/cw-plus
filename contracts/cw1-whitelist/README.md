@@ -5,7 +5,7 @@ It contains a set of admins that are defined upon creation.
 Any of those admins may `Execute` any message via the contract,
 per the CW1 spec.
 
-To make this slighly less minimalistic, you can allow the admin set
+To make this slightly less minimalistic, you can allow the admin set
 to be mutable or immutable. If it is mutable, then any admin may
 (a) change the admin set and (b) freeze it (making it immutable).
 
@@ -40,5 +40,5 @@ ls -l cw1_whitelist.wasm
 sha256sum cw1_whitelist.wasm
 ```
 
-Or for a production-ready (optimized) build, run a build command in the
+Or for a production-ready (optimized) build, run a build command in 
 the repository root: https://github.com/CosmWasm/cw-plus#compiling.
