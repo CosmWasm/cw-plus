@@ -314,6 +314,7 @@ dependencies = [
  "cw-storage-plus",
  "schemars",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
