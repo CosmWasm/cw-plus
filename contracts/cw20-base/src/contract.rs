@@ -243,10 +243,6 @@ pub fn execute_transfer(
     recipient: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    if amount == Uint128::zero() {
-        return Err(ContractError::InvalidZeroAmount {});
-    }
-
     let rcpt_addr = deps.api.addr_validate(&recipient)?;
 
     BALANCES.update(
@@ -276,10 +272,6 @@ pub fn execute_burn(
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    if amount == Uint128::zero() {
-        return Err(ContractError::InvalidZeroAmount {});
-    }
-
     // lower balance
     BALANCES.update(
         deps.storage,
@@ -308,10 +300,6 @@ pub fn execute_mint(
     recipient: String,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
-    if amount == Uint128::zero() {
-        return Err(ContractError::InvalidZeroAmount {});
-    }
-
     let mut config = TOKEN_INFO
         .may_load(deps.storage)?
         .ok_or(ContractError::Unauthorized {})?;
@@ -358,10 +346,6 @@ pub fn execute_send(
     amount: Uint128,
     msg: Binary,
 ) -> Result<Response, ContractError> {
-    if amount == Uint128::zero() {
-        return Err(ContractError::InvalidZeroAmount {});
-    }
-
     let rcpt_addr = deps.api.addr_validate(&contract)?;
 
     // move the tokens to the contract
@@ -910,15 +894,14 @@ mod tests {
         assert_eq!(get_balance(deps.as_ref(), genesis), amount);
         assert_eq!(get_balance(deps.as_ref(), winner.clone()), prize);
 
-        // but cannot mint nothing
+        // Allows minting 0
         let msg = ExecuteMsg::Mint {
             recipient: winner.clone(),
             amount: Uint128::zero(),
         };
         let info = mock_info(minter.as_ref(), &[]);
         let env = mock_env();
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
+        execute(deps.as_mut(), env, info, msg).unwrap();
 
         // but if it exceeds cap (even over multiple rounds), it fails
         // cap is enforced
@@ -1171,15 +1154,14 @@ mod tests {
 
         do_instantiate(deps.as_mut(), &addr1, amount1);
 
-        // cannot transfer nothing
+        // Allows transferring 0
         let info = mock_info(addr1.as_ref(), &[]);
         let env = mock_env();
         let msg = ExecuteMsg::Transfer {
             recipient: addr2.clone(),
             amount: Uint128::zero(),
         };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
+        execute(deps.as_mut(), env, info, msg).unwrap();
 
         // cannot send more than we have
         let info = mock_info(addr1.as_ref(), &[]);
@@ -1230,14 +1212,13 @@ mod tests {
 
         do_instantiate(deps.as_mut(), &addr1, amount1);
 
-        // cannot burn nothing
+        // Allows burning 0
         let info = mock_info(addr1.as_ref(), &[]);
         let env = mock_env();
         let msg = ExecuteMsg::Burn {
             amount: Uint128::zero(),
         };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
+        execute(deps.as_mut(), env, info, msg).unwrap();
         assert_eq!(
             query_token_info(deps.as_ref()).unwrap().total_supply,
             amount1
@@ -1281,7 +1262,7 @@ mod tests {
 
         do_instantiate(deps.as_mut(), &addr1, amount1);
 
-        // cannot send nothing
+        // Allows sending 0
         let info = mock_info(addr1.as_ref(), &[]);
         let env = mock_env();
         let msg = ExecuteMsg::Send {
@@ -1289,8 +1270,7 @@ mod tests {
             amount: Uint128::zero(),
             msg: send_msg.clone(),
         };
-        let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
-        assert_eq!(err, ContractError::InvalidZeroAmount {});
+        execute(deps.as_mut(), env, info, msg).unwrap();
 
         // cannot send more than we have
         let info = mock_info(addr1.as_ref(), &[]);
