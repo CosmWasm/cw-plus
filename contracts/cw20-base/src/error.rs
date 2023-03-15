@@ -12,6 +12,8 @@ pub enum ContractError {
     #[error("Cannot set to own account")]
     CannotSetOwnAccount {},
 
+    // Unused error case. Zero is now treated like every other value.
+    #[deprecated(note = "Unused. All zero amount checks have been removed")]
     #[error("Invalid zero amount")]
     InvalidZeroAmount {},
 
