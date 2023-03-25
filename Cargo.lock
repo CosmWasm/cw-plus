@@ -62,6 +62,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "boot-contract-derive"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d84f177bfffb77aa3b1797bcf1003735a588da78987c44423921885878d94a"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "boot-core"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7e7b5cf2d083d54105942eab8c59d6079475b646ac065acbaf25e5559582cce"
+dependencies = [
+ "anyhow",
+ "boot-contract-derive",
+ "boot-fns-derive",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "log",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "boot-fns-derive"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fc242325fd8f7a49d2ae53b835fd7b6c1e90c96eb158cdf170cf67284760341"
+dependencies = [
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -84,6 +124,15 @@ name = "const-oid"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "520fbf3c07483f94e3e3ca9d0cfd913d7718ef2483d2cfd91c0d9e91474ab913"
+
+[[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "cosmwasm-crypto"
@@ -334,6 +383,7 @@ dependencies = [
 name = "cw20"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-utils",
@@ -345,6 +395,7 @@ dependencies = [
 name = "cw20-base"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -677,6 +728,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
+name = "log"
+version = "0.4.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -976,6 +1036,12 @@ name = "unicode-ident"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5464a87b239f13a63a501f2701565754bae92d243d4bb7eb12f6d57d2269bf4"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "version_check"
