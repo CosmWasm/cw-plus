@@ -1,3 +1,5 @@
+use boot_core::QueryFns;
+use boot_fns_derive::ExecuteFns;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
 use cw3::Vote;
@@ -18,6 +20,7 @@ pub struct Voter {
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[cw_serde]
+#[derive(ExecuteFns)]
 pub enum ExecuteMsg {
     Propose {
         title: String,
@@ -40,7 +43,7 @@ pub enum ExecuteMsg {
 
 // We can also add this as a cw3 extension
 #[cw_serde]
-#[derive(QueryResponses)]
+#[derive(QueryResponses, QueryFns)]
 pub enum QueryMsg {
     #[returns(cw_utils::ThresholdResponse)]
     Threshold {},

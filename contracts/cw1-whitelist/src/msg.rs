@@ -1,9 +1,8 @@
-use schemars::JsonSchema;
-
-use std::fmt;
+use boot_core::QueryFns;
+use boot_fns_derive::ExecuteFns;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::CosmosMsg;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -12,14 +11,12 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub enum ExecuteMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[derive(ExecuteFns)]
+pub enum ExecuteMsg {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
     /// determine in
-    Execute { msgs: Vec<CosmosMsg<T>> },
+    Execute { msgs: Vec<CosmosMsg> },
     /// Freeze will make a mutable contract immutable, must be called by an admin
     Freeze {},
     /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,
@@ -28,11 +25,8 @@ where
 }
 
 #[cw_serde]
-#[derive(QueryResponses)]
-pub enum QueryMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[derive(QueryResponses, QueryFns)]
+pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
     #[returns(AdminListResponse)]
     AdminList {},
@@ -40,7 +34,7 @@ where
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
     #[returns(cw1::CanExecuteResponse)]
-    CanExecute { sender: String, msg: CosmosMsg<T> },
+    CanExecute { sender: String, msg: CosmosMsg },
 }
 
 #[cw_serde]

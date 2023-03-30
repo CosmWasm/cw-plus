@@ -1,10 +1,7 @@
-use boot_fns_derive::ExecuteFns;
-use schemars::JsonSchema;
-
-use std::fmt;
+use boot_fns_derive::{ExecuteFns, QueryFns};
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Coin, CosmosMsg, Empty};
+use cosmwasm_std::{Coin, CosmosMsg};
 use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
@@ -43,11 +40,8 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses)]
-pub enum QueryMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[derive(QueryResponses, QueryFns)]
+pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
     #[returns(cw1_whitelist::msg::AdminListResponse)]
     AdminList {},
@@ -61,7 +55,7 @@ where
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
     #[returns(cw1::CanExecuteResponse)]
-    CanExecute { sender: String, msg: CosmosMsg<T> },
+    CanExecute { sender: String, msg: CosmosMsg },
     /// Gets all Allowances for this contract
     #[returns(AllAllowancesResponse)]
     AllAllowances {

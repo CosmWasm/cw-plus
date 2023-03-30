@@ -1,3 +1,4 @@
+use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
 
@@ -18,6 +19,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
+#[derive(ExecuteFns)]
 pub enum ExecuteMsg {
     /// Bond will bond all staking tokens sent with the message and update membership weight
     Bond {},
@@ -47,7 +49,7 @@ pub enum ReceiveMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses)]
+#[derive(QueryResponses, QueryFns)]
 pub enum QueryMsg {
     /// Claims shows the tokens in process of unbonding for this address
     #[returns(cw_controllers::ClaimsResponse)]
