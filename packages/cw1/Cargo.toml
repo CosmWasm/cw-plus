@@ -9,6 +9,9 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
+boot-fns-derive = {path = "/Users/robin/Programming/Abstract/BOOT/packages/boot-fns-derive"}
+
+boot-core = { version = "0.9.0" }
 cosmwasm-schema = "1.1.0"
 cosmwasm-std = "1.1.0"
 schemars = "0.8.1"

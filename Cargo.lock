@@ -79,7 +79,7 @@ checksum = "d7e7b5cf2d083d54105942eab8c59d6079475b646ac065acbaf25e5559582cce"
 dependencies = [
  "anyhow",
  "boot-contract-derive",
- "boot-fns-derive",
+ "boot-fns-derive 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cosmwasm-std",
  "cw-multi-test",
  "log",
@@ -87,6 +87,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "boot-fns-derive"
+version = "0.9.0"
+dependencies = [
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -312,6 +322,8 @@ dependencies = [
 name = "cw1"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
+ "boot-fns-derive 0.9.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "schemars",
@@ -322,6 +334,8 @@ dependencies = [
 name = "cw1-subkeys"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
+ "boot-fns-derive 0.9.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
@@ -341,6 +355,7 @@ version = "1.0.1"
 dependencies = [
  "anyhow",
  "assert_matches",
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -413,6 +428,7 @@ dependencies = [
 name = "cw20-ics20"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
@@ -430,6 +446,8 @@ dependencies = [
 name = "cw3"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
+ "boot-fns-derive 0.9.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-utils",
@@ -443,6 +461,7 @@ dependencies = [
 name = "cw3-fixed-multisig"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -461,6 +480,7 @@ dependencies = [
 name = "cw3-flex-multisig"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -482,6 +502,7 @@ dependencies = [
 name = "cw4"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
@@ -493,6 +514,7 @@ dependencies = [
 name = "cw4-group"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
@@ -509,6 +531,7 @@ dependencies = [
 name = "cw4-stake"
 version = "1.0.1"
 dependencies = [
+ "boot-core",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",

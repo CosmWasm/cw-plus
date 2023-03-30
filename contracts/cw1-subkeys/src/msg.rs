@@ -1,3 +1,4 @@
+use boot_fns_derive::ExecuteFns;
 use schemars::JsonSchema;
 
 use std::fmt;
@@ -9,14 +10,12 @@ use cw_utils::{Expiration, NativeBalance};
 use crate::state::Permissions;
 
 #[cw_serde]
-pub enum ExecuteMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[derive(ExecuteFns)]
+pub enum ExecuteMsg {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
     /// determine in
-    Execute { msgs: Vec<CosmosMsg<T>> },
+    Execute { msgs: Vec<CosmosMsg> },
     /// Freeze will make a mutable contract immutable, must be called by an admin
     Freeze {},
     /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,

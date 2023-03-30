@@ -1,21 +1,18 @@
+use boot_fns_derive::ExecuteFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::CosmosMsg;
 use cw_utils::Expiration;
 
 #[cw_serde]
-
-pub enum Cw3ExecuteMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[derive(ExecuteFns)]
+pub enum Cw3ExecuteMsg {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg<T>>,
+        msgs: Vec<CosmosMsg>,
         earliest: Option<Expiration>,
         latest: Option<Expiration>,
     },
@@ -60,7 +57,7 @@ mod test {
 
     #[test]
     fn vote_encoding_embedded() {
-        let msg = Cw3ExecuteMsg::Vote::<Empty> {
+        let msg = Cw3ExecuteMsg::Vote {
             proposal_id: 17,
             vote: Vote::No,
         };

@@ -1,18 +1,16 @@
-use schemars::JsonSchema;
-use std::fmt;
+use boot_core::QueryFns;
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::CosmosMsg;
 
 #[cw_serde]
-pub enum Cw1QueryMsg<T = Empty>
-where
-    T: Clone + fmt::Debug + PartialEq + JsonSchema,
-{
+#[derive(QueryFns)]
+pub enum Cw1QueryMsg {
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// from the given sender, before any further state changes, should also succeed.
-    CanExecute { sender: String, msg: CosmosMsg<T> },
+    #[returns(CanExecuteResponse)]
+    CanExecute { sender: String, msg: CosmosMsg },
 }
 
 #[cw_serde]

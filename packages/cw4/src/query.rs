@@ -1,23 +1,29 @@
+use boot_core::QueryFns;
 use cosmwasm_schema::cw_serde;
 
 #[cw_serde]
-
+#[derive(QueryFns)]
 pub enum Cw4QueryMsg {
     /// Return AdminResponse
+    #[returns(AdminResponse)]
     Admin {},
     /// Return TotalWeightResponse
+    #[returns(TotalWeightResponse)]
     TotalWeight { at_height: Option<u64> },
     /// Returns MembersListResponse
+    #[returns(MemberListResponse)]
     ListMembers {
         start_after: Option<String>,
         limit: Option<u32>,
     },
     /// Returns MemberResponse
+    #[returns(MemberResponse)]
     Member {
         addr: String,
         at_height: Option<u64>,
     },
     /// Shows all registered hooks. Returns HooksResponse.
+    #[returns(HooksResponse)]
     Hooks {},
 }
 
