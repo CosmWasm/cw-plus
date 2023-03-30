@@ -72,8 +72,7 @@ impl InstantiateMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses)]
-#[derive(QueryFns)]
+#[derive(QueryResponses, QueryFns)]
 pub enum QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     #[returns(cw20::BalanceResponse)]

@@ -4,7 +4,6 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Uint128};
 use cw_utils::Expiration;
 
-
 #[cw_serde]
 #[derive(ExecuteFns)]
 pub enum Cw20ExecuteMsg {
