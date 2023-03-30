@@ -123,7 +123,7 @@ pub enum QueryMsg {
     DownloadLogo {},
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
 pub struct MigrateMsg {}
 
 #[cfg(test)]
