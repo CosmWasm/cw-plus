@@ -18,7 +18,6 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-boot-fns-derive = {path = "/Users/robin/Programming/Abstract/BOOT/packages/boot-fns-derive"}
 
 boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git", branch = "update/cw-plus"}
 cosmwasm-schema = { version = "1.1.0" }

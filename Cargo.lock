@@ -78,7 +78,7 @@ source = "git+https://github.com/Abstract-OS/BOOT.git?branch=update/cw-plus#b374
 dependencies = [
  "anyhow",
  "boot-contract-derive",
- "boot-fns-derive 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "boot-fns-derive",
  "cosmwasm-std",
  "cw-multi-test",
  "log",
@@ -86,16 +86,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "boot-fns-derive"
-version = "0.10.0"
-dependencies = [
- "convert_case",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -322,7 +312,6 @@ name = "cw1"
 version = "1.0.1"
 dependencies = [
  "boot-core",
- "boot-fns-derive 0.10.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "schemars",
@@ -334,7 +323,6 @@ name = "cw1-subkeys"
 version = "1.0.1"
 dependencies = [
  "boot-core",
- "boot-fns-derive 0.10.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
@@ -355,7 +343,6 @@ dependencies = [
  "anyhow",
  "assert_matches",
  "boot-core",
- "boot-fns-derive 0.10.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -447,7 +434,6 @@ name = "cw3"
 version = "1.0.1"
 dependencies = [
  "boot-core",
- "boot-fns-derive 0.10.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-utils",
@@ -462,7 +448,6 @@ name = "cw3-fixed-multisig"
 version = "1.0.1"
 dependencies = [
  "boot-core",
- "boot-fns-derive 0.10.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
@@ -482,7 +467,6 @@ name = "cw3-flex-multisig"
 version = "1.0.1"
 dependencies = [
  "boot-core",
- "boot-fns-derive 0.10.0",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",

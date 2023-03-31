@@ -9,7 +9,6 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
-boot-fns-derive = {path = "/Users/robin/Programming/Abstract/BOOT/packages/boot-fns-derive"}
 
 boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git", branch = "update/cw-plus"}
 cw-utils = "1.0.1"

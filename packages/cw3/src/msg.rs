@@ -1,4 +1,4 @@
-use boot_fns_derive::ExecuteFns;
+use boot_core::ExecuteFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
