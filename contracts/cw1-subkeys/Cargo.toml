@@ -21,7 +21,7 @@ test-utils = []
 [dependencies]
 boot-fns-derive = {path = "/Users/robin/Programming/Abstract/BOOT/packages/boot-fns-derive"}
 
-boot-core = { version = "0.9.0" }
+boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git", branch = "update/cw-plus"}
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
 cw1 = { path = "../../packages/cw1", version = "1.0.1" }

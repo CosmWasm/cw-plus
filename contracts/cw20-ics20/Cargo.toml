@@ -18,7 +18,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-boot-core = { version = "0.9.0" }
+boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git", branch = "update/cw-plus"}
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
 cw2 = { path = "../../packages/cw2", version = "1.0.1" }
