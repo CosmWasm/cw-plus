@@ -19,7 +19,7 @@ library = []
 test-utils = []
 
 [dependencies]
-boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git", branch = "update/cw-plus"}
+boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git"}
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
 cw1 = { path = "../../packages/cw1", version = "1.0.1" }

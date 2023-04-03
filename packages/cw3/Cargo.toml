@@ -10,7 +10,7 @@ homepage = "https://cosmwasm.com"
 
 [dependencies]
 
-boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git", branch = "update/cw-plus"}
+boot-core     = { git = "https://github.com/Abstract-OS/BOOT.git"}
 cw-utils = "1.0.1"
 cw20 = { path = "../../packages/cw20", version = "1.0.1" }
 cosmwasm-schema = "1.1.0"
