@@ -1,10 +1,12 @@
+#[cfg(features="script")]
 use boot_core::QueryFns;
 
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::CosmosMsg;
 
 #[cw_serde]
-#[derive(QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(features="script", derive(QueryFns))]
 pub enum Cw1QueryMsg {
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,

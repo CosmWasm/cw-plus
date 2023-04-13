@@ -1,3 +1,4 @@
+#[cfg(features="script")]
 use boot_core::{ExecuteFns, QueryFns};
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -10,7 +11,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-#[derive(ExecuteFns)]
+#[cfg_attr(features="script", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
@@ -24,7 +25,8 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses, QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(features="script", derive(QueryFns))]
 pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
     #[returns(AdminListResponse)]

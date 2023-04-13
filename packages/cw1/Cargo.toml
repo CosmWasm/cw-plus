@@ -8,10 +8,16 @@ license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
+[features]
+script = ["boot-macros/outside_contract", "dep:boot-contract-derive", "dep:boot-core"]
+
 [dependencies]
 
-boot-core     = { version = "0.10.0"}
 cosmwasm-schema = "1.1.0"
 cosmwasm-std = "1.1.0"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+
+boot-macros = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
+boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
+boot-core = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }

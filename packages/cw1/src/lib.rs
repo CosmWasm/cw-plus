@@ -26,5 +26,16 @@ pub mod msg;
 pub mod query;
 
 pub use crate::helpers::Cw1Contract;
-pub use crate::msg::{Cw1ExecuteMsg, Cw1ExecuteMsgFns};
-pub use crate::query::{CanExecuteResponse, Cw1QueryMsg, Cw1QueryMsgFns};
+
+#[cfg(features="script")]
+pub use crate::msg::Cw1ExecuteMsgFns;
+#[cfg(features="script")]
+pub use crate::query::Cw1QueryMsgFns;
+
+
+
+
+
+pub use crate::msg::{Cw1ExecuteMsg};
+pub use crate::query::{CanExecuteResponse, Cw1QueryMsg};
+
