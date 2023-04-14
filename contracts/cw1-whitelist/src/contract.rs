@@ -17,7 +17,7 @@ use crate::state::{AdminList, ADMIN_LIST};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-use boot_macros::boot_contract;
+use boot_contract_derive::boot_contract;
 
 
 #[boot_contract]

@@ -27,7 +27,7 @@ use crate::msg::{
 };
 use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
 
-use boot_macros::boot_contract;
+use boot_contract_derive::boot_contract;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
@@ -35,11 +35,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[boot_contract]
 pub fn instantiate(
-    mut deps: DepsMut,
+    deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
+    let mut deps = deps;
     let result = whitelist_instantiate(deps.branch(), env, info, msg)?;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(result)

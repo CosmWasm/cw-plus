@@ -17,7 +17,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 test-utils = []
-script = ["boot-macros/outside_contract", "dep:boot-contract-derive", "dep:boot-core"]
+script = ["boot-contract-derive/outside_contract","boot-fns-derive/outside_contract", "dep:boot-core"]
 
 [dependencies]
 cosmwasm-schema = { version = "1.1.0" }
@@ -30,8 +30,8 @@ schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
 
-boot-macros = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
-boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
+boot-fns-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
+boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
 boot-core = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
 
 [dev-dependencies]
