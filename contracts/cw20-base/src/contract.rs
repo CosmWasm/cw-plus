@@ -24,6 +24,7 @@ use crate::state::{
     TOKEN_INFO,
 };
 
+use boot_contract_derive::boot_contract;
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -91,13 +92,14 @@ fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[boot_contract]
 pub fn instantiate(
-    mut deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    let mut deps = deps;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -184,7 +186,7 @@ pub fn validate_accounts(accounts: &[Cw20Coin]) -> Result<(), ContractError> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[boot_contract]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -504,7 +506,7 @@ pub fn execute_upload_logo(
     Ok(res)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[boot_contract]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),

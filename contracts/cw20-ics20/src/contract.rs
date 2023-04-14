@@ -24,17 +24,19 @@ use crate::state::{
 };
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
+use boot_contract_derive::boot_contract;
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[boot_contract]
 pub fn instantiate(
-    mut deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InitMsg,
 ) -> Result<Response, ContractError> {
+    let mut deps = deps;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let cfg = Config {
         default_timeout: msg.default_timeout,
@@ -56,7 +58,8 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+
+#[boot_contract]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -270,7 +273,7 @@ fn from_semver(err: semver::Error) -> StdError {
     StdError::generic_err(format!("Semver: {}", err))
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[boot_contract]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Port {} => to_binary(&query_port(deps)?),
