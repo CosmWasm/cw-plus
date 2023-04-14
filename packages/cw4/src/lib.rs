@@ -21,7 +21,7 @@ For more information on this specification, please check out the
 
 mod helpers;
 mod hook;
-mod msg;
+pub mod msg;
 mod query;
 
 pub use crate::helpers::Cw4Contract;

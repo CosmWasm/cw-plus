@@ -12,7 +12,7 @@ For more information on this specification, please check out the
 // mod helpers;
 mod deposit;
 mod helpers;
-mod msg;
+pub mod msg;
 mod proposal;
 mod query;
 
