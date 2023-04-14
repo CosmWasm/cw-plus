@@ -27,11 +27,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // make use of the custom errors
 #[boot_contract]
 pub fn instantiate(
-    mut deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    let mut deps = deps;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let api = deps.api;
     ADMIN.set(deps.branch(), maybe_addr(api, msg.admin)?)?;
