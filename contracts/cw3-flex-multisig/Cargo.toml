@@ -1,0 +1,42 @@
+[package]
+name = "cw3-flex-multisig"
+version = "1.0.1"
+authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
+edition = "2021"
+description = "Implementing cw3 with multiple voting patterns and dynamic groups"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cw-plus"
+homepage = "https://cosmwasm.com"
+documentation = "https://docs.cosmwasm.com"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+backtraces = ["cosmwasm-std/backtraces"]
+# use library feature to disable all instantiate/execute/query exports
+library = []
+script = ["boot-contract-derive/outside_contract","boot-fns-derive/outside_contract", "dep:boot-core"]
+
+[dependencies]
+
+boot-fns-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
+boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
+boot-core = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
+cosmwasm-schema = { version = "1.1.0" }
+cw-utils = "1.0.1"
+cw2 = { path = "../../packages/cw2", version = "1.0.1" }
+cw3 = { path = "../../packages/cw3", version = "1.0.1" }
+cw3-fixed-multisig = { path = "../cw3-fixed-multisig", version = "1.0.1", features = ["library"] }
+cw4 = { path = "../../packages/cw4", version = "1.0.1" }
+cw20 = { path = "../../packages/cw20", version = "1.0.1" }
+cw-storage-plus = "1.0.1"
+cosmwasm-std = { version = "1.1.0" }
+schemars = "0.8.1"
+serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.23" }
+
+[dev-dependencies]
+cw4-group = { path = "../cw4-group", version = "1.0.1" }
+cw-multi-test = "0.16.1"
+cw20-base = { path = "../cw20-base", version = "1.0.1" }

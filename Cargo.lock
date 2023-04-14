@@ -392,6 +392,174 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw20"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-utils",
+ "schemars",
+ "serde",
+]
+
+[[package]]
+name = "cw20-base"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2 1.0.1",
+ "cw20",
+ "schemars",
+ "semver",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw20-ics20"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-controllers",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2 1.0.1",
+ "cw20",
+ "schemars",
+ "semver",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw3"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-utils",
+ "cw20",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw3-fixed-multisig"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2 1.0.1",
+ "cw20",
+ "cw20-base",
+ "cw3",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw3-flex-multisig"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-multi-test",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2 1.0.1",
+ "cw20",
+ "cw20-base",
+ "cw3",
+ "cw3-fixed-multisig",
+ "cw4",
+ "cw4-group",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw4"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "schemars",
+ "serde",
+]
+
+[[package]]
+name = "cw4-group"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-controllers",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2 1.0.1",
+ "cw4",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw4-stake"
+version = "1.0.1"
+dependencies = [
+ "boot-contract-derive",
+ "boot-core",
+ "boot-fns-derive",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-controllers",
+ "cw-storage-plus",
+ "cw-utils",
+ "cw2 1.0.1",
+ "cw20",
+ "cw4",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
