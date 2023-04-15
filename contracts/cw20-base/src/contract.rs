@@ -1,5 +1,4 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
+
 use cosmwasm_std::Order::Ascending;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
@@ -588,7 +587,7 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[boot_contract]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let original_version =
         ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;

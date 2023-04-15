@@ -1,5 +1,4 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{
     coins, from_slice, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Order,
     Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,

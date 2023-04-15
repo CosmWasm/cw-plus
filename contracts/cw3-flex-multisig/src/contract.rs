@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
+
 use cosmwasm_std::{
     to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
     Response, StdResult,
