@@ -14,7 +14,7 @@ mod deposit;
 mod helpers;
 pub mod msg;
 mod proposal;
-mod query;
+pub mod query;
 
 pub use crate::deposit::{DepositError, DepositInfo, UncheckedDepositInfo};
 pub use crate::helpers::Cw3Contract;

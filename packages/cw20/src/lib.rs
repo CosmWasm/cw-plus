@@ -30,7 +30,7 @@ mod denom;
 mod helpers;
 mod logo;
 pub mod msg;
-mod query;
+pub mod query;
 mod receiver;
 
 #[cfg(test)]

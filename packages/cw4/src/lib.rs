@@ -22,7 +22,7 @@ For more information on this specification, please check out the
 mod helpers;
 mod hook;
 pub mod msg;
-mod query;
+pub mod query;
 
 pub use crate::helpers::Cw4Contract;
 pub use crate::hook::{MemberChangedHookMsg, MemberDiff};
