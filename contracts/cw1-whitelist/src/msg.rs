@@ -24,8 +24,7 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses)]
-#[derive(QueryFns)]
+#[derive(QueryResponses, QueryFns)]
 pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
     #[returns(AdminListResponse)]

@@ -19,7 +19,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use boot_contract_derive::boot_contract;
 
-
 #[boot_contract]
 pub fn instantiate(
     deps: DepsMut,

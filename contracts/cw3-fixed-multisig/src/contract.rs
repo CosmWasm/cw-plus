@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-
 use cosmwasm_std::{
     to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
     Response, StdResult,

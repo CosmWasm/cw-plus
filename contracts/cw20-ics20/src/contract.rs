@@ -56,7 +56,6 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-
 #[boot_contract]
 pub fn execute(
     deps: DepsMut,
