@@ -33,6 +33,9 @@ pub struct Ics20Packet {
     pub receiver: String,
     /// the sender address
     pub sender: String,
+    /// optional memo for the IBC transfer
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
 }
 
 impl Ics20Packet {
@@ -42,7 +45,12 @@ impl Ics20Packet {
             amount,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
+            memo: None
         }
+    }
+
+    pub fn with_memo(self, memo: Option<String>) -> Self {
+        Ics20Packet { memo, ..self }
     }
 
     pub fn validate(&self) -> Result<(), ContractError> {

@@ -51,6 +51,8 @@ pub struct TransferMsg {
     pub remote_address: String,
     /// How long the packet lives in seconds. If not specified, use default_timeout
     pub timeout: Option<u64>,
+    /// An optional memo to add to the IBC transfer
+    pub memo: Option<String>,
 }
 
 #[cw_serde]
