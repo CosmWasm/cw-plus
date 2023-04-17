@@ -16,12 +16,12 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
-script = ["boot-contract-derive/outside_contract","boot-fns-derive/outside_contract", "dep:boot-core"]
+boot = ["dep:boot-contract-derive","dep:boot-fns-derive", "dep:boot-core"]
 
 [dependencies]
 
-boot-fns-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
-boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface" }
+boot-fns-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
+boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true  }
 boot-core = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"

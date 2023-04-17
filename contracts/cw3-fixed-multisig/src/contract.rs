@@ -17,12 +17,13 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{next_id, Config, BALLOTS, CONFIG, PROPOSALS, VOTERS};
 
+#[cfg(features="boot")]
 use boot_contract_derive::boot_contract;
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -53,7 +54,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -236,7 +237,7 @@ pub fn execute_close(
         .add_attribute("proposal_id", proposal_id.to_string()))
 }
 
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),

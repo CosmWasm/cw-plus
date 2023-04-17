@@ -15,6 +15,7 @@ use cw_utils::{maybe_addr, NativeBalance};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
+#[cfg(features="boot")]
 use boot_contract_derive::boot_contract;
 
 // version info for migration info
@@ -23,7 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -51,7 +52,7 @@ pub fn instantiate(
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -287,7 +288,7 @@ fn coin_to_string(amount: Uint128, denom: &str) -> String {
     format!("{} {}", amount, denom)
 }
 
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member {

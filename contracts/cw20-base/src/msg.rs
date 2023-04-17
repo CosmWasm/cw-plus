@@ -1,3 +1,4 @@
+#[cfg(features="boot")]
 use boot_fns_derive::QueryFns;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{StdError, StdResult, Uint128};
@@ -72,7 +73,8 @@ impl InstantiateMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses, QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(features="boot", derive(QueryFns))]
 pub enum QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     #[returns(cw20::BalanceResponse)]

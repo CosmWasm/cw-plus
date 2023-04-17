@@ -15,6 +15,7 @@ use crate::helpers::validate_unique_members;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{ADMIN, HOOKS, MEMBERS, TOTAL};
 
+#[cfg(features="boot")]
 use boot_contract_derive::boot_contract;
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw4-group";
@@ -22,7 +23,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -63,7 +64,7 @@ pub fn create(
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -156,7 +157,7 @@ pub fn update_members(
     Ok(MemberChangedHookMsg { diffs })
 }
 
-#[boot_contract]
+#[cfg_attr(features="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member {

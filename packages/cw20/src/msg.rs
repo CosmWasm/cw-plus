@@ -1,11 +1,12 @@
 use crate::logo::Logo;
+#[cfg(features="boot")]
 use boot_fns_derive::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Uint128};
 use cw_utils::Expiration;
 
 #[cw_serde]
-#[derive(ExecuteFns)]
+#[cfg_attr(features="boot", derive(ExecuteFns))]
 pub enum Cw20ExecuteMsg {
     /// Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },

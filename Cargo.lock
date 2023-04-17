@@ -64,7 +64,7 @@ dependencies = [
 [[package]]
 name = "boot-contract-derive"
 version = "0.10.0"
-source = "git+https://github.com/Kayanski/BOOT?branch=feature/new-contract-interface#b56008fff129f307bc28c403ff1a2873f041d765"
+source = "git+https://github.com/Kayanski/BOOT?branch=feature/new-contract-interface#bd0bf46009066178b032d81cf30b984a96d589ae"
 dependencies = [
  "convert_case",
  "cosmwasm-std",
@@ -79,7 +79,7 @@ dependencies = [
 [[package]]
 name = "boot-core"
 version = "0.10.0"
-source = "git+https://github.com/Kayanski/BOOT?branch=feature/new-contract-interface#b56008fff129f307bc28c403ff1a2873f041d765"
+source = "git+https://github.com/Kayanski/BOOT?branch=feature/new-contract-interface#bd0bf46009066178b032d81cf30b984a96d589ae"
 dependencies = [
  "anyhow",
  "boot-contract-derive",
@@ -96,7 +96,7 @@ dependencies = [
 [[package]]
 name = "boot-fns-derive"
 version = "0.10.0"
-source = "git+https://github.com/Kayanski/BOOT?branch=feature/new-contract-interface#b56008fff129f307bc28c403ff1a2873f041d765"
+source = "git+https://github.com/Kayanski/BOOT?branch=feature/new-contract-interface#bd0bf46009066178b032d81cf30b984a96d589ae"
 dependencies = [
  "convert_case",
  "proc-macro2",

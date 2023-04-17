@@ -1,3 +1,4 @@
+#[cfg(features="boot")]
 use boot_fns_derive::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw4::Member;
@@ -11,7 +12,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-#[derive(ExecuteFns)]
+#[cfg_attr(features="boot", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// Change the admin
     UpdateAdmin { admin: Option<String> },
@@ -28,7 +29,8 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-#[derive(QueryResponses, QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(features="boot", derive(QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_controllers::AdminResponse)]
     Admin {},

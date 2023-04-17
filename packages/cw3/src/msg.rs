@@ -1,3 +1,4 @@
+#[cfg(features="boot")]
 use boot_fns_derive::ExecuteFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use cosmwasm_std::CosmosMsg;
 use cw_utils::Expiration;
 
 #[cw_serde]
-#[derive(ExecuteFns)]
+#[cfg_attr(features="boot", derive(ExecuteFns))]
 pub enum Cw3ExecuteMsg {
     Propose {
         title: String,
