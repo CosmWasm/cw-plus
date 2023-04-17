@@ -16,12 +16,7 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
-script = ["boot-contract-derive/outside_contract","boot-fns-derive/outside_contract", "dep:boot-core", 
-	"cw3/script",
-	"cw3-fixed-multisig/script",
-	"cw4/script",
-	"cw20/script",
-	]
+script = ["boot-contract-derive/outside_contract","boot-fns-derive/outside_contract", "dep:boot-core"]
 
 [dependencies]
 
