@@ -473,6 +473,7 @@ mod test {
             amount: amount.into(),
             sender: "remote-sender".to_string(),
             receiver: receiver.to_string(),
+            memo: None,
         };
         print!("Packet denom: {}", &data.denom);
         IbcPacket::new(
@@ -519,6 +520,7 @@ mod test {
             channel: send_channel.to_string(),
             remote_address: "remote-rcpt".to_string(),
             timeout: None,
+            memo: None,
         };
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: "local-sender".to_string(),
@@ -533,6 +535,7 @@ mod test {
             amount: Uint128::new(987654321),
             sender: "local-sender".to_string(),
             receiver: "remote-rcpt".to_string(),
+            memo: None,
         };
         let timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
         assert_eq!(
@@ -599,6 +602,7 @@ mod test {
             channel: send_channel.to_string(),
             remote_address: "my-remote-address".to_string(),
             timeout: None,
+            memo: None,
         });
         let info = mock_info("local-sender", &coins(987654321, denom));
         execute(deps.as_mut(), mock_env(), info, msg).unwrap();
