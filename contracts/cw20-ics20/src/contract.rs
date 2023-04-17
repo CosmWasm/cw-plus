@@ -135,7 +135,8 @@ pub fn execute_transfer(
         amount.denom(),
         sender.as_ref(),
         &msg.remote_address,
-    ).with_memo(msg.memo);
+    )
+    .with_memo(msg.memo);
     packet.validate()?;
 
     // Update the balance now (optimistically) like ibctransfer modules.

@@ -45,7 +45,7 @@ impl Ics20Packet {
             amount,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
-            memo: None
+            memo: None,
         }
     }
 
