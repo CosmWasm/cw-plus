@@ -626,7 +626,7 @@ mod test {
         };
 
         // works with proper funds
-        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let msg = ExecuteMsg::Transfer(transfer);
         let info = mock_info("foobar", &coins(1234567, "ucosm"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(res.messages[0].gas_limit, None);
