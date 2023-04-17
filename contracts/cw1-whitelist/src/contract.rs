@@ -17,10 +17,10 @@ use crate::state::{AdminList, ADMIN_LIST};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -40,7 +40,7 @@ pub fn map_validate(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
     admins.iter().map(|addr| api.addr_validate(addr)).collect()
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -116,7 +116,7 @@ fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
     Ok(can)
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),

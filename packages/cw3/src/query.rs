@@ -1,4 +1,4 @@
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_fns_derive::QueryFns;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, CosmosMsg, Empty};
@@ -8,7 +8,7 @@ use crate::{msg::Vote, DepositInfo};
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(features="boot", derive(QueryFns))]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum Cw3QueryMsg {
     /// Returns the threshold rules that would be used for a new proposal that was
     /// opened right now. The threshold rules do not change often, but the `total_weight`

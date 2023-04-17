@@ -1,4 +1,4 @@
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_fns_derive::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, CosmosMsg};
@@ -7,7 +7,7 @@ use cw_utils::{Expiration, NativeBalance};
 use crate::state::Permissions;
 
 #[cw_serde]
-#[cfg_attr(features="boot", derive(ExecuteFns))]
+#[cfg_attr(feature="boot", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
@@ -41,7 +41,7 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(features="boot", derive(QueryFns))]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum QueryMsg {
     /// Shows all admins and whether or not it is mutable
     #[returns(cw1_whitelist::msg::AdminListResponse)]

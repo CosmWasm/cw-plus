@@ -1,4 +1,4 @@
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_fns_derive::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
@@ -23,7 +23,7 @@ pub struct InstantiateMsg {
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[cw_serde]
-#[cfg_attr(features="boot", derive(ExecuteFns))]
+#[cfg_attr(feature="boot", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     Propose {
         title: String,
@@ -49,7 +49,7 @@ pub enum ExecuteMsg {
 // We can also add this as a cw3 extension
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(features="boot", derive(QueryFns))]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_utils::ThresholdResponse)]
     Threshold {},

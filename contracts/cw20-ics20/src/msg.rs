@@ -1,4 +1,4 @@
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_fns_derive::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw20::Cw20ReceiveMsg;
@@ -31,7 +31,7 @@ pub struct MigrateMsg {
 }
 
 #[cw_serde]
-#[cfg_attr(features="boot", derive(ExecuteFns))]
+#[cfg_attr(feature="boot", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
@@ -58,7 +58,7 @@ pub struct TransferMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(features="boot", derive(QueryFns))]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum QueryMsg {
     /// Return the port ID bound by this contract.
     #[returns(PortResponse)]

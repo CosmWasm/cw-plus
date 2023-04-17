@@ -1,4 +1,4 @@
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_fns_derive::QueryFns;
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -6,7 +6,7 @@ use cosmwasm_std::CosmosMsg;
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(features="boot", derive(QueryFns))]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum Cw1QueryMsg {
     /// Checks permissions of the caller on this proxy.
     /// If CanExecute returns true then a call to `Execute` with the same message,

@@ -20,14 +20,14 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{Config, CONFIG};
 
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -61,7 +61,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -305,7 +305,7 @@ pub fn execute_membership_hook(
     Ok(Response::default())
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),

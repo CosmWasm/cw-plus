@@ -22,7 +22,7 @@ use crate::state::{
     TOKEN_INFO,
 };
 
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -91,7 +91,7 @@ fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
     }
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -185,7 +185,7 @@ pub fn validate_accounts(accounts: &[Cw20Coin]) -> Result<(), ContractError> {
     }
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -505,7 +505,7 @@ pub fn execute_upload_logo(
     Ok(res)
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
@@ -587,7 +587,7 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
     }
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let original_version =
         ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;

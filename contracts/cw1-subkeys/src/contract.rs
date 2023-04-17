@@ -27,14 +27,14 @@ use crate::msg::{
 };
 use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
 
-#[cfg(features="boot")]
+#[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -47,7 +47,7 @@ pub fn instantiate(
     Ok(result)
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -303,7 +303,7 @@ where
     Ok(res)
 }
 
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
@@ -455,7 +455,7 @@ pub fn query_all_permissions(
 }
 
 // Migrate contract if version is lower than current version
-#[cfg_attr(features="boot", boot_contract)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse()?;
     let storage_version: Version = get_contract_version(deps.storage)?.version.parse()?;
