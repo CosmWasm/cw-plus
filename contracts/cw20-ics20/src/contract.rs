@@ -612,4 +612,50 @@ mod test {
         let config = query_config(deps.as_ref()).unwrap();
         assert_eq!(config.default_gas_limit, Some(123456));
     }
+
+    fn test_with_memo(memo: &str) {
+        let send_channel = "channel-5";
+        let mut deps = setup(&[send_channel, "channel-10"], &[]);
+
+        let transfer = TransferMsg {
+            channel: send_channel.to_string(),
+            remote_address: "foreign-address".to_string(),
+            timeout: None,
+            memo: Some(memo.to_string()),
+        };
+
+        // works with proper funds
+        let msg = ExecuteMsg::Transfer(transfer.clone());
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(res.messages[0].gas_limit, None);
+        assert_eq!(1, res.messages.len());
+        if let CosmosMsg::Ibc(IbcMsg::SendPacket {
+            channel_id,
+            data,
+            timeout,
+        }) = &res.messages[0].msg
+        {
+            let expected_timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
+            assert_eq!(timeout, &expected_timeout.into());
+            assert_eq!(channel_id.as_str(), send_channel);
+            let msg: Ics20Packet = from_binary(data).unwrap();
+            assert_eq!(msg.amount, Uint128::new(1234567));
+            assert_eq!(msg.denom.as_str(), "ucosm");
+            assert_eq!(msg.sender.as_str(), "foobar");
+            assert_eq!(msg.receiver.as_str(), "foreign-address");
+        } else {
+            panic!("Unexpected return message: {:?}", res.messages[0]);
+        }
+    }
+
+    #[test]
+    fn execute_with_memo_works() {
+        test_with_memo("memo");
+    }
+
+    #[test]
+    fn execute_with_empty_string_memo_works() {
+        test_with_memo("");
+    }
 }
