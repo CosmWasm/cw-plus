@@ -24,10 +24,14 @@ use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 #[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
@@ -57,6 +61,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
@@ -208,6 +213,7 @@ const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
 // the new functionality starts in 0.13.1, this is the last release that needs to be migrated to v3
 const MIGRATE_VERSION_3: &str = "0.13.0";
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let mut deps = deps;
@@ -272,6 +278,7 @@ fn from_semver(err: semver::Error) -> StdError {
     StdError::generic_err(format!("Semver: {}", err))
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {

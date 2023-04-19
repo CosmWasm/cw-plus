@@ -29,11 +29,14 @@ use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
 
 #[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-subkeys";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
@@ -47,6 +50,7 @@ pub fn instantiate(
     Ok(result)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
@@ -303,6 +307,7 @@ where
     Ok(res)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -455,6 +460,7 @@ pub fn query_all_permissions(
 }
 
 // Migrate contract if version is lower than current version
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: Empty) -> Result<Response, ContractError> {
     let version: Version = CONTRACT_VERSION.parse()?;

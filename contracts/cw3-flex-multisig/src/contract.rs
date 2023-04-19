@@ -22,11 +22,14 @@ use crate::state::{Config, CONFIG};
 
 #[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
@@ -61,6 +64,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
@@ -305,6 +309,7 @@ pub fn execute_membership_hook(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {

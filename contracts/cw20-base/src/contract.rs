@@ -24,6 +24,9 @@ use crate::state::{
 
 #[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -91,6 +94,7 @@ fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
     }
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
@@ -185,6 +189,7 @@ pub fn validate_accounts(accounts: &[Cw20Coin]) -> Result<(), ContractError> {
     }
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
@@ -505,6 +510,7 @@ pub fn execute_upload_logo(
     Ok(res)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -587,6 +593,7 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
     }
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let original_version =

@@ -19,7 +19,10 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
@@ -40,6 +43,7 @@ pub fn map_validate(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
     admins.iter().map(|addr| api.addr_validate(addr)).collect()
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
@@ -116,6 +120,7 @@ fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
     Ok(can)
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {

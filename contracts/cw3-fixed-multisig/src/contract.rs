@@ -19,10 +19,14 @@ use crate::state::{next_id, Config, BALLOTS, CONFIG, PROPOSALS, VOTERS};
 
 #[cfg(feature="boot")]
 use boot_contract_derive::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
@@ -54,6 +58,7 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
@@ -237,6 +242,7 @@ pub fn execute_close(
         .add_attribute("proposal_id", proposal_id.to_string()))
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
 #[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
