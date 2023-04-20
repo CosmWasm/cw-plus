@@ -135,7 +135,8 @@ pub fn execute_transfer(
         amount.denom(),
         sender.as_ref(),
         &msg.remote_address,
-    );
+    )
+    .with_memo(msg.memo);
     packet.validate()?;
 
     // Update the balance now (optimistically) like ibctransfer modules.
@@ -382,6 +383,7 @@ mod test {
     use super::*;
     use crate::test_helpers::*;
 
+    use cosmwasm_schema::cw_serde;
     use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
     use cosmwasm_std::{coin, coins, CosmosMsg, IbcMsg, StdError, Uint128};
 
@@ -431,6 +433,7 @@ mod test {
             channel: send_channel.to_string(),
             remote_address: "foreign-address".to_string(),
             timeout: None,
+            memo: None,
         };
 
         // works with proper funds
@@ -492,6 +495,7 @@ mod test {
             channel: send_channel.to_string(),
             remote_address: "foreign-address".to_string(),
             timeout: Some(7777),
+            memo: None,
         };
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: "my-account".into(),
@@ -538,6 +542,7 @@ mod test {
             channel: send_channel.to_string(),
             remote_address: "foreign-address".to_string(),
             timeout: Some(7777),
+            memo: None,
         };
         let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
             sender: "my-account".into(),
@@ -607,5 +612,94 @@ mod test {
         // check config updates
         let config = query_config(deps.as_ref()).unwrap();
         assert_eq!(config.default_gas_limit, Some(123456));
+    }
+
+    fn test_with_memo(memo: &str) {
+        let send_channel = "channel-5";
+        let mut deps = setup(&[send_channel, "channel-10"], &[]);
+
+        let transfer = TransferMsg {
+            channel: send_channel.to_string(),
+            remote_address: "foreign-address".to_string(),
+            timeout: None,
+            memo: Some(memo.to_string()),
+        };
+
+        // works with proper funds
+        let msg = ExecuteMsg::Transfer(transfer);
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(res.messages[0].gas_limit, None);
+        assert_eq!(1, res.messages.len());
+        if let CosmosMsg::Ibc(IbcMsg::SendPacket {
+            channel_id,
+            data,
+            timeout,
+        }) = &res.messages[0].msg
+        {
+            let expected_timeout = mock_env().block.time.plus_seconds(DEFAULT_TIMEOUT);
+            assert_eq!(timeout, &expected_timeout.into());
+            assert_eq!(channel_id.as_str(), send_channel);
+            let msg: Ics20Packet = from_binary(data).unwrap();
+            assert_eq!(msg.amount, Uint128::new(1234567));
+            assert_eq!(msg.denom.as_str(), "ucosm");
+            assert_eq!(msg.sender.as_str(), "foobar");
+            assert_eq!(msg.receiver.as_str(), "foreign-address");
+            assert_eq!(
+                msg.memo
+                    .expect("Memo was None when Some was expected")
+                    .as_str(),
+                memo
+            );
+        } else {
+            panic!("Unexpected return message: {:?}", res.messages[0]);
+        }
+    }
+
+    #[test]
+    fn execute_with_memo_works() {
+        test_with_memo("memo");
+    }
+
+    #[test]
+    fn execute_with_empty_string_memo_works() {
+        test_with_memo("");
+    }
+
+    #[test]
+    fn memo_is_backwards_compatible() {
+        let mut deps = setup(&["channel-5", "channel-10"], &[]);
+        let transfer: TransferMsg = cosmwasm_std::from_slice(
+            br#"{"channel": "channel-5", "remote_address": "foreign-address"}"#,
+        )
+        .unwrap();
+
+        let msg = ExecuteMsg::Transfer(transfer);
+        let info = mock_info("foobar", &coins(1234567, "ucosm"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(1, res.messages.len());
+        if let CosmosMsg::Ibc(IbcMsg::SendPacket {
+            channel_id: _,
+            data,
+            timeout: _,
+        }) = &res.messages[0].msg
+        {
+            let msg: Ics20Packet = from_binary(data).unwrap();
+            assert_eq!(msg.memo, None);
+
+            // This is the old version of the Ics20Packet. Deserializing into it
+            // should still work as the memo isn't included
+            #[cw_serde]
+            struct Ics20PacketNoMemo {
+                pub amount: Uint128,
+                pub denom: String,
+                pub sender: String,
+                pub receiver: String,
+            }
+
+            let _msg: Ics20PacketNoMemo = from_binary(data).unwrap();
+        } else {
+            panic!("Unexpected return message: {:?}", res.messages[0]);
+        }
     }
 }
