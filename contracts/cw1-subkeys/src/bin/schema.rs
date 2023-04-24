@@ -1,5 +1,5 @@
-use cosmwasm_std::Empty;
 use cosmwasm_schema::write_api;
+use cosmwasm_std::Empty;
 
 use cw1_subkeys::msg::{ExecuteMsg, QueryMsg};
 

@@ -1,5 +1,5 @@
-use cosmwasm_std::Empty;
 use cosmwasm_schema::write_api;
+use cosmwasm_std::Empty;
 
 use cw3_fixed_multisig::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 

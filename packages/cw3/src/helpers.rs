@@ -1,5 +1,5 @@
-use cosmwasm_std::Empty;
 use cosmwasm_schema::cw_serde;
+use cosmwasm_std::Empty;
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 
 use crate::msg::{Cw3ExecuteMsg, Vote};

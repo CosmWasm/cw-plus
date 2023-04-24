@@ -1,6 +1,6 @@
 use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{CosmosMsg};
+use cosmwasm_std::CosmosMsg;
 use cw3::Vote;
 use cw_utils::{Duration, Expiration, Threshold};
 

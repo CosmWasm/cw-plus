@@ -44,9 +44,9 @@ pub enum Vote {
 
 #[cfg(test)]
 mod test {
-    use cosmwasm_std::Empty;
-use super::*;
+    use super::*;
     use cosmwasm_std::to_vec;
+    use cosmwasm_std::Empty;
 
     #[test]
     fn vote_encoding() {

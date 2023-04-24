@@ -1,5 +1,5 @@
-use cosmwasm_std::Empty;
 use cosmwasm_schema::write_api;
+use cosmwasm_std::Empty;
 
 use cw1_whitelist::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 
