@@ -1,5 +1,5 @@
 #[cfg(feature="boot")]
-use boot_fns_derive::ExecuteFns;
+use boot_core::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 
 #[cw_serde]

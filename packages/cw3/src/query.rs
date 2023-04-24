@@ -1,5 +1,5 @@
 #[cfg(feature="boot")]
-use boot_fns_derive::QueryFns;
+use boot_core::QueryFns;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, CosmosMsg, Empty};
 use cw_utils::{Expiration, ThresholdResponse};

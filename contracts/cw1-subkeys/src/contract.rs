@@ -28,7 +28,7 @@ use crate::msg::{
 use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
 
 #[cfg(feature="boot")]
-use boot_contract_derive::boot_contract;
+use boot_core::boot_contract;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

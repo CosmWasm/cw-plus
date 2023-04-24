@@ -18,7 +18,7 @@ const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(feature="boot")]
-use boot_contract_derive::boot_contract;
+use boot_core::boot_contract;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

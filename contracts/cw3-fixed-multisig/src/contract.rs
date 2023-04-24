@@ -18,7 +18,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{next_id, Config, BALLOTS, CONFIG, PROPOSALS, VOTERS};
 
 #[cfg(feature="boot")]
-use boot_contract_derive::boot_contract;
+use boot_core::boot_contract;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

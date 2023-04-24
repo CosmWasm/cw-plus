@@ -40,3 +40,7 @@ overflow-checks = true
 opt-level = 3
 debug = false
 debug-assertions = false
+
+
+[patch.crates-io]
+boot-core = { git="https://github.com/Kayanski/BOOT.git", branch="feature/new-contract-interface"  }

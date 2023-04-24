@@ -1,5 +1,5 @@
 #[cfg(feature="boot")]
-use boot_fns_derive::{ExecuteFns, QueryFns};
+use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
 use cw3::{UncheckedDepositInfo, Vote};

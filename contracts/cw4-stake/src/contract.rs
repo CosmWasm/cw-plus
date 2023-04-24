@@ -16,7 +16,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 #[cfg(feature="boot")]
-use boot_contract_derive::boot_contract;
+use boot_core::boot_contract;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

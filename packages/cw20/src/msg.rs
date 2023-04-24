@@ -1,6 +1,6 @@
 use crate::logo::Logo;
 #[cfg(feature="boot")]
-use boot_fns_derive::ExecuteFns;
+use boot_core::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Uint128};
 use cw_utils::Expiration;

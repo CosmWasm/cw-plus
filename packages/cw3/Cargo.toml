@@ -9,13 +9,11 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [features]
-boot = ["dep:boot-contract-derive","dep:boot-fns-derive", "dep:boot-core"]
+boot = ["dep:boot-core"]
 
 [dependencies]
 
-boot-fns-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
-boot-contract-derive = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true  }
-boot-core = { git = "https://github.com/Kayanski/BOOT", branch = "feature/new-contract-interface", optional=true }
+boot-core = { version="0.10.0", optional=true }
 cw-utils = "1.0.1"
 cw20 = { path = "../../packages/cw20", version = "1.0.1" }
 cosmwasm-schema = "1.1.0"
