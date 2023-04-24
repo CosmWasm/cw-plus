@@ -7,11 +7,11 @@ use crate::state::Permissions;
 
 #[cw_serde]
 #[derive(ExecuteFns)]
-pub enum ExecuteMsg {
+pub enum ExecuteMsg<T> {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
     /// determine in
-    Execute { msgs: Vec<CosmosMsg> },
+    Execute { msgs: Vec<CosmosMsg<T>> },
     /// Freeze will make a mutable contract immutable, must be called by an admin
     Freeze {},
     /// UpdateAdmins will change the admin set of the contract, must be called by an existing admin,
@@ -40,7 +40,7 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 #[derive(QueryResponses, QueryFns)]
-pub enum QueryMsg {
+pub enum QueryMsg<T> {
     /// Shows all admins and whether or not it is mutable
     #[returns(cw1_whitelist::msg::AdminListResponse)]
     AdminList {},
@@ -54,7 +54,7 @@ pub enum QueryMsg {
     /// If CanExecute returns true then a call to `Execute` with the same message,
     /// before any further state changes, should also succeed.
     #[returns(cw1::CanExecuteResponse)]
-    CanExecute { sender: String, msg: CosmosMsg },
+    CanExecute { sender: String, msg: CosmosMsg<T> },
     /// Gets all Allowances for this contract
     #[returns(AllAllowancesResponse)]
     AllAllowances {

@@ -59,7 +59,7 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: ExecuteMsg,
+    msg: ExecuteMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
         ExecuteMsg::Propose {

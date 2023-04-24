@@ -8,11 +8,11 @@ use cw_utils::Expiration;
 
 #[cw_serde]
 #[derive(ExecuteFns)]
-pub enum Cw3ExecuteMsg {
+pub enum Cw3ExecuteMsg<T> {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg>,
+        msgs: Vec<CosmosMsg<T>>,
         earliest: Option<Expiration>,
         latest: Option<Expiration>,
     },
@@ -44,7 +44,8 @@ pub enum Vote {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use cosmwasm_std::Empty;
+use super::*;
     use cosmwasm_std::to_vec;
 
     #[test]
@@ -57,7 +58,7 @@ mod test {
 
     #[test]
     fn vote_encoding_embedded() {
-        let msg = Cw3ExecuteMsg::Vote {
+        let msg = Cw3ExecuteMsg::<Empty>::Vote {
             proposal_id: 17,
             vote: Vote::No,
         };

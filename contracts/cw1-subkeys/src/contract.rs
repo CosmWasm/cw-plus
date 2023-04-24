@@ -52,7 +52,7 @@ pub fn execute(
     info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
-    msg: ExecuteMsg,
+    msg: ExecuteMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
         ExecuteMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
@@ -302,7 +302,7 @@ where
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg<Empty>) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::Allowance { spender } => to_binary(&query_allowance(deps, env, spender)?),

@@ -1,6 +1,6 @@
 use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{CosmosMsg, Empty};
+use cosmwasm_std::{CosmosMsg};
 use cw3::{UncheckedDepositInfo, Vote};
 use cw4::MemberChangedHookMsg;
 use cw_utils::{Duration, Expiration, Threshold};
@@ -23,11 +23,11 @@ pub struct InstantiateMsg {
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[cw_serde]
 #[derive(ExecuteFns)]
-pub enum ExecuteMsg {
+pub enum ExecuteMsg<T> {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg<Empty>>,
+        msgs: Vec<CosmosMsg<T>>,
         // note: we ignore API-spec'd earliest if passed, always opens immediately
         latest: Option<Expiration>,
     },

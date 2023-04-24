@@ -65,7 +65,7 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: ExecuteMsg,
+    msg: ExecuteMsg<Empty>,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
         ExecuteMsg::Propose {
@@ -671,7 +671,7 @@ mod tests {
         (msgs, title, description)
     }
 
-    fn pay_somebody_proposal() -> ExecuteMsg {
+    fn pay_somebody_proposal() -> ExecuteMsg<Empty> {
         let (msgs, title, description) = proposal_info();
         ExecuteMsg::Propose {
             title,
@@ -681,7 +681,7 @@ mod tests {
         }
     }
 
-    fn text_proposal() -> ExecuteMsg {
+    fn text_proposal() -> ExecuteMsg<Empty> {
         let (_, title, description) = proposal_info();
         ExecuteMsg::Propose {
             title,
@@ -1039,7 +1039,7 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Owner with 0 voting power cannot vote
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -1080,7 +1080,7 @@ mod tests {
         assert_eq!(tally, 1);
 
         // Cast a No vote
-        let no_vote = ExecuteMsg::Vote {
+        let no_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::No,
         };
@@ -1089,7 +1089,7 @@ mod tests {
             .unwrap();
 
         // Cast a Veto vote
-        let veto_vote = ExecuteMsg::Vote {
+        let veto_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Veto,
         };
@@ -1193,7 +1193,7 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Cast a No vote
-        let no_vote = ExecuteMsg::Vote {
+        let no_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::No,
         };
@@ -1217,7 +1217,7 @@ mod tests {
         );
 
         // Rejected proposals can still be voted (while they are not expired)
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -1270,7 +1270,7 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Only Passed can be executed
-        let execution = ExecuteMsg::Execute { proposal_id };
+        let execution = ExecuteMsg::<Empty>::Execute { proposal_id };
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &execution, &[])
             .unwrap_err();
@@ -1280,7 +1280,7 @@ mod tests {
         );
 
         // Vote it, so it passes
-        let vote = ExecuteMsg::Vote {
+        let vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -1298,7 +1298,7 @@ mod tests {
         );
 
         // In passing: Try to close Passed fails
-        let closing = ExecuteMsg::Close { proposal_id };
+        let closing = ExecuteMsg::<Empty>::Close { proposal_id };
         let err = app
             .execute_contract(Addr::unchecked(OWNER), flex_addr.clone(), &closing, &[])
             .unwrap_err();
@@ -1374,14 +1374,14 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Vote it, so it passes
-        let vote = ExecuteMsg::Vote {
+        let vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
         app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &vote, &[])
             .unwrap();
 
-        let execution = ExecuteMsg::Execute { proposal_id };
+        let execution = ExecuteMsg::<Empty>::Execute { proposal_id };
         let err = app
             .execute_contract(
                 Addr::unchecked(Addr::unchecked("anyone")), // anyone is not allowed to execute
@@ -1431,14 +1431,14 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Vote it, so it passes
-        let vote = ExecuteMsg::Vote {
+        let vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
         app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &vote, &[])
             .unwrap();
 
-        let execution = ExecuteMsg::Execute { proposal_id };
+        let execution = ExecuteMsg::<Empty>::Execute { proposal_id };
         let err = app
             .execute_contract(
                 Addr::unchecked(Addr::unchecked("anyone")), // anyone is not allowed to execute
@@ -1502,7 +1502,7 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Vote it, so it passes after voting period is over
-        let vote = ExecuteMsg::Vote {
+        let vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -1537,7 +1537,7 @@ mod tests {
             .execute_contract(
                 Addr::unchecked(SOMEBODY),
                 flex_addr.clone(),
-                &ExecuteMsg::Close { proposal_id },
+                &ExecuteMsg::<Empty>::Close { proposal_id },
                 &[],
             )
             .unwrap_err();
@@ -1548,7 +1548,7 @@ mod tests {
             .execute_contract(
                 Addr::unchecked(SOMEBODY),
                 flex_addr,
-                &ExecuteMsg::Execute { proposal_id },
+                &ExecuteMsg::<Empty>::Execute { proposal_id },
                 &[],
             )
             .unwrap();
@@ -1592,7 +1592,7 @@ mod tests {
         let proposal_id: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // Non-expired proposals cannot be closed
-        let closing = ExecuteMsg::Close { proposal_id };
+        let closing = ExecuteMsg::<Empty>::Close { proposal_id };
         let err = app
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr.clone(), &closing, &[])
             .unwrap_err();
@@ -1613,7 +1613,7 @@ mod tests {
         );
 
         // Trying to close it again fails
-        let closing = ExecuteMsg::Close { proposal_id };
+        let closing = ExecuteMsg::<Empty>::Close { proposal_id };
         let err = app
             .execute_contract(Addr::unchecked(SOMEBODY), flex_addr, &closing, &[])
             .unwrap_err();
@@ -1712,7 +1712,7 @@ mod tests {
         let proposal_id2: u64 = res.custom_attrs(1)[2].value.parse().unwrap();
 
         // VOTER2 can pass this alone with the updated vote (newer height ignores snapshot)
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id: proposal_id2,
             vote: Vote::Yes,
         };
@@ -1721,7 +1721,7 @@ mod tests {
         assert_eq!(prop_status(&app, proposal_id2), Status::Passed);
 
         // VOTER2 can only vote on first proposal with weight of 2 (not enough to pass)
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -1821,13 +1821,13 @@ mod tests {
         app.update_block(|b| b.height += 1);
 
         // Pass and execute first proposal
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id: update_proposal_id,
             vote: Vote::Yes,
         };
         app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &yes_vote, &[])
             .unwrap();
-        let execution = ExecuteMsg::Execute {
+        let execution = ExecuteMsg::<Empty>::Execute {
             proposal_id: update_proposal_id,
         };
         app.execute_contract(Addr::unchecked(VOTER4), flex_addr.clone(), &execution, &[])
@@ -1842,7 +1842,7 @@ mod tests {
 
         // VOTER3 can still pass the cash proposal
         // voting on it fails
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id: cash_proposal_id,
             vote: Vote::Yes,
         };
@@ -1863,7 +1863,7 @@ mod tests {
         assert_eq!(ContractError::Unauthorized {}, err.downcast().unwrap());
 
         // extra: ensure no one else can call the hook
-        let hook_hack = ExecuteMsg::MemberChangedHook(MemberChangedHookMsg {
+        let hook_hack = ExecuteMsg::<Empty>::MemberChangedHook(MemberChangedHookMsg {
             diffs: vec![MemberDiff::new(VOTER1, Some(1), None)],
         });
         let err = app
@@ -1930,7 +1930,7 @@ mod tests {
 
         // VOTER2 votes according to original weights: 3 + 2 = 5 / 12 => Open
         // with updated weights, it would be 3 + 9 = 12 / 12 => Passed
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -2015,7 +2015,7 @@ mod tests {
 
         // VOTER2 votes yes, according to original weights: 3 yes, 2 no, 5 total (will fail when expired)
         // with updated weights, it would be 3 yes, 9 yes, 11 total (will pass when expired)
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -2070,7 +2070,7 @@ mod tests {
         app.update_block(|block| block.height += 3);
 
         // reach 60% of yes votes, not enough to pass early (or late)
-        let yes_vote = ExecuteMsg::Vote {
+        let yes_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::Yes,
         };
@@ -2080,7 +2080,7 @@ mod tests {
         assert_eq!(prop_status(&app), Status::Open);
 
         // add 3 weight no vote and we hit quorum and this passes
-        let no_vote = ExecuteMsg::Vote {
+        let no_vote = ExecuteMsg::<Empty>::Vote {
             proposal_id,
             vote: Vote::No,
         };
@@ -2250,7 +2250,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr.clone(),
-            &ExecuteMsg::Execute { proposal_id: 1 },
+            &ExecuteMsg::<Empty>::Execute { proposal_id: 1 },
             &[],
         )
         .unwrap();
@@ -2311,7 +2311,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr.clone(),
-            &ExecuteMsg::Vote {
+            &ExecuteMsg::<Empty>::Vote {
                 proposal_id: 2,
                 vote: Vote::No,
             },
@@ -2325,7 +2325,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr,
-            &ExecuteMsg::Close { proposal_id: 2 },
+            &ExecuteMsg::<Empty>::Close { proposal_id: 2 },
             &[],
         )
         .unwrap();
@@ -2394,7 +2394,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr.clone(),
-            &ExecuteMsg::Vote {
+            &ExecuteMsg::<Empty>::Vote {
                 proposal_id: 1,
                 vote: Vote::No,
             },
@@ -2408,7 +2408,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr,
-            &ExecuteMsg::Close { proposal_id: 1 },
+            &ExecuteMsg::<Empty>::Close { proposal_id: 1 },
             &[],
         )
         .unwrap();
@@ -2480,7 +2480,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr.clone(),
-            &ExecuteMsg::Execute { proposal_id: 1 },
+            &ExecuteMsg::<Empty>::Execute { proposal_id: 1 },
             &[],
         )
         .unwrap();
@@ -2512,7 +2512,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr.clone(),
-            &ExecuteMsg::Vote {
+            &ExecuteMsg::<Empty>::Vote {
                 proposal_id: 2,
                 vote: Vote::No,
             },
@@ -2526,7 +2526,7 @@ mod tests {
         app.execute_contract(
             Addr::unchecked(VOTER4),
             flex_addr,
-            &ExecuteMsg::Close { proposal_id: 2 },
+            &ExecuteMsg::<Empty>::Close { proposal_id: 2 },
             &[],
         )
         .unwrap();

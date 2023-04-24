@@ -65,7 +65,7 @@ impl Suite {
     where
         M: Serialize + DeserializeOwned,
     {
-        let execute: ExecuteMsg = ExecuteMsg::Execute {
+        let execute: ExecuteMsg<Empty> = ExecuteMsg::Execute {
             msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: target_contract.to_string(),
                 msg: to_binary(&msg)?,
@@ -102,13 +102,13 @@ fn proxy_freeze_message() {
         suite.instantiate_cw1_contract(vec![first_contract.addr().to_string()], true);
     assert_ne!(second_contract, first_contract);
 
-    let freeze_msg: ExecuteMsg = ExecuteMsg::Freeze {};
+    let freeze_msg: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
     assert_matches!(
         suite.execute(first_contract.addr(), &second_contract.addr(), freeze_msg),
         Ok(_)
     );
 
-    let query_msg: QueryMsg = QueryMsg::AdminList {};
+    let query_msg: QueryMsg<Empty> = QueryMsg::AdminList {};
     assert_matches!(
         suite.query(second_contract.addr(), query_msg),
         Ok(
