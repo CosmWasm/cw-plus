@@ -17,9 +17,9 @@ backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 test-utils = []
+boot = ["dep:boot-core"]
 
 [dependencies]
-boot-core     = { version = "0.10.0"}
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
 cw1 = { path = "../../packages/cw1", version = "1.0.1" }
@@ -32,5 +32,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = "1.0.23"
 semver = "1"
 
-[dev-dependencies]
-cw1-whitelist = { path = "../cw1-whitelist", version = "1.0.1", features = ["library", "test-utils"] }
+boot-core = { version="0.10.0", optional=true }

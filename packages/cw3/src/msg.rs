@@ -1,4 +1,6 @@
+#[cfg(feature="boot")]
 use boot_core::ExecuteFns;
+use cosmwasm_std::Empty;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -7,12 +9,12 @@ use cosmwasm_std::CosmosMsg;
 use cw_utils::Expiration;
 
 #[cw_serde]
-#[derive(ExecuteFns)]
-pub enum Cw3ExecuteMsg {
+#[cfg_attr(feature="boot", derive(ExecuteFns))]
+pub enum Cw3ExecuteMsg<T = Empty> {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg>,
+        msgs: Vec<CosmosMsg<T>>,
         earliest: Option<Expiration>,
         latest: Option<Expiration>,
     },
@@ -46,6 +48,7 @@ pub enum Vote {
 mod test {
     use super::*;
     use cosmwasm_std::to_vec;
+    use cosmwasm_std::Empty;
 
     #[test]
     fn vote_encoding() {

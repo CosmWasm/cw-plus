@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
     Response, StdResult,
@@ -19,11 +17,17 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{next_id, Config, BALLOTS, CONFIG, PROPOSALS, VOTERS};
 
+#[cfg(feature="boot")]
+use boot_core::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
+
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-fixed-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -55,6 +59,7 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -238,6 +243,7 @@ pub fn execute_close(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),

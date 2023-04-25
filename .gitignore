@@ -16,10 +16,10 @@ target/
 .cargo-ok
 
 # Build artifacts
-*.wasm
-hash.txt
-contracts.txt
-artifacts/
+#  *.wasm
+#  hash.txt
+#  contracts.txt
+#  artifacts/
 
 # code coverage
 tarpaulin-report.*

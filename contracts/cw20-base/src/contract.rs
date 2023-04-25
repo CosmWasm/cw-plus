@@ -1,5 +1,3 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
 use cosmwasm_std::Order::Ascending;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Uint128,
@@ -23,6 +21,11 @@ use crate::state::{
     MinterData, TokenInfo, ALLOWANCES, ALLOWANCES_SPENDER, BALANCES, LOGO, MARKETING_INFO,
     TOKEN_INFO,
 };
+
+#[cfg(feature="boot")]
+use boot_core::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-base";
@@ -92,12 +95,14 @@ fn verify_logo(logo: &Logo) -> Result<(), ContractError> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
-    mut deps: DepsMut,
+    deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    let mut deps = deps;
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     // check valid token info
     msg.validate()?;
@@ -185,6 +190,7 @@ pub fn validate_accounts(accounts: &[Cw20Coin]) -> Result<(), ContractError> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -505,6 +511,7 @@ pub fn execute_upload_logo(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Balance { address } => to_binary(&query_balance(deps, address)?),
@@ -587,6 +594,7 @@ pub fn query_download_logo(deps: Deps) -> StdResult<DownloadLogoResponse> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, ContractError> {
     let original_version =
         ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;

@@ -1,8 +1,6 @@
 use schemars::JsonSchema;
 use std::fmt;
 
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
     StdResult,
@@ -19,7 +17,13 @@ use crate::state::{AdminList, ADMIN_LIST};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg(feature="boot")]
+use boot_core::boot_contract;
+#[cfg(not(feature="library"))]
+use cosmwasm_std::entry_point;
+
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -40,6 +44,7 @@ pub fn map_validate(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(feature="boot", boot_contract)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -116,7 +121,8 @@ fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+#[cfg_attr(feature="boot", boot_contract)]
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg<Empty>) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
         QueryMsg::CanExecute { sender, msg } => to_binary(&query_can_execute(deps, sender, msg)?),

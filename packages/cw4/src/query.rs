@@ -1,8 +1,10 @@
+#[cfg(feature="boot")]
 use boot_core::QueryFns;
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
-#[derive(QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum Cw4QueryMsg {
     /// Return AdminResponse
     #[returns(AdminResponse)]

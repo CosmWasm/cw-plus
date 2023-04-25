@@ -108,7 +108,7 @@ fn proxy_freeze_message() {
         Ok(_)
     );
 
-    let query_msg: QueryMsg = QueryMsg::AdminList {};
+    let query_msg: QueryMsg<Empty> = QueryMsg::AdminList {};
     assert_matches!(
         suite.query(second_contract.addr(), query_msg),
         Ok(

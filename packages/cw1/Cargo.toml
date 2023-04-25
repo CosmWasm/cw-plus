@@ -8,10 +8,14 @@ license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
+[features]
+boot = ["dep:boot-core"]
+
 [dependencies]
 
-boot-core     = { version = "0.10.0"}
 cosmwasm-schema = "1.1.0"
 cosmwasm-std = "1.1.0"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+
+boot-core = { version="0.10.0", optional=true }

@@ -16,11 +16,11 @@ pub use crate::coin::{Cw20Coin, Cw20CoinVerified};
 pub use crate::denom::{Denom, UncheckedDenom};
 pub use crate::helpers::Cw20Contract;
 pub use crate::logo::{EmbeddedLogo, Logo, LogoInfo};
-pub use crate::msg::{Cw20ExecuteMsg, Cw20ExecuteMsgFns};
+pub use crate::msg::Cw20ExecuteMsg;
 pub use crate::query::{
     AllAccountsResponse, AllAllowancesResponse, AllSpenderAllowancesResponse, AllowanceInfo,
-    AllowanceResponse, BalanceResponse, Cw20QueryMsg, Cw20QueryMsgFns, DownloadLogoResponse,
-    MarketingInfoResponse, MinterResponse, SpenderAllowanceInfo, TokenInfoResponse,
+    AllowanceResponse, BalanceResponse, Cw20QueryMsg, DownloadLogoResponse, MarketingInfoResponse,
+    MinterResponse, SpenderAllowanceInfo, TokenInfoResponse,
 };
 pub use crate::receiver::Cw20ReceiveMsg;
 
@@ -29,8 +29,8 @@ mod coin;
 mod denom;
 mod helpers;
 mod logo;
-mod msg;
-mod query;
+pub mod msg;
+pub mod query;
 mod receiver;
 
 #[cfg(test)]

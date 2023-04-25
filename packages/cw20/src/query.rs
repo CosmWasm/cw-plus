@@ -1,15 +1,17 @@
+#[cfg(feature="boot")]
 use boot_core::QueryFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary, Uint128};
 
 use crate::logo::LogoInfo;
 use cw_utils::Expiration;
 
 #[cw_serde]
-#[derive(QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum Cw20QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     /// Return type: BalanceResponse.

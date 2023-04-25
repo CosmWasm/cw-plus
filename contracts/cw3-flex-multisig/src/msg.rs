@@ -1,3 +1,4 @@
+#[cfg(feature="boot")]
 use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
@@ -20,14 +21,13 @@ pub struct InstantiateMsg {
     pub proposal_deposit: Option<UncheckedDepositInfo>,
 }
 
-// TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[cw_serde]
-#[derive(ExecuteFns)]
-pub enum ExecuteMsg {
+#[cfg_attr(feature="boot", derive(ExecuteFns))]
+pub enum ExecuteMsg<T = Empty> {
     Propose {
         title: String,
         description: String,
-        msgs: Vec<CosmosMsg<Empty>>,
+        msgs: Vec<CosmosMsg<T>>,
         // note: we ignore API-spec'd earliest if passed, always opens immediately
         latest: Option<Expiration>,
     },
@@ -47,7 +47,8 @@ pub enum ExecuteMsg {
 
 // We can also add this as a cw3 extension
 #[cw_serde]
-#[derive(QueryResponses, QueryFns)]
+#[derive(QueryResponses)]
+#[cfg_attr(feature="boot", derive(QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_utils::ThresholdResponse)]
     Threshold {},
