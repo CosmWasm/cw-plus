@@ -51,7 +51,7 @@ pub fn execute(
     info: MessageInfo,
     // Note: implement this function with different type to add support for custom messages
     // and then import the rest of this contract code.
-    msg: ExecuteMsg<Empty>,
+    msg: ExecuteMsg,
 ) -> Result<Response<Empty>, ContractError> {
     match msg {
         ExecuteMsg::Execute { msgs } => execute_execute(deps, env, info, msgs),
@@ -239,7 +239,7 @@ mod tests {
         let info = mock_info(bob, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
-        let freeze: ExecuteMsg<Empty> = ExecuteMsg::Freeze {};
+        let freeze: ExecuteMsg = ExecuteMsg::Freeze {};
         let msgs = vec![
             BankMsg::Send {
                 to_address: bob.to_string(),

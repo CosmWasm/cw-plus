@@ -6,7 +6,7 @@ use cw1_whitelist::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 fn main() {
     write_api! {
         instantiate: InstantiateMsg,
-        execute: ExecuteMsg<Empty>,
+        execute: ExecuteMsg,
         query: QueryMsg<Empty>,
     }
 }

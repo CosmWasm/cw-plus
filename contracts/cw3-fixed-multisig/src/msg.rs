@@ -1,7 +1,7 @@
 #[cfg(feature="boot")]
 use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::CosmosMsg;
+use cosmwasm_std::{CosmosMsg, Empty};
 use cw3::Vote;
 use cw_utils::{Duration, Expiration, Threshold};
 
@@ -21,7 +21,7 @@ pub struct Voter {
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[cw_serde]
 #[cfg_attr(feature="boot", derive(ExecuteFns))]
-pub enum ExecuteMsg<T> {
+pub enum ExecuteMsg<T = Empty> {
     Propose {
         title: String,
         description: String,

@@ -1,5 +1,6 @@
 #[cfg(feature="boot")]
 use boot_core::ExecuteFns;
+use cosmwasm_std::Empty;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +10,7 @@ use cw_utils::Expiration;
 
 #[cw_serde]
 #[cfg_attr(feature="boot", derive(ExecuteFns))]
-pub enum Cw3ExecuteMsg<T> {
+pub enum Cw3ExecuteMsg<T = Empty> {
     Propose {
         title: String,
         description: String,
@@ -59,7 +60,7 @@ mod test {
 
     #[test]
     fn vote_encoding_embedded() {
-        let msg = Cw3ExecuteMsg::<Empty>::Vote {
+        let msg = Cw3ExecuteMsg::Vote {
             proposal_id: 17,
             vote: Vote::No,
         };

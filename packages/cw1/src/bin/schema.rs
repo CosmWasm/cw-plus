@@ -1,4 +1,3 @@
-use cosmwasm_std::Empty;
 use std::env::current_dir;
 use std::fs::create_dir_all;
 
@@ -12,7 +11,7 @@ fn main() {
     create_dir_all(&out_dir).unwrap();
     remove_schemas(&out_dir).unwrap();
 
-    export_schema_with_title(&schema_for!(Cw1ExecuteMsg<Empty>), &out_dir, "ExecuteMsg");
+    export_schema_with_title(&schema_for!(Cw1ExecuteMsg), &out_dir, "ExecuteMsg");
     export_schema_with_title(&schema_for!(Cw1QueryMsg), &out_dir, "QueryMsg");
     export_schema(&schema_for!(CanExecuteResponse), &out_dir);
 }

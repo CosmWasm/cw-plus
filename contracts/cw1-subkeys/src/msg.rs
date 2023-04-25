@@ -1,14 +1,14 @@
 #[cfg(feature="boot")]
 use boot_core::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Coin, CosmosMsg};
+use cosmwasm_std::{Coin, CosmosMsg, Empty};
 use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
 
 #[cw_serde]
 #[cfg_attr(feature="boot", derive(ExecuteFns))]
-pub enum ExecuteMsg<T> {
+pub enum ExecuteMsg<T = Empty> {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
     /// determine in

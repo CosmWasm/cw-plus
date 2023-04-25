@@ -1,5 +1,4 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::Empty;
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 
 use crate::msg::{Cw3ExecuteMsg, Vote};
@@ -20,7 +19,7 @@ impl Cw3Contract {
         self.0.clone()
     }
 
-    pub fn encode_msg(&self, msg: Cw3ExecuteMsg<Empty>) -> StdResult<CosmosMsg> {
+    pub fn encode_msg(&self, msg: Cw3ExecuteMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr().into(),
             msg: to_binary(&msg)?,
