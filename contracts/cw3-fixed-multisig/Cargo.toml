@@ -21,6 +21,7 @@ boot = ["dep:boot-core"]
 [dependencies]
 
 boot-core = { version="0.10.0", optional=true }
+cw-multi-test        = { workspace = true }
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
 cw2 = { path = "../../packages/cw2", version = "1.0.1" }

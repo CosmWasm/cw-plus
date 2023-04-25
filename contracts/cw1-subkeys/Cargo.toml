@@ -33,3 +33,4 @@ thiserror = "1.0.23"
 semver = "1"
 
 boot-core = { version="0.10.0", optional=true }
+cw-multi-test        = { workspace = true }

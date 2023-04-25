@@ -32,6 +32,7 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.23" }
 
 boot-core = { version="0.10.0", optional=true }
+cw-multi-test        = { workspace = true }
 
 [dev-dependencies]
 anyhow = "1"
