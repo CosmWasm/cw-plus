@@ -41,9 +41,6 @@ opt-level = 3
 debug = false
 debug-assertions = false
 
-[workspace.dependencies]
-cw-multi-test = { version = "0.16.0" }
-
 [patch.crates-io]
 #boot-core = { git="https://github.com/Kayanski/BOOT.git", branch="feature/new-contract-interface"  }
 boot-core = { path="../boot/boot-core" }
