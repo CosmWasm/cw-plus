@@ -16,10 +16,10 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
-boot = ["dep:boot-core"]
+interface = ["dep:cw-orchestrate"]
 
 [dependencies]
-boot-core = { version="0.10.0", optional=true }
+cw-orchestrate = { git = "https://github.com/AbstractSDK/cw-orchestrate", optional = true }
 
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"

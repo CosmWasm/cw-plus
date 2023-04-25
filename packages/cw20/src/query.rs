@@ -1,5 +1,5 @@
-#[cfg(feature="boot")]
-use boot_core::QueryFns;
+#[cfg(feature="interface")]
+use cw_orchestrate::QueryFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ use cw_utils::Expiration;
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="boot", derive(QueryFns))]
+#[cfg_attr(feature="interface", derive(QueryFns))]
 pub enum Cw20QueryMsg {
     /// Returns the current balance of the given address, 0 if unset.
     /// Return type: BalanceResponse.

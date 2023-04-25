@@ -1,6 +1,6 @@
 mod msg {
     use crate::logo::Logo;
-    use boot_core::ExecuteFns;
+    use cw_orchestrate::ExecuteFns;
     use cosmwasm_schema::cw_serde;
     use cosmwasm_std::{Binary, Uint128};
     use cw_utils::Expiration;
@@ -65,14 +65,14 @@ mod msg {
         UploadLogo(Logo),
     }
     pub trait Cw20ExecuteMsgFns<
-        Chain: ::boot_core::CwEnv,
-    >: ::boot_core::BootExecute<Chain, ExecuteMsg = Cw20ExecuteMsg> {
+        Chain: ::cw_orchestrate::CwEnv,
+    >: ::cw_orchestrate::BootExecute<Chain, ExecuteMsg = Cw20ExecuteMsg> {
         #[allow(clippy::too_many_arguments)]
         fn transfer(
             &self,
             amount: Uint128,
             recipient: String,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::Transfer {
                 amount,
                 recipient,
@@ -83,7 +83,7 @@ mod msg {
         fn burn(
             &self,
             amount: Uint128,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::Burn { amount };
             self.execute(&msg, None)
         }
@@ -93,7 +93,7 @@ mod msg {
             amount: Uint128,
             contract: String,
             msg: Binary,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::Send {
                 amount,
                 contract,
@@ -107,7 +107,7 @@ mod msg {
             amount: Uint128,
             spender: String,
             expires: Option<Expiration>,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::IncreaseAllowance {
                 amount,
                 spender,
@@ -121,7 +121,7 @@ mod msg {
             amount: Uint128,
             spender: String,
             expires: Option<Expiration>,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::DecreaseAllowance {
                 amount,
                 spender,
@@ -135,7 +135,7 @@ mod msg {
             amount: Uint128,
             owner: String,
             recipient: String,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::TransferFrom {
                 amount,
                 owner,
@@ -150,7 +150,7 @@ mod msg {
             contract: String,
             msg: Binary,
             owner: String,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::SendFrom {
                 amount,
                 contract,
@@ -164,7 +164,7 @@ mod msg {
             &self,
             amount: Uint128,
             owner: String,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::BurnFrom {
                 amount,
                 owner,
@@ -176,7 +176,7 @@ mod msg {
             &self,
             amount: Uint128,
             recipient: String,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::Mint {
                 amount,
                 recipient,
@@ -187,7 +187,7 @@ mod msg {
         fn update_minter(
             &self,
             new_minter: Option<String>,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::UpdateMinter {
                 new_minter,
             };
@@ -199,7 +199,7 @@ mod msg {
             description: Option<String>,
             marketing: Option<String>,
             project: Option<String>,
-        ) -> Result<::boot_core::TxResponse<Chain>, ::boot_core::BootError> {
+        ) -> Result<::cw_orchestrate::TxResponse<Chain>, ::cw_orchestrate::BootError> {
             let msg = Cw20ExecuteMsg::UpdateMarketing {
                 description,
                 marketing,
@@ -209,10 +209,10 @@ mod msg {
         }
     }
     #[automatically_derived]
-    impl<SupportedContract, Chain: ::boot_core::CwEnv> Cw20ExecuteMsgFns<Chain>
+    impl<SupportedContract, Chain: ::cw_orchestrate::CwEnv> Cw20ExecuteMsgFns<Chain>
     for SupportedContract
     where
-        SupportedContract: ::boot_core::BootExecute<Chain, ExecuteMsg = Cw20ExecuteMsg>,
+        SupportedContract: ::cw_orchestrate::BootExecute<Chain, ExecuteMsg = Cw20ExecuteMsg>,
     {}
     #[doc(hidden)]
     #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]

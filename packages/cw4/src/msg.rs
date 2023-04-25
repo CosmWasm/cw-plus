@@ -1,9 +1,9 @@
-#[cfg(feature="boot")]
-use boot_core::ExecuteFns;
+#[cfg(feature="interface")]
+use cw_orchestrate::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 
 #[cw_serde]
-#[cfg_attr(feature="boot", derive(ExecuteFns))]
+#[cfg_attr(feature="interface", derive(ExecuteFns))]
 pub enum Cw4ExecuteMsg {
     /// Change the admin
     UpdateAdmin { admin: Option<String> },

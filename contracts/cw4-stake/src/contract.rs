@@ -15,8 +15,8 @@ use cw_utils::{maybe_addr, NativeBalance};
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
-#[cfg(feature="boot")]
-use boot_core::boot_contract;
+#[cfg(feature="interface")]
+use cw_orchestrate::interface;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 
@@ -27,7 +27,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // Note, you can use StdResult in some functions where you do not
 // make use of the custom errors
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="boot", boot_contract)]
+#[cfg_attr(feature="interface", interface)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -56,7 +56,7 @@ pub fn instantiate(
 
 // And declare a custom Error variant for the ones where you will want to make use of it
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="boot", boot_contract)]
+#[cfg_attr(feature="interface", interface)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -293,7 +293,7 @@ fn coin_to_string(amount: Uint128, denom: &str) -> String {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="boot", boot_contract)]
+#[cfg_attr(feature="interface", interface)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Member {

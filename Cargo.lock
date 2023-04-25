@@ -243,17 +243,18 @@ dependencies = [
 [[package]]
 name = "boot-contract-derive"
 version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d5010efb5d2f121985dca0aa92acd3fce48bcdfc99f6b11a0464e8aeaf717d"
 dependencies = [
- "convert_case",
- "log",
  "quote",
- "schemars",
  "syn 1.0.109",
 ]
 
 [[package]]
 name = "boot-core"
 version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f94dfd762791312c37914087fc3771ec827e27295b87e5c941a904f9791cceb8"
 dependencies = [
  "anyhow",
  "base16",
@@ -271,7 +272,6 @@ dependencies = [
  "hex",
  "hkd32",
  "ibc-chain-registry",
- "ibc-relayer-types",
  "log",
  "prost 0.11.9",
  "rand_core 0.6.4",
@@ -291,6 +291,8 @@ dependencies = [
 [[package]]
 name = "boot-fns-derive"
 version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d393ab931ab528220197c7fe9bfc361f0a0459743d4dd49211cec86ee1d70232"
 dependencies = [
  "convert_case",
  "proc-macro2",
