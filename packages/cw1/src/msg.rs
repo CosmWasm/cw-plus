@@ -6,9 +6,9 @@ use cosmwasm_std::CosmosMsg;
 
 #[cw_serde]
 #[cfg_attr(feature="boot", derive(ExecuteFns))]
-pub enum Cw1ExecuteMsg {
+pub enum Cw1ExecuteMsg<T> {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
     /// determine in
-    Execute { msgs: Vec<CosmosMsg> },
+    Execute { msgs: Vec<CosmosMsg<T>> },
 }

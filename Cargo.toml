@@ -41,7 +41,6 @@ opt-level = 3
 debug = false
 debug-assertions = false
 
-
 [workspace.dependencies]
 cw-multi-test = { version = "0.16.0" }
 

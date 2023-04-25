@@ -107,7 +107,7 @@ fn cw3_controls_cw20() {
         msg: to_binary(&cw20_mint_msg).unwrap(),
         funds: vec![],
     };
-    let propose_msg = ExecuteMsg::Propose {
+    let propose_msg = ExecuteMsg::<Empty>::Propose {
         title: "Mint tokens".to_string(),
         description: "Need to mint tokens".to_string(),
         msgs: vec![execute_mint_msg.into()],
@@ -119,7 +119,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // second votes
-    let vote2_msg = ExecuteMsg::Vote {
+    let vote2_msg = ExecuteMsg::<Empty>::Vote {
         proposal_id: 1,
         vote: Vote::Yes,
     };
@@ -128,7 +128,7 @@ fn cw3_controls_cw20() {
         .unwrap();
 
     // only 1 vote and msg mint fails
-    let execute_proposal_msg = ExecuteMsg::Execute { proposal_id: 1 };
+    let execute_proposal_msg = ExecuteMsg::<Empty>::Execute { proposal_id: 1 };
     // execute mint
     router
         .execute_contract(addr1, multisig_addr, &execute_proposal_msg, &[])
