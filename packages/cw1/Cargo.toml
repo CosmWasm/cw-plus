@@ -9,7 +9,7 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [features]
-interface = ["dep:cw-orchestrate"]
+interface = ["dep:cw-orch"]
 
 [dependencies]
 
@@ -18,4 +18,4 @@ cosmwasm-std = "1.1.0"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 
-cw-orchestrate = { git = "https://github.com/AbstractSDK/cw-orchestrate", optional = true }
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchhestrator", optional = true }

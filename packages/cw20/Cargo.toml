@@ -9,10 +9,10 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [features]
-interface = ["dep:cw-orchestrate"]
+interface = ["dep:cw-orch"]
 
 [dependencies]
-cw-orchestrate = { git = "https://github.com/AbstractSDK/cw-orchestrate", optional = true }
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchhestrator", optional = true }
 cw-utils = "1.0.1"
 cosmwasm-schema = "1.1.0"
 cosmwasm-std = "1.1.0"

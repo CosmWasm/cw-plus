@@ -16,10 +16,10 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all init/handle/query exports
 library = []
-interface = ["dep:cw-orchestrate"]
+interface = ["dep:cw-orch"]
 
 [dependencies]
-cw-orchestrate = { git = "https://github.com/AbstractSDK/cw-orchestrate", optional = true }
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchhestrator", optional = true }
 cosmwasm-schema = { version = "1.1.0" }
 cw-utils = "1.0.1"
 cw2 = { path = "../../packages/cw2", version = "1.0.1" }

@@ -1,5 +1,5 @@
 #[cfg(feature="interface")]
-use cw_orchestrate::ExecuteFns;
+use cw_orch::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 
 #[cw_serde]

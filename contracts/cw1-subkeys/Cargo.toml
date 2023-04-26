@@ -17,7 +17,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 test-utils = []
-interface = ["dep:cw-orchestrate"]
+interface = ["dep:cw-orch"]
 
 [dependencies]
 cosmwasm-schema = { version = "1.1.0" }
@@ -32,4 +32,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = "1.0.23"
 semver = "1"
 
-cw-orchestrate = { git = "https://github.com/AbstractSDK/cw-orchestrate", optional = true }
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchhestrator", optional = true }

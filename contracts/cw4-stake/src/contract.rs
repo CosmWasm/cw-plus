@@ -16,7 +16,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, ReceiveMsg, StakedResponse};
 use crate::state::{Config, ADMIN, CLAIMS, CONFIG, HOOKS, MEMBERS, STAKE, TOTAL};
 #[cfg(feature="interface")]
-use cw_orchestrate::interface;
+use cw_orch::interface;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

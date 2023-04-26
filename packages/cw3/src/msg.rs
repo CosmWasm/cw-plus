@@ -1,5 +1,5 @@
 #[cfg(feature="interface")]
-use cw_orchestrate::ExecuteFns;
+use cw_orch::ExecuteFns;
 use cosmwasm_std::Empty;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

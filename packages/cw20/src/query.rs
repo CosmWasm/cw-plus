@@ -1,5 +1,5 @@
 #[cfg(feature="interface")]
-use cw_orchestrate::QueryFns;
+use cw_orch::QueryFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

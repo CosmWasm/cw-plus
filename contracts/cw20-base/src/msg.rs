@@ -1,5 +1,5 @@
 #[cfg(feature="interface")]
-use cw_orchestrate::QueryFns;
+use cw_orch::QueryFns;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{StdError, StdResult, Uint128};
 use cw20::{Cw20Coin, Logo, MinterResponse};

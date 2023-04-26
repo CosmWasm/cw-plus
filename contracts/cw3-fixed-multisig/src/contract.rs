@@ -18,7 +18,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{next_id, Config, BALLOTS, CONFIG, PROPOSALS, VOTERS};
 
 #[cfg(feature="interface")]
-use cw_orchestrate::interface;
+use cw_orch::interface;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

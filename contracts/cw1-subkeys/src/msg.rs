@@ -1,5 +1,5 @@
 #[cfg(feature="interface")]
-use cw_orchestrate::{ExecuteFns, QueryFns};
+use cw_orch::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, CosmosMsg, Empty};
 use cw_utils::{Expiration, NativeBalance};

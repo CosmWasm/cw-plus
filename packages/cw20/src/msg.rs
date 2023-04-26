@@ -1,6 +1,6 @@
 use crate::logo::Logo;
 #[cfg(feature="interface")]
-use cw_orchestrate::ExecuteFns;
+use cw_orch::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Uint128};
 use cw_utils::Expiration;

@@ -28,7 +28,7 @@ use crate::msg::{
 use crate::state::{Allowance, Permissions, ALLOWANCES, PERMISSIONS};
 
 #[cfg(feature="interface")]
-use cw_orchestrate::interface;
+use cw_orch::interface;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 

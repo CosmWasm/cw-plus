@@ -23,7 +23,7 @@ use crate::state::{
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
 #[cfg(feature="interface")]
-use cw_orchestrate::interface;
+use cw_orch::interface;
 #[cfg(not(feature="library"))]
 use cosmwasm_std::entry_point;
 
