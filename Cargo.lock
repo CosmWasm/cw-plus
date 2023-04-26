@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "cw-orch"
 version = "0.10.0"
-source = "git+https://github.com/AbstractSDK/cw-orchestrator#769b331e321c1a311a49e68b46a95cc3726d3aa0"
+source = "git+https://github.com/AbstractSDK/cw-orchestrator?branch=fix/feature_flag_daemon_impl#d9f2da8f40368cd0f5e60c524f938487f1e82692"
 dependencies = [
  "anyhow",
  "cosmwasm-std",
@@ -262,7 +262,7 @@ dependencies = [
 [[package]]
 name = "cw-orch-contract-derive"
 version = "0.10.0"
-source = "git+https://github.com/AbstractSDK/cw-orchestrator#769b331e321c1a311a49e68b46a95cc3726d3aa0"
+source = "git+https://github.com/AbstractSDK/cw-orchestrator?branch=fix/feature_flag_daemon_impl#d9f2da8f40368cd0f5e60c524f938487f1e82692"
 dependencies = [
  "convert_case",
  "log",
@@ -274,7 +274,7 @@ dependencies = [
 [[package]]
 name = "cw-orch-fns-derive"
 version = "0.10.0"
-source = "git+https://github.com/AbstractSDK/cw-orchestrator#769b331e321c1a311a49e68b46a95cc3726d3aa0"
+source = "git+https://github.com/AbstractSDK/cw-orchestrator?branch=fix/feature_flag_daemon_impl#d9f2da8f40368cd0f5e60c524f938487f1e82692"
 dependencies = [
  "convert_case",
  "proc-macro2",
