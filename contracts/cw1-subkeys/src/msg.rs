@@ -1,13 +1,13 @@
-#[cfg(feature="interface")]
-use cw_orch::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, CosmosMsg, Empty};
+#[cfg(feature = "interface")]
+use cw_orch::{ExecuteFns, QueryFns};
 use cw_utils::{Expiration, NativeBalance};
 
 use crate::state::Permissions;
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum ExecuteMsg<T = Empty> {
     /// Execute requests the contract to re-dispatch all these messages with the
     /// contract's address as sender. Every implementation has it's own logic to
@@ -41,7 +41,7 @@ pub enum ExecuteMsg<T = Empty> {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(QueryFns))]
+#[cfg_attr(feature = "interface", derive(QueryFns))]
 pub enum QueryMsg<T> {
     /// Shows all admins and whether or not it is mutable
     #[returns(cw1_whitelist::msg::AdminListResponse)]

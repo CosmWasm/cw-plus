@@ -1,12 +1,12 @@
 use crate::logo::Logo;
-#[cfg(feature="interface")]
-use cw_orch::ExecuteFns;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Binary, Uint128};
+#[cfg(feature = "interface")]
+use cw_orch::ExecuteFns;
 use cw_utils::Expiration;
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum Cw20ExecuteMsg {
     /// Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },

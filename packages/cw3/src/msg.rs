@@ -1,6 +1,6 @@
-#[cfg(feature="interface")]
-use cw_orch::ExecuteFns;
 use cosmwasm_std::Empty;
+#[cfg(feature = "interface")]
+use cw_orch::ExecuteFns;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ use cosmwasm_std::CosmosMsg;
 use cw_utils::Expiration;
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum Cw3ExecuteMsg<T = Empty> {
     Propose {
         title: String,

@@ -1,9 +1,9 @@
-#[cfg(feature="interface")]
-use cw_orch::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
 use cw3::{UncheckedDepositInfo, Vote};
 use cw4::MemberChangedHookMsg;
+#[cfg(feature = "interface")]
+use cw_orch::{ExecuteFns, QueryFns};
 use cw_utils::{Duration, Expiration, Threshold};
 
 use crate::state::Executor;
@@ -22,7 +22,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum ExecuteMsg<T = Empty> {
     Propose {
         title: String,
@@ -48,7 +48,7 @@ pub enum ExecuteMsg<T = Empty> {
 // We can also add this as a cw3 extension
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(QueryFns))]
+#[cfg_attr(feature = "interface", derive(QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_utils::ThresholdResponse)]
     Threshold {},

@@ -1,7 +1,7 @@
-#[cfg(feature="interface")]
-use cw_orch::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw4::Member;
+#[cfg(feature = "interface")]
+use cw_orch::{ExecuteFns, QueryFns};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -12,7 +12,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// Change the admin
     UpdateAdmin { admin: Option<String> },
@@ -30,7 +30,7 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(QueryFns))]
+#[cfg_attr(feature = "interface", derive(QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_controllers::AdminResponse)]
     Admin {},

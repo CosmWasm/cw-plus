@@ -1,7 +1,7 @@
-#[cfg(feature="interface")]
-use cw_orch::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw20::Cw20ReceiveMsg;
+#[cfg(feature = "interface")]
+use cw_orch::{ExecuteFns, QueryFns};
 
 use crate::amount::Amount;
 use crate::state::ChannelInfo;
@@ -31,7 +31,7 @@ pub struct MigrateMsg {
 }
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
@@ -58,7 +58,7 @@ pub struct TransferMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(QueryFns))]
+#[cfg_attr(feature = "interface", derive(QueryFns))]
 pub enum QueryMsg {
     /// Return the port ID bound by this contract.
     #[returns(PortResponse)]

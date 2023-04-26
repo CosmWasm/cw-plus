@@ -1,10 +1,10 @@
-#[cfg(feature="interface")]
-use cw_orch::QueryFns;
 use cosmwasm_schema::{cw_serde, QueryResponses};
+#[cfg(feature = "interface")]
+use cw_orch::QueryFns;
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(QueryFns))]
+#[cfg_attr(feature = "interface", derive(QueryFns))]
 pub enum Cw4QueryMsg {
     /// Return AdminResponse
     #[returns(AdminResponse)]

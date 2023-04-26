@@ -1,7 +1,7 @@
-#[cfg(feature="interface")]
-use cw_orch::{ExecuteFns, QueryFns};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Uint128;
+#[cfg(feature = "interface")]
+use cw_orch::{ExecuteFns, QueryFns};
 
 use cw20::{Cw20ReceiveMsg, Denom};
 pub use cw_controllers::ClaimsResponse;
@@ -20,7 +20,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(ExecuteFns))]
 pub enum ExecuteMsg {
     /// Bond will bond all staking tokens sent with the message and update membership weight
     Bond {},
@@ -51,7 +51,7 @@ pub enum ReceiveMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(QueryFns))]
+#[cfg_attr(feature = "interface", derive(QueryFns))]
 pub enum QueryMsg {
     /// Claims shows the tokens in process of unbonding for this address
     #[returns(cw_controllers::ClaimsResponse)]

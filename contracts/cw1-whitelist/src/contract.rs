@@ -17,13 +17,13 @@ use crate::state::{AdminList, ADMIN_LIST};
 const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg(feature="interface")]
-use cw_orch::interface;
-#[cfg(not(feature="library"))]
+#[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+#[cfg(feature = "interface")]
+use cw_orch::interface;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -44,7 +44,7 @@ pub fn map_validate(api: &dyn Api, admins: &[String]) -> StdResult<Vec<Addr>> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -121,7 +121,7 @@ fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg<Empty>) -> StdResult<Binary> {
     match msg {
         QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),

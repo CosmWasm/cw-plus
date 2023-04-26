@@ -22,17 +22,17 @@ use crate::state::{
 };
 use cw_utils::{maybe_addr, nonpayable, one_coin};
 
-#[cfg(feature="interface")]
-use cw_orch::interface;
-#[cfg(not(feature="library"))]
+#[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+#[cfg(feature = "interface")]
+use cw_orch::interface;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw20-ics20";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -62,7 +62,7 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -214,7 +214,7 @@ const MIGRATE_VERSION_2: &str = "0.12.0-alpha1";
 const MIGRATE_VERSION_3: &str = "0.13.0";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let mut deps = deps;
     let version: Version = CONTRACT_VERSION.parse().map_err(from_semver)?;
@@ -279,7 +279,7 @@ fn from_semver(err: semver::Error) -> StdError {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature="interface", interface)]
+#[cfg_attr(feature = "interface", interface)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Port {} => to_binary(&query_port(deps)?),
