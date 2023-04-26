@@ -243,15 +243,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-orc"
+name = "cw-orch"
 version = "0.10.0"
-source = "git+https://github.com/AbstractSDK/cw-orchestrator#0ec4550523a61feb972f1d55b2a6214a409bf72f"
+source = "git+https://github.com/AbstractSDK/cw-orchestrator#769b331e321c1a311a49e68b46a95cc3726d3aa0"
 dependencies = [
  "anyhow",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orc-contract-derive",
- "cw-orc-fns-derive",
+ "cw-orch-contract-derive",
+ "cw-orch-fns-derive",
  "log",
  "schemars",
  "serde",
@@ -260,9 +260,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-orc-contract-derive"
+name = "cw-orch-contract-derive"
 version = "0.10.0"
-source = "git+https://github.com/AbstractSDK/cw-orchestrator#0ec4550523a61feb972f1d55b2a6214a409bf72f"
+source = "git+https://github.com/AbstractSDK/cw-orchestrator#769b331e321c1a311a49e68b46a95cc3726d3aa0"
 dependencies = [
  "convert_case",
  "log",
@@ -272,9 +272,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-orc-fns-derive"
+name = "cw-orch-fns-derive"
 version = "0.10.0"
-source = "git+https://github.com/AbstractSDK/cw-orchestrator#0ec4550523a61feb972f1d55b2a6214a409bf72f"
+source = "git+https://github.com/AbstractSDK/cw-orchestrator#769b331e321c1a311a49e68b46a95cc3726d3aa0"
 dependencies = [
  "convert_case",
  "proc-macro2",
@@ -314,7 +314,7 @@ version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orc",
+ "cw-orch",
  "schemars",
  "serde",
 ]
@@ -325,7 +325,7 @@ version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -346,7 +346,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -388,7 +388,7 @@ version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orc",
+ "cw-orch",
  "cw-utils",
  "schemars",
  "serde",
@@ -401,7 +401,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.0.1",
@@ -419,7 +419,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.0.1",
@@ -436,7 +436,7 @@ version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orc",
+ "cw-orch",
  "cw-utils",
  "cw20",
  "schemars",
@@ -451,7 +451,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.0.1",
@@ -469,7 +469,7 @@ version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.0.1",
@@ -490,7 +490,7 @@ version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "schemars",
  "serde",
@@ -503,7 +503,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.0.1",
@@ -520,7 +520,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
- "cw-orc",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.0.1",
