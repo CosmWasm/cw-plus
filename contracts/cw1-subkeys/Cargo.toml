@@ -34,4 +34,4 @@ serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 thiserror = "1.0.23"
 semver = "1"
 
-cw-orch = { git = "https://github.com/AbstractSDK/cw-orchestrator", branch = "fix/feature_flag_daemon_impl", optional = true }
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchestrator", optional = true }
