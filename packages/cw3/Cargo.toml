@@ -13,7 +13,7 @@ interface = ["dep:cw-orch"]
 
 [dependencies]
 
-cw-orch = { git = "https://github.com/AbstractSDK/cw-orchestrator", branch = "fix/feature_flag_daemon_impl", optional = true }
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchestrator", optional = true }
 cw-utils = "1.0.1"
 cw20 = { path = "../../packages/cw20", version = "1.0.1" }
 cosmwasm-schema = "1.1.0"
