@@ -17,6 +17,11 @@ use crate::state::{
 };
 use cw20::Cw20ExecuteMsg;
 
+#[cfg(feature = "interface")]
+use crate::contract::Cw20Ics20;
+#[cfg(feature = "interface")]
+use cw_orch::interface_entry_point;
+
 pub const ICS20_VERSION: &str = "ics20-1";
 pub const ICS20_ORDERING: IbcOrder = IbcOrder::Unordered;
 
@@ -79,7 +84,7 @@ const RECEIVE_ID: u64 = 1337;
 const ACK_FAILURE_ID: u64 = 0xfa17;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature = "interface", interface)]
+#[cfg_attr(feature = "interface", interface_entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
     match reply.id {
         RECEIVE_ID => match reply.result {

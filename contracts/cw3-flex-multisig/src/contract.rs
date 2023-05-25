@@ -23,14 +23,14 @@ use crate::state::{Config, CONFIG};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 #[cfg(feature = "interface")]
-use cw_orch::interface;
+use cw_orch::interface_entry_point;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw3-flex-multisig";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature = "interface", interface)]
+#[cfg_attr(feature = "interface", interface_entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -65,7 +65,7 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature = "interface", interface)]
+#[cfg_attr(feature = "interface", interface_entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -310,7 +310,7 @@ pub fn execute_membership_hook(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-#[cfg_attr(feature = "interface", interface)]
+#[cfg_attr(feature = "interface", interface_entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
