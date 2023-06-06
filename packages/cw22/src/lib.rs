@@ -63,43 +63,23 @@ pub fn query_supported_interface_version(
 }
 
 pub fn minimum_version(version: &str, required: &str) -> bool {
-    let mut req_str = ">=".to_owned();
-    req_str.push_str(required);
-    let req = VersionReq::parse(req_str.as_str());
-    let req = match req {
-        Ok(r) => r,
-        Err(_) => {
-            return false;
+    if let Ok(ver) = Version::parse(version) {
+        if let Ok(req) = VersionReq::parse(format!(">={}", required).as_str()) {
+            return req.matches(&ver);
         }
-    };
-    let ver = Version::parse(version);
-    let ver = match ver {
-        Ok(v) => v,
-        Err(_) => {
-            return false;
-        }
-    };
-    req.matches(&ver)
+    }
+    false
 }
 
 /// query_supported_interface show if contract supports an interface with version following SemVer query
 /// query example">=1.2.3, <1.8.0"
 pub fn require_version(version: &str, request: &str) -> bool {
-    let req = VersionReq::parse(request);
-    let req = match req {
-        Ok(r) => r,
-        Err(_) => {
-            return false;
+    if let Ok(ver) = Version::parse(version) {
+        if let Ok(req) = VersionReq::parse(request) {
+            return req.matches(&ver);
         }
-    };
-    let ver = Version::parse(version);
-    let ver = match ver {
-        Ok(v) => v,
-        Err(_) => {
-            return false;
-        }
-    };
-    req.matches(&ver)
+    }
+    false
 }
 
 #[cfg(test)]
@@ -147,45 +127,42 @@ mod tests {
         let loaded = query_supported_interface_version(&store, interface2).unwrap();
         let expected = String::from("0.16.0");
         assert_eq!(Some(expected), loaded);
+    }
 
-        // check request version
+    #[test]
+    fn test_require_version() {
         let version_req = ">=0.1.0";
         let result = require_version("0.16.0", version_req);
         assert!(result);
 
-        // check request version
         let version_req = ">=0.16.0";
         let result = require_version("0.1.0", version_req);
         assert!(!result);
 
-        // check request version
         let version_req = ">=1.2.3, <1.8.0";
         let result = require_version("0.16.0", version_req);
         assert!(!result);
 
-        // check request version - version format invalid
         let version_req = ">=0.2.3";
         let result = require_version("v0.16.0", version_req);
         assert!(!result);
 
-        // check require version - require version invalid
         let version_req = "!=0.2.3";
         let result = require_version("0.16.0", version_req);
         assert!(!result);
+    }
 
-        // check minimum version
+    #[test]
+    fn test_minimum_version() {
         let result = minimum_version("0.16.0", "0.2.3");
         assert!(result);
 
-        // check minimum version
         let result = minimum_version("0.2.0", "0.2.3");
         assert!(!result);
 
-        // check minimum version - version format error
         let result = minimum_version("v0.16.0", "0.2.3");
         assert!(!result);
 
-        // check minimum version - require version format error
         let result = minimum_version("0.16.0", "v0.2.3");
         assert!(!result);
     }
