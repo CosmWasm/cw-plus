@@ -372,6 +372,19 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw22"
+version = "0.1.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "schemars",
+ "semver",
+ "serde",
 ]
 
 [[package]]
