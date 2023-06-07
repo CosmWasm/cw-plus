@@ -21,6 +21,7 @@ workflows:
       - package_cw3
       - package_cw4
       - package_cw20
+      - package_cw22
       - lint
       - wasm-build
       - coverage
@@ -418,6 +419,31 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-v2-cw20:1.64.0-{{ checksum "~/project/Cargo.lock" }}
+
+  package_cw22:
+    docker:
+      - image: rust:1.64.0
+    working_directory: ~/project/packages/cw22
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Version information
+          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
+      - restore_cache:
+          keys:
+            - cargocache-v2-cw22:1.64.0-{{ checksum "~/project/Cargo.lock" }}
+      - run:
+          name: Build library for native target
+          command: cargo build --locked
+      - run:
+          name: Run unit tests
+          command: cargo test --locked
+      - save_cache:
+          paths:
+            - /usr/local/cargo/registry
+            - target
+          key: cargocache-v2-cw22:1.64.0-{{ checksum "~/project/Cargo.lock" }}
 
   package_cw1155:
     docker:
