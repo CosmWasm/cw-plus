@@ -19,7 +19,7 @@ pub const SUPPORTED_INTERFACES: Map<&str, String> = Map::new("supported_interfac
 
 #[cw_serde]
 pub struct ContractSupportedInterface<'a> {
-    /// supported_interface is the name of an interface that the contract support. 
+    /// supported_interface is the name of an interface that the contract support.
     /// This is inspired by the EIP-165 from Ethereum.
     /// Interface names should follow a common standard such as <Registry Domain>:<Crate Name> in Rust crate registry.
     /// e.g. "crates.io:cw2"
@@ -41,7 +41,11 @@ pub fn set_contract_supported_interface(
         let ver = Version::parse(&item.version);
         match ver {
             Ok(_) => {
-                SUPPORTED_INTERFACES.save(store, &item.supported_interface, &item.version.to_string())?;
+                SUPPORTED_INTERFACES.save(
+                    store,
+                    &item.supported_interface,
+                    &item.version.to_string(),
+                )?;
             }
             Err(_) => {
                 return Err(StdError::generic_err("Version's format is invalid"));
