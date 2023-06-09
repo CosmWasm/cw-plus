@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
-use std::fmt;
+use crate::no_std::fmt;
+use crate::no_std::prelude::*;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{CosmosMsg, Empty};

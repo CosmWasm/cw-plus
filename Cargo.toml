@@ -40,3 +40,14 @@ overflow-checks = true
 opt-level = 3
 debug = false
 debug-assertions = false
+
+[workspace.dependencies]
+cosmwasm-std = { git = "https://github.com/dzmitry-lahoda-forks/cosmwasm", rev = "1277597cbf380a8d04dbe676d9cb344ca31634b6", default-features = false, features = [
+  "iterator",
+  "cosmwasm_1_2",
+] }
+schemars = { version = "0.8.12" }
+cosmwasm-schema = { version = "1.2.6"}
+serde = { version = "1.0.103", default-features = false, features = ["derive", "alloc"] }
+thiserror = { version = "1.0.38", package = "thiserror-core", default-features = false }
+cw-storage-plus = { git = "https://github.com/dzmitry-lahoda-forks/cw-storage-plus/", rev="d0a2cf126cae3e3960c787ebcfc9baa54f59f71c", default-features= false}

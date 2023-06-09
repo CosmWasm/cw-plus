@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
-use std::fmt;
+use crate::no_std::fmt;
+use crate::no_std::prelude::*;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{CosmosMsg, Empty};
@@ -14,6 +15,7 @@ where
     /// from the given sender, before any further state changes, should also succeed.
     CanExecute { sender: String, msg: CosmosMsg<T> },
 }
+
 
 #[cw_serde]
 pub struct CanExecuteResponse {

@@ -1,0 +1,11 @@
+[toolchain]
+channel = "nightly-2022-11-17"
+components = [
+  "rust-src",
+  "cargo",
+]
+targets = [
+  "wasm32-unknown-unknown",
+  # that is the way to test that it checks and builds againt no_std target
+  "thumbv7em-none-eabi"
+  ]

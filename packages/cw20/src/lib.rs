@@ -8,7 +8,10 @@ to any standard cw20 contract.
 For more information on this specification, please check out the
 [README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw20/README.md).
 */
-
+#![cfg_attr(not(feature = "std"), no_std)]
+#![feature(error_in_core)]
+extern crate alloc;
+mod no_std;
 pub use cw_utils::Expiration;
 
 pub use crate::balance::Balance;
@@ -32,11 +35,3 @@ mod logo;
 mod msg;
 mod query;
 mod receiver;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        // test me
-    }
-}

@@ -8,12 +8,19 @@ license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
+
+[features]
+std = ["cosmwasm-std/std", "cw-utils/std"]
+
 [dependencies]
-cw-utils = "1.0.1"
-cosmwasm-schema = "1.1.0"
-cosmwasm-std = "1.1.0"
-schemars = "0.8.1"
-serde = { version = "1.0.103", default-features = false, features = ["derive"] }
+cw-utils = { path = "../cw-utils" }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, default-features = false, features = [
+    "derive",
+    "alloc",
+] }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "1.0.1" }
+cosmwasm-schema = { workspace = true }

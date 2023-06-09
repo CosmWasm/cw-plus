@@ -1,0 +1,28 @@
+[package]
+name = "cw-utils"
+version = "1.0.1"
+authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
+edition = "2021"
+description = "Common helpers for other cw specs"
+license = "Apache-2.0"
+repository = "https://github.com/CosmWasm/cw-utils"
+homepage = "https://cosmwasm.com"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+std = ["cosmwasm-std/std", "cw2/std"]
+
+[dependencies]
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
+cw2 = { path = "../cw2" }
+schemars = { workspace = true }
+semver = "1"
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+cw-storage-plus = "1.0.1"
+prost = "0.11.0"
+anyhow = "1.0.65"         # Not used directly but prost-derive does not set a sufficiently high anyhow version

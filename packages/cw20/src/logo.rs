@@ -1,3 +1,4 @@
+use crate::no_std::prelude::*;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Binary;
 

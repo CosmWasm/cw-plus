@@ -1,6 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg};
 
+use crate::no_std::prelude::*;
 use crate::msg::Cw1ExecuteMsg;
 
 /// Cw1Contract is a wrapper around Addr that provides a lot of helpers

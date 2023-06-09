@@ -16,7 +16,11 @@ of any CW2-compliant contract.
 For more information on this specification, please check out the
 [README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw2/README.md).
 */
-
+#![cfg_attr(not(feature = "std"), no_std)]
+#![feature(error_in_core)]
+extern crate alloc;
+mod no_std;
+use crate::no_std::prelude::*;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
     CustomQuery, QuerierWrapper, QueryRequest, StdError, StdResult, Storage, WasmQuery,

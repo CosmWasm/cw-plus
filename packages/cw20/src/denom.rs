@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Deps, StdResult, Uint128};
-
+use crate::no_std::prelude::*;
 use crate::{Cw20QueryMsg, TokenInfoResponse};
 
 #[cw_serde]

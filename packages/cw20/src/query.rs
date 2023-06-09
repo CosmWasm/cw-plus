@@ -1,3 +1,4 @@
+use crate::no_std::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

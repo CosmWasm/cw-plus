@@ -20,10 +20,14 @@ execute arbitrary `CosmosMsg` in the same transaction.
 For more information on this specification, please check out the
 [README](https://github.com/CosmWasm/cw-plus/blob/main/packages/cw1/README.md).
 */
+#![cfg_attr(not(feature = "std"), no_std)]
+#![feature(error_in_core)]
+extern crate alloc;
 
 pub mod helpers;
 pub mod msg;
 pub mod query;
+mod no_std;
 
 pub use crate::helpers::Cw1Contract;
 pub use crate::msg::Cw1ExecuteMsg;

@@ -1,6 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint128};
-use std::fmt;
+use crate::no_std::prelude::*;
+use crate::no_std::fmt;
 
 #[cw_serde]
 pub struct Cw20Coin {

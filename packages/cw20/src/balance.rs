@@ -1,7 +1,8 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Coin;
 
-use std::fmt;
+use crate::no_std::prelude::*;
+use crate::no_std::fmt;
 
 use cw_utils::NativeBalance;
 
