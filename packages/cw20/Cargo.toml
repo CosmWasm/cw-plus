@@ -10,6 +10,7 @@ homepage = "https://cosmwasm.com"
 
 
 [features]
+default = ["std"]
 std = ["cosmwasm-std/std", "cw-utils/std"]
 
 [dependencies]

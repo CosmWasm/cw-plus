@@ -8,10 +8,8 @@ license = "Apache-2.0"
 repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
-
-
-
 [features]
+default = ["std"]
 std = ["cosmwasm-std/std", "cw-storage-plus/std"]
 
 [dependencies]

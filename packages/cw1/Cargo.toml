@@ -9,6 +9,7 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [features]
+default = ["std"]
 std = ["cosmwasm-std/std"]
 
 [dependencies]
