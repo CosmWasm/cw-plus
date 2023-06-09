@@ -411,16 +411,16 @@ name = "cw20-base"
 version = "1.0.1"
 dependencies = [
  "cosmwasm-schema",
- "cosmwasm-std 1.2.1",
+ "cosmwasm-std 1.2.5",
  "cw-multi-test",
- "cw-storage-plus 1.0.1",
- "cw-utils 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cw-storage-plus 1.0.2",
+ "cw-utils 1.0.1",
  "cw2 1.0.1",
  "cw20",
  "schemars",
  "semver",
  "serde",
- "thiserror",
+ "thiserror-core",
 ]
 
 [[package]]

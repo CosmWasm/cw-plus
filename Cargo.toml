@@ -50,4 +50,4 @@ schemars = { version = "0.8.12" }
 cosmwasm-schema = { version = "1.2.6"}
 serde = { version = "1.0.103", default-features = false, features = ["derive", "alloc"] }
 thiserror = { version = "1.0.38", package = "thiserror-core", default-features = false }
-cw-storage-plus = { git = "https://github.com/dzmitry-lahoda-forks/cw-storage-plus/", rev="d0a2cf126cae3e3960c787ebcfc9baa54f59f71c", default-features= false}
+cw-storage-plus = { git = "https://github.com/dzmitry-lahoda-forks/cw-storage-plus/", rev="d0a2cf126cae3e3960c787ebcfc9baa54f59f71c", default-features= false, features = ["iterator"]}
