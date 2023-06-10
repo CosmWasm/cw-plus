@@ -102,7 +102,7 @@ mod tests {
         };
         let contract_interface22 = ContractSupportedInterface {
             supported_interface: Cow::Borrowed(interface22),
-            version: Cow::from("0.1.0"),
+            version: "0.1.0".into(),
         };
         let contract_interface721 = ContractSupportedInterface {
             supported_interface: Cow::Borrowed(interface22),
