@@ -102,9 +102,9 @@ To compile all the contracts, run the following in the repo root:
 
 ```
 docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
+  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
   --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/workspace-optimizer:0.12.13
+  cosmwasm/workspace-optimizer:0.13.0
 ```
 
 This will compile all packages in the `contracts` directory and output the stripped and optimized wasm code under the
