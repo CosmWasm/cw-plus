@@ -16,7 +16,7 @@ use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{AdminList, ADMIN_LIST};
 
 // version info for migration info
-const CONTRACT_NAME: &str = "crates.io:cw1-whitelist";
+const CONTRACT_NAME: &str = "crates.io:cw1-general";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
