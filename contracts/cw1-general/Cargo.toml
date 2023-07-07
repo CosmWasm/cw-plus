@@ -1,13 +1,13 @@
 [package]
-name = "cw1-whitelist"
-version = "1.1.0"
-authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
+name = "cw1-general"
+version = "1.0.0"
+authors = ["Skip"]
 edition = "2021"
-description = "Implementation of an proxy contract using a whitelist"
-license = "Apache-2.0"
-repository = "https://github.com/CosmWasm/cw-plus"
-homepage = "https://cosmwasm.com"
-documentation = "https://docs.cosmwasm.com"
+description = "Implementation of a proxy contract that can be called by anyone"
+license = "TBD"
+repository = "https://github.com/skip-mev/cw-plus"
+homepage = "https://skip.money"
+documentation = "https://docs.skip.money"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
