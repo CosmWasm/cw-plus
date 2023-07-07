@@ -41,13 +41,13 @@ impl Suite {
         Ok(Suite { app, owner, cw1_id })
     }
 
-    pub fn instantiate_cw1_contract(&mut self, admins: Vec<String>, mutable: bool) -> Cw1Contract {
+    pub fn instantiate_cw1_contract(&mut self) -> Cw1Contract {
         let contract = self
             .app
             .instantiate_contract(
                 self.cw1_id,
                 Addr::unchecked(self.owner.clone()),
-                &InstantiateMsg { admins, mutable },
+                &InstantiateMsg { },
                 &[],
                 "Whitelist",
                 None,
@@ -97,9 +97,9 @@ impl Suite {
 fn proxy_freeze_message() {
     let mut suite = Suite::init().unwrap();
 
-    let first_contract = suite.instantiate_cw1_contract(vec![suite.owner.clone()], true);
+    let first_contract = suite.instantiate_cw1_contract();
     let second_contract =
-        suite.instantiate_cw1_contract(vec![first_contract.addr().to_string()], true);
+        suite.instantiate_cw1_contract();
     assert_ne!(second_contract, first_contract);
 
     let freeze_msg: ExecuteMsg = ExecuteMsg::Freeze {};

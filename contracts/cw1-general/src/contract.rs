@@ -13,7 +13,7 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{AdminList, ADMIN_LIST};
+use crate::state::{ADMIN_LIST};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:cw1-general";
@@ -24,14 +24,9 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    _msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    let cfg = AdminList {
-        admins: map_validate(deps.api, &msg.admins)?,
-        mutable: msg.mutable,
-    };
-    ADMIN_LIST.save(deps.storage, &cfg)?;
     Ok(Response::default())
 }
 
@@ -158,10 +153,7 @@ mod tests {
         let anyone = "anyone";
 
         // instantiate the contract
-        let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.to_string(), bob.to_string(), carl.to_string()],
-            mutable: true,
-        };
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info(anyone, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
@@ -221,15 +213,11 @@ mod tests {
     fn execute_messages_has_proper_permissions() {
         let mut deps = mock_dependencies();
 
-        let alice = "alice";
         let bob = "bob";
         let carl = "carl";
 
         // instantiate the contract
-        let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.to_string(), carl.to_string()],
-            mutable: false,
-        };
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info(bob, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 
@@ -276,10 +264,7 @@ mod tests {
         let anyone = "anyone";
 
         // instantiate the contract
-        let instantiate_msg = InstantiateMsg {
-            admins: vec![alice.to_string(), bob.to_string()],
-            mutable: false,
-        };
+        let instantiate_msg = InstantiateMsg {};
         let info = mock_info(anyone, &[]);
         instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
 

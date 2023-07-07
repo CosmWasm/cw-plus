@@ -6,10 +6,7 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{CosmosMsg, Empty};
 
 #[cw_serde]
-pub struct InstantiateMsg {
-    pub admins: Vec<String>,
-    pub mutable: bool,
-}
+pub struct InstantiateMsg {}
 
 #[cw_serde]
 pub enum ExecuteMsg<T = Empty>
