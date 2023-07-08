@@ -1,8 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
-};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use cw1::CanExecuteResponse;
 use cw2::set_contract_version;
@@ -30,10 +28,8 @@ pub fn execute(
     _deps: DepsMut,
     _env: Env,
     _info: MessageInfo,
-    // Note: implement this function with different type to add support for custom messages
-    // and then import the rest of this contract code.
-    msg: ExecuteMsg<Empty>,
-) -> Result<Response<Empty>, ContractError> {
+    msg: ExecuteMsg,
+) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Execute { msgs } => {
             let res = Response::new()
