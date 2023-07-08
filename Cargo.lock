@@ -278,8 +278,6 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-storage-plus",
- "cw-utils",
  "cw1",
  "cw2 1.1.0",
  "derivative",
