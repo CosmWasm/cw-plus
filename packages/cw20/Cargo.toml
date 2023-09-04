@@ -1,6 +1,6 @@
 [package]
 name = "cw20"
-version = "1.0.1"
+version = "1.1.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Definition and types for the CosmWasm-20 interface"
@@ -16,4 +16,4 @@ schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "1.0.1" }
+cosmwasm-schema = { version = "1.1.0" }

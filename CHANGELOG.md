@@ -1,5 +1,27 @@
 # Changelog
 
+## [v1.1.0](https://github.com/CosmWasm/cw-plus/tree/v1.1.0) (2023-06-19)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.0.1...v1.1.0)
+
+**Closed issues:**
+
+- thread 'main' panicked at 'called `Result::unwrap\(\) [\#867](https://github.com/CosmWasm/cw-plus/issues/867)
+- CW20 All accounts query sorting issue [\#864](https://github.com/CosmWasm/cw-plus/issues/864)
+- discussion: cw20-base methods should be nonpayable, or forward funds [\#862](https://github.com/CosmWasm/cw-plus/issues/862)
+- CW2: add a `cw2::VersionError` error type [\#857](https://github.com/CosmWasm/cw-plus/issues/857)
+
+**Merged pull requests:**
+
+- Update optimizer to latest [\#870](https://github.com/CosmWasm/cw-plus/pull/870) ([TrevorJTClarke](https://github.com/TrevorJTClarke))
+- Added optional memo to ics20 packets [\#868](https://github.com/CosmWasm/cw-plus/pull/868) ([nicolaslara](https://github.com/nicolaslara))
+- Remove unnecessary zero checks [\#863](https://github.com/CosmWasm/cw-plus/pull/863) ([webmaster128](https://github.com/webmaster128))
+- Update rustc to 1.64 on CI wasm-build [\#861](https://github.com/CosmWasm/cw-plus/pull/861) ([ueco-jb](https://github.com/ueco-jb))
+- Address minor typos in cw1 comments and README [\#860](https://github.com/CosmWasm/cw-plus/pull/860) ([mikedotexe](https://github.com/mikedotexe))
+- Update workspace-optimizer version in README to 0.12.11 [\#859](https://github.com/CosmWasm/cw-plus/pull/859) ([mikedotexe](https://github.com/mikedotexe))
+- CW2: add a method to assert contract version [\#858](https://github.com/CosmWasm/cw-plus/pull/858) ([larry0x](https://github.com/larry0x))
+- Remove non-existent profile [\#856](https://github.com/CosmWasm/cw-plus/pull/856) ([mandrean](https://github.com/mandrean))
+
 ## [v1.0.1](https://github.com/CosmWasm/cw-plus/tree/v1.0.1) (2022-12-16)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.0.0...v1.0.1)
