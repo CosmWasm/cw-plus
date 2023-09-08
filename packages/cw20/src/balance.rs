@@ -1,7 +1,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Coin;
 
-use std::fmt;
+use std::{fmt, fmt::Display};
 
 use cw_utils::NativeBalance;
 
@@ -20,7 +20,7 @@ impl Default for Balance {
     }
 }
 
-impl fmt::Display for Balance {
+impl Display for Balance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Balance::Native(native) => write!(f, "{native}"),
@@ -56,5 +56,46 @@ impl From<Vec<Coin>> for Balance {
 impl From<Cw20CoinVerified> for Balance {
     fn from(cw20_coin: Cw20CoinVerified) -> Balance {
         Balance::Cw20(cw20_coin)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::{Addr, Uint128};
+
+    #[test]
+    fn default_balance_is_native() {
+        let balance: Balance = Default::default();
+        assert!(matches!(balance, Balance::Native(_)));
+    }
+
+    #[test]
+    fn displaying_native_balance_works() {
+        let balance: Balance = Default::default();
+        assert_eq!("", format!("{balance}",));
+    }
+
+    #[test]
+    fn displaying_cw20_balance_works() {
+        let balance = Balance::Cw20(Cw20CoinVerified {
+            address: Addr::unchecked("sender"),
+            amount: Uint128::zero(),
+        });
+        assert_eq!("address: sender, amount: 0", format!("{balance}",));
+    }
+
+    #[test]
+    fn default_native_balance_is_empty() {
+        assert!(Balance::default().is_empty());
+    }
+
+    #[test]
+    fn cw20_balance_with_zero_amount_is_empty() {
+        assert!(Balance::Cw20(Cw20CoinVerified {
+            address: Addr::unchecked("sender"),
+            amount: Uint128::zero(),
+        })
+        .is_empty());
     }
 }
