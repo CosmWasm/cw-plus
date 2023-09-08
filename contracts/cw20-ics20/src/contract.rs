@@ -268,7 +268,7 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
 }
 
 fn from_semver(err: semver::Error) -> StdError {
-    StdError::generic_err(format!("Semver: {}", err))
+    StdError::generic_err(format!("Semver: {err}"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -519,7 +519,7 @@ mod test {
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
             assert_eq!(msg.amount, Uint128::new(888777666));
-            assert_eq!(msg.denom, format!("cw20:{}", cw20_addr));
+            assert_eq!(msg.denom, format!("cw20:{cw20_addr}"));
             assert_eq!(msg.sender.as_str(), "my-account");
             assert_eq!(msg.receiver.as_str(), "foreign-address");
         } else {

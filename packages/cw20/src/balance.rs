@@ -23,8 +23,8 @@ impl Default for Balance {
 impl fmt::Display for Balance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Balance::Native(native) => write!(f, "{}", native),
-            Balance::Cw20(cw20) => write!(f, "{}", cw20),
+            Balance::Native(native) => write!(f, "{native}"),
+            Balance::Cw20(cw20) => write!(f, "{cw20}"),
         }?;
         Ok(())
     }
