@@ -26,7 +26,7 @@ pub fn mock_channel(channel_id: &str) -> IbcChannel {
         },
         IbcEndpoint {
             port_id: REMOTE_PORT.into(),
-            channel_id: format!("{}5", channel_id),
+            channel_id: format!("{channel_id}5"),
         },
         ICS20_ORDERING,
         ICS20_VERSION,
@@ -39,7 +39,7 @@ pub fn mock_channel_info(channel_id: &str) -> ChannelInfo {
         id: channel_id.to_string(),
         counterparty_endpoint: IbcEndpoint {
             port_id: REMOTE_PORT.into(),
-            channel_id: format!("{}5", channel_id),
+            channel_id: format!("{channel_id}5"),
         },
         connection_id: CONNECTION_ID.into(),
     }
