@@ -234,7 +234,7 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
             previous_version: stored.version,
         });
     }
-    // run the v1->v2 converstion if we are v1 style
+    // run the v1->v2 conversion if we are v1 style
     if storage_version <= MIGRATE_VERSION_2.parse().map_err(from_semver)? {
         let old_config = v1::CONFIG.load(deps.storage)?;
         ADMIN.set(deps.branch(), Some(old_config.gov_contract))?;
@@ -244,7 +244,7 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
         };
         CONFIG.save(deps.storage, &config)?;
     }
-    // run the v2->v3 converstion if we are v2 style
+    // run the v2->v3 conversion if we are v2 style
     if storage_version <= MIGRATE_VERSION_3.parse().map_err(from_semver)? {
         v2::update_balances(deps.branch(), &env)?;
     }
@@ -268,7 +268,7 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
 }
 
 fn from_semver(err: semver::Error) -> StdError {
-    StdError::generic_err(format!("Semver: {}", err))
+    StdError::generic_err(format!("Semver: {err}"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -519,7 +519,7 @@ mod test {
             assert_eq!(channel_id.as_str(), send_channel);
             let msg: Ics20Packet = from_binary(data).unwrap();
             assert_eq!(msg.amount, Uint128::new(888777666));
-            assert_eq!(msg.denom, format!("cw20:{}", cw20_addr));
+            assert_eq!(msg.denom, format!("cw20:{cw20_addr}"));
             assert_eq!(msg.sender.as_str(), "my-account");
             assert_eq!(msg.receiver.as_str(), "foreign-address");
         } else {
@@ -701,5 +701,10 @@ mod test {
         } else {
             panic!("Unexpected return message: {:?}", res.messages[0]);
         }
+    }
+
+    #[test]
+    fn invalid_contract_version_should_fail() {
+        assert!("A.1.0".parse::<Version>().map_err(from_semver).is_err());
     }
 }

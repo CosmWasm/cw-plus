@@ -284,7 +284,7 @@ pub fn execute_claim(
 
 #[inline]
 fn coin_to_string(amount: Uint128, denom: &str) -> String {
-    format!("{} {}", amount, denom)
+    format!("{amount} {denom}")
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
