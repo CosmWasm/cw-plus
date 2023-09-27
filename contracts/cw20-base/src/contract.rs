@@ -432,7 +432,7 @@ pub fn execute_update_marketing(
         .marketing
         .as_ref()
         .ok_or(ContractError::Unauthorized {})?
-        != &info.sender
+        != info.sender
     {
         return Err(ContractError::Unauthorized {});
     }
@@ -485,7 +485,7 @@ pub fn execute_upload_logo(
         .marketing
         .as_ref()
         .ok_or(ContractError::Unauthorized {})?
-        != &info.sender
+        != info.sender
     {
         return Err(ContractError::Unauthorized {});
     }

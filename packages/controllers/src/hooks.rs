@@ -43,7 +43,7 @@ impl<'a> Hooks<'a> {
 
     pub fn add_hook(&self, storage: &mut dyn Storage, addr: Addr) -> Result<(), HookError> {
         let mut hooks = self.0.may_load(storage)?.unwrap_or_default();
-        if !hooks.iter().any(|h| h == &addr) {
+        if !hooks.iter().any(|h| h == addr) {
             hooks.push(addr);
         } else {
             return Err(HookError::HookAlreadyRegistered {});
@@ -53,7 +53,7 @@ impl<'a> Hooks<'a> {
 
     pub fn remove_hook(&self, storage: &mut dyn Storage, addr: Addr) -> Result<(), HookError> {
         let mut hooks = self.0.load(storage)?;
-        if let Some(p) = hooks.iter().position(|x| x == &addr) {
+        if let Some(p) = hooks.iter().position(|x| x == addr) {
             hooks.remove(p);
         } else {
             return Err(HookError::HookNotRegistered {});
