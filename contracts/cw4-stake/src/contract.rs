@@ -90,7 +90,7 @@ pub fn execute_bond(
     let amount = match (&cfg.denom, &amount) {
         (Denom::Native(want), Balance::Native(have)) => must_pay_funds(have, want),
         (Denom::Cw20(want), Balance::Cw20(have)) => {
-            if want == &have.address {
+            if want == have.address {
                 Ok(have.amount)
             } else {
                 Err(ContractError::InvalidDenom(want.into()))

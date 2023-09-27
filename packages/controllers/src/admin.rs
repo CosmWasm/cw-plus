@@ -46,7 +46,7 @@ impl<'a> Admin<'a> {
     /// we hit an error with Api or Storage usage
     pub fn is_admin<Q: CustomQuery>(&self, deps: Deps<Q>, caller: &Addr) -> StdResult<bool> {
         match self.0.load(deps.storage)? {
-            Some(owner) => Ok(caller == &owner),
+            Some(owner) => Ok(caller == owner),
             None => Ok(false),
         }
     }

@@ -902,7 +902,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -931,7 +931,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1034,7 +1034,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1076,7 +1076,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1115,7 +1115,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1154,7 +1154,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1200,7 +1200,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1247,7 +1247,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1362,7 +1362,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1403,7 +1403,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1444,7 +1444,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1484,7 +1484,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1517,7 +1517,7 @@ mod tests {
             .unwrap();
 
             assert_eq!(rsp.messages, vec![]);
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1701,7 +1701,7 @@ mod tests {
                 rsp.messages,
                 msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
             );
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1868,7 +1868,7 @@ mod tests {
                 rsp.messages,
                 msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
             );
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
 
             assert_eq!(
@@ -1903,7 +1903,7 @@ mod tests {
                 rsp.messages,
                 msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
             );
-            assert_eq!(rsp.events, vec![]);
+            assert!(rsp.events.is_empty());
             assert_eq!(rsp.data, None);
         }
 
@@ -1971,7 +1971,7 @@ mod tests {
                     rsp.messages,
                     msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
                 );
-                assert_eq!(rsp.events, vec![]);
+                assert!(rsp.events.is_empty());
                 assert_eq!(rsp.data, None);
             }
         }
@@ -2017,7 +2017,7 @@ mod tests {
                     rsp.messages,
                     msgs.into_iter().map(SubMsg::new).collect::<Vec<_>>()
                 );
-                assert_eq!(rsp.events, vec![]);
+                assert!(rsp.events.is_empty());
                 assert_eq!(rsp.data, None);
             }
         }

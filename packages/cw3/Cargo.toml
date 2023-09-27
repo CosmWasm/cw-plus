@@ -11,8 +11,8 @@ homepage = "https://cosmwasm.com"
 [dependencies]
 cw-utils = "1.0.1"
 cw20 = { path = "../../packages/cw20", version = "1.1.0" }
-cosmwasm-schema = "1.1.0"
-cosmwasm-std = "1.1.0"
-schemars = "0.8.1"
-serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.23" }
+cosmwasm-schema = "1.4.0"
+cosmwasm-std = "1.4.0"
+schemars = "0.8.15"
+serde = { version = "1.0.188", default-features = false, features = ["derive"] }
+thiserror = { version = "1.0.49" }
