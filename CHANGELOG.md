@@ -1,5 +1,21 @@
 # Changelog
 
+## [v1.1.1](https://github.com/CosmWasm/cw-plus/tree/v1.1.1) (2023-09-27)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.1.0...v1.1.1)
+
+**Closed issues:**
+
+- Issue in providing cw4_stake.wasm contract values for initiating [\#878](https://github.com/CosmWasm/cw-plus/issues/878)
+- Bump cw2 version [\#873](https://github.com/CosmWasm/cw-plus/issues/873)
+
+**Merged pull requests:**
+
+- Update deps [\#882](https://github.com/CosmWasm/cw-plus/pull/882) ([jawoznia](https://github.com/jawoznia))
+- Bumped Rust version and cosmwasm-check version [\#881](https://github.com/CosmWasm/cw-plus/pull/881) ([DariuszDepta](https://github.com/DariuszDepta))
+- Set the resolver version to value 2 [\#880](https://github.com/CosmWasm/cw-plus/pull/880) ([DariuszDepta](https://github.com/DariuszDepta))
+- Upgrade workspace-optimizer to 0.13.0 [\#876](https://github.com/CosmWasm/cw-plus/pull/876) ([webmaster128](https://github.com/webmaster128))
+
 ## [v1.1.0](https://github.com/CosmWasm/cw-plus/tree/v1.1.0) (2023-06-19)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.0.1...v1.1.0)
