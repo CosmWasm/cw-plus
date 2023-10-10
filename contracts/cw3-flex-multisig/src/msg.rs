@@ -21,6 +21,7 @@ pub struct InstantiateMsg {
 
 // TODO: add some T variants? Maybe good enough as fixed Empty for now
 #[cw_serde]
+#[cfg_attr(feature="interface", derive(cw_orch::ExecuteFns))]
 pub enum ExecuteMsg {
     Propose {
         title: String,
@@ -46,6 +47,7 @@ pub enum ExecuteMsg {
 // We can also add this as a cw3 extension
 #[cw_serde]
 #[derive(QueryResponses)]
+#[cfg_attr(feature="interface", derive(cw_orch::QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_utils::ThresholdResponse)]
     Threshold {},

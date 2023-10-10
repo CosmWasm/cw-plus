@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
+interface = ["dep:cw-orch"]
 
 [dependencies]
 cosmwasm-schema = { version = "1.4.0" }
@@ -27,6 +28,7 @@ cosmwasm-std = { version = "1.4.0" }
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.49" }
+cw-orch = {version="0.16.0", optional = true}
 
 [dev-dependencies]
 cw20 = { path = "../../packages/cw20", version = "1.1.1" }

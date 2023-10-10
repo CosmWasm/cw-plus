@@ -29,6 +29,7 @@ pub struct MigrateMsg {
 }
 
 #[cw_serde]
+#[cfg_attr(feature="interface", derive(cw_orch::ExecuteFns))]
 pub enum ExecuteMsg {
     /// This accepts a properly-encoded ReceiveMsg from a cw20 contract
     Receive(Cw20ReceiveMsg),
@@ -57,6 +58,7 @@ pub struct TransferMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
+#[cfg_attr(feature="interface", derive(cw_orch::QueryFns))]
 pub enum QueryMsg {
     /// Return the port ID bound by this contract.
     #[returns(PortResponse)]
