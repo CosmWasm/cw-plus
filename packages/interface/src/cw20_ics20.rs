@@ -1,24 +1,25 @@
-use cosmwasm_std::{DepsMut, Env, IbcChannelOpenMsg, Ibc3ChannelOpenResponse};
-use cw_orch::{
-    interface,
-    prelude::*,
-};
+use cosmwasm_std::{DepsMut, Env, Ibc3ChannelOpenResponse, IbcChannelOpenMsg};
+use cw_orch::{interface, prelude::*};
+
+pub use cw20_ics20::msg::{ExecuteMsg, InitMsg, MigrateMsg, QueryMsg};
 
 use cw20_ics20::{
-    msg::{ExecuteMsg, InitMsg, MigrateMsg, QueryMsg},
-    contract, ibc::{ibc_channel_open, ibc_channel_connect, ibc_channel_close, ibc_packet_receive, ibc_packet_ack, ibc_packet_timeout}
+    contract,
+    ibc::{
+        ibc_channel_close, ibc_channel_connect, ibc_channel_open, ibc_packet_ack,
+        ibc_packet_receive, ibc_packet_timeout,
+    },
 };
 
 #[interface(InitMsg, ExecuteMsg, QueryMsg, MigrateMsg)]
 pub struct Cw20Ics20;
 
-
-
 impl<Chain: CwEnv> Uploadable for Cw20Ics20<Chain> {
     // Return the path to the wasm file
     fn wasm(&self) -> WasmPath {
         artifacts_dir_from_workspace!()
-            .find_wasm_path("cw20_ics20.wasm").unwrap()
+            .find_wasm_path("cw20_ics20.wasm")
+            .unwrap()
     }
     // Return a CosmWasm contract wrapper
     fn wrapper(&self) -> Box<dyn MockContract<Empty>> {
@@ -35,7 +36,7 @@ impl<Chain: CwEnv> Uploadable for Cw20Ics20<Chain> {
                 ibc_channel_close,
                 ibc_packet_receive,
                 ibc_packet_ack,
-                ibc_packet_timeout
+                ibc_packet_timeout,
             ),
         )
     }
