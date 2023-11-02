@@ -10,7 +10,7 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-#[cfg_attr(feature="interface", derive(cw_orch::ExecuteFns))]
+#[cfg_attr(feature = "interface", derive(cw_orch::ExecuteFns))]
 pub enum ExecuteMsg {
     /// Change the admin
     UpdateAdmin { admin: Option<String> },
@@ -28,7 +28,7 @@ pub enum ExecuteMsg {
 
 #[cw_serde]
 #[derive(QueryResponses)]
-#[cfg_attr(feature="interface", derive(cw_orch::QueryFns))]
+#[cfg_attr(feature = "interface", derive(cw_orch::QueryFns))]
 pub enum QueryMsg {
     #[returns(cw_controllers::AdminResponse)]
     Admin {},

@@ -401,7 +401,7 @@ mod test {
     use crate::contract::{execute, migrate, query_channel};
     use crate::msg::{ExecuteMsg, MigrateMsg, TransferMsg};
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, to_vec, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp, Addr};
+    use cosmwasm_std::{coins, to_vec, Addr, IbcEndpoint, IbcMsg, IbcTimeout, Timestamp};
     use cw20::Cw20ReceiveMsg;
 
     pub const RELAYER: &str = "relayer";
