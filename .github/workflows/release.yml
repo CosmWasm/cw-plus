@@ -1,5 +1,8 @@
   on:
     push:
+      tags:
+        - 'v[0-9]+.[0-9]+.[0-9]+.*' # This matches the semantic versioning like v1.0.0
+
   jobs:
     build-and-publish:
       runs-on: ubuntu-latest
