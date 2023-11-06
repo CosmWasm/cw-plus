@@ -26,3 +26,28 @@
           run: |
             docker run --volumes-from with_code cosmwasm/workspace-optimizer:0.13.0
             docker cp with_code:/code/artifacts ./artifacts
+        - name: Show data
+          run: |
+            ls -l artifacts
+            cat artifacts/checksums.txt
+
+        - name: Create Release
+          id: create_release
+          uses: actions/create-release@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: ${{ github.ref }}
+            release_name: Release ${{ github.ref }}
+            draft: false
+            prerelease: false
+
+        - name: Upload Release Asset
+          uses: actions/upload-release-asset@v1
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            asset_path: ./path/to/artifact.zip
+            asset_name: artifact.zip
+            asset_content_type: application/zip
