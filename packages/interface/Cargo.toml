@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 cosmwasm-std = "1.4.1"
-cw-orch = "0.16.4"
+cw-orch = { workspace = true }
 cw1 = { version = "1.1.1", path = "../cw1" }
 cw1-subkeys = { version = "1.1.1", path = "../../contracts/cw1-subkeys" }
 cw1-whitelist = { version = "1.1.1", path = "../../contracts/cw1-whitelist" }

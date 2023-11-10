@@ -17,7 +17,7 @@ cosmwasm-schema = "1.4.0"
 cosmwasm-std = "1.4.0"
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-cw-orch = {version="0.16.0", optional = true}
+cw-orch = { workspace = true, optional = true}
 
 [dev-dependencies]
 cosmwasm-schema = { version = "1.4.0" }
