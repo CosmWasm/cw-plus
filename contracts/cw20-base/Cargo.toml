@@ -19,7 +19,6 @@ library = []
 
 [dependencies]
 cosmwasm-schema = { version = "1.4.0" }
-cw-utils = "1.0.1"
 cw2 = { path = "../../packages/cw2", version = "1.1.1" }
 cw20 = { path = "../../packages/cw20", version = "1.1.1" }
 cw-storage-plus = "1.1.0"
@@ -31,3 +30,4 @@ thiserror = { version = "1.0.49" }
 
 [dev-dependencies]
 cw-multi-test = "0.16.5"
+cw-utils = "1.0.1"
