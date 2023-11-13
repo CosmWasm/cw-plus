@@ -20,9 +20,11 @@ wasmd query wasm contract-state raw [contract_addr] 636F6E74726163745F696E666F -
 ```
 
 When the `migrate` function is called, then the new contract
-can read that data andsee if this is an expected contract we can 
+can read that data and see if this is an expected contract we can 
 migrate from. And also contain extra version information if we 
 support multiple migrate paths.
+This crate provides an `ensure_from_older_version` helper that
+handles this.
 
 ### Data structures
 

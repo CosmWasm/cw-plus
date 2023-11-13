@@ -24,6 +24,10 @@ use cosmwasm_std::{
 use cw_storage_plus::Item;
 use thiserror::Error;
 
+mod migrate;
+
+pub use migrate::ensure_from_older_version;
+
 pub const CONTRACT: Item<ContractVersion> = Item::new("contract_info");
 
 #[cw_serde]
