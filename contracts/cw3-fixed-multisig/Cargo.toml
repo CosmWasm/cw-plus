@@ -1,6 +1,6 @@
 [package]
 name = "cw3-fixed-multisig"
-version = "1.1.1"
+version = "1.2.1"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implementing cw3 with an fixed group multisig"
@@ -21,8 +21,8 @@ interface = ["dep:cw-orch"]
 [dependencies]
 cosmwasm-schema = { version = "1.4.0" }
 cw-utils = "1.0.1"
-cw2 = { path = "../../packages/cw2", version = "1.1.1" }
-cw3 = { path = "../../packages/cw3", version = "1.1.1" }
+cw2 = { path = "../../packages/cw2", version = "1.2.1" }
+cw3 = { path = "../../packages/cw3", version = "1.2.1" }
 cw-storage-plus = "1.1.0"
 cosmwasm-std = { version = "1.4.0" }
 schemars = "0.8.15"
@@ -31,6 +31,6 @@ thiserror = { version = "1.0.49" }
 cw-orch = { workspace = true, optional = true}
 
 [dev-dependencies]
-cw20 = { path = "../../packages/cw20", version = "1.1.1" }
-cw20-base = { path = "../cw20-base", version = "1.1.1", features = ["library"] }
+cw20 = { path = "../../packages/cw20", version = "1.2.1" }
+cw20-base = { path = "../cw20-base", version = "1.2.1", features = ["library"] }
 cw-multi-test = "0.16.1"

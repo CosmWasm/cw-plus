@@ -1,7 +1,9 @@
 use crate::msg::{AdminListResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use anyhow::{anyhow, Result};
 use assert_matches::assert_matches;
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError, WasmMsg, WasmQuery};
+use cosmwasm_std::{
+    to_json_binary, Addr, CosmosMsg, Empty, QueryRequest, StdError, WasmMsg, WasmQuery,
+};
 use cw1::Cw1Contract;
 use cw_multi_test::{App, AppResponse, Contract, ContractWrapper, Executor};
 use derivative::Derivative;
@@ -68,7 +70,7 @@ impl Suite {
         let execute: ExecuteMsg = ExecuteMsg::Execute {
             msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: target_contract.to_string(),
-                msg: to_binary(&msg)?,
+                msg: to_json_binary(&msg)?,
                 funds: vec![],
             })],
         };
@@ -88,7 +90,7 @@ impl Suite {
     {
         self.app.wrap().query(&QueryRequest::Wasm(WasmQuery::Smart {
             contract_addr: target_contract.to_string(),
-            msg: to_binary(&msg).unwrap(),
+            msg: to_json_binary(&msg).unwrap(),
         }))
     }
 }

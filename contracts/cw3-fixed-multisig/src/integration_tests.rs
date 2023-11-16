@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use cosmwasm_std::{to_binary, Addr, Empty, Uint128, WasmMsg};
+use cosmwasm_std::{to_json_binary, Addr, Empty, Uint128, WasmMsg};
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
@@ -104,7 +104,7 @@ fn cw3_controls_cw20() {
 
     let execute_mint_msg = WasmMsg::Execute {
         contract_addr: cw20_addr.to_string(),
-        msg: to_binary(&cw20_mint_msg).unwrap(),
+        msg: to_json_binary(&cw20_mint_msg).unwrap(),
         funds: vec![],
     };
     let propose_msg = ExecuteMsg::Propose {

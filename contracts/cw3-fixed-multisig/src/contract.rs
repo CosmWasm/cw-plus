@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    to_json_binary, Binary, BlockInfo, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
     Response, StdResult,
 };
 
@@ -240,24 +240,28 @@ pub fn execute_close(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Threshold {} => to_binary(&query_threshold(deps)?),
-        QueryMsg::Proposal { proposal_id } => to_binary(&query_proposal(deps, env, proposal_id)?),
-        QueryMsg::Vote { proposal_id, voter } => to_binary(&query_vote(deps, proposal_id, voter)?),
+        QueryMsg::Threshold {} => to_json_binary(&query_threshold(deps)?),
+        QueryMsg::Proposal { proposal_id } => {
+            to_json_binary(&query_proposal(deps, env, proposal_id)?)
+        }
+        QueryMsg::Vote { proposal_id, voter } => {
+            to_json_binary(&query_vote(deps, proposal_id, voter)?)
+        }
         QueryMsg::ListProposals { start_after, limit } => {
-            to_binary(&list_proposals(deps, env, start_after, limit)?)
+            to_json_binary(&list_proposals(deps, env, start_after, limit)?)
         }
         QueryMsg::ReverseProposals {
             start_before,
             limit,
-        } => to_binary(&reverse_proposals(deps, env, start_before, limit)?),
+        } => to_json_binary(&reverse_proposals(deps, env, start_before, limit)?),
         QueryMsg::ListVotes {
             proposal_id,
             start_after,
             limit,
-        } => to_binary(&list_votes(deps, proposal_id, start_after, limit)?),
-        QueryMsg::Voter { address } => to_binary(&query_voter(deps, address)?),
+        } => to_json_binary(&list_votes(deps, proposal_id, start_after, limit)?),
+        QueryMsg::Voter { address } => to_json_binary(&query_voter(deps, address)?),
         QueryMsg::ListVoters { start_after, limit } => {
-            to_binary(&list_voters(deps, start_after, limit)?)
+            to_json_binary(&list_voters(deps, start_after, limit)?)
         }
     }
 }
@@ -412,7 +416,7 @@ fn list_voters(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, from_binary, BankMsg, Decimal};
+    use cosmwasm_std::{coin, from_json, BankMsg, Decimal};
 
     use cw2::{get_contract_version, ContractVersion};
     use cw_utils::{Duration, Threshold};
@@ -485,8 +489,7 @@ mod tests {
             start_after: None,
             limit: None,
         };
-        let votes: VoteListResponse =
-            from_binary(&query(deps, mock_env(), voters).unwrap()).unwrap();
+        let votes: VoteListResponse = from_json(&query(deps, mock_env(), voters).unwrap()).unwrap();
         // Sum the weights of the Yes votes to get the tally
         votes
             .votes
@@ -1017,7 +1020,7 @@ mod tests {
         };
 
         // Proposal should now be passed
-        let prop: ProposalResponse = from_binary(
+        let prop: ProposalResponse = from_json(
             &query(
                 deps.as_ref(),
                 env.clone(),

@@ -1,6 +1,6 @@
 [package]
 name = "cw-plus-interface"
-version = "0.1.0"
+version = "1.2.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,12 +8,12 @@ edition = "2021"
 [dependencies]
 cosmwasm-std = "1.4.1"
 cw-orch = { workspace = true }
-cw1 = { version = "1.1.1", path = "../cw1" }
-cw1-subkeys = { version = "1.1.1", path = "../../contracts/cw1-subkeys" }
-cw1-whitelist = { version = "1.1.1", path = "../../contracts/cw1-whitelist" }
-cw20-base = { version = "1.1.1", path = "../../contracts/cw20-base" }
-cw20-ics20 = { version = "1.1.1", path = "../../contracts/cw20-ics20" }
-cw3-fixed-multisig = { version = "1.1.1", path = "../../contracts/cw3-fixed-multisig" }
-cw3-flex-multisig = { version = "1.1.1", path = "../../contracts/cw3-flex-multisig" }
-cw4-group = { version = "1.1.1", path = "../../contracts/cw4-group" }
-cw4-stake = { version = "1.1.1", path = "../../contracts/cw4-stake" }
+cw1 = { version = "1.2.1", path = "../cw1" }
+cw1-subkeys = { version = "1.2.1", path = "../../contracts/cw1-subkeys" }
+cw1-whitelist = { version = "1.2.1", path = "../../contracts/cw1-whitelist" }
+cw20-base = { version = "1.2.1", path = "../../contracts/cw20-base" }
+cw20-ics20 = { version = "1.2.1", path = "../../contracts/cw20-ics20" }
+cw3-fixed-multisig = { version = "1.2.1", path = "../../contracts/cw3-fixed-multisig" }
+cw3-flex-multisig = { version = "1.2.1", path = "../../contracts/cw3-flex-multisig" }
+cw4-group = { version = "1.2.1", path = "../../contracts/cw4-group" }
+cw4-stake = { version = "1.2.1", path = "../../contracts/cw4-stake" }
