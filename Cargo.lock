@@ -221,7 +221,7 @@ dependencies = [
 
 [[package]]
 name = "cw-controllers"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -279,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "cw1"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-subkeys"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -297,7 +297,7 @@ dependencies = [
  "cw-utils",
  "cw1",
  "cw1-whitelist",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "schemars",
  "semver",
  "serde",
@@ -306,7 +306,7 @@ dependencies = [
 
 [[package]]
 name = "cw1-whitelist"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -316,7 +316,7 @@ dependencies = [
  "cw-storage-plus",
  "cw-utils",
  "cw1",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "derivative",
  "schemars",
  "serde",
@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "cw2"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -352,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "cw20"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -363,14 +363,14 @@ dependencies = [
 
 [[package]]
 name = "cw20-base"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "cw20",
  "schemars",
  "semver",
@@ -380,14 +380,14 @@ dependencies = [
 
 [[package]]
 name = "cw20-ics20"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "cw20",
  "schemars",
  "semver",
@@ -397,7 +397,7 @@ dependencies = [
 
 [[package]]
 name = "cw3"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -410,14 +410,14 @@ dependencies = [
 
 [[package]]
 name = "cw3-fixed-multisig"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "cw20",
  "cw20-base",
  "cw3",
@@ -428,14 +428,14 @@ dependencies = [
 
 [[package]]
 name = "cw3-flex-multisig"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "cw20",
  "cw20-base",
  "cw3",
@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "cw4"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -460,14 +460,14 @@ dependencies = [
 
 [[package]]
 name = "cw4-group"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "cw4",
  "schemars",
  "serde",
@@ -476,14 +476,14 @@ dependencies = [
 
 [[package]]
 name = "cw4-stake"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers",
  "cw-storage-plus",
  "cw-utils",
- "cw2 1.1.1",
+ "cw2 1.1.2",
  "cw20",
  "cw4",
  "schemars",
