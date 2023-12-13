@@ -21,16 +21,16 @@ interface = ["dep:cw-orch"]
 [dependencies]
 cosmwasm-schema = { version = "1.4.0" }
 cw-utils = "1.0.1"
-cw2 = { path = "../../packages/cw2", version = "1.2.1" }
-cw3 = { path = "../../packages/cw3", version = "1.2.1" }
+cw2 = { path = "../../packages/cw2" }
+cw3 = { path = "../../packages/cw3" }
 cw-storage-plus = "1.1.0"
 cosmwasm-std = { version = "1.4.0" }
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.49" }
-cw-orch = { workspace = true, optional = true}
+cw-orch = { workspace = true, optional = true }
 
 [dev-dependencies]
-cw20 = { path = "../../packages/cw20", version = "1.2.1" }
-cw20-base = { path = "../cw20-base", version = "1.2.1", features = ["library"] }
+cw20 = { path = "../../packages/cw20" }
+cw20-base = { path = "../cw20-base", features = ["library"] }
 cw-multi-test = "0.16.1"

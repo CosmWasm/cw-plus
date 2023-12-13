@@ -21,21 +21,19 @@ interface = ["dep:cw-orch"]
 [dependencies]
 cosmwasm-schema = { version = "1.4.0" }
 cw-utils = "1.0.1"
-cw2 = { path = "../../packages/cw2", version = "1.2.1" }
-cw3 = { path = "../../packages/cw3", version = "1.2.1" }
-cw3-fixed-multisig = { path = "../cw3-fixed-multisig", version = "1.2.1", features = [
-  "library",
-] }
-cw4 = { path = "../../packages/cw4", version = "1.2.1" }
-cw20 = { path = "../../packages/cw20", version = "1.2.1" }
+cw2 = { path = "../../packages/cw2" }
+cw3 = { path = "../../packages/cw3" }
+cw3-fixed-multisig = { path = "../cw3-fixed-multisig", features = ["library"] }
+cw4 = { path = "../../packages/cw4" }
+cw20 = { path = "../../packages/cw20" }
 cw-storage-plus = "1.1.0"
 cosmwasm-std = { version = "1.4.0" }
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.49" }
-cw-orch = { workspace = true, optional = true}
+cw-orch = { workspace = true, optional = true }
 
 [dev-dependencies]
-cw4-group = { path = "../cw4-group", version = "1.2.1" }
+cw4-group = { path = "../cw4-group" }
 cw-multi-test = "0.16.5"
-cw20-base = { path = "../cw20-base", version = "1.2.1" }
+cw20-base = { path = "../cw20-base" }

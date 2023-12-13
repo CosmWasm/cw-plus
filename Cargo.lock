@@ -54,6 +54,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2969dcb958b36655471fc61f7e416fa76033bdd4bfed0678d8fee1e2d07a1f0"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -381,12 +390,35 @@ dependencies = [
  "anyhow",
  "cosmwasm-std",
  "cw-orch-contract-derive",
- "cw-orch-core",
+ "cw-orch-core 0.18.0",
  "cw-orch-fns-derive",
- "cw-orch-mock",
- "cw-orch-traits",
+ "cw-orch-mock 0.18.0",
+ "cw-orch-traits 0.18.0",
  "cw-utils",
  "log",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "cw-orch"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8dfac153484bf23219876a12d38a0dd45f627641a70bd7926ebbe1d2f00debc"
+dependencies = [
+ "abstract-cw-multi-test",
+ "anyhow",
+ "cosmwasm-std",
+ "cw-orch-contract-derive",
+ "cw-orch-core 0.19.0",
+ "cw-orch-fns-derive",
+ "cw-orch-mock 0.19.0",
+ "cw-orch-traits 0.19.0",
+ "cw-utils",
+ "hex",
+ "log",
+ "sanitize-filename",
  "schemars",
  "serde",
  "thiserror",
@@ -421,6 +453,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-orch-core"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90742906d091e509f185bb26c07706c037949ddaaa522bb3f3927b53835cc1fd"
+dependencies = [
+ "abstract-cw-multi-test",
+ "anyhow",
+ "cosmwasm-std",
+ "cw-utils",
+ "dirs",
+ "log",
+ "serde",
+ "serde_json",
+ "sha256",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-orch-fns-derive"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -440,7 +490,20 @@ checksum = "086aa0c00e709f59f83ba61c5390d89353e8ed5c7dafa9d0393dbb73fb3fa1e7"
 dependencies = [
  "abstract-cw-multi-test",
  "cosmwasm-std",
- "cw-orch-core",
+ "cw-orch-core 0.18.0",
+ "cw-utils",
+ "serde",
+]
+
+[[package]]
+name = "cw-orch-mock"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21eb2fbab0c10b1955226871d2f1e7a20cd2066c589ceb2da88b0e45bdca6999"
+dependencies = [
+ "abstract-cw-multi-test",
+ "cosmwasm-std",
+ "cw-orch-core 0.19.0",
  "cw-utils",
  "serde",
 ]
@@ -451,7 +514,18 @@ version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a5d92716089d3673ce416b7068766b33a918f55b37f2210e386f6ff4c1c1ec"
 dependencies = [
- "cw-orch-core",
+ "cw-orch-core 0.18.0",
+ "prost 0.11.9",
+ "prost-types",
+]
+
+[[package]]
+name = "cw-orch-traits"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f786295d8d9754466f8bdb94a67d6c9c647937450bcb4bb12403174800ae1ae7"
+dependencies = [
+ "cw-orch-core 0.19.0",
  "prost 0.11.9",
  "prost-types",
 ]
@@ -461,7 +535,7 @@ name = "cw-plus-interface"
 version = "1.2.1"
 dependencies = [
  "cosmwasm-std",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw1",
  "cw1-subkeys",
  "cw1-whitelist",
@@ -515,7 +589,7 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -536,7 +610,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -592,7 +666,7 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-utils",
  "schemars",
  "serde",
@@ -605,7 +679,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch",
+ "cw-orch 0.18.1",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -642,7 +716,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers 1.2.1",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -673,7 +747,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -692,7 +766,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -725,7 +799,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers 1.2.1",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -742,7 +816,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-controllers 1.2.1",
- "cw-orch",
+ "cw-orch 0.19.0",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -1069,6 +1143,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
 name = "libc"
 version = "0.2.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1268,6 +1348,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
+
+[[package]]
 name = "rfc6979"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1299,6 +1408,16 @@ name = "ryu"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad4cc8da4ef723ed60bced201181d83791ad433213d8c24efffda1eec85d741"
+
+[[package]]
+name = "sanitize-filename"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ed72fbaf78e6f2d41744923916966c4fbe3d7c74e3037a8ee482f1115572603"
+dependencies = [
+ "lazy_static",
+ "regex",
+]
 
 [[package]]
 name = "schemars"

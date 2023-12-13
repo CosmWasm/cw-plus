@@ -22,21 +22,19 @@ interface = ["dep:cw-orch"]
 [dependencies]
 cosmwasm-schema = { version = "1.4.0" }
 cw-utils = "1.0.1"
-cw1 = { path = "../../packages/cw1", version = "1.2.1" }
-cw2 = { path = "../../packages/cw2", version = "1.2.1" }
-cw1-whitelist = { path = "../cw1-whitelist", version = "1.2.1", features = [
-  "library",
-] }
+cw1 = { path = "../../packages/cw1" }
+cw2 = { path = "../../packages/cw2" }
+cw1-whitelist = { path = "../cw1-whitelist", features = ["library"] }
 cosmwasm-std = { version = "1.4.0", features = ["staking"] }
 cw-storage-plus = "1.1.0"
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = "1.0.49"
 semver = "1"
-cw-orch = { workspace = true, optional = true}
+cw-orch = { workspace = true, optional = true }
 
 [dev-dependencies]
-cw1-whitelist = { path = "../cw1-whitelist", version = "1.2.1", features = [
+cw1-whitelist = { path = "../cw1-whitelist", features = [
   "library",
   "test-utils",
 ] }

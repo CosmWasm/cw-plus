@@ -10,7 +10,7 @@ homepage = "https://cosmwasm.com"
 
 [dependencies]
 cw-utils = "1.0.1"
-cw20 = { path = "../../packages/cw20", version = "1.2.1" }
+cw20 = { path = "../../packages/cw20" }
 cosmwasm-schema = "1.4.0"
 cosmwasm-std = "1.4.0"
 schemars = "0.8.15"
