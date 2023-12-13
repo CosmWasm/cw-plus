@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "cw-controllers"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -382,27 +382,6 @@ dependencies = [
 
 [[package]]
 name = "cw-orch"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1b77e4e68e2822ac297cf9265f747f8e1256ebf4c370c341b459417aef4ee21"
-dependencies = [
- "abstract-cw-multi-test",
- "anyhow",
- "cosmwasm-std",
- "cw-orch-contract-derive",
- "cw-orch-core 0.18.0",
- "cw-orch-fns-derive",
- "cw-orch-mock 0.18.0",
- "cw-orch-traits 0.18.0",
- "cw-utils",
- "log",
- "schemars",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "cw-orch"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8dfac153484bf23219876a12d38a0dd45f627641a70bd7926ebbe1d2f00debc"
@@ -411,10 +390,10 @@ dependencies = [
  "anyhow",
  "cosmwasm-std",
  "cw-orch-contract-derive",
- "cw-orch-core 0.19.0",
+ "cw-orch-core",
  "cw-orch-fns-derive",
- "cw-orch-mock 0.19.0",
- "cw-orch-traits 0.19.0",
+ "cw-orch-mock",
+ "cw-orch-traits",
  "cw-utils",
  "hex",
  "log",
@@ -433,23 +412,6 @@ dependencies = [
  "convert_case",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "cw-orch-core"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fad948ad25e5032d8422722455ccea11165cb7179ba7eea23755cb4575d20395"
-dependencies = [
- "abstract-cw-multi-test",
- "anyhow",
- "cosmwasm-std",
- "dirs",
- "log",
- "serde",
- "serde_json",
- "sha256",
- "thiserror",
 ]
 
 [[package]]
@@ -484,39 +446,15 @@ dependencies = [
 
 [[package]]
 name = "cw-orch-mock"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "086aa0c00e709f59f83ba61c5390d89353e8ed5c7dafa9d0393dbb73fb3fa1e7"
-dependencies = [
- "abstract-cw-multi-test",
- "cosmwasm-std",
- "cw-orch-core 0.18.0",
- "cw-utils",
- "serde",
-]
-
-[[package]]
-name = "cw-orch-mock"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21eb2fbab0c10b1955226871d2f1e7a20cd2066c589ceb2da88b0e45bdca6999"
 dependencies = [
  "abstract-cw-multi-test",
  "cosmwasm-std",
- "cw-orch-core 0.19.0",
+ "cw-orch-core",
  "cw-utils",
  "serde",
-]
-
-[[package]]
-name = "cw-orch-traits"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3a5d92716089d3673ce416b7068766b33a918f55b37f2210e386f6ff4c1c1ec"
-dependencies = [
- "cw-orch-core 0.18.0",
- "prost 0.11.9",
- "prost-types",
 ]
 
 [[package]]
@@ -525,17 +463,17 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f786295d8d9754466f8bdb94a67d6c9c647937450bcb4bb12403174800ae1ae7"
 dependencies = [
- "cw-orch-core 0.19.0",
+ "cw-orch-core",
  "prost 0.11.9",
  "prost-types",
 ]
 
 [[package]]
 name = "cw-plus-interface"
-version = "1.2.1"
+version = "1.2.2"
 dependencies = [
  "cosmwasm-std",
- "cw-orch 0.19.0",
+ "cw-orch",
  "cw1",
  "cw1-subkeys",
  "cw1-whitelist",
@@ -589,7 +527,7 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orch 0.19.0",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -610,7 +548,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch 0.19.0",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw1",
@@ -666,7 +604,7 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-orch 0.19.0",
+ "cw-orch",
  "cw-utils",
  "schemars",
  "serde",
@@ -679,7 +617,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch 0.18.1",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -715,8 +653,8 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-controllers 1.2.1",
- "cw-orch 0.19.0",
+ "cw-controllers 1.2.2",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -747,7 +685,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch 0.19.0",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -766,7 +704,7 @@ dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
- "cw-orch 0.19.0",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -798,8 +736,8 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-controllers 1.2.1",
- "cw-orch 0.19.0",
+ "cw-controllers 1.2.2",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",
@@ -815,8 +753,8 @@ version = "1.2.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-controllers 1.2.1",
- "cw-orch 0.19.0",
+ "cw-controllers 1.2.2",
+ "cw-orch",
  "cw-storage-plus",
  "cw-utils",
  "cw2 1.2.1",

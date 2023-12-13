@@ -1,6 +1,6 @@
 [package]
 name = "cw4-stake"
-version = "1.2.1"
+version = "1.2.2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "CW4 implementation of group based on staked tokens"

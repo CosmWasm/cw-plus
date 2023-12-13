@@ -1,6 +1,6 @@
 [package]
 name = "cw1-whitelist"
-version = "1.2.1"
+version = "1.2.2"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implementation of an proxy contract using a whitelist"
