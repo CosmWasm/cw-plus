@@ -325,7 +325,7 @@ pub fn ibc_packet_timeout(
 
 // update the balance stored on this (channel, denom) index
 fn on_packet_success(_deps: DepsMut, packet: IbcPacket) -> Result<IbcBasicResponse, ContractError> {
-    let msg: Ics20Packet = from_json(&packet.data)?;
+    let msg: Ics20Packet = from_json(packet.data)?;
 
     // similar event messages like ibctransfer module
     let attributes = vec![
