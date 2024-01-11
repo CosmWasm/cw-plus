@@ -957,7 +957,7 @@ mod tests {
         assert!(res.is_ok());
         let query_minter_msg = QueryMsg::Minter {};
         let res = query(deps.as_ref(), env, query_minter_msg);
-        let mint: MinterResponse = from_json(&res.unwrap()).unwrap();
+        let mint: MinterResponse = from_json(res.unwrap()).unwrap();
 
         // Minter cannot update cap.
         assert!(mint.cap == cap);
@@ -1007,7 +1007,7 @@ mod tests {
         assert!(res.is_ok());
         let query_minter_msg = QueryMsg::Minter {};
         let res = query(deps.as_ref(), env, query_minter_msg);
-        let mint: Option<MinterResponse> = from_json(&res.unwrap()).unwrap();
+        let mint: Option<MinterResponse> = from_json(res.unwrap()).unwrap();
 
         // Check that mint information was removed.
         assert_eq!(mint, None);
@@ -1124,7 +1124,7 @@ mod tests {
             QueryMsg::Balance { address: addr1 },
         )
         .unwrap();
-        let loaded: BalanceResponse = from_json(&data).unwrap();
+        let loaded: BalanceResponse = from_json(data).unwrap();
         assert_eq!(loaded.balance, amount1);
 
         // check balance query (empty)
@@ -1136,7 +1136,7 @@ mod tests {
             },
         )
         .unwrap();
-        let loaded: BalanceResponse = from_json(&data).unwrap();
+        let loaded: BalanceResponse = from_json(data).unwrap();
         assert_eq!(loaded.balance, Uint128::zero());
     }
 

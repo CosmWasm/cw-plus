@@ -395,7 +395,7 @@ mod test {
         let deps = setup(&["channel-3", "channel-7"], &[]);
 
         let raw_list = query(deps.as_ref(), mock_env(), QueryMsg::ListChannels {}).unwrap();
-        let list_res: ListChannelsResponse = from_json(&raw_list).unwrap();
+        let list_res: ListChannelsResponse = from_json(raw_list).unwrap();
         assert_eq!(2, list_res.channels.len());
         assert_eq!(mock_channel_info("channel-3"), list_res.channels[0]);
         assert_eq!(mock_channel_info("channel-7"), list_res.channels[1]);
@@ -408,7 +408,7 @@ mod test {
             },
         )
         .unwrap();
-        let chan_res: ChannelResponse = from_json(&raw_channel).unwrap();
+        let chan_res: ChannelResponse = from_json(raw_channel).unwrap();
         assert_eq!(chan_res.info, mock_channel_info("channel-3"));
         assert_eq!(0, chan_res.total_sent.len());
         assert_eq!(0, chan_res.balances.len());

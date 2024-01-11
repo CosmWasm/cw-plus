@@ -220,7 +220,7 @@ mod tests {
             limit: None,
         };
         let allowances: AllSpenderAllowancesResponse =
-            from_json(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
+            from_json(query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 2);
 
         // one is owner1 (order of CanonicalAddr uncorrelated with String)
@@ -230,7 +230,7 @@ mod tests {
             limit: Some(1),
         };
         let allowances: AllSpenderAllowancesResponse =
-            from_json(&query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
+            from_json(query(deps.as_ref(), env.clone(), msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.owner, &owner1);
@@ -244,7 +244,7 @@ mod tests {
             limit: Some(10000),
         };
         let allowances: AllSpenderAllowancesResponse =
-            from_json(&query(deps.as_ref(), env, msg).unwrap()).unwrap();
+            from_json(query(deps.as_ref(), env, msg).unwrap()).unwrap();
         assert_eq!(allowances.allowances.len(), 1);
         let allow = &allowances.allowances[0];
         assert_eq!(&allow.owner, &owner2);

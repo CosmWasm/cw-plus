@@ -407,12 +407,12 @@ fn raw_queries_work() {
 
     // get total from raw key
     let total_raw = deps.storage.get(TOTAL_KEY.as_bytes()).unwrap();
-    let total: u64 = from_json(&total_raw).unwrap();
+    let total: u64 = from_json(total_raw).unwrap();
     assert_eq!(17, total);
 
     // get member votes from raw key
     let member2_raw = deps.storage.get(&member_key(USER2)).unwrap();
-    let member2: u64 = from_json(&member2_raw).unwrap();
+    let member2: u64 = from_json(member2_raw).unwrap();
     assert_eq!(6, member2);
 
     // and execute misses

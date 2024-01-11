@@ -489,7 +489,7 @@ mod tests {
             start_after: None,
             limit: None,
         };
-        let votes: VoteListResponse = from_json(&query(deps, mock_env(), voters).unwrap()).unwrap();
+        let votes: VoteListResponse = from_json(query(deps, mock_env(), voters).unwrap()).unwrap();
         // Sum the weights of the Yes votes to get the tally
         votes
             .votes
@@ -1021,7 +1021,7 @@ mod tests {
 
         // Proposal should now be passed
         let prop: ProposalResponse = from_json(
-            &query(
+            query(
                 deps.as_ref(),
                 env.clone(),
                 QueryMsg::Proposal { proposal_id },
