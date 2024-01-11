@@ -31,3 +31,8 @@ semver = "1"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.49" }
 cw-orch = { workspace = true, optional = true }
+
+[dev-dependencies]
+cosmwasm-std = { version = "1.4.0", --default-features = false, features = [
+    "ibc3",
+] }
