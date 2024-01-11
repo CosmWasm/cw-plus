@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.2](https://github.com/CosmWasm/cw-plus/tree/1.1.2) (2023-11-23)
+
+[Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.1.1...1.1.2)
+
+**Merged pull requests:**
+
+- Add `ensure_from_older_version` [\#886](https://github.com/CosmWasm/cw-plus/pull/886) ([chipshort](https://github.com/chipshort))
+
 ## [v1.1.1](https://github.com/CosmWasm/cw-plus/tree/v1.1.1) (2023-09-27)
 
 [Full Changelog](https://github.com/CosmWasm/cw-plus/compare/v1.1.0...v1.1.1)
