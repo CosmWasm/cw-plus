@@ -9,8 +9,8 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
-cosmwasm-schema = "1.4.0"
-cosmwasm-std = { version = "1.4.0", default-features = false }
+cosmwasm-schema = "1.5.1"
+cosmwasm-std = { version = "1.5.1", default-features = false }
 cw-storage-plus = "1.1.0"
 schemars = "0.8.15"
 semver = { version = "1.0.20", default-features = false }
