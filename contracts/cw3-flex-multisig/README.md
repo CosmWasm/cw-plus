@@ -76,9 +76,9 @@ Once you are happy with the content, you can compile it to wasm via:
 
 ```
 RUSTFLAGS='-C link-arg=-s' cargo wasm
-cp ../../target/wasm32-unknown-unknown/release/cw3_fixed_multisig.wasm .
-ls -l cw3_fixed_multisig.wasm
-sha256sum cw3_fixed_multisig.wasm
+cp ../../target/wasm32-unknown-unknown/release/cw3_flex_multisig.wasm .
+ls -l cw3_flex_multisig.wasm
+sha256sum cw3_flex_multisig.wasm
 ```
 
 Or for a production-ready (optimized) build, run a build command in
