@@ -22,7 +22,7 @@ test-utils = []
 cosmwasm-schema = { version = "1.4.0" }
 cw-utils = "1.0.1"
 cw1 = { path = "../../packages/cw1", version = "1.1.2" }
-cw2 = { path = "../../packages/cw2", version = "1.1.2" }
+cw2 = "1.1.2"
 cw1-whitelist = { path = "../cw1-whitelist", version = "1.1.2", features = [
   "library",
 ] }

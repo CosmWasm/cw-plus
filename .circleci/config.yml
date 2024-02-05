@@ -15,9 +15,7 @@ workflows:
       - contract_cw4_stake
       - contract_cw20_base
       - contract_cw20_ics20
-      - package_controllers
       - package_cw1
-      - package_cw2
       - package_cw3
       - package_cw4
       - package_cw20
@@ -256,31 +254,6 @@ jobs:
             - target
           key: cargocache-cw20-ics20-rust:1.67.0-{{ checksum "~/project/Cargo.lock" }}
 
-  package_controllers:
-    docker:
-      - image: rust:1.67.0
-    working_directory: ~/project/packages/controllers
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
-      - restore_cache:
-          keys:
-            - cargocache-v2-controllers:1.67.0-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Build library for native target
-          command: cargo build --locked
-      - run:
-          name: Run unit tests
-          command: cargo test --locked
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-v2-controllers:1.67.0-{{ checksum "~/project/Cargo.lock" }}
-
   package_cw1:
     docker:
       - image: rust:1.67.0
@@ -308,32 +281,6 @@ jobs:
             - /usr/local/cargo/registry
             - target
           key: cargocache-v2-cw1:1.67.0-{{ checksum "~/project/Cargo.lock" }}
-
-  package_cw2:
-    docker:
-      - image: rust:1.67.0
-    working_directory: ~/project/packages/cw2
-    steps:
-      - checkout:
-          path: ~/project
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version; rustup target list --installed
-      - restore_cache:
-          keys:
-            - cargocache-v2-cw2:1.67.0-{{ checksum "~/project/Cargo.lock" }}
-      - run:
-          name: Build library for native target
-          command: cargo build --locked
-      - run:
-          name: Run unit tests
-          command: cargo test --locked
-      # note: there are no schemas to generate
-      - save_cache:
-          paths:
-            - /usr/local/cargo/registry
-            - target
-          key: cargocache-v2-cw2:1.67.0-{{ checksum "~/project/Cargo.lock" }}
 
   package_cw3:
     docker:
