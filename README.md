@@ -170,9 +170,6 @@ key which you can pass using `--token` flag.
 There's also a convenience `scripts/update_changelog.sh`, which can take a --since-tag parameter (to avoid processing
 the entire history). It can also auto-detect the latest version tag for you, with --latest-tag.
 
-## Licenses
+## License
 
 This repo is licensed under [Apache 2.0](./LICENSE).
-
-All _specifications_ will always be Apache-2.0. All contracts that are meant to be _building blocks_ will also be
-Apache-2.0. This is along the lines of Open Zeppelin or other public references.
