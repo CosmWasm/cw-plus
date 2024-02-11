@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, WasmMsg,
+    to_json_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, WasmMsg,
     WasmQuery,
 };
 
@@ -30,7 +30,7 @@ impl Cw4Contract {
     fn encode_msg(&self, msg: Cw4ExecuteMsg) -> StdResult<CosmosMsg> {
         Ok(WasmMsg::Execute {
             contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
+            msg: to_json_binary(&msg)?,
             funds: vec![],
         }
         .into())
@@ -56,7 +56,7 @@ impl Cw4Contract {
     fn encode_smart_query<Q: CustomQuery>(&self, msg: Cw4QueryMsg) -> StdResult<QueryRequest<Q>> {
         Ok(WasmQuery::Smart {
             contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
+            msg: to_json_binary(&msg)?,
         }
         .into())
     }

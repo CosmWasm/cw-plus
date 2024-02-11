@@ -1,6 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, Uint128,
+    to_json_binary, Addr, CosmosMsg, CustomQuery, QuerierWrapper, QueryRequest, StdResult, Uint128,
     WasmMsg, WasmQuery,
 };
 
@@ -22,7 +22,7 @@ impl Cw20Contract {
     }
 
     pub fn call<T: Into<Cw20ExecuteMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
-        let msg = to_binary(&msg.into())?;
+        let msg = to_json_binary(&msg.into())?;
         Ok(WasmMsg::Execute {
             contract_addr: self.addr().into(),
             msg,
@@ -37,7 +37,7 @@ impl Cw20Contract {
     ) -> StdResult<QueryRequest<CQ>> {
         Ok(WasmQuery::Smart {
             contract_addr: self.addr().into(),
-            msg: to_binary(&msg)?,
+            msg: to_json_binary(&msg)?,
         }
         .into())
     }

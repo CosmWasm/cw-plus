@@ -3,7 +3,7 @@ use cw_utils::{must_pay, PaymentError};
 use thiserror::Error;
 
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Coin, CosmosMsg, Deps, MessageInfo, StdResult, Uint128, WasmMsg,
+    to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Deps, MessageInfo, StdResult, Uint128, WasmMsg,
 };
 use cw20::{Denom, UncheckedDenom};
 
@@ -102,7 +102,7 @@ impl DepositInfo {
                 vec![WasmMsg::Execute {
                     contract_addr: address.to_string(),
                     funds: vec![],
-                    msg: to_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
+                    msg: to_json_binary(&cw20::Cw20ExecuteMsg::TransferFrom {
                         owner: depositor.to_string(),
                         recipient: contract.to_string(),
                         amount: *amount,
@@ -128,7 +128,7 @@ impl DepositInfo {
             .into(),
             Denom::Cw20(address) => WasmMsg::Execute {
                 contract_addr: address.to_string(),
-                msg: to_binary(&cw20::Cw20ExecuteMsg::Transfer {
+                msg: to_json_binary(&cw20::Cw20ExecuteMsg::Transfer {
                     recipient: depositor.to_string(),
                     amount: self.amount,
                 })?,

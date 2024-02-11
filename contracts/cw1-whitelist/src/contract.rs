@@ -4,7 +4,7 @@ use std::fmt;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    to_json_binary, Addr, Api, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Response,
     StdResult,
 };
 
@@ -118,8 +118,10 @@ fn can_execute(deps: Deps, sender: &str) -> StdResult<bool> {
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::AdminList {} => to_binary(&query_admin_list(deps)?),
-        QueryMsg::CanExecute { sender, msg } => to_binary(&query_can_execute(deps, sender, msg)?),
+        QueryMsg::AdminList {} => to_json_binary(&query_admin_list(deps)?),
+        QueryMsg::CanExecute { sender, msg } => {
+            to_json_binary(&query_can_execute(deps, sender, msg)?)
+        }
     }
 }
 
@@ -242,7 +244,7 @@ mod tests {
             .into(),
             WasmMsg::Execute {
                 contract_addr: "some contract".into(),
-                msg: to_binary(&freeze).unwrap(),
+                msg: to_json_binary(&freeze).unwrap(),
                 funds: vec![],
             }
             .into(),

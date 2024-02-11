@@ -29,7 +29,7 @@ mod coin;
 mod denom;
 mod helpers;
 mod logo;
-mod msg;
+pub mod msg;
 mod query;
 mod receiver;
 
