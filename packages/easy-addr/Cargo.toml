@@ -1,0 +1,16 @@
+[package]
+name = "easy-addr"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+proc-macro = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cosmwasm-std = "2.0.0-rc.1"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "1.0.6", features = ["full", "printing", "extra-traits"] }
