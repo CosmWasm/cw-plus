@@ -1,8 +1,8 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    coins, from_slice, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Order,
-    Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,
+    coins, from_json, to_json_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
+    Order, Response, StdResult, Storage, SubMsg, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
@@ -131,7 +131,7 @@ pub fn execute_receive(
     // wrapper.sender is the address of the user that requested the cw20 contract to send this.
     // This cannot be fully trusted (the cw20 contract can fake it), so only use it for actions
     // in the address's favor (like paying/bonding tokens, not withdrawls)
-    let msg: ReceiveMsg = from_slice(&wrapper.msg)?;
+    let msg: ReceiveMsg = from_json(&wrapper.msg)?;
     let balance = Balance::Cw20(Cw20CoinVerified {
         address: info.sender,
         amount: wrapper.amount,
@@ -268,7 +268,7 @@ pub fn execute_claim(
             };
             let message = SubMsg::new(WasmMsg::Execute {
                 contract_addr: addr.into(),
-                msg: to_binary(&transfer)?,
+                msg: to_json_binary(&transfer)?,
                 funds: vec![],
             });
             (amount_str, message)
@@ -293,17 +293,17 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::Member {
             addr,
             at_height: height,
-        } => to_binary(&query_member(deps, addr, height)?),
+        } => to_json_binary(&query_member(deps, addr, height)?),
         QueryMsg::ListMembers { start_after, limit } => {
-            to_binary(&list_members(deps, start_after, limit)?)
+            to_json_binary(&list_members(deps, start_after, limit)?)
         }
-        QueryMsg::TotalWeight {} => to_binary(&query_total_weight(deps)?),
+        QueryMsg::TotalWeight {} => to_json_binary(&query_total_weight(deps)?),
         QueryMsg::Claims { address } => {
-            to_binary(&CLAIMS.query_claims(deps, &deps.api.addr_validate(&address)?)?)
+            to_json_binary(&CLAIMS.query_claims(deps, &deps.api.addr_validate(&address)?)?)
         }
-        QueryMsg::Staked { address } => to_binary(&query_staked(deps, address)?),
-        QueryMsg::Admin {} => to_binary(&ADMIN.query_admin(deps)?),
-        QueryMsg::Hooks {} => to_binary(&HOOKS.query_hooks(deps)?),
+        QueryMsg::Staked { address } => to_json_binary(&query_staked(deps, address)?),
+        QueryMsg::Admin {} => to_json_binary(&ADMIN.query_admin(deps)?),
+        QueryMsg::Hooks {} => to_json_binary(&HOOKS.query_hooks(deps)?),
     }
 }
 
@@ -359,26 +359,28 @@ fn list_members(
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{
-        coin, from_slice, CosmosMsg, OverflowError, OverflowOperation, StdError, Storage,
+        coin, from_json, CosmosMsg, OverflowError, OverflowOperation, StdError, Storage,
     };
     use cw20::Denom;
     use cw4::{member_key, TOTAL_KEY};
     use cw_controllers::{AdminError, Claim, HookError};
     use cw_utils::Duration;
 
+    use easy_addr::addr;
+
     use crate::error::ContractError;
 
     use super::*;
 
-    const INIT_ADMIN: &str = "juan";
-    const USER1: &str = "somebody";
-    const USER2: &str = "else";
-    const USER3: &str = "funny";
+    const INIT_ADMIN: &str = addr!("juan");
+    const USER1: &str = addr!("somebody");
+    const USER2: &str = addr!("else");
+    const USER3: &str = addr!("funny");
     const DENOM: &str = "stake";
     const TOKENS_PER_WEIGHT: Uint128 = Uint128::new(1_000);
     const MIN_BOND: Uint128 = Uint128::new(5_000);
     const UNBONDING_BLOCKS: u64 = 100;
-    const CW20_ADDRESS: &str = "wasm1234567890";
+    const CW20_ADDRESS: &str = addr!("wasm1234567890");
 
     fn default_instantiate(deps: DepsMut) {
         do_instantiate(
@@ -440,7 +442,7 @@ mod tests {
                 let msg = ExecuteMsg::Receive(Cw20ReceiveMsg {
                     sender: addr.to_string(),
                     amount: Uint128::new(*stake),
-                    msg: to_binary(&ReceiveMsg::Bond {}).unwrap(),
+                    msg: to_json_binary(&ReceiveMsg::Bond {}).unwrap(),
                 });
                 let info = mock_info(CW20_ADDRESS, &[]);
                 execute(deps.branch(), env.clone(), info, msg).unwrap();
@@ -478,7 +480,7 @@ mod tests {
 
     fn get_member(deps: Deps, addr: String, at_height: Option<u64>) -> Option<u64> {
         let raw = query(deps, mock_env(), QueryMsg::Member { addr, at_height }).unwrap();
-        let res: MemberResponse = from_slice(&raw).unwrap();
+        let res: MemberResponse = from_json(raw).unwrap();
         res.weight
     }
 
@@ -512,11 +514,11 @@ mod tests {
                 limit: None,
             };
             let raw = query(deps, mock_env(), msg).unwrap();
-            let members: MemberListResponse = from_slice(&raw).unwrap();
+            let members: MemberListResponse = from_json(raw).unwrap();
             assert_eq!(count, members.members.len());
 
             let raw = query(deps, mock_env(), QueryMsg::TotalWeight {}).unwrap();
-            let total: TotalWeightResponse = from_slice(&raw).unwrap();
+            let total: TotalWeightResponse = from_json(raw).unwrap();
             assert_eq!(sum, total.weight); // 17 - 11 + 15 = 21
         }
     }
@@ -600,9 +602,7 @@ mod tests {
         assert_eq!(
             err,
             ContractError::Std(StdError::overflow(OverflowError::new(
-                OverflowOperation::Sub,
-                5000,
-                5100
+                OverflowOperation::Sub
             )))
         );
     }
@@ -669,7 +669,7 @@ mod tests {
             }) => {
                 assert_eq!(contract_addr.as_str(), CW20_ADDRESS);
                 assert_eq!(funds.len(), 0);
-                let parsed: Cw20ExecuteMsg = from_slice(msg).unwrap();
+                let parsed: Cw20ExecuteMsg = from_json(msg).unwrap();
                 assert_eq!(
                     parsed,
                     Cw20ExecuteMsg::Transfer {
@@ -692,12 +692,12 @@ mod tests {
 
         // get total from raw key
         let total_raw = deps.storage.get(TOTAL_KEY.as_bytes()).unwrap();
-        let total: u64 = from_slice(&total_raw).unwrap();
+        let total: u64 = from_json(total_raw).unwrap();
         assert_eq!(17, total);
 
         // get member votes from raw key
         let member2_raw = deps.storage.get(&member_key(USER2)).unwrap();
-        let member2: u64 = from_slice(&member2_raw).unwrap();
+        let member2: u64 = from_json(member2_raw).unwrap();
         assert_eq!(6, member2);
 
         // and execute misses
@@ -852,8 +852,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = String::from("hook1");
-        let contract2 = String::from("hook2");
+        let contract1 = addr!("hook1").to_string();
+        let contract2 = addr!("hook2").to_string();
 
         let add_msg = ExecuteMsg::AddHook {
             addr: contract1.clone(),
@@ -920,8 +920,8 @@ mod tests {
         let hooks = HOOKS.query_hooks(deps.as_ref()).unwrap();
         assert!(hooks.hooks.is_empty());
 
-        let contract1 = String::from("hook1");
-        let contract2 = String::from("hook2");
+        let contract1 = addr!("hook1").to_string();
+        let contract2 = addr!("hook2").to_string();
 
         // register 2 hooks
         let admin_info = mock_info(INIT_ADMIN, &[]);
