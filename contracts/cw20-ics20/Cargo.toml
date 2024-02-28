@@ -13,19 +13,21 @@ documentation = "https://docs.cosmwasm.com"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all init/handle/query exports
 library = []
 
 [dependencies]
-cosmwasm-schema = { version = "1.4.0" }
-cw-utils = "1.0.1"
-cw2 = "1.1.2"
+cosmwasm-schema = "2.0.0-rc.1"
+cw-utils = "2.0.0-rc.0"
+cw2 = "2.0.0-rc.0"
 cw20 = { path = "../../packages/cw20", version = "1.1.2" }
-cosmwasm-std = { version = "1.4.0", features = ["stargate"] }
-cw-storage-plus = "1.1.0"
-cw-controllers = "1.1.2"
+cosmwasm-std = { version = "2.0.0-rc.1", features = ["stargate"] }
+cw-storage-plus = "2.0.0-rc.0"
+cw-controllers = "2.0.0-rc.0"
 schemars = "0.8.15"
 semver = "1"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.49" }
+
+[dev-dependencies]
+easy-addr = { path = "../../packages/easy-addr" }

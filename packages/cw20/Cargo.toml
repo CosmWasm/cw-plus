@@ -9,11 +9,11 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
-cw-utils = "1.0.1"
-cosmwasm-schema = "1.4.0"
-cosmwasm-std = "1.4.0"
+cw-utils = "2.0.0-rc.0"
+cosmwasm-schema = "2.0.0-rc.1"
+cosmwasm-std = "2.0.0-rc.1"
 schemars = "0.8.15"
 serde = { version = "1.0.188", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
-cosmwasm-schema = { version = "1.4.0" }
+cosmwasm-schema = { version = "2.0.0-rc.1" }
