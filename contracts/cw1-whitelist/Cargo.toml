@@ -1,6 +1,6 @@
 [package]
 name = "cw1-whitelist"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Implementation of an proxy contract using a whitelist"
@@ -18,18 +18,18 @@ library = []
 test-utils = []
 
 [dependencies]
-cosmwasm-schema = { version = "2.0.0-rc.1" }
-cw-utils = "1.0.1"
-cw1 = { path = "../../packages/cw1", version = "1.1.2" }
-cw2 = "2.0.0-rc.0"
-cosmwasm-std = { version = "2.0.0-rc.1", features = ["staking"] }
-cw-storage-plus = "2.0.0-rc.0"
-schemars = "0.8.15"
-serde = { version = "1.0.188", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0.49" }
+cosmwasm-schema = { workspace = true }
+cw-utils = { workspace = true }
+cw1 = { workspace = true }
+cw2 = { workspace = true }
+cosmwasm-std = { workspace = true, features = ["staking"] }
+cw-storage-plus = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 anyhow = "1"
 assert_matches = "1"
-cw-multi-test = "0.16.5"
+cw-multi-test = { workspace = true }
 derivative = "2"

@@ -1,6 +1,6 @@
 [package]
 name = "cw1"
-version = "1.1.2"
+version.workspace = true
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2021"
 description = "Definition and types for the CosmWasm-1 interface"
@@ -9,7 +9,7 @@ repository = "https://github.com/CosmWasm/cw-plus"
 homepage = "https://cosmwasm.com"
 
 [dependencies]
-cosmwasm-schema = "2.0.0-rc.1"
-cosmwasm-std = "2.0.0-rc.1"
-schemars = "0.8.15"
-serde = { version = "1.0.188", default-features = false, features = ["derive"] }
+cosmwasm-schema = { workspace = true }
+cosmwasm-std = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
